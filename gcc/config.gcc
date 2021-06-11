@@ -1238,7 +1238,7 @@ arm*-*-freebsd*)                # ARM FreeBSD EABI
 	esac
 	with_tls=${with_tls:-gnu}
 	;;
-arm*-*-netbsdelf*)
+arm*-*-netbsd*)
 	target_cpu_cname="strongarm"
 	tmake_file="${tmake_file} arm/t-arm"
 	tm_file="dbxelf.h elfos.h ${nbsd_tm_file} arm/elf.h"
@@ -1247,7 +1247,7 @@ arm*-*-netbsdelf*)
 	arm*eb-*) tm_defines="${tm_defines} TARGET_BIG_ENDIAN_DEFAULT=1" ;;
 	esac
 	case ${target} in
-	arm*-*-netbsdelf-*eabi*)
+	arm*-*-netbsd*-*eabi*)
 	    tm_file="$tm_file arm/bpabi.h arm/netbsd-elf.h arm/netbsd-eabi.h"
 	    tmake_file="$tmake_file arm/t-bpabi arm/t-netbsdeabi"
 	    ;;
@@ -1258,7 +1258,7 @@ arm*-*-netbsdelf*)
 	esac
 	tm_file="${tm_file} arm/aout.h arm/arm.h"
 	case ${target} in
-	arm*-*-netbsdelf-*eabihf*)
+	arm*-*-netbsd*-*eabihf*)
 	    # Hard-float requires at least Arm v5te
 	    target_cpu_cname="arm10e"
 	    tm_defines="${tm_defines} TARGET_DEFAULT_FLOAT_ABI=ARM_FLOAT_ABI_HARD"
@@ -1889,12 +1889,12 @@ i[34567]86-*-freebsd*)
 x86_64-*-freebsd*)
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${fbsd_tm_file} i386/x86-64.h i386/freebsd.h i386/freebsd64.h"
 	;;
-i[34567]86-*-netbsdelf*)
-	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${nbsd_tm_file} i386/netbsd-elf.h"
+x86_64-*-netbsdaout*)
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${nbsd_tm_file} i386/x86-64.h i386/netbsd64.h"
 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
 	;;
-x86_64-*-netbsd*)
-	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${nbsd_tm_file} i386/x86-64.h i386/netbsd64.h"
+i[34567]86-*-netbsd*)
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${nbsd_tm_file} i386/netbsd-elf.h"
 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
 	;;
 i[34567]86-*-openbsd*)
@@ -2335,7 +2335,7 @@ m68k-*-elf* | fido-*-elf*)
 		;;
 	esac
 	;;
-m68k*-*-netbsdelf*)
+m68k*-*-netbsd*)
 	default_m68k_cpu=68020
 	default_cf_cpu=5475
 	tm_file="${tm_file} dbxelf.h elfos.h ${nbsd_tm_file} m68k/netbsd-elf.h"
@@ -3161,7 +3161,7 @@ s390x-ibm-tpf*)
 	;;
 sh-*-elf* | sh[12346l]*-*-elf* | \
   sh-*-linux* | sh[2346lbe]*-*-linux* | \
-  sh-*-netbsdelf* | shl*-*-netbsdelf*)
+  sh-*-netbsd* | shl*-*-netbsd*)
 	tmake_file="${tmake_file} sh/t-sh sh/t-elf"
 	if test x${with_endian} = x; then
 		case ${target} in
@@ -3354,12 +3354,6 @@ sparc-*-linux*)
 		tmake_file="${tmake_file} sparc/t-linux"
 	fi
 	;;
-sparc-*-netbsdelf*)
-	tm_file="${tm_file} dbxelf.h elfos.h sparc/sysv4.h ${nbsd_tm_file} sparc/netbsd-elf.h"
-	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
-	extra_options="${extra_options} sparc/long-double-switch.opt"
-	tmake_file="${tmake_file} sparc/t-sparc"
-	;;
 sparc*-*-solaris2*)
 	tm_file="sparc/biarch64.h ${tm_file} ${sol2_tm_file} sparc/tso.h"
 	case ${target} in
@@ -3401,12 +3395,18 @@ sparc64-*-freebsd*|ultrasparc-*-freebsd*)
 	esac
 	tmake_file="${tmake_file} sparc/t-sparc"
 	;;
-sparc64-*-netbsd*)
+sparc64-*-netbsdaout*)
 	tm_file="sparc/biarch64.h ${tm_file}"
 	tm_file="${tm_file} dbxelf.h elfos.h sparc/sysv4.h ${nbsd_tm_file} sparc/netbsd-elf.h"
 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
 	extra_options="${extra_options} sparc/long-double-switch.opt"
 	tmake_file="${tmake_file} sparc/t-sparc sparc/t-netbsd64"
+	;;
+sparc-*-netbsd*)
+	tm_file="${tm_file} dbxelf.h elfos.h sparc/sysv4.h ${nbsd_tm_file} sparc/netbsd-elf.h"
+	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
+	extra_options="${extra_options} sparc/long-double-switch.opt"
+	tmake_file="${tmake_file} sparc/t-sparc"
 	;;
 sparc64-*-openbsd*)
 	tm_file="sparc/openbsd1-64.h ${tm_file} dbxelf.h elfos.h sparc/sysv4.h sparc/sp64-elf.h"
@@ -3497,7 +3497,7 @@ vax-*-linux*)
 	tm_file="${tm_file} dbxelf.h elfos.h gnu-user.h linux.h vax/elf.h vax/linux.h"
 	extra_options="${extra_options} vax/elf.opt"
 	;;
-vax-*-netbsdelf*)
+vax-*-netbsd*)
 	tm_file="${tm_file} elfos.h ${nbsd_tm_file} vax/elf.h vax/netbsd-elf.h"
 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt vax/elf.opt"
 	tm_defines="${tm_defines} CHAR_FAST8=1 SHORT_FAST16=1"

@@ -456,10 +456,10 @@ arm*-*-fuchsia*)
 	tm_file="${tm_file} arm/bpabi-lib.h"
 	unwind_header=config/arm/unwind-arm.h
 	;;
-arm*-*-netbsdelf*)
+arm*-*-netbsd*)
 	tmake_file="$tmake_file arm/t-arm"
 	case ${host} in
-	  arm*-*-netbsdelf-*eabi*)
+	  arm*-*-netbsd-*eabi*)
 	    tmake_file="${tmake_file} arm/t-netbsd-eabi"
 	    unwind_header=config/arm/unwind-arm.h
 	    ;;
@@ -719,7 +719,7 @@ x86_64-*-freebsd*)
 	tmake_file="${tmake_file} i386/t-freebsd i386/t-crtstuff"
 	md_unwind_header=i386/freebsd-unwind.h
 	;;
-i[34567]86-*-netbsdelf*)
+i[34567]86-*-netbsd*)
 	tmake_file="${tmake_file} i386/t-crtstuff"
 	;;
 x86_64-*-netbsd*)
@@ -936,7 +936,7 @@ m32rle-*-linux*)
 m68k-*-elf* | fido-*-elf)
 	tmake_file="$tmake_file m68k/t-floatlib"
 	;;
-m68k*-*-netbsdelf*)
+m68k*-*-netbsd*)
 	;;
 m68k*-*-openbsd*)
 	;;
@@ -1342,7 +1342,7 @@ sh-*-linux* | sh[2346lbe]*-*-linux*)
 	tmake_file="${tmake_file} sh/t-sh t-slibgcc-libgcc sh/t-linux t-fdpbit"
 	md_unwind_header=sh/linux-unwind.h
 	;;
-sh-*-netbsdelf* | shl*-*-netbsdelf*)
+sh-*-netbsd* | shl*-*-netbsd*)
 	tmake_file="$tmake_file sh/t-sh sh/t-netbsd"
 
 	# NetBSD's C library includes a fast software FP library that
@@ -1361,7 +1361,7 @@ sh-*-rtems*)
 sh-wrs-vxworks)
 	tmake_file="$tmake_file sh/t-sh t-crtstuff-pic t-fdpbit"
 	;;
-sparc-*-netbsdelf*)
+sparc-*-netbsd*)
 	;;
 sparc64-*-openbsd*)
 	;;
@@ -1468,7 +1468,7 @@ v850*-*-*)
 vax-*-linux*)
 	tmake_file="$tmake_file vax/t-linux"
 	;;
-vax-*-netbsdelf*)
+vax-*-netbsd*)
 	;;
 vax-*-openbsd*)
 	;;

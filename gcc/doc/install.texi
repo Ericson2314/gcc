@@ -754,7 +754,7 @@ eabi, eabialtivec, eabisim, eabisimaltivec, elf, elf32,
 elfbare, elfoabi, freebsd@var{version}, gnu, hpux, hpux@var{version},
 kfreebsd-gnu, kopensolaris-gnu, linux-androideabi, linux-gnu,
 linux-gnu_altivec, linux-musl, linux-uclibc, lynxos, mingw32, mingw32crt,
-mmixware, msdosdjgpp, netbsd, netbsdelf@var{version}, nto-qnx, openbsd,
+mmixware, msdosdjgpp, netbsdaout, netbsdelf@var{version}, nto-qnx, openbsd,
 rtems, solaris@var{version}, symbianelf, tpf, uclinux, uclinux_eabi, vms,
 vxworks, vxworksae, vxworksmils
 @end quotation
