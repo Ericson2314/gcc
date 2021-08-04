@@ -361,6 +361,7 @@ static void putenv_from_prefixes (const struct path_prefix *, const char *,
 				  bool);
 static int access_check (const char *, int);
 static char *find_a_file (const struct path_prefix *, const char *, int, bool);
+static char *find_a_program (const char *);
 static void add_prefix (struct path_prefix *, const char *, const char *,
 			int, int, int);
 static void add_sysrooted_prefix (struct path_prefix *, const char *,
@@ -3046,17 +3047,7 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
 {
   struct file_at_path_info info;
 
-#ifdef DEFAULT_ASSEMBLER
-  if (! strcmp (name, "as") && access (DEFAULT_ASSEMBLER, mode) == 0)
-    return xstrdup (DEFAULT_ASSEMBLER);
-#endif
-
-#ifdef DEFAULT_LINKER
-  if (! strcmp (name, "ld") && access (DEFAULT_LINKER, mode) == 0)
-    return xstrdup (DEFAULT_LINKER);
-#endif
-
-  /* Determine the filename to execute (special case for absolute paths).  */
+  /* Find the filename in question (special case for absolute paths).  */
 
   if (IS_ABSOLUTE_PATH (name))
     {
@@ -3075,6 +3066,27 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
   return (char*) for_each_path (pprefix, do_multi,
 				info.name_len + info.suffix_len,
 				file_at_path, &info);
+}
+
+/* Specialization of find_a_file for programs that also takes into account
+   configure-specified default programs. */
+
+static char*
+find_a_program (const char *name)
+{
+  /* Do not search if default matches query. */
+
+#ifdef DEFAULT_ASSEMBLER
+  if (! strcmp (name, "as") && access (DEFAULT_ASSEMBLER, mode) == 0)
+    return xstrdup (DEFAULT_ASSEMBLER);
+#endif
+
+#ifdef DEFAULT_LINKER
+  if (! strcmp (name, "ld") && access (DEFAULT_LINKER, mode) == 0)
+    return xstrdup (DEFAULT_LINKER);
+#endif
+
+  return find_a_file (&exec_prefixes, name, X_OK, false);
 }
 
 /* Ranking of prefixes in the sort list. -B prefixes are put before
@@ -3232,8 +3244,7 @@ execute (void)
 
   if (wrapper_string)
     {
-      string = find_a_file (&exec_prefixes,
-			    argbuf[0], X_OK, false);
+      string = find_a_program (argbuf[0]);
       if (string)
 	argbuf[0] = string;
       insert_wrapper (wrapper_string);
@@ -3258,7 +3269,7 @@ execute (void)
 
   if (!wrapper_string)
     {
-      string = find_a_file (&exec_prefixes, commands[0].prog, X_OK, false);
+      string = find_a_program(commands[0].prog);
       if (string)
 	commands[0].argv[0] = string;
     }
@@ -3273,8 +3284,7 @@ execute (void)
 	commands[n_commands].prog = argbuf[i + 1];
 	commands[n_commands].argv
 	  = &(argbuf.address ())[i + 1];
-	string = find_a_file (&exec_prefixes, commands[n_commands].prog,
-			      X_OK, false);
+	string = find_a_program(commands[n_commands].prog);
 	if (string)
 	  commands[n_commands].argv[0] = string;
 	n_commands++;
@@ -8466,8 +8476,7 @@ driver::maybe_putenv_COLLECT_LTO_WRAPPER () const
   if (have_c)
     lto_wrapper_file = NULL;
   else
-    lto_wrapper_file = find_a_file (&exec_prefixes, "lto-wrapper",
-				    X_OK, false);
+    lto_wrapper_file = find_a_program ("lto-wrapper");
   if (lto_wrapper_file)
     {
       lto_wrapper_file = convert_white_space (lto_wrapper_file);
@@ -8577,7 +8586,7 @@ driver::maybe_print_and_exit () const
 #endif
 	  print_prog_name = concat (print_prog_name, use_ld, NULL);
 	}
-      char *newname = find_a_file (&exec_prefixes, print_prog_name, X_OK, 0);
+      char *newname = find_a_program (print_prog_name);
       printf ("%s\n", (newname ? newname : print_prog_name));
       return (0);
     }
@@ -8976,7 +8985,7 @@ driver::maybe_run_linker (const char *argv0) const
 	  /* We'll use ld if we can't find collect2.  */
 	  if (! strcmp (linker_name_spec, "collect2"))
 	    {
-	      char *s = find_a_file (&exec_prefixes, "collect2", X_OK, false);
+	      char *s = find_a_program ("collect2");
 	      if (s == NULL)
 		set_static_spec_shared (&linker_name_spec, "ld");
 	    }
