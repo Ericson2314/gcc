@@ -3086,15 +3086,9 @@ program_at_path (char *path, bool machine_specific, void *data)
   struct file_at_path_info *info = (struct file_at_path_info *) data;
   size_t path_len = strlen (path);
 
-  for (auto prefix : { just_machine_prefix, "" })
+  auto search = [=](size_t len) -> void *
     {
-      auto len = path_len;
-
-      auto prefix_len = strlen(prefix);
-      memcpy (path + len, prefix, prefix_len);
-      len += prefix_len;
-
-      memcpy (path + len, info->name, info->name_len);
+      memcpy (path + len, info->name, info->name_len + 1);
       len += info->name_len;
 
       /* Some systems have a suffix for executable files.
@@ -3109,9 +3103,22 @@ program_at_path (char *path, bool machine_specific, void *data)
       path[len] = '\0';
       if (access_check (path, info->mode) == 0)
 	return path;
+
+      return NULL;
+    };
+
+  /* Additionally search for $target-prog in machine-agnostic dirs, as an
+     additional way to disambiguate targets. Do not do this in machine-specific
+     dirs because so further disambiguation is needed. */
+  if (!machine_specific)
+    {
+      auto prefix_len = strlen(just_machine_prefix);
+      memcpy (path + path_len, just_machine_prefix, prefix_len);
+      auto res = search(path_len + prefix_len);
+      if (res) return res;
     }
 
-  return NULL;
+  return search(path_len);
 }
 
 /* Specialization of find_a_file for programs that also takes into account
