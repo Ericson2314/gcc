@@ -3977,9 +3977,7 @@ dnl Substs:
 dnl  thread_header
 dnl
 AC_DEFUN([GLIBCXX_ENABLE_THREADS], [
-  AC_MSG_CHECKING([for thread model used by GCC])
-  target_thread_file=`$CXX -v 2>&1 | sed -n 's/^Thread model: //p'`
-  AC_MSG_RESULT([$target_thread_file])
+  GCC_AC_THREAD_MODEL
   GCC_AC_THREAD_HEADER([$target_thread_file])
 ])
 
@@ -3989,7 +3987,8 @@ dnl Check if gthread implementation defines the types and functions
 dnl required by the c++0x thread library.  Conforming gthread
 dnl implementations can define __GTHREADS_CXX0X to enable use with c++0x.
 dnl
-dnl GLIBCXX_ENABLE_SYMVERS must be done before this.
+dnl GLIBCXX_ENABLE_SYMVERS and GLIBCXX_ENABLE_THREADS must be done
+dnl before this.
 dnl
 AC_DEFUN([GLIBCXX_CHECK_GTHREADS], [
   GLIBCXX_ENABLE(libstdcxx-threads,auto,,[enable C++11 threads support])
@@ -4004,7 +4003,6 @@ AC_DEFUN([GLIBCXX_CHECK_GTHREADS], [
   CXXFLAGS="$CXXFLAGS -fno-exceptions \
 	-I${toplevel_srcdir}/libgcc -I${toplevel_builddir}/libgcc"
 
-  target_thread_file=`$CXX -v 2>&1 | sed -n 's/^Thread model: //p'`
   case $target_thread_file in
     posix)
       CXXFLAGS="$CXXFLAGS -DSUPPORTS_WEAK -DGTHREAD_USE_WEAK -D_PTHREADS"
