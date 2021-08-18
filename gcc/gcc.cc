@@ -2772,7 +2772,7 @@ static void *
 for_each_path (const struct path_prefix *paths,
 	       bool do_multi,
 	       size_t extra_space,
-	       void *(*callback) (char *, void *),
+	       void *(*callback) (char *, bool, void *),
 	       void *callback_info)
 {
   struct prefix_list *pl;
@@ -2833,7 +2833,7 @@ for_each_path (const struct path_prefix *paths,
 	  if (!skip_multi_dir)
 	    {
 	      memcpy (path + len, multi_suffix, suffix_len + 1);
-	      ret = callback (path, callback_info);
+	      ret = callback (path, true, callback_info);
 	      if (ret)
 		break;
 	    }
@@ -2844,7 +2844,7 @@ for_each_path (const struct path_prefix *paths,
 	      && pl->require_machine_suffix == 2)
 	    {
 	      memcpy (path + len, just_multi_suffix, just_suffix_len + 1);
-	      ret = callback (path, callback_info);
+	      ret = callback (path, true, callback_info);
 	      if (ret)
 		break;
 	    }
@@ -2854,7 +2854,7 @@ for_each_path (const struct path_prefix *paths,
 	      && !pl->require_machine_suffix && multiarch_dir)
 	    {
 	      memcpy (path + len, multiarch_suffix, multiarch_len + 1);
-	      ret = callback (path, callback_info);
+	      ret = callback (path, true, callback_info);
 	      if (ret)
 		break;
 	    }
@@ -2882,7 +2882,7 @@ for_each_path (const struct path_prefix *paths,
 	      else
 		path[len] = '\0';
 
-	      ret = callback (path, callback_info);
+	      ret = callback (path, false, callback_info);
 	      if (ret)
 		break;
 	    }
@@ -2937,7 +2937,7 @@ struct add_to_obstack_info {
 };
 
 static void *
-add_to_obstack (char *path, void *data)
+add_to_obstack (char *path, bool, void *data)
 {
   struct add_to_obstack_info *info = (struct add_to_obstack_info *) data;
 
@@ -3029,7 +3029,7 @@ struct file_at_path_info {
 };
 
 static void *
-file_at_path (char *path, void *data)
+file_at_path (char *path, bool, void *data)
 {
   struct file_at_path_info *info = (struct file_at_path_info *) data;
   size_t len = strlen (path);
@@ -3080,7 +3080,7 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
    path. Like file_at_path but tries machine prefix and exe suffix too. */
 
 static void *
-program_at_path (char *path, void *data)
+program_at_path (char *path, bool machine_specific, void *data)
 {
   /* try first with machine-prefixed name */
   struct file_at_path_info *info = (struct file_at_path_info *) data;
@@ -6036,7 +6036,7 @@ struct spec_path_info {
 };
 
 static void *
-spec_path (char *path, void *data)
+spec_path (char *path, bool, void *data)
 {
   struct spec_path_info *info = (struct spec_path_info *) data;
   size_t len = 0;
