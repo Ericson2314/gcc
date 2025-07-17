@@ -5,7 +5,7 @@ SHLIB_EXT = .exe
 SHLIB_OBJS = @shlib_objs@
 SHLIB_NAME = @shlib_base_name@.exe
 SHLIB_MULTILIB =
-SHLIB_INSTALL = $(INSTALL_DATA) $(SHLIB_NAME) $(DESTDIR)$(libsubdir)/$(SHLIB_NAME)
+SHLIB_INSTALL = $(INSTALL_DATA) $(SHLIB_NAME) $(DESTDIR)$(libdir)/$(SHLIB_NAME)
 SHLIB_SYMVEC = \
   grep -F -e "\$$BSS\$$" -e "\$$DATA\$$" -e " sdata " -e " data.rel " -e " data.rel.ro " -e " sbss " \
         -e "\$$LINK\$$" -e "\$$READONLY\$$" | \
