@@ -202,10 +202,10 @@ STRIP = @STRIP@
 STRIP_FOR_TARGET = $(STRIP)
 
 # Used to install the shared libgcc.
-slibdir = @slibdir@
+slibdir = $(libdir)
 # Maybe used for DLLs on Windows targets.
-toolexecdir = @toolexecdir@
-toolexeclibdir = @toolexeclibdir@
+toolexecdir = $(bindir)
+toolexeclibdir = $(libdir)
 
 export AR_FOR_TARGET
 export AR_CREATE_FOR_TARGET

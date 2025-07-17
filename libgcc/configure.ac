@@ -479,9 +479,6 @@ if test x"$enable_as_accelerator_for" != x; then
   accel_dir_suffix=/accel/${target_noncanonical}
   real_host_noncanonical=${enable_as_accelerator_for}
 fi
-# Directory in which the compiler finds libraries etc.
-libdir=${orig_libdir}/gcc/${real_host_noncanonical}/'$(version)'${accel_dir_suffix}
-includedir=${libdir}/include
 
 if test x"$enable_offload_targets" != x; then
   extra_parts="${extra_parts} crtoffloadbegin.o crtoffloadend.o"
