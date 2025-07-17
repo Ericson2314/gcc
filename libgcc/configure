@@ -604,8 +604,6 @@ set_use_emutls
 set_have_cc_tls
 vis_hide
 solaris_ld_v2_maps
-real_host_noncanonical
-accel_dir_suffix
 use_tm_clone_registry
 force_explicit_eh_registry
 CET_FLAGS
@@ -2461,6 +2459,8 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $version_specific_libs" >&5
 $as_echo "$version_specific_libs" >&6; }
 
+orig_libdir=$libdir
+
 
 # Check whether --with-toolexeclibdir was given.
 if test "${with_toolexeclibdir+set}" = set; then :
@@ -2483,7 +2483,7 @@ if test "${with_slibdir+set}" = set; then :
   withval=$with_slibdir; slibdir="$with_slibdir"
 else
   if test "${version_specific_libs}" = yes; then
-  slibdir='$(libsubdir)'
+  slibdir='$(libdir)'
 elif test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
   case ${with_toolexeclibdir} in
     no)
@@ -2494,7 +2494,7 @@ elif test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
       ;;
   esac
 else
-  slibdir='$(libdir)'
+  slibdir=$orig_libdir
 fi
 fi
 
@@ -2730,7 +2730,7 @@ case ${version_specific_libs} in
     # Need the gcc compiler version to know where to install libraries
     # and header files if --enable-version-specific-runtime-libs option
     # is selected.
-    toolexecdir='$(libdir)/gcc/$(target_noncanonical)'
+    toolexecdir=$orig_libdir'/gcc/$(target_noncanonical)'
     toolexeclibdir='$(toolexecdir)/$(gcc_version)$(MULTISUBDIR)'
     ;;
   no)
@@ -2747,8 +2747,8 @@ case ${version_specific_libs} in
 	  ;;
       esac
     else
-      toolexecdir='$(libdir)/gcc-lib/$(target_noncanonical)'
-      toolexeclibdir='$(libdir)'
+      toolexecdir=$orig_libdir'/gcc-lib/$(target_noncanonical)'
+      toolexeclibdir=$orig_libdir
     fi
     multi_os_directory=`$CC -print-multi-os-directory`
     case $multi_os_directory in
@@ -5291,8 +5291,9 @@ if test x"$enable_as_accelerator_for" != x; then
   accel_dir_suffix=/accel/${target_noncanonical}
   real_host_noncanonical=${enable_as_accelerator_for}
 fi
-
-
+# Directory in which the compiler finds libraries etc.
+libdir=${orig_libdir}/gcc/${real_host_noncanonical}/'$(version)'${accel_dir_suffix}
+includedir=${libdir}/include
 
 if test x"$enable_offload_targets" != x; then
   extra_parts="${extra_parts} crtoffloadbegin.o crtoffloadend.o"

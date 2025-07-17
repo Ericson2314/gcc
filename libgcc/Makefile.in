@@ -31,6 +31,7 @@ prefix = @prefix@
 exec_prefix = @exec_prefix@
 libdir = @libdir@
 shlib_slibdir = @slibdir@
+includedir= @includedir@
 
 SHELL = @SHELL@
 
@@ -53,7 +54,6 @@ sfp_machine_header = @sfp_machine_header@
 thread_header = @thread_header@
 
 host_noncanonical = @host_noncanonical@
-real_host_noncanonical = @real_host_noncanonical@
 target_noncanonical = @target_noncanonical@
 
 # List of extra object files that should be compiled for this target machine.
@@ -109,7 +109,7 @@ FLAGS_TO_PASS = \
 	"prefix=$(prefix)" \
 	"exec_prefix=$(exec_prefix)" \
 	"libdir=$(libdir)" \
-	"libsubdir=$(libsubdir)" \
+	"includedir=$(includedir)" \
 	"tooldir=$(tooldir)"
 
 # Dependencies for "all" are set later in the file.
@@ -199,8 +199,6 @@ RANLIB_FOR_TARGET = $(RANLIB)
 STRIP = @STRIP@
 STRIP_FOR_TARGET = $(STRIP)
 
-# Directory in which the compiler finds libraries etc.
-libsubdir = $(libdir)/gcc/$(real_host_noncanonical)/$(version)@accel_dir_suffix@
 # Used to install the shared libgcc.
 slibdir = @slibdir@
 # Maybe used for DLLs on Windows targets.
@@ -222,7 +220,6 @@ export LIPO_FOR_TARGET
 export NM_FOR_TARGET
 export STRIP_FOR_TARGET
 export RANLIB_FOR_TARGET
-export libsubdir
 export slibdir
 export toolexecdir
 export toolexeclibdir
@@ -310,7 +307,7 @@ MULTIDIR := $(shell $(CC) $(CFLAGS) -print-multi-directory)
 MULTIOSDIR := $(shell $(CC) $(CFLAGS) -print-multi-os-directory)
 
 MULTIOSSUBDIR := $(shell if test "$(MULTIOSDIR)" != .; then echo /$(MULTIOSDIR); fi)
-inst_libdir = $(libsubdir)$(MULTISUBDIR)
+inst_libdir = $(libdir)$(MULTISUBDIR)
 inst_slibdir = $(slibdir)$(MULTIOSSUBDIR)
 
 gcc_compile_bare = $(CC) $(INTERNAL_CFLAGS) $(CFLAGS-$(<F))
@@ -1137,14 +1134,14 @@ install-unwind_h-forbuild: unwind.h
 # This is however useful for "install-no-fixincludes" case, when only the gcc
 # internal headers are copied by gcc's install.
 install-unwind_h:
-	$(mkinstalldirs) $(DESTDIR)$(libsubdir)/include
-	$(INSTALL_DATA) unwind.h $(DESTDIR)$(libsubdir)/include
+	$(mkinstalldirs) $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) unwind.h $(DESTDIR)$(includedir)
 
 all: install-unwind_h-forbuild
 
 install-gcov_h:
-	$(mkinstalldirs) $(DESTDIR)$(libsubdir)/include
-	$(INSTALL_DATA) $(srcdir)/gcov.h $(DESTDIR)$(libsubdir)/include
+	$(mkinstalldirs) $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) $(srcdir)/gcov.h $(DESTDIR)$(includedir)
 
 # Documentation targets (empty).
 .PHONY: info html dvi pdf install-info install-html install-pdf

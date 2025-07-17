@@ -109,13 +109,15 @@ AC_ARG_ENABLE(version-specific-runtime-libs,
 [version_specific_libs=no])
 AC_MSG_RESULT($version_specific_libs)
 
+orig_libdir=$libdir
+
 GCC_WITH_TOOLEXECLIBDIR
 
 AC_ARG_WITH(slibdir,
 [  --with-slibdir=DIR      shared libraries in DIR [LIBDIR]],
 slibdir="$with_slibdir",
 [if test "${version_specific_libs}" = yes; then
-  slibdir='$(libsubdir)'
+  slibdir='$(libdir)'
 elif test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
   case ${with_toolexeclibdir} in
     no)
@@ -126,7 +128,7 @@ elif test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
       ;;
   esac
 else
-  slibdir='$(libdir)'
+  slibdir=$orig_libdir
 fi])
 AC_SUBST(slibdir)
 
@@ -177,7 +179,7 @@ case ${version_specific_libs} in
     # Need the gcc compiler version to know where to install libraries
     # and header files if --enable-version-specific-runtime-libs option
     # is selected.
-    toolexecdir='$(libdir)/gcc/$(target_noncanonical)'
+    toolexecdir=$orig_libdir'/gcc/$(target_noncanonical)'
     toolexeclibdir='$(toolexecdir)/$(gcc_version)$(MULTISUBDIR)'
     ;;
   no)
@@ -194,8 +196,8 @@ case ${version_specific_libs} in
 	  ;;
       esac
     else
-      toolexecdir='$(libdir)/gcc-lib/$(target_noncanonical)'
-      toolexeclibdir='$(libdir)'
+      toolexecdir=$orig_libdir'/gcc-lib/$(target_noncanonical)'
+      toolexeclibdir=$orig_libdir
     fi
     multi_os_directory=`$CC -print-multi-os-directory`
     case $multi_os_directory in
@@ -477,8 +479,9 @@ if test x"$enable_as_accelerator_for" != x; then
   accel_dir_suffix=/accel/${target_noncanonical}
   real_host_noncanonical=${enable_as_accelerator_for}
 fi
-AC_SUBST(accel_dir_suffix)
-AC_SUBST(real_host_noncanonical)
+# Directory in which the compiler finds libraries etc.
+libdir=${orig_libdir}/gcc/${real_host_noncanonical}/'$(version)'${accel_dir_suffix}
+includedir=${libdir}/include
 
 if test x"$enable_offload_targets" != x; then
   extra_parts="${extra_parts} crtoffloadbegin.o crtoffloadend.o"
