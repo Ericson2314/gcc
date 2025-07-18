@@ -207,10 +207,6 @@ esac
 AC_SUBST(toolexecdir)
 AC_SUBST(toolexeclibdir)
 
-# Directory in which the compiler finds libraries etc.
-libdir='$(toolexeclibdir)'
-includedir=${orig_libdir}/gcc/${host_noncanonical}/'$(version)/include'
-
 if test ${multilib} = yes; then
   multilib_arg="--enable-multilib"
 else
