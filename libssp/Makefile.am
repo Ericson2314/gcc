@@ -34,11 +34,9 @@ endif
 AM_CFLAGS = -Wall
 AM_CFLAGS += $(XCFLAGS)
 
-toolexeclib_LTLIBRARIES = libssp.la libssp_nonshared.la
+lib_LTLIBRARIES = libssp.la libssp_nonshared.la
 
-target_noncanonical = @target_noncanonical@
-libsubincludedir = $(libdir)/gcc/$(target_noncanonical)/$(gcc_version)/include
-nobase_libsubinclude_HEADERS = ssp/ssp.h ssp/string.h ssp/stdio.h ssp/unistd.h
+nobase_include_HEADERS = ssp/ssp.h ssp/string.h ssp/stdio.h ssp/unistd.h
 
 libssp_la_SOURCES = \
 	ssp.c gets-chk.c memcpy-chk.c memmove-chk.c mempcpy-chk.c \

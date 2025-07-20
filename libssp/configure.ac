@@ -168,6 +168,8 @@ GCC_WITH_TOOLEXECLIBDIR
 
 AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
 
+orig_libdir=$libdir
+
 # Calculate toolexeclibdir
 # Also toolexecdir, though it's only used in toolexeclibdir
 case ${version_specific_libs} in
@@ -175,7 +177,7 @@ case ${version_specific_libs} in
     # Need the gcc compiler version to know where to install libraries
     # and header files if --enable-version-specific-runtime-libs option
     # is selected.
-    toolexecdir='$(libdir)/gcc/$(target_alias)'
+    toolexecdir=${orig_libdir}'/gcc/$(target_alias)'
     toolexeclibdir='$(toolexecdir)/$(gcc_version)$(MULTISUBDIR)'
     ;;
   no)
@@ -192,8 +194,8 @@ case ${version_specific_libs} in
 	  ;;
       esac
     else
-      toolexecdir='$(libdir)/gcc-lib/$(target_alias)'
-      toolexeclibdir='$(libdir)'
+      toolexecdir=${orig_libdir}'/gcc-lib/$(target_alias)'
+      toolexeclibdir=${orig_libdir}
     fi
     multi_os_directory=`$CC -print-multi-os-directory`
     case $multi_os_directory in
@@ -204,6 +206,10 @@ case ${version_specific_libs} in
 esac
 AC_SUBST(toolexecdir)
 AC_SUBST(toolexeclibdir)
+
+# Directory in which the compiler finds libraries etc.
+libdir='$(toolexeclibdir)'
+includedir=${orig_libdir}/gcc/${host_noncanonical}/'$(version)/include'
 
 if test ${multilib} = yes; then
   multilib_arg="--enable-multilib"
