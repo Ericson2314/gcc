@@ -727,84 +727,10 @@ dnl
 dnl This logic must match gcc/configure.ac's setting of gcc_gxx_include_dir.
 dnl config/gxx-include-dir.m4 must be kept consistant with this as well.
 AC_DEFUN([GLIBCXX_EXPORT_INSTALL_INFO], [
-  glibcxx_toolexecdir=no
-  glibcxx_toolexeclibdir=no
+  glibcxx_toolexecdir='$(libdir)'
+  glibcxx_toolexeclibdir='$(libdir)'
+  gxx_include_dir='$(includedir)-cxx'
   glibcxx_prefixdir=$prefix
-
-  AC_MSG_CHECKING([for gxx-include-dir])
-  AC_ARG_WITH([gxx-include-dir],
-    AC_HELP_STRING([--with-gxx-include-dir=DIR],
-		   [installation directory for include files]),
-    [case "$withval" in
-      yes) AC_MSG_ERROR([Missing directory for --with-gxx-include-dir]) ;;
-      no)  gxx_include_dir=no ;;
-      *)   gxx_include_dir=$withval ;;
-     esac],
-    [gxx_include_dir=no])
-  AC_MSG_RESULT($gxx_include_dir)
-
-  AC_MSG_CHECKING([for --enable-version-specific-runtime-libs])
-  AC_ARG_ENABLE([version-specific-runtime-libs],
-    AC_HELP_STRING([--enable-version-specific-runtime-libs],
-		   [Specify that runtime libraries should be installed in a compiler-specific directory]),
-    [case "$enableval" in
-      yes) version_specific_libs=yes ;;
-      no)  version_specific_libs=no ;;
-      *)   AC_MSG_ERROR([Unknown argument to enable/disable version-specific libs]);;
-     esac],
-    [version_specific_libs=no])
-  AC_MSG_RESULT($version_specific_libs)
-
-  GCC_WITH_TOOLEXECLIBDIR
-
-  # Default case for install directory for include files.
-  if test $version_specific_libs = no && test $gxx_include_dir = no; then
-    gxx_include_dir='include/c++/${gcc_version}'
-    if test -n "$with_cross_host" &&
-       test x"$with_cross_host" != x"no"; then
-      gxx_include_dir='${prefix}/${target_alias}/'"$gxx_include_dir"
-    else
-      gxx_include_dir='${prefix}/'"$gxx_include_dir"
-    fi
-  fi
-
-  # Version-specific runtime libs processing.
-  if test $version_specific_libs = yes; then
-    # Need the gcc compiler version to know where to install libraries
-    # and header files if --enable-version-specific-runtime-libs option
-    # is selected.  FIXME: these variables are misnamed, there are
-    # no executables installed in _toolexecdir or _toolexeclibdir.
-    if test x"$gxx_include_dir" = x"no"; then
-      gxx_include_dir='${libdir}/gcc/${host_alias}/${gcc_version}/include/c++'
-    fi
-    glibcxx_toolexecdir='${libdir}/gcc/${host_alias}'
-    glibcxx_toolexeclibdir='${toolexecdir}/${gcc_version}$(MULTISUBDIR)'
-  fi
-
-  # Calculate glibcxx_toolexecdir, glibcxx_toolexeclibdir
-  # Install a library built with a cross compiler in tooldir, not libdir.
-  if test x"$glibcxx_toolexecdir" = x"no"; then
-    if test -n "$with_cross_host" &&
-       test x"$with_cross_host" != x"no"; then
-      glibcxx_toolexecdir='${exec_prefix}/${host_alias}'
-      case ${with_toolexeclibdir} in
-	no)
-	  glibcxx_toolexeclibdir='${toolexecdir}/lib'
-	  ;;
-	*)
-	  glibcxx_toolexeclibdir=${with_toolexeclibdir}
-	  ;;
-      esac
-    else
-      glibcxx_toolexecdir='${libdir}/gcc/${host_alias}'
-      glibcxx_toolexeclibdir='${libdir}'
-    fi
-    multi_os_directory=`$CXX -print-multi-os-directory`
-    case $multi_os_directory in
-      .) ;; # Avoid trailing /.
-      *) glibcxx_toolexeclibdir=$glibcxx_toolexeclibdir/$multi_os_directory ;;
-    esac
-  fi
 
   AC_MSG_CHECKING([for install location])
   AC_MSG_RESULT($gxx_include_dir)

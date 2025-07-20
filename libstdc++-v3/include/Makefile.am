@@ -1048,7 +1048,7 @@ endif
 
 host_srcdir = ${glibcxx_srcdir}/$(OS_INC_SRCDIR)
 host_builddir = ./${host_alias}/bits
-host_installdir = ${gxx_include_dir}/${host_alias}$(MULTISUBDIR)/bits
+host_installdir = ${gxx_include_dir}/bits
 host_headers = \
 	${host_srcdir}/ctype_base.h \
 	${host_srcdir}/ctype_inline.h \
