@@ -18,10 +18,6 @@ AC_CACHE_CHECK([for the threading model used by GCC], [gcc_cv_target_thread_file
   # Set new cache variable
   gcc_cv_target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p'`
 ])
-# Set variable name (not prefixed enough to be a good cache variable
-# name) traditionally used for this purpose, to avoid having to change
-# a bunch of configure scripts.
-target_thread_file="$gcc_cv_target_thread_file"
 ])
 
 

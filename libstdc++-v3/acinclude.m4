@@ -3811,7 +3811,7 @@ EOF
   if test $atomicity_dir = "cpu/generic" ; then
     atomicity_dir=cpu/generic/atomicity_mutex
     AC_MSG_WARN([No native atomic operations are provided for this platform.])
-      if test "x$target_thread_file" = xsingle; then
+      if test "x$gcc_cv_target_thread_file" = xsingle; then
 	AC_MSG_WARN([They cannot be faked when thread support is disabled.])
 	AC_MSG_WARN([Thread-safety of certain classes is not guaranteed.])
       else
@@ -4194,7 +4194,7 @@ dnl  thread_header
 dnl
 AC_DEFUN([GLIBCXX_ENABLE_THREADS], [
   AC_REQUIRE([GCC_AC_THREAD_MODEL])
-  GCC_AC_THREAD_HEADER([$target_thread_file])
+  GCC_AC_THREAD_HEADER([$gcc_cv_target_thread_file])
 ])
 
 
@@ -4219,7 +4219,7 @@ AC_DEFUN([GLIBCXX_CHECK_GTHREADS], [
   CXXFLAGS="$CXXFLAGS -fno-exceptions \
 	-I${toplevel_srcdir}/libgcc -I${toplevel_builddir}/libgcc"
 
-  case $target_thread_file in
+  case $gcc_cv_target_thread_file in
     posix)
       CXXFLAGS="$CXXFLAGS -DSUPPORTS_WEAK -DGTHREAD_USE_WEAK -D_PTHREADS"
       ;;
@@ -4292,7 +4292,7 @@ AC_DEFUN([GLIBCXX_CHECK_GTHREADS], [
     fi
 
     # See above for the rationale.
-    if test $target_thread_file = win32; then
+    if test $gcc_cv_target_thread_file = win32; then
       CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600"
     fi
   fi

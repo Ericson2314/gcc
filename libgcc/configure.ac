@@ -716,7 +716,7 @@ AC_SUBST(tm_file)
 AC_SUBST(tm_defines)
 
 # Map from thread model to thread header.
-GCC_AC_THREAD_HEADER([$target_thread_file])
+GCC_AC_THREAD_HEADER([$gcc_cv_target_thread_file])
 
 AC_CACHE_CHECK([for strub support],
   [libgcc_cv_strub_support],

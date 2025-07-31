@@ -2055,30 +2055,28 @@ esac
 # Threading
 # ---------
 
-# Check if a valid thread package
-case ${enable_threads} in
-  "" | no)
-    # No threads
-    target_thread_file='single'
-    ;;
-  yes)
-    # default
-    target_thread_file='single'
-    ;;
-  aix | dce | lynx | mipssde | posix | rtems | \
-  single | tpf | vxworks | win32 | mcf)
-    target_thread_file=${enable_threads}
-    ;;
-  *)
-    echo "${enable_threads} is an unknown thread package" 1>&2
-    exit 1
-    ;;
-esac
-
+# No thread file set by target-specific clauses in config.gcc,
+# so use file chosen this default logic.
 if test x${thread_file} = x; then
-  # No thread file set by target-specific clauses in config.gcc,
-  # so use file chosen by default logic above
-  thread_file=${target_thread_file}
+  # Check if a valid thread package
+  case ${enable_threads} in
+    "" | no)
+      # No threads
+      thread_file='single'
+      ;;
+    yes)
+      # default
+      thread_file='single'
+      ;;
+    aix | dce | lynx | mipssde | posix | rtems | \
+    single | tpf | vxworks | win32 | mcf)
+      thread_file=${enable_threads}
+      ;;
+    *)
+      echo "${enable_threads} is an unknown thread package" 1>&2
+      exit 1
+      ;;
+  esac
 fi
 
 # --------

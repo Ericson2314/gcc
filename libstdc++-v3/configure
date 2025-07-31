@@ -16346,15 +16346,11 @@ else
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_target_thread_file" >&5
 $as_echo "$gcc_cv_target_thread_file" >&6; }
-# Set variable name (not prefixed enough to be a good cache variable
-# name) traditionally used for this purpose, to avoid having to change
-# a bunch of configure scripts.
-target_thread_file="$gcc_cv_target_thread_file"
 
 
 
 
-case $target_thread_file in
+case $gcc_cv_target_thread_file in
     aix)	thread_header=config/rs6000/gthr-aix.h ;;
     dce)	thread_header=config/pa/gthr-dce.h ;;
     gcn)	thread_header=config/gcn/gthr-gcn.h ;;
@@ -16368,7 +16364,7 @@ case $target_thread_file in
     win32)	thread_header=config/i386/gthr-win32.h ;;
     mcf)	thread_header=config/i386/gthr-mcf.h ;;
     *)
-        as_fn_error $? "No known header for threading model '$target_thread_file'." "$LINENO" 5
+        as_fn_error $? "No known header for threading model '$gcc_cv_target_thread_file'." "$LINENO" 5
         ;;
 esac
 
@@ -16443,7 +16439,7 @@ $as_echo "$glibcxx_cv_atomic_word" >&6; }
     # Fake what AC_TRY_COMPILE does.
 
     cat > conftest.$ac_ext << EOF
-#line 16446 "configure"
+#line 16442 "configure"
 #include "${glibcxx_srcdir}/config/$atomic_word_dir/atomic_word.h"
 int main()
 {
@@ -16493,7 +16489,7 @@ $as_echo "#define _GLIBCXX_ATOMIC_WORD_BUILTINS 1" >>confdefs.h
     atomicity_dir=cpu/generic/atomicity_mutex
     { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No native atomic operations are provided for this platform." >&5
 $as_echo "$as_me: WARNING: No native atomic operations are provided for this platform." >&2;}
-      if test "x$target_thread_file" = xsingle; then
+      if test "x$gcc_cv_target_thread_file" = xsingle; then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: They cannot be faked when thread support is disabled." >&5
 $as_echo "$as_me: WARNING: They cannot be faked when thread support is disabled." >&2;}
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Thread-safety of certain classes is not guaranteed." >&5
@@ -16589,7 +16585,7 @@ $as_echo "mutex" >&6; }
   # unnecessary for this test.
 
     cat > conftest.$ac_ext << EOF
-#line 16592 "configure"
+#line 16588 "configure"
 int main()
 {
   _Decimal32 d1;
@@ -16631,7 +16627,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
   # unnecessary for this test.
 
   cat > conftest.$ac_ext << EOF
-#line 16634 "configure"
+#line 16630 "configure"
 template<typename T1, typename T2>
   struct same
   { typedef T2 type; };
@@ -52303,7 +52299,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
   CXXFLAGS="$CXXFLAGS -fno-exceptions \
 	-I${toplevel_srcdir}/libgcc -I${toplevel_builddir}/libgcc"
 
-  case $target_thread_file in
+  case $gcc_cv_target_thread_file in
     posix)
       CXXFLAGS="$CXXFLAGS -DSUPPORTS_WEAK -DGTHREAD_USE_WEAK -D_PTHREADS"
       ;;
@@ -52432,7 +52428,7 @@ fi
     fi
 
     # See above for the rationale.
-    if test $target_thread_file = win32; then
+    if test $gcc_cv_target_thread_file = win32; then
       CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600"
     fi
   fi
@@ -53990,7 +53986,7 @@ $as_echo "$glibcxx_cv_libbacktrace_atomics" >&6; }
     CXXFLAGS='-O0 -S'
 
     cat > conftest.$ac_ext << EOF
-#line 53993 "configure"
+#line 53989 "configure"
 #include <stddef.h>
 int main()
 {

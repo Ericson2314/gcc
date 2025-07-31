@@ -5098,10 +5098,6 @@ else
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_target_thread_file" >&5
 $as_echo "$gcc_cv_target_thread_file" >&6; }
-# Set variable name (not prefixed enough to be a good cache variable
-# name) traditionally used for this purpose, to avoid having to change
-# a bunch of configure scripts.
-target_thread_file="$gcc_cv_target_thread_file"
 
 
 # Check for assembler CFI support.
@@ -5776,7 +5772,7 @@ tm_file="${tm_file_}"
 
 # Map from thread model to thread header.
 
-case $target_thread_file in
+case $gcc_cv_target_thread_file in
     aix)	thread_header=config/rs6000/gthr-aix.h ;;
     dce)	thread_header=config/pa/gthr-dce.h ;;
     gcn)	thread_header=config/gcn/gthr-gcn.h ;;
@@ -5790,7 +5786,7 @@ case $target_thread_file in
     win32)	thread_header=config/i386/gthr-win32.h ;;
     mcf)	thread_header=config/i386/gthr-mcf.h ;;
     *)
-        as_fn_error $? "No known header for threading model '$target_thread_file'." "$LINENO" 5
+        as_fn_error $? "No known header for threading model '$gcc_cv_target_thread_file'." "$LINENO" 5
         ;;
 esac
 

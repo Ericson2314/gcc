@@ -280,7 +280,7 @@ case ${host} in
   # configuration.
   tmake_file="$tmake_file t-freebsd t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver"
   extra_parts="crtbegin.o crtend.o crtbeginS.o crtbeginT.o crtendS.o"
-  case ${target_thread_file} in
+  case ${gcc_cv_target_thread_file} in
     posix)
       tmake_file="${tmake_file} t-freebsd-thread"
       # Before 5.0, FreeBSD can't bind shared libraries to -lc
@@ -316,7 +316,7 @@ case ${host} in
   ;;
 *-*-openbsd*)
   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip"
-  case ${target_thread_file} in
+  case ${gcc_cv_target_thread_file} in
     posix)
       tmake_file="$tmake_file t-openbsd-thread"
       ;;
@@ -452,7 +452,7 @@ aarch64*-*-vxworks7*)
 	tmake_file="${tmake_file} t-dfprules"
 	;;
 aarch64-*-mingw*)
-	case ${target_thread_file} in
+	case ${gcc_cv_target_thread_file} in
 	  win32)
 	    tmake_thr_file="mingw/t-gthr-win32"
 	    ;;
@@ -886,7 +886,7 @@ i[34567]86-*-mingw*)
 	if test x$enable_vtable_verify = xyes; then
 		extra_parts="$extra_parts vtv_start.o vtv_end.o vtv_start_preinit.o vtv_end_preinit.o"
 	fi
-	case ${target_thread_file} in
+	case ${gcc_cv_target_thread_file} in
 	  win32)
 	    tmake_thr_file="mingw/t-gthr-win32"
 	    ;;
@@ -913,7 +913,7 @@ i[34567]86-*-mingw*)
 	tmake_file="${tmake_file} ${tmake_eh_file} ${tmake_thr_file} ${tmake_dlldir_file} i386/t-slibgcc-cygming i386/t-slibgcc-mingw i386/t-cygming i386/t-mingw32 t-crtfm i386/t-chkstk t-dfprules"
 	;;
 x86_64-*-mingw*)
-	case ${target_thread_file} in
+	case ${gcc_cv_target_thread_file} in
 	  win32)
 	    tmake_thr_file="mingw/t-gthr-win32"
 	    ;;
@@ -1658,7 +1658,7 @@ esac
 # The vxworks threads implementation relies on a few extra sources,
 # which we arrange to add after everything else:
 
-case ${target_thread_file} in
+case ${gcc_cv_target_thread_file} in
 vxworks)
 	case ${host} in
 	*-*-vxworksae)
