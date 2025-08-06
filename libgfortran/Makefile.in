@@ -1016,12 +1016,12 @@ libcaf_single_la_LINK = $(LINK) $(libcaf_single_la_LDFLAGS)
 @ENABLE_CAF_SHMEM_TRUE@libcaf_shmem_la_LINK = $(LINK) $(libcaf_shmem_la_LDFLAGS) $(CAF_SHMEM_LIBS)
 @IEEE_SUPPORT_TRUE@fincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)$(MULTISUBDIR)/finclude
 @IEEE_SUPPORT_TRUE@nodist_finclude_HEADERS = ieee_arithmetic.mod ieee_exceptions.mod ieee_features.mod
-AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/$(MULTISRCTOP)../gcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../gcc/config $(LIBQUADINCLUDE) \
+AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/../gcc \
+	      -I$(srcdir)/../gcc/config $(LIBQUADINCLUDE) \
 	      -I$(MULTIBUILDTOP)../../$(host_subdir)/gcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libgcc \
+	      -I$(srcdir)/../libgcc \
 	      -I$(MULTIBUILDTOP)../libgcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
+	      -I$(srcdir)/../libbacktrace \
 	      -I$(MULTIBUILDTOP)../libbacktrace \
 	      -I../libbacktrace
 
@@ -1873,7 +1873,6 @@ libgfortran_la_SOURCES = $(gfor_src) $(gfor_built_src) $(gfor_io_src) \
 	$(gfor_helper_src) $(gfor_ieee_src) $(gfor_io_headers) $(gfor_specific_src)
 
 EXTRA_DIST = m4
-MULTISRCTOP = 
 MULTIBUILDTOP = 
 MULTIDIRS = 
 MULTISUBDIR = 

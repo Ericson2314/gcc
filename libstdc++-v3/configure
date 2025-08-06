@@ -3114,18 +3114,10 @@ fi
 
 
 # We may get other options which we leave undocumented:
-# --with-target-subdir, --with-multisrctop, --with-multisubdir
+# --with-target-subdir, --with-multisubdir
 # See config-ml.in if you want the gory details.
 
-if test "$srcdir" = "."; then
-  if test "$with_target_subdir" != "."; then
-    multi_basedir="$srcdir/$with_multisrctop../.."
-  else
-    multi_basedir="$srcdir/$with_multisrctop.."
-  fi
-else
-  multi_basedir="$srcdir/.."
-fi
+multi_basedir="$srcdir/.."
 
 
 # Even if the default multilib is not a cross compilation,
@@ -12679,7 +12671,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12682 "configure"
+#line 12674 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12785,7 +12777,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12788 "configure"
+#line 12780 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -16475,7 +16467,7 @@ $as_echo "$glibcxx_cv_atomic_word" >&6; }
     # Fake what AC_COMPILE_IFELSE does.
 
     cat > conftest.$ac_ext << EOF
-#line 16478 "configure"
+#line 16470 "configure"
 #include "atomic_word.h"
 int main()
 {
@@ -16622,7 +16614,7 @@ $as_echo "mutex" >&6; }
   # unnecessary for this test.
 
     cat > conftest.$ac_ext << EOF
-#line 16625 "configure"
+#line 16617 "configure"
 int main()
 {
   _Decimal32 d1;
@@ -16663,7 +16655,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
   # unnecessary for this test.
 
   cat > conftest.$ac_ext << EOF
-#line 16666 "configure"
+#line 16658 "configure"
 template<typename T1, typename T2>
   struct same
   { typedef T2 type; };
@@ -53737,7 +53729,7 @@ $as_echo "$glibcxx_cv_libbacktrace_atomics" >&6; }
     CXXFLAGS='-O0 -S'
 
     cat > conftest.$ac_ext << EOF
-#line 53740 "configure"
+#line 53732 "configure"
 #include <stddef.h>
 int main()
 {
@@ -56895,7 +56887,6 @@ srcdir="$srcdir"
 host="$host"
 target="$target"
 with_multisubdir="$with_multisubdir"
-with_multisrctop="$with_multisrctop"
 with_target_subdir="$with_target_subdir"
 ac_configure_args="${multilib_arg} ${ac_configure_args}"
 multi_basedir="$multi_basedir"

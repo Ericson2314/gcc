@@ -28,9 +28,9 @@ if test "${srcdir}" = "."; then
     libiberty_topdir="${srcdir}/.."
   else
     if test "${with_target_subdir}" != "."; then
-      libiberty_topdir="${srcdir}/${with_multisrctop}../.."
+      libiberty_topdir="${srcdir}/../.."
     else
-      libiberty_topdir="${srcdir}/${with_multisrctop}.."
+      libiberty_topdir="${srcdir}/.."
     fi
   fi
 else

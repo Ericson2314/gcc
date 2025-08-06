@@ -93,12 +93,12 @@ endif
 
 ## io.h conflicts with a system header on some platforms, so
 ## use -iquote
-AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/$(MULTISRCTOP)../gcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../gcc/config $(LIBQUADINCLUDE) \
+AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/../gcc \
+	      -I$(srcdir)/../gcc/config $(LIBQUADINCLUDE) \
 	      -I$(MULTIBUILDTOP)../../$(host_subdir)/gcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libgcc \
+	      -I$(srcdir)/../libgcc \
 	      -I$(MULTIBUILDTOP)../libgcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
+	      -I$(srcdir)/../libbacktrace \
 	      -I$(MULTIBUILDTOP)../libbacktrace \
 	      -I../libbacktrace
 

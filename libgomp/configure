@@ -3451,18 +3451,10 @@ fi
 
 
 # We may get other options which we leave undocumented:
-# --with-target-subdir, --with-multisrctop, --with-multisubdir
+# --with-target-subdir, --with-multisubdir
 # See config-ml.in if you want the gory details.
 
-if test "$srcdir" = "."; then
-  if test "$with_target_subdir" != "."; then
-    multi_basedir="$srcdir/$with_multisrctop../.."
-  else
-    multi_basedir="$srcdir/$with_multisrctop.."
-  fi
-else
-  multi_basedir="$srcdir/.."
-fi
+multi_basedir="$srcdir/.."
 
 
 # Even if the default multilib is not a cross compilation,
@@ -11858,7 +11850,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11861 "configure"
+#line 11853 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11964,7 +11956,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11967 "configure"
+#line 11959 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -18259,7 +18251,6 @@ srcdir="$srcdir"
 host="$host"
 target="$target"
 with_multisubdir="$with_multisubdir"
-with_multisrctop="$with_multisrctop"
 with_target_subdir="$with_target_subdir"
 ac_configure_args="${multilib_arg} ${ac_configure_args}"
 multi_basedir="$multi_basedir"

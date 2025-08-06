@@ -574,7 +574,6 @@ MAKEINFOFLAGS = -I $(srcdir)/../gcc/doc/include
 @BUILD_LIBQUADMATH_FALSE@info_TEXINFOS = 
 @BUILD_LIBQUADMATH_TRUE@info_TEXINFOS = libquadmath.texi
 libquadmath_TEXINFOS = libquadmath-vers.texi
-MULTISRCTOP = 
 MULTIBUILDTOP = 
 MULTIDIRS = 
 MULTISUBDIR = 

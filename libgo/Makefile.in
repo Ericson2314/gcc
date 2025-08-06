@@ -1202,7 +1202,6 @@ MOSTLYCLEANFILES = \
 	runtime.inc runtime.inc.tmp2 runtime.inc.tmp3 runtime.inc.raw
 
 CLEANFILES = *.go *.c s-* libgo.sum libgo.log runtime.inc
-MULTISRCTOP = 
 MULTIBUILDTOP = 
 MULTIDIRS = 
 MULTISUBDIR = 

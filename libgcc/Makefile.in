@@ -64,7 +64,6 @@ FORCE_EXPLICIT_EH_REGISTRY = @force_explicit_eh_registry@
 extra-parts = libgcc-extra-parts
 
 # Multilib support variables.
-MULTISRCTOP =
 MULTIBUILDTOP =
 MULTIDIRS =
 MULTISUBDIR =

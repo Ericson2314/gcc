@@ -103,7 +103,6 @@ class GenericFilter:
                 'mkinstalldirs',
                 'move-if-change',
                 'shlibpath.m4',
-                'symlink-tree',
                 'ylwrap',
 
                 # Skip FSF mission statement, etc.

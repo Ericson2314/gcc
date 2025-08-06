@@ -34,10 +34,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LIBCFLAGS = $(CFLAGS) $(LDFLAGS)
 
-# Multilib support variables.
-MULTISRCTOP =
-
-INCDIR=$(srcdir)/../$(MULTISRCTOP)../include
+INCDIR=$(srcdir)/../../include
 
 all:
 

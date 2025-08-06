@@ -35,7 +35,6 @@ objext = @OBJEXT@
 SHELL = @SHELL@
 
 # Multilib support variables.
-MULTISRCTOP =
 MULTIBUILDTOP =
 MULTIDIRS =
 MULTISUBDIR =
@@ -110,7 +109,7 @@ installcheck: installcheck-subdir
 
 @host_makefile_frag@
 
-INCDIR=$(srcdir)/$(MULTISRCTOP)../include
+INCDIR=$(srcdir)/../include
 
 COMPILE.c = $(CC) -c @DEFS@ $(CFLAGS) $(CPPFLAGS) -I. -I$(INCDIR) \
                $(HDEFINES) @ac_libiberty_warn_cflags@ -D_GNU_SOURCE \
