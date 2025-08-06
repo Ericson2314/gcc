@@ -23,14 +23,14 @@ AC_ARG_ENABLE(multilib,
 	      [multilib=yes])
 
 # We may get other options which we leave undocumented:
-# --with-target-subdir, --with-multisrctop, --with-multisubdir
+# --with-target-subdir, --with-multisubdir
 # See config-ml.in if you want the gory details.
 
 if test "$srcdir" = "."; then
   if test "$with_target_subdir" != "."; then
-    multi_basedir="$srcdir/$with_multisrctop../$2"
+    multi_basedir="$srcdir/../$2"
   else
-    multi_basedir="$srcdir/$with_multisrctop$2"
+    multi_basedir="$srcdir/$2"
   fi
 else
   multi_basedir="$srcdir/$2"
@@ -57,7 +57,6 @@ srcdir="$srcdir"
 host="$host"
 target="$target"
 with_multisubdir="$with_multisubdir"
-with_multisrctop="$with_multisrctop"
 with_target_subdir="$with_target_subdir"
 ac_configure_args="${multilib_arg} ${ac_configure_args}"
 multi_basedir="$multi_basedir"

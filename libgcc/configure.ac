@@ -37,9 +37,9 @@ if test "${srcdir}" = "."; then
     libgcc_topdir="${srcdir}/.."
   else
     if test "${with_target_subdir}" != "."; then
-      libgcc_topdir="${srcdir}/${with_multisrctop}../.."
+      libgcc_topdir="${srcdir}/../.."
     else
-      libgcc_topdir="${srcdir}/${with_multisrctop}.."
+      libgcc_topdir="${srcdir}/.."
     fi
   fi
 else
