@@ -2775,7 +2775,7 @@ clear_failure_queue (void)
    Returns the value returned by CALLBACK.  */
 
 template<typename fun>
-void *
+auto *
 for_each_path (const struct path_prefix *paths,
 	       bool do_multi,
 	       size_t extra_space,
@@ -2788,7 +2788,7 @@ for_each_path (const struct path_prefix *paths,
   const char *multi_suffix;
   const char *just_multi_suffix;
   char *path = NULL;
-  void *ret = NULL;
+  decltype (callback (nullptr)) ret;
   bool skip_multi_dir = false;
   bool skip_multi_os_dir = false;
 
@@ -3034,9 +3034,9 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
   /* Callback appends the file name to the directory path.  If the
      resulting file exists in the right mode, return the full pathname
      to the file.  */
-  return (char*) for_each_path (pprefix, do_multi,
-				name_len + suffix_len,
-				[name, suffix, suffix_len, name_len, mode](char *path) -> void* {
+  return for_each_path (pprefix, do_multi,
+			name_len + suffix_len,
+			[name, suffix, suffix_len, name_len, mode](char *path) -> char* {
     size_t len = strlen (path);
 
     memcpy (path + len, name, name_len);
