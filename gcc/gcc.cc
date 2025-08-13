@@ -2944,30 +2944,28 @@ find_within_paths::for_each_path (const struct path_prefix *paths,
   return ret;
 }
 
-/* Callback for build_search_list.  Adds path to obstack being built.  */
-
-struct add_to_obstack : find_within_paths {
-  struct obstack *ob;
-  bool check_dir;
-  bool first_time;
-
-private:
-  void *callback (char *path) override;
-};
-
-void *
-add_to_obstack::callback (char *path)
+/* This is an adapter for using a lambda.  It is separate from
+   find_within_paths::for_each_path in order that the main body of the
+   function (that function) *not* be template-specialised, and just this
+   tiny wrapper is instead.  */
+template<typename fun>
+static void *
+for_each_path (const struct path_prefix *paths,
+	       bool do_multi,
+	       size_t extra_space,
+	       fun && callback)
 {
-  if (check_dir && !is_directory (path))
-    return NULL;
-
-  if (!first_time)
-    obstack_1grow (ob, PATH_SEPARATOR);
-
-  obstack_grow (ob, path, strlen (path));
-
-  first_time = false;
-  return NULL;
+  struct adapter : find_within_paths {
+    fun cb;
+    adapter(fun && cb) : cb{cb} {}
+  private:
+    void *callback (char *path) override
+    {
+      return cb(path);
+    }
+  };
+  adapter a{std::move(callback)};
+  return a.for_each_path(paths, do_multi, extra_space);
 }
 
 /* Add or change the value of an environment variable, outputting the
@@ -2990,16 +2988,25 @@ static char *
 build_search_list (const struct path_prefix *paths, const char *prefix,
 		   bool check_dir, bool do_multi)
 {
-  struct add_to_obstack info;
-
-  info.ob = &collect_obstack;
-  info.check_dir = check_dir;
-  info.first_time = true;
+  struct obstack *const ob = &collect_obstack;
+  bool first_time = true;
 
   obstack_grow (&collect_obstack, prefix, strlen (prefix));
   obstack_1grow (&collect_obstack, '=');
 
-  info.for_each_path (paths, do_multi, 0);
+  /* Callback adds path to obstack being built.  */
+  for_each_path (paths, do_multi, 0, [ob, &first_time, check_dir](char *path) -> void* {
+    if (check_dir && !is_directory (path))
+      return NULL;
+
+    if (!first_time)
+      obstack_1grow (ob, PATH_SEPARATOR);
+
+    obstack_grow (ob, path, strlen (path));
+
+    first_time = false;
+    return NULL;
+  });
 
   obstack_1grow (&collect_obstack, '\0');
   return XOBFINISH (&collect_obstack, char *);
@@ -3033,44 +3040,6 @@ access_check (const char *name, int mode)
   return access (name, mode);
 }
 
-/* Callback for find_a_file.  Appends the file name to the directory
-   path.  If the resulting file exists in the right mode, return the
-   full pathname to the file.  */
-
-struct file_at_path : find_within_paths {
-  const char *name;
-  const char *suffix;
-  int name_len;
-  int suffix_len;
-  int mode;
-
-private:
-  void *callback (char *path) override;
-};
-
-void *
-file_at_path::callback (char *path)
-{
-  size_t len = strlen (path);
-
-  memcpy (path + len, name, name_len);
-  len += name_len;
-
-  /* Some systems have a suffix for executable files.
-     So try appending that first.  */
-  if (suffix_len)
-    {
-      memcpy (path + len, suffix, suffix_len + 1);
-      if (access_check (path, mode) == 0)
-	return path;
-    }
-
-  path[len] = '\0';
-  if (access_check (path, mode) == 0)
-    return path;
-
-  return NULL;
-}
 
 /* Search for NAME using the prefix list PREFIXES.  MODE is passed to
    access to check permissions.  If DO_MULTI is true, search multilib
@@ -3081,8 +3050,6 @@ static char *
 find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
 	     bool do_multi)
 {
-  struct file_at_path info;
-
   /* Find the filename in question (special case for absolute paths).  */
 
   if (IS_ABSOLUTE_PATH (name))
@@ -3093,14 +3060,37 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
       return NULL;
     }
 
-  info.name = name;
-  info.suffix = (mode & X_OK) != 0 ? HOST_EXECUTABLE_SUFFIX : "";
-  info.name_len = strlen (info.name);
-  info.suffix_len = strlen (info.suffix);
-  info.mode = mode;
+  const char *suffix = (mode & X_OK) != 0 ? HOST_EXECUTABLE_SUFFIX : "";
+  const int name_len = strlen (name);
+  const int suffix_len = strlen (suffix);
 
-  return (char*) info.for_each_path (pprefix, do_multi,
-				     info.name_len + info.suffix_len);
+
+  /* Callback appends the file name to the directory path.  If the
+     resulting file exists in the right mode, return the full pathname
+     to the file.  */
+  return (char*) for_each_path (pprefix, do_multi,
+				name_len + suffix_len,
+				[name, suffix, suffix_len, name_len, mode](char *path) -> void* {
+    size_t len = strlen (path);
+
+    memcpy (path + len, name, name_len);
+    len += name_len;
+
+    /* Some systems have a suffix for executable files.
+       So try appending that first.  */
+    if (suffix_len)
+      {
+	memcpy (path + len, suffix, suffix_len + 1);
+	if (access_check (path, mode) == 0)
+	  return path;
+      }
+
+    path[len] = '\0';
+    if (access_check (path, mode) == 0)
+      return path;
+
+    return NULL;
+  });
 }
 
 /* Specialization of find_a_file for programs that also takes into account
