@@ -2774,22 +2774,12 @@ clear_failure_queue (void)
 
    Returns the value returned by CALLBACK.  */
 
-class find_within_paths
-{
-protected:
-  virtual void * callback (char *) = 0;
-
-public:
-  void *
-  for_each_path (const struct path_prefix *paths,
-		 bool do_multi,
-		 size_t extra_space);
-};
-
+template<typename fun>
 void *
-find_within_paths::for_each_path (const struct path_prefix *paths,
+for_each_path (const struct path_prefix *paths,
 	       bool do_multi,
-	       size_t extra_space)
+	       size_t extra_space,
+	       fun && callback)
 {
   struct prefix_list *pl;
   const char *multi_dir = NULL;
@@ -2942,30 +2932,6 @@ find_within_paths::for_each_path (const struct path_prefix *paths,
   if (ret != path)
     free (path);
   return ret;
-}
-
-/* This is an adapter for using a lambda.  It is separate from
-   find_within_paths::for_each_path in order that the main body of the
-   function (that function) *not* be template-specialised, and just this
-   tiny wrapper is instead.  */
-template<typename fun>
-static void *
-for_each_path (const struct path_prefix *paths,
-	       bool do_multi,
-	       size_t extra_space,
-	       fun && callback)
-{
-  struct adapter : find_within_paths {
-    fun cb;
-    adapter(fun && cb) : cb{cb} {}
-  private:
-    void *callback (char *path) override
-    {
-      return cb(path);
-    }
-  };
-  adapter a{std::move(callback)};
-  return a.for_each_path(paths, do_multi, extra_space);
 }
 
 /* Add or change the value of an environment variable, outputting the
@@ -6010,7 +5976,7 @@ do_self_spec (const char *spec)
 
 /* Callback for processing %D and %I specs.  */
 
-struct spec_path : find_within_paths {
+struct spec_path {
   const char *option;
   const char *append;
   size_t append_len;
@@ -6018,12 +5984,11 @@ struct spec_path : find_within_paths {
   bool separate_options;
   bool realpaths;
 
-private:
-  void *callback (char *path) override;
+  void *operator() (char *path);
 };
 
 void *
-spec_path::callback (char *path)
+spec_path::operator() (char *path)
 {
   size_t len = 0;
   char save = 0;
@@ -6271,7 +6236,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	      info.separate_options = false;
 	      info.realpaths = false;
 
-	      info.for_each_path (&startfile_prefixes, true, 0);
+	      for_each_path (&startfile_prefixes, true, 0, info);
 	    }
 	    break;
 
@@ -6286,7 +6251,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	      /* We want to embed the actual paths that have the libraries.  */
 	      info.realpaths = true;
 
-	      info.for_each_path (&startfile_prefixes, true, 0);
+	      for_each_path (&startfile_prefixes, true, 0, info);
 	    }
 	    break;
 
@@ -6613,7 +6578,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	      info.separate_options = true;
 	      info.realpaths = false;
 
-	      info.for_each_path (&include_prefixes, false, info.append_len);
+	      for_each_path (&include_prefixes, false, info.append_len, info);
 
 	      info.append = "include-fixed";
 	      if (*sysroot_hdrs_suffix_spec)
@@ -6626,13 +6591,13 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		  info.append = concat (info.append, dir_separator_str,
 					multiarch_dir, NULL);
 		  info.append_len = strlen (info.append);
-		  info.for_each_path (&include_prefixes, false,
-				      info.append_len);
+		  for_each_path (&include_prefixes, false,
+				 info.append_len, info);
 
 		  info.append = "include-fixed";
 		}
 	      info.append_len = strlen (info.append);
-	      info.for_each_path (&include_prefixes, false, info.append_len);
+	      for_each_path (&include_prefixes, false, info.append_len, info);
 	    }
 	    break;
 
