@@ -2983,6 +2983,51 @@ for_each_path (const struct path_prefix *paths,
   return ret;
 }
 
+/* Call CALLBACK once per directory named in VALUE, a PATH_SEPARATOR
+   separated list such as the value of COMPILER_PATH or PATH.  VALUE may be
+   null, in which case CALLBACK is not called at all.
+
+   An empty element denotes the current directory.  Each directory is passed
+   with a trailing directory separator, as add_prefix expects.  The buffer
+   handed to CALLBACK is reused between iterations, so CALLBACK must copy
+   anything it wants to keep -- add_prefix does.  */
+
+template<typename fun>
+static void
+for_each_env_path (const char *value, fun callback)
+{
+  if (!value)
+    return;
+
+  char *nstore = (char *) alloca (strlen (value) + 3);
+
+  for (const char *startp = value, *endp = value; ; endp++)
+    {
+      if (*endp != PATH_SEPARATOR && *endp != 0)
+	continue;
+
+      if (endp == startp)
+	strcpy (nstore, concat (".", dir_separator_str, NULL));
+      else
+	{
+	  strncpy (nstore, startp, endp - startp);
+	  if (!IS_DIR_SEPARATOR (endp[-1]))
+	    {
+	      nstore[endp - startp] = DIR_SEPARATOR;
+	      nstore[endp - startp + 1] = 0;
+	    }
+	  else
+	    nstore[endp - startp] = 0;
+	}
+
+      callback (nstore);
+
+      if (*endp == 0)
+	break;
+      startp = endp + 1;
+    }
+}
+
 /* Add or change the value of an environment variable, outputting the
    change to standard error if in verbose mode.  */
 static void
@@ -4962,103 +5007,24 @@ process_command (unsigned int decoded_options_count,
   /* COMPILER_PATH and LIBRARY_PATH have values
      that are lists of directory names with colons.  */
 
-  temp = env.get ("COMPILER_PATH");
-  if (temp)
+  for_each_env_path (env.get ("COMPILER_PATH"), [] (const char *dir)
     {
-      const char *startp, *endp;
-      char *nstore = (char *) alloca (strlen (temp) + 3);
+      add_prefix (&exec_prefixes, dir, 0, PREFIX_PRIORITY_LAST, 0, 0);
+      add_prefix (&include_prefixes, dir, 0, PREFIX_PRIORITY_LAST, 0, 0);
+    });
 
-      startp = endp = temp;
-      while (1)
-	{
-	  if (*endp == PATH_SEPARATOR || *endp == 0)
-	    {
-	      strncpy (nstore, startp, endp - startp);
-	      if (endp == startp)
-		strcpy (nstore, concat (".", dir_separator_str, NULL));
-	      else if (!IS_DIR_SEPARATOR (endp[-1]))
-		{
-		  nstore[endp - startp] = DIR_SEPARATOR;
-		  nstore[endp - startp + 1] = 0;
-		}
-	      else
-		nstore[endp - startp] = 0;
-	      add_prefix (&exec_prefixes, nstore, 0,
-			  PREFIX_PRIORITY_LAST, 0, 0);
-	      add_prefix (&include_prefixes, nstore, 0,
-			  PREFIX_PRIORITY_LAST, 0, 0);
-	      if (*endp == 0)
-		break;
-	      endp = startp = endp + 1;
-	    }
-	  else
-	    endp++;
-	}
-    }
-
-  temp = env.get (LIBRARY_PATH_ENV);
-  if (temp && *cross_compile == '0')
+  if (*cross_compile == '0')
     {
-      const char *startp, *endp;
-      char *nstore = (char *) alloca (strlen (temp) + 3);
-
-      startp = endp = temp;
-      while (1)
+      auto add_startfile_prefix = [] (const char *dir)
 	{
-	  if (*endp == PATH_SEPARATOR || *endp == 0)
-	    {
-	      strncpy (nstore, startp, endp - startp);
-	      if (endp == startp)
-		strcpy (nstore, concat (".", dir_separator_str, NULL));
-	      else if (!IS_DIR_SEPARATOR (endp[-1]))
-		{
-		  nstore[endp - startp] = DIR_SEPARATOR;
-		  nstore[endp - startp + 1] = 0;
-		}
-	      else
-		nstore[endp - startp] = 0;
-	      add_prefix (&startfile_prefixes, nstore, NULL,
-			  PREFIX_PRIORITY_LAST, 0, 1);
-	      if (*endp == 0)
-		break;
-	      endp = startp = endp + 1;
-	    }
-	  else
-	    endp++;
-	}
-    }
+	  add_prefix (&startfile_prefixes, dir, NULL,
+		      PREFIX_PRIORITY_LAST, 0, 1);
+	};
 
-  /* Use LPATH like LIBRARY_PATH (for the CMU build program).  */
-  temp = env.get ("LPATH");
-  if (temp && *cross_compile == '0')
-    {
-      const char *startp, *endp;
-      char *nstore = (char *) alloca (strlen (temp) + 3);
+      for_each_env_path (env.get (LIBRARY_PATH_ENV), add_startfile_prefix);
 
-      startp = endp = temp;
-      while (1)
-	{
-	  if (*endp == PATH_SEPARATOR || *endp == 0)
-	    {
-	      strncpy (nstore, startp, endp - startp);
-	      if (endp == startp)
-		strcpy (nstore, concat (".", dir_separator_str, NULL));
-	      else if (!IS_DIR_SEPARATOR (endp[-1]))
-		{
-		  nstore[endp - startp] = DIR_SEPARATOR;
-		  nstore[endp - startp + 1] = 0;
-		}
-	      else
-		nstore[endp - startp] = 0;
-	      add_prefix (&startfile_prefixes, nstore, NULL,
-			  PREFIX_PRIORITY_LAST, 0, 1);
-	      if (*endp == 0)
-		break;
-	      endp = startp = endp + 1;
-	    }
-	  else
-	    endp++;
-	}
+      /* Use LPATH like LIBRARY_PATH (for the CMU build program).  */
+      for_each_env_path (env.get ("LPATH"), add_startfile_prefix);
     }
 
   /* Process the options and store input files and switches in their
