@@ -59,12 +59,9 @@ build_os=@build_os@
 host=@host@
 host_noncanonical=@host_noncanonical@
 host_os=@host_os@
-target=@target@
-target_noncanonical:=@target_noncanonical@
 
 # Normally identical to target_noncanonical, except for compilers built
 # as accelerator targets.
-real_target_noncanonical:=@real_target_noncanonical@
 accel_dir_suffix = @accel_dir_suffix@
 
 # Sed command to transform gcc to installed name.
@@ -93,7 +90,7 @@ objdir := $(shell pwd)
 
 host_subdir=@host_subdir@
 build_subdir=@build_subdir@
-target_subdir=@target_subdir@
+
 build_libsubdir=@build_libsubdir@
 
 # Top build directory for the "Cygnus tree", relative to $(top_builddir).
@@ -691,9 +688,9 @@ libexecdir = @libexecdir@
 # --------
 
 # Directory in which the compiler finds libraries etc.
-libsubdir = $(libdir)/gcc/$(real_target_noncanonical)/$(version)$(accel_dir_suffix)
+libsubdir = $(libdir)/gcc/$(version)$(accel_dir_suffix)
 # Directory in which the compiler finds executables
-libexecsubdir = $(libexecdir)/gcc/$(real_target_noncanonical)/$(version)$(accel_dir_suffix)
+libexecsubdir = $(libexecdir)/gcc/$(version)$(accel_dir_suffix)
 # Directory in which all plugin resources are installed
 plugin_resourcesdir = $(libsubdir)/plugin
  # Directory in which plugin headers are installed
@@ -2678,8 +2675,6 @@ DRIVER_DEFINES = \
   -DSTANDARD_EXEC_PREFIX=\"$(libdir)/gcc/\" \
   -DSTANDARD_LIBEXEC_PREFIX=\"$(libexecdir)/gcc/\" \
   -DDEFAULT_TARGET_VERSION=\"$(version)\" \
-  -DDEFAULT_REAL_TARGET_MACHINE=\"$(real_target_noncanonical)\" \
-  -DDEFAULT_TARGET_MACHINE=\"$(target_noncanonical)\" \
   -DSTANDARD_BINDIR_PREFIX=\"$(bindir)/\" \
   -DTOOLDIR_BASE_PREFIX=\"$(libsubdir_to_prefix)$(prefix_to_exec_prefix)\" \
   -DACCEL_DIR_SUFFIX=\"$(accel_dir_suffix)\" \
@@ -4748,7 +4743,7 @@ uninstall: lang.uninstall
 # These targets are for the dejagnu testsuites. The file site.exp
 # contains global variables that all the testsuites will use.
 
-target_subdir = @target_subdir@
+
 
 site.exp: ./config.status Makefile testsuite/et-static.exp
 	@echo "Making a new config file..."

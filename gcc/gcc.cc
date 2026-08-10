@@ -349,8 +349,11 @@ static const char *const spec_version = DEFAULT_TARGET_VERSION;
 
 /* The target machine.  */
 
-static const char *spec_machine = DEFAULT_TARGET_MACHINE;
-static const char *spec_host_machine = DEFAULT_REAL_TARGET_MACHINE;
+/* The target in force.  Empty until one is selected: a compiler serving
+   several targets has no single machine of its own, and anything that needs
+   one -- -dumpmachine, the tool search, the "Target:" line -- is asking about
+   the target selected, not about the compiler.  */
+static const char *spec_machine = "";
 
 /* List of offload targets.  Separated by colon.  Empty string for
    -foffload=disable.  */
@@ -5543,8 +5546,8 @@ process_command (unsigned int decoded_options_count,
      running, or, if that is not available, the configured prefix.  */
   tooldir_prefix
     = concat (gcc_exec_prefix ? gcc_exec_prefix : standard_exec_prefix,
-	      spec_host_machine, dir_separator_str, spec_version,
-	      accel_dir_suffix, dir_separator_str, tooldir_prefix2, NULL);
+	      spec_version, accel_dir_suffix, dir_separator_str,
+	      tooldir_prefix2, NULL);
   free (tooldir_prefix2);
 
   add_prefix (&exec_prefixes,
@@ -8560,10 +8563,14 @@ driver::set_up_specs () const
 
   /* Read specs from a file if there is one.  */
 
-  machine_suffix = concat (spec_host_machine, dir_separator_str, spec_version,
-			   accel_dir_suffix, dir_separator_str, NULL);
-  just_machine_suffix = concat (spec_machine, dir_separator_str, NULL);
-  just_machine_prefix = concat (spec_machine, "-", NULL);
+  /* One compiler serves every target it was built for, so its own directories
+     carry no machine name; they are laid out under the version alone.  Where a
+     machine name is wanted for a particular target -- to find that target's
+     tools, or its files -- it comes from the target in force.  */
+  machine_suffix = concat (spec_version, accel_dir_suffix, dir_separator_str,
+			   NULL);
+  just_machine_suffix = "";
+  just_machine_prefix = "";
 
   specs_file = find_a_file (&startfile_prefixes, "specs", true);
   /* Read the specs file unless it is a default one.  */
@@ -8772,8 +8779,7 @@ driver::set_up_specs () const
 
   /* If we have a GCC_EXEC_PREFIX envvar, modify it for cpp's sake.  */
   if (gcc_exec_prefix)
-    gcc_exec_prefix = concat (gcc_exec_prefix, spec_host_machine,
-			      dir_separator_str, spec_version,
+    gcc_exec_prefix = concat (gcc_exec_prefix, spec_version,
 			      accel_dir_suffix, dir_separator_str, NULL);
 
   /* Now we have the specs.
@@ -11439,7 +11445,7 @@ driver::finalize ()
   free (outbase);
   dumpdir = dumpbase = dumpbase_ext = outbase = NULL;
   dumpdir_length = outbase_length = 0;
-  spec_machine = DEFAULT_TARGET_MACHINE;
+  spec_machine = "";
   greatest_status = 1;
 
   obstack_free (&obstack, NULL);

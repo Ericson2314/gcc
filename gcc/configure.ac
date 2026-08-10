@@ -30,23 +30,34 @@ AC_CONFIG_HEADER(auto-host.h:config.in)
 
 gcc_version=`cat $srcdir/BASE-VER`
 
-# Determine the host, build, and target systems
+# Determine the host and build systems
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
-AC_CANONICAL_TARGET
 
-# Determine the noncanonical host name, for Ada.
+# Determine the noncanonical build name, and the noncanonical host name for Ada.
+ACX_NONCANONICAL_BUILD
 ACX_NONCANONICAL_HOST
 
-# Determine the noncanonical target name, for directory use.
-ACX_NONCANONICAL_TARGET
-
 # Used for constructing correct paths for offload compilers.
-real_target_noncanonical=${target_noncanonical}
 accel_dir_suffix=
 
-# Determine the target- and build-specific subdirectories
-GCC_TOPLEV_SUBDIRS
+# Determine the build- and host-specific subdirectories.  GCC_TOPLEV_SUBDIRS
+# would do this, but it also derives a target_subdir and requires a canonical
+# target for it.
+build_subdir="build-${build_noncanonical}"
+if ( test $srcdir = . && test -d ../gcc ) \
+   || test -d $srcdir/../host-${host_noncanonical}; then
+  host_subdir="host-${host_noncanonical}"
+else
+  host_subdir=.
+fi
+AC_SUBST(host_subdir)
+AC_ARG_WITH(build-libsubdir,
+[AS_HELP_STRING([--with-build-libsubdir=DIR],
+		[directory where to find libraries for build system])],
+build_libsubdir="$withval",
+build_libsubdir="$build_subdir")
+AC_SUBST(build_libsubdir)
 
 # Set program_transform_name
 AC_ARG_PROGRAM
@@ -404,9 +415,6 @@ AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
 AC_SUBST(GDCFLAGS)
 
-# Determine PICFLAG for target gnatlib.
-GCC_PICFLAG_FOR_TARGET
-AC_SUBST(PICFLAG_FOR_TARGET)
 
 # -------------------------
 # Check C compiler features
@@ -1853,19 +1861,15 @@ case ${enable_targets} in
     ;;
 esac
 
-dnl When targets are named explicitly they are the whole list: ${target} gets no
-dnl privileged place in it.
-dnl
-dnl A build-time default target is a hiding place.  Anything still target-specific
-dnl keeps working as long as it happens to be the default, so the dependency is
-dnl never noticed -- it only surfaces for whichever target was not chosen at
-dnl configure time.  Making every target equal means nothing can hide there.
-dnl The endgame is no --target at all, only --enable-targets.
-if test x"${gcc_extra_targets}" != x; then
-  gcc_manifest_targets="${gcc_extra_targets}"
-else
-  gcc_manifest_targets="${target}"
+dnl --enable-targets names every target, and there is no other source for the
+dnl list.  In particular there is no falling back on --target: autoconf sets
+dnl `target' from `target_alias' whenever --target is passed, so a fallback
+dnl would silently reinstate a default target and give it a privileged position
+dnl again -- which is the thing being removed.
+if test x"${gcc_extra_targets}" = x; then
+  AC_MSG_ERROR([--enable-targets=LIST is required])
 fi
+gcc_manifest_targets="${gcc_extra_targets}"
 
 gcc_all_common_objects=
 gcc_all_common_symbols=

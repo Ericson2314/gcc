@@ -804,6 +804,7 @@ MKINSTALLDIRS
 INSTALL_SCRIPT
 get_gcc_base_ver
 HAVE_AUTO_BUILD
+build_subdir
 extra_opt_files
 extra_modes_file
 NATIVE_SYSTEM_HEADER_DIR
@@ -885,7 +886,6 @@ CPP
 EGREP
 GREP
 CXXCPP
-PICFLAG_FOR_TARGET
 GDCFLAGS
 GDC
 GNATMAKE
@@ -905,16 +905,10 @@ CROSS_SYSTEM_HEADER_DIR
 TARGET_SYSTEM_ROOT_DEFINE
 TARGET_SYSTEM_ROOT
 SYSROOT_CFLAGS_FOR_TARGET
-target_subdir
-host_subdir
-build_subdir
 build_libsubdir
-target_noncanonical
+host_subdir
 host_noncanonical
-target_os
-target_vendor
-target_cpu
-target
+build_noncanonical
 host_os
 host_vendor
 host_cpu
@@ -1693,7 +1687,6 @@ Program names:
 System types:
   --build=BUILD     configure for building on BUILD [guessed]
   --host=HOST       cross-compile to build programs to run on HOST [BUILD]
-  --target=TARGET   configure for building compilers for TARGET [HOST]
 _ACEOF
 fi
 
@@ -1854,7 +1847,8 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-build-libsubdir=DIR  Directory where to find libraries for build system
+  --with-build-libsubdir=DIR
+                          directory where to find libraries for build system
   --with-local-prefix=DIR specifies directory to put local include
   --with-native-system-header-dir=dir
                           use dir as the directory to look for standard
@@ -3405,7 +3399,7 @@ ac_config_headers="$ac_config_headers auto-host.h:config.in"
 
 gcc_version=`cat $srcdir/BASE-VER`
 
-# Determine the host, build, and target systems
+# Determine the host and build systems
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
   if test -f "$ac_dir/install-sh"; then
@@ -3506,51 +3500,14 @@ IFS=$ac_save_IFS
 case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking target system type" >&5
-$as_echo_n "checking target system type... " >&6; }
-if ${ac_cv_target+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test "x$target_alias" = x; then
-  ac_cv_target=$ac_cv_host
-else
-  ac_cv_target=`$SHELL "$ac_aux_dir/config.sub" $target_alias` ||
-    as_fn_error $? "$SHELL $ac_aux_dir/config.sub $target_alias failed" "$LINENO" 5
-fi
 
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_target" >&5
-$as_echo "$ac_cv_target" >&6; }
-case $ac_cv_target in
-*-*-*) ;;
-*) as_fn_error $? "invalid value of canonical target" "$LINENO" 5;;
-esac
-target=$ac_cv_target
-ac_save_IFS=$IFS; IFS='-'
-set x $ac_cv_target
-shift
-target_cpu=$1
-target_vendor=$2
-shift; shift
-# Remember, the first character of IFS is used to create $*,
-# except with old shells:
-target_os=$*
-IFS=$ac_save_IFS
-case $target_os in *\ *) target_os=`echo "$target_os" | sed 's/ /-/g'`;; esac
-
-
-# The aliases save the names the user supplied, while $host etc.
-# will get canonicalized.
-test -n "$target_alias" &&
-  test "$program_prefix$program_suffix$program_transform_name" = \
-    NONENONEs,x,x, &&
-  program_prefix=${target_alias}-
-
-# Determine the noncanonical host name, for Ada.
+# Determine the noncanonical build name, and the noncanonical host name for Ada.
  case ${build_alias} in
   "") build_noncanonical=${build} ;;
   *) build_noncanonical=${build_alias} ;;
 esac
+
+
 
  case ${host_alias} in
   "") host_noncanonical=${build_noncanonical} ;;
@@ -3560,32 +3517,20 @@ esac
 
 
 
-# Determine the noncanonical target name, for directory use.
- case ${target_alias} in
-  "") target_noncanonical=${host_noncanonical} ;;
-  *) target_noncanonical=${target_alias} ;;
-esac
-
-
-
-
 # Used for constructing correct paths for offload compilers.
-real_target_noncanonical=${target_noncanonical}
 accel_dir_suffix=
 
-# Determine the target- and build-specific subdirectories
-
-# post-stage1 host modules use a different CC_FOR_BUILD so, in order to
-# have matching libraries, they should use host libraries: Makefile.tpl
-# arranges to pass --with-build-libsubdir=$(HOST_SUBDIR).
-# However, they still use the build modules, because the corresponding
-# host modules (e.g. bison) are only built for the host when bootstrap
-# finishes. So:
-# - build_subdir is where we find build modules, and never changes.
-# - build_libsubdir is where we find build libraries, and can be overridden.
-
-# Prefix 'build-' so this never conflicts with target_subdir.
+# Determine the build- and host-specific subdirectories.  GCC_TOPLEV_SUBDIRS
+# would do this, but it also derives a target_subdir and requires a canonical
+# target for it.
 build_subdir="build-${build_noncanonical}"
+if ( test $srcdir = . && test -d ../gcc ) \
+   || test -d $srcdir/../host-${host_noncanonical}; then
+  host_subdir="host-${host_noncanonical}"
+else
+  host_subdir=.
+fi
+
 
 # Check whether --with-build-libsubdir was given.
 if test "${with_build_libsubdir+set}" = set; then :
@@ -3594,15 +3539,6 @@ else
   build_libsubdir="$build_subdir"
 fi
 
-# --srcdir=. covers the toplevel, while "test -d" covers the subdirectories
-if ( test $srcdir = . && test -d gcc ) \
-   || test -d $srcdir/../host-${host_noncanonical}; then
-  host_subdir="host-${host_noncanonical}"
-else
-  host_subdir=.
-fi
-# No prefix.
-target_subdir=${target_noncanonical}
 
 
 # Set program_transform_name
@@ -5379,90 +5315,6 @@ case "$CC" in
 esac
 
 
-
-
-# Determine PICFLAG for target gnatlib.
-
-
-
-
-case "${target}" in
-    # PIC is the default on some targets or must not be used.
-    *-*-darwin*)
-	# For darwin, common symbols are not allowed in MH_DYLIB files
-	case "${CFLAGS}" in
-	  # If we are using a compiler supporting mdynamic-no-pic
-	  # and the option has been tested as safe to add, then cancel
-	  # it here, since the code generated is incompatible with shared
-	  # libs.
-	  *-mdynamic-no-pic*) PICFLAG_FOR_TARGET='-fno-common -mno-dynamic-no-pic' ;;
-	  *) PICFLAG_FOR_TARGET=-fno-common ;;
-	esac
-	;;
-    alpha*-dec-osf5*)
-	# PIC is the default.
-	;;
-    hppa*64*-*-hpux*)
-	# PIC is the default for 64-bit PA HP-UX.
-	;;
-    i[34567]86-*-cygwin* | x86_64-*-cygwin*)
-	;;
-    i[34567]86-*-mingw* | x86_64-*-mingw*)
-	;;
-    i[34567]86-*-interix[3-9]*)
-	# Interix 3.x gcc -fpic/-fPIC options generate broken code.
-	# Instead, we relocate shared libraries at runtime.
-	;;
-    i[34567]86-*-nto-qnx*)
-	# QNX uses GNU C++, but need to define -shared option too, otherwise
-	# it will coredump.
-	PICFLAG_FOR_TARGET='-fPIC -shared'
-	;;
-    i[34567]86-pc-msdosdjgpp*)
-	# DJGPP does not support shared libraries at all.
-	;;
-    ia64*-*-hpux*)
-	# On IA64 HP-UX, PIC is the default but the pic flag
-	# sets the default TLS model and affects inlining.
-	PICFLAG_FOR_TARGET=-fPIC
-	;;
-    loongarch*-*-*)
-	PICFLAG_FOR_TARGET=-fpic
-	;;
-    mips-sgi-irix6*)
-	# PIC is the default.
-	;;
-    rs6000-ibm-aix* | powerpc-ibm-aix*)
-	# All AIX code is PIC.
-	;;
-
-    # Some targets support both -fPIC and -fpic, but prefer the latter.
-    # FIXME: Why?
-    i[34567]86-*-* | x86_64-*-*)
-	PICFLAG_FOR_TARGET=-fpic
-	;;
-    # FIXME: Override -fPIC default in libgcc only?
-    sh-*-linux* | sh[2346lbe]*-*-linux*)
-	PICFLAG_FOR_TARGET=-fpic
-	;;
-    sh*-*-netbsd*)
-	PICFLAG_FOR_TARGET=-fpic
-	;;
-    # Default to -fPIC unless specified otherwise.
-    *)
-	PICFLAG_FOR_TARGET=-fPIC
-	;;
-esac
-
-# If the user explicitly uses -fpic/-fPIC, keep that.
-case "${CFLAGS_FOR_TARGET}" in
-    *-fpic*)
-	PICFLAG_FOR_TARGET=-fpic
-	;;
-    *-fPIC*)
-	PICFLAG_FOR_TARGET=-fPIC
-	;;
-esac
 
 
 
@@ -12876,11 +12728,10 @@ case ${enable_targets} in
     ;;
 esac
 
-if test x"${gcc_extra_targets}" != x; then
-  gcc_manifest_targets="${gcc_extra_targets}"
-else
-  gcc_manifest_targets="${target}"
+if test x"${gcc_extra_targets}" = x; then
+  as_fn_error $? "--enable-targets=LIST is required" "$LINENO" 5
 fi
+gcc_manifest_targets="${gcc_extra_targets}"
 
 gcc_all_common_objects=
 gcc_all_common_symbols=
@@ -21950,7 +21801,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21953 "configure"
+#line 21804 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22056,7 +21907,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22059 "configure"
+#line 21910 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
