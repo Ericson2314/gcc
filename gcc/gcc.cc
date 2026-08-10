@@ -2990,13 +2990,19 @@ for_each_path (const struct path_prefix *paths,
    An empty element denotes the current directory.  Each directory is passed
    with a trailing directory separator, as add_prefix expects.  The buffer
    handed to CALLBACK is reused between iterations, so CALLBACK must copy
-   anything it wants to keep -- add_prefix does.  */
+   anything it wants to keep -- add_prefix does.
 
-static void
-for_each_env_path (const char *value, void (*callback) (const char *))
+   As with for_each_path, CALLBACK returns null to carry on to the next
+   directory, and anything else to stop there.  That value is returned.  */
+
+template<typename fun>
+static auto *
+for_each_env_path (const char *value, fun callback)
 {
+  decltype (callback (nullptr)) ret = nullptr;
+
   if (!value)
-    return;
+    return ret;
 
   char *nstore = (char *) alloca (strlen (value) + 3);
 
@@ -3019,12 +3025,16 @@ for_each_env_path (const char *value, void (*callback) (const char *))
 	    nstore[endp - startp] = 0;
 	}
 
-      callback (nstore);
+      ret = callback (nstore);
+      if (ret)
+	break;
 
       if (*endp == 0)
 	break;
       startp = endp + 1;
     }
+
+  return ret;
 }
 
 /* Add or change the value of an environment variable, outputting the
@@ -3054,7 +3064,8 @@ build_search_list (const struct path_prefix *paths, const char *prefix,
   obstack_1grow (&collect_obstack, '=');
 
   /* Callback adds path to obstack being built.  */
-  for_each_path (paths, do_multi, 0, [&](char *path, bool) -> void*
+  for_each_path (paths, do_multi, 0,
+		 [ob, check_dir, &first_time](char *path, bool) -> void*
     {
       if (check_dir && !is_directory (path))
 	return NULL;
@@ -3128,7 +3139,7 @@ find_a_file (const struct path_prefix *pprefix, const char *name,
      to the file.  */
   return for_each_path (pprefix, do_multi,
 			name_len,
-			[=](char *path, bool) -> char*
+			[name, name_len](char *path, bool) -> char*
     {
       memcpy (path + strlen (path), name, name_len + 1);
 
@@ -3185,13 +3196,15 @@ find_a_program (const char *name)
   /* Callback appends the file name to the directory path.  If the
      resulting file exists in the right mode, return the full pathname
      to the file.  */
-  return for_each_path (&exec_prefixes, false,
-			prefix_len + name_len + suffix_len,
-			[=](char *path, bool machine_specific) -> char*
+  char *ret = for_each_path (&exec_prefixes, false,
+			     prefix_len + name_len + suffix_len,
+			     [name, name_len, prefix_len, suffix, suffix_len]
+			     (char *path, bool machine_specific) -> char*
     {
       size_t path_len = strlen (path);
 
-      auto search = [=](size_t len) -> char*
+      auto search = [path, name, name_len, suffix, suffix_len]
+		    (size_t len) -> char*
 	{
 	  memcpy (path + len, name, name_len + 1);
 	  len += name_len;
@@ -3225,6 +3238,36 @@ find_a_program (const char *name)
 	}
 
       return search(path_len);
+    });
+
+  if (ret)
+    return ret;
+
+  /* Nothing among our own directories, so fall back to PATH.
+
+     Searching it here rather than via execvp means we know which file
+     we picked, so -print-prog-name can report it.  */
+
+  return for_each_env_path (env.get ("PATH"),
+			    [name, suffix, suffix_len] (const char *dir)
+			    -> char*
+    {
+      /* Some systems have a suffix for executable files.  As above, try
+	 appending that first.  */
+      if (suffix_len)
+	{
+	  char *candidate = concat (dir, name, suffix, NULL);
+	  if (access_check (candidate, X_OK) == 0)
+	    return candidate;
+	  free (candidate);
+	}
+
+      char *candidate = concat (dir, name, NULL);
+      if (access_check (candidate, X_OK) == 0)
+	return candidate;
+
+      free (candidate);
+      return NULL;
     });
 }
 
@@ -3547,8 +3590,7 @@ execute (void)
       const char *string = commands[i].argv[0];
 
       errmsg = pex_run (pex,
-			((i + 1 == n_commands ? PEX_LAST : 0)
-			 | (string == commands[i].prog ? PEX_SEARCH : 0)),
+			(i + 1 == n_commands ? PEX_LAST : 0),
 			string, const_cast<char **> (commands[i].argv),
 			NULL, NULL, &err);
       if (errmsg != NULL)
@@ -5006,18 +5048,20 @@ process_command (unsigned int decoded_options_count,
   /* COMPILER_PATH and LIBRARY_PATH have values
      that are lists of directory names with colons.  */
 
-  for_each_env_path (env.get ("COMPILER_PATH"), [] (const char *dir)
+  for_each_env_path (env.get ("COMPILER_PATH"), [] (const char *dir) -> void*
     {
       add_prefix (&exec_prefixes, dir, 0, PREFIX_PRIORITY_LAST, 0, 0);
       add_prefix (&include_prefixes, dir, 0, PREFIX_PRIORITY_LAST, 0, 0);
+      return NULL;
     });
 
   if (*cross_compile == '0')
     {
-      auto add_startfile_prefix = [] (const char *dir)
+      auto add_startfile_prefix = [] (const char *dir) -> void*
 	{
 	  add_prefix (&startfile_prefixes, dir, NULL,
 		      PREFIX_PRIORITY_LAST, 0, 1);
+	  return NULL;
 	};
 
       for_each_env_path (env.get (LIBRARY_PATH_ENV), add_startfile_prefix);
