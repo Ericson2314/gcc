@@ -72,18 +72,40 @@ AC_ARG_WITH([ld],
   [AS_HELP_STRING([--with-ld=PATH], [linker to probe (default: TARGET-ld, or ld if native)])],
   [gcc_cv_ld=$withval], [gcc_cv_ld=$ts_default_ld])
 
-dnl Values that gcc/configure would have frozen into configure_default_options[]
-dnl and paired with the target's OPTION_DEFAULT_SPECS templates.  Here they are
-dnl just inputs, so a single driver can carry different defaults per target.
-AC_ARG_WITH([arch],
-  [AS_HELP_STRING([--with-arch=ARCH], [default -march for this target])],
-  [spec_with_arch=$withval], [spec_with_arch=])
-AC_ARG_WITH([cpu],
-  [AS_HELP_STRING([--with-cpu=CPU], [default -mcpu for this target])],
-  [spec_with_cpu=$withval], [spec_with_cpu=])
-AC_ARG_WITH([tune],
-  [AS_HELP_STRING([--with-tune=TUNE], [default -mtune for this target])],
-  [spec_with_tune=$withval], [spec_with_tune=])
+dnl This target's CPU/ABI defaults.  gcc/configure used to freeze one target's
+dnl answers into configure_default_options[[]] and pair them with that target's
+dnl OPTION_DEFAULT_SPECS templates inside the driver; here they are ordinary
+dnl inputs, so one driver can carry different defaults for every target it
+dnl serves.  gcc/config.gcc infers them from the triple and gcc/configure.ac
+dnl records them in the multi-target manifest as `name=value' pairs.
+AC_ARG_WITH([option-defaults],
+  [AS_HELP_STRING([--with-option-defaults=LIST],
+     [space-separated name=value defaults, as config.gcc infers them])],
+  [spec_option_defaults=$withval], [spec_option_defaults=])
+
+dnl Which back end this target uses.  The templates below are not the same for
+dnl every back end -- i386 spells the `cpu' and `tune' defaults as -mtune, most
+dnl others spell `cpu' as -mcpu -- so the expansion has to know.
+AC_ARG_WITH([cpu-type],
+  [AS_HELP_STRING([--with-cpu-type=NAME], [back end name, e.g. i386, mips])],
+  [spec_cpu_type=$withval], [spec_cpu_type=])
+
+dnl Properties of the target that are decided by the target itself rather than
+dnl probed from a tool: gcc/config.gcc derives them from the triple and
+dnl gcc/configure.ac reports them in the manifest.  They are passed through here
+dnl because the target config file is the one channel cc1 reads.
+AC_ARG_WITH([decimal-float],
+  [AS_HELP_STRING([--with-decimal-float=0|1],
+     [target has decimal float support in its libgcc])],
+  [spec_decimal_float=$withval], [spec_decimal_float=0])
+AC_ARG_WITH([decimal-bid-format],
+  [AS_HELP_STRING([--with-decimal-bid-format=0|1],
+     [target ABI encodes decimal float as BID rather than DPD])],
+  [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=0])
+AC_ARG_WITH([s390-excess-float-precision],
+  [AS_HELP_STRING([--with-s390-excess-float-precision=0|1],
+     [s390 target C library typedefs float_t to double])],
+  [spec_s390_excess_fp=$withval], [spec_s390_excess_fp=0])
 
 AC_ARG_WITH([specs-file],
   [AS_HELP_STRING([--with-specs-file=PATH], [where to write the spec file])],
@@ -197,6 +219,24 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-pie' > /dev/null; then
 fi
 AC_MSG_RESULT([$gcc_cv_ld_pie])
 
+dnl .sleb128/.uleb128 with symbol arithmetic.  Older GAS and several non-GNU
+dnl assemblers accept the directives but compute the difference wrongly, so the
+dnl probe assembles a symbol difference and checks the encoded bytes rather than
+dnl just the exit status.  Feeds targ_caps.leb128 in cc1, not a spec string.
+AC_MSG_CHECKING([assembler for .sleb128/.uleb128])
+gcc_cv_as_leb128=no
+cat > conftest.s <<'TSEOF'
+	.data
+	.uleb128 L2 - L1
+L1:
+	.uleb128 0x8000000000000000
+L2:
+TSEOF
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  gcc_cv_as_leb128=yes
+fi
+AC_MSG_RESULT([$gcc_cv_as_leb128])
+
 AC_MSG_CHECKING([linker for -Bstatic/-Bdynamic])
 gcc_cv_ld_static_dynamic=no
 if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
@@ -238,22 +278,87 @@ case $gcc_cv_ld_compress_debug in
   2) link_compress_debug=' %{gz|gz=zlib:--compress-debug-sections=zlib} %{gz=none:--compress-debug-sections=none} %{gz=zstd:--compress-debug-sections=zstd} %{gz=zlib-gnu:}' ;;
 esac
 
-dnl Expand the option-default templates now, so the driver receives a plain self
-dnl spec with no %(VALUE) left in it.
+dnl Expand this target's option defaults against its back end's
+dnl OPTION_DEFAULT_SPECS templates, so the driver receives a plain self spec with
+dnl no %(VALUE) left in it.  The driver used to hold both halves -- the template
+dnl from tm.h, the value from configure -- in a static table that -dumpspecs did
+dnl not show and no spec file could reach.
 dnl
-dnl CAVEAT: the templates below are the common shape (as used by i386, aarch64,
-dnl riscv and most others).  A target whose OPTION_DEFAULT_SPECS differs will
-dnl need its own template, which is exactly the config.gcc-derived data that
-dnl should move into this generator rather than living in gcc/.
+dnl The templates are transcribed from the back ends' OPTION_DEFAULT_SPECS.  They
+dnl are NOT uniform: i386 spells both `cpu' and `tune' as -mtune, most others
+dnl spell `cpu' as -mcpu, and mips guards -march with MIPS_ARCH_OPTION_SPEC.
+dnl
+dnl An option this script has no template for is NOT silently dropped: it is
+dnl reported, and recorded as a comment in the spec file.  Dropping it would look
+dnl exactly like a target that has no default for it, which is how a wrong
+dnl default gets into a compiler without anyone noticing.
 option_defaults=
-if test x"$spec_with_arch" != x; then
-  option_defaults="${option_defaults}%{!march=*:-march=${spec_with_arch}} "
-fi
-if test x"$spec_with_cpu" != x; then
-  option_defaults="${option_defaults}%{!mcpu=*:%{!march=*:-mcpu=${spec_with_cpu}}} "
-fi
-if test x"$spec_with_tune" != x; then
-  option_defaults="${option_defaults}%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${spec_with_tune}}}} "
+option_defaults_unhandled=
+for ts_od in ${spec_option_defaults}; do
+  ts_name=`echo "$ts_od" | sed 's/=.*//'`
+  ts_value=`echo "$ts_od" | sed 's/^[[^=]]*=//'`
+  test x"$ts_value" = x && continue
+  ts_tmpl=
+  case ${spec_cpu_type}:${ts_name} in
+    i386:cpu | i386:tune)
+      dnl i386.h: {"cpu"|"tune", "%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=%(VALUE)}}}"}
+      ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    mips:arch)
+      dnl mips.h guards this with MIPS_ARCH_OPTION_SPEC, which lists every -m
+      dnl option that already implies an architecture.  Approximating it here
+      dnl would be a guess, so it is reported instead.
+      ts_tmpl= ;;
+    *:arch)
+      ts_tmpl="%{!march=*:-march=${ts_value}}" ;;
+    *:cpu)
+      ts_tmpl="%{!mcpu=*:%{!march=*:-mcpu=${ts_value}}}" ;;
+    *:tune)
+      ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    *:abi)
+      ts_tmpl="%{!mabi=*:-mabi=${ts_value}}" ;;
+    *:float)
+      ts_tmpl="%{!msoft-float:%{!mhard-float:-m${ts_value}-float}}" ;;
+    *:nan)
+      ts_tmpl="%{!mnan=*:-mnan=${ts_value}}" ;;
+    *:divide)
+      ts_tmpl="%{!mdivide-traps:%{!mdivide-breaks:-mdivide-${ts_value}}}" ;;
+    *:llsc)
+      ts_tmpl="%{!mllsc:%{!mno-llsc:-m${ts_value}}}" ;;
+    *:mips-plt)
+      ts_tmpl="%{!mplt:%{!mno-plt:-m${ts_value}}}" ;;
+    *:synci)
+      ts_tmpl="%{!msynci:%{!mno-synci:-m${ts_value}}}" ;;
+    *:lxc1-sxc1)
+      ts_tmpl="%{!mlxc1-sxc1:%{!mno-lxc1-sxc1:-m${ts_value}}}" ;;
+    *:madd4)
+      ts_tmpl="%{!mmadd4:%{!mno-madd4:-m${ts_value}}}" ;;
+    *:msa)
+      ts_tmpl="%{!mmsa:%{!mno-msa:-m${ts_value}}}" ;;
+    *:compact-branches)
+      ts_tmpl="%{!mcompact-branches=*:-mcompact-branches=${ts_value}}" ;;
+    *:tls)
+      dnl i386 spells this -mtls-dialect=; loongarch and riscv spell it -mtls-dialect=
+      dnl too, and arm -mtls-dialect=.  Uniform enough to state.
+      ts_tmpl="%{!mtls-dialect=*:-mtls-dialect=${ts_value}}" ;;
+    *:schedule)
+      ts_tmpl="%{!mschedule=*:-mschedule=${ts_value}}" ;;
+  esac
+  if test x"$ts_tmpl" = x; then
+    option_defaults_unhandled="${option_defaults_unhandled} ${ts_name}=${ts_value}"
+  else
+    option_defaults="${option_defaults}${ts_tmpl} "
+  fi
+done
+
+dnl The _32/_64 variants, --with-cmodel, --with-fp-32, --with-odd-spreg-32,
+dnl --with-fpu and --with-isa-spec are deliberately absent from the table above.
+dnl Their templates are guarded by OPT_ARCH32/OPT_ARCH64, whose expansion is a
+dnl compile-time property of the back end's tm.h (i386 keys it on
+dnl TARGET_64BIT_DEFAULT, mips on the default ABI), or they reach the back end as
+dnl tm_defines rather than as a driver option at all.  Transcribing them from
+dnl shell would be a guess; they are reported instead.
+if test x"$option_defaults_unhandled" != x; then
+  AC_MSG_WARN([no OPTION_DEFAULT_SPECS template for:${option_defaults_unhandled}])
 fi
 
 dnl Only write a spec file if the probes actually ran.  Writing one built from
@@ -264,6 +369,29 @@ if test x"$have_target_tools" != xyes; then
   AC_MSG_NOTICE([skipping $specs_file: target tools unavailable, nothing probed])
 else
 
+dnl Capabilities that cc1 (not the driver) consults.  These cannot be spec
+dnl strings -- cc1 never reads spec files -- so they go into a side-car config
+dnl file, and the spec file below merely tells the driver to pass its path.
+dnl One option carries all of them, so adding a capability never adds an option.
+target_config_file=${specs_file}-config
+AC_MSG_NOTICE([writing $target_config_file])
+cat > "$target_config_file" <<EOF
+# Target assembler/linker capabilities for ${target}.
+# Read by cc1 via -ftarget-config=; see gcc/target-caps.h.
+leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
+# Properties of the target rather than of its tools: derived by config.gcc from
+# the triple and passed in, not probed here.
+decimal_float ${spec_decimal_float}
+decimal_bid_format ${spec_decimal_bid_format}
+s390_excess_float_precision ${spec_s390_excess_fp}
+EOF
+
+dnl Absolute path, because the driver's cwd is not the spec file's directory.
+case $target_config_file in
+  /*) target_config_path=$target_config_file ;;
+  *)  target_config_path=`pwd`/$target_config_file ;;
+esac
+
 AC_MSG_NOTICE([writing $specs_file])
 cat > "$specs_file" <<EOF
 # Generated by target-specs/configure for ${target}.
@@ -271,6 +399,9 @@ cat > "$specs_file" <<EOF
 #   as: ${gcc_cv_as}
 #   ld: ${gcc_cv_ld}
 # Do not edit; regenerate by re-running that script against the same toolchain.
+# Option defaults with no template here (see the warning above), recorded so a
+# missing default is visible rather than looking like a target that has none:
+#   ${option_defaults_unhandled}
 
 *asm_debug:
 ${asm_debug_spec}
@@ -290,6 +421,9 @@ ${option_defaults}
 *link_buildid:
 ${link_buildid}
 
+*cc1_target_config:
+-ftarget-config=${target_config_path}
+
 EOF
 
 AC_MSG_NOTICE([probe results for ${target}:])
@@ -301,6 +435,412 @@ AC_MSG_NOTICE([  ld --build-id ............ ${gcc_cv_ld_buildid}])
 AC_MSG_NOTICE([  ld --eh-frame-hdr ........ ${gcc_cv_ld_eh_frame_hdr}])
 AC_MSG_NOTICE([  ld -pie .................. ${gcc_cv_ld_pie}])
 AC_MSG_NOTICE([  ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}])
+
+fi
+
+dnl ===========================================================================
+dnl LINKER SECTION
+dnl
+dnl Everything below is the gcc_cv_ld_* half of the probes relocated out of
+dnl gcc/configure.ac.  It is kept in one block, and appends to the two files
+dnl written above rather than editing their heredocs, so that work on the
+dnl assembler half and work on this half never touch the same lines.
+dnl
+dnl The originals decided most of these from the in-tree ld's version number
+dnl (gcc_fn_gld_min_version) or from a `case $target' listing which vendor
+dnl linker was known to have the feature.  Neither is available here and
+dnl neither is wanted: this script has the actual linker in $gcc_cv_ld, so
+dnl every probe below asks it directly.  Where the original had no runnable
+dnl test at all -- only a target pattern -- that is called out.
+dnl ===========================================================================
+
+if test x"$have_target_tools" = xyes; then
+
+dnl --- Driver-side only: these become spec strings, and never reach cc1. -----
+
+AC_MSG_CHECKING([linker for --as-needed])
+gcc_cv_ld_as_needed=no
+gcc_cv_ld_as_needed_option='--as-needed'
+gcc_cv_ld_no_as_needed_option='--no-as-needed'
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--as-needed' > /dev/null; then
+  gcc_cv_ld_as_needed=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_as_needed])
+
+dnl Solaris ld spells the same idea as a linker-script directive.  The original
+dnl gated this on `case $target' plus a version number; ask the linker instead.
+AC_MSG_CHECKING([linker for $ldscript-style as-needed])
+gcc_cv_ld_use_as_needed_ldscript=no
+if test x"$gcc_cv_ld_as_needed" != xyes \
+   && "$gcc_cv_ld" -z help 2>&1 | grep -- 'ignore' > /dev/null; then
+  gcc_cv_ld_use_as_needed_ldscript=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_use_as_needed_ldscript])
+
+AC_MSG_CHECKING([linker for --demangle])
+gcc_cv_ld_demangle=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--demangle' > /dev/null; then
+  gcc_cv_ld_demangle=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_demangle])
+
+AC_MSG_CHECKING([linker for --sysroot])
+gcc_cv_ld_sysroot=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--sysroot' > /dev/null; then
+  gcc_cv_ld_sysroot=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_sysroot])
+
+AC_MSG_CHECKING([linker for GNU-style response files])
+gcc_cv_ld_at_file=no
+echo '.byte 0' > conftest.s
+echo conftest.o > conftest.at
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+   && "$gcc_cv_ld" -r -o conftest2.o @conftest.at > /dev/null 2>&1; then
+  gcc_cv_ld_at_file=yes
+fi
+rm -f conftest.s conftest.o conftest2.o conftest.at
+AC_MSG_RESULT([$gcc_cv_ld_at_file])
+
+dnl The original counted this in three levels, the middle one meaning "gold
+dnl 2.20, plugin support only when -fuse-linker-plugin is given".  That
+dnl distinction was a version-number judgement about one long-obsolete linker;
+dnl here a linker either takes -plugin or it does not.
+AC_MSG_CHECKING([linker for -plugin])
+gcc_cv_lto_plugin=0
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-plugin' > /dev/null; then
+  gcc_cv_lto_plugin=2
+fi
+AC_MSG_RESULT([$gcc_cv_lto_plugin])
+
+dnl -Bstatic/-Bdynamic is probed above; the option *spelling* is not, and AIX
+dnl and HP-UX spell it differently.  Ask for the spelling the linker admits to.
+gcc_cv_ld_static_option='-Bstatic'
+gcc_cv_ld_dynamic_option='-Bdynamic'
+if test x"$gcc_cv_ld_static_dynamic" != xyes; then
+  if "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+    gcc_cv_ld_static_dynamic=yes
+    gcc_cv_ld_static_option='-bstatic'
+    gcc_cv_ld_dynamic_option='-bdynamic'
+  elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+    gcc_cv_ld_static_dynamic=yes
+    gcc_cv_ld_static_option='-aarchive_shared'
+    gcc_cv_ld_dynamic_option='-adefault'
+  fi
+fi
+
+dnl --- Consulted by cc1: these go in the target config file. ----------------
+
+AC_MSG_CHECKING([linker for .hidden])
+gcc_cv_ld_hidden=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bsymbolic' > /dev/null; then
+  gcc_cv_ld_hidden=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_hidden])
+
+dnl HAVE_GAS_HIDDEN needs both halves; gcc_cv_as_hidden is probed by the
+dnl assembler section of this script.
+gcc_cv_gas_hidden=no
+if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then
+  gcc_cv_gas_hidden=yes
+fi
+
+AC_MSG_CHECKING([linker for read-only/read-write section mixing])
+gcc_cv_ld_ro_rw_mix=unknown
+echo '.section myfoosect, "a"' > conftest1.s
+echo '.section myfoosect, "aw"' > conftest2.s
+echo '.byte 1' >> conftest2.s
+echo '.section myfoosect, "a"' > conftest3.s
+echo '.byte 0' >> conftest3.s
+if "$gcc_cv_as" -o conftest1.o conftest1.s > /dev/null 2>&1 \
+   && "$gcc_cv_as" -o conftest2.o conftest2.s > /dev/null 2>&1 \
+   && "$gcc_cv_as" -o conftest3.o conftest3.s > /dev/null 2>&1; then
+  dnl The Wild linker has --gc-sections on by default, hence --no-gc-sections.
+  if "$gcc_cv_ld" -shared -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o --no-gc-sections > /dev/null 2>&1 \
+     || "$gcc_cv_ld" -shared -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o > /dev/null 2>&1 \
+     || "$gcc_cv_ld" -r -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o > /dev/null 2>&1; then
+    if test x"$gcc_cv_objdump" != x; then
+      ts_mix=`"$gcc_cv_objdump" -h conftest1.so | sed -e '/myfoosect/!d' -e N`
+      if echo "$ts_mix" | grep CONTENTS > /dev/null; then
+	if echo "$ts_mix" | grep READONLY > /dev/null; then
+	  gcc_cv_ld_ro_rw_mix=read-only
+	else
+	  gcc_cv_ld_ro_rw_mix=read-write
+	fi
+      fi
+    fi
+  fi
+fi
+rm -f conftest1.s conftest2.s conftest3.s conftest1.o conftest2.o conftest3.o
+rm -f conftest1.so
+AC_MSG_RESULT([$gcc_cv_ld_ro_rw_mix])
+
+AC_MSG_CHECKING([linker for --gc-sections with exception handling])
+gcc_cv_ld_eh_gc_sections=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--gc-sections' > /dev/null; then
+  gcc_cv_ld_eh_gc_sections=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_eh_gc_sections])
+
+AC_MSG_CHECKING([linker for -z ctf])
+gcc_cv_ld_ctf=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z ctf' > /dev/null; then
+  gcc_cv_ld_ctf=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_ctf])
+
+AC_MSG_CHECKING([linker for --version-script])
+gcc_cv_ld_version_script=no
+ld_version_script_option=
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--version-script' > /dev/null; then
+  gcc_cv_ld_version_script=yes
+  ld_version_script_option='--version-script='
+fi
+AC_MSG_RESULT([$gcc_cv_ld_version_script])
+
+AC_MSG_CHECKING([linker for -soname])
+gcc_cv_ld_soname=no
+ld_soname_option=
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-soname' > /dev/null; then
+  gcc_cv_ld_soname=yes
+  ld_soname_option='-soname'
+fi
+AC_MSG_RESULT([$gcc_cv_ld_soname])
+
+dnl PE-only.  The original grepped the in-tree ld's own linker scripts for
+dnl NOLOAD on .debug_loclists/.debug_rnglists, which cannot be done against an
+dnl installed linker; ld --verbose prints the script it would use.
+AC_MSG_CHECKING([linker for non-broken PE dwarf5])
+gcc_cv_ld_broken_pe_dwarf5=no
+case $target in
+  *-*-cygwin* | *-*-mingw* | *-*-pe | *-*-win32)
+    gcc_cv_ld_broken_pe_dwarf5=yes
+    if "$gcc_cv_ld" --verbose 2>/dev/null \
+       | grep -- '\.debug_loclists.*NOLOAD' > /dev/null; then
+      gcc_cv_ld_broken_pe_dwarf5=no
+    fi
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_ld_broken_pe_dwarf5])
+
+AC_MSG_CHECKING([linker for --disable-dynamicbase])
+gcc_cv_ld_disable_dynamicbase=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--disable-dynamicbase' > /dev/null; then
+  gcc_cv_ld_disable_dynamicbase=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_disable_dynamicbase])
+
+dnl PowerPC-specific.  All three originals were AC_CACHE_CHECKs that assembled
+dnl a snippet and linked it; kept as link tests, without the version fallbacks.
+AC_MSG_CHECKING([linker for PowerPC .gnu.attributes long double])
+gcc_cv_ld_ppc_attr=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--no-warn-mismatch' > /dev/null; then
+  gcc_cv_ld_ppc_attr=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_ppc_attr])
+
+AC_MSG_CHECKING([linker for omitting dot symbols])
+gcc_cv_ld_no_dot_syms=no
+case $target in
+  powerpc64*-*-*)
+    cat > conftest1.s <<'TSEOF'
+	.text
+	bl .foo
+TSEOF
+    cat > conftest2.s <<'TSEOF'
+	.section ".opd","aw"
+	.align 3
+	.globl foo
+	.type foo,@function
+foo:
+	.quad .LEfoo,.TOC.@tocbase,0
+	.text
+.LEfoo:
+	blr
+	.size foo,.-.LEfoo
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest1.o conftest1.s > /dev/null 2>&1 \
+       && "$gcc_cv_as" -a64 -o conftest2.o conftest2.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -melf64ppc -o conftest conftest1.o conftest2.o \
+	    > /dev/null 2>&1; then
+      gcc_cv_ld_no_dot_syms=yes
+    fi
+    rm -f conftest conftest1.s conftest2.s conftest1.o conftest2.o
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_ld_no_dot_syms])
+
+AC_MSG_CHECKING([linker for large TOC])
+gcc_cv_ld_large_toc=no
+case $target in
+  powerpc64*-*-* | powerpc*-*-aix*)
+    cat > conftest.s <<'TSEOF'
+	.section ".tbss","awT",@nobits
+	.align 3
+ie0:	.space 8
+	.global _start
+	.text
+_start:
+	addis 9,13,ie0@got@tprel@ha
+	ld 9,ie0@got@tprel@l(9)
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -melf64ppc --no-toc-optimize -o conftest conftest.o \
+	    > /dev/null 2>&1; then
+      gcc_cv_ld_large_toc=yes
+    fi
+    rm -f conftest conftest.s conftest.o
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_ld_large_toc])
+
+AC_MSG_CHECKING([linker for TOC pointer alignment])
+gcc_cv_ld_toc_align=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--no-toc-optimize' > /dev/null; then
+  gcc_cv_ld_toc_align=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_toc_align])
+
+AC_MSG_CHECKING([linker for .eh_frame personality relaxation])
+gcc_cv_ld_mips_personality_relaxation=no
+case $target in
+  mips*-*-*)
+    cat > conftest.s <<'TSEOF'
+	.cfi_startproc
+	.cfi_personality 0x80,indirect_ptr
+	.ent test
+test:
+	nop
+	.end test
+	.cfi_endproc
+
+	.section .data,"aw",@progbits
+indirect_ptr:
+	.dc.a personality
+TSEOF
+    if "$gcc_cv_as" -KPIC -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -shared > /dev/null 2>&1 \
+       && test x"$gcc_cv_readelf" != x; then
+      if "$gcc_cv_readelf" -d conftest 2>&1 | grep TEXTREL > /dev/null 2>&1; then
+	:
+      elif "$gcc_cv_readelf" --relocs conftest 2>&1 \
+	   | grep 'R_MIPS_REL32 *$' > /dev/null 2>&1; then
+	:
+      else
+	gcc_cv_ld_mips_personality_relaxation=yes
+      fi
+    fi
+    rm -f conftest conftest.s conftest.o
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_ld_mips_personality_relaxation])
+
+AC_MSG_CHECKING([linker for -pie with copy relocations])
+gcc_cv_ld_pie_copyreloc=no
+if test x"$gcc_cv_ld_pie" = xyes \
+   && "$gcc_cv_ld" --help 2>&1 | grep -- '-z text' > /dev/null; then
+  gcc_cv_ld_pie_copyreloc=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_pie_copyreloc])
+
+dnl AVR only.  The originals read the linker's version string and compared it
+dnl against 2.29 and 2.42; ask the linker which emulations it has instead.
+AC_MSG_CHECKING([linker for avr emulations])
+gcc_cv_ld_avr_avrxmega3_rodata_in_flash=no
+gcc_cv_ld_avr_avrxmega2_flmap=no
+gcc_cv_ld_avr_avrxmega4_flmap=no
+case $target in
+  avr-*-*)
+    ts_emuls=`"$gcc_cv_ld" -V 2>/dev/null`
+    if echo "$ts_emuls" | grep avrxmega3 > /dev/null; then
+      dnl The .rodata-in-flash change and the avrxmega3 emulation shipped
+      dnl together, so the emulation's presence is the test.
+      gcc_cv_ld_avr_avrxmega3_rodata_in_flash=yes
+    fi
+    if echo "$ts_emuls" | grep avrxmega2_flmap > /dev/null; then
+      gcc_cv_ld_avr_avrxmega2_flmap=yes
+    fi
+    if echo "$ts_emuls" | grep avrxmega4_flmap > /dev/null; then
+      gcc_cv_ld_avr_avrxmega4_flmap=yes
+    fi
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_ld_avr_avrxmega3_rodata_in_flash/$gcc_cv_ld_avr_avrxmega2_flmap/$gcc_cv_ld_avr_avrxmega4_flmap])
+
+dnl --- Emit. -----------------------------------------------------------------
+
+ts_bool () {
+  if test x"$1" = xyes; then echo 1; else echo 0; fi
+}
+
+cat >> "$target_config_file" <<EOF
+# Linker capabilities.
+gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
+ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
+ld_eh_gc_sections `ts_bool "$gcc_cv_ld_eh_gc_sections"`
+ld_ctf `ts_bool "$gcc_cv_ld_ctf"`
+ld_sysroot `ts_bool "$gcc_cv_ld_sysroot"`
+ld_at_file `ts_bool "$gcc_cv_ld_at_file"`
+ld_pie_copyreloc `ts_bool "$gcc_cv_ld_pie_copyreloc"`
+ld_personality_relaxation `ts_bool "$gcc_cv_ld_mips_personality_relaxation"`
+ld_no_dot_syms `ts_bool "$gcc_cv_ld_no_dot_syms"`
+ld_large_toc `ts_bool "$gcc_cv_ld_large_toc"`
+ld_toc_align `ts_bool "$gcc_cv_ld_toc_align"`
+ld_ppc_attr `ts_bool "$gcc_cv_ld_ppc_attr"`
+ld_broken_pe_dwarf5 `ts_bool "$gcc_cv_ld_broken_pe_dwarf5"`
+ld_avr_avrxmega3_rodata_in_flash `ts_bool "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash"`
+ld_avr_avrxmega2_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega2_flmap"`
+ld_avr_avrxmega4_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega4_flmap"`
+EOF
+
+dnl The driver-side ones are spec fragments.  They are appended as their own
+dnl spec entries rather than folded into the ones written above.
+if test x"$gcc_cv_ld_as_needed" = xyes; then
+  link_as_needed="%{!static:%{!static-pie:${gcc_cv_ld_as_needed_option}}}"
+  link_no_as_needed="%{!static:%{!static-pie:${gcc_cv_ld_no_as_needed_option}}}"
+else
+  link_as_needed=
+  link_no_as_needed=
+fi
+
+cat >> "$specs_file" <<EOF
+*link_as_needed:
+${link_as_needed}
+
+*link_no_as_needed:
+${link_no_as_needed}
+
+*link_static:
+${gcc_cv_ld_static_option}
+
+*link_dynamic:
+${gcc_cv_ld_dynamic_option}
+
+*link_demangle:
+%{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
+
+*link_plugin:
+`if test "$gcc_cv_lto_plugin" -gt 0; then echo '%{!fno-use-linker-plugin:%{!fno-lto:-plugin %(linker_plugin_file)}}'; fi`
+
+*link_disable_dynamicbase:
+`if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`
+
+EOF
+
+AC_MSG_NOTICE([  ld --as-needed ........... ${gcc_cv_ld_as_needed}])
+AC_MSG_NOTICE([  ld --demangle ............ ${gcc_cv_ld_demangle}])
+AC_MSG_NOTICE([  ld --sysroot ............. ${gcc_cv_ld_sysroot}])
+AC_MSG_NOTICE([  ld @file ................. ${gcc_cv_ld_at_file}])
+AC_MSG_NOTICE([  ld -plugin ............... ${gcc_cv_lto_plugin}])
+AC_MSG_NOTICE([  ld .hidden ............... ${gcc_cv_ld_hidden}])
+AC_MSG_NOTICE([  ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}])
+AC_MSG_NOTICE([  ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}])
+AC_MSG_NOTICE([  ld -z ctf ................ ${gcc_cv_ld_ctf}])
+AC_MSG_NOTICE([  ld --version-script ...... ${gcc_cv_ld_version_script}])
+AC_MSG_NOTICE([  ld -soname ............... ${gcc_cv_ld_soname}])
 
 fi
 

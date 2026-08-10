@@ -291,11 +291,9 @@ msp430_option_override (void)
     error ("%<-fuse-cxa-atexit%> is not supported for msp430-elf");
 #endif
 
-#ifndef HAVE_NEWLIB_NANO_FORMATTED_IO
-  if (TARGET_TINY_PRINTF)
-    error ("GCC must be configured with %<--enable-newlib-nano-formatted-io%> "
-	   "to use %<-mtiny-printf%>");
-#endif
+  if (!HAVE_NEWLIB_NANO_FORMATTED_IO && TARGET_TINY_PRINTF)
+    error ("%<-mtiny-printf%> requires a newlib built with the nano "
+	   "formatted-IO variant");
 }
 
 #undef  TARGET_SCALAR_MODE_SUPPORTED_P

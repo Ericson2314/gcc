@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target.h"
 #include "cppbuiltin.h"
 #include "configargs.h"
+#include "target-caps.h"
 
 #ifndef TARGET_OS_CPP_BUILTINS
 # define TARGET_OS_CPP_BUILTINS()
@@ -1735,7 +1736,7 @@ c_cpp_builtins (cpp_reader *pfile)
   /* If decimal floating point is supported, tell the user if the
      alternate format (BID) is used instead of the standard (DPD)
      format.  */
-  if (ENABLE_DECIMAL_FLOAT && ENABLE_DECIMAL_BID_FORMAT)
+  if (targ_caps.decimal_float && targ_caps.decimal_bid_format)
     cpp_define (pfile, "__DECIMAL_BID_FORMAT__");
 }
 

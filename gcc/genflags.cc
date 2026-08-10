@@ -23,7 +23,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+
+/* Multi-target: this program's output, insn-flags.h, describes one back end,
+   and a multi-target build makes one copy of it per back end.  Which tm.h to
+   read the target macros from is therefore chosen on the command line; the
+   configured target's is the default.  */
+#ifndef TM_H_FILE
+#define TM_H_FILE "tm.h"
+#endif
+#include TM_H_FILE
+
 #include "rtl.h"
 #include "obstack.h"
 #include "errors.h"

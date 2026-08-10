@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "emit-rtl.h"
 #include "diagnostic-core.h"
 #include "fold-const.h"
+#include "target-caps.h"
 #include "internal-fn.h"
 #include "stor-layout.h"
 #include "dojump.h"
@@ -5732,11 +5733,7 @@ expand_FLOATTOBITINT (internal_fn, gcall *stmt)
   const char *q;
   if (DECIMAL_FLOAT_MODE_P (mode))
     {
-#if ENABLE_DECIMAL_BID_FORMAT
-      memcpy (p, "__bid_fix", 9);
-#else
-      memcpy (p, "__dpd_fix", 9);
-#endif
+      memcpy (p, targ_caps.decimal_bid_format ? "__bid_fix" : "__dpd_fix", 9);
       p += 9;
     }
   else
@@ -5771,11 +5768,8 @@ expand_BITINTTOFLOAT (internal_fn, gcall *stmt)
   const char *q;
   if (DECIMAL_FLOAT_MODE_P (mode))
     {
-#if ENABLE_DECIMAL_BID_FORMAT
-      memcpy (p, "__bid_floatbitint", 17);
-#else
-      memcpy (p, "__dpd_floatbitint", 17);
-#endif
+      memcpy (p, (targ_caps.decimal_bid_format
+		  ? "__bid_floatbitint" : "__dpd_floatbitint"), 17);
       p += 17;
     }
   else

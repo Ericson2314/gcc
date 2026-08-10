@@ -35,7 +35,6 @@
 #include "gomp-constants.h"
 #include "simple-object.h"
 #include "elf.h"
-#include "configargs.h"  /* For configure_default_options.  */
 #include "multilib.h"  /* For multilib_options.  */
 
 #include "tree.h"	 /* Dependency of omp-general.h.  */
@@ -139,7 +138,10 @@ static struct obstack files_to_cleanup;
 enum offload_abi offload_abi = OFFLOAD_ABI_UNSET;
 const char *offload_abi_host_opts = NULL;
 
-enum elf_arch_code elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX900;  // Default GPU architecture.
+/* Default GPU architecture.  This is what config.gcc inferred for amdgcn
+   whenever --with-arch was not given, which is now always.  */
+#define GCN_DEFAULT_ARCH "gfx90a"
+enum elf_arch_code elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX90A;
 uint32_t elf_flags = EF_AMDGPU_FEATURE_SRAMECC_UNSUPPORTED_V4;
 static int gcn_stack_size = 0;  /* Zero means use default.  */
 
@@ -987,14 +989,10 @@ main (int argc, char **argv)
   diagnostic_initialize (global_dc, 0);
   diagnostic_color_init (global_dc);
 
-  for (size_t i = 0; i < ARRAY_SIZE (configure_default_options); i++)
-    if (configure_default_options[i].name != NULL
-	&& strcmp (configure_default_options[i].name, "arch") == 0)
-      {
-	with_arch_str = configure_default_options[0].value;
-	elf_arch = get_arch (configure_default_options[0].value, NULL);
-	break;
-      }
+  /* --with-arch is gone.  config.gcc always inferred gfx90a for amdgcn when
+     it was not given, so that is the default (see elf_arch above); a value
+     other than the default now has to come in as -march=.  */
+  with_arch_str = GCN_DEFAULT_ARCH;
   enum elf_arch_code default_arch = elf_arch;
 
   obstack_init (&files_to_cleanup);

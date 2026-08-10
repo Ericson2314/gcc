@@ -23,7 +23,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "common/common-target.h"
 #include "opts.h"
-#include "options.h"
+/* This file reads MASK_CMOVE and friends, which exist only in an options
+   header generated from epiphany.opt.  Unlike its neighbours it pulls them in
+   through options.h directly rather than through tm.h, so it needs naming to
+   this back end's copy: the plain options.h belongs to whichever target the
+   build was configured for.  */
+#include "options-epiphany.h"
 
 #define TARGET_OPTION_OPTIMIZATION_TABLE epiphany_option_optimization_table
 

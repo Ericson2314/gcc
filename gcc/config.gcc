@@ -171,9 +171,11 @@
 #
 #  thread_file		Set to control which thread package to use.
 #
-#  configure_default_options
-#			Set to an initializer for configure_default_options
-#			in configargs.h, based on --with-cpu et cetera.
+#  target_option_defaults
+#			This target's own CPU/ABI defaults, as `name=value'
+#			pairs whose names are its OPTION_DEFAULT_SPECS keys.
+#			Recorded in the multi-target manifest and turned into
+#			the option_defaults spec of the target's spec file.
 #
 #  native_system_header_dir
 #			Where system header files are found for this
@@ -204,6 +206,36 @@
 #
 #  target_has_targetjitm	Set to yes or no depending on whether the target
 #			has its own definition of targetjitm.
+
+# A compiler that serves every target it was configured for cannot have one
+# target's CPU/ABI defaults chosen at configure time: the target is picked when
+# the compiler runs.  The --with-cpu/--with-arch/--with-tune/--with-abi family
+# was never declared with AC_ARG_WITH -- autoconf's generic parser set with_*
+# and the case statements below read it -- so it never appeared in
+# `configure --help' either.  The knobs are gone; what survives is the
+# *inference* those same case statements do from ${target}, which is per-target
+# data and is recorded in the manifest for the target's spec file.
+#
+# Clearing them here rather than at the call site means both ways of reaching
+# config.gcc agree.  (gcc/configure.ac clears the same group before sourcing
+# this file per extra target; that was added to stop the primary target's values
+# leaking into every other target, which is the same bug seen from the far end.)
+with_abi=
+with_arch= with_arch_32= with_arch_64=
+with_cpu= with_cpu_32= with_cpu_64=
+with_tune= with_tune_32= with_tune_64=
+with_schedule=
+with_float= with_fpu= with_fp_32= with_fpu_config=
+with_mode= with_endian= with_nan= with_tls=
+with_divide= with_llsc= with_synci= with_lxc1_sxc1= with_madd4= with_msa=
+with_odd_spreg_32= with_compact_branches= with_mips_plt=
+with_cmodel= with_simd= with_strict_align_lib= with_multilib_default=
+with_advance_toolchain= with_isa_spec= with_riscv_attribute= with_nds32_lib=
+with_picolibc=
+# --with-multilib-list/--with-multilib-generator are gone too; `default' is the
+# value every arm below reads as "this target's own multilib set".
+with_multilib_list=default
+with_multilib_generator=default
 
 out_file=
 common_out_file=
@@ -262,19 +294,11 @@ case ${target}:`uname -v` in
     ;;
 esac
 
-# Obsolete configurations.
-case ${target} in
-     ia64*-*-hpux* | ia64*-*-*vms* | ia64*-*-elf*	\
-   | epiphany*-*-* | rl78*-*-*		\
- )
-    if test "x$enable_obsolete" != xyes; then
-      echo "*** Configuration ${target} is obsolete." >&2
-      echo "*** Specify --enable-obsolete to build it anyway." >&2
-      echo "*** Support will be REMOVED in the next major release of GCC," >&2
-      echo "*** unless a maintainer comes forward." >&2
-      exit 1
-    fi;;
-esac
+# --enable-obsolete is gone with the rest of the undeclared options.  It gated
+# ia64-hpux/vms/elf, epiphany and rl78, which are obsolete but still present;
+# a compiler asked to serve every target serves those too, and gcc/configure.ac
+# was already forcing the option on for every target in the manifest.  The
+# targets are unchanged -- only the refusal to configure them is gone.
 
 # Unsupported targets list.  Do not put an entry in this list unless
 # it would otherwise be caught by a more permissive pattern.  The list
@@ -1217,6 +1241,65 @@ case ${target} in
   ;;
 esac
 
+# Decimal floating point: whether this target has it at all, and whether its ABI
+# encodes it as BID or DPD.
+#
+# This was --enable-decimal-float, whose default lived in ../config/dfp.m4 as a
+# `case $target'.  That file stays -- libgcc and libdecnumber are built per
+# target and still ask it -- but the compiler cannot, so the same list is
+# reproduced here.  KEEP THE TWO IN STEP: dfp.m4 is the reference, and a target
+# added there and not here silently loses decimal float.
+#
+# Reported in the multi-target manifest and written into the target config file,
+# where cc1 reads them as targ_caps.decimal_float / targ_caps.decimal_bid_format.
+target_decimal_float=0
+target_decimal_bid_format=0
+case ${target} in
+  aarch64* | \
+  powerpc*-*-linux* | i?86*-*-linux* | x86_64*-*-linux* | s390*-*-linux* | \
+  i?86*-*-elfiamcu | i?86*-*-gnu* | x86_64*-*-gnu* | \
+  i?86*-*-mingw* | x86_64*-*-mingw* | \
+  i?86*-*-cygwin* | x86_64*-*-cygwin*)
+    target_decimal_float=1
+    ;;
+esac
+if test x$target_decimal_float = x1; then
+  # x86 and aarch64 use BID; everything else uses DPD.
+  case ${target} in
+    aarch64* | i?86*-*-* | x86_64*-*-*)
+      target_decimal_bid_format=1
+      ;;
+  esac
+fi
+
+# Whether TFmode (128-bit) long double is the default for this target.
+#
+# This was gcc/configure.ac's --with-long-double-128 and, failing that, a probe
+# that read __GLIBC__ out of ${target_header_dir}/features.h -- i.e. it opened
+# the target's sysroot to decide how the compiler generates code.  A compiler
+# that serves many targets cannot have a sysroot of its own, and the probe had
+# a worse failure mode than that: with no target headers installed it could not
+# run at all and recorded "no", quietly changing the ABI.
+#
+# glibc grew TFmode long double in 2.4 (2006), below anything GCC still
+# supports, so for glibc the probe had exactly one answer.  musl was already
+# decided by triple in the old code; that half is kept verbatim.
+#
+# The consumers test `#ifdef', not the value, so this is defined only in the
+# affirmative case -- adding TARGET_DEFAULT_LONG_DOUBLE_128=0 would read as
+# "yes" to every one of them.
+case ${target} in
+  # musl: only s390x uses 128-bit long double.
+  s390x-*-linux-musl*)
+    tm_defines="${tm_defines} TARGET_DEFAULT_LONG_DOUBLE_128=1"
+    ;;
+  powerpc*-*-linux-musl* | sparc*-*-linux-musl* | alpha*-*-linux-musl*)
+    ;;
+  powerpc*-*-linux* | sparc*-*-linux* | s390x-*-linux* | alpha*-*-linux*)
+    tm_defines="${tm_defines} TARGET_DEFAULT_LONG_DOUBLE_128=1"
+    ;;
+esac
+
 # Figure out if we need to enable heap trampolines by default
 case ${target} in
 *-*-darwin2*)
@@ -1860,10 +1943,8 @@ amdgcn-*-amdhsa)
 		fi
 		;;
 	esac
-	if test x$enable_as_accelerator = xyes; then
-		extra_programs="${extra_programs} mkoffload\$(exeext)"
-		tm_file="${tm_file} gcn/offload.h"
-	fi
+	# --enable-as-accelerator-for is gone, so nothing builds this back end as
+	# somebody else's offload compiler; mkoffload and gcn/offload.h went with it.
 	# Force .init_array support.
 	gcc_cv_initfini_array=yes
 	thread_file=gcn
@@ -2921,10 +3002,7 @@ nvptx-*)
 	tm_file="${tm_file} newlib-stdint.h"
 	use_gcc_stdint=wrap
 	tmake_file="nvptx/t-nvptx"
-	if test x$enable_as_accelerator = xyes; then
-		extra_programs="${extra_programs} mkoffload\$(exeext)"
-		tm_file="${tm_file} nvptx/offload.h"
-	fi
+	# See the gcn case above: no accelerator builds, so no mkoffload here either.
 	;;
 or1k*-*-*)
 	tm_file="elfos.h ${tm_file}"
@@ -3658,9 +3736,9 @@ case ${target} in
 	;;
 esac
 
-# picolibc systems
-case "${target}_${with_picolibc}" in
-*-picolibc-*|*_yes)
+# picolibc systems.  --with-picolibc is gone; only the triple decides now.
+case "" in
+*-picolibc-*)
 	default_use_cxa_atexit=yes
 	use_gcc_stdint=none
 	# add newlib-stdint.h if not already present
@@ -4148,15 +4226,6 @@ if test x$with_cpu = x ; then
   esac
 fi
 
-# Support for --with-arch and related options (and a few unrelated options,
-# too).
-case ${with_arch} in
-  yes | no)
-    echo "--with-arch must be passed a value" 1>&2
-    exit 1
-    ;;
-esac
-
 # If there is no $with_arch option, try to infer one from ${target}.
 # This block sets nothing except for with_arch.
 if test x$with_arch = x ; then
@@ -4169,13 +4238,9 @@ if test x$with_arch = x ; then
       with_arch=lakemont
       ;;
     i[34567]86-*-*)
-      # --with-fpmath sets the default ISA to SSE2, which is the same
-      # ISA supported by Pentium 4.
-      if test x$with_fpmath = x || test $arch_without_sse2 = no; then
-	with_arch=$arch
-      else
-	with_arch=pentium4
-      fi
+      # --with-fpmath used to raise this to pentium4 when the triple's own arch
+      # had no SSE2; with the option gone, the triple's arch is all there is.
+      with_arch=$arch
       ;;
     x86_64-*-*)
       with_arch=$arch
@@ -4244,29 +4309,10 @@ if test x$with_fpu = x; then
   esac
 fi
 
-# Support --with-fpmath.
-if test x$with_fpmath != x; then
-  case ${target} in
-    i[34567]86-*-* | x86_64-*-*)
-      case ${with_fpmath} in
-      avx)
-	tm_file="${tm_file} i386/avxmath.h"
-	;;
-      sse)
-	tm_file="${tm_file} i386/ssemath.h"
-	;;
-      *)
-	echo "Invalid --with-fpmath=$with_fpmath" 1>&2
-	exit 1
-	;;
-      esac
-      ;;
-    *)
-      echo "--with-fpmath isn't supported for $target." 1>&2
-      exit 1
-      ;;
-  esac
-fi
+# --with-fpmath is gone with the rest of this family.  It selected the default
+# FP math unit on x86 by adding i386/avxmath.h or i386/ssemath.h to tm_file; not
+# giving it -- which is now the only possibility -- adds neither, which is what
+# every configuration that did not name it already got.
 
 # Similarly for --with-schedule.
 if test x$with_schedule = x; then
@@ -4292,162 +4338,14 @@ if test x$with_llsc = x; then
   esac
 fi
 
-# Validate and mark as valid any --with options supported
-# by this target.  In order to use a particular --with option
-# you must list it in supported_defaults; validating the value
-# is optional.  This case statement should set nothing besides
-# supported_defaults.
-
-supported_defaults=
+# Per-target defaults that are still inferred from ${target}.
+#
+# This used to be the validator for the --with-cpu/--with-arch/... family, and
+# every arm carried a `supported_defaults=` list naming which of them the target
+# accepted.  Those options are gone (see the with_* clearing at the top of this
+# file), so what is left here is only the part that derives a default from the
+# target triple, plus the options that gcc/configure.ac really does declare.
 case "${target}" in
-	aarch64*-*-*)
-		supported_defaults="abi cpu cpu_64 arch arch_64 tune tune_64"
-		if test x$with_cpu_64 != x && test x$with_cpu = x; then
-			with_cpu=$with_cpu_64
-		fi
-		if test x$with_arch_64 != x && test x$with_arch = x; then
-			with_arch=$with_arch_64
-		fi
-		if test x$with_tune_64 != x && test x$with_tune = x; then
-			with_tune=$with_tune_64
-		fi
-		for which in cpu arch tune; do
-			eval "val=\$with_$which"
-			filtered_val=`echo "$val" | sed -E -e 's/[-A-Za-z0-9.+]+//'`
-			if [ x"$filtered_val" != x ]; then
-			  echo "Invalid characters used in --with-$which=$val"
-			  exit 1
-			fi
-
-			escaped_val=`echo "$val" | sed -E -e 's/\./\\\./g'`
-			base_val=`echo "$escaped_val" | sed -E -e 's/\+.*//'`
-			ext_val=`echo "$escaped_val" | sed -E -e 's/^[^+]*//'`
-
-			if [ $which = arch ]; then
-			  def=aarch64-arches.def
-			  pattern=AARCH64_ARCH
-			else
-			  def=aarch64-cores.def
-			  pattern=AARCH64_CORE
-			fi
-
-			# Find the base CPU or ARCH id in aarch64-cores.def or
-			# aarch64-arches.def
-			if [ x"$base_val" = x ] \
-			    || grep "^$pattern(\"$base_val\"," \
-				    ${srcdir}/config/aarch64/$def \
-				    > /dev/null; then
-
-			  # Disallow extensions in --with-tune=cortex-a53+crc.
-			  if [ $which = tune ] && [ x"$ext_val" != x ]; then
-			    echo "Architecture extensions not supported in --with-$which=$val" 1>&2
-			    exit 1
-			  fi
-
-			  # Use the pre-processor to strip flatten the options.
-			  # This makes the format less rigid than if we use
-			  # grep and sed directly here.
-			  opt_macro="AARCH64_OPT_EXTENSION(A, B, C, D, E, F)=A, B, C, D, E, F"
-			  options_parsed="`$ac_cv_prog_CPP -D"$opt_macro" -x c \
-				${srcdir}/config/aarch64/aarch64-option-extensions.def`"
-
-			  while [ x"$ext_val" != x ]
-			  do
-				ext_val=`echo "$ext_val" | sed -E -e 's/\+//'`
-				ext=`echo "$ext_val" | sed -E -e 's/\+.*//'`
-				base_ext=`echo "$ext" | sed -E -e 's/^no//'`
-				opt_line=`echo -e "$options_parsed" | \
-					grep "^\"$base_ext\""`
-
-				if [ x"$opt_line" != x ]; then
-				  true
-				else
-				  echo "Unknown extension used in --with-$which=$val" 1>&2
-				  exit 1
-				fi
-				ext_val=`echo "$ext_val" | sed -E -e 's/[^+]+//'`
-			  done
-
-			  true
-			else
-			  # Allow --with-$which=native.
-			  if [ "$val" = native ]; then
-			    true
-			  else
-			    echo "Unknown $which used in --with-$which=$val" 1>&2
-			    exit 1
-			  fi
-			fi
-		done
-		;;
-
-	alpha*-*-*)
-		supported_defaults="cpu tune"
-		for which in cpu tune; do
-			eval "val=\$with_$which"
-			case "$val" in
-			"" \
-			| ev4 | ev45 | 21064 | ev5 | 21164 | ev56 | 21164a \
-			| pca56 | 21164PC | 21164pc | ev6 | 21264 | ev67 \
-			| 21264a)
-				;;
-			*)
-				echo "Unknown CPU used in --with-$which=$val" 1>&2
-				exit 1
-				;;
-			esac
-		done
-		;;
-
-	arc*-*-*)
-		supported_defaults="cpu fpu"
-
-		new_cpu=hs38_linux
-		if [ x"$with_cpu" = x ] \
-		    || grep -q -E "^ARC_CPU[[:blank:]]*\($with_cpu," \
-		       ${srcdir}/config/arc/arc-cpus.def
-		then
-		 # Ok
-		 new_cpu=$with_cpu
-		else
-		 echo "Unknown cpu used in --with-cpu=$with_cpu" 1>&2
-		 exit 1
-		fi
-
-		# see if --with-fpu matches any of the supported FPUs
-		case "$with_fpu" in
-		"")
-			# OK
-			;;
-		fpus | fpus_div | fpus_fma | fpus_all)
-			# OK if em or hs
-			flags_ok="[emhs]+"
-			;;
-		fpuda | fpuda_div | fpuda_fma | fpuda_all)
-			# OK only em
-			flags_ok="em"
-			;;
-		fpud | fpud_div | fpud_fma | fpud_all)
-			# OK only hs
-			flags_ok="hs"
-			;;
-		*)
-			echo "Unknown floating point type used in "\
-			     "--with-fpu=$with_fpu" 1>&2
-			exit 1
-			;;
-		esac
-
-		if [ -n "$flags_ok" ] \
-		   && ! grep -q -E "^ARC_CPU[[:blank:]]*\($new_cpu,[[:blank:]]*$flags_ok," \
-		   ${srcdir}/config/arc/arc-cpus.def
-		then
-		   echo "Unknown floating point type used in "\
-			 "--with-fpu=$with_fpu for cpu $new_cpu" 1>&2
-			 exit 1
-		fi
-		;;
-
 	avr-*-*)
 		# Handle --with-multilib-list.
 		if test "x${with_multilib_list}" != xdefault; then
@@ -4455,98 +4353,15 @@ case "${target}" in
 		fi
 	;;
 
-    csky-*-*)
-	supported_defaults="cpu endian float"
-	;;
-
 	arm*-*-*)
-		supported_defaults="arch cpu float tune fpu abi mode tls"
-		for which in cpu tune arch; do
-			# See if it matches a supported value
-			eval "val=\$with_$which"
-			if [ x"$val" != x ]; then
-			  cpu=`awk -f ${srcdir}/config/arm/parsecpu.awk \
-				-v cmd="chk$which $val" \
-				${srcdir}/config/arm/arm-cpus.in`
-			  if [ "$cpu" = "error" ]; then
-			    echo "Unknown target in --with-$which=$val" 1>&2
-			    exit 1
-			  else
-			    new_val=$cpu
-			    eval "target_${which}_cname=$new_val"
-			    echo "For $val real value is $new_val"
-			  fi
-			fi
-		done
-
-		case "$with_float" in
-		"" \
-		| soft | hard | softfp)
-			# OK
-			;;
-		*)
-			echo "Unknown floating point type used in --with-float=$with_float" 1>&2
-			exit 1
-			;;
-		esac
-
-		# see if --with-fpu matches any of the supported FPUs
-		if [ x"$with_fpu" != x ] ; then
-		  val=$with_fpu
-		  fpu=`awk -f ${srcdir}/config/arm/parsecpu.awk \
-			-v cmd="chkfpu $val" \
-			${srcdir}/config/arm/arm-cpus.in`
-		  if [ "$fpu" = "error" ]
-		  then
-		    echo "Unknown target in --with-fpu=$val" 1>&2
-		    exit 1
-		  fi
-		fi
-
-		case "$with_abi" in
-		"" \
-		| apcs-gnu | atpcs | aapcs | aapcs-linux )
-			#OK
-			;;
-		*)
-			echo "Unknown ABI used in --with-abi=$with_abi"
-			exit 1
-			;;
-		esac
-
-		case "$with_mode" in
-		"" \
-		| arm | thumb )
-			#OK
-			;;
-		*)
-			echo "Unknown mode used in --with-mode=$with_mode"
-			exit 1
-			;;
-		esac
-
-		case "$with_tls" in
-		"" \
-		| gnu | gnu2)
-			# OK
-			;;
-		*)
-			echo "Unknown TLS method used in --with-tls=$with_tls" 1>&2
-			exit 1
-			;;
-		esac
-
-		if test "x$with_arch" != x && test "x$with_cpu" != x; then
-			echo "Switch \"--with-arch\" may not be used with switch \"--with-cpu\""  1>&2
-			exit 1
-		fi
-
-		if test "x$with_cpu" != x && test "x$with_tune" != x; then
-			echo "Switch \"--with-tune\" may not be used with switch \"--with-cpu\""  1>&2
-			exit 1
-		fi
-
-		# Add extra multilibs
+		# --with-arch/--with-cpu/--with-tune/--with-float/--with-fpu/
+		# --with-abi/--with-mode/--with-tls are gone; all that hung off them
+		# here was validation against config/arm/arm-cpus.in.
+		#
+		# --with-multilib-list is declared with AC_ARG_WITH and stays.  The
+		# check it used to make against --with-arch/cpu/fpu/float/mode goes
+		# with those options; arm/t-aprofile and arm/t-rmprofile were only
+		# ever designed for the no-with-* case, which is now the only case.
 		if test "x$with_multilib_list" != x; then
 			ml=
 			arm_multilibs=`echo $with_multilib_list | sed -e 's/,/ /g'`
@@ -4575,18 +4390,7 @@ case "${target}" in
 			fi
 
 			if test "x${tmake_profile_file}" != x ; then
-				# arm/t-aprofile and arm/t-rmprofile are only
-				# designed to work without any with-cpu,
-				# with-arch, with-mode, with-fpu or with-float
-				# options.
-				if test "x$with_arch" != x \
-				    || test "x$with_cpu" != x \
-				    || test "x$with_float" != x \
-				    || test "x$with_fpu" != x \
-				    || test "x$with_mode" != x ; then
-				    echo "Error: You cannot use any of --with-arch/cpu/fpu/float/mode with --with-multilib-list=${with_multilib_list}" 1>&2
-				    exit 1
-				elif test "x$ml" != x ; then
+				if test "x$ml" != x ; then
 				    echo "Error: You cannot use builtin multilib profiles along with custom ones" 1>&2
 				    exit 1
 				fi
@@ -4598,24 +4402,12 @@ case "${target}" in
 				TM_MULTILIB_CONFIG="$with_multilib_list"
 			fi
 		fi
+		# arm's entry in the target_cpu_default2 case below insists on a CPU,
+		# so this default is load-bearing, not cosmetic.
 		target_cpu_cname=${target_cpu_cname:-arm7tdmi}
 		with_cpu=${with_cpu:-$target_cpu_cname}
 		;;
-
-	fr*-*-*linux*)
-		supported_defaults=cpu
-		case "$with_cpu" in
-		fr400) ;;
-		fr550) ;;
-		*)
-			echo "Unknown cpu used in --with-cpu=$with_cpu" 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
 	fido-*-* | m68k*-*-*)
-		supported_defaults="arch cpu"
 		case "$with_arch" in
 		"" | "m68k"| "cf")
 			m68k_arch_family="$with_arch"
@@ -4653,21 +4445,9 @@ case "${target}" in
 			;;
 		esac
 		;;
-
 	amdgcn-*-*)
-		supported_defaults="arch tune"
-
-		for which in arch tune; do
-			eval "val=\$with_$which"
-			if test x"$val" != x \
-			   && ! grep -q "GCN_DEVICE($val," \
-					"${srcdir}/config/gcn/gcn-devices.def";
-			then
-				echo "Unknown cpu used in --with-$which=$val." 1>&2
-				exit 1
-			fi
-		done
-		[ "x$with_arch" = x ] && with_arch=gfx90a
+		# --with-arch/--with-tune are gone; gfx90a was --with-arch's default.
+		with_arch=gfx90a
 
 		case "x${with_multilib_list}" in
 		x | xno)
@@ -4682,217 +4462,46 @@ case "${target}" in
 		esac
 		;;
 
-	hppa*-*-*)
-		supported_defaults="arch schedule"
-
-		case "$with_arch" in
-		"" | 1.0 | 1.1 | 2.0)
-			# OK
-			;;
-		*)
-			echo "Unknown architecture used in --with-arch=$with_arch" 1>&2
-			exit 1
-			;;
-		esac
-
-		case "$with_schedule" in
-		"" | 700 | 7100 | 7100LC | 7200 | 7300 | 8000)
-			# OK
-			;;
-		*)
-			echo "Unknown processor used in --with-schedule=$with_schedule." 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
-	i[34567]86-*-* | x86_64-*-*)
-		supported_defaults="abi arch arch_32 arch_64 cpu cpu_32 cpu_64 tune tune_32 tune_64 tls"
-		for which in arch arch_32 arch_64 cpu cpu_32 cpu_64 tune tune_32 tune_64; do
-			eval "val=\$with_$which"
-			case " $x86_archs " in
-			*" ${val} "*)
-				case "${target}" in
-				  x86_64-*-*)
-				      case "x$which" in
-					*_32)
-						;;
-					*)
-						echo "CPU given in --with-$which=$val doesn't support 64bit mode." 1>&2
-						exit 1
-						;;
-				      esac
-				      ;;
-				esac
-				# OK
-				;;
-			*)
-				if test x${val} != x; then
-					case " $x86_64_archs " in
-					*" ${val} "*)
-						# Disallow x86-64-v* for --with-cpu=/--with-tune=
-						case "x$which$val" in
-						xcpu*x86-64-v*|xtune*x86-64-v*)
-							echo "Unknown CPU given in --with-$which=$val." 1>&2
-							exit 1
-							;;
-						*)
-							;;
-						esac
-						# OK
-						;;
-					*)
-						# Allow $x86_cpus --with-cpu=/--with-tune=
-						case "x$which" in
-						xcpu*|xtune*)
-							case " $x86_cpus " in
-							*" ${val} "*)
-								# OK
-								;;
-							*)
-								echo "Unknown CPU given in --with-$which=$val." 1>&2
-								exit 1
-								;;
-							esac
-							;;
-						*)
-							echo "Unknown CPU given in --with-$which=$val." 1>&2
-							exit 1
-							;;
-						esac
-					;;
-					esac
-				fi
-				;;
-			esac
-		done
-
-		# Handle --with-tls.
-		case "$with_tls" in
-		""|gnu|gnu2)
-			# OK
-			;;
-		*)
-			echo "Unknown TLS method used in --with-tls=$with_tls" 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
 	riscv*-*-*)
-		supported_defaults="abi arch cpu tune riscv_attribute isa_spec tls cmodel"
-
+		# --with-arch/--with-abi/--with-isa-spec/--with-riscv-attribute/
+		# --with-cmodel/--with-tls/--with-cpu/--with-tune are gone.  Each of
+		# them had a default, and those defaults are what is left: ISA spec
+		# 20191213, .riscv.attributes on, the GC ISA for the triple's XLEN,
+		# the ABI that ISA implies, and the medlow code model.
 		case "${target}" in
 		riscv-* | riscv32*) xlen=32 ;;
 		riscv64*) xlen=64 ;;
 		*) echo "Unsupported RISC-V target ${target}" 1>&2; exit 1 ;;
 		esac
 
-		case "${with_isa_spec}" in
-		""|default|20191213|201912)
-			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_20191213"
-			with_isa_spec=20191213
-			;;
-		2.2)
-			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_2P2"
-			;;
-		20190608 | 201906)
-			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_20190608"
-			with_isa_spec=20190608
-			;;
-		*)
-			echo "--with-isa-spec only accept 2.2, 20191213, 201912, 20190608 or 201906" 1>&2
-			exit 1
-		esac
+		tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_20191213"
+		with_isa_spec=20191213
 
-		case "${with_riscv_attribute}" in
-		yes)
-			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
-			;;
-		no)
-			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=0"
-			;;
-		""|default)
-			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
-			;;
-		*)
-			echo "--with-riscv-attribute=${with_riscv_attribute} is not supported.  The argument must begin with yes, no or default." 1>&2
-			exit 1
-			;;
-		esac
+		tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
 
-
-		# Infer arch from --with-arch, --target, and --with-abi.
-		case "${with_arch}" in
-		rv32e* | rv32i* | rv32g* | rv64e* | rv64i* | rv64g* \
-		| rvi20* | rva20* | rva22* | rva23* | rvb23*)
-			# OK.
-			;;
-		"")
-			# Infer XLEN, but otherwise assume GC.
-			case "${with_abi}" in
-			ilp32e) with_arch="rv32e" ;;
-			ilp32 | ilp32f | ilp32d) with_arch="rv32gc" ;;
-			lp64 | lp64f | lp64d) with_arch="rv64gc" ;;
-			lp64e) with_arch="rv64e" ;;
-			*) with_arch="rv${xlen}gc" ;;
-			esac
-			;;
-		*)
-			echo "--with-arch=${with_arch} is not supported.  The argument must begin with rv32e, rv32i, rv32g, rv64e, rv64i, rv64g, or a profile." 1>&2
-			exit 1
-			;;
-		esac
+		# Infer the ISA from ${target}; without --with-abi to key off, the
+		# XLEN is all there is to go on, and GC is what that inferred.
+		with_arch="rv${xlen}gc"
 		PYTHON=`which python3 || which python`
 		if test "x${PYTHON}" != x; then
 			with_arch=`${PYTHON} ${srcdir}/config/riscv/arch-canonicalize -misa-spec=${with_isa_spec} ${with_arch}`
 		fi
 		tm_defines="${tm_defines} TARGET_RISCV_DEFAULT_ARCH=${with_arch}"
 
-		# Make sure --with-abi is valid.  If it was not specified,
-		# pick a default based on the ISA, preferring soft-float
-		# unless the D extension is present.
-		case "${with_abi}" in
-		ilp32 | ilp32e | ilp32f | ilp32d | lp64 | lp64e | lp64f | lp64d)
-			;;
-		"")
-			case "${with_arch}" in
-			rv32*d* | rv32g*) with_abi=ilp32d ;;
-			rv32e*) with_abi=ilp32e ;;
-			rv32*) with_abi=ilp32 ;;
-			rv64*d* | rv64g*) with_abi=lp64d ;;
-			rv64e*) with_abi=lp64e ;;
-			rv64*) with_abi=lp64 ;;
-			esac
-			;;
-		*)
-			echo "--with-abi=${with_abi} is not supported" 1>&2
-			exit 1
-			;;
+		# The ABI the ISA implies: D is present in rv32gc/rv64gc, so this is
+		# the hard-float ABI, exactly as before.
+		case "${with_arch}" in
+		rv32*d* | rv32g*) with_abi=ilp32d ;;
+		rv32e*) with_abi=ilp32e ;;
+		rv32*) with_abi=ilp32 ;;
+		rv64*d* | rv64g*) with_abi=lp64d ;;
+		rv64e*) with_abi=lp64e ;;
+		rv64*) with_abi=lp64 ;;
 		esac
 		tm_defines="${tm_defines} TARGET_RISCV_DEFAULT_ABI=${with_abi}"
 
-		# Make sure ABI and ISA are compatible.
-		case "${with_abi},${with_arch}" in
-		ilp32,rv32* | ilp32e,rv32e* \
-		| ilp32f,rv32*f* | ilp32f,rv32g* \
-		| ilp32d,rv32*d* | ilp32d,rv32g* \
-		| ilp32,rvi20u32* | ilp32f,rvi20u32* \
-		| ilp32d,rvi20u32* \
-		| lp64,rv64* | lp64e,rv64e* \
-		| lp64f,rv64*f* | lp64f,rv64g* \
-		| lp64d,rv64*d* | lp64d,rv64g* \
-		| lp64,rvi20u64* | lp64f,rvi20u64* \
-		| lp64d,rva20u64* | lp64d,rva22u64* \
-		| lp64d,rva23u64* | lp64d,rva23s64* \
-		| lp64d,rvb23u64* | lp64d,rvb23s64)
-			;;
-		*)
-			echo "--with-abi=${with_abi} is not supported for ISA ${with_arch}" 1>&2
-			exit 1
-			;;
-		esac
-		# Handle --with-multilib-generator.
+		# --with-multilib-generator and --with-multilib-list are declared
+		# with AC_ARG_WITH and are not part of this group.
 		if test "x${with_multilib_generator}" != xdefault; then
 			if test "x${with_multilib_list}" != xdefault; then
 				echo "--with-multilib-list= can't used with --with-multilib-generator= at same time" 1>&2
@@ -4917,19 +4526,7 @@ case "${target}" in
 				;;
 			esac
 		fi
-		# Handle --with-tls.
-		case "$with_tls" in
-		"" \
-		| trad | desc)
-			# OK
-			;;
-		*)
-			echo "Unknown TLS method used in --with-tls=$with_tls" 1>&2
-			exit 1
-			;;
-		esac
 
-		# Handle --with-multilib-list.
 		if test "x${with_multilib_list}" != xdefault; then
 			tmake_file="${tmake_file} riscv/t-withmultilib"
 
@@ -4944,208 +4541,21 @@ case "${target}" in
 			esac
 		fi
 
-		# Handle --with-cmodel.
-		# Make sure --with-cmodel is valid.  If it was not specified,
-		# use medlow as the default value.
-		case "${with_cmodel}" in
-		"" | medlow)
-			tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CM_MEDLOW"
-			;;
-		medany)
-			tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CM_MEDANY"
-			;;
-		large)
-			tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CM_LARGE"
-			;;
-		*)
-			echo "invalid option for --with-cmodel: '${with_cmodel}', available values are 'medlow' 'medany' 'large'" 1>&2
-			exit 1
-			;;
-		esac
+		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CM_MEDLOW"
 		;;
 
 	mips*-*-*)
-		supported_defaults="abi arch arch_32 arch_64 float fpu nan fp_32 odd_spreg_32 tune tune_32 tune_64 divide llsc mips-plt synci lxc1-sxc1 madd4 compact-branches msa"
-
-		case ${with_float} in
-		"" | soft | hard)
-			# OK
-			;;
-		*)
-			echo "Unknown floating point type used in --with-float=$with_float" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_fpu} in
-		"" | single | double)
-			# OK
-			;;
-		*)
-			echo "Unknown fpu type used in --with-fpu=$with_fpu" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_nan} in
-		"" | 2008 | legacy)
-			# OK
-			;;
-		*)
-			echo "Unknown NaN encoding used in --with-nan=$with_nan" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_fp_32} in
-		"" | 32 | xx | 64)
-			# OK
-			;;
-		*)
-			echo "Unknown FP mode used in --with-fp-32=$with_fp_32" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_odd_spreg_32} in
-		yes)
-			with_odd_spreg_32="odd-spreg"
-			;;
-		no)
-			with_odd_spreg_32="no-odd-spreg"
-			;;
-		"")
-			# OK
-			;;
-		*)
-			echo "Unknown odd-spreg-32 type used in --with-odd-spreg-32=$with_odd_spreg_32" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_abi} in
-		"" | 32 | o64 | n32 | 64 | eabi)
-			# OK
-			;;
-		*)
-			echo "Unknown ABI used in --with-abi=$with_abi" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_divide} in
-		"" | breaks | traps)
-			# OK
-			;;
-		*)
-			echo "Unknown division check type use in --with-divide=$with_divide" 1>&2
-			exit 1
-			;;
-		esac
-
+		# --with-llsc is inferred from ${target} above (the Linux kernel
+		# emulates LL/SC, the R5900 has neither).  mips.h spells this option
+		# `-m%(VALUE)' in OPTION_DEFAULT_SPECS, so the yes/no answer has to
+		# become the option name before it is recorded.
 		case ${with_llsc} in
-		yes)
-			with_llsc=llsc
-			;;
-		no)
-			with_llsc="no-llsc"
-			;;
-		"")
-			# OK
-			;;
-		*)
-			echo "Unknown llsc type used in --with-llsc" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_mips_plt} in
-		yes)
-			with_mips_plt=plt
-			;;
-		no)
-			with_mips_plt=no-plt
-			;;
-		"")
-			;;
-		*)
-			echo "Unknown --with-mips-plt argument: $with_mips_plt" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_synci} in
-		yes)
-			with_synci=synci
-			;;
-		no)
-			with_synci=no-synci
-			;;
-		"")
-			;;
-		*)
-			echo "Unknown synci type used in --with-synci" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_lxc1_sxc1} in
-		yes)
-			with_lxc1_sxc1=lxc1-sxc1
-			;;
-		no)
-			with_lxc1_sxc1=no-lxc1-sxc1
-			;;
-		"")
-			;;
-		*)
-			echo "Unknown lxc1-sxc1 type used in --with-lxc1-sxc1" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_madd4} in
-		yes)
-			with_madd4=madd4
-			;;
-		no)
-			with_madd4=no-madd4
-			;;
-		"")
-			;;
-		*)
-			echo "Unknown madd4 type used in --with-madd4" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_compact_branches} in
-		"" | never | always | optimal)
-			;;
-		*)
-			echo "Unknown compact-branches policy used in --with-compact-branches" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_msa} in
-		yes)
-			with_msa=msa
-			;;
-		no)
-			with_msa=no-msa
-			;;
-		"")
-			;;
-		*)
-			echo "Unknown msa type used in --with-msa" 1>&2
-			exit 1
-			;;
+		yes)	with_llsc=llsc ;;
+		no)	with_llsc=no-llsc ;;
 		esac
 		;;
 
 	loongarch*-*)
-		supported_defaults="abi arch tune fpu simd multilib-default strict-align-lib tls cmodel"
 
 		# Local variables
 		unset \
@@ -5154,16 +4564,6 @@ case "${target}" in
 			fpu_pattern	fpu_default \
 			triplet_os	triplet_abi \
 			strict_align_opt
-
-		# --with-abi is now obsolete, emit a warning if given.
-		case ${with_abi} in
-		"") ;;
-		*)
-			echo "warning: --with-abi= is now obsolete," \
-			"the default ABI is derived from your target" \
-			"triplet ${target}" 1>&2
-			;;
-		esac
 
 		# Infer ABI from the triplet.
 		case ${target} in
@@ -5210,54 +4610,6 @@ case "${target}" in
 			;;
 		esac
 
-
-		# Perform initial sanity checks on --with-* options.
-		case ${with_arch} in
-		"" | la64v1.[01] | abi-default | loongarch64 | la[46]64 | la32v1.0 | la32rv1.0)
-			;; # OK, append here.
-		native)
-			if test x${host} != x${target}; then
-				echo "--with-arch=native is illegal for cross-compiler." 1>&2
-				exit 1
-			fi
-			;;
-		*)
-			echo "Unknown arch in --with-arch=$with_arch" 1>&2
-			exit 1
-			;;
-		esac
-
-
-		case ${with_fpu} in
-		"" | none | 32 | 64) ;; # OK, append here.
-		0)
-			# Convert "0" to "none" for upcoming checks.
-			with_fpu="none"
-			;;
-		*)
-			echo "Unknown fpu type in --with-fpu=$with_fpu" 1>&2
-			exit 1
-			;;
-		esac
-
-		case ${with_simd} in
-		"" | none) ;;
-		lsx | lasx)  # OK, append here.
-			case ${with_fpu} in
-			64) ;;
-			"") with_fpu=64 ;;
-			*)
-				echo "--with-simd=${with_simd} conflicts with --with-fpu=${with_fpu}" 1>&2
-				exit 1
-				;;
-			esac
-			;;
-
-		*)
-			echo "Unknown SIMD extension in --with-simd=$with_simd" 1>&2
-			exit 1
-			;;
-		esac
 
 		# Infer ISA-related default options from the ABI: pass 1
 		case ${abi_base}/${abi_ext} in
@@ -5307,115 +4659,28 @@ case "${target}" in
 			;;
 		esac
 
-		## Set default value for with_arch.
-		case ${with_arch} in
-		"")
-			if test x${arch_default} != x; then
-				with_arch=${arch_default}
-			else
-				with_arch=${arch_pattern}
-			fi
-			;;
-
-		*)
-			if echo "${with_arch}" | grep -E "^${arch_pattern}$" > /dev/null; then
-				: # OK
-			else
-				echo "${abi_base}/${abi_ext} ABI cannot be implemented with" \
-				"--with-arch=${with_arch}." 1>&2
-				exit 1
-			fi
-			;;
-		esac
-
-		## Set default value for with_fpu.
-		case ${with_fpu} in
-		"")
-			if test x${fpu_default} != x; then
-				with_fpu=${fpu_default}
-			else
-				with_fpu=${fpu_pattern}
-			fi
-			;;
-
-		*)
-			if echo "${with_fpu}" | grep -E "^${fpu_pattern}$" > /dev/null; then
-				: # OK
-			else
-				echo "${abi_base}/${abi_ext} ABI cannot be implemented with" \
-				"--with-fpu=${with_fpu}." 1>&2
-				exit 1
-			fi
-			;;
-		esac
-
-
-		# Check default with_tune configuration using with_arch.
-		tune_pattern="native|generic|loongarch64|la[46]64|loongarch32"
-
-		case ${with_tune} in
-		"") ;; # OK
-		*)
-			if echo "${with_tune}" | grep -E "^${tune_pattern}$" > /dev/null; then
-				: # OK
-			else
-				echo "Incompatible options: --with-tune=${with_tune}" \
-				"and --with-arch=${with_arch}." 1>&2
-				exit 1
-			fi
-			;;
-		esac
-
-		# Build libraries with -mstrict-align if --with-strict-align-lib is given.
-		case ${with_strict_align_lib} in
-		yes) strict_align_opt="/mstrict-align" ;;
-		""|no)  ;;
-		*)
-			echo "Unknown option: --with-strict-align-lib=${with_strict_align_lib}" 1>&2
-			exit 1
-			;;
-		esac
-
-
-		# Handle --with-multilib-default
-		if echo "${with_multilib_default}" \
-		| grep -E -e '[[:space:]]' -e '//' -e '/$' -e '^/' > /dev/null 2>&1; then
-			echo "Invalid argument to --with-multilib-default." 1>&2
-			exit 1
-		fi
-
-		if test x${with_multilib_default} = x; then
-			# Use -march=abi-default by default when building libraries.
-			with_multilib_default="/march=abi-default"
+		## The ABI's own -march and -mfpu.  --with-arch/--with-fpu/--with-tune
+		## are gone, so the ABI-derived default (or, where the ABI names no
+		## single one, the pattern of what it permits) is what is recorded.
+		if test x${arch_default} != x; then
+			with_arch=${arch_default}
 		else
-			unset parse_state component
-			parse_state=arch
-			for component in $(echo "${with_multilib_default}" | tr '/' ' '); do
-				case ${parse_state},${component} in
-				arch,|arch,abi-default)
-					# ABI-default: use the ABI's default ARCH configuration for
-					# multilib library builds, unless otherwise specified
-					# in --with-multilib-list.
-					with_multilib_default="/march=abi-default" ;;
-				arch,fixed)
-					# Fixed: use the default gcc configuration for all multilib
-					# builds by default.
-					with_multilib_default="" ;;
-				arch,native|arch,la64v1.[01]|arch,loongarch64|arch,la[46]64|arch,la32v1.0|arch,la32rv1.0) # OK, append here.
-					with_multilib_default="/march=${component}" ;;
-				arch,*)
-					with_multilib_default="/march=abi-default"
-					with_multilib_default="${with_multilib_default}/${component}" ;;
-				opts,*)
-					with_multilib_default="${with_multilib_default}/${component}" ;;
-				esac
-
-				if test x${parse_state} = xarch; then
-					parse_state=opt;
-				fi
-			done
-			unset parse_state component
+			with_arch=${arch_pattern}
 		fi
+
+		if test x${fpu_default} != x; then
+			with_fpu=${fpu_default}
+		else
+			with_fpu=${fpu_pattern}
+		fi
+
+		# --with-strict-align-lib is gone.  Its default was `no', i.e. target
+		# libraries are not built with -mstrict-align.
+		strict_align_opt=
+
+		# --with-multilib-default is gone.  Its default was to build libraries
+		# with the ABI's default architecture.
+		with_multilib_default="/march=abi-default"
 
 		# Handle --with-multilib-list.
 		if test x"${with_multilib_list}" = x \
@@ -5425,18 +4690,6 @@ case "${target}" in
 
 			with_multilib_list="${abi_base}/${abi_ext}"
 		fi
-
-		# Handle --with-tls.
-		case "$with_tls" in
-		"" \
-		| trad | desc)
-		    # OK
-		    ;;
-		*)
-		    echo "Unknown TLS method used in --with-tls=$with_tls" 1>&2
-		    exit 1
-		    ;;
-		esac
 
 		# Check if the configured default ABI combination is included in
 		# ${with_multilib_list}.
@@ -5589,127 +4842,35 @@ case "${target}" in
 		# Remove the excessive appending comma.
 		loongarch_multilib_list_c=${loongarch_multilib_list_c%,}
 		loongarch_multilib_list_make=${loongarch_multilib_list_make%,}
-
-		# Handle --with-cmodel.
-		# Make sure --with-cmodel is valid.  If it was not specified,
-		# use medium as the default value.
-		case "${with_cmodel}" in
-		"" | medium)
-			tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CMODEL_MEDIUM"
-			;;
-		normal)
-			tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CMODEL_NORMAL"
-			;;
-		*)
-			echo "invalid option for --with-cmodel: '${with_cmodel}', available values are 'medium' and 'normal'" 1>&2
-			exit 1
-			;;
-		esac
+		# --with-cmodel is gone; `medium' was its default.
+		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CMODEL_MEDIUM"
 		;;
 
 	nds32*-*-*)
-		supported_defaults="arch cpu nds32_lib float fpu_config"
+		# --with-arch/--with-cpu/--with-float/--with-fpu-config are gone.
+		# The defaults they had were arch=v3 (TARGET_ARCH_DEFAULT=0) and
+		# cpu=n9; float and fpu-config had no configure-time effect at all
+		# beyond being validated.
+		tm_defines="${tm_defines} TARGET_ARCH_DEFAULT=0"
+		with_cpu=n9
 
-		# process --with-arch
-		case "${with_arch}" in
-		"" | v3 )
-			tm_defines="${tm_defines} TARGET_ARCH_DEFAULT=0"
+		# --with-nds32-lib is gone; the library was already inferred from
+		# ${target} whenever it was not given, and that inference is what
+		# survives.
+		case ${target} in
+		*-*-*uclibc*)
+			with_nds32_lib=ulibc
 			;;
-		v2 | v2j | v3m)
-			# OK
-			tm_defines="${tm_defines} TARGET_ARCH_DEFAULT=0"
-			;;
-		v3f)
-			tm_defines="${tm_defines} TARGET_ARCH_DEFAULT=1"
-			;;
-		v3s)
-			tm_defines="${tm_defines} TARGET_ARCH_DEFAULT=2"
-
+		*-*-linux*)
+			with_nds32_lib=glibc
 			;;
 		*)
-			echo "Cannot accept --with-arch=$with_arch, available values are: v2 v2j v3 v3m v3f v3s" 1>&2
-			exit 1
-			;;
-		esac
-
-		case "${with_cpu}" in
-		"")
-			with_cpu=n9
-			;;
-		n6 | n7 |n8 | e8 | s8 | n9 | n10 | d10 | n12 | n13 | n15)
-			# OK
-			;;
-		*)
-			echo "Cannot accept --with-cpu=$with_cpu, available values are: n6 n7 n8 e8 s8 n9 n10 d10 n12 n13 n15" 1>&2
-			exit 1
-			;;
-		esac
-
-		# process --with-nds32-lib
-		case "${with_nds32_lib}" in
-		"")
-			case ${target} in
-			*-*-*uclibc*)
-				with_nds32_lib=ulibc
-				;;
-			*-*-linux*)
-				with_nds32_lib=glibc
-				;;
-			*)
-				with_nds32_lib=newlib
-				tm_defines="${tm_defines} TARGET_DEFAULT_CTOR_DTOR=1"
-				;;
-			esac
-			;;
-		newlib)
-			# OK
+			with_nds32_lib=newlib
 			tm_defines="${tm_defines} TARGET_DEFAULT_CTOR_DTOR=1"
 			;;
-		mculib)
-			# OK
-			# for the arch=v3f or arch=v3s under mculib toolchain,
-			# we would like to set -fno-math-errno as default
-			case "${with_arch}" in
-			v3f | v3s)
-				tm_defines="${tm_defines} TARGET_DEFAULT_NO_MATH_ERRNO=1"
-				;;
-			esac
-			;;
-		glibc | uclibc)
-			# OK
-			;;
-		*)
-			echo "Cannot accept --with-nds32-lib=$with_nds32_lib, available values are: newlib mculib glibc uclibc" 1>&2
-			exit 1
-			;;
 		esac
-
-		# process --with-float
-		case "${with_float}" in
-		"" | soft | hard)
-			# OK
-			;;
-		*)
-			echo "Cannot accept --with-float=$with_float, available values are: soft hard" 1>&2
-			exit 1
-			;;
-		esac
-
-		# process --with-config-fpu
-		case "${with_config_fpu}" in
-		"" | 0 | 1 | 2 | 3)
-			# OK
-			;;
-		*)
-			echo "Cannot accept --with-config-fpu=$with_config_fpu, available values from 0 to 7" 1>&2
-			exit 1
-			;;
-		esac
-
-
 		;;
 	nvptx-*)
-		supported_defaults=arch
 
 		nvptx_multilibs_default=sm_52
 
@@ -5775,216 +4936,6 @@ case "${target}" in
 			esac
 		done
 		TM_MULTILIB_CONFIG=`echo $TM_MULTILIB_CONFIG | sed 's/^ //'`
-		;;
-
-	powerpc*-*-* | rs6000-*-*)
-		supported_defaults="abi cpu cpu_32 cpu_64 float tune tune_32 tune_64 advance_toolchain"
-
-		for which in cpu cpu_32 cpu_64 tune tune_32 tune_64; do
-			eval "val=\$with_$which"
-			case ${val} in
-			default32 | default64)
-				case $which in
-				cpu | tune)
-					;;
-				*)
-					echo "$val only valid for --with-cpu and --with-tune." 1>&2
-					exit 1
-					;;
-				esac
-				with_which="with_$which"
-				eval $with_which=
-				;;
-			405cr)
-				tm_defines="${tm_defines} CONFIG_PPC405CR"
-				eval "with_$which=405"
-				;;
-			"" | common | native \
-			| power[3456789] | power1[01] | future | power5+ | power6x \
-			| powerpc | powerpc64 | powerpc64le \
-			| rs64 \
-			| 401 | 403 | 405 | 405fp | 440 | 440fp | 464 | 464fp \
-			| 476 | 476fp | 505 | 601 | 602 | 603 | 603e | ec603e \
-			| 604 | 604e | 620 | 630 | 740 | 750 | 7400 | 7450 \
-			| a2 | e300c[23] | 854[08] | e500mc | e500mc64 | e5500 | e6500 \
-			| titan | 801 | 821 | 823 | 860 | 970 | G3 | G4 | G5 | cell)
-				# OK
-				;;
-			*)
-				echo "Unknown cpu used in --with-$which=$val." 1>&2
-				exit 1
-				;;
-			esac
-		done
-
-		case "$with_abi" in
-		"" | elfv1 | elfv2 )
-			#OK
-			;;
-		*)
-			echo "Unknown ABI used in --with-abi=$with_abi"
-			exit 1
-			;;
-		esac
-
-		if test "x$with_advance_toolchain" != x; then
-		    if test -d "/opt/$with_advance_toolchain/." -a \
-			-d "/opt/$with_advance_toolchain/bin/." -a \
-			-d "/opt/$with_advance_toolchain/include/."; then
-
-			tm_file="$tm_file ./advance-toolchain.h"
-			(at="/opt/$with_advance_toolchain"
-			 echo "/* Use Advance Toolchain $at */"
-			 echo
-			 echo "#undef  LINK_OS_NEW_DTAGS_SPEC"
-			 echo "#define LINK_OS_NEW_DTAGS_SPEC" \
-			      "\"--enable-new-dtags\""
-			 echo
-			 echo "#undef  DYNAMIC_LINKER_PREFIX"
-			 echo "#define DYNAMIC_LINKER_PREFIX \"$at\""
-			 echo
-			 echo "#undef  MD_EXEC_PREFIX"
-			 echo "#define MD_EXEC_PREFIX \"$at/bin/\""
-			 echo
-			 echo "#undef  MD_STARTFILE_PREFIX"
-			 echo "#define MD_STARTFILE_PREFIX \"$prefix/lib/\""
-			 echo
-			 echo "#undef  MD_STARTFILE_PREFIX_1"
-			 echo "#define MD_STARTFILE_PREFIX_1 \"$at/lib/\"") \
-			    > advance-toolchain.h
-		    else
-			echo "Unknown advance-toolchain $with_advance_toolchain"
-			exit 1
-		    fi
-		fi
-
-		# Set up the default long double format if the user changed it.
-		if test x$with_long_double_format = xieee; then
-		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
-
-		elif test x$with_long_double_format = xibm; then
-		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
-		fi
-		;;
-
-	s390x-*-*)
-		supported_defaults="arch mode tune"
-
-		for which in arch tune; do
-			eval "val=\$with_$which"
-			case ${val} in
-			"" | native | z900 | z990 | z9-109 | z9-ec | z10 | z196 | zEC12 | z13 | z14 | z15 | z16 | z17 | arch5 | arch6 | arch7 | arch8 | arch9 | arch10 | arch11 | arch12 | arch13 | arch14 | arch15 )
-				# OK
-				;;
-			*)
-				echo "Unknown cpu used in --with-$which=$val." 1>&2
-				exit 1
-				;;
-			esac
-		done
-
-		case ${with_mode} in
-		"" | zarch)
-			# OK
-			;;
-		esa)
-			echo "ESA/390 mode is no longer supported." 1>&2
-			exit 1
-			;;
-		*)
-			echo "Unknown architecture mode used in --with-mode=$with_mode." 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
-	sh[123456ble]*-*-* | sh-*-*)
-		supported_defaults="cpu"
-		case "`echo $with_cpu | tr ABCDEFGHIJKLMNOPQRSTUVWXYZ_ abcdefghijklmnopqrstuvwxyz- | sed s/sh/m/`" in
-		"" | m1 | m2 | m2e | m3 | m3e | m4 | m4-single | m4-single-only | m4-nofpu )
-			# OK
-			;;
-		m2a | m2a-single | m2a-single-only | m2a-nofpu)
-			;;
-		m4a | m4a-single | m4a-single-only | m4a-nofpu | m4al)
-		        ;;
-		*)
-			echo "Unknown CPU used in --with-cpu=$with_cpu, known values:"  1>&2
-			echo "m1 m2 m2e m3 m3e m4 m4-single m4-single-only m4-nofpu" 1>&2
-			echo "m4a m4a-single m4a-single-only m4a-nofpu m4al" 1>&2
-			echo "m2a m2a-single m2a-single-only m2a-nofpu" 1>&2
-			exit 1
-			;;
-		esac
-		;;
-	sparc*-*-*)
-		supported_defaults="cpu cpu_32 cpu_64 float tune tune_32 tune_64"
-
-		for which in cpu cpu_32 cpu_64 tune tune_32 tune_64; do
-			eval "val=\$with_$which"
-			case ${val} in
-			"" | sparc | sparcv9 | sparc64 \
-			| v7 | cypress \
-			| v8 | supersparc | hypersparc | leon | leon3 | leon3v7 \
-			| sparclite | f930 | f934 | sparclite86x \
-			| sparclet | tsc701 \
-			| v9 | ultrasparc | ultrasparc3 | niagara | niagara2 \
-			| niagara3 | niagara4 | niagara7 | m8)
-				# OK
-				;;
-			*)
-				echo "Unknown cpu used in --with-$which=$val" 1>&2
-				exit 1
-				;;
-			esac
-		done
-
-		case ${with_float} in
-		"" | soft | hard)
-			# OK
-			;;
-		*)
-			echo "Unknown floating point type used in --with-float=$with_float" 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
-	tic6x-*-*)
-		supported_defaults="arch"
-
-		case ${with_arch} in
-		"" | c62x | c64x | c64x+ | c67x | c67x+ | c674x)
-			# OK
-			;;
-		*)
-			echo "Unknown arch used in --with-arch=$with_arch." 1>&2
-			exit 1
-			;;
-		esac
-		;;
-
-	v850*-*-*)
-		supported_defaults=cpu
-		case ${with_cpu} in
-		"" | v850e | v850e1 | v850e2 | v850es | v850e2v3 | v850e3v5)
-			# OK
-			;;
-		*)
-			echo "Unknown cpu used in --with-cpu=$with_cpu" 1>&2
-			exit 1
-			;;
-		esac
-		;;
-	visium-*-*)
-		supported_defaults="cpu"
-		case $with_cpu in
-		  "" | gr5 | gr6)
-			;;
-		  *)    echo "Unknown cpu used in --with-cpu=$with_cpu" 1>&2
-			exit 1
-			;;
-		esac
 		;;
 esac
 
@@ -6227,37 +5178,28 @@ case ${target} in
 		;;
 esac
 
-t=
-all_defaults="abi cpu cpu_32 cpu_64 arch arch_32 arch_64 tune tune_32 tune_64 schedule float mode fpu nan fp_32 odd_spreg_32 divide llsc mips-plt synci tls lxc1-sxc1 madd4 isa_spec compact-branches msa cmodel"
-for option in $all_defaults
+# Collect this target's own CPU/ABI defaults, as inferred above from ${target}.
+# These used to be validated against a per-target `supported_defaults' list and
+# frozen into configargs.h as a single `configure_default_options[]' array --
+# one target's answers, compiled into the driver.  There is no user input left
+# to validate (see the with_* clearing at the top of this file), so what is left
+# is data: `name=value' pairs, one line per option, which gcc/configure.ac
+# records in the multi-target manifest and target-specs turns into the
+# `option_defaults' spec of that target's spec file.
+#
+# The name is the OPTION_DEFAULT_SPECS key the back end's tm.h uses, so the
+# spelling here still has to match those headers exactly.
+target_option_defaults=
+for option in abi cpu cpu_32 cpu_64 arch arch_32 arch_64 tune tune_32 tune_64 \
+	      schedule float mode fpu nan fp_32 odd_spreg_32 divide llsc \
+	      mips-plt synci tls lxc1-sxc1 madd4 isa_spec compact-branches \
+	      msa cmodel
 do
 	eval "val=\$with_"`echo $option | sed s/-/_/g`
 	if test -n "$val"; then
-		case " $supported_defaults " in
-		*" $option "*)
-			;;
-		*)
-			echo "This target does not support --with-$option." 2>&1
-			echo "Valid --with options are: $supported_defaults" 2>&1
-			exit 1
-			;;
-		esac
-
-		if test "x$t" = x
-		then
-			t="{ \"$option\", \"$val\" }"
-		else
-			t="${t}, { \"$option\", \"$val\" }"
-		fi
+		target_option_defaults="${target_option_defaults} ${option}=${val}"
 	fi
 done
-
-if test "x$t" = x
-then
-	configure_default_options="{ { NULL, NULL} }"
-else
-	configure_default_options="{ ${t} }"
-fi
 
 if test "$target_cpu_default2" != ""
 then
@@ -6269,10 +5211,3 @@ then
 	fi
 fi
 
-case ${target} in
-i[34567]86-*-* | x86_64-*-*)
-	if test x$enable_as_accelerator = xyes; then
-		extra_programs="mkoffload\$(exeext)"
-	fi
-	;;
-esac

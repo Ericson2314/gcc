@@ -35,7 +35,7 @@
 
 function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   if (cpu == "" || seen[cpu])
-    { cpu = ""; md = ""; tmp = ""; return }
+    { cpu = ""; md = ""; tmp = ""; xmodes = ""; return }
   seen[cpu] = 1;
 
   # Reading a back end's .md means knowing its machine modes: the md files
@@ -44,9 +44,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # "unknown mode".  So each back end gets its own genmodes, its own
   # min-insn-modes.cc, and its own genpreds linked against that.
   #
-  # config.gcc records the extra modes file per target but the manifest does
-  # not carry it, so fall back on the naming convention every back end that
-  # has one follows.
+  # Which file that is comes from the manifest's extra_modes, which configure
+  # took from config.gcc -- not from the <cpu>/<cpu>-modes.def naming
+  # convention, which most but not all back ends happen to follow.
+  #
   # A few back ends generate headers of their own (arm-isa.h from
   # arm-cpus.in, gcn-device-macros.h from gcn-devices.def) which their config
   # headers include by name.  Those rules normally come from the target's
@@ -59,9 +60,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "include $(srcdir)/config/%s/t-%s-headers\n", cpu, cpu;
   }
 
-  modes = "config/" cpu "/" cpu "-modes.def";
-  if ((getline junk < (srcdir "/" modes)) >= 0) {
-    close(srcdir "/" modes);
+  if (xmodes != "") {
+    modes = "config/" xmodes;
     modesdep = " $(srcdir)/" modes;
     printf "build/genmodes-%s.o : BUILD_CPPFLAGS += -DTARGET_EXTRA_MODES_FILE='\"%s\"'\n", cpu, modes;
   } else {
@@ -85,7 +85,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # Everything the generators link against sees the mode enum through
   # coretypes.h, so it all has to be compiled against this back end's modes,
   # not just the one file that tabulates them.
-  n = split("genpreds rtl read-rtl ggc-none vec gensupport print-rtl " \
+  n = split("rtl read-rtl ggc-none vec gensupport print-rtl " \
 	    "hash-table sort read-md errors", parts, " ");
   objs = "build/min-insn-modes-" cpu ".o";
   for (i = 1; i <= n; i++)
@@ -99,16 +99,42 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "  errors.h $(READ_MD_H) $(GENSUPPORT_H) $(HASH_TABLE_H) $(OBSTACK_H)\n";
   printf "$(MULTI_TARGET_GEN_OBJS_%s) : BUILD_CPPFLAGS += \\\n", cpu;
   printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
-  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n", cpu;
-  # Only genpreds.cc reads a target macro out of tm.h (TARGET_MEM_CONSTRAINT);
-  # the rest of the library just needs the modes to agree.
-  printf "build/genpreds-%s.o : tm-%s.h\n", cpu, cpu;
-  printf "build/genpreds-%s.o : BUILD_CPPFLAGS += -DTM_H_FILE='\"tm-%s.h\"'\n\n", cpu, cpu;
+  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n\n", cpu;
 
-  printf "build/genpreds-%s$(build_exeext): $(MULTI_TARGET_GEN_OBJS_%s) \\\n", cpu, cpu;
-  printf "  $(BUILD_LIBDEPS)\n";
-  printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
-  printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+  # The programs themselves.  Each holds a main(), so they cannot share one
+  # link; they share the library above instead.  genpreds.cc additionally
+  # reads a target macro out of tm.h (TARGET_MEM_CONSTRAINT), and genflags.cc
+  # is what makes insn-flags-<base>.h, so both want this back end's tm.h.
+  n = split("preds flags", parts, " ");
+  for (i = 1; i <= n; i++) {
+    printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
+	   parts[i], cpu, parts[i], cpu, cpu;
+    printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_BASE_H) $(GTM_H) \\\n";
+    printf "  errors.h $(READ_MD_H) $(GENSUPPORT_H) $(OBSTACK_H)\n";
+    printf "build/gen%s-%s.o : BUILD_CPPFLAGS += \\\n", parts[i], cpu;
+    printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
+    printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"' \\\n", cpu;
+    printf "  -DTM_H_FILE='\"tm-%s.h\"'\n", cpu;
+    printf "build/gen%s-%s$(build_exeext): build/gen%s-%s.o \\\n",
+	   parts[i], cpu, parts[i], cpu;
+    printf "  $(MULTI_TARGET_GEN_OBJS_%s) $(BUILD_LIBDEPS)\n", cpu;
+    printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
+    printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+  }
+
+  # tm-<base>.h names this, so that a back end compiled against it gets its own
+  # HAVE_* rather than the configured target's.  Upstream feeds genflags
+  # insn-conditions.md as well, which resolves each pattern's condition to 1 or
+  # 0 up front; that file comes from gencondmd, which is itself built against
+  # one target and is not per-back-end yet.  Without it genflags emits the
+  # condition as the body of the HAVE_* macro, which is what GCC did before
+  # gencondmd existed -- correct, just not pre-evaluated.
+  printf "insn-flags-%s.h: build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
+  printf "  $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s > tmp-flags-%s.h\n", md, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-flags-%s.h $@\n", cpu;
+  printf "%s-common.o: insn-flags-%s.h insn-modes-%s.h\n\n", cpu, cpu, cpu;
 
   printf "tm-preds-%s.h: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
   printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) -h $(srcdir)/common.md \\\n", cpu;
@@ -137,11 +163,12 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # builds it lives in multi-target-common.mk, so add the prerequisite here.
   printf "%s-common.o: tm_p-%s.h tm-constrs-%s.h\n\n", cpu, cpu, cpu;
 
-  cpu = ""; md = ""; tmp = "";
+  cpu = ""; md = ""; tmp = ""; xmodes = "";
 }
 
 $1 == "cpu_type"  { cpu = $2 }
 $1 == "md_file"   { md = $2 }
+$1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 NF == 0		  { flush() }
 END		  { flush() }

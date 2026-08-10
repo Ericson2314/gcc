@@ -1,0 +1,30 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_loongarch_headers_included
+t_loongarch_headers_included := 1
+
+# Headers generated into the build directory that loongarch's own config
+# headers include by name -- loongarch-driver.h includes loongarch-multilib.h
+# directly, so unlike the tm_file entries it cannot be renamed per target.
+# Factored out of t-multilib so that a multi-target build, which includes no
+# single target's tmake_file, can generate it too; see
+# gen-multi-target-md.awk.
+#
+# The content is MLIB_SELF_SPECS, derived from TM_MULTILIB_CONFIG.  A
+# multi-target build includes no tmake_file, so that variable is empty there
+# and the empty-file branch is the right answer; a loongarch build that does
+# include t-multilib gets the real thing.  Both paths reach this one
+# definition, so the rule is never defined twice.
+ifneq ($(TM_MULTILIB_CONFIG),)
+loongarch-multilib.h:
+	@echo "#define MLIB_SELF_SPECS" \
+	      "\"$(default_mlib_spec)\"," \
+	      "\"$(lib_build_spec)\"," > $@
+else
+loongarch-multilib.h: ; @touch $@
+endif
+
+loongarch-common.o: loongarch-multilib.h
+
+endif

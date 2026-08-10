@@ -841,12 +841,11 @@ dw2_asm_output_symname_uleb128 (const char *lab1 ATTRIBUTE_UNUSED,
 
   va_start (ap, comment);
 
-#ifdef HAVE_AS_LEB128
+  if (!HAVE_AS_LEB128)
+    gcc_unreachable ();
+
   fputs ("\t.uleb128 ", asm_out_file);
   assemble_name (asm_out_file, lab1);
-#else
-  gcc_unreachable ();
-#endif
 
   if (flag_debug_asm && comment)
     {

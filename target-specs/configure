@@ -638,12 +638,16 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_target
+with_tools_dir
 with_as
 with_ld
-with_arch
-with_cpu
-with_tune
+with_option_defaults
+with_cpu_type
+with_decimal_float
+with_decimal_bid_format
+with_s390_excess_float_precision
 with_specs_file
+enable_linker_build_id
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1259,17 +1263,34 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-linker-build-id
+                          always pass --build-id to the linker
+
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-target=TRIPLE    target these specs describe
+  --with-tools-dir=DIR    directory of the target's binutils; prepended to
+                          PATH while probing
   --with-as=PATH          assembler to probe (default: TARGET-as, or as if
                           native)
   --with-ld=PATH          linker to probe (default: TARGET-ld, or ld if
                           native)
-  --with-arch=ARCH        default -march for this target
-  --with-cpu=CPU          default -mcpu for this target
-  --with-tune=TUNE        default -mtune for this target
+  --with-option-defaults=LIST
+                          space-separated name=value defaults, as config.gcc
+                          infers them
+  --with-cpu-type=NAME    back end name, e.g. i386, mips
+  --with-decimal-float=0|1
+                          target has decimal float support in its libgcc
+  --with-decimal-bid-format=0|1
+                          target ABI encodes decimal float as BID rather than
+                          DPD
+  --with-s390-excess-float-precision=0|1
+                          s390 target C library typedefs float_t to double
   --with-specs-file=PATH  where to write the spec file
 
 Report bugs to the package provider.
@@ -1848,6 +1869,26 @@ if test "${with_target+set}" = set; then :
 fi
 
 
+
+# Check whether --with-tools-dir was given.
+if test "${with_tools_dir+set}" = set; then :
+  withval=$with_tools_dir; ts_tools_dir=$withval
+else
+  ts_tools_dir=
+fi
+
+
+if test x"$ts_tools_dir" != x; then
+  if test -d "$ts_tools_dir"; then
+    PATH="$ts_tools_dir:$PATH"
+    export PATH
+    { $as_echo "$as_me:${as_lineno-$LINENO}: probing with $ts_tools_dir at the front of PATH" >&5
+$as_echo "$as_me: probing with $ts_tools_dir at the front of PATH" >&6;}
+  else
+    as_fn_error $? "--with-tools-dir=$ts_tools_dir is not a directory" "$LINENO" 5
+  fi
+fi
+
 if test "$target" = "$host"; then
   ts_default_as=as
   ts_default_ld=ld
@@ -1877,27 +1918,45 @@ fi
 
 
 
-# Check whether --with-arch was given.
-if test "${with_arch+set}" = set; then :
-  withval=$with_arch; spec_with_arch=$withval
+# Check whether --with-option-defaults was given.
+if test "${with_option_defaults+set}" = set; then :
+  withval=$with_option_defaults; spec_option_defaults=$withval
 else
-  spec_with_arch=
+  spec_option_defaults=
 fi
 
 
-# Check whether --with-cpu was given.
-if test "${with_cpu+set}" = set; then :
-  withval=$with_cpu; spec_with_cpu=$withval
+
+# Check whether --with-cpu-type was given.
+if test "${with_cpu_type+set}" = set; then :
+  withval=$with_cpu_type; spec_cpu_type=$withval
 else
-  spec_with_cpu=
+  spec_cpu_type=
 fi
 
 
-# Check whether --with-tune was given.
-if test "${with_tune+set}" = set; then :
-  withval=$with_tune; spec_with_tune=$withval
+
+# Check whether --with-decimal-float was given.
+if test "${with_decimal_float+set}" = set; then :
+  withval=$with_decimal_float; spec_decimal_float=$withval
 else
-  spec_with_tune=
+  spec_decimal_float=0
+fi
+
+
+# Check whether --with-decimal-bid-format was given.
+if test "${with_decimal_bid_format+set}" = set; then :
+  withval=$with_decimal_bid_format; spec_decimal_bid_format=$withval
+else
+  spec_decimal_bid_format=0
+fi
+
+
+# Check whether --with-s390-excess-float-precision was given.
+if test "${with_s390_excess_float_precision+set}" = set; then :
+  withval=$with_s390_excess_float_precision; spec_s390_excess_fp=$withval
+else
+  spec_s390_excess_fp=0
 fi
 
 
@@ -1982,6 +2041,14 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_compress_debug" >&5
 $as_echo "$gcc_cv_ld_compress_debug" >&6; }
 
+# Check whether --enable-linker-build-id was given.
+if test "${enable_linker_build_id+set}" = set; then :
+  enableval=$enable_linker_build_id;
+else
+  enable_linker_build_id=no
+fi
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --build-id" >&5
 $as_echo_n "checking linker for --build-id... " >&6; }
 gcc_cv_ld_buildid=no
@@ -1990,6 +2057,18 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '--build-id' > /dev/null; then
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_buildid" >&5
 $as_echo "$gcc_cv_ld_buildid" >&6; }
+
+if test x"$enable_linker_build_id" = xyes && test x"$gcc_cv_ld_buildid" != xyes; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --build-id is not supported by $gcc_cv_ld; ignored" >&5
+$as_echo "$as_me: WARNING: --build-id is not supported by $gcc_cv_ld; ignored" >&2;}
+  enable_linker_build_id=no
+fi
+
+if test x"$enable_linker_build_id" = xyes; then
+  link_buildid='%{!r:--build-id} '
+else
+  link_buildid=
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --eh-frame-hdr" >&5
 $as_echo_n "checking linker for --eh-frame-hdr... " >&6; }
@@ -2008,6 +2087,22 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-pie' > /dev/null; then
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_pie" >&5
 $as_echo "$gcc_cv_ld_pie" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .sleb128/.uleb128" >&5
+$as_echo_n "checking assembler for .sleb128/.uleb128... " >&6; }
+gcc_cv_as_leb128=no
+cat > conftest.s <<'TSEOF'
+	.data
+	.uleb128 L2 - L1
+L1:
+	.uleb128 0x8000000000000000
+L2:
+TSEOF
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  gcc_cv_as_leb128=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_leb128" >&5
+$as_echo "$gcc_cv_as_leb128" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -Bstatic/-Bdynamic" >&5
 $as_echo_n "checking linker for -Bstatic/-Bdynamic... " >&6; }
@@ -2048,20 +2143,85 @@ case $gcc_cv_ld_compress_debug in
 esac
 
 option_defaults=
-if test x"$spec_with_arch" != x; then
-  option_defaults="${option_defaults}%{!march=*:-march=${spec_with_arch}} "
-fi
-if test x"$spec_with_cpu" != x; then
-  option_defaults="${option_defaults}%{!mcpu=*:%{!march=*:-mcpu=${spec_with_cpu}}} "
-fi
-if test x"$spec_with_tune" != x; then
-  option_defaults="${option_defaults}%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${spec_with_tune}}}} "
+option_defaults_unhandled=
+for ts_od in ${spec_option_defaults}; do
+  ts_name=`echo "$ts_od" | sed 's/=.*//'`
+  ts_value=`echo "$ts_od" | sed 's/^[^=]*=//'`
+  test x"$ts_value" = x && continue
+  ts_tmpl=
+  case ${spec_cpu_type}:${ts_name} in
+    i386:cpu | i386:tune)
+            ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    mips:arch)
+                        ts_tmpl= ;;
+    *:arch)
+      ts_tmpl="%{!march=*:-march=${ts_value}}" ;;
+    *:cpu)
+      ts_tmpl="%{!mcpu=*:%{!march=*:-mcpu=${ts_value}}}" ;;
+    *:tune)
+      ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    *:abi)
+      ts_tmpl="%{!mabi=*:-mabi=${ts_value}}" ;;
+    *:float)
+      ts_tmpl="%{!msoft-float:%{!mhard-float:-m${ts_value}-float}}" ;;
+    *:nan)
+      ts_tmpl="%{!mnan=*:-mnan=${ts_value}}" ;;
+    *:divide)
+      ts_tmpl="%{!mdivide-traps:%{!mdivide-breaks:-mdivide-${ts_value}}}" ;;
+    *:llsc)
+      ts_tmpl="%{!mllsc:%{!mno-llsc:-m${ts_value}}}" ;;
+    *:mips-plt)
+      ts_tmpl="%{!mplt:%{!mno-plt:-m${ts_value}}}" ;;
+    *:synci)
+      ts_tmpl="%{!msynci:%{!mno-synci:-m${ts_value}}}" ;;
+    *:lxc1-sxc1)
+      ts_tmpl="%{!mlxc1-sxc1:%{!mno-lxc1-sxc1:-m${ts_value}}}" ;;
+    *:madd4)
+      ts_tmpl="%{!mmadd4:%{!mno-madd4:-m${ts_value}}}" ;;
+    *:msa)
+      ts_tmpl="%{!mmsa:%{!mno-msa:-m${ts_value}}}" ;;
+    *:compact-branches)
+      ts_tmpl="%{!mcompact-branches=*:-mcompact-branches=${ts_value}}" ;;
+    *:tls)
+                  ts_tmpl="%{!mtls-dialect=*:-mtls-dialect=${ts_value}}" ;;
+    *:schedule)
+      ts_tmpl="%{!mschedule=*:-mschedule=${ts_value}}" ;;
+  esac
+  if test x"$ts_tmpl" = x; then
+    option_defaults_unhandled="${option_defaults_unhandled} ${ts_name}=${ts_value}"
+  else
+    option_defaults="${option_defaults}${ts_tmpl} "
+  fi
+done
+
+if test x"$option_defaults_unhandled" != x; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: no OPTION_DEFAULT_SPECS template for:${option_defaults_unhandled}" >&5
+$as_echo "$as_me: WARNING: no OPTION_DEFAULT_SPECS template for:${option_defaults_unhandled}" >&2;}
 fi
 
 if test x"$have_target_tools" != xyes; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: skipping $specs_file: target tools unavailable, nothing probed" >&5
 $as_echo "$as_me: skipping $specs_file: target tools unavailable, nothing probed" >&6;}
 else
+
+target_config_file=${specs_file}-config
+{ $as_echo "$as_me:${as_lineno-$LINENO}: writing $target_config_file" >&5
+$as_echo "$as_me: writing $target_config_file" >&6;}
+cat > "$target_config_file" <<EOF
+# Target assembler/linker capabilities for ${target}.
+# Read by cc1 via -ftarget-config=; see gcc/target-caps.h.
+leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
+# Properties of the target rather than of its tools: derived by config.gcc from
+# the triple and passed in, not probed here.
+decimal_float ${spec_decimal_float}
+decimal_bid_format ${spec_decimal_bid_format}
+s390_excess_float_precision ${spec_s390_excess_fp}
+EOF
+
+case $target_config_file in
+  /*) target_config_path=$target_config_file ;;
+  *)  target_config_path=`pwd`/$target_config_file ;;
+esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: writing $specs_file" >&5
 $as_echo "$as_me: writing $specs_file" >&6;}
@@ -2071,6 +2231,9 @@ cat > "$specs_file" <<EOF
 #   as: ${gcc_cv_as}
 #   ld: ${gcc_cv_ld}
 # Do not edit; regenerate by re-running that script against the same toolchain.
+# Option defaults with no template here (see the warning above), recorded so a
+# missing default is visible rather than looking like a target that has none:
+#   ${option_defaults_unhandled}
 
 *asm_debug:
 ${asm_debug_spec}
@@ -2086,6 +2249,12 @@ ${link_compress_debug}
 
 *option_defaults:
 ${option_defaults}
+
+*link_buildid:
+${link_buildid}
+
+*cc1_target_config:
+-ftarget-config=${target_config_path}
 
 EOF
 
@@ -2107,6 +2276,425 @@ $as_echo "$as_me:   ld --eh-frame-hdr ........ ${gcc_cv_ld_eh_frame_hdr}" >&6;}
 $as_echo "$as_me:   ld -pie .................. ${gcc_cv_ld_pie}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}" >&5
 $as_echo "$as_me:   ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}" >&6;}
+
+fi
+
+
+if test x"$have_target_tools" = xyes; then
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --as-needed" >&5
+$as_echo_n "checking linker for --as-needed... " >&6; }
+gcc_cv_ld_as_needed=no
+gcc_cv_ld_as_needed_option='--as-needed'
+gcc_cv_ld_no_as_needed_option='--no-as-needed'
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--as-needed' > /dev/null; then
+  gcc_cv_ld_as_needed=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_as_needed" >&5
+$as_echo "$gcc_cv_ld_as_needed" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for $ldscript-style as-needed" >&5
+$as_echo_n "checking linker for $ldscript-style as-needed... " >&6; }
+gcc_cv_ld_use_as_needed_ldscript=no
+if test x"$gcc_cv_ld_as_needed" != xyes \
+   && "$gcc_cv_ld" -z help 2>&1 | grep -- 'ignore' > /dev/null; then
+  gcc_cv_ld_use_as_needed_ldscript=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_use_as_needed_ldscript" >&5
+$as_echo "$gcc_cv_ld_use_as_needed_ldscript" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --demangle" >&5
+$as_echo_n "checking linker for --demangle... " >&6; }
+gcc_cv_ld_demangle=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--demangle' > /dev/null; then
+  gcc_cv_ld_demangle=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_demangle" >&5
+$as_echo "$gcc_cv_ld_demangle" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --sysroot" >&5
+$as_echo_n "checking linker for --sysroot... " >&6; }
+gcc_cv_ld_sysroot=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--sysroot' > /dev/null; then
+  gcc_cv_ld_sysroot=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_sysroot" >&5
+$as_echo "$gcc_cv_ld_sysroot" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for GNU-style response files" >&5
+$as_echo_n "checking linker for GNU-style response files... " >&6; }
+gcc_cv_ld_at_file=no
+echo '.byte 0' > conftest.s
+echo conftest.o > conftest.at
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+   && "$gcc_cv_ld" -r -o conftest2.o @conftest.at > /dev/null 2>&1; then
+  gcc_cv_ld_at_file=yes
+fi
+rm -f conftest.s conftest.o conftest2.o conftest.at
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_at_file" >&5
+$as_echo "$gcc_cv_ld_at_file" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -plugin" >&5
+$as_echo_n "checking linker for -plugin... " >&6; }
+gcc_cv_lto_plugin=0
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-plugin' > /dev/null; then
+  gcc_cv_lto_plugin=2
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_lto_plugin" >&5
+$as_echo "$gcc_cv_lto_plugin" >&6; }
+
+gcc_cv_ld_static_option='-Bstatic'
+gcc_cv_ld_dynamic_option='-Bdynamic'
+if test x"$gcc_cv_ld_static_dynamic" != xyes; then
+  if "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+    gcc_cv_ld_static_dynamic=yes
+    gcc_cv_ld_static_option='-bstatic'
+    gcc_cv_ld_dynamic_option='-bdynamic'
+  elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+    gcc_cv_ld_static_dynamic=yes
+    gcc_cv_ld_static_option='-aarchive_shared'
+    gcc_cv_ld_dynamic_option='-adefault'
+  fi
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for .hidden" >&5
+$as_echo_n "checking linker for .hidden... " >&6; }
+gcc_cv_ld_hidden=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bsymbolic' > /dev/null; then
+  gcc_cv_ld_hidden=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_hidden" >&5
+$as_echo "$gcc_cv_ld_hidden" >&6; }
+
+gcc_cv_gas_hidden=no
+if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then
+  gcc_cv_gas_hidden=yes
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for read-only/read-write section mixing" >&5
+$as_echo_n "checking linker for read-only/read-write section mixing... " >&6; }
+gcc_cv_ld_ro_rw_mix=unknown
+echo '.section myfoosect, "a"' > conftest1.s
+echo '.section myfoosect, "aw"' > conftest2.s
+echo '.byte 1' >> conftest2.s
+echo '.section myfoosect, "a"' > conftest3.s
+echo '.byte 0' >> conftest3.s
+if "$gcc_cv_as" -o conftest1.o conftest1.s > /dev/null 2>&1 \
+   && "$gcc_cv_as" -o conftest2.o conftest2.s > /dev/null 2>&1 \
+   && "$gcc_cv_as" -o conftest3.o conftest3.s > /dev/null 2>&1; then
+    if "$gcc_cv_ld" -shared -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o --no-gc-sections > /dev/null 2>&1 \
+     || "$gcc_cv_ld" -shared -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o > /dev/null 2>&1 \
+     || "$gcc_cv_ld" -r -o conftest1.so conftest1.o \
+        conftest2.o conftest3.o > /dev/null 2>&1; then
+    if test x"$gcc_cv_objdump" != x; then
+      ts_mix=`"$gcc_cv_objdump" -h conftest1.so | sed -e '/myfoosect/!d' -e N`
+      if echo "$ts_mix" | grep CONTENTS > /dev/null; then
+	if echo "$ts_mix" | grep READONLY > /dev/null; then
+	  gcc_cv_ld_ro_rw_mix=read-only
+	else
+	  gcc_cv_ld_ro_rw_mix=read-write
+	fi
+      fi
+    fi
+  fi
+fi
+rm -f conftest1.s conftest2.s conftest3.s conftest1.o conftest2.o conftest3.o
+rm -f conftest1.so
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_ro_rw_mix" >&5
+$as_echo "$gcc_cv_ld_ro_rw_mix" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --gc-sections with exception handling" >&5
+$as_echo_n "checking linker for --gc-sections with exception handling... " >&6; }
+gcc_cv_ld_eh_gc_sections=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--gc-sections' > /dev/null; then
+  gcc_cv_ld_eh_gc_sections=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_eh_gc_sections" >&5
+$as_echo "$gcc_cv_ld_eh_gc_sections" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -z ctf" >&5
+$as_echo_n "checking linker for -z ctf... " >&6; }
+gcc_cv_ld_ctf=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z ctf' > /dev/null; then
+  gcc_cv_ld_ctf=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_ctf" >&5
+$as_echo "$gcc_cv_ld_ctf" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --version-script" >&5
+$as_echo_n "checking linker for --version-script... " >&6; }
+gcc_cv_ld_version_script=no
+ld_version_script_option=
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--version-script' > /dev/null; then
+  gcc_cv_ld_version_script=yes
+  ld_version_script_option='--version-script='
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_version_script" >&5
+$as_echo "$gcc_cv_ld_version_script" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -soname" >&5
+$as_echo_n "checking linker for -soname... " >&6; }
+gcc_cv_ld_soname=no
+ld_soname_option=
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-soname' > /dev/null; then
+  gcc_cv_ld_soname=yes
+  ld_soname_option='-soname'
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_soname" >&5
+$as_echo "$gcc_cv_ld_soname" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for non-broken PE dwarf5" >&5
+$as_echo_n "checking linker for non-broken PE dwarf5... " >&6; }
+gcc_cv_ld_broken_pe_dwarf5=no
+case $target in
+  *-*-cygwin* | *-*-mingw* | *-*-pe | *-*-win32)
+    gcc_cv_ld_broken_pe_dwarf5=yes
+    if "$gcc_cv_ld" --verbose 2>/dev/null \
+       | grep -- '\.debug_loclists.*NOLOAD' > /dev/null; then
+      gcc_cv_ld_broken_pe_dwarf5=no
+    fi
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_broken_pe_dwarf5" >&5
+$as_echo "$gcc_cv_ld_broken_pe_dwarf5" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --disable-dynamicbase" >&5
+$as_echo_n "checking linker for --disable-dynamicbase... " >&6; }
+gcc_cv_ld_disable_dynamicbase=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--disable-dynamicbase' > /dev/null; then
+  gcc_cv_ld_disable_dynamicbase=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_disable_dynamicbase" >&5
+$as_echo "$gcc_cv_ld_disable_dynamicbase" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for PowerPC .gnu.attributes long double" >&5
+$as_echo_n "checking linker for PowerPC .gnu.attributes long double... " >&6; }
+gcc_cv_ld_ppc_attr=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--no-warn-mismatch' > /dev/null; then
+  gcc_cv_ld_ppc_attr=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_ppc_attr" >&5
+$as_echo "$gcc_cv_ld_ppc_attr" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for omitting dot symbols" >&5
+$as_echo_n "checking linker for omitting dot symbols... " >&6; }
+gcc_cv_ld_no_dot_syms=no
+case $target in
+  powerpc64*-*-*)
+    cat > conftest1.s <<'TSEOF'
+	.text
+	bl .foo
+TSEOF
+    cat > conftest2.s <<'TSEOF'
+	.section ".opd","aw"
+	.align 3
+	.globl foo
+	.type foo,@function
+foo:
+	.quad .LEfoo,.TOC.@tocbase,0
+	.text
+.LEfoo:
+	blr
+	.size foo,.-.LEfoo
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest1.o conftest1.s > /dev/null 2>&1 \
+       && "$gcc_cv_as" -a64 -o conftest2.o conftest2.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -melf64ppc -o conftest conftest1.o conftest2.o \
+	    > /dev/null 2>&1; then
+      gcc_cv_ld_no_dot_syms=yes
+    fi
+    rm -f conftest conftest1.s conftest2.s conftest1.o conftest2.o
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_no_dot_syms" >&5
+$as_echo "$gcc_cv_ld_no_dot_syms" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for large TOC" >&5
+$as_echo_n "checking linker for large TOC... " >&6; }
+gcc_cv_ld_large_toc=no
+case $target in
+  powerpc64*-*-* | powerpc*-*-aix*)
+    cat > conftest.s <<'TSEOF'
+	.section ".tbss","awT",@nobits
+	.align 3
+ie0:	.space 8
+	.global _start
+	.text
+_start:
+	addis 9,13,ie0@got@tprel@ha
+	ld 9,ie0@got@tprel@l(9)
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -melf64ppc --no-toc-optimize -o conftest conftest.o \
+	    > /dev/null 2>&1; then
+      gcc_cv_ld_large_toc=yes
+    fi
+    rm -f conftest conftest.s conftest.o
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_large_toc" >&5
+$as_echo "$gcc_cv_ld_large_toc" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for TOC pointer alignment" >&5
+$as_echo_n "checking linker for TOC pointer alignment... " >&6; }
+gcc_cv_ld_toc_align=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '--no-toc-optimize' > /dev/null; then
+  gcc_cv_ld_toc_align=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_toc_align" >&5
+$as_echo "$gcc_cv_ld_toc_align" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for .eh_frame personality relaxation" >&5
+$as_echo_n "checking linker for .eh_frame personality relaxation... " >&6; }
+gcc_cv_ld_mips_personality_relaxation=no
+case $target in
+  mips*-*-*)
+    cat > conftest.s <<'TSEOF'
+	.cfi_startproc
+	.cfi_personality 0x80,indirect_ptr
+	.ent test
+test:
+	nop
+	.end test
+	.cfi_endproc
+
+	.section .data,"aw",@progbits
+indirect_ptr:
+	.dc.a personality
+TSEOF
+    if "$gcc_cv_as" -KPIC -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -shared > /dev/null 2>&1 \
+       && test x"$gcc_cv_readelf" != x; then
+      if "$gcc_cv_readelf" -d conftest 2>&1 | grep TEXTREL > /dev/null 2>&1; then
+	:
+      elif "$gcc_cv_readelf" --relocs conftest 2>&1 \
+	   | grep 'R_MIPS_REL32 *$' > /dev/null 2>&1; then
+	:
+      else
+	gcc_cv_ld_mips_personality_relaxation=yes
+      fi
+    fi
+    rm -f conftest conftest.s conftest.o
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_mips_personality_relaxation" >&5
+$as_echo "$gcc_cv_ld_mips_personality_relaxation" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -pie with copy relocations" >&5
+$as_echo_n "checking linker for -pie with copy relocations... " >&6; }
+gcc_cv_ld_pie_copyreloc=no
+if test x"$gcc_cv_ld_pie" = xyes \
+   && "$gcc_cv_ld" --help 2>&1 | grep -- '-z text' > /dev/null; then
+  gcc_cv_ld_pie_copyreloc=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_pie_copyreloc" >&5
+$as_echo "$gcc_cv_ld_pie_copyreloc" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for avr emulations" >&5
+$as_echo_n "checking linker for avr emulations... " >&6; }
+gcc_cv_ld_avr_avrxmega3_rodata_in_flash=no
+gcc_cv_ld_avr_avrxmega2_flmap=no
+gcc_cv_ld_avr_avrxmega4_flmap=no
+case $target in
+  avr-*-*)
+    ts_emuls=`"$gcc_cv_ld" -V 2>/dev/null`
+    if echo "$ts_emuls" | grep avrxmega3 > /dev/null; then
+                  gcc_cv_ld_avr_avrxmega3_rodata_in_flash=yes
+    fi
+    if echo "$ts_emuls" | grep avrxmega2_flmap > /dev/null; then
+      gcc_cv_ld_avr_avrxmega2_flmap=yes
+    fi
+    if echo "$ts_emuls" | grep avrxmega4_flmap > /dev/null; then
+      gcc_cv_ld_avr_avrxmega4_flmap=yes
+    fi
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_avr_avrxmega3_rodata_in_flash/$gcc_cv_ld_avr_avrxmega2_flmap/$gcc_cv_ld_avr_avrxmega4_flmap" >&5
+$as_echo "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash/$gcc_cv_ld_avr_avrxmega2_flmap/$gcc_cv_ld_avr_avrxmega4_flmap" >&6; }
+
+
+ts_bool () {
+  if test x"$1" = xyes; then echo 1; else echo 0; fi
+}
+
+cat >> "$target_config_file" <<EOF
+# Linker capabilities.
+gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
+ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
+ld_eh_gc_sections `ts_bool "$gcc_cv_ld_eh_gc_sections"`
+ld_ctf `ts_bool "$gcc_cv_ld_ctf"`
+ld_sysroot `ts_bool "$gcc_cv_ld_sysroot"`
+ld_at_file `ts_bool "$gcc_cv_ld_at_file"`
+ld_pie_copyreloc `ts_bool "$gcc_cv_ld_pie_copyreloc"`
+ld_personality_relaxation `ts_bool "$gcc_cv_ld_mips_personality_relaxation"`
+ld_no_dot_syms `ts_bool "$gcc_cv_ld_no_dot_syms"`
+ld_large_toc `ts_bool "$gcc_cv_ld_large_toc"`
+ld_toc_align `ts_bool "$gcc_cv_ld_toc_align"`
+ld_ppc_attr `ts_bool "$gcc_cv_ld_ppc_attr"`
+ld_broken_pe_dwarf5 `ts_bool "$gcc_cv_ld_broken_pe_dwarf5"`
+ld_avr_avrxmega3_rodata_in_flash `ts_bool "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash"`
+ld_avr_avrxmega2_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega2_flmap"`
+ld_avr_avrxmega4_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega4_flmap"`
+EOF
+
+if test x"$gcc_cv_ld_as_needed" = xyes; then
+  link_as_needed="%{!static:%{!static-pie:${gcc_cv_ld_as_needed_option}}}"
+  link_no_as_needed="%{!static:%{!static-pie:${gcc_cv_ld_no_as_needed_option}}}"
+else
+  link_as_needed=
+  link_no_as_needed=
+fi
+
+cat >> "$specs_file" <<EOF
+*link_as_needed:
+${link_as_needed}
+
+*link_no_as_needed:
+${link_no_as_needed}
+
+*link_static:
+${gcc_cv_ld_static_option}
+
+*link_dynamic:
+${gcc_cv_ld_dynamic_option}
+
+*link_demangle:
+%{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
+
+*link_plugin:
+`if test "$gcc_cv_lto_plugin" -gt 0; then echo '%{!fno-use-linker-plugin:%{!fno-lto:-plugin %(linker_plugin_file)}}'; fi`
+
+*link_disable_dynamicbase:
+`if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`
+
+EOF
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&5
+$as_echo "$as_me:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --demangle ............ ${gcc_cv_ld_demangle}" >&5
+$as_echo "$as_me:   ld --demangle ............ ${gcc_cv_ld_demangle}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --sysroot ............. ${gcc_cv_ld_sysroot}" >&5
+$as_echo "$as_me:   ld --sysroot ............. ${gcc_cv_ld_sysroot}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld @file ................. ${gcc_cv_ld_at_file}" >&5
+$as_echo "$as_me:   ld @file ................. ${gcc_cv_ld_at_file}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -plugin ............... ${gcc_cv_lto_plugin}" >&5
+$as_echo "$as_me:   ld -plugin ............... ${gcc_cv_lto_plugin}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld .hidden ............... ${gcc_cv_ld_hidden}" >&5
+$as_echo "$as_me:   ld .hidden ............... ${gcc_cv_ld_hidden}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}" >&5
+$as_echo "$as_me:   ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}" >&5
+$as_echo "$as_me:   ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&5
+$as_echo "$as_me:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --version-script ...... ${gcc_cv_ld_version_script}" >&5
+$as_echo "$as_me:   ld --version-script ...... ${gcc_cv_ld_version_script}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -soname ............... ${gcc_cv_ld_soname}" >&5
+$as_echo "$as_me:   ld -soname ............... ${gcc_cv_ld_soname}" >&6;}
 
 fi
 

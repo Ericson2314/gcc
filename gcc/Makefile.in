@@ -444,10 +444,23 @@ CPPINC = -I$(srcdir)/../libcpp/include
 CODYLIB = ../libcody/libcody.a
 CODYINC = -I$(srcdir)/../libcody
 
-# Where to find decNumber
-enable_decimal_float = @enable_decimal_float@
+# Where to find decNumber.
+#
+# UNRESOLVED, and the one place decimal float is still target-specific at build
+# time: libdecnumber is built in exactly one encoding, bid or dpd, and cc1 links
+# it for host-side decimal constant folding.  --enable-decimal-float used to
+# choose which, keyed on $target.  The option is gone and the *target* side of
+# the question -- which libgcc entry points to call, what __DECIMAL_BID_FORMAT__
+# says -- is now runtime (targ_caps.decimal_bid_format), but the host library
+# cannot be two things at once.
+#
+# bid is pinned here rather than derived, because it is what x86 and aarch64
+# get from a stock build and those are the configurations this tree can
+# actually test.  That is an x86/aarch64 bias and it should not survive: the
+# fix is for libdecnumber to build both encodings so cc1 can pick at run time.
+decimal_float_format = bid
 DECNUM = $(srcdir)/../libdecnumber
-DECNUMFMT = $(srcdir)/../libdecnumber/$(enable_decimal_float)
+DECNUMFMT = $(srcdir)/../libdecnumber/$(decimal_float_format)
 DECNUMINC = -I$(DECNUM) -I$(DECNUMFMT) -I../libdecnumber
 LIBDECNUMBER = ../libdecnumber/libdecnumber.a
 
@@ -653,19 +666,20 @@ extra_opt_files=@extra_opt_files@
 host_hook_obj=@out_host_hook_obj@
 
 # Multiarch support
-enable_multiarch = @enable_multiarch@
-with_cpu = @with_cpu@
-with_float = @with_float@
-ifeq ($(enable_multiarch),yes)
-  if_multiarch = $(1)
-else
-  ifeq ($(enable_multiarch),auto)
-    # SYSTEM_HEADER_DIR is makefile syntax, cannot be evaluated in configure.ac
-    if_multiarch = $(if $(wildcard $(shell echo $(BUILD_SYSTEM_HEADER_DIR))/../../usr/lib/*/crti.o),$(1))
-  else
-    if_multiarch =
-  endif
-endif
+
+# if_multiarch used to expand to its argument when --enable-multiarch was given,
+# and in the default `auto' case decided by wildcard-probing the BUILD machine
+# for $(BUILD_SYSTEM_HEADER_DIR)/../../usr/lib/*/crti.o -- a target-sysroot
+# probe, run at build time, guessing a target path convention from whatever
+# distribution happened to be building the compiler.  A multi-target compiler
+# has no single answer to give, so it expands to nothing.
+#
+# The `$(call if_multiarch,:<triplet>)' arguments in the config/*/t-* fragments
+# are deliberately left in place: they are the multilib -> multiarch osdirname
+# mapping, which is real per-target data that target-specs/ has to emit.
+# Deleting the call sites would destroy that mapping; neutering the probe does
+# not.
+if_multiarch =
 
 # Multilib control
 with_multi_buildlist = @with_multi_buildlist@
@@ -2742,8 +2756,14 @@ target-specs: multi-target.manifest
 	  fi; \
 	  if command -v "$$tas" > /dev/null 2>&1 && command -v "$$tld" > /dev/null 2>&1; then \
 	    rm -rf tmp-ts-$$t; mkdir tmp-ts-$$t; \
+	    tod=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="option_defaults"{$$1="";print;exit}' multi-target.manifest`; \
+	    tct=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="cpu_type"{print $$2;exit}' multi-target.manifest`; \
+	    tdf=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_float"{print $$2;exit}' multi-target.manifest`; \
+	    tdb=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_bid_format"{print $$2;exit}' multi-target.manifest`; \
 	    if (cd tmp-ts-$$t && $$tsdir/configure --with-target=$$t \
 	          --with-as="$$tas" --with-ld="$$tld" \
+	          --with-option-defaults="$$tod" --with-cpu-type="$$tct" \
+	          --with-decimal-float="$$tdf" --with-decimal-bid-format="$$tdb" \
 	          --with-specs-file=../specs-$$t > probe.log 2>&1); then \
 	      echo "target-specs: wrote specs-$$t (as=$$tas ld=$$tld)"; \
 	      made=`expr $$made + 1`; \

@@ -1,3 +1,9 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_gcn_headers_included
+t_gcn_headers_included := 1
+
 # Headers generated from gcn-devices.def.  Factored out of t-gcn-hsa so that
 # a multi-target build -- which includes no single target's tmake_file -- can
 # generate them too; see gen-multi-target-md.awk.
@@ -7,3 +13,5 @@ gcn-device-macros.h: $(srcdir)/config/gcn/gcn-devices.def $(srcdir)/config/gcn/g
 generated_files += gcn-device-macros.h
 
 gcn-common.o: gcn-device-macros.h
+
+endif

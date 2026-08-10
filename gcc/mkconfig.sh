@@ -93,20 +93,40 @@ fi
 #
 # Multi-target: the per-back-end copies are called tm-<base>.h, and they need
 # the same tail as tm.h -- otherwise they are not drop-in replacements for it
-# and anything compiled against one is missing the insn-* declarations.
+# and anything compiled against one is missing the insn-* declarations.  The
+# files named have to be that back end's own: insn-flags.h and insn-modes.h
+# are generated from a machine description, so the copies in the build root
+# describe whichever target the build was configured for.  Naming those from a
+# tm-<base>.h would hand every back end but one the wrong HAVE_* and the wrong
+# mode enum.  It is only because the generators define GENERATOR_FILE, and so
+# skip both, that this has not bitten yet.
 
 case $output in
-    tm.h | tm-*.h )
-        cat >> ${output}T <<EOF
+    tm.h )
+	insn_flags_h=insn-flags.h
+	insn_modes_h=insn-modes.h
+	;;
+    tm-*.h )
+	# tm-<base>.h -> <base>
+	tm_base=`echo ${output} | sed -e 's/^tm-//' -e 's/\.h$//'`
+	insn_flags_h=insn-flags-${tm_base}.h
+	insn_modes_h=insn-modes-${tm_base}.h
+	;;
+    * )
+	insn_flags_h=
+	;;
+esac
+
+if test x"$insn_flags_h" != x; then
+    cat >> ${output}T <<EOF
 #if defined IN_GCC && !defined GENERATOR_FILE && !defined USED_FOR_TARGET
-# include "insn-flags.h"
+# include "${insn_flags_h}"
 #endif
 #if defined IN_GCC && !defined GENERATOR_FILE
-# include "insn-modes.h"
+# include "${insn_modes_h}"
 #endif
 EOF
-    ;;
-esac
+fi
 
 # A tm header is not usable without defaults.h -- it is where TARGET_UNIT and
 # friends come from -- and it has to come last, after the insn-* headers.  The

@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "target-caps.h"
 #include "target.h"
 #include "function.h"
 #include "rtl.h"
@@ -669,7 +670,7 @@ default_float_exceptions_rounding_supported_p (void)
 bool
 default_decimal_float_supported_p (void)
 {
-  return ENABLE_DECIMAL_FLOAT;
+  return targ_caps.decimal_float;
 }
 
 /* True if the target supports fixed-point arithmetic.  */

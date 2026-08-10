@@ -74,6 +74,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "tree-eh.h"
 #include "gimplify.h"
+#include "target-caps.h"
 #include "opts.h"
 #include "tree-pass.h"
 #include "context.h"
@@ -17249,10 +17250,7 @@ s390_invalid_binary_op (int op ATTRIBUTE_UNUSED, const_tree type1, const_tree ty
 
   return NULL;
 }
-
-#if ENABLE_S390_EXCESS_FLOAT_PRECISION == 1
-/* Implement TARGET_C_EXCESS_PRECISION to maintain historic behavior with older
-   glibc versions
+/* Implement TARGET_C_EXCESS_PRECISION.
 
    For historical reasons, float_t and double_t had been typedef'ed to
    double on s390, causing operations on float_t to operate in a higher
@@ -17260,46 +17258,48 @@ s390_invalid_binary_op (int op ATTRIBUTE_UNUSED, const_tree type1, const_tree ty
    operations have implicit excess precision, and we generate more optimal
    code if we let the compiler know no implicit extra precision is added.
 
-   With a glibc with that "historic" definition, configure will enable this hook
-   to set FLT_EVAL_METHOD to 1 for -fexcess-precision=standard (e.g., as implied
-   by -std=cXY).  That means when we are compiling with -fexcess-precision=fast,
+   With a C library that uses that "historic" definition, this hook has to set
+   FLT_EVAL_METHOD to 1 for -fexcess-precision=standard (e.g., as implied by
+   -std=cXY).  That means when we are compiling with -fexcess-precision=fast,
    the value we set for FLT_EVAL_METHOD will be out of line with the actual
    precision of float_t.
 
-   Newer versions of glibc will be modified to derive the definition of float_t
-   from FLT_EVAL_METHOD on s390x, as on many other architectures.  There,
-   configure will disable this hook by default, so that we defer to the default
-   of FLT_EVAL_METHOD_PROMOTE_TO_FLOAT and a resulting typedef of float_t to
-   float.  Note that in that scenario, float_t and FLT_EVAL_METHOD will be in
-   line independent of -fexcess-precision. */
+   Newer versions of glibc derive the definition of float_t from
+   FLT_EVAL_METHOD on s390x, as on many other architectures.  There we defer to
+   the default of FLT_EVAL_METHOD_PROMOTE_TO_FLOAT and a resulting typedef of
+   float_t to float.  Note that in that scenario, float_t and FLT_EVAL_METHOD
+   will be in line independent of -fexcess-precision.
 
+   Which of the two the target C library does used to be
+   --enable-s390-excess-float-precision, or failing that a `#include <math.h>'
+   compiled against the target sysroot while GCC itself was configured.  It is
+   now a runtime setting, read from the target config file, because a compiler
+   built once and pointed at several targets cannot have looked inside any one
+   of their libcs.  */
 static enum flt_eval_method
 s390_excess_precision (enum excess_precision_type type)
 {
-  switch (type)
-    {
-      case EXCESS_PRECISION_TYPE_IMPLICIT:
-      case EXCESS_PRECISION_TYPE_FAST:
-	/* The fastest type to promote to will always be the native type,
-	   whether that occurs with implicit excess precision or
-	   otherwise.  */
-	return FLT_EVAL_METHOD_PROMOTE_TO_FLOAT;
-      case EXCESS_PRECISION_TYPE_STANDARD:
-	/* Otherwise, when we are in a standards compliant mode, to
-	   ensure consistency with the implementation in glibc, report that
-	   float is evaluated to the range and precision of double.  */
-	return FLT_EVAL_METHOD_PROMOTE_TO_DOUBLE;
-      case EXCESS_PRECISION_TYPE_FLOAT16:
-	return FLT_EVAL_METHOD_PROMOTE_TO_FLOAT16;
-      default:
-	gcc_unreachable ();
-    }
-  return FLT_EVAL_METHOD_UNPREDICTABLE;
-}
-#else
-static enum flt_eval_method
-s390_excess_precision (enum excess_precision_type type)
-{
+  if (targ_caps.s390_excess_float_precision)
+    switch (type)
+      {
+	case EXCESS_PRECISION_TYPE_IMPLICIT:
+	case EXCESS_PRECISION_TYPE_FAST:
+	  /* The fastest type to promote to will always be the native type,
+	     whether that occurs with implicit excess precision or
+	     otherwise.  */
+	  return FLT_EVAL_METHOD_PROMOTE_TO_FLOAT;
+	case EXCESS_PRECISION_TYPE_STANDARD:
+	  /* Otherwise, when we are in a standards compliant mode, to
+	     ensure consistency with the implementation in the C library,
+	     report that float is evaluated to the range and precision of
+	     double.  */
+	  return FLT_EVAL_METHOD_PROMOTE_TO_DOUBLE;
+	case EXCESS_PRECISION_TYPE_FLOAT16:
+	  return FLT_EVAL_METHOD_PROMOTE_TO_FLOAT16;
+	default:
+	  gcc_unreachable ();
+      }
+
   /* As time of writing this, there is no hardware support for _Float16 on
      s390.  Therefore, operations have to be extended and truncated.  In case
      of EXCESS_PRECISION_TYPE_FLOAT16, this can happen on tree or rtl level.
@@ -17312,7 +17312,7 @@ s390_excess_precision (enum excess_precision_type type)
 
   return default_excess_precision (type);
 }
-#endif
+
 
 void
 s390_rawmemchr (machine_mode elt_mode, rtx dst, rtx src, rtx pat)

@@ -33,7 +33,6 @@
 #include "sbitmap.h"
 #include "diagnostic.h"
 
-#include "configargs.h"
 
 /* Set default optimization options.  */
 static const struct default_options arm_option_optimization_table[] =
@@ -252,24 +251,6 @@ check_isa_bits_for (const enum isa_feature* bits, enum isa_feature bit)
   return false;
 }
 
-/* Look up NAME in the configuration defaults for this build of the
-   the compiler.  Return the value associated with that name, or NULL
-   if no value is found.  */
-static const char *
-arm_config_default (const char *name)
-{
-  unsigned i;
-
-  if (configure_default_options[0].name == NULL)
-    return NULL;
-
-  for (i = 0; i < ARRAY_SIZE (configure_default_options); i++)
-    if (strcmp (configure_default_options[i].name, name) == 0)
-      return configure_default_options[i].value;
-
-  return NULL;
-}
-
 /* Called by the driver to check whether the target denoted by current
    command line options is a Thumb-only, or ARM-only, target.  ARGV is
    an array of tuples (normally only one) where the first element of
@@ -332,19 +313,11 @@ arm_target_mode (int argc, const char **argv)
 	return "-marm";
     }
 
-  const char *default_mode = arm_config_default ("mode");
-  if (default_mode)
-    {
-      if (strcmp (default_mode, "thumb") == 0)
-	return "-mthumb";
-      else if (strcmp (default_mode, "arm") == 0)
-	return "-marm";
-      else
-	gcc_unreachable ();
-    }
-
-  /* Compiler hasn't been configured with a default, and the CPU
-     doesn't require Thumb, so default to ARM.  */
+  /* --with-mode is gone: a compiler that serves every target has no single
+     target's configuration to consult, and the default it used to supply now
+     arrives from that target's spec file as an ordinary -marm or -mthumb.
+     Reaching here means the command line asked for neither and the CPU does
+     not require Thumb -- the same case an unconfigured default covered.  */
   return "-marm";
 }
 

@@ -434,6 +434,10 @@ Common Driver RejectNegative Alias(-help) Undocumented
 fhelp=
 Common Driver RejectNegative Joined Alias(-help=) Undocumented
 
+ftarget-config=
+Common Joined RejectNegative Var(target_config_file)
+Read target assembler/linker capabilities from <file>.  Supplied by the driver out of the spec file; not intended to be given by hand.
+
 ftarget-help
 Common Driver RejectNegative Alias(-target-help) Undocumented
 

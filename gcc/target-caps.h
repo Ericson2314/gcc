@@ -1,0 +1,198 @@
+/* Runtime target assembler/linker capabilities.
+   Copyright (C) 2026 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
+/* These used to be HAVE_AS_x, HAVE_GAS_x and HAVE_LD_x macros, answered by probing
+   a specific as/ld while GCC itself was configured and frozen into
+   auto-host.h.  A multi-target compiler is built once and used against many
+   toolchains, so a single frozen answer is wrong by construction: the macros
+   are now runtime values.
+
+   target-specs/configure probes the real toolchain after the build and writes
+   a target-config file next to that target's spec file.  The driver passes it
+   to cc1 with -ftarget-config=, out of the spec file, so specs remain the one
+   configuration channel.
+
+   Everything defaults to the answer a modern GNU toolchain gives, so a
+   compiler with no target-config file behaves like a normally-configured one
+   rather than silently losing features.  */
+
+#ifndef GCC_TARGET_CAPS_H
+#define GCC_TARGET_CAPS_H
+
+struct target_caps
+{
+  /* Assembler understands .uleb128/.sleb128 with symbolic arguments.  */
+  bool leb128;
+
+  /* s390 only: the target C library typedefs float_t to double, so
+     -fexcess-precision=standard has to report FLT_EVAL_METHOD 1 to stay
+     consistent with it.  Was --enable-s390-excess-float-precision, whose
+     default compiled a `#include <math.h>' against the target sysroot.  A
+     property of somebody else's libc is not something a compiler can know at
+     build time, so it is asked for here instead; false is GCC's stated
+     direction (glibc deriving float_t from __FLT_EVAL_METHOD__) and is what a
+     cross build without target headers already got.  */
+  bool s390_excess_float_precision;
+
+  /* Decimal floating point (_Decimal32 and friends) is usable for this target:
+     the back end has the modes and its libgcc has the support functions.  Was
+     --enable-decimal-float, whose default was a `case $target' listing the
+     handful of CPU/OS pairs that qualify.  Default false: a compiler that has
+     not been told anything about the target cannot know that its libgcc
+     carries __bid_*/__dpd_*, and claiming the modes exist turns a clean "mode
+     not supported" into a link failure.  */
+  bool decimal_float;
+
+  /* Decimal float uses the BID encoding rather than DPD.  This is fixed by the
+     target's ABI -- x86 and aarch64 are BID, powerpc and s390 are DPD -- and
+     picks which half of libgcc's __bid_*/__dpd_* entry points is called, so it
+     is derived from the target rather than probed.  DPD is the format the
+     standard describes and what everything other than x86/aarch64 uses, so it
+     is the default.  Only meaningful when decimal_float is true.  */
+  bool decimal_bid_format;
+
+  /* Assembler debug/CFI capabilities.  Was the DWARF half of the
+     gcc_GAS_CHECK_FEATURE block in gcc/configure.ac; see the ASSEMBLER DEBUG
+     SECTION of target-specs/configure.ac.  All default true: every binutils
+     GCC still builds with has had these for well over a decade, so an
+     unconfigured compiler behaves like a normally configured one.  The
+     original probes answered "no" for a cross build with no assembler to ask,
+     which silently cost debug quality rather than failing.  */
+
+  /* Assembler accepts .cfi_personality.  Was
+     HAVE_GAS_CFI_PERSONALITY_DIRECTIVE.  */
+  bool cfi_personality;
+
+  /* Assembler accepts .cfi_sections.  Was HAVE_GAS_CFI_SECTIONS_DIRECTIVE,
+     whose probe carried a `case $target_os' checking that PE targets got the
+     right .debug_frame relocation (fixed in binutils 2.21).  */
+  bool cfi_sections;
+
+  /* Assembler accepts the is_stmt sub-directive of .loc.  Was
+     HAVE_GAS_LOC_STMT.  */
+  bool gas_loc_stmt;
+
+  /* Assembler accepts the discriminator sub-directive of .loc.  Was
+     HAVE_GAS_DISCRIMINATOR, which defaults.h turned into
+     SUPPORTS_DISCRIMINATOR.  */
+  bool gas_discriminator;
+
+  /* Assembler tolerates `# 0 "" 2' line markers.  Was HAVE_AS_LINE_ZERO.  */
+  bool as_line_zero;
+
+  /* Assembler supports dwarf2 .file/.loc and preserves file table indices
+     exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
+     debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives
+     DWARF2_ASM_LINE_DEBUG_INFO from this.  */
+  bool dwarf2_debug_line;
+
+  /* Assembler supports views in .loc directives.  Was
+     HAVE_AS_DWARF2_DEBUG_VIEW; its probe also required leb128, since the test
+     emits .uleb128 of a view symbol.  Feeds DWARF2_ASM_VIEW_DEBUG_INFO.  */
+  bool dwarf2_debug_view;
+
+  /* Linker capabilities.  Was the gcc_cv_ld_* half of the configure probes;
+     see the LINKER SECTION of target-specs/configure.ac, which now asks the
+     real linker rather than deciding from its version number or from a
+     `case $target' listing which vendor linker was known to qualify.
+
+     The defaults below split into two groups.  Features every current GNU ld
+     has default true, so an unconfigured compiler behaves like a normally
+     configured one.  Features that were target-specific in the original --
+     the PowerPC, MIPS and PE ones -- default false, because there the safe
+     answer is not "modern toolchain" but "assume nothing": each of them turns
+     on a codegen shortcut that is wrong if the linker cannot back it up,
+     whereas false only costs optimisation.  */
+
+  /* Assembler and linker both handle .hidden.  Was HAVE_GAS_HIDDEN, the one
+     capability needing both halves; the linker half is probed here and the
+     assembler half by the assembler section of the same script.  */
+  bool gas_hidden;
+
+  /* Linker merges read-only and read-write input sections of the same name
+     into a read-write output section.  Was HAVE_LD_RO_RW_SECTION_MIXING.  */
+  bool ld_ro_rw_section_mixing;
+
+  /* --gc-sections is safe in the presence of exception handling.  Was
+     HAVE_LD_EH_GC_SECTIONS.  */
+  bool ld_eh_gc_sections;
+
+  /* Linker understands -z ctf.  Was HAVE_LD_CTF, which only Solaris ld
+     answered yes to; false here.  */
+  bool ld_ctf;
+
+  /* Linker understands --sysroot.  Was HAVE_LD_SYSROOT.  */
+  bool ld_sysroot;
+
+  /* Linker reads GNU-style @file response files.  Was HAVE_LD_AT_FILE.  */
+  bool ld_at_file;
+
+  /* Linker supports -pie together with copy relocations, so a PIE may bind
+     to a definition in a shared library by copy.  Was HAVE_LD_PIE_COPYRELOC,
+     consulted by i386.  */
+  bool ld_pie_copyreloc;
+
+  /* MIPS only: linker relaxes absolute .eh_frame personality pointers into
+     PC-relative form.  Was HAVE_LD_PERSONALITY_RELAXATION.  */
+  bool ld_personality_relaxation;
+
+  /* PowerPC64 ELFv1 only: linker copes with code that omits dot symbols.  Was
+     HAVE_LD_NO_DOT_SYMS.  */
+  bool ld_no_dot_syms;
+
+  /* PowerPC64 only: linker supports a TOC larger than 64k.  Was
+     HAVE_LD_LARGE_TOC.  */
+  bool ld_large_toc;
+
+  /* PowerPC64 only: the linker forces .TOC. to 8-byte alignment.  Was
+     POWERPC64_TOC_POINTER_ALIGNMENT, which was a byte count rather than a
+     flag; the only two values it ever took were 8 (linker guarantees it) and
+     4, so it is a flag here and the byte count is recovered in defaults.h.  */
+  bool ld_toc_align;
+
+  /* PowerPC only: linker understands .gnu.attributes for long double.  Was
+     HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE.  */
+  bool ld_ppc_attr;
+
+  /* PE only: this linker's default script puts .debug_loclists and
+     .debug_rnglists where DWARF 5 output is unusable, so DWARF 5 must not be
+     the default.  Was HAVE_LD_BROKEN_PE_DWARF5.  Note the sense: true means
+     broken.  */
+  bool ld_broken_pe_dwarf5;
+
+  /* AVR only.  The linker's default script for the avrxmega3 emulation leaves
+     .rodata in flash, so avr-gcc can skip __do_copy_data for it; and the
+     avrxmega2_flmap / avrxmega4_flmap emulations exist at all.  Were
+     HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH, HAVE_LD_AVR_AVRXMEGA2_FLMAP and
+     HAVE_LD_AVR_AVRXMEGA4_FLMAP, decided from the linker's version string
+     (2.29 and 2.42 respectively).  False by default for the same reason as
+     the PowerPC entries: claiming an emulation the linker does not have
+     turns a clean diagnostic into a link failure.  */
+  bool ld_avr_avrxmega3_rodata_in_flash;
+  bool ld_avr_avrxmega2_flmap;
+  bool ld_avr_avrxmega4_flmap;
+};
+
+extern struct target_caps targ_caps;
+
+/* Read capabilities from FILE, a `name value' per line text file.  Unknown
+   names are ignored, so an older compiler tolerates a newer spec file.  */
+extern void read_target_caps (const char *file);
+
+#endif /* GCC_TARGET_CAPS_H */

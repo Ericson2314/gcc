@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
-#include "configargs.h"
 
 struct vendor_cpu
 {
@@ -119,19 +118,13 @@ host_detect_local_cpu (int argc, const char **argv)
 
 not_found:
   {
-    unsigned int i;
-    unsigned int opt;
-    const char *search[] = {NULL, "arch"};
-
+    /* The host CPU was not recognised.  This used to fall back on the
+       --with-cpu/--with-arch this compiler was configured with; those options
+       are gone, and the target's own defaults now reach the driver through the
+       option_defaults spec of its spec file, which has already been applied by
+       the time a spec function runs.  Nothing to add here.  */
     if (f)
       fclose (f);
-
-    search[0] = argv[0];
-    for (opt = 0; opt < ARRAY_SIZE (search); opt++)
-      for (i = 0; i < ARRAY_SIZE (configure_default_options); i++)
-	if (strcmp (configure_default_options[i].name, search[opt]) == 0)
-	  return concat ("-m", search[opt], "=",
-			 configure_default_options[i].value, NULL);
     return NULL;
   }
 }

@@ -432,7 +432,6 @@ static char *save_string (const char *, int);
 static void set_collect_gcc_options (void);
 static int do_spec_1 (const char *, int, const char *);
 static int do_spec_2 (const char *, const char *);
-static void do_option_spec (const char *, const char *);
 static void do_self_spec (const char *);
 static const char *find_file (const char *);
 static int is_directory (const char *);
@@ -1075,19 +1074,20 @@ proper position among the other output files.  */
     verification runtime library, libvtv.so, has been created.  Currently
     the vtable verification runtime functions are in libstdc++, so we use
     the spec just below this one.  */
+/* Whether libvtv exists for the target is not something the driver can know;
+   it used to come from the configure-time ENABLE_VTABLE_VERIFY.  The built-in
+   answer is the one the stock default produced -- reject -fvtable-verify with
+   a diagnostic rather than link silently -- and a configuration that does
+   build libvtv overrides vtable_verification from its specs file with
+   "%{!nostdlib:%{!r:%{fvtable-verify=std|fvtable-verify=preinit:
+   -lvtv -u_vtable_map_vars_start -u_vtable_map_vars_end}}}".  */
 #ifndef VTABLE_VERIFICATION_SPEC
-#if ENABLE_VTABLE_VERIFY
-#define VTABLE_VERIFICATION_SPEC "\
-%{!nostdlib:%{!r:%{fvtable-verify=std: -lvtv -u_vtable_map_vars_start -u_vtable_map_vars_end}\
-    %{fvtable-verify=preinit: -lvtv -u_vtable_map_vars_start -u_vtable_map_vars_end}}}"
-#else
 #define VTABLE_VERIFICATION_SPEC "\
 %{fvtable-verify=none:} \
 %{fvtable-verify=std: \
   %e-fvtable-verify=std is not supported in this configuration} \
 %{fvtable-verify=preinit: \
   %e-fvtable-verify=preinit is not supported in this configuration}"
-#endif
 #endif
 
 /* -u* was put back because both BSD and SysV seem to support it.  */
@@ -1235,9 +1235,15 @@ static const char *cpp_options =
 static const char *cpp_debug_options = DUMPS_OPTIONS ("");
 
 /* NB: This is shared amongst all front-ends, except for Ada.  */
+/* Path to the target's capability file, passed to cc1 as -ftarget-config=.
+   Empty here: a compiler with no spec file for the target keeps the built-in
+   defaults in target-caps.h.  target-specs/configure overrides this.  */
+static const char *cc1_target_config = "";
+
 static const char *cc1_options =
 "%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}}\
  %{!iplugindir*:%{fplugin*:%:find-plugindir()}}\
+ %(cc1_target_config)\
  %1 %{!Q:-quiet} %(cpp_debug_options) %{m*} %{aux-info*}\
  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs}\
  %{v:-version} %{pg:-p} %{p} %{f*} %{undef}\
@@ -1316,26 +1322,13 @@ static const char *const driver_self_specs[] = {
   "%<fmultiflags"
 };
 
-#ifndef OPTION_DEFAULT_SPECS
-#define OPTION_DEFAULT_SPECS { "", "" }
-#endif
-
-struct default_spec
-{
-  const char *name;
-  const char *spec;
-};
-
-static const struct default_spec
-  option_default_specs[] = { OPTION_DEFAULT_SPECS };
-
-/* OPTION_DEFAULT_SPECS above pairs target-supplied templates with the values
-   configure recorded for --with-arch and friends, and is consumed directly from
-   that static table -- so it never appears in -dumpspecs and cannot be set from
-   a spec file.  For a driver that is not built against one target, those
-   defaults have to arrive as data like everything else.  This spec holds the
-   already-expanded equivalent (no %(VALUE) left in it) and is applied as a self
-   spec at the same points the table is walked.  */
+/* The target's configure-time defaults for command-line options -- what
+   --with-arch, --with-cpu, --with-tune and the rest of that family used to
+   supply.  They were a static table, OPTION_DEFAULT_SPECS from tm.h paired with
+   a configure_default_options[] array, so they never appeared in -dumpspecs and
+   could not be set from a spec file: one target's answers, compiled in.  Now
+   they are data like every other spec.  This holds the already-expanded form
+   (no %(VALUE) left in it) and is applied as a self spec.  */
 static const char *option_defaults_spec = "";
 
 struct user_specs
@@ -1690,6 +1683,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("trad_capable_cpp",		&trad_capable_cpp),
   INIT_STATIC_SPEC ("cc1",			&cc1_spec),
   INIT_STATIC_SPEC ("cc1_options",		&cc1_options),
+  INIT_STATIC_SPEC ("cc1_target_config",		&cc1_target_config),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
   INIT_STATIC_SPEC ("link_ssp",			&link_ssp_spec),
@@ -1968,8 +1962,12 @@ init_spec (void)
   }
 #endif
 
-#if defined LINK_EH_SPEC || defined LINK_BUILDID_SPEC || \
-    defined LINKER_HASH_STYLE
+/* --with-linker-hash-style is gone.  It prepended --hash-style= to link_spec
+   here, which made one linker's hash format a property of the compiler binary.
+   A per-target spec file can say it in its own link spec, and a build that did
+   not pass the option -- the default -- prepended nothing, which is what this
+   now always does.  */
+#if defined LINK_EH_SPEC || defined LINK_BUILDID_SPEC
 # ifdef LINK_BUILDID_SPEC
   /* Prepend LINK_BUILDID_SPEC to whatever link_spec we had before.  */
   obstack_grow (&obstack, LINK_BUILDID_SPEC, sizeof (LINK_BUILDID_SPEC) - 1);
@@ -1977,16 +1975,6 @@ init_spec (void)
 # ifdef LINK_EH_SPEC
   /* Prepend LINK_EH_SPEC to whatever link_spec we had before.  */
   obstack_grow (&obstack, LINK_EH_SPEC, sizeof (LINK_EH_SPEC) - 1);
-# endif
-# ifdef LINKER_HASH_STYLE
-  /* Prepend --hash-style=LINKER_HASH_STYLE to whatever link_spec we had
-     before.  */
-  {
-    static const char hash_style[] = "--hash-style=";
-    obstack_grow (&obstack, hash_style, sizeof (hash_style) - 1);
-    obstack_grow (&obstack, LINKER_HASH_STYLE, sizeof (LINKER_HASH_STYLE) - 1);
-    obstack_1grow (&obstack, ' ');
-  }
 # endif
   obstack_grow0 (&obstack, link_spec, strlen (link_spec));
   link_spec = XOBFINISH (&obstack, const char *);
@@ -5919,55 +5907,6 @@ do_spec_2 (const char *spec, const char *soft_matched_part)
    of the switches/n_switches array.  */
 
 static void
-do_option_spec (const char *name, const char *spec)
-{
-  unsigned int i, value_count, value_len;
-  const char *p, *q, *value;
-  char *tmp_spec, *tmp_spec_p;
-
-  if (configure_default_options[0].name == NULL)
-    return;
-
-  for (i = 0; i < ARRAY_SIZE (configure_default_options); i++)
-    if (strcmp (configure_default_options[i].name, name) == 0)
-      break;
-  if (i == ARRAY_SIZE (configure_default_options))
-    return;
-
-  value = configure_default_options[i].value;
-  value_len = strlen (value);
-
-  /* Compute the size of the final spec.  */
-  value_count = 0;
-  p = spec;
-  while ((p = strstr (p, "%(VALUE)")) != NULL)
-    {
-      p ++;
-      value_count ++;
-    }
-
-  /* Replace each %(VALUE) by the specified value.  */
-  tmp_spec = (char *) alloca (strlen (spec) + 1
-		     + value_count * (value_len - strlen ("%(VALUE)")));
-  tmp_spec_p = tmp_spec;
-  q = spec;
-  while ((p = strstr (q, "%(VALUE)")) != NULL)
-    {
-      memcpy (tmp_spec_p, q, p - q);
-      tmp_spec_p = tmp_spec_p + (p - q);
-      memcpy (tmp_spec_p, value, value_len);
-      tmp_spec_p += value_len;
-      q = p + strlen ("%(VALUE)");
-    }
-  strcpy (tmp_spec_p, q);
-
-  do_self_spec (tmp_spec);
-}
-
-/* Process the given spec string and add any new options to the end
-   of the switches/n_switches array.  */
-
-static void
 do_self_spec (const char *spec)
 {
   int i;
@@ -8570,14 +8509,9 @@ driver::set_up_specs () const
   if (access (specs_file, R_OK) == 0)
     read_specs (specs_file, true, false);
 
-  /* Process any configure-time defaults specified for the command line
-     options, via OPTION_DEFAULT_SPECS.  */
-  for (i = 0; i < ARRAY_SIZE (option_default_specs); i++)
-    do_option_spec (option_default_specs[i].name,
-		    option_default_specs[i].spec);
-
-  /* Same defaults, but supplied as data by the spec file read just above rather
-     than baked in at build time.  */
+  /* The target's configure-time option defaults, supplied as data by the spec
+     file read just above.  This has to happen here, before driver_self_specs:
+     user -specs= files are not read until much later, so they cannot serve.  */
   if (option_defaults_spec && *option_defaults_spec)
     do_self_spec (option_defaults_spec);
 
@@ -11560,8 +11494,8 @@ driver::finalize ()
 }
 
 /* PR jit/64810.
-   Targets can provide configure-time default options in
-   OPTION_DEFAULT_SPECS.  The jit needs to access these, but
+   Targets can provide configure-time default options through the
+   option_defaults spec.  The jit needs to access these, but
    they are expressed in the spec language.
 
    Run just enough of the driver to be able to expand these
@@ -11579,10 +11513,6 @@ driver_get_configure_time_options (void (*cb) (const char *option,
   obstack_init (&obstack);
   init_opts_obstack ();
   n_switches = 0;
-
-  for (i = 0; i < ARRAY_SIZE (option_default_specs); i++)
-    do_option_spec (option_default_specs[i].name,
-		    option_default_specs[i].spec);
 
   if (option_defaults_spec && *option_defaults_spec)
     do_self_spec (option_defaults_spec);

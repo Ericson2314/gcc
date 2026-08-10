@@ -1,3 +1,9 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_arm_headers_included
+t_arm_headers_included := 1
+
 # Headers generated from arm-cpus.in.  Factored out of t-arm so that a
 # multi-target build -- which includes no single target's tmake_file -- can
 # generate them too; see gen-multi-target-md.awk.
@@ -47,3 +53,5 @@ s-arm-native: $(srcdir)/config/arm/parsecpu.awk \
 # does not name them, so spell out the dependency here (harmless in a
 # single-target build, required when many back ends build in parallel).
 arm-common.o: arm-cpu.h arm-isa.h arm-cpu-cdata.h
+
+endif

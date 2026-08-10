@@ -48,14 +48,10 @@ lib_build_spec = $(foreach mlib,\
 default_mlib_spec := %{fmultiflags:%{!mabi=*:-mabi=$(mlib_default)}}
 lib_build_spec    := %{fmultiflags:$(lib_build_spec)}
 
-ifneq ($(TM_MULTILIB_CONFIG),)
-loongarch-multilib.h:
-	@echo "#define MLIB_SELF_SPECS" \
-	      "\"$(default_mlib_spec)\"," \
-	      "\"$(lib_build_spec)\"," > $@
-else
-loongarch-multilib.h: ; @touch $@
-endif
+# The rule lives in t-loongarch-headers, which a multi-target build includes
+# too: loongarch-driver.h includes loongarch-multilib.h by name, so the file
+# has to exist whether or not this fragment is in play.
+include $(srcdir)/config/loongarch/t-loongarch-headers
 
 # Multiarch
 ifneq ($(call if_multiarch,yes),yes)

@@ -26,6 +26,25 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #ifndef GCC_DEFAULTS_H
 #define GCC_DEFAULTS_H
 
+/* Assembler and linker capabilities that used to be frozen into auto-host.h by
+   configure-time probes of one specific toolchain.  They are runtime values
+   now; see target-caps.h.  Generators and target-library builds never consult
+   them and must not pull in compiler internals, so they are guarded out --
+   which also means any use has to be an ordinary `if', never a `#if'.  */
+#if !defined (GENERATOR_FILE) && !defined (USED_FOR_TARGET)
+#include "target-caps.h"
+#undef HAVE_AS_LEB128
+#define HAVE_AS_LEB128 (targ_caps.leb128)
+#undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
+#define HAVE_GAS_CFI_PERSONALITY_DIRECTIVE (targ_caps.cfi_personality)
+#undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE
+#define HAVE_GAS_CFI_SECTIONS_DIRECTIVE (targ_caps.cfi_sections)
+#undef HAVE_GAS_LOC_STMT
+#define HAVE_GAS_LOC_STMT (targ_caps.gas_loc_stmt)
+#undef HAVE_AS_LINE_ZERO
+#define HAVE_AS_LINE_ZERO (targ_caps.as_line_zero)
+#endif
+
 /* How to start an assembler comment.  */
 #ifndef ASM_COMMENT_START
 #define ASM_COMMENT_START ";#"
@@ -278,10 +297,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* This determines whether or not we support the discriminator
    attribute in the .loc directive.  */
 #ifndef SUPPORTS_DISCRIMINATOR
-#ifdef HAVE_GAS_DISCRIMINATOR
-#define SUPPORTS_DISCRIMINATOR 1
-#else
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
 #define SUPPORTS_DISCRIMINATOR 0
+#else
+#define SUPPORTS_DISCRIMINATOR (targ_caps.gas_discriminator)
 #endif
 #endif
 
@@ -1377,6 +1396,75 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    (config/linux.h, config/gnu.h); everyone else gets 0.  */
 #ifndef USE_GNU_UNIQUE_OBJECT
 #define USE_GNU_UNIQUE_OBJECT 0
+#endif
+
+/* Nonzero if libvtv is available for the target, so -fvtable-verify can link
+   against it.  Target headers for configurations that build libvtv raise this;
+   the stock default was 0.  */
+#ifndef ENABLE_VTABLE_VERIFY
+#define ENABLE_VTABLE_VERIFY 0
+#endif
+
+/* Nonzero if the target's newlib was built with the "nano" formatted-IO
+   variant, which msp430 needs for -mtiny-printf.  This used to mirror a newlib
+   configure flag via --enable-newlib-nano-formatted-io.  */
+#ifndef HAVE_NEWLIB_NANO_FORMATTED_IO
+#define HAVE_NEWLIB_NANO_FORMATTED_IO 0
+#endif
+
+/* Assembler/linker capabilities that used to be frozen into auto-host.h by
+   configure-time probes of one specific toolchain.  They are runtime values
+   now; see target-caps.h.  Generators and target-library builds never consult
+   them, and must not pull in compiler internals, so they are guarded out.  */
+#if !defined (GENERATOR_FILE) && !defined (USED_FOR_TARGET)
+#include "target-caps.h"
+#undef HAVE_AS_LEB128
+#define HAVE_AS_LEB128 (targ_caps.leb128)
+
+/* The linker half, same treatment.  These were answered by probing one ld
+   while GCC was configured; a compiler serving many toolchains has to ask at
+   run time.  Each is #undef'd first because auto-host.h may still define it
+   from a probe that has not been relocated yet, and the runtime answer must
+   win.  Consumers that test them with #ifdef rather than #if have to become
+   plain `if' -- the macro is always defined now, so an #ifdef is always
+   true.  */
+#undef HAVE_GAS_HIDDEN
+#define HAVE_GAS_HIDDEN (targ_caps.gas_hidden)
+#undef HAVE_LD_RO_RW_SECTION_MIXING
+#define HAVE_LD_RO_RW_SECTION_MIXING (targ_caps.ld_ro_rw_section_mixing)
+#undef HAVE_LD_EH_GC_SECTIONS
+#define HAVE_LD_EH_GC_SECTIONS (targ_caps.ld_eh_gc_sections)
+#undef HAVE_LD_CTF
+#define HAVE_LD_CTF (targ_caps.ld_ctf)
+#undef HAVE_LD_SYSROOT
+#define HAVE_LD_SYSROOT (targ_caps.ld_sysroot)
+#undef HAVE_LD_AT_FILE
+#define HAVE_LD_AT_FILE (targ_caps.ld_at_file)
+#undef HAVE_LD_PIE_COPYRELOC
+#define HAVE_LD_PIE_COPYRELOC (targ_caps.ld_pie_copyreloc)
+#undef HAVE_LD_PERSONALITY_RELAXATION
+#define HAVE_LD_PERSONALITY_RELAXATION (targ_caps.ld_personality_relaxation)
+#undef HAVE_LD_NO_DOT_SYMS
+#define HAVE_LD_NO_DOT_SYMS (targ_caps.ld_no_dot_syms)
+#undef HAVE_LD_LARGE_TOC
+#define HAVE_LD_LARGE_TOC (targ_caps.ld_large_toc)
+#undef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
+#define HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE (targ_caps.ld_ppc_attr)
+#undef HAVE_LD_BROKEN_PE_DWARF5
+#define HAVE_LD_BROKEN_PE_DWARF5 (targ_caps.ld_broken_pe_dwarf5)
+#undef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
+#define HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH \
+  (targ_caps.ld_avr_avrxmega3_rodata_in_flash)
+#undef HAVE_LD_AVR_AVRXMEGA2_FLMAP
+#define HAVE_LD_AVR_AVRXMEGA2_FLMAP (targ_caps.ld_avr_avrxmega2_flmap)
+#undef HAVE_LD_AVR_AVRXMEGA4_FLMAP
+#define HAVE_LD_AVR_AVRXMEGA4_FLMAP (targ_caps.ld_avr_avrxmega4_flmap)
+
+/* Not a flag but a byte count: the alignment the linker forces on .TOC..
+   rs6000.cc supplies 8 when this is undefined, and the probe only ever chose
+   between 8 and 4, so the flag selects between them.  */
+#undef POWERPC64_TOC_POINTER_ALIGNMENT
+#define POWERPC64_TOC_POINTER_ALIGNMENT (targ_caps.ld_toc_align ? 8 : 4)
 #endif
 
 /* Nonzero if the target object format has COMDAT groups (ELF section groups,

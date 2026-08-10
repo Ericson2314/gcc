@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "stor-layout.h"
 #include "rtl.h"
+#include "target-caps.h"
 
 struct target_libfuncs default_target_libfuncs;
 #if SWITCHABLE_TARGET
@@ -40,12 +41,15 @@ struct target_libfuncs *this_target_libfuncs = &default_target_libfuncs;
 #define libfunc_hash \
   (this_target_libfuncs->x_libfunc_hash)
 
-/* Prefixes for the current version of decimal floating point (BID vs. DPD) */
-#if ENABLE_DECIMAL_BID_FORMAT
-#define DECIMAL_PREFIX "bid_"
-#else
-#define DECIMAL_PREFIX "dpd_"
-#endif
+/* Prefix for the current version of decimal floating point (BID vs. DPD).
+   Which one the target uses is fixed by its ABI and now arrives at run time,
+   so this is a value rather than a macro.  */
+#define DECIMAL_PREFIX (targ_caps.decimal_bid_format ? "bid_" : "dpd_")
+
+/* Length of DECIMAL_PREFIX.  Both spellings are four characters, which the
+   callers below rely on for sizing; it used to come from sizeof on a string
+   literal, which no longer works now that the prefix is chosen at run time.  */
+#define DECIMAL_PREFIX_LEN 4
 
 /* Used for libfunc_hash.  */
 
@@ -217,11 +221,11 @@ gen_fp_libfunc (optab optable, const char *opname, char suffix,
     gen_libfunc (optable, opname, suffix, mode);
   if (DECIMAL_FLOAT_MODE_P (mode))
     {
-      dec_opname = XALLOCAVEC (char, sizeof (DECIMAL_PREFIX) + strlen (opname));
+      dec_opname = XALLOCAVEC (char, DECIMAL_PREFIX_LEN + 1 + strlen (opname));
       /* For BID support, change the name to have either a bid_ or dpd_ prefix
 	 depending on the low level floating format used.  */
-      memcpy (dec_opname, DECIMAL_PREFIX, sizeof (DECIMAL_PREFIX) - 1);
-      strcpy (dec_opname + sizeof (DECIMAL_PREFIX) - 1, opname);
+      memcpy (dec_opname, DECIMAL_PREFIX, DECIMAL_PREFIX_LEN);
+      strcpy (dec_opname + DECIMAL_PREFIX_LEN, opname);
       gen_libfunc (optable, dec_opname, suffix, mode);
     }
 }
@@ -386,7 +390,7 @@ gen_interclass_conv_libfunc (convert_optab tab,
 
   /* If this is a decimal conversion, add the current BID vs. DPD prefix that
      depends on which underlying decimal floating point format is used.  */
-  const size_t dec_len = sizeof (DECIMAL_PREFIX) - 1;
+  const size_t dec_len = DECIMAL_PREFIX_LEN;
 
   mname_len = strlen (GET_MODE_NAME (tmode)) + strlen (GET_MODE_NAME (fmode));
 
@@ -520,7 +524,7 @@ gen_intraclass_conv_libfunc (convert_optab tab, const char *opname,
 
   /* If this is a decimal conversion, add the current BID vs. DPD prefix that
      depends on which underlying decimal floating point format is used.  */
-  const size_t dec_len = sizeof (DECIMAL_PREFIX) - 1;
+  const size_t dec_len = DECIMAL_PREFIX_LEN;
 
   mname_len = strlen (GET_MODE_NAME (tmode)) + strlen (GET_MODE_NAME (fmode));
 
