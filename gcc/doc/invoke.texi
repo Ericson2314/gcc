@@ -21230,8 +21230,11 @@ relative to some @file{lib} subdirectory.
 @itemx --print-prog-name=@var{program}
 @itemx --print-prog-name @var{program}
 Like @option{-print-file-name}, but searches for a program such as @command{cpp}.
-The compiler's own directories are searched first, then @env{PATH}.  If no
-such program is found, @var{program} is printed back unchanged.
+The compiler's own directories are searched first, then @env{PATH}.  In a
+directory that is not already specific to one target, the name prefixed
+with the target machine, such as @command{@var{machine}-ld}, is tried
+before @var{program} itself.  If no such program is found, @var{program}
+is printed back unchanged.
 
 @opindex print-libgcc-file-name
 @item -print-libgcc-file-name

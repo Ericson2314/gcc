@@ -3195,9 +3195,7 @@ find_a_program (const char *name)
   /* Callback appends the file name to the directory path.  If the
      resulting file exists in the right mode, return the full pathname
      to the file.  */
-  char *ret = for_each_path (&exec_prefixes, false,
-			     prefix_len + name_len + suffix_len,
-			     [=](char *path, bool machine_specific) -> char*
+  auto try_dir = [=](char *path, bool machine_specific) -> char*
     {
       size_t path_len = strlen (path);
 
@@ -3235,7 +3233,10 @@ find_a_program (const char *name)
 	}
 
       return search(path_len);
-    });
+    };
+
+  char *ret = for_each_path (&exec_prefixes, false,
+			     prefix_len + name_len + suffix_len, try_dir);
 
   if (ret)
     return ret;
@@ -3243,26 +3244,21 @@ find_a_program (const char *name)
   /* Nothing among our own directories, so fall back to PATH.
 
      Searching it here rather than via execvp means we know which file
-     we picked, so -print-prog-name can report it.  */
+     we picked, so -print-prog-name can report it.  It also lets us look
+     for NAME and MACHINE-NAME without revisiting the directory.  */
 
   return for_each_env_path (env.get ("PATH"), [&] (const char *dir) -> char*
     {
-      /* Some systems have a suffix for executable files.  As above, try
-	 appending that first.  */
-      if (suffix_len)
-	{
-	  char *candidate = concat (dir, name, suffix, NULL);
-	  if (access_check (candidate, X_OK) == 0)
-	    return candidate;
-	  free (candidate);
-	}
+      char *path = XNEWVEC (char, strlen (dir) + prefix_len + name_len
+			    + suffix_len + 1);
+      strcpy (path, dir);
 
-      char *candidate = concat (dir, name, NULL);
-      if (access_check (candidate, X_OK) == 0)
-	return candidate;
-
-      free (candidate);
-      return NULL;
+      char *found = try_dir (path,
+			     /* PATH dirs we consider machine-agnostic.  */
+			     false);
+      if (!found)
+	free (path);
+      return found;
     });
 }
 
