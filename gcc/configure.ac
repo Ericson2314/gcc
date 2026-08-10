@@ -1966,10 +1966,24 @@ case ${enable_targets} in
     ;;
 esac
 
+dnl When targets are named explicitly they are the whole list: ${target} gets no
+dnl privileged place in it.
+dnl
+dnl A build-time default target is a hiding place.  Anything still target-specific
+dnl keeps working as long as it happens to be the default, so the dependency is
+dnl never noticed -- it only surfaces for whichever target was not chosen at
+dnl configure time.  Making every target equal means nothing can hide there.
+dnl The endgame is no --target at all, only --enable-targets.
+if test x"${gcc_extra_targets}" != x; then
+  gcc_manifest_targets="${gcc_extra_targets}"
+else
+  gcc_manifest_targets="${target}"
+fi
+
 gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
-for gcc_mt in ${target} ${gcc_extra_targets}; do
+for gcc_mt in ${gcc_manifest_targets}; do
   # config.gcc validates --with-arch/--with-cpu/... against the target it is
   # being run for.  Those options were given for the primary target, so they must
   # not leak into an extra one: aarch64 rejects x86's --with-arch=x86-64 outright.

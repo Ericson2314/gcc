@@ -13040,10 +13040,16 @@ case ${enable_targets} in
     ;;
 esac
 
+if test x"${gcc_extra_targets}" != x; then
+  gcc_manifest_targets="${gcc_extra_targets}"
+else
+  gcc_manifest_targets="${target}"
+fi
+
 gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
-for gcc_mt in ${target} ${gcc_extra_targets}; do
+for gcc_mt in ${gcc_manifest_targets}; do
   # config.gcc validates --with-arch/--with-cpu/... against the target it is
   # being run for.  Those options were given for the primary target, so they must
   # not leak into an extra one: aarch64 rejects x86's --with-arch=x86-64 outright.
@@ -22013,7 +22019,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22016 "configure"
+#line 22022 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22119,7 +22125,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22122 "configure"
+#line 22128 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
