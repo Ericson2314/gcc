@@ -888,28 +888,10 @@ proper position among the other output files.  */
 #endif
 #endif
 
-/* Linker options for compressed debug sections.  */
-#if HAVE_LD_COMPRESS_DEBUG == 0
-/* No linker support.  */
-#define LINK_COMPRESS_DEBUG_SPEC \
-	" %{gz*:%e-gz is not supported in this configuration} "
-#elif HAVE_LD_COMPRESS_DEBUG == 1
-/* ELF gABI style.  */
-#define LINK_COMPRESS_DEBUG_SPEC \
-	" %{gz|gz=zlib:"  LD_COMPRESS_DEBUG_OPTION "=zlib}" \
-	" %{gz=none:"	  LD_COMPRESS_DEBUG_OPTION "=none}" \
-	" %{gz=zstd:%e-gz=zstd is not supported in this configuration} " \
-	" %{gz=zlib-gnu:}" /* Ignore silently zlib-gnu option value.  */
-#elif HAVE_LD_COMPRESS_DEBUG == 2
-/* ELF gABI style and ZSTD.  */
-#define LINK_COMPRESS_DEBUG_SPEC \
-	" %{gz|gz=zlib:"  LD_COMPRESS_DEBUG_OPTION "=zlib}" \
-	" %{gz=none:"	  LD_COMPRESS_DEBUG_OPTION "=none}" \
-	" %{gz=zstd:"	  LD_COMPRESS_DEBUG_OPTION "=zstd}" \
-	" %{gz=zlib-gnu:}" /* Ignore silently zlib-gnu option value.  */
-#else
-#error Unknown value for HAVE_LD_COMPRESS_DEBUG.
-#endif
+/* Linker options for compressed debug sections.  What the linker supports is a
+   property of that linker, so the spec comes from the spec file rather than
+   from anything decided here; empty until one supplies it.  */
+#define LINK_COMPRESS_DEBUG_SPEC ""
 
 /* config.h can define LIBGCC_SPEC to override how and when libgcc.a is
    included.  */
@@ -939,39 +921,14 @@ proper position among the other output files.  */
 #define LINKER_NAME "collect2"
 #endif
 
-#ifdef HAVE_AS_DEBUG_PREFIX_MAP
-#define ASM_MAP " %{ffile-prefix-map=*:--debug-prefix-map %*} %{fdebug-prefix-map=*:--debug-prefix-map %*}"
-#else
+/* Whether the assembler takes --debug-prefix-map is a property of that
+   assembler, so the mapping arrives with the rest of asm_debug from the spec
+   file.  */
 #define ASM_MAP ""
-#endif
 
-/* Assembler options for compressed debug sections.  */
-#if HAVE_LD_COMPRESS_DEBUG == 0
-/* Reject if the linker cannot write compressed debug sections.  */
-#define ASM_COMPRESS_DEBUG_SPEC \
-	" %{gz*:%e-gz is not supported in this configuration} "
-#else /* HAVE_LD_COMPRESS_DEBUG >= 1 */
-#if HAVE_AS_COMPRESS_DEBUG == 0
-/* No assembler support.  Ignore silently.  */
-#define ASM_COMPRESS_DEBUG_SPEC \
-	" %{gz*:} "
-#elif HAVE_AS_COMPRESS_DEBUG == 1
-/* ELF gABI style.  */
-#define ASM_COMPRESS_DEBUG_SPEC \
-	" %{gz|gz=zlib:"  AS_COMPRESS_DEBUG_OPTION "=zlib}" \
-	" %{gz=none:"	  AS_COMPRESS_DEBUG_OPTION "=none}" \
-	" %{gz=zlib-gnu:}" /* Ignore silently zlib-gnu option value.  */
-#elif HAVE_AS_COMPRESS_DEBUG == 2
-/* ELF gABI style and ZSTD.  */
-#define ASM_COMPRESS_DEBUG_SPEC \
-	" %{gz|gz=zlib:"  AS_COMPRESS_DEBUG_OPTION "=zlib}" \
-	" %{gz=none:"	  AS_COMPRESS_DEBUG_OPTION "=none}" \
-	" %{gz=zstd:"	  AS_COMPRESS_DEBUG_OPTION "=zstd}" \
-	" %{gz=zlib-gnu:}" /* Ignore silently zlib-gnu option value.  */
-#else
-#error Unknown value for HAVE_AS_COMPRESS_DEBUG.
-#endif
-#endif /* HAVE_LD_COMPRESS_DEBUG >= 1 */
+/* Assembler options for compressed debug sections.  As with the linker, this
+   describes one assembler and is supplied by the spec file.  */
+#define ASM_COMPRESS_DEBUG_SPEC ""
 
 /* Define ASM_DEBUG_SPEC to be a spec suitable for translating '-g'
    to the assembler, when compiling assembly sources only.  */

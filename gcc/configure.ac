@@ -2037,6 +2037,19 @@ for gcc_mt in ${gcc_manifest_targets}; do
     echo "extra_options ${extra_options}"
     echo "out_file ${out_file}"
     echo "md_file ${md_file}"
+    # The header list this target's tm.h is built from, in the same form the
+    # single-target path uses.  $( ) rather than backticks: this is inside the
+    # substitution capturing the stanza.
+    mt_tm_include_list="options.h insn-constants.h"
+    for mt_f in ${tm_file}; do
+      case ${mt_f} in
+	./* ) mt_tm_include_list="${mt_tm_include_list} $(echo ${mt_f} | sed 's/^..//')" ;;
+	defaults.h ) mt_tm_include_list="${mt_tm_include_list} ${mt_f}" ;;
+	* ) mt_tm_include_list="${mt_tm_include_list} config/${mt_f}" ;;
+      esac
+    done
+    echo "tm_include_list ${mt_tm_include_list}"
+    echo "tm_defines ${tm_defines}"
   ` || {
     # Read the message here, not in the AC_MSG_ERROR argument: that argument is
     # m4-quoted, so a substitution written inside it is emitted literally and the
@@ -6131,39 +6144,13 @@ foo:
    fi
  fi
 
- gcc_GAS_CHECK_FEATURE([--debug-prefix-map option],
-  gcc_cv_as_debug_prefix_map_flag,
-  [--debug-prefix-map /a=/b], [$insn],,
-  [AC_DEFINE(HAVE_AS_DEBUG_PREFIX_MAP, 1,
-[Define if your assembler supports the --debug-prefix-map option.])])
+dnl --debug-prefix-map is likewise a property of the assembler in use, feeding
+dnl only a spec string; target-specs probes it.
 fi
 
-gcc_GAS_CHECK_FEATURE([compressed debug sections],
-  gcc_cv_as_compress_debug,,,
-  [# gas compiled without zlib cannot compress debug sections and warns
-   # about it, but still exits successfully.  So check for this, too.
-   if $gcc_cv_as --compress-debug-sections -o conftest.o conftest.s 2>&1 | grep -i warning > /dev/null
-   then
-     gcc_cv_as_compress_debug=0
-   elif $gcc_cv_as --compress-debug-sections=zlib -o conftest.o conftest.s > /dev/null 2>&1
-   then
-     gcc_cv_as_compress_debug=1
-     gcc_cv_as_compress_debug_option="--compress-debug-sections"
-     gcc_cv_as_no_compress_debug_option="--nocompress-debug-sections"
-     # Since binutils 2.40, gas supports --compress-debug-sections=zstd.
-     if $gcc_cv_as --compress-debug-sections=zstd -o conftest.o conftest.s > /dev/null 2>&1
-     then
-       gcc_cv_as_compress_debug=2
-     fi
-   else
-     gcc_cv_as_compress_debug=0
-   fi])
-AC_DEFINE_UNQUOTED(HAVE_AS_COMPRESS_DEBUG, $gcc_cv_as_compress_debug,
-[Define to the level of your assembler's compressed debug section support.])
-AC_DEFINE_UNQUOTED(AS_COMPRESS_DEBUG_OPTION, "$gcc_cv_as_compress_debug_option",
-[Define to the assembler option to enable compressed debug sections.])
-AC_DEFINE_UNQUOTED(AS_NO_COMPRESS_DEBUG_OPTION, "$gcc_cv_as_no_compress_debug_option",
-[Define to the assembler option to disable compressed debug sections.])
+dnl Compressed debug section support is a property of a particular assembler,
+dnl not of a target, and it feeds nothing but a spec string.  It is probed by
+dnl target-specs, against the assembler actually in use.
 
 gcc_GAS_CHECK_FEATURE([.lcomm with alignment], gcc_cv_as_lcomm_with_alignment,,
 [.lcomm bar,4,16],,
@@ -6482,41 +6469,11 @@ if test x$gcc_cv_ld_eh_gc_sections_bug = xyes; then
 fi
 AC_MSG_RESULT($gcc_cv_ld_eh_gc_sections_bug)
 
-AC_MSG_CHECKING(linker for compressed debug sections)
-# GNU ld/gold support --compressed-debug-sections=zlib since binutils 2.26.
-if $gcc_cv_ld --help 2>&1 | grep -- '--compress-debug-sections.*\<zlib-gabi\>' > /dev/null; then
-    gcc_cv_ld_compress_debug=1
-    gcc_cv_ld_compress_debug_option="--compress-debug-sections"
-    # Detect zstd debug section compression support
-    if $gcc_cv_ld --help 2>&1 | grep -- '--compress-debug-sections.*\<zstd\>' > /dev/null; then
-      gcc_cv_ld_compress_debug=2
-    fi
-else
-changequote(,)dnl
-  case "${target}" in
-    *-*-solaris2*)
-      # Introduced in Solaris 11.2.
-      gcc_cv_ld_compress_debug=1
-      gcc_cv_ld_compress_debug_option="-z compress-sections"
-      # Detect zstd debug section compression support.  Introduced in
-      # Solaris 11.4 SRU 90.
-      if $gcc_cv_ld --help 2>&1 | grep -- '-z compress-sections.*\<zstd\>' > /dev/null; then
-	gcc_cv_ld_compress_debug=2
-      fi
-      ;;
-    *)
-      # Assume linkers other than GNU ld don't support compessed debug
-      # sections.
-      gcc_cv_ld_compress_debug=0
-      ;;
-  esac
-changequote([,])dnl
-fi
-AC_DEFINE_UNQUOTED(HAVE_LD_COMPRESS_DEBUG, $gcc_cv_ld_compress_debug,
-[Define to the level of your linker's compressed debug section support.])
-AC_DEFINE_UNQUOTED(LD_COMPRESS_DEBUG_OPTION, "$gcc_cv_ld_compress_debug_option",
-[Define to the linker option to enable compressed debug sections.])
-AC_MSG_RESULT($gcc_cv_ld_compress_debug)
+dnl Compressed debug section support is a property of a particular linker, and
+dnl feeds nothing but a spec string.  target-specs probes it, against the linker
+dnl actually in use.  Note the Solaris case that used to live here keyed on
+dnl ${target} for want of a way to ask the linker itself, which is precisely the
+dnl guesswork that asking the real tool removes.
 
 AC_MSG_CHECKING(linker support for -z ctf)
 gcc_cv_ld_ctf=no
