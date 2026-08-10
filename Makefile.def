@@ -45,6 +45,19 @@ host_modules= { module= fixincludes; bootstrap=true;
 		missing= TAGS;
 		missing= install-dvi; };
 host_modules= { module= flex; no_check_cross= true; };
+// Generates a spec file per target by probing that target's assembler and
+// linker.  A host module rather than part of gcc: the probing is not specific
+// to one target, and it must be able to run after gcc is built.
+host_modules= { module= target-specs;
+		missing= TAGS;
+		missing= install-dvi;
+		missing= install-pdf;
+		missing= install-html;
+		missing= install-info;
+		missing= dvi;
+		missing= pdf;
+		missing= html;
+		missing= info; };
 host_modules= { module= gas; bootstrap=true; };
 host_modules= { module= gcc; bootstrap=true; 
 		extra_make_flags="$(EXTRA_GCC_FLAGS)";

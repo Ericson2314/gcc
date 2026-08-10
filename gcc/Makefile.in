@@ -2682,6 +2682,123 @@ DRIVER_DEFINES = \
 CFLAGS-gcc.o += $(DRIVER_DEFINES) -DBASEVER=$(BASEVER_s)
 gcc.o: $(BASEVER)
 
+# Multi-target: assert the driver compiles against no target-specific header.
+# Reads the compiler's own generated dependency record for gcc.o, so this
+# cannot drift from what was actually #included.  Fails loudly, listing the
+# offenders, if any gcc/config/ header (or tm.h) creeps back in.
+# Multi-target: check that probing the toolchain AFTER the build reproduces what
+# configure baked in at build time.  This is the safety net for moving the
+# HAVE_AS_*/HAVE_LD_* checks out of configure and into per-target spec files:
+# if the two ever disagree, the migration has changed behaviour.
+# (Same idea as GHC validating ghc-toolchain against its configure output.)
+#
+# The reference is a -dumpspecs capture from a driver that still has the values
+# built in.  Once the driver stops baking them in, comparing against its own
+# -dumpspecs is vacuous -- it would compare the probe against empty strings -- so
+# point REFERENCE_SPECS at a capture from a stock build:
+#
+#   make check-target-specs REFERENCE_SPECS=/path/to/baseline-dumpspecs.txt
+#
+# It defaults to this driver's own output, which is the right thing only while
+# the driver is still built against a single target's tm.h.
+# Multi-target: generate one spec file per target named in multi-target.manifest
+# (written by configure from --enable-targets).  Each target is probed with its
+# own assembler and linker, which is the whole point -- the answers describe that
+# toolchain, not this build.  A target whose tools are not installed is skipped
+# with a notice rather than silently omitted.
+.PHONY: target-specs
+target-specs: multi-target.manifest
+	@set -e; \
+	tsdir=$(srcdir)/../target-specs; \
+	if test ! -x $$tsdir/configure; then \
+	  echo "target-specs: $$tsdir/configure not generated; run autoconf there" >&2; \
+	  exit 1; \
+	fi; \
+	made=0; skipped=0; \
+	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
+	  if test "$$t" = "$(target_noncanonical)"; then \
+	    tas=`./xgcc$(exeext) -print-prog-name=as 2>/dev/null || echo $$t-as`; \
+	    tld=`./xgcc$(exeext) -print-prog-name=ld 2>/dev/null || echo $$t-ld`; \
+	  else \
+	    tas=$$t-as; tld=$$t-ld; \
+	  fi; \
+	  if command -v "$$tas" > /dev/null 2>&1 && command -v "$$tld" > /dev/null 2>&1; then \
+	    rm -rf tmp-ts-$$t; mkdir tmp-ts-$$t; \
+	    if (cd tmp-ts-$$t && $$tsdir/configure --with-target=$$t \
+	          --with-as="$$tas" --with-ld="$$tld" \
+	          --with-specs-file=../specs-$$t > probe.log 2>&1); then \
+	      echo "target-specs: wrote specs-$$t (as=$$tas ld=$$tld)"; \
+	      made=`expr $$made + 1`; \
+	    else \
+	      echo "target-specs: FAILED for $$t; see tmp-ts-$$t/probe.log" >&2; \
+	      exit 1; \
+	    fi; \
+	  else \
+	    echo "target-specs: SKIP $$t -- $$tas or $$tld not found"; \
+	    skipped=`expr $$skipped + 1`; \
+	  fi; \
+	done; \
+	echo "target-specs: $$made generated, $$skipped skipped"
+
+REFERENCE_SPECS =
+.PHONY: check-target-specs
+check-target-specs: xgcc$(exeext)
+	@set -e; \
+	tsdir=$(srcdir)/../target-specs; \
+	if test ! -x $$tsdir/configure; then \
+	  echo "check-target-specs: $$tsdir/configure not generated; run autoconf there" >&2; \
+	  exit 1; \
+	fi; \
+	probe_as=`./xgcc$(exeext) -print-prog-name=as`; \
+	probe_ld=`./xgcc$(exeext) -print-prog-name=ld`; \
+	rm -rf tmp-target-specs; mkdir tmp-target-specs; \
+	(cd tmp-target-specs && \
+	   $$tsdir/configure --with-target=$(target_noncanonical) \
+	     --with-as="$$probe_as" --with-ld="$$probe_ld" \
+	     --with-specs-file=probed.specs > probe.log 2>&1) || \
+	  { echo "check-target-specs: probe configure failed" >&2; \
+	    tail -20 tmp-target-specs/probe.log >&2; exit 1; }; \
+	if test -n "$(REFERENCE_SPECS)"; then \
+	  cp "$(REFERENCE_SPECS)" tmp-target-specs/built.specs; \
+	  echo "check-target-specs: reference = $(REFERENCE_SPECS)"; \
+	else \
+	  ./xgcc$(exeext) -dumpspecs > tmp-target-specs/built.specs; \
+	  echo "check-target-specs: reference = this driver's -dumpspecs"; \
+	fi; \
+	rc=0; \
+	for s in asm_debug asm_debug_option; do \
+	  a=`awk -v k="$$s" '$$0=="*"k":"{getline; print; exit}' tmp-target-specs/built.specs`; \
+	  b=`awk -v k="$$s" '$$0=="*"k":"{getline; print; exit}' tmp-target-specs/probed.specs`; \
+	  if test "$$a" = "$$b"; then \
+	    echo "check-target-specs: MATCH  *$$s"; \
+	  else \
+	    echo "check-target-specs: DIFFER *$$s" >&2; \
+	    echo "    built-in: $$a" >&2; \
+	    echo "    probed  : $$b" >&2; \
+	    rc=1; \
+	  fi; \
+	done; \
+	test $$rc -eq 0 || { echo "check-target-specs: FAIL" >&2; exit 1; }; \
+	echo "check-target-specs: PASS"
+
+.PHONY: check-driver-target-clean
+check-driver-target-clean: gcc.o
+	@deps=.deps/gcc.Po; \
+	if test ! -f $$deps; then \
+	  echo "check-driver-target-clean: $$deps not found; build gcc.o first" >&2; \
+	  exit 1; \
+	fi; \
+	bad=`tr ' \\\\' '\n\n' < $$deps \
+	     | sed -e 's/:$$//' \
+	     | grep -E '(^|/)config/|(^|/)tm\.h$$|(^|/)tm_p\.h$$|insn-constants\.h$$' \
+	     | sort -u`; \
+	if test -n "$$bad"; then \
+	  echo "check-driver-target-clean: FAIL -- driver still depends on target headers:" >&2; \
+	  echo "$$bad" | sed -e 's/^/    /' >&2; \
+	  exit 1; \
+	fi; \
+	echo "check-driver-target-clean: PASS -- gcc.o has no target-specific dependency"
+
 specs.h : s-specs ; @true
 s-specs : Makefile
 	lsf="$(lang_specs_files)"; for f in $$lsf; do \
