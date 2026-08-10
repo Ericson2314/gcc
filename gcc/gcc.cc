@@ -36,7 +36,22 @@ compilation is specified by a string called a "spec".  */
 #endif
 #include "coretypes.h"
 #include "multilib.h" /* before tm.h */
-#include "tm.h"
+/* EXPERIMENT (multi-target): tm.h deliberately not included, so the driver
+   carries no target-specific defaults.  Every target spec macro in this file
+   is #ifndef-guarded and every other target macro is #ifdef-guarded, so the
+   generic fallbacks apply.  Per-target values must then arrive at runtime via
+   a specs file (see -dumpspecs / read_specs).
+
+   tm.h is a bundle; mkconfig.sh builds it as
+
+       options.h insn-constants.h <target headers...> defaults.h
+
+   options.h is not target data and the driver still needs it (OPT_* enums,
+   global_options, flag-types.h), so include it directly.  defaults.h cannot be
+   included standalone -- it #errors without DWARF2_DEBUGGING_INFO, which only a
+   target header supplies -- so the one macro the driver took from it is given a
+   local fallback below, matching how the 37 spec macros here already work.  */
+#include "options.h"
 #include "xregex.h"
 #include "obstack.h"
 #include "intl.h"
@@ -1195,7 +1210,7 @@ proper position among the other output files.  */
     LINK_PLUGIN_SPEC \
    "%{flto|flto=*:%<fcompare-debug*} \
     %{flto} %{fno-lto} %{flto=*} %l " LINK_PIE_SPEC \
-   "%{fuse-ld=*:-fuse-ld=%*} " LINK_COMPRESS_DEBUG_SPEC \
+   "%{fuse-ld=*:-fuse-ld=%*} %(link_compress_debug) " \
    "%X %{o*} %{e*} %{N} %{n} %{r}\
     %{s} %{t} %{u*} %{z} %{Z} %{!nostdlib:%{!r:%{!nostartfiles:%S}}} \
     %{static|no-pie|static-pie:} %@{L*} %(link_libgcc) " \
@@ -1236,6 +1251,13 @@ proper position among the other output files.  */
 
 static const char *asm_debug = ASM_DEBUG_SPEC;
 static const char *asm_debug_option = ASM_DEBUG_OPTION_SPEC;
+/* Compressed-debug handling is decided by probing the assembler and linker.
+   Those answers describe a particular as/ld, not the target as such, so they
+   have to be settable per target rather than fixed when the driver is built.
+   Give them named specs; they were previously pasted straight into asm_options
+   and LINK_COMMAND_SPEC, which left no way to override them.  */
+static const char *asm_compress_debug = ASM_COMPRESS_DEBUG_SPEC;
+static const char *link_compress_debug = LINK_COMPRESS_DEBUG_SPEC;
 static const char *cpp_spec = CPP_SPEC LIBC_CPP_SPEC;
 static const char *cc1_spec = CC1_SPEC OS_CC1_SPEC;
 static const char *cc1plus_spec = CC1PLUS_SPEC;
@@ -1335,7 +1357,7 @@ static const char *asm_options =
 "%{-target-help:%:print-asm-header()} "
 ASM_V_SPEC
 " %(asm_debug_option)"
-ASM_COMPRESS_DEBUG_SPEC
+" %(asm_compress_debug) "
 "%a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %d%w%u%O}";
 
 static const char *invoke_as =
@@ -1407,6 +1429,15 @@ struct default_spec
 
 static const struct default_spec
   option_default_specs[] = { OPTION_DEFAULT_SPECS };
+
+/* OPTION_DEFAULT_SPECS above pairs target-supplied templates with the values
+   configure recorded for --with-arch and friends, and is consumed directly from
+   that static table -- so it never appears in -dumpspecs and cannot be set from
+   a spec file.  For a driver that is not built against one target, those
+   defaults have to arrive as data like everything else.  This spec holds the
+   already-expanded equivalent (no %(VALUE) left in it) and is applied as a self
+   spec at the same points the table is walked.  */
+static const char *option_defaults_spec = "";
 
 struct user_specs
 {
@@ -1747,6 +1778,9 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("asm",			&asm_spec),
   INIT_STATIC_SPEC ("asm_debug",		&asm_debug),
   INIT_STATIC_SPEC ("asm_debug_option",		&asm_debug_option),
+  INIT_STATIC_SPEC ("asm_compress_debug",	&asm_compress_debug),
+  INIT_STATIC_SPEC ("link_compress_debug",	&link_compress_debug),
+  INIT_STATIC_SPEC ("option_defaults",		&option_defaults_spec),
   INIT_STATIC_SPEC ("asm_final",		&asm_final_spec),
   INIT_STATIC_SPEC ("asm_options",		&asm_options),
   INIT_STATIC_SPEC ("invoke_as",		&invoke_as),
@@ -5684,6 +5718,12 @@ process_command (unsigned int decoded_options_count,
   infiles[n_infiles].name = 0;
 }
 
+/* Normally inherited from defaults.h via tm.h; the driver no longer includes
+   either, so supply the same generic value here.  */
+#ifndef COLLECT2_OPTIONS_MAX_LENGTH
+#define COLLECT2_OPTIONS_MAX_LENGTH 1024
+#endif
+
 /* Set COLLECT_GCC_OPTIONS in the environment.  If the value would
    exceed COLLECT2_OPTIONS_MAX_LENGTH, spill it to a temporary
    response file and set the variable to @<path> instead.  */
@@ -8650,6 +8690,11 @@ driver::set_up_specs () const
   for (i = 0; i < ARRAY_SIZE (option_default_specs); i++)
     do_option_spec (option_default_specs[i].name,
 		    option_default_specs[i].spec);
+
+  /* Same defaults, but supplied as data by the spec file read just above rather
+     than baked in at build time.  */
+  if (option_defaults_spec && *option_defaults_spec)
+    do_self_spec (option_defaults_spec);
 
   /* Process DRIVER_SELF_SPECS, adding any new options to the end
      of the command line.  */
@@ -11682,6 +11727,9 @@ driver_get_configure_time_options (void (*cb) (const char *option,
   for (i = 0; i < ARRAY_SIZE (option_default_specs); i++)
     do_option_spec (option_default_specs[i].name,
 		    option_default_specs[i].spec);
+
+  if (option_defaults_spec && *option_defaults_spec)
+    do_self_spec (option_defaults_spec);
 
   for (i = 0; (int) i < n_switches; i++)
     {
