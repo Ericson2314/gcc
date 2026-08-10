@@ -806,6 +806,7 @@ HAVE_AUTO_BUILD
 extra_opt_files
 extra_modes_file
 NATIVE_SYSTEM_HEADER_DIR
+gcc_extra_targets
 objext
 manext
 LIBICONV_DEP
@@ -984,6 +985,7 @@ enable_coverage
 enable_gather_detailed_mem_stats
 enable_valgrind_annotations
 enable_multilib
+enable_targets
 enable_multiarch
 with_stack_clash_protection_guard_size
 with_matchpd_partitions
@@ -1730,6 +1732,8 @@ Optional Features:
   --enable-valgrind-annotations
                           enable valgrind runtime interaction
   --enable-multilib       enable library support for multiple ABIs
+  --enable-targets=all|LIST
+                          additional target machines to support
   --enable-multiarch      enable support for multiarch paths
   --enable-__cxa_atexit   enable __cxa_atexit for C++
   --enable-decimal-float={no,yes,bid,dpd}
@@ -7825,6 +7829,24 @@ fi
 
 
 
+# Additional target machines this compiler should be able to serve, beyond the
+# one named by --target.  Comma-separated list, or "all".  Compare binutils'
+# --enable-targets, which GCC has never had.
+#
+# This does not yet build additional back ends; it collects each extra target's
+# configuration so that target-specific data can be emitted per target rather
+# than frozen into the binary at configure time.
+# Check whether --enable-targets was given.
+if test "${enable_targets+set}" = set; then :
+  enableval=$enable_targets; case "${enableval}" in
+  yes) as_fn_error $? "--enable-targets needs \"all\" or a list of targets" "$LINENO" 5 ;;
+  *)   ;;
+esac
+else
+  enable_targets=no
+fi
+
+
 # Determine whether or not multiarch is enabled.
 # Check whether --enable-multiarch was given.
 if test "${enable_multiarch+set}" = set; then :
@@ -12993,6 +13015,76 @@ target_gtfiles=
 
 # Collect target-machine-specific information.
 . ${srcdir}/config.gcc || exit 1
+
+# Multi-target: collect the same information for each additional target named by
+# --enable-targets.  config.gcc dispatches on ${target} and assigns tm_file &c.
+# unconditionally, so every extra target is handled by sourcing it again inside a
+# subshell; that keeps the primary target's variables above untouched and lets an
+# unsupported target fail as a non-zero exit we can report.
+#
+# The result is a manifest, one stanza per target, which later build steps read
+# to emit per-target data instead of freezing one target's values into the
+# binary.  No additional back end is compiled yet.
+gcc_extra_targets=
+case ${enable_targets} in
+  no | "")
+    ;;
+  all)
+    # config.gcc matches targets with shell globs, not literal names, so there is
+    # no honest way to enumerate "every target" from it.  Refuse rather than
+    # guess at a list.
+    as_fn_error $? "--enable-targets=all is not implemented yet; pass an explicit list" "$LINENO" 5
+    ;;
+  *)
+    gcc_extra_targets=`echo "${enable_targets}" | sed 's/,/ /g'`
+    ;;
+esac
+
+gcc_target_manifest=multi-target.manifest
+: > ${gcc_target_manifest}
+gcc_mt_err=conftest.mterr
+for gcc_mt in ${target} ${gcc_extra_targets}; do
+  # config.gcc validates --with-arch/--with-cpu/... against the target it is
+  # being run for.  Those options were given for the primary target, so they must
+  # not leak into an extra one: aarch64 rejects x86's --with-arch=x86-64 outright.
+  # Clear the whole with_* group along with the outputs.  (Per-target --with-arch
+  # would need its own syntax; not attempted here.)
+  gcc_mt_data=`
+    target=${gcc_mt}
+    with_arch= with_arch_32= with_arch_64=
+    with_cpu= with_cpu_32= with_cpu_64=
+    with_tune= with_tune_32= with_tune_64=
+    with_abi= with_fpu= with_float= with_mode= with_endian=
+    tm_defines= cpu_type= target_cpu_default=
+    tm_file= tm_p_file= tmake_file=
+    extra_objs= extra_options= extra_headers=
+    out_file= md_file= target_gtfiles=
+    . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
+    # config.gcc leaves these unset for most targets; the primary target gets
+    # them defaulted just below, so apply the same rules here or the manifest
+    # would claim the target has no machine description.
+    test x"${tm_file}" = x && tm_file=${cpu_type}/${cpu_type}.h
+    test x"${md_file}" = x && md_file=${cpu_type}/${cpu_type}.md
+    test x"${out_file}" = x && out_file=${cpu_type}/${cpu_type}.cc
+    echo "target ${gcc_mt}"
+    echo "cpu_type ${cpu_type}"
+    echo "tm_file ${tm_file}"
+    echo "tm_p_file ${tm_p_file}"
+    echo "tmake_file ${tmake_file}"
+    echo "extra_objs ${extra_objs}"
+    echo "extra_options ${extra_options}"
+    echo "out_file ${out_file}"
+    echo "md_file ${md_file}"
+  ` || as_fn_error $? "--enable-targets: config.gcc failed for ${gcc_mt}: \`cat ${gcc_mt_err} 2>/dev/null | tr '\n' ' '\`" "$LINENO" 5
+  echo "${gcc_mt_data}" >> ${gcc_target_manifest}
+  echo "" >> ${gcc_target_manifest}
+done
+rm -f ${gcc_mt_err}
+if test x"${gcc_extra_targets}" != x; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: additional targets: ${gcc_extra_targets}" >&5
+$as_echo "$as_me: additional targets: ${gcc_extra_targets}" >&6;}
+fi
+
 
 extra_objs="${host_extra_objs} ${extra_objs}"
 extra_gcc_objs="${host_extra_gcc_objs} ${extra_gcc_objs}"
@@ -21921,7 +22013,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21924 "configure"
+#line 22016 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22027,7 +22119,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22030 "configure"
+#line 22122 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H

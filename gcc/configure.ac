@@ -834,6 +834,22 @@ AC_ARG_ENABLE(multilib,
 [], [enable_multilib=yes])
 AC_SUBST(enable_multilib)
 
+# Additional target machines this compiler should be able to serve, beyond the
+# one named by --target.  Comma-separated list, or "all".  Compare binutils'
+# --enable-targets, which GCC has never had.
+#
+# This does not yet build additional back ends; it collects each extra target's
+# configuration so that target-specific data can be emitted per target rather
+# than frozen into the binary at configure time.
+AC_ARG_ENABLE(targets,
+[AS_HELP_STRING([--enable-targets=all|LIST],
+		[additional target machines to support])],
+[case "${enableval}" in
+  yes) AC_MSG_ERROR([--enable-targets needs "all" or a list of targets]) ;;
+  *)   ;;
+esac],
+[enable_targets=no])
+
 # Determine whether or not multiarch is enabled.
 AC_ARG_ENABLE(multiarch,
 [AS_HELP_STRING([--enable-multiarch],
@@ -1925,6 +1941,75 @@ target_gtfiles=
 
 # Collect target-machine-specific information.
 . ${srcdir}/config.gcc || exit 1
+
+# Multi-target: collect the same information for each additional target named by
+# --enable-targets.  config.gcc dispatches on ${target} and assigns tm_file &c.
+# unconditionally, so every extra target is handled by sourcing it again inside a
+# subshell; that keeps the primary target's variables above untouched and lets an
+# unsupported target fail as a non-zero exit we can report.
+#
+# The result is a manifest, one stanza per target, which later build steps read
+# to emit per-target data instead of freezing one target's values into the
+# binary.  No additional back end is compiled yet.
+gcc_extra_targets=
+case ${enable_targets} in
+  no | "")
+    ;;
+  all)
+    # config.gcc matches targets with shell globs, not literal names, so there is
+    # no honest way to enumerate "every target" from it.  Refuse rather than
+    # guess at a list.
+    AC_MSG_ERROR([--enable-targets=all is not implemented yet; pass an explicit list])
+    ;;
+  *)
+    gcc_extra_targets=`echo "${enable_targets}" | sed 's/,/ /g'`
+    ;;
+esac
+
+gcc_target_manifest=multi-target.manifest
+: > ${gcc_target_manifest}
+gcc_mt_err=conftest.mterr
+for gcc_mt in ${target} ${gcc_extra_targets}; do
+  # config.gcc validates --with-arch/--with-cpu/... against the target it is
+  # being run for.  Those options were given for the primary target, so they must
+  # not leak into an extra one: aarch64 rejects x86's --with-arch=x86-64 outright.
+  # Clear the whole with_* group along with the outputs.  (Per-target --with-arch
+  # would need its own syntax; not attempted here.)
+  gcc_mt_data=`
+    target=${gcc_mt}
+    with_arch= with_arch_32= with_arch_64=
+    with_cpu= with_cpu_32= with_cpu_64=
+    with_tune= with_tune_32= with_tune_64=
+    with_abi= with_fpu= with_float= with_mode= with_endian=
+    tm_defines= cpu_type= target_cpu_default=
+    tm_file= tm_p_file= tmake_file=
+    extra_objs= extra_options= extra_headers=
+    out_file= md_file= target_gtfiles=
+    . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
+    # config.gcc leaves these unset for most targets; the primary target gets
+    # them defaulted just below, so apply the same rules here or the manifest
+    # would claim the target has no machine description.
+    test x"${tm_file}" = x && tm_file=${cpu_type}/${cpu_type}.h
+    test x"${md_file}" = x && md_file=${cpu_type}/${cpu_type}.md
+    test x"${out_file}" = x && out_file=${cpu_type}/${cpu_type}.cc
+    echo "target ${gcc_mt}"
+    echo "cpu_type ${cpu_type}"
+    echo "tm_file ${tm_file}"
+    echo "tm_p_file ${tm_p_file}"
+    echo "tmake_file ${tmake_file}"
+    echo "extra_objs ${extra_objs}"
+    echo "extra_options ${extra_options}"
+    echo "out_file ${out_file}"
+    echo "md_file ${md_file}"
+  ` || AC_MSG_ERROR([--enable-targets: config.gcc failed for ${gcc_mt}: `cat ${gcc_mt_err} 2>/dev/null | tr '\n' ' '`])
+  echo "${gcc_mt_data}" >> ${gcc_target_manifest}
+  echo "" >> ${gcc_target_manifest}
+done
+rm -f ${gcc_mt_err}
+if test x"${gcc_extra_targets}" != x; then
+  AC_MSG_NOTICE([additional targets: ${gcc_extra_targets}])
+fi
+AC_SUBST(gcc_extra_targets)
 
 extra_objs="${host_extra_objs} ${extra_objs}"
 extra_gcc_objs="${host_extra_gcc_objs} ${extra_gcc_objs}"
