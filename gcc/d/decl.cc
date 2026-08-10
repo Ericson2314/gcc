@@ -1928,7 +1928,7 @@ finish_thunk (tree thunk, tree function)
     }
 
   if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function)
-      && targetm_common.have_named_sections)
+      && targetm_common->have_named_sections)
     {
       tree fn = function;
       symtab_node *symbol = symtab_node::get (function);

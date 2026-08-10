@@ -92,4 +92,4 @@ pdp11_option_init_struct (struct gcc_options *opts)
 #undef TARGET_OPTION_INIT_STRUCT
 #define TARGET_OPTION_INIT_STRUCT pdp11_option_init_struct
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

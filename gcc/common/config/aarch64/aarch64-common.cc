@@ -842,7 +842,7 @@ is_host_cpu_not_armv8_base (int argc, const char **argv)
   return "";
 }
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;
 
 #undef AARCH64_CPU_NAME_LENGTH
 

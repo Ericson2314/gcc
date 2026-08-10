@@ -420,7 +420,7 @@ register_moduleinfo (Module *decl, tree minfo)
   if (targetdm.d_minfo_section == NULL)
     return;
 
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     sorry ("%<-fmoduleinfo%> is not supported on this target");
 
   /* Build the ModuleInfo reference, this is done once for every Module.  */

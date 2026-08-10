@@ -235,7 +235,7 @@ init_eh (void)
 
   /* Create the SjLj_Function_Context structure.  This should match
      the definition in unwind-sjlj.c.  */
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
     {
       tree f_jbuf, f_per, f_lsda, f_prev, f_cs, f_data, tmp;
 
@@ -1529,7 +1529,7 @@ finish_eh_generation (void)
   basic_block bb;
 
   /* Construct the landing pads.  */
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
     sjlj_build_landing_pads ();
   else
     dw2_build_landing_pads ();
@@ -1566,7 +1566,7 @@ finish_eh_generation (void)
 	}
     }
 
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ
       /* Kludge for Alpha (see alpha_gp_save_rtx).  */
       || single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun))->insns.r)
     commit_edge_insertions ();
@@ -2774,7 +2774,7 @@ pass_convert_to_eh_region_ranges::gate (function *)
   /* Nothing to do for SJLJ exceptions or if no regions created.  */
   if (cfun->eh->region_tree == NULL)
     return false;
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
     return false;
   return true;
 }
@@ -2945,7 +2945,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
   if (exception_section
   /* Don't use the cached section for comdat if it will be different. */
 #ifdef HAVE_LD_EH_GC_SECTIONS
-      && !(targetm_common.have_named_sections
+      && !(targetm_common->have_named_sections
 	   && DECL_COMDAT_GROUP (current_function_decl)
 	   && HAVE_COMDAT_GROUP)
 #endif
@@ -2969,7 +2969,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 
       /* Compute the section and cache it into exception_section,
 	 unless it depends on the function name.  */
-      if (targetm_common.have_named_sections)
+      if (targetm_common->have_named_sections)
 	{
 #ifdef HAVE_LD_EH_GC_SECTIONS
 	  if (flag_function_sections
@@ -3107,7 +3107,7 @@ output_one_function_exception_table (int section)
 
   if (!HAVE_AS_LEB128)
     {
-      if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+      if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
 	call_site_len = sjlj_size_of_call_site_table ();
       else
 	call_site_len = dw2_size_of_call_site_table (section);
@@ -3178,7 +3178,7 @@ output_one_function_exception_table (int section)
       dw2_asm_output_delta_uleb128 (cs_end_label, cs_after_size_label,
 				    "Call-site table length");
       ASM_OUTPUT_LABEL (asm_out_file, cs_after_size_label);
-      if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+      if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
 	sjlj_output_call_site_table ();
       else
 	dw2_output_call_site_table (cs_format, section);
@@ -3187,7 +3187,7 @@ output_one_function_exception_table (int section)
   else
     {
       dw2_asm_output_data_uleb128 (call_site_len, "Call-site table length");
-      if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+      if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
 	sjlj_output_call_site_table ();
       else
 	dw2_output_call_site_table (cs_format, section);
@@ -3244,7 +3244,7 @@ output_function_exception_table (int section)
 {
   /* Not all functions need anything.  */
   if (!crtl->uses_eh_lsda
-      || targetm_common.except_unwind_info (&global_options) == UI_NONE)
+      || targetm_common->except_unwind_info (&global_options) == UI_NONE)
     return;
 
   /* No need to emit any boilerplate stuff for the cold part.  */

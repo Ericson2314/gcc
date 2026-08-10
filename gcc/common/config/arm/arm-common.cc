@@ -1097,7 +1097,7 @@ arm_asm_auto_mfpu (int argc, const char **argv)
 #undef TARGET_EXCEPT_UNWIND_INFO
 #define TARGET_EXCEPT_UNWIND_INFO  arm_except_unwind_info
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;
 
 /* Returns a canonical representation of the -march option from the current
    -march string (if given) and other options on the command line that might

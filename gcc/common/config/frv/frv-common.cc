@@ -42,4 +42,4 @@ along with GCC; see the file COPYING3.  If not see
    | MASK_MULTI_CE				\
    | MASK_NESTED_CE)
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

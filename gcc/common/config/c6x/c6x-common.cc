@@ -61,4 +61,4 @@ c6x_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
 #undef TARGET_EXCEPT_UNWIND_INFO
 #define TARGET_EXCEPT_UNWIND_INFO  c6x_except_unwind_info
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

@@ -66,6 +66,20 @@ struct default_options
 
 #include "common-target.def"
 
-extern struct gcc_targetm_common targetm_common;
+/* Each common/config/<cpu>/<cpu>-common.cc defines its hook table under this
+   name.  The build gives every target its own name via -D, so that more than
+   one of them can be linked into the same compiler; without that they all
+   define `targetm_common' and collide.  */
+#ifndef TARGETM_COMMON_SYMBOL
+#define TARGETM_COMMON_SYMBOL targetm_common_generic
+#endif
+
+/* The table in force.  A pointer rather than a struct so that selecting a
+   target is a pointer assignment, and -- more importantly -- so that the
+   initialiser below is a constant expression: taking the address of a global
+   needs no dynamic initialisation, and therefore has no cross-translation-unit
+   ordering hazard.  Copying a struct here would be dynamically initialised, and
+   anything running before that copy would silently see zeroed hooks.  */
+extern struct gcc_targetm_common *targetm_common;
 
 #endif /* GCC_C_TARGET_H */

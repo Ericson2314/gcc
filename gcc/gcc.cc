@@ -10289,7 +10289,7 @@ set_multilib_dir (void)
     }
 
   multilib_dir =
-    targetm_common.compute_multilib (
+    targetm_common->compute_multilib (
       switches,
       n_switches,
       multilib_dir,

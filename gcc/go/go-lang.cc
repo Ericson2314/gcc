@@ -338,7 +338,7 @@ go_langhook_post_options (const char **pfilename ATTRIBUTE_UNUSED)
     global_options.x_write_symbols = PREFERRED_DEBUGGING_TYPE;
 
   /* We turn on stack splitting if we can.  */
-  if (targetm_common.supports_split_stack (false, &global_options))
+  if (targetm_common->supports_split_stack (false, &global_options))
     SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 			 flag_split_stack, 1);
 

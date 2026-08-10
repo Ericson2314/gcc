@@ -2255,7 +2255,7 @@ default_print_patchable_function_entry (FILE *file,
   code_num = recog_memoized (my_nop);
   nop_templ = get_insn_template (code_num, my_nop);
 
-  if (record_p && targetm_common.have_named_sections)
+  if (record_p && targetm_common->have_named_sections)
     {
       char buf[256];
       section *previous_section = in_section;

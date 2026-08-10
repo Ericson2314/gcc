@@ -272,4 +272,4 @@ rs6000_supports_split_stack (bool report,
 #undef TARGET_SUPPORTS_SPLIT_STACK
 #define TARGET_SUPPORTS_SPLIT_STACK rs6000_supports_split_stack
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

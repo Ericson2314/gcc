@@ -285,7 +285,7 @@ update_path (const char *path, const char *key)
 	  && (p != result && IS_DIR_SEPARATOR (p[-1])))
 	{
 	  *p = 0;
-	  if (!targetm_common.always_strip_dotdot
+	  if (!targetm_common->always_strip_dotdot
 	      && access (result, X_OK) == 0)
 	    {
 	      *p = '.';

@@ -2137,7 +2137,7 @@ jumptable_relocatable (void)
 
   if (!CASE_VECTOR_PC_RELATIVE
       && !targetm.asm_out.generate_pic_addr_diff_vec ()
-      && targetm_common.have_named_sections)
+      && targetm_common->have_named_sections)
      relocatable = targetm.asm_out.reloc_rw_mask ();
 
   return relocatable;

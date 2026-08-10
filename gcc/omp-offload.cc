@@ -412,7 +412,7 @@ omp_finish_file (void)
   if (num_funcs == 0 && num_vars == 0 && num_ind_funcs == 0)
     return;
 
-  if (targetm_common.have_named_sections)
+  if (targetm_common->have_named_sections)
     {
       vec<constructor_elt, va_gc> *v_f, *v_v, *v_if;
       vec_alloc (v_f, num_funcs);

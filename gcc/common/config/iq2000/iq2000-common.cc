@@ -24,4 +24,4 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

@@ -1391,7 +1391,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define STACK_OLD_CHECK_PROTECT						\
  (!global_options.x_flag_exceptions					\
   ? 75 * UNITS_PER_WORD							\
-  : targetm_common.except_unwind_info (&global_options) == UI_SJLJ	\
+  : targetm_common->except_unwind_info (&global_options) == UI_SJLJ	\
     ? 4 * 1024								\
     : 8 * 1024)
 #endif
@@ -1403,7 +1403,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define STACK_CHECK_PROTECT						\
  (!global_options.x_flag_exceptions					\
   ? 4 * 1024								\
-  : targetm_common.except_unwind_info (&global_options) == UI_SJLJ	\
+  : targetm_common->except_unwind_info (&global_options) == UI_SJLJ	\
     ? 8 * 1024								\
     : 12 * 1024)
 #endif

@@ -450,11 +450,11 @@ d_init_versions (void)
   else
     VersionCondition::addPredefinedGlobalIdent ("LittleEndian");
 
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
     VersionCondition::addPredefinedGlobalIdent ("GNU_SjLj_Exceptions");
-  else if (targetm_common.except_unwind_info (&global_options) == UI_SEH)
+  else if (targetm_common->except_unwind_info (&global_options) == UI_SEH)
     VersionCondition::addPredefinedGlobalIdent ("GNU_SEH_Exceptions");
-  else if (targetm_common.except_unwind_info (&global_options) == UI_DWARF2)
+  else if (targetm_common->except_unwind_info (&global_options) == UI_DWARF2)
     VersionCondition::addPredefinedGlobalIdent ("GNU_DWARF2_Exceptions");
 
   if (!targetm.have_tls)

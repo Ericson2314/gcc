@@ -1032,7 +1032,7 @@ static tree
 d_handle_section_attribute (tree *node, tree name, tree args, int flags,
 			    bool *no_add_attrs)
 {
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     {
       error ("section attributes are not supported for this target");
       *no_add_attrs = true;

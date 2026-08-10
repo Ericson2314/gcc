@@ -486,7 +486,7 @@ resolve_unique_section (tree decl, int reloc ATTRIBUTE_UNUSED,
 			int flag_function_or_data_sections)
 {
   if (DECL_SECTION_NAME (decl) == NULL
-      && targetm_common.have_named_sections
+      && targetm_common->have_named_sections
       && (flag_function_or_data_sections
 	  || lookup_attribute ("retain", DECL_ATTRIBUTES (decl))
 	  || DECL_COMDAT_GROUP (decl)))
@@ -537,7 +537,7 @@ hot_function_section (tree decl)
 {
   if (decl != NULL_TREE
       && DECL_SECTION_NAME (decl) != NULL
-      && targetm_common.have_named_sections)
+      && targetm_common->have_named_sections)
     return get_named_section (decl, NULL, 0);
   else
     return text_section;
@@ -608,7 +608,7 @@ default_function_section (tree decl, enum node_frequency freq,
 #endif
 
   if (!flag_reorder_functions
-      || !targetm_common.have_named_sections)
+      || !targetm_common->have_named_sections)
     return NULL;
   /* Startup code should go to startup subsection unless it is
      unlikely executed (this happens especially with function splitting

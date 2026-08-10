@@ -129,7 +129,7 @@ option_proposer::build_option_suggestions (const char *prefix)
 	      if (option->flags & CL_TARGET)
 		{
 		  vec<const char *> option_values
-		    = targetm_common.get_valid_option_values (i, prefix);
+		    = targetm_common->get_valid_option_values (i, prefix);
 		  if (!option_values.is_empty ())
 		    {
 		      option_added = true;

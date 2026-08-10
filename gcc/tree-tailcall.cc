@@ -181,7 +181,7 @@ suitable_for_tail_call_opt_p (gcall *call, bool diag_musttail)
   /* If we are using sjlj exceptions, we may need to add a call to
      _Unwind_SjLj_Unregister at exit of the function.  Which means
      that we cannot do any sibcall transformations.  */
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ
       && current_function_has_exception_handlers ())
     {
       maybe_error_musttail (call, _("caller uses sjlj exceptions"),

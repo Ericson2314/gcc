@@ -1266,7 +1266,7 @@ record_new_stack_level (void)
     update_nonlocal_goto_save_area ();
 
   /* Record the new stack level for SJLJ exceptions.  */
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ)
+  if (targetm_common->except_unwind_info (&global_options) == UI_SJLJ)
     update_sjlj_context ();
 }
 

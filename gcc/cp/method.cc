@@ -338,7 +338,7 @@ use_thunk (tree thunk_fndecl, bool emit_p)
   push_to_top_level ();
 
   if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function)
-      && targetm_common.have_named_sections)
+      && targetm_common->have_named_sections)
     {
       tree fn = function;
       struct symtab_node *symbol;

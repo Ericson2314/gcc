@@ -199,7 +199,7 @@ a68_switch_to_export_section (void)
 
   if (exports_sec == NULL)
     {
-      gcc_assert (targetm_common.have_named_sections);
+      gcc_assert (targetm_common->have_named_sections);
 #ifdef OBJECT_FORMAT_MACHO
       exports_sec
 	= get_section (A68_EXPORT_SEGMENT_NAME "," A68_EXPORT_SECTION_NAME,

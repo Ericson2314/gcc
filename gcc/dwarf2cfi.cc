@@ -3263,7 +3263,7 @@ create_cie_data (void)
   def_cfa_1 (&loc);
 
   if (targetm.debug_unwind_info () == UI_DWARF2
-      || targetm_common.except_unwind_info (&global_options) == UI_DWARF2)
+      || targetm_common->except_unwind_info (&global_options) == UI_DWARF2)
     {
       initial_return_save (INCOMING_RETURN_ADDR_RTX);
 
@@ -3705,7 +3705,7 @@ dwarf2out_do_eh_frame (void)
 {
   return
     (flag_unwind_tables || flag_exceptions)
-    && targetm_common.except_unwind_info (&global_options) == UI_DWARF2;
+    && targetm_common->except_unwind_info (&global_options) == UI_DWARF2;
 }
 
 /* Decide whether we want to emit frame unwind information for the current

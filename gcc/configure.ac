@@ -1980,6 +1980,8 @@ else
   gcc_manifest_targets="${target}"
 fi
 
+gcc_all_common_objects=
+gcc_all_common_symbols=
 gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
@@ -1999,6 +2001,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     tm_file= tm_p_file= tmake_file=
     extra_objs= extra_options= extra_headers=
     out_file= md_file= target_gtfiles=
+    common_out_file= target_has_targetm_common=
     . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
     # config.gcc leaves these unset for most targets; the primary target gets
     # them defaulted just below, so apply the same rules here or the manifest
@@ -2008,6 +2011,12 @@ for gcc_mt in ${gcc_manifest_targets}; do
     test x"${out_file}" = x && out_file=${cpu_type}/${cpu_type}.cc
     echo "target ${gcc_mt}"
     echo "cpu_type ${cpu_type}"
+    # Which common-hook table this target uses, and the name it will be
+    # compiled under.  Recorded per target so that several can be built and
+    # linked together; config.gcc applies this defaulting itself, after the
+    # per-target clauses have had their say.
+    echo "common_out_file ${common_out_file}"
+    echo "common_out_symbol targetm_common_`basename ${common_out_file} .cc | sed 's/-/_/g'`"
     echo "tm_file ${tm_file}"
     echo "tm_p_file ${tm_p_file}"
     echo "tmake_file ${tmake_file}"
@@ -2018,8 +2027,24 @@ for gcc_mt in ${gcc_manifest_targets}; do
   ` || AC_MSG_ERROR([--enable-targets: config.gcc failed for ${gcc_mt}: `cat ${gcc_mt_err} 2>/dev/null | tr '\n' ' '`])
   echo "${gcc_mt_data}" >> ${gcc_target_manifest}
   echo "" >> ${gcc_target_manifest}
+
+  # Collect each target's common-hook table so the build can compile all of
+  # them.  Duplicates are real: several targets share one common file (and every
+  # target without its own uses default-common.cc), so the same object must not
+  # be listed, or built, twice.
+  gcc_mt_cof=`echo "${gcc_mt_data}" | sed -n 's/^common_out_file //p'`
+  gcc_mt_sym=`echo "${gcc_mt_data}" | sed -n 's/^common_out_symbol //p'`
+  gcc_mt_obj=`basename ${gcc_mt_cof} .cc`.o
+  case " ${gcc_all_common_objects} " in
+    *" ${gcc_mt_obj} "*) ;;
+    *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
+       gcc_all_common_symbols="${gcc_all_common_symbols} ${gcc_mt_sym}"
+       ;;
+  esac
 done
 rm -f ${gcc_mt_err}
+AC_SUBST(gcc_all_common_objects)
+AC_SUBST(gcc_all_common_symbols)
 if test x"${gcc_extra_targets}" != x; then
   AC_MSG_NOTICE([additional targets: ${gcc_extra_targets}])
 fi
@@ -2504,6 +2529,18 @@ tmake_file="${tmake_file_}${omp_device_property_tmake_file}"
 
 out_object_file=`basename $out_file .cc`.o
 common_out_object_file=`basename $common_out_file .cc`.o
+
+# Name this target's common hook table is defined under.  Every target used to
+# call it `targetm_common', which is why two of them could never be linked into
+# the same compiler.  Derived from the file name so it needs no new data, and
+# sanitised because it becomes a C identifier.
+# NB: no brackets in the sed expression.  `[' and `]' are m4 quote characters, so
+# a character class here is silently eaten and the substitution never happens --
+# which produced `targetm_common_i386-common' and a compile error on the `-'.
+# Hyphen is the only character these file names contain that a C identifier
+# cannot, so replacing it directly avoids the problem entirely.
+common_out_symbol=targetm_common_`basename $common_out_file .cc | sed 's/-/_/g'`
+AC_SUBST(common_out_symbol)
 
 tm_file_list="options.h"
 tm_include_list="options.h insn-constants.h"

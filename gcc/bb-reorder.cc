@@ -1725,7 +1725,7 @@ find_rarely_executed_basic_blocks_and_crossing_edges (void)
   if (cfun->eh->lp_array)
     {
       const bool sjlj
-	= (targetm_common.except_unwind_info (&global_options) == UI_SJLJ);
+	= (targetm_common->except_unwind_info (&global_options) == UI_SJLJ);
       unsigned i;
       eh_landing_pad lp;
 

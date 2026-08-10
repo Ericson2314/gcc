@@ -8691,7 +8691,7 @@ pa_asm_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 	   && !(flag_pic && TREE_PUBLIC (function))
 	   && (TARGET_GAS || last_address < 262132))
 	  || (!TARGET_LONG_CALLS && !TARGET_SOM && !TARGET_PORTABLE_RUNTIME
-	      && ((targetm_common.have_named_sections
+	      && ((targetm_common->have_named_sections
 		   && DECL_SECTION_NAME (thunk_fndecl) != NULL
 		   /* The GNU 64-bit linker has rather poor stub management.
 		      So, we use a long branch from thunks that aren't in
@@ -8705,12 +8705,12 @@ pa_asm_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 		  /* In this case, we need to be able to reach the start of
 		     the stub table even though the function is likely closer
 		     and can be jumped to directly.  */
-		  || (targetm_common.have_named_sections
+		  || (targetm_common->have_named_sections
 		      && DECL_SECTION_NAME (thunk_fndecl) == NULL
 		      && DECL_SECTION_NAME (function) == NULL
 		      && total_code_bytes < MAX_PCREL17F_OFFSET)
 		  /* Likewise.  */
-		  || (!targetm_common.have_named_sections
+		  || (!targetm_common->have_named_sections
 		      && total_code_bytes < MAX_PCREL17F_OFFSET))))
 	{
 	  if (!val_14)
@@ -8937,7 +8937,7 @@ pa_asm_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 	   && !(flag_pic && TREE_PUBLIC (function))
 	   && (TARGET_GAS || last_address < 262132))
 	  || (!TARGET_LONG_CALLS && !TARGET_SOM && !TARGET_PORTABLE_RUNTIME
-	      && ((targetm_common.have_named_sections
+	      && ((targetm_common->have_named_sections
 		   && DECL_SECTION_NAME (thunk_fndecl) != NULL
 		   /* The GNU 64-bit linker has rather poor stub management.
 		      So, we use a long branch from thunks that aren't in
@@ -8951,12 +8951,12 @@ pa_asm_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 		  /* In this case, we need to be able to reach the start of
 		     the stub table even though the function is likely closer
 		     and can be jumped to directly.  */
-		  || (targetm_common.have_named_sections
+		  || (targetm_common->have_named_sections
 		      && DECL_SECTION_NAME (thunk_fndecl) == NULL
 		      && DECL_SECTION_NAME (function) == NULL
 		      && total_code_bytes < MAX_PCREL17F_OFFSET)
 		  /* Likewise.  */
-		  || (!targetm_common.have_named_sections
+		  || (!targetm_common->have_named_sections
 		      && total_code_bytes < MAX_PCREL17F_OFFSET))))
 	{
 	  nbytes += 4;
@@ -10829,7 +10829,7 @@ pa_function_section (tree decl, enum node_frequency freq,
 		     bool startup, bool exit)
 {
   /* Put functions in text section if target doesn't have named sections.  */
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     return text_section;
 
   /* Force nested functions into the same section as the containing

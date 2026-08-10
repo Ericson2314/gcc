@@ -160,6 +160,6 @@ nds32_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
 
 /* ------------------------------------------------------------------------ */
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;
 
 /* ------------------------------------------------------------------------ */

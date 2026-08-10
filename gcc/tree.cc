@@ -10297,7 +10297,7 @@ build_common_builtin_nodes (void)
   ftype = build_function_type_list (void_type_node, ptr_type_node, NULL_TREE);
   local_define_builtin ("__builtin_unwind_resume", ftype,
 			BUILT_IN_UNWIND_RESUME,
-			((targetm_common.except_unwind_info (&global_options)
+			((targetm_common->except_unwind_info (&global_options)
 			  == UI_SJLJ)
 			 ? "_Unwind_SjLj_Resume" : "_Unwind_Resume"),
 			ECF_NORETURN | ECF_XTHROW);

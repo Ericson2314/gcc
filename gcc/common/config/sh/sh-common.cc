@@ -152,4 +152,4 @@ sh_handle_option (struct gcc_options *opts,
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION sh_handle_option
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

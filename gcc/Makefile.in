@@ -600,6 +600,7 @@ out_file=$(srcdir)/config/@out_file@
 out_object_file=@out_object_file@
 common_out_file=$(srcdir)/common/config/@common_out_file@
 common_out_object_file=@common_out_object_file@
+common_out_symbol=@common_out_symbol@
 EXTRA_GTYPE_DEPS=
 md_file=$(srcdir)/common.md $(srcdir)/config/@md_file@
 tm_file_list=@tm_file_list@
@@ -1929,7 +1930,7 @@ OBJS-libcommon = \
 
 # Objects in libcommon-target.a, used by drivers and by the core
 # compiler and containing target-dependent code.
-OBJS-libcommon-target = $(common_out_object_file) prefix.o \
+OBJS-libcommon-target = $(common_out_object_file) common/common-target-select.o prefix.o \
 	opts.o opts-common.o opts-diagnostic.o options.o \
 	vec.o hooks.o common/common-targhooks.o \
 	hash-table.o file-find.o spellcheck.o selftest.o opt-suggestions.o \
@@ -2870,8 +2871,14 @@ $(out_object_file): $(out_file)
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+# Compiled under a name of its own so that several targets' tables can coexist.
 $(common_out_object_file): $(common_out_file)
-	$(COMPILE) $<
+	$(COMPILE) -DTARGETM_COMMON_SYMBOL=$(common_out_symbol) $<
+	$(POSTCOMPILE)
+
+# Names which of those tables is in force; needs the same -D.
+common/common-target-select.o: $(srcdir)/common/common-target-select.cc
+	$(COMPILE) -DTARGETM_COMMON_SYMBOL=$(common_out_symbol) $<
 	$(POSTCOMPILE)
 #
 # Generate header and source files from the machine description,

@@ -4221,7 +4221,7 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
   /* On SEH targets, install an exception handler around the main entry
      point to catch unhandled exceptions.  */
   if (DECL_NAME (gnu_subprog) == main_identifier_node
-      && targetm_common.except_unwind_info (&global_options) == UI_SEH)
+      && targetm_common->except_unwind_info (&global_options) == UI_SEH)
     {
       tree t;
       tree etype;

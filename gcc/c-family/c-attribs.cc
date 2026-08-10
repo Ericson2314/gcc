@@ -2616,7 +2616,7 @@ handle_section_attribute (tree *node, tree name, tree args,
   tree argval = TREE_VALUE (args);
   const char* new_section_name;
 
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     {
       error_at (DECL_SOURCE_LOCATION (*node),
 		"section attributes are not supported for this target");
@@ -3076,7 +3076,7 @@ handle_special_var_sec_attribute (tree *node, tree name, tree args,
 
   /* First perform generic validation common to "noinit" and "persistent"
      attributes.  */
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     {
       error_at (DECL_SOURCE_LOCATION (decl),
 		"section attributes are not supported for this target");

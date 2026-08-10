@@ -988,7 +988,7 @@ dwarf2out_do_cfi_startproc (bool second)
 
   /* .cfi_personality and .cfi_lsda are only relevant to DWARF2
      eh unwinders.  */
-  if (targetm_common.except_unwind_info (&global_options) != UI_DWARF2)
+  if (targetm_common->except_unwind_info (&global_options) != UI_DWARF2)
     return;
 
   rtx personality = get_personality_function (current_function_decl);
@@ -1086,7 +1086,7 @@ dwarf2out_begin_prologue (unsigned int line ATTRIBUTE_UNUSED,
      call-site information.  We must emit this label if it might be used.  */
   if (!do_frame
       && (!flag_exceptions
-	  || targetm_common.except_unwind_info (&global_options) == UI_SJLJ))
+	  || targetm_common->except_unwind_info (&global_options) == UI_SJLJ))
     return;
 
   fnsec = function_section (current_function_decl);

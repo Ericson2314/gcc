@@ -64,4 +64,4 @@ msp430_handle_option (struct gcc_options *opts ATTRIBUTE_UNUSED,
 #undef  TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION			msp430_handle_option
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

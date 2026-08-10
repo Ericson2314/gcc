@@ -88,7 +88,7 @@ rust_write_export_data (const char *bytes, unsigned int size)
 
   if (sec == NULL)
     {
-      gcc_assert (targetm_common.have_named_sections);
+      gcc_assert (targetm_common->have_named_sections);
       sec = get_section (RUST_EXPORT_SECTION_NAME,
 			 TARGET_AIX_OS ? SECTION_EXCLUDE : SECTION_DEBUG, NULL);
     }

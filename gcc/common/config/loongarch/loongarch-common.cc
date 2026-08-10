@@ -40,4 +40,4 @@ static const struct default_options loongarch_option_optimization_table[] =
   { OPT_LEVELS_NONE, 0, NULL, 0 }
 };
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

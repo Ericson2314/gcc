@@ -3427,7 +3427,7 @@ process_attributes (tree *node, struct attrib **attr_list, bool in_place,
 	break;
 
       case ATTR_LINK_SECTION:
-	if (targetm_common.have_named_sections)
+	if (targetm_common->have_named_sections)
 	  {
 	    set_decl_section_name (*node, IDENTIFIER_POINTER (attr->name));
 	    DECL_COMMON (*node) = 0;

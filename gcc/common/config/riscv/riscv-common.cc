@@ -2365,4 +2365,4 @@ static const struct default_options riscv_option_optimization_table[] =
 #undef  TARGET_GET_VALID_OPTION_VALUES
 #define TARGET_GET_VALID_OPTION_VALUES riscv_get_valid_option_values
 
-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+struct gcc_targetm_common TARGETM_COMMON_SYMBOL = TARGETM_COMMON_INITIALIZER;

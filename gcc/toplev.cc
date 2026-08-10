@@ -1590,7 +1590,7 @@ process_options ()
 		     "cannot open %s: %m", aux_info_file_name);
     }
 
-  if (!targetm_common.have_named_sections)
+  if (!targetm_common->have_named_sections)
     {
       if (flag_function_sections)
 	{
