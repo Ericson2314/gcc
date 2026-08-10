@@ -51,3 +51,12 @@ along with GCC.  If not, see <http://www.gnu.org/licenses/>.
   "%{!shared: %{pg|p|profile:%{static:gcrt0.o%s;:gcrt1.o%s};static:crt0.o%s;:crt1.o%s}} \
    crti.o%s %{static:crtbeginT.o%s;shared:crtbeginS.o%s;:crtbegin.o%s}"
 #endif
+
+/* See config/linux.h.  */
+#define TARGET_FHARDENED_SUPPORTED 1
+
+/* glibc's ld.so honours STB_GNU_UNIQUE, so @gnu_unique_object may be used.
+   This was previously the configure-time HAVE_GAS_GNU_UNIQUE_OBJECT probe,
+   which combined an assembler check with a glibc >= 2.11 version check.  */
+#undef USE_GNU_UNIQUE_OBJECT
+#define USE_GNU_UNIQUE_OBJECT (OPTION_GLIBC ? flag_gnu_unique : 0)

@@ -106,10 +106,8 @@ along with GCC; see the file COPYING3.  If not see
       }									\
   } while (0)
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
 /* i386 glibc provides __stack_chk_guard in %gs:0x14.  */
 #define TARGET_THREAD_SSP_OFFSET	0x14
 
 /* i386 glibc provides __private_ss in %gs:0x30.  */
 #define TARGET_THREAD_SPLIT_STACK_OFFSET 0x30
-#endif

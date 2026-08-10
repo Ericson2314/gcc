@@ -33,7 +33,7 @@ output=$1
 rm -f ${output}T
 
 # This converts a file name into header guard macro format.
-hg_sed_expr='y,abcdefghijklmnopqrstuvwxyz./,ABCDEFGHIJKLMNOPQRSTUVWXYZ__,'
+hg_sed_expr='y,abcdefghijklmnopqrstuvwxyz./-,ABCDEFGHIJKLMNOPQRSTUVWXYZ___,'
 header_guard=GCC_`echo ${output} | sed -e ${hg_sed_expr}`
 
 # Add multiple inclusion protection guard, part one.
@@ -87,12 +87,16 @@ if [ -n "$HEADERS" ]; then
     fi
 fi
 
-# If this is tm.h, now include insn-flags.h only if IN_GCC is defined
+# If this is a tm header, now include insn-flags.h only if IN_GCC is defined
 # but neither GENERATOR_FILE nor USED_FOR_TARGET is defined.  (Much of this
 # is temporary.)
+#
+# Multi-target: the per-back-end copies are called tm-<base>.h, and they need
+# the same tail as tm.h -- otherwise they are not drop-in replacements for it
+# and anything compiled against one is missing the insn-* declarations.
 
 case $output in
-    tm.h )
+    tm.h | tm-*.h )
         cat >> ${output}T <<EOF
 #if defined IN_GCC && !defined GENERATOR_FILE && !defined USED_FOR_TARGET
 # include "insn-flags.h"
@@ -102,6 +106,14 @@ case $output in
 #endif
 EOF
     ;;
+esac
+
+# A tm header is not usable without defaults.h -- it is where TARGET_UNIT and
+# friends come from -- and it has to come last, after the insn-* headers.  The
+# single-target tm_include_list ends with it; the per-back-end lists do not, so
+# supply it here rather than let each caller remember.
+case $output in
+    tm.h | tm-*.h ) postpone_defaults_h="yes" ;;
 esac
 
 # If we postponed including defaults.h, add the #include now.

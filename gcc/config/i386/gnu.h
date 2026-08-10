@@ -24,8 +24,6 @@ along with GCC.  If not, see <http://www.gnu.org/licenses/>.
 #undef GNU_USER_DYNAMIC_LINKER
 #define GNU_USER_DYNAMIC_LINKER "/lib/ld.so"
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
-
 /* i386 glibc provides __stack_chk_guard in %gs:0x14.  */
 #define TARGET_THREAD_SSP_OFFSET        0x14
 
@@ -37,4 +35,3 @@ along with GCC.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 /* We steal the last transactional memory word.  */
 #define TARGET_THREAD_SPLIT_STACK_OFFSET 0x30
-#endif

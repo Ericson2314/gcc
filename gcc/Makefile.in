@@ -561,7 +561,7 @@ LINKER_PLUGIN_API_H = $(srcdir)/../include/plugin-api.h
 NATIVE_SYSTEM_HEADER_DIR = @NATIVE_SYSTEM_HEADER_DIR@
 # Default cross SYSTEM_HEADER_DIR, to be overridden by targets.
 ifeq (@includedir@,$(prefix)/include)
-  CROSS_SYSTEM_HEADER_DIR = @CROSS_SYSTEM_HEADER_DIR@
+  CROSS_SYSTEM_HEADER_DIR = @includedir@
 else
   CROSS_SYSTEM_HEADER_DIR = @includedir@
 endif
@@ -585,8 +585,6 @@ LIMITS_H_TEST = [ -f $(BUILD_SYSTEM_HEADER_DIR)/limits.h ]
 
 # Directory for prefix to system directories, for
 # each of $(system_prefix)/usr/include, $(system_prefix)/usr/lib, etc.
-TARGET_SYSTEM_ROOT = @TARGET_SYSTEM_ROOT@
-TARGET_SYSTEM_ROOT_DEFINE = @TARGET_SYSTEM_ROOT_DEFINE@
 
 xmake_file=@xmake_file@
 tmake_file=@tmake_file@
@@ -601,6 +599,17 @@ common_out_symbol=@common_out_symbol@
 # Every target's common hook table, one object each, deduplicated by configure
 # (several targets share a common file, and any target without one of its own
 # uses default-common.cc).
+# Every target this compiler serves.
+enabled_targets=@gcc_manifest_targets@
+
+# The one the testsuite is currently exercising.  The suite asks the compiler
+# what it is targeting -- `istarget' and friends match on the triple -- and a
+# compiler serving several cannot answer that on its own, so it is named here.
+# Defaults to the first configured target; run the suite once per target to
+# cover them all:
+#     make check-gcc TEST_TARGET=vax-unknown-linux-gnu
+TEST_TARGET=$(firstword $(enabled_targets))
+
 gcc_all_common_objects=@gcc_all_common_objects@
 gcc_all_common_symbols=@gcc_all_common_symbols@
 
@@ -639,7 +648,6 @@ lang_opt_files=@lang_opt_files@ $(srcdir)/c-family/c.opt $(srcdir)/common.opt $(
 lang_specs_files=@lang_specs_files@
 lang_tree_files=@lang_tree_files@
 target_cpu_default=@target_cpu_default@
-OBJC_BOEHM_GC=@objc_boehm_gc@
 extra_modes_file=@extra_modes_file@
 extra_opt_files=@extra_opt_files@
 host_hook_obj=@out_host_hook_obj@
@@ -1196,6 +1204,23 @@ BUILD_RTL = build/rtl.o build/read-rtl.o build/ggc-none.o \
 BUILD_MD = build/read-md.o
 BUILD_ERRORS = build/errors.o
 
+# Rules for the per-back-end machine-description generators and headers
+# (build/genmodes-<base>, build/genpreds-<base>, tm-preds-<base>.h,
+# tm-constrs-<base>.h, tm_p-<base>.h).  Unlike the per-target rules in
+# multi-target-common.mk these need no help from configure: everything they
+# depend on -- each back end's md_file and tm_p_file -- is already recorded
+# in multi-target.manifest, so derive them here.
+#
+# This has to sit after BUILD_RTL and friends, whose values the generated
+# rules name as prerequisites (prerequisites are expanded as the makefile is
+# read), and before the genprog* lists are used to build the generators,
+# since the fragment appends to genprogerr.
+multi-target-md.mk: multi-target.manifest $(srcdir)/gen-multi-target-md.awk
+	$(AWK) -v srcdir=$(srcdir) -f $(srcdir)/gen-multi-target-md.awk \
+	  multi-target.manifest > tmp-multi-target-md.mk
+	$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-md.mk $@
+-include multi-target-md.mk
+
 # Specify the directories to be searched for header files.
 # Both . and srcdir are used, in that order,
 # so that *config.h will be found in the compilation
@@ -1237,8 +1262,7 @@ LANG_MAKEFRAGS = @all_lang_makefrags@
 LIBGCCJIT_VERSION_NUM = @libgccjit_version@
 LD_VERSION_SCRIPT_OPTION = @ld_version_script_option@
 LD_SONAME_OPTION = @ld_soname_option@
-@ENABLE_DARWIN_AT_RPATH_TRUE@DARWIN_RPATH = @rpath
-@ENABLE_DARWIN_AT_RPATH_FALSE@DARWIN_RPATH = ${libdir}
+DARWIN_RPATH = ${libdir}
 
 # Flags to pass to recursive makes.
 # CC is set by configure.
@@ -2167,12 +2191,9 @@ cs-tconfig.h: Makefile
 	$(SHELL) $(srcdir)/mkconfig.sh tconfig.h
 
 cs-tm.h: Makefile
-@ENABLE_DARWIN_AT_RPATH_FALSE@	TARGET_CPU_DEFAULT="$(target_cpu_default)" \
-@ENABLE_DARWIN_AT_RPATH_FALSE@	HEADERS="$(tm_include_list)" DEFINES="$(tm_defines)" \
-@ENABLE_DARWIN_AT_RPATH_FALSE@	$(SHELL) $(srcdir)/mkconfig.sh tm.h
-@ENABLE_DARWIN_AT_RPATH_TRUE@	TARGET_CPU_DEFAULT="$(target_cpu_default)" \
-@ENABLE_DARWIN_AT_RPATH_TRUE@	HEADERS="$(tm_include_list)" DEFINES="$(tm_defines) DARWIN_AT_RPATH=1" \
-@ENABLE_DARWIN_AT_RPATH_TRUE@	$(SHELL) $(srcdir)/mkconfig.sh tm.h
+	TARGET_CPU_DEFAULT="$(target_cpu_default)" \
+	HEADERS="$(tm_include_list)" DEFINES="$(tm_defines)" \
+	$(SHELL) $(srcdir)/mkconfig.sh tm.h
 
 cs-tm_p.h: Makefile
 	TARGET_CPU_DEFAULT="" \
@@ -2545,27 +2566,20 @@ libgcc.mvars: config.status Makefile specs xgcc$(exeext)
 # switches.
 multilib.h: s-mlib; @true
 s-mlib: $(srcdir)/genmultilib Makefile
-	if test @enable_multilib@ = yes \
-	   || test -n "$(MULTILIB_OSDIRNAMES)"; then \
-	  $(SHELL) $(srcdir)/genmultilib \
-	    "$(MULTILIB_OPTIONS)" \
-	    "$(MULTILIB_DIRNAMES)" \
-	    "$(MULTILIB_MATCHES)" \
-	    "$(MULTILIB_EXCEPTIONS)" \
-	    "$(MULTILIB_EXTRA_OPTS)" \
-	    "$(MULTILIB_EXCLUSIONS)" \
-	    "$(MULTILIB_OSDIRNAMES)" \
-	    "$(MULTILIB_REQUIRED)" \
-	    "$(if $(MULTILIB_OSDIRNAMES),,$(MULTIARCH_DIRNAME))" \
-	    "$(MULTILIB_REUSE)" \
-	    "$(if $(with_multi_buildlist),true,false)" \
-	    "@enable_multilib@" \
-	    > tmp-mlib.h; \
-	else \
-	  $(SHELL) $(srcdir)/genmultilib '' '' '' '' '' '' '' '' \
-	    "$(MULTIARCH_DIRNAME)" '' 'false' no \
-	    > tmp-mlib.h; \
-	fi
+	$(SHELL) $(srcdir)/genmultilib \
+	  "$(MULTILIB_OPTIONS)" \
+	  "$(MULTILIB_DIRNAMES)" \
+	  "$(MULTILIB_MATCHES)" \
+	  "$(MULTILIB_EXCEPTIONS)" \
+	  "$(MULTILIB_EXTRA_OPTS)" \
+	  "$(MULTILIB_EXCLUSIONS)" \
+	  "$(MULTILIB_OSDIRNAMES)" \
+	  "$(MULTILIB_REQUIRED)" \
+	  "$(if $(MULTILIB_OSDIRNAMES),,$(MULTIARCH_DIRNAME))" \
+	  "$(MULTILIB_REUSE)" \
+	  "$(if $(with_multi_buildlist),true,false)" \
+	  yes \
+	  > tmp-mlib.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-mlib.h multilib.h
 	$(STAMP) s-mlib
 #
@@ -2596,15 +2610,15 @@ gcc-ranlib$(exeext): gcc-ranlib.o $(AR_OBJS) $(LIBDEPS)
 
 CFLAGS-gcc-ar.o += $(DRIVER_DEFINES) \
 	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
-	@TARGET_SYSTEM_ROOT_DEFINE@ -DPERSONALITY=\"ar\"
+	-DPERSONALITY=\"ar\"
 
 CFLAGS-gcc-ranlib.o += $(DRIVER_DEFINES) \
 	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
-	@TARGET_SYSTEM_ROOT_DEFINE@ -DPERSONALITY=\"ranlib\"
+	-DPERSONALITY=\"ranlib\"
 
 CFLAGS-gcc-nm.o += $(DRIVER_DEFINES) \
 	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
-	@TARGET_SYSTEM_ROOT_DEFINE@ -DPERSONALITY=\"nm\"
+	-DPERSONALITY=\"nm\"
 
 # ??? the implicit rules dont trigger if the source file has a different name
 # so copy instead
@@ -2624,7 +2638,6 @@ collect2$(exeext): $(COLLECT2_OBJS) $(LIBDEPS)
 	mv -f T$@ $@
 
 CFLAGS-collect2.o += -DTARGET_MACHINE=\"$(target_noncanonical)\" \
-	@TARGET_SYSTEM_ROOT_DEFINE@
 
 LTO_WRAPPER_OBJS = lto-wrapper.o collect-utils.o ggc-none.o lockfile.o \
   lto-ltrans-cache.o
@@ -2636,7 +2649,7 @@ lto-wrapper$(exeext): $(LTO_WRAPPER_OBJS) libcommon-target.a $(LIBDEPS)
 
 # Files used by all variants of C or by the stand-alone pre-processor.
 
-CFLAGS-c-family/c-opts.o += @TARGET_SYSTEM_ROOT_DEFINE@
+
 
 CFLAGS-c-family/c-pch.o += -DHOST_MACHINE=\"$(host)\" \
 	-DTARGET_MACHINE=\"$(target)\"
@@ -2678,7 +2691,6 @@ DRIVER_DEFINES = \
   -DSTANDARD_BINDIR_PREFIX=\"$(bindir)/\" \
   -DTOOLDIR_BASE_PREFIX=\"$(libsubdir_to_prefix)$(prefix_to_exec_prefix)\" \
   -DACCEL_DIR_SUFFIX=\"$(accel_dir_suffix)\" \
-  @TARGET_SYSTEM_ROOT_DEFINE@ \
   $(VALGRIND_DRIVER_DEFINES) \
   $(if $(SHLIB),$(if $(filter yes,@enable_shared@),-DENABLE_SHARED_LIBGCC)) \
   -DCONFIGURE_SPECS="\"@CONFIGURE_SPECS@\"" \
@@ -3621,7 +3633,6 @@ PREPROCESSOR_DEFINES = \
   -DNATIVE_SYSTEM_HEADER_DIR=\"$(NATIVE_SYSTEM_HEADER_DIR)\" \
   -DPREFIX=\"$(prefix)/\" \
   -DSTANDARD_EXEC_PREFIX=\"$(libdir)/gcc/\" \
-  @TARGET_SYSTEM_ROOT_DEFINE@
 
 CFLAGS-cppbuiltin.o += $(PREPROCESSOR_DEFINES) -DBASEVER=$(BASEVER_s)
 cppbuiltin.o: $(BASEVER)
@@ -4757,8 +4768,8 @@ site.exp: ./config.status Makefile testsuite/et-static.exp
 	@echo "set srcdir \"`cd ${srcdir}; ${PWD_COMMAND}`\"" >> ./site.tmp
 	@echo "set host_triplet $(host)" >> ./site.tmp
 	@echo "set build_triplet $(build)" >> ./site.tmp
-	@echo "set target_triplet $(target)" >> ./site.tmp
-	@echo "set target_alias $(target_noncanonical)" >> ./site.tmp
+	@echo "set target_triplet $(TEST_TARGET)" >> ./site.tmp
+	@echo "set target_alias $(TEST_TARGET)" >> ./site.tmp
 	@echo "set libiconv \"$(LIBICONV)\"" >> ./site.tmp
 # CFLAGS is set even though it's empty to show we reserve the right to set it.
 	@echo "set CFLAGS \"\"" >> ./site.tmp
@@ -4818,9 +4829,6 @@ site.exp: ./config.status Makefile testsuite/et-static.exp
 	@if [ "X$(COMPAT_OPTIONS)" != "X" ] ; then \
 	  echo "set COMPAT_OPTIONS \"$(COMPAT_OPTIONS)\"" >> ./site.tmp; \
 	else true; \
-	fi
-	@if test "X@ENABLE_DARWIN_AT_RPATH_TRUE@" != "X#" ; then \
-	  echo "set ENABLE_DARWIN_AT_RPATH 1" >> ./site.tmp; \
 	fi
 	@echo "## All variables above are generated by configure. Do Not Edit ##" >> ./site.tmp
 	@cat ./site.tmp > site.exp

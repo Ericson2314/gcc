@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "tm-pdp11.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"
@@ -62,11 +62,11 @@ pdp11_handle_option (struct gcc_options *opts,
 
     case OPT_munix_asm:
     case OPT_mgnu_asm:
-      targetm_common.have_named_sections = false;
+      targetm_common->have_named_sections = false;
       return true;
 
     case OPT_mdec_asm:
-      targetm_common.have_named_sections = true;
+      targetm_common->have_named_sections = true;
       return true;
 
     default:

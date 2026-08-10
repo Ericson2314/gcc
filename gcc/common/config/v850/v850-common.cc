@@ -21,7 +21,7 @@
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic-core.h"
-#include "tm.h"
+#include "tm-v850.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"

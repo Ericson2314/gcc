@@ -24,7 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic-core.h"
-#include "tm.h"
+#include "tm-arc.h"
 #include "common/common-target.h"
 #include "opts.h"
 #include "flags.h"

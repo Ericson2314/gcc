@@ -685,7 +685,7 @@ default_fixed_point_supported_p (void)
 bool
 default_has_ifunc_p (void)
 {
-  return HAVE_GNU_INDIRECT_FUNCTION;
+  return TARGET_HAS_IFUNC;
 }
 
 /* Return true if we predict the loop LOOP will be transformed to a

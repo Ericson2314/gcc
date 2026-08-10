@@ -71,3 +71,7 @@ along with GCC; see the file COPYING3.  If not see
 #if (DEFAULT_LIBC == LIBC_GLIBC) && HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
 #define TARGET_CAN_SPLIT_STACK
 #endif
+
+/* -mfentry is the default here: glibc's profiling wants the call before the
+   prologue.  */
+#define ENABLE_X86_64_MFENTRY 1

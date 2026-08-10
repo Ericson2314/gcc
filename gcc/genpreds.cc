@@ -23,7 +23,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+
+/* Multi-target: TARGET_MEM_CONSTRAINT below comes from the back end's tm.h,
+   and it decides which letter common.md's generic memory constraint claims.
+   Read a back end's constraints against another's tm.h and the two collide
+   ("redefinition of constraint 'm'"), so which tm.h to use is chosen on the
+   command line.  The configured target's is the default.  */
+#ifndef TM_H_FILE
+#define TM_H_FILE "tm.h"
+#endif
+#include TM_H_FILE
+
 #include "rtl.h"
 #include "errors.h"
 #include "obstack.h"

@@ -157,12 +157,31 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '--compress-debug-sections' > /dev/null; t
 fi
 AC_MSG_RESULT([$gcc_cv_ld_compress_debug])
 
+dnl Whether to pass --build-id is a matter of what this linker supports and
+dnl what the installation wants, so it is decided here rather than when the
+dnl compiler is built.
+AC_ARG_ENABLE([linker-build-id],
+  [AS_HELP_STRING([--enable-linker-build-id],
+     [always pass --build-id to the linker])],
+  [], [enable_linker_build_id=no])
+
 AC_MSG_CHECKING([linker for --build-id])
 gcc_cv_ld_buildid=no
 if "$gcc_cv_ld" --help 2>&1 | grep -- '--build-id' > /dev/null; then
   gcc_cv_ld_buildid=yes
 fi
 AC_MSG_RESULT([$gcc_cv_ld_buildid])
+
+if test x"$enable_linker_build_id" = xyes && test x"$gcc_cv_ld_buildid" != xyes; then
+  AC_MSG_WARN([--build-id is not supported by $gcc_cv_ld; ignored])
+  enable_linker_build_id=no
+fi
+
+if test x"$enable_linker_build_id" = xyes; then
+  link_buildid='%{!r:--build-id} '
+else
+  link_buildid=
+fi
 
 AC_MSG_CHECKING([linker for --eh-frame-hdr])
 gcc_cv_ld_eh_frame_hdr=no
@@ -267,6 +286,9 @@ ${link_compress_debug}
 
 *option_defaults:
 ${option_defaults}
+
+*link_buildid:
+${link_buildid}
 
 EOF
 

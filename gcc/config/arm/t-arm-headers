@@ -1,0 +1,49 @@
+# Headers generated from arm-cpus.in.  Factored out of t-arm so that a
+# multi-target build -- which includes no single target's tmake_file -- can
+# generate them too; see gen-multi-target-md.awk.
+
+
+arm-cpu.h: s-arm-cpu ; @true
+s-arm-cpu: $(srcdir)/config/arm/parsecpu.awk \
+  $(srcdir)/config/arm/arm-cpus.in
+	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=headers \
+		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu.h arm-cpu.h
+	$(STAMP) s-arm-cpu
+
+arm-isa.h: s-arm-isa ; @true
+s-arm-isa: $(srcdir)/config/arm/parsecpu.awk \
+  $(srcdir)/config/arm/arm-cpus.in
+	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=isa \
+		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-isa.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-arm-isa.h arm-isa.h
+	$(STAMP) s-arm-isa
+
+arm-cpu-data.h: s-arm-data ; @true
+s-arm-data: $(srcdir)/config/arm/parsecpu.awk \
+  $(srcdir)/config/arm/arm-cpus.in
+	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=data \
+		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu-data.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu-data.h arm-cpu-data.h
+	$(STAMP) s-arm-data
+
+arm-cpu-cdata.h: s-arm-cdata ; @true
+s-arm-cdata: $(srcdir)/config/arm/parsecpu.awk \
+  $(srcdir)/config/arm/arm-cpus.in
+	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=common-data \
+		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu-cdata.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu-cdata.h arm-cpu-cdata.h
+	$(STAMP) s-arm-cdata
+
+arm-native.h: s-arm-native ; @true
+s-arm-native: $(srcdir)/config/arm/parsecpu.awk \
+  $(srcdir)/config/arm/arm-cpus.in
+	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=native \
+		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-native.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-arm-native.h arm-native.h
+	$(STAMP) s-arm-native
+
+# The common object for this back end includes these; the rule that builds it
+# does not name them, so spell out the dependency here (harmless in a
+# single-target build, required when many back ends build in parallel).
+arm-common.o: arm-cpu.h arm-isa.h arm-cpu-cdata.h

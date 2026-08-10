@@ -168,39 +168,6 @@ else
  test_exec_prefix=$exec_prefix
 fi
 
-AC_ARG_WITH(sysroot,
-[AS_HELP_STRING([[--with-sysroot[=DIR]]],
-		[search for usr/lib, usr/include, et al, within DIR])],
-[
- case ${with_sysroot} in
- /) ;;
- */) with_sysroot=`echo $with_sysroot | sed 's,/$,,'` ;;
- esac
- case ${with_sysroot} in
- yes) TARGET_SYSTEM_ROOT='${exec_prefix}/${target_noncanonical}/sys-root' ;;
- *) TARGET_SYSTEM_ROOT=$with_sysroot ;;
- esac
-   
- TARGET_SYSTEM_ROOT_DEFINE='-DTARGET_SYSTEM_ROOT=\"$(TARGET_SYSTEM_ROOT)\"'
- CROSS_SYSTEM_HEADER_DIR='$(TARGET_SYSTEM_ROOT)$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
-	
- case ${TARGET_SYSTEM_ROOT} in
- "${test_prefix}"|"${test_prefix}/"*|\
- "${test_exec_prefix}"|"${test_exec_prefix}/"*|\
- '${prefix}'|'${prefix}/'*|\
- '${exec_prefix}'|'${exec_prefix}/'*)
-   t="$TARGET_SYSTEM_ROOT_DEFINE -DTARGET_SYSTEM_ROOT_RELOCATABLE"
-   TARGET_SYSTEM_ROOT_DEFINE="$t"
-   ;;
- esac
-], [
- TARGET_SYSTEM_ROOT=
- TARGET_SYSTEM_ROOT_DEFINE=
- CROSS_SYSTEM_HEADER_DIR='$(gcc_tooldir)/sys-include'
-])
-AC_SUBST(TARGET_SYSTEM_ROOT)
-AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
-AC_SUBST(CROSS_SYSTEM_HEADER_DIR)
 
 # Don't set gcc_gxx_include_dir to gxx_include_dir since that's only
 # passed in by the toplevel make and thus we'd get different behavior
@@ -223,21 +190,7 @@ gcc_gxx_include_dir_add_sysroot=0
 
 # This logic must match libstdc++-v3/acinclude.m4:GLIBCXX_EXPORT_INSTALL_INFO.
 if test x${gcc_gxx_include_dir} = x; then
-  if test x${enable_version_specific_runtime_libs} = xyes; then
-    gcc_gxx_include_dir='${libsubdir}/include/c++'
-  else
-    libstdcxx_incdir='include/c++/$(version)'
-    if test x$host != x$target; then
-       libstdcxx_incdir="$target_alias/$libstdcxx_incdir"
-    fi
-    gcc_gxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)$libstdcxx_incdir"
-  fi
-elif test "${with_sysroot+set}" = set; then
-  gcc_gxx_without_sysroot=`expr "${gcc_gxx_include_dir}" : "${with_sysroot}"'\(.*\)'`
-  if test "${gcc_gxx_without_sysroot}"; then
-    gcc_gxx_include_dir="${gcc_gxx_without_sysroot}"
-    gcc_gxx_include_dir_add_sysroot=1
-  fi
+  gcc_gxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)include/c++/\$(version)"
 fi
 
 # Configuration for an alternate set of C++ headers.
@@ -284,24 +237,10 @@ fi
 AC_DEFINE_UNQUOTED(ENABLE_STDLIB_OPTION, $gcc_enable_stdlib_opt,
           [Define if the -stdlib= option should be enabled.])
 
-# Sysroot behaviour as for gxx-include-dir
 if test x${gcc_gxx_libcxx_include_dir} = x; then
-  # default path,embedded in the compiler tree.
+  # default path, embedded in the compiler tree.
   libcxx_incdir='include/c++/v1'
-  if test x${enable_version_specific_runtime_libs} = xyes; then
-    gcc_gxx_libcxx_include_dir='${libsubdir}/$libcxx_incdir'
-  else
-    if test x$host != x$target; then
-       libcxx_incdir="$target_alias/$libcxx_incdir"
-    fi
-    gcc_gxx_libcxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)$libcxx_incdir"
-  fi
-elif test "${with_sysroot+set}" = set; then
-  gcc_gxx_libcxx_without_sysroot=`expr "${gcc_gxx_libcxx_include_dir}" : "${with_sysroot}"'\(.*\)'`
-  if test "${gcc_gxx_libcxx_without_sysroot}"; then
-    gcc_gxx_libcxx_include_dir="${gcc_gxx_libcxx_without_sysroot}"
-    gcc_gxx_libcxx_include_dir_add_sysroot=1
-  fi
+  gcc_gxx_libcxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)$libcxx_incdir"
 fi
 
 AC_ARG_WITH(cpp_install_dir,
@@ -343,16 +282,8 @@ AC_SUBST(GENINSRC)
 # Find default linker
 # -------------------
 
-case $target in
-    *darwin*)
-	ld64_flag=yes # Darwin can only use a ld64-compatible linker.
-	dsymutil_flag=yes # Darwin uses dsymutil to link debug.
-	;;
-    *)
-	ld64_flag=no
-	dsymutil_flag=no
-	;;
-esac
+ld64_flag=no
+dsymutil_flag=no
 
 
 
@@ -750,12 +681,6 @@ fi
 # Miscenalleous configure options
 # -------------------------------
 
-# Determine whether or not multilibs are enabled.
-AC_ARG_ENABLE(multilib,
-[AS_HELP_STRING([--enable-multilib],
-		[enable library support for multiple ABIs])],
-[], [enable_multilib=yes])
-AC_SUBST(enable_multilib)
 
 # Additional target machines this compiler should be able to serve, beyond the
 # one named by --target.  Comma-separated list, or "all".  Compare binutils'
@@ -784,10 +709,6 @@ esac], [enable_multiarch=auto])
 if test x${enable_multiarch} = xauto; then
   if test x${with_native_system_header_dir} != x; then
     ma_msg_suffix=", disabled auto check (configured with --native-system-header-dir)"
-    enable_multiarch=no
-  fi
-  if test x$host != x$target && test "x$with_sysroot" = x; then
-    ma_msg_suffix=", disabled auto check (cross build configured without --with-sysroot)"
     enable_multiarch=no
   fi
 fi
@@ -916,17 +837,6 @@ analyzer=1)
 AC_DEFINE_UNQUOTED(ENABLE_ANALYZER, $analyzer,
 [Define 0/1 if static analyzer feature is enabled.])
 
-AC_ARG_ENABLE(objc-gc,
-[AS_HELP_STRING([--enable-objc-gc],
-		[enable the use of Boehm's garbage collector with
-		 the GNU Objective-C runtime])],
-if test x$enable_objc_gc = xno; then
-	objc_boehm_gc=''
-else
-	objc_boehm_gc=1
-fi,
-objc_boehm_gc='')
-
 AC_ARG_WITH(dwarf2,
 [AS_HELP_STRING([--with-dwarf2], [force the default debug format to be DWARF 2 (or later)])],
 dwarf2="$with_dwarf2",
@@ -951,17 +861,11 @@ AC_ARG_ENABLE(shared,
 ], [enable_shared=yes])
 AC_SUBST(enable_shared)
 
-AC_ARG_ENABLE(gcov,
-[  --disable-gcov          don't provide libgcov and related host tools],
-[], [case $target in
-       bpf-*-*)
-         enable_gcov=no
-       ;;
-       *)
-         enable_gcov=yes
-       ;;
-     esac])
-
+dnl Whether to build libgcov and the related host tools.  This used to be
+dnl selectable with --disable-gcov, whose default was keyed on $target
+dnl (bpf-*-* opted out).  A multi-target compiler cannot answer that at
+dnl configure time, so the host tools are always built.
+enable_gcov=yes
 AC_SUBST(enable_gcov)
 
 AC_ARG_WITH(specs,
@@ -1790,15 +1694,7 @@ AC_ARG_ENABLE(sjlj-exceptions,
 [AS_HELP_STRING([--enable-sjlj-exceptions],
                 [arrange to use setjmp/longjmp exception handling])],
 [force_sjlj_exceptions=yes],
-[case $target in
-  lm32*-*-*)
-     force_sjlj_exceptions=yes
-     enableval=yes
-     ;;
-  *)
-    force_sjlj_exceptions=no
-    ;;
-esac])
+[force_sjlj_exceptions=no])
 if test $force_sjlj_exceptions = yes; then
   sjlj=`if test $enableval = yes; then echo 1; else echo 0; fi`
   AC_DEFINE_UNQUOTED(CONFIG_SJLJ_EXCEPTIONS, $sjlj,
@@ -1810,13 +1706,13 @@ fi
 # Non-mingw hosts ignore this option.
 # The shell variables this sets are picked up from the mingw branches
 # of config.host so they have to be set before it gets sourced.
-AC_ARG_ENABLE(win32-utf8-manifest,
-[AS_HELP_STRING([--disable-win32-utf8-manifest],
+AC_ARG_ENABLE(host-win32-utf8-manifest,
+[AS_HELP_STRING([--disable-host-win32-utf8-manifest],
                 [disable embedding a utf8 manifest on mingw hosts])
-AS_HELP_STRING([--enable-win32-utf8-manifest],
+AS_HELP_STRING([--enable-host-win32-utf8-manifest],
                [enable embedding a utf8 manifest on mingw hosts (default)])],,)
 
-if test "x$enable_win32_utf8_manifest" != xno; then
+if test "x$enable_host_win32_utf8_manifest" != xno; then
   host_xmake_mingw=i386/x-mingw32-utf8
   host_extra_gcc_objs_mingw=utf8rc-mingw32.o
   host_extra_objs_mingw=utf8-mingw32.o
@@ -1851,10 +1747,25 @@ case ${enable_targets} in
   no | "")
     ;;
   all)
-    # config.gcc matches targets with shell globs, not literal names, so there is
-    # no honest way to enumerate "every target" from it.  Refuse rather than
-    # guess at a list.
-    AC_MSG_ERROR([--enable-targets=all is not implemented yet; pass an explicit list])
+    # config.gcc matches targets with shell globs, so it cannot be enumerated.
+    # contrib/config-list.mk carries the list GCC itself uses to build every
+    # configuration, which is the same question asked for the same reason, so
+    # take it from there rather than inventing a second list that would drift.
+    #
+    # Entries may carry configure options as a trailing OPT-with-cpu=... ; only
+    # the triple is wanted here.  \134 is a backslash, spelled in octal so that
+    # neither m4 nor the shell has to be argued with about quoting.
+    gcc_extra_targets=`sed -n '/^LIST = /,/^ *$/p' ${srcdir}/../contrib/config-list.mk \
+      | sed -e 's/^LIST = //' \
+      | tr -d '\134' \
+      | tr ' ' '\012' \
+      | sed -e 's/OPT.*$//' \
+      | grep . \
+      | sort -u \
+      | tr '\012' ' '`
+    if test x"${gcc_extra_targets}" = x; then
+      AC_MSG_ERROR([--enable-targets=all: could not read contrib/config-list.mk])
+    fi
     ;;
   *)
     gcc_extra_targets=`echo "${enable_targets}" | sed 's/,/ /g'`
@@ -1885,6 +1796,21 @@ gcc_common_ent=multi-target-common.ent
 gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
+
+# Canonicalise the list.  Targets are named the way one would type them on a
+# command line -- aarch64-elf, alpha-netbsd -- and configure would normally
+# expand those before anyone sees them.  config.gcc matches canonical triples
+# only, and answers a short form with "Configuration ... not supported".
+gcc_mt_canon=
+for gcc_mt in ${gcc_manifest_targets}; do
+  gcc_mt_c=`${srcdir}/../config.sub ${gcc_mt} 2>/dev/null`
+  if test x"${gcc_mt_c}" = x; then
+    AC_MSG_ERROR([--enable-targets: ${gcc_mt} is not a recognised target name])
+  fi
+  gcc_mt_canon="${gcc_mt_canon} ${gcc_mt_c}"
+done
+gcc_manifest_targets=${gcc_mt_canon}
+
 for gcc_mt in ${gcc_manifest_targets}; do
   # config.gcc validates --with-arch/--with-cpu/... against the target it is
   # being run for.  Those options were given for the primary target, so they must
@@ -1893,6 +1819,9 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # would need its own syntax; not attempted here.)
   gcc_mt_data=`
     target=${gcc_mt}
+    # A compiler asked to serve every target serves the obsolete ones too;
+    # refusing them here would just make the list quietly incomplete.
+    enable_obsolete=yes
     with_arch= with_arch_32= with_arch_64=
     with_cpu= with_cpu_32= with_cpu_64=
     with_tune= with_tune_32= with_tune_64=
@@ -1958,6 +1887,21 @@ for gcc_mt in ${gcc_manifest_targets}; do
   gcc_mt_cof=`echo "${gcc_mt_data}" | sed -n 's/^common_out_file //p'`
   gcc_mt_sym=`echo "${gcc_mt_data}" | sed -n 's/^common_out_symbol //p'`
   gcc_mt_obj=`basename ${gcc_mt_cof} .cc`.o
+  gcc_mt_base=`basename ${gcc_mt_cof} -common.cc`
+  gcc_mt_incl=`echo "${gcc_mt_data}" | sed -n 's/^tm_include_list //p'`
+  gcc_mt_tmdef=`echo "${gcc_mt_data}" | sed -n 's/^tm_defines //p'`
+  gcc_mt_eopts=`echo "${gcc_mt_data}" | sed -n 's/^extra_options //p'`
+  # This target's tm.h must pull in this target's options.h, not the generic
+  # one: the types and enums a back end needs -- aarch64_feature_flags, bfin's
+  # WA_*, alpha's MASK_SOFT_FP -- reach a build through the .opt files'
+  # HeaderInclude directives, and so exist only in a generated options header
+  # that was built with those .opt files.
+  gcc_mt_md=`echo "${gcc_mt_data}" | sed -n 's/^md_file //p'`
+  gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|^options\.h|options-${gcc_mt_base}.h|" -e "s|insn-constants\.h|insn-constants-${gcc_mt_base}.h|"`
+  gcc_mt_optfiles=
+  for gcc_mt_o in ${gcc_mt_eopts}; do
+    gcc_mt_optfiles="${gcc_mt_optfiles} \$(srcdir)/config/${gcc_mt_o}"
+  done
   case " ${gcc_all_common_objects} " in
     *" ${gcc_mt_obj} "*) ;;
     *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
@@ -1966,8 +1910,31 @@ for gcc_mt in ${gcc_manifest_targets}; do
        # sit in the build root but their sources are under
        # common/config/<cpu>/, and vpath cannot glob those directories.  The
        # -D is what gives each table a name of its own.
-       printf '%s: $(srcdir)/common/config/%s\n\t$(COMPILE) -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
-         "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_sym}" >> ${gcc_common_mk}
+       # Each back end gets a tm.h of its own, under a name of its own, rather
+       # than every back end sharing the one tm.h and 46 of them getting some
+       # other target's macros.  default-common.cc includes no tm.h and so
+       # needs none.
+       if test x"${gcc_mt_base}" != xdefault; then
+         # This back end's own options header, built from the generic .opt files
+         # plus this target's, so that its HeaderInclude directives bring in the
+         # types its sources use.
+         printf 'optionlist-%s: $(lang_opt_files)%s $(srcdir)/opt-gather.awk\n\tLC_ALL=C; export LC_ALL; \\\n\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@\n\n' \
+           "${gcc_mt_base}" "${gcc_mt_optfiles}" "${gcc_mt_optfiles}" >> ${gcc_common_mk}
+         printf 'options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n' \
+           "${gcc_mt_base}" "${gcc_mt_base}" >> ${gcc_common_mk}
+         # ... and this back end's constants, from its own machine description
+         # rather than whichever target happened to generate insn-constants.h.
+         printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
+           "${gcc_mt_base}" "${gcc_mt_md}" "${gcc_mt_md}" >> ${gcc_common_mk}
+         printf 'tm-%s.h: options-%s.h insn-constants-%s.h Makefile\n\tTARGET_CPU_DEFAULT="" HEADERS="%s" DEFINES="%s" \\\n\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
+           "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" >> ${gcc_common_mk}
+         printf '%s: $(srcdir)/common/config/%s tm-%s.h\n\t$(COMPILE) -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
+           "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_base}" "${gcc_mt_sym}" >> ${gcc_common_mk}
+         gcc_all_common_tm_headers="${gcc_all_common_tm_headers} tm-${gcc_mt_base}.h"
+       else
+         printf '%s: $(srcdir)/common/config/%s\n\t$(COMPILE) -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
+           "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_sym}" >> ${gcc_common_mk}
+       fi
        printf 'extern struct gcc_targetm_common %s;\n' "${gcc_mt_sym}" >> ${gcc_common_ext}
        ;;
   esac
@@ -1992,6 +1959,7 @@ rm -f ${gcc_mt_err}
 } > multi-target-common.h
 rm -f ${gcc_common_ext} ${gcc_common_ent}
 
+AC_SUBST(gcc_manifest_targets)
 AC_SUBST(gcc_all_common_objects)
 AC_SUBST(gcc_all_common_symbols)
 if test x"${gcc_extra_targets}" != x; then
@@ -2019,10 +1987,10 @@ if test x"$tmake_file" = x
 then tmake_file=$cpu_type/t-$cpu_type
 fi
 
-# Support --enable-initfini-array.
-if test x$enable_initfini_array != xno; then
-  tm_file="${tm_file} initfini-array.h"
-fi
+# initfini-array.h is self-guarding: its body is wrapped in
+# `#if HAVE_INITFINI_ARRAY_SUPPORT', which config/elfos.h raises for ELF
+# targets, so it can simply always be in the bundle.
+tm_file="${tm_file} initfini-array.h"
 
 if test x"$dwarf2" = xyes
 then tm_file="$tm_file tm-dwarf2.h"
@@ -2138,35 +2106,6 @@ int main() { mcontext_t m; if (m->ss.srr0) return 0; return 0; }
     ;;
 esac
 
-# ---------
-# Threading
-# ---------
-
-# Check if a valid thread package
-case ${enable_threads} in
-  "" | no)
-    # No threads
-    target_thread_file='single'
-    ;;
-  yes)
-    # default
-    target_thread_file='single'
-    ;;
-  aix | dce | lynx | mipssde | posix | rtems | \
-  single | tpf | vxworks | win32 | mcf)
-    target_thread_file=${enable_threads}
-    ;;
-  *)
-    echo "${enable_threads} is an unknown thread package" 1>&2
-    exit 1
-    ;;
-esac
-
-if test x${thread_file} = x; then
-  # No thread file set by target-specific clauses in config.gcc,
-  # so use file chosen by default logic above
-  thread_file=${target_thread_file}
-fi
 
 # --------
 # UNSORTED
@@ -2356,90 +2295,31 @@ case "$LIBINTL" in *$LIBICONV*)
 	LIBICONV= ;;
 esac
 
-AC_ARG_ENABLE(secureplt,
-[AS_HELP_STRING([--enable-secureplt],
-		[enable -msecure-plt by default for PowerPC])],
-[], [])
-
-AC_ARG_ENABLE(mingw-wildcard,
-[AS_HELP_STRING([--enable-mingw-wildcard],
-		[Set whether to expand wildcard on command-line.
-		 Default to platform configuration])],
-[],[enable_mingw_wildcard=platform])
-AS_IF([test x"$enable_mingw_wildcard" != xplatform ],
-      [AC_DEFINE_UNQUOTED(MINGW_DOWILDCARD,
-		 $(test x"$enable_mingw_wildcard" = xno; echo $?),
-		 [Value to set mingw's _dowildcard to.])])
-
-AC_ARG_ENABLE(large-address-aware,
-[AS_HELP_STRING([--enable-large-address-aware],
-		[Link mingw executables with --large-address-aware])])
-AS_IF([test x"$enable_large_address_aware" = xyes],
-  [AC_DEFINE([MINGW_DEFAULT_LARGE_ADDR_AWARE], 1,
-    [Define if we should link mingw executables with --large-address-aware])])
-
-AC_ARG_ENABLE(leading-mingw64-underscores,
-  AS_HELP_STRING([--enable-leading-mingw64-underscores],
-                 [enable leading underscores on 64 bit mingw targets]),
-  [],[])
-AS_IF([ test x"$enable_leading_mingw64_underscores" = xyes ],
-  [AC_DEFINE(USE_MINGW64_LEADING_UNDERSCORES, 1,
-    [Define if we should use leading underscore on 64 bit mingw targets])])
-
-AC_ARG_ENABLE(cld,
-[AS_HELP_STRING([--enable-cld], [enable -mcld by default for 32bit x86])], [],
-[enable_cld=no])
-
-AC_ARG_ENABLE(frame-pointer,
-[AS_HELP_STRING([--enable-frame-pointer],
-		[enable -fno-omit-frame-pointer by default for x86])], [],
-[
-case $target_os in
-linux* | gnu* | darwin[[8912]]* | cygwin* | mingw*)
-  # Enable -fomit-frame-pointer by default for these systems with DWARF2.
-  enable_frame_pointer=no
-  ;;
-*)
-  enable_frame_pointer=yes
-  ;;
-esac
-])
-
-case $target in
-i[[34567]]86-*-* | x86_64-*-*)
-	if test "x$enable_cld" = xyes; then
-		tm_defines="${tm_defines} USE_IX86_CLD=1"
-	fi
-	if test "x$enable_frame_pointer" = xyes; then
-		tm_defines="${tm_defines} USE_IX86_FRAME_POINTER=1"
-	fi
-	;;
-esac
 
 # Windows32 Registry support for specifying GCC installation paths.
-AC_ARG_ENABLE(win32-registry,
-[AS_HELP_STRING([--disable-win32-registry],
+AC_ARG_ENABLE(host-win32-registry,
+[AS_HELP_STRING([--disable-host-win32-registry],
                 [disable lookup of installation paths in the
                  Registry on Windows hosts])
-AS_HELP_STRING([--enable-win32-registry], [enable registry lookup (default)])
-AS_HELP_STRING([--enable-win32-registry=KEY],
+AS_HELP_STRING([--enable-host-win32-registry], [enable registry lookup (default)])
+AS_HELP_STRING([--enable-host-win32-registry=KEY],
                [use KEY instead of GCC version as the last portion
                 of the registry key])],,)
 
 case $host_os in
   win32 | pe | cygwin* | mingw32*)
-    if test "x$enable_win32_registry" != xno; then
-      AC_SEARCH_LIBS(RegOpenKeyExA, advapi32,, [enable_win32_registry=no])
+    if test "x$enable_host_win32_registry" != xno; then
+      AC_SEARCH_LIBS(RegOpenKeyExA, advapi32,, [enable_host_win32_registry=no])
     fi
 
-    if test "x$enable_win32_registry" != xno; then
+    if test "x$enable_host_win32_registry" != xno; then
       AC_DEFINE(ENABLE_WIN32_REGISTRY, 1,
   [Define to 1 if installation paths should be looked up in the Windows
    Registry. Ignored on non-Windows hosts.])
 
-      if test "x$enable_win32_registry" != xyes \
-         && test "x$enable_win32_registry" != x; then
-	AC_DEFINE_UNQUOTED(WIN32_REGISTRY_KEY, "$enable_win32_registry",
+      if test "x$enable_host_win32_registry" != xyes \
+         && test "x$enable_host_win32_registry" != x; then
+	AC_DEFINE_UNQUOTED(WIN32_REGISTRY_KEY, "$enable_host_win32_registry",
   [Define to be the last component of the Windows registry key under which
    to look for installation paths.  The full key used will be 
    HKEY_LOCAL_MACHINE/SOFTWARE/Free Software Foundation/{WIN32_REGISTRY_KEY}.
@@ -2622,32 +2502,9 @@ ALL=all.internal				AC_SUBST(ALL)
 SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
 BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
-if test x$host != x$target || test "x$TARGET_SYSTEM_ROOT" != x ||
-   test x$build != x$host || test "x$with_build_sysroot" != x; then
-  if test "x$with_build_sysroot" != x; then
-    BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
-  else
-    BUILD_SYSTEM_HEADER_DIR='$(CROSS_SYSTEM_HEADER_DIR)'
-  fi
-
-  if test x$host != x$target
-  then
-    CROSS="-DCROSS_DIRECTORY_STRUCTURE"
-    ALL=all.cross
-    SYSTEM_HEADER_DIR=$BUILD_SYSTEM_HEADER_DIR
-  elif test "x$TARGET_SYSTEM_ROOT" != x; then
-    SYSTEM_HEADER_DIR='$(CROSS_SYSTEM_HEADER_DIR)'
-  fi
-
-  if test "x$with_build_sysroot" != "x"; then
-    target_header_dir="${with_build_sysroot}${native_system_header_dir}"
-  elif test "x$with_sysroot" = x; then
-    target_header_dir="${test_exec_prefix}/${target_noncanonical}/sys-include"
-  elif test "x$with_sysroot" = xyes; then
-    target_header_dir="${test_exec_prefix}/${target_noncanonical}/sys-root${native_system_header_dir}"
-  else
-    target_header_dir="${with_sysroot}${native_system_header_dir}"
-  fi
+if test "x$with_build_sysroot" != x; then
+  BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
+  target_header_dir="${with_build_sysroot}${native_system_header_dir}"
 else
   target_header_dir=${native_system_header_dir}
 fi
@@ -2661,9 +2518,8 @@ fi
 # This prevents libgcc2 from containing any code which requires libc
 # support.
 : ${inhibit_libc=false}
-if { { test x$host != x$target && test "x$with_sysroot" = x ; } ||
-       test x$with_newlib = xyes ; } &&
-     { test "x$with_headers" = xno || test ! -f "$target_header_dir/stdio.h"; } ; then
+if test x$with_newlib = xyes &&
+   { test "x$with_headers" = xno || test ! -f "$target_header_dir/stdio.h"; } ; then
        inhibit_libc=true
 fi
 AC_SUBST(inhibit_libc)
@@ -2752,7 +2608,6 @@ LT_INIT
 AC_SUBST(objdir)
 AC_SUBST(enable_fast_install)
 
-AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
 DARWIN_DO_EXTRA_RPATH=0
 AC_ARG_WITH(darwin-extra-rpath,
 [AS_HELP_STRING(
@@ -2791,39 +2646,6 @@ else
         AC_PATH_PROG(gcc_cv_as, $AS_FOR_TARGET)
 fi])
 
-AC_MSG_CHECKING(assembler flavor)
-as_flavor=gnu
-case $target in
-  *-*-aix*)
-    if $gcc_cv_as -v 2>&1 | grep '^as V' > /dev/null; then
-      as_flavor=aix
-    fi
-    ;;
-  *-*-darwin*)
-    as_flavor=darwin
-    ;;
-  *-*-solaris2*)
-    if $gcc_cv_as -V 2>&1 | grep 'Compiler Common.*SunOS' > /dev/null; then
-      as_flavor=solaris
-    fi
-    ;;
-  hppa*64*-*-hpux11*)
-    if $gcc_cv_as -V 2>&1 | grep 'UX.11.*PA-RISC.*Assembler' > /dev/null; then
-      as_flavor=hpux
-    fi
-    ;;
-  nvptx-*-*)
-    as_flavor=nvptx
-    ;;
-esac
-AC_MSG_RESULT($as_flavor)
-dnl Don't define HAVE_GNU_AS, only HAVE_<FLAVOR>_AS when actually used.
-aix_as_bool=`if test $as_flavor = aix; then echo 1; else echo 0; fi`
-AC_DEFINE_UNQUOTED(HAVE_AIX_AS, $aix_as_bool,
-	[Define to 1 if using the AIX assembler.])
-solaris_as_bool=`if test $as_flavor = solaris; then echo 1; else echo 0; fi`
-AC_DEFINE_UNQUOTED(HAVE_SOLARIS_AS, $solaris_as_bool,
-	[Define to 1 if using the Solaris assembler.])
 
 ORIGINAL_AS_FOR_TARGET=$gcc_cv_as
 AC_SUBST(ORIGINAL_AS_FOR_TARGET)
@@ -2896,39 +2718,9 @@ else
         AC_PATH_PROG(gcc_cv_ld, $LD_FOR_TARGET)
 fi])
 
-AC_MSG_CHECKING(linker flavor)
-ld_flavor=gnu
-case $target in
-  *-*-aix*)
-    if $gcc_cv_ld -V 2>&1 | grep 'ld: LD ' > /dev/null; then
-      ld_flavor=aix
-    fi
-    ;;
-  *-*-darwin*)
-    ld_flavor=darwin
-    ;;
-  *-*-solaris2*)
-    if $gcc_cv_ld -V 2>&1 | grep 'Solaris Link Editors' > /dev/null; then
-      ld_flavor=solaris
-    fi
-    ;;
-  hppa*64*-*-hpux11*)
-    if $gcc_cv_ld -V 2>&1 | grep 'linker command.*sgs.*ld PA64' > /dev/null; then
-      ld_flavor=hpux
-    fi
-    ;;
-  nvptx-*-*)
-    ld_flavor=nvptx
-    ;;
-esac
-AC_MSG_RESULT($ld_flavor)
-dnl Don't define HAVE_GNU_LD, only HAVE_<FLAVOR>_LD when actually used.
-solaris_ld_bool=`if test $ld_flavor = solaris; then echo 1; else echo 0; fi`
-AC_DEFINE_UNQUOTED(HAVE_SOLARIS_LD, $solaris_ld_bool,
-	[Define to 1 if using the Solaris linker.])
 
 ORIGINAL_PLUGIN_LD_FOR_TARGET=$gcc_cv_ld
-PLUGIN_LD_SUFFIX=`basename $gcc_cv_ld | sed -e "s,$target_alias-,,"`
+PLUGIN_LD_SUFFIX=`basename $gcc_cv_ld`
 # if the PLUGIN_LD is set ld-new, just have it as ld
 # as that is the installed named.
 if test x$PLUGIN_LD_SUFFIX = xld-new \
@@ -2944,28 +2736,6 @@ AC_ARG_WITH(plugin-ld,
 AC_SUBST(ORIGINAL_PLUGIN_LD_FOR_TARGET)
 AC_DEFINE_UNQUOTED(PLUGIN_LD_SUFFIX, "$PLUGIN_LD_SUFFIX", [Specify plugin linker])
 
-# Settings that depend on ld_flavor must be done here instead of config.gcc.
-
-case "$target:$ld_flavor" in
-  *-*-solaris2*:solaris)
-    # While Solaris ld has -m32/-m64 it usually determines the ELF class
-    # from the input objects.
-    ;;
-  i?86-*-solaris2*:gnu | x86_64-*-solaris2*:gnu)
-    ld_32_opt=-melf_i386_sol2
-    ld_64_opt=-melf_x86_64_sol2
-    ;;
-  i?86-*-*:gnu | x86_64-*-*:gnu)
-    ld_32_opt=-melf_i386
-    ld_64_opt=-melf_x86_64
-    ;;
-esac
-
-case "$target:$ld_flavor" in
-  hppa*64*-*-hpux11*:gnu)
-    target_cpu_default="${target_cpu_default}|MASK_GNU_LD"
-    ;;
-esac
 
 # Check to see if we are using gold instead of ld
 AC_MSG_CHECKING(whether we are using gold)
@@ -3288,58 +3058,6 @@ gcc_GAS_CHECK_FEATURE([.base64], gcc_cv_as_base64,,
 
 gcc_GAS_CHECK_FEATURE([.cv_ucomp], gcc_cv_as_cv_ucomp,,[.cv_ucomp 0],,
 [AC_DEFINE(HAVE_GAS_CV_UCOMP, 1, [Define if your assembler supports .cv_ucomp.])])
-
-# gnu_indirect_function type is an extension proposed at
-# http://groups.google/com/group/generic-abi/files. It allows dynamic runtime
-# selection of function implementation
-AC_ARG_ENABLE(gnu-indirect-function,
- [AS_HELP_STRING([--enable-gnu-indirect-function],
-                 [enable the use of the @gnu_indirect_function to glibc systems])],
- [case $enable_gnu_indirect_function in
-    yes | no) ;;
-    *) AC_MSG_ERROR(['$enable_gnu_indirect_function' is an invalid value for --enable-gnu-indirect-function.
-Valid choices are 'yes' and 'no'.]) ;;
-  esac],
- [enable_gnu_indirect_function="$default_gnu_indirect_function"])
-
-case "${target}" in
-  riscv*-*-linux*)
-    AC_MSG_CHECKING(linker ifunc IRELATIVE support)
-    cat > conftest.s <<EOF
-	.text
-	.type	foo_resolver, @function
-foo_resolver:
-	ret
-	.size	foo_resolver, .-foo_resolver
-
-	.globl	foo
-	.type	foo, %gnu_indirect_function
-	.set	foo, foo_resolver
-
-	.globl	bar
-	.type	bar, @function
-bar:
-	call	foo
-	ret
-	.size	bar, .-bar
-EOF
-    if test x"$gcc_cv_as" != x \
-       && test x"$gcc_cv_ld" != x \
-       && test x"$gcc_cv_readelf" != x \
-       && $gcc_cv_as -o conftest.o conftest.s > /dev/null 2>&1 \
-       && $gcc_cv_ld -o conftest conftest.o > /dev/null 2>&1 \
-       && $gcc_cv_readelf --relocs --wide conftest \
-	  | grep R_RISCV_IRELATIVE > /dev/null 2>&1; then
-      enable_gnu_indirect_function=yes
-    fi
-    rm -f conftest conftest.o conftest.s
-    AC_MSG_RESULT($enable_gnu_indirect_function)
-    ;;
-esac
-
-gif=`if test x$enable_gnu_indirect_function = xyes; then echo 1; else echo 0; fi`
-AC_DEFINE_UNQUOTED(HAVE_GNU_INDIRECT_FUNCTION, $gif,
-[Define if your system supports gnu indirect functions.])
 
 
 changequote(,)dnl
@@ -3896,102 +3614,18 @@ AC_DEFINE_UNQUOTED(HAVE_GAS_SHF_MERGE,
     || test $gcc_cv_as_shf_merge_percent = yes; then echo 1; else echo 0; fi`],
 [Define 0/1 if your assembler supports marking sections with SHF_MERGE flag.])
 
-gcc_GAS_CHECK_FEATURE([COMDAT group support (GNU as)],
- gcc_cv_as_comdat_group,
- [$fw_as_opt],
- [.section .text,"axG",@progbits,.foo,comdat])
-if test $gcc_cv_as_comdat_group = yes; then
-  gcc_cv_as_comdat_group_percent=no
-  gcc_cv_as_comdat_group_group=no
-else
- gcc_GAS_CHECK_FEATURE([COMDAT group support (GNU as, %type)],
-   gcc_cv_as_comdat_group_percent,
-   [$fw_as_opt],
-   [.section .text,"axG",%progbits,.foo,comdat])
- if test $gcc_cv_as_comdat_group_percent = yes; then
-   gcc_cv_as_comdat_group_group=no
- else
-   case "${target}" in
-     # Sun as uses a completely different syntax.
-     *-*-solaris2*)
-       case "${target}" in
-         sparc*-*-solaris2*)
-           conftest_s='
-               .group foo,".text%foo",#comdat
-               .section ".text%foo", #alloc,#execinstr,#progbits
-               .globl foo
-             foo:
-	     '
-           ;;
-         i?86-*-solaris2* | x86_64-*-solaris2*)
-	   conftest_s='
-               .group foo,.text%foo,#comdat
-               .section .text%foo, "ax", @progbits
-               .globl  foo
-             foo:
-	     '
-	   ;;
-       esac
-       gcc_GAS_CHECK_FEATURE([COMDAT group support (Sun as, .group)],
-         gcc_cv_as_comdat_group_group,
-         , [$conftest_s])
-       ;;
-   esac
-   if test -z "${gcc_cv_as_comdat_group_group+set}"; then
-     gcc_cv_as_comdat_group_group=no
-   fi
- fi
-fi
-if test x"$ld_is_gold" = xyes; then
-  comdat_group=yes
-elif test x"$ld_is_mold" = xyes; then
-  comdat_group=yes
-elif test x"$ld_is_wild" = xyes; then
-  comdat_group=yes
-elif test $in_tree_ld = yes ; then
-  comdat_group=no
-  if gcc_fn_gld_elf_min_version 2 16; then
-     comdat_group=yes
-  fi
-elif echo "$ld_ver" | grep GNU > /dev/null; then
-  comdat_group=yes
-  if test 0"$ld_date" -lt 20050308; then
-    if test -n "$ld_date"; then
-      # If there was date string, but was earlier than 2005-03-08, fail
-      comdat_group=no
-    elif test "$ld_vers_major" -lt 2; then
-      comdat_group=no
-    elif test "$ld_vers_major" -eq 2 -a "$ld_vers_minor" -lt 16; then
-      comdat_group=no
-    fi
-  fi
-else
-changequote(,)dnl
-  case "${target}" in
-    *-*-solaris2*)
-      comdat_group=yes
-      ;;
-    *)
-      # Assume linkers other than GNU ld don't support COMDAT group.
-      comdat_group=no
-      ;;
-  esac
-changequote([,])dnl
-fi
-# Allow overriding the automatic COMDAT group tests above.
-AC_ARG_ENABLE(comdat,
-  [AS_HELP_STRING([--enable-comdat], [enable COMDAT group support])],
-  [comdat_group="$enable_comdat"])
-if test $comdat_group = no; then
-  gcc_cv_as_comdat_group=no
-  gcc_cv_as_comdat_group_percent=no
-  gcc_cv_as_comdat_group_group=no
-fi
-AC_DEFINE_UNQUOTED(HAVE_COMDAT_GROUP,
-  [`if test $gcc_cv_as_comdat_group = yes \
-    || test $gcc_cv_as_comdat_group_percent = yes \
-    || test $gcc_cv_as_comdat_group_group = yes; then echo 1; else echo 0; fi`],
-[Define 0/1 if your assembler and linker support COMDAT groups.])
+dnl --enable-comdat, the `.section ...,comdat' assembler probes (including the
+dnl Sun as `.group' variants selected by `case "${target}"') and the GNU ld
+dnl version ladder used to answer HAVE_COMDAT_GROUP here.  Whether COMDAT
+dnl groups exist is a property of the target object format, so
+dnl HAVE_COMDAT_GROUP now comes from config/elfos.h (1), with a 0 default in
+dnl defaults.h for the non-ELF targets (PE/COFF, Mach-O) that answered no.
+dnl
+dnl gcc_cv_as_comdat_group survives only because the HAVE_LD_EH_GC_SECTIONS
+dnl probes further down still consult it.  Those are target-linker probes in
+dnl their own right and belong in target-specs/; until they move, pin this to
+dnl the answer a normal ELF box produced so their result does not change.
+gcc_cv_as_comdat_group=yes
 
 gcc_GAS_CHECK_FEATURE([line table is_stmt support],
  gcc_cv_as_is_stmt,,
@@ -4669,75 +4303,13 @@ case "$target" in
 	.xword %dtprel(expr)
     ],,[AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
 	[Define if your assembler supports DTPREL relocation.])])
-    # Enable Branch Target Identification Mechanism and Return Address
-    # Signing by default.
-    AC_ARG_ENABLE(standard-branch-protection,
-    [
-AS_HELP_STRING([--enable-standard-branch-protection],
-        [enable Branch Target Identification Mechanism, Return Address Signing, and Guarded Control Stack by default for AArch64])
-AS_HELP_STRING([--disable-standard-branch-protection],
-        [disable Branch Target Identification Mechanism, Return Address Signing, and Guarded Control Stack by default for AArch64])
-    ],
-      [
-        case $enableval in
-          yes)
-            tm_defines="${tm_defines} TARGET_ENABLE_BTI=1 TARGET_ENABLE_PAC_RET=1 TARGET_ENABLE_GCS=1"
-            ;;
-          no)
-            ;;
-          *)
-            AC_MSG_ERROR(['$enableval' is an invalid value for --enable-standard-branch-protection.\
-  Valid choices are 'yes' and 'no'.])
-            ;;
-        esac
-      ],
-    [])
-    # Enable default workaround for AArch64 Cortex-A53 erratum 835769.
-    AC_ARG_ENABLE(fix-cortex-a53-835769,
-    [
-AS_HELP_STRING([--enable-fix-cortex-a53-835769],
-        [enable workaround for AArch64 Cortex-A53 erratum 835769 by default])
-AS_HELP_STRING([--disable-fix-cortex-a53-835769],
-        [disable workaround for AArch64 Cortex-A53 erratum 835769 by default])
-    ],
-      [
-        case $enableval in
-          yes)
-            tm_defines="${tm_defines} TARGET_FIX_ERR_A53_835769_DEFAULT=1"
-            ;;
-          no)
-            ;;
-          *)
-            AC_MSG_ERROR(['$enableval' is an invalid value for --enable-fix-cortex-a53-835769.\
-  Valid choices are 'yes' and 'no'.])
-            ;;
-
-        esac
-      ],
-    [])
-    # Enable default workaround for AArch64 Cortex-A53 erratum 843419.
-    AC_ARG_ENABLE(fix-cortex-a53-843419,
-    [
-AS_HELP_STRING([--enable-fix-cortex-a53-843419],
-        [enable workaround for AArch64 Cortex-A53 erratum 843419 by default])
-AS_HELP_STRING([--disable-fix-cortex-a53-843419],
-        [disable workaround for AArch64 Cortex-A53 erratum 843419 by default])
-    ],
-      [
-        case $enableval in
-          yes)
-            tm_defines="${tm_defines} TARGET_FIX_ERR_A53_843419_DEFAULT=1"
-            ;;
-          no)
-            ;;
-          *)
-            AC_MSG_ERROR(['$enableval' is an invalid value for --enable-fix-cortex-a53-843419.\
-  Valid choices are 'yes' and 'no'.])
-            ;;
-
-        esac
-      ],
-    [])
+    dnl --enable-standard-branch-protection, --enable-fix-cortex-a53-835769 and
+    dnl --enable-fix-cortex-a53-843419 used to append to tm_defines from inside
+    dnl this aarch64 arm of `case $target'.  Every macro they set
+    dnl (TARGET_ENABLE_BTI, TARGET_ENABLE_PAC_RET, TARGET_ENABLE_GCS,
+    dnl TARGET_FIX_ERR_A53_835769_DEFAULT, TARGET_FIX_ERR_A53_843419_DEFAULT)
+    dnl already has a default in config/aarch64/aarch64.h, so the options are
+    dnl simply gone.
     ;;
 
   # All TARGET_ABI_OSF targets.
@@ -5993,12 +5565,6 @@ gcc_GAS_CHECK_FEATURE([.lcomm with alignment], gcc_cv_as_lcomm_with_alignment,,
 [AC_DEFINE(HAVE_GAS_LCOMM_WITH_ALIGNMENT, 1,
   [Define if your assembler supports .lcomm with an alignment field.])])
 
-if test x$with_sysroot = x && test x$host = x$target \
-   && test "$prefix" != "/usr" && test "x$prefix" != "x$local_prefix" \
-   && test "$prefix" != "NONE"; then
-  AC_DEFINE_UNQUOTED(PREFIX_INCLUDE_DIR, "$prefix/include",
-[Define to PREFIX/include if cpp should also search that directory.])
-fi
 
 # Determine the version of glibc, if any, used on the target.
 AC_MSG_CHECKING([for target glibc version])
@@ -6025,24 +5591,12 @@ AC_DEFINE_UNQUOTED([TARGET_GLIBC_MAJOR], [$glibc_version_major],
 AC_DEFINE_UNQUOTED([TARGET_GLIBC_MINOR], [$glibc_version_minor],
 [GNU C Library minor version number used on the target, or 0.])
 
-AC_ARG_ENABLE(gnu-unique-object,
- [AS_HELP_STRING([--enable-gnu-unique-object],
-   [enable the use of the @gnu_unique_object ELF extension on glibc systems])],
- [case $enable_gnu_unique_object in
-    yes | no) ;;
-    *) AC_MSG_ERROR(['$enable_gnu_unique_object' is an invalid value for --enable-gnu-unique-object.
-Valid choices are 'yes' and 'no'.]) ;;
-  esac],
- [gcc_GAS_CHECK_FEATURE([gnu_unique_object], gcc_cv_as_gnu_unique_object,,
-   [.type foo, '$target_type_format_char'gnu_unique_object],,
-# We need to unquote above to to use the definition from config.gcc.
-# Also check for ld.so support, i.e. glibc 2.11 or higher.
-   [GCC_GLIBC_VERSION_GTE_IFELSE([2], [11], [enable_gnu_unique_object=yes], )]
-   )])
-if test x$enable_gnu_unique_object = xyes; then
-  AC_DEFINE(HAVE_GAS_GNU_UNIQUE_OBJECT, 1,
-   [Define if your assembler supports @gnu_unique_object.])
-fi
+dnl --enable-gnu-unique-object and its probe lived here.  The probe assembled
+dnl `.type foo, @gnu_unique_object' using $target_type_format_char from
+dnl config.gcc and then required glibc >= 2.11 for ld.so support.  Both halves
+dnl describe the target, so the decision now lives in the libc target headers
+dnl as USE_GNU_UNIQUE_OBJECT (config/linux.h, config/gnu.h), defaulting to 0 in
+dnl defaults.h.  config/elfos.h consumes it from inside ASM_DECLARE_OBJECT_NAME.
 
 AC_CACHE_CHECK([assembler for tolerance to line number 0],
  [gcc_cv_as_line_zero],
@@ -6756,38 +6310,6 @@ EOF
     ;;
 esac
 
-AC_CACHE_CHECK(linker --build-id support,
-  gcc_cv_ld_buildid,
-  [gcc_cv_ld_buildid=no
-  if test $in_tree_ld = yes ; then
-    if gcc_fn_gld_elf_min_version 2 18; then
-      gcc_cv_ld_buildid=yes
-    fi
-  elif test x$gcc_cv_ld != x; then
-    if $gcc_cv_ld --help 2>&1 | grep build-id > /dev/null; then
-      gcc_cv_ld_buildid=yes
-    fi
-  fi])
-if test x"$gcc_cv_ld_buildid" = xyes; then
-  AC_DEFINE(HAVE_LD_BUILDID, 1,
-  [Define if your linker supports --build-id.])
-fi
-
-AC_ARG_ENABLE(linker-build-id,
-[AS_HELP_STRING([--enable-linker-build-id],
-                [compiler will always pass --build-id to linker])],
-[],
-enable_linker_build_id=no)
-
-if test x"$enable_linker_build_id" = xyes; then
-  if test x"$gcc_cv_ld_buildid" = xyes; then
-    AC_DEFINE(ENABLE_LD_BUILDID, 1,
-    [Define if gcc should always pass --build-id to linker.])
-  else
-    AC_MSG_WARN(--build-id is not supported by your linker; --enable-linker-build-id ignored)
-  fi
-fi
-
 AC_CACHE_CHECK(linker --sysroot support,
   gcc_cv_ld_sysroot,
   [gcc_cv_ld_sysroot=no
@@ -6803,90 +6325,20 @@ AC_CACHE_CHECK(linker --sysroot support,
 if test x"$gcc_cv_ld_sysroot" = xyes; then
   AC_DEFINE(HAVE_LD_SYSROOT, 1,
   [Define if your linker supports --sysroot.])
-fi	  
-
-AC_ARG_ENABLE(libssp,
-[AS_HELP_STRING([--enable-libssp], [enable linking against libssp])],
-[case "${enableval}" in
-  yes|no)
-    ;;
-  *)
-    AC_MSG_ERROR([unknown libssp setting $enableval])
-    ;;
-esac], [])
-
-# Test for stack protector support in target C library.
-AC_CACHE_CHECK(__stack_chk_fail in target C library,
-  gcc_cv_libc_provides_ssp,
-  [gcc_cv_libc_provides_ssp=no
-  if test "x$enable_libssp" = "xno"; then
-    gcc_cv_libc_provides_ssp=yes
-  elif test "x$enable_libssp" = "xyes"; then
-    gcc_cv_libc_provides_ssp=no
-  else
-    case "$target" in
-       *-*-musl*)
-	 # All versions of musl provide stack protector
-	 gcc_cv_libc_provides_ssp=yes;;
-       *-*-linux* | *-*-kfreebsd*-gnu)
-      # glibc 2.4 and later provides __stack_chk_fail and
-      # either __stack_chk_guard, or TLS access to stack guard canary.
-      GCC_GLIBC_VERSION_GTE_IFELSE([2], [4], [gcc_cv_libc_provides_ssp=yes], [
-      [if test -f $target_header_dir/features.h \
-	 && $EGREP '^[ 	]*#[ 	]*define[ 	]+__GNU_LIBRARY__[ 	]+([1-9][0-9]|[6-9])' \
-	    $target_header_dir/features.h > /dev/null; then
-	if $EGREP '^[ 	]*#[ 	]*define[ 	]+__UCLIBC__[ 	]+1' \
-	     $target_header_dir/features.h > /dev/null && \
-	     test -f $target_header_dir/bits/uClibc_config.h && \
-	     $EGREP '^[ 	]*#[ 	]*define[ 	]+__UCLIBC_HAS_SSP__[ 	]+1' \
-	     $target_header_dir/bits/uClibc_config.h > /dev/null; then
-	  gcc_cv_libc_provides_ssp=yes
-	fi
-      # all versions of Bionic support stack protector
-      elif test -f $target_header_dir/sys/cdefs.h \
-        && $EGREP '^[  ]*#[    ]*define[       ]+__BIONIC__[   ]+1' \
-           $target_header_dir/sys/cdefs.h > /dev/null; then
-         gcc_cv_libc_provides_ssp=yes
-      fi]])
-	;;
-       *-*-gnu*)
-	 # Avoid complicated tests (see
-	 # <http://gcc.gnu.org/ml/gcc/2008-10/msg00130.html>) and for now
-	 # simply assert that glibc does provide this, which is true for all
-	 # realistically usable GNU/Hurd configurations.
-	 # All supported versions of musl provide it as well
-	 gcc_cv_libc_provides_ssp=yes;;
-       *-*-darwin* | *-*-freebsd* | *-*-netbsd*)
-	 AC_CHECK_FUNC(__stack_chk_fail,[gcc_cv_libc_provides_ssp=yes],
-           [echo "no __stack_chk_fail on this target"])
-        ;;
-       *) gcc_cv_libc_provides_ssp=no ;;
-    esac
-  fi])
-
-if test x$gcc_cv_libc_provides_ssp = xyes; then
-  AC_DEFINE(TARGET_LIBC_PROVIDES_SSP, 1,
-	    [Define if your target C library provides stack protector support])
 fi
 
-# Check whether --enable-default-ssp was given.
-AC_ARG_ENABLE(default-ssp,
-[AS_HELP_STRING([--enable-default-ssp],
-  [enable Stack Smashing Protection as default])],[
-if test x$gcc_cv_libc_provides_ssp = xyes; then
-  case "$target" in
-    ia64*-*-*) enable_default_ssp=no ;;
-    *) enable_default_ssp=$enableval ;;
-  esac
-else
-  enable_default_ssp=no
-fi],
-enable_default_ssp=no)
-if test x$enable_default_ssp = xyes ; then
-  AC_DEFINE(ENABLE_DEFAULT_SSP, 1,
-      [Define if your target supports default stack protector and it is enabled.])
-fi
-AC_SUBST([enable_default_ssp])
+dnl --enable-libssp and the gcc_cv_libc_provides_ssp probe used to decide
+dnl TARGET_LIBC_PROVIDES_SSP by inspecting the target C library: a
+dnl `case "$target"' over musl/linux/gnu/darwin/*bsd plus greps of
+dnl $target_header_dir/features.h.  That is a property of the target, so
+dnl TARGET_LIBC_PROVIDES_SSP now comes from the target headers
+dnl (config/gnu-user.h, config/freebsd.h, config/netbsd.h, config/darwin.h)
+dnl with a 0 default in defaults.h.
+
+dnl --enable-default-ssp used to AC_DEFINE(ENABLE_DEFAULT_SSP), gated on a
+dnl `case "$target"' that excluded ia64.  ENABLE_DEFAULT_SSP is now purely a
+dnl target-header knob; defaults.h supplies DEFAULT_FLAG_SSP 0 when no target
+dnl header defines it.
 
 if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
   AC_DEFINE(TARGET_PROVIDES_LIBATOMIC, 1,
@@ -7375,11 +6827,6 @@ AC_SUBST(dollar)
 
 # Find a directory in which to install a shared libgcc.
 
-AC_ARG_ENABLE(version-specific-runtime-libs,
-[AS_HELP_STRING([--enable-version-specific-runtime-libs],
-                [specify that runtime libraries should be
-                 installed in a compiler-specific directory])])
-
 # Substitute configuration variables
 AC_SUBST(subdirs)
 AC_SUBST(srcdir)
@@ -7426,7 +6873,6 @@ AC_SUBST(lang_specs_files)
 AC_SUBST(lang_tree_files)
 AC_SUBST(local_prefix)
 AC_SUBST(md_file)
-AC_SUBST(objc_boehm_gc)
 AC_SUBST(out_file)
 AC_SUBST(out_object_file)
 AC_SUBST(common_out_file)
@@ -7636,16 +7082,6 @@ else
 fi
 AC_SUBST([libgccjit_version])
 
-# Check whether --enable-default-pie was given.
-AC_ARG_ENABLE(default-pie,
-[AS_HELP_STRING([--enable-default-pie],
-  [enable Position Independent Executable as default])],
-enable_default_pie=$enableval,
-enable_default_pie=no)
-if test x$enable_default_pie = xyes ; then
-  AC_DEFINE(ENABLE_DEFAULT_PIE, 1,
-      [Define if your target supports default PIE and it is enabled.])
-fi
 
 # Check if -fno-PIE works.
 AC_CACHE_CHECK([for -fno-PIE option],
@@ -7823,32 +7259,6 @@ esac
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120881
 # Enable -mfentry by default on x86-64 to put the profiling counter call
 # before the prologue.
-AC_ARG_ENABLE(x86-64-mfentry,
-  [AS_HELP_STRING([--enable-x86-64-mfentry],
-		  [enable -mfentry by default on x86-64 targets])],
-  [case "${enableval}" in
-   yes | no | auto)
-     enable_x86_64_mfentry=$enableval
-     ;;
-   *)
-     AC_MSG_ERROR(['$enable_x86_64_mfentry' is an invalid value for --enable-x86-64-mfentry.  Valid choices are 'yes', 'no' and 'auto'.])
-     ;;
-   esac],
-  [enable_x86_64_mfentry=auto])
-
-if test x"$enable_x86_64_mfentry" = xauto; then
-  case "${target}" in
-  i?86-*-*gnu* | x86_64-*-*gnu*)
-    # Enable -mfentry by default with glibc on x86.
-    enable_x86_64_mfentry=yes
-    ;;
-  esac
-fi
-
-gif=`if test x$enable_x86_64_mfentry = xyes; then echo 1; else echo 0; fi`
-AC_DEFINE_UNQUOTED(ENABLE_X86_64_MFENTRY, $gif,
-[Define to enable -mfentry by default on x86-64.])
-
 AC_PATH_PROG(PERF, perf, no)
 AFDO_PROFILER=perf
 if test x$PERF != xno; then
@@ -7913,20 +7323,6 @@ AC_DEFINE_UNQUOTED(HAVE_LD_RELRO_SUPPORT,
   [Define 0/1 if your linker supports -z relro])
 AC_MSG_RESULT($ld_relro_support)
 
-case $target_os in
-linux* | gnu*)
-  # -fhardened is only supported on GNU/Linux.
-  fhardened_support=yes
-  ;;
-*)
-  fhardened_support=no
-  ;;
-esac
-
-AC_DEFINE_UNQUOTED(HAVE_FHARDENED_SUPPORT,
-  [`if test x"$fhardened_support" = xyes; then echo 1; else echo 0; fi`],
-  [Define 0/1 if -fhardened is supported])
-AC_MSG_RESULT($fhardened_support)
 
 # Configure the subdirectories
 # AC_CONFIG_SUBDIRS($subdirs)

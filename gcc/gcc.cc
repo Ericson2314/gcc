@@ -964,38 +964,18 @@ proper position among the other output files.  */
 #define LINK_GCC_C_SEQUENCE_SPEC "%G %{!nolibc:%L %G}"
 #endif
 
+/* Whether -fstack-protector needs -lssp depends on the target C library, which
+   the driver cannot know: it used to be answered by the configure-time
+   TARGET_LIBC_PROVIDES_SSP probe of $target_header_dir.  The neutral answer is
+   to link nothing extra -- correct for every libc that provides
+   __stack_chk_fail itself.  Targets whose libc does not carry it override
+   link_ssp from their specs file (see config/freebsd.h for the in-tree
+   spelling).  */
 #ifndef LINK_SSP_SPEC
-#ifdef TARGET_LIBC_PROVIDES_SSP
-#define LINK_SSP_SPEC "%{fstack-protector|fstack-protector-all" \
-		       "|fstack-protector-strong|fstack-protector-explicit:}"
-#else
-#define LINK_SSP_SPEC "%{fstack-protector|fstack-protector-all" \
-		       "|fstack-protector-strong|fstack-protector-explicit" \
-		       ":-lssp_nonshared -lssp}"
-#endif
+#define LINK_SSP_SPEC ""
 #endif
 
-#ifdef ENABLE_DEFAULT_PIE
-#define PIE_SPEC		"!no-pie"
-#define NO_FPIE1_SPEC		"fno-pie"
-#define FPIE1_SPEC		NO_FPIE1_SPEC ":;"
-#define NO_FPIE2_SPEC		"fno-PIE"
-#define FPIE2_SPEC		NO_FPIE2_SPEC ":;"
-#define NO_FPIE_SPEC		NO_FPIE1_SPEC "|" NO_FPIE2_SPEC
-#define FPIE_SPEC		NO_FPIE_SPEC ":;"
-#define NO_FPIC1_SPEC		"fno-pic"
-#define FPIC1_SPEC		NO_FPIC1_SPEC ":;"
-#define NO_FPIC2_SPEC		"fno-PIC"
-#define FPIC2_SPEC		NO_FPIC2_SPEC ":;"
-#define NO_FPIC_SPEC		NO_FPIC1_SPEC "|" NO_FPIC2_SPEC
-#define FPIC_SPEC		NO_FPIC_SPEC ":;"
-#define NO_FPIE1_AND_FPIC1_SPEC	NO_FPIE1_SPEC "|" NO_FPIC1_SPEC
-#define FPIE1_OR_FPIC1_SPEC	NO_FPIE1_AND_FPIC1_SPEC ":;"
-#define NO_FPIE2_AND_FPIC2_SPEC	NO_FPIE2_SPEC "|" NO_FPIC2_SPEC
-#define FPIE2_OR_FPIC2_SPEC	NO_FPIE2_AND_FPIC2_SPEC ":;"
-#define NO_FPIE_AND_FPIC_SPEC	NO_FPIE_SPEC "|" NO_FPIC_SPEC
-#define FPIE_OR_FPIC_SPEC	NO_FPIE_AND_FPIC_SPEC ":;"
-#else
+
 #define PIE_SPEC		"pie"
 #define FPIE1_SPEC		"fpie"
 #define NO_FPIE1_SPEC		FPIE1_SPEC ":;"
@@ -1015,7 +995,6 @@ proper position among the other output files.  */
 #define NO_FPIE2_AND_FPIC2_SPEC	FPIE1_OR_FPIC2_SPEC ":;"
 #define FPIE_OR_FPIC_SPEC	FPIE_SPEC "|" FPIC_SPEC
 #define NO_FPIE_AND_FPIC_SPEC	FPIE_OR_FPIC_SPEC ":;"
-#endif
 
 #ifndef LINK_PIE_SPEC
 #ifdef HAVE_LD_PIE
@@ -1026,12 +1005,6 @@ proper position among the other output files.  */
 #define LD_PIE_SPEC ""
 #endif
 #define LINK_PIE_SPEC "%{static|shared|r:;" PIE_SPEC ":" LD_PIE_SPEC "} "
-#endif
-
-#ifndef LINK_BUILDID_SPEC
-# if defined(HAVE_LD_BUILDID) && defined(ENABLE_LD_BUILDID)
-#  define LINK_BUILDID_SPEC "%{!r:--build-id} "
-# endif
 #endif
 
 #ifndef LTO_PLUGIN_SPEC

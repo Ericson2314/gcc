@@ -285,6 +285,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 #endif
 
+/* Nonzero if .init_array/.fini_array sections are available and working.
+   ELF targets define this to 1 in config/elfos.h; this used to be probed at
+   configure time, which also meant every cross compiler answered 0.  */
+#ifndef HAVE_INITFINI_ARRAY_SUPPORT
+#define HAVE_INITFINI_ARRAY_SUPPORT 0
+#endif
+
 /* This determines whether or not we support marking sections with
    SHF_GNU_RETAIN flag.  Also require .init_array/.fini_array section
    for constructors and destructors.  */
@@ -407,6 +414,24 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #ifndef DWARF_FRAME_REGISTERS
 #define DWARF_FRAME_REGISTERS FIRST_PSEUDO_REGISTER
+#endif
+
+/* Whether -mfentry is on by default on x86-64.  The x86 GNU targets say so;
+   see config/i386/gnu-user-common.h.  */
+#ifndef ENABLE_X86_64_MFENTRY
+#define ENABLE_X86_64_MFENTRY 0
+#endif
+
+/* Whether the target supports gnu indirect functions.  Targets that do say so
+   in config.gcc.  */
+#ifndef TARGET_HAS_IFUNC
+#define TARGET_HAS_IFUNC 0
+#endif
+
+/* Whether -fhardened can deliver what it promises here.  A target that can
+   says so itself; see config/linux.h.  */
+#ifndef TARGET_FHARDENED_SUPPORTED
+#define TARGET_FHARDENED_SUPPORTED 0
 #endif
 
 /* Offsets recorded in opcodes are a multiple of this alignment factor.  */
@@ -1344,6 +1369,30 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #ifndef STACK_SIZE_MODE
 #define STACK_SIZE_MODE word_mode
+#endif
+
+/* Whether to emit @gnu_unique_object symbols for symbols that must be unique
+   across the whole process.  This needs a dynamic linker that honours
+   STB_GNU_UNIQUE, so only the libc target headers that have it raise this
+   (config/linux.h, config/gnu.h); everyone else gets 0.  */
+#ifndef USE_GNU_UNIQUE_OBJECT
+#define USE_GNU_UNIQUE_OBJECT 0
+#endif
+
+/* Nonzero if the target object format has COMDAT groups (ELF section groups,
+   or the Sun as `.group' spelling of them).  ELF targets define this to 1 in
+   config/elfos.h; PE/COFF and Mach-O leave it 0 and fall back to
+   .gnu.linkonce / one-only semantics.  */
+#ifndef HAVE_COMDAT_GROUP
+#define HAVE_COMDAT_GROUP 0
+#endif
+
+/* Nonzero if the target C library provides stack protector support, i.e. it
+   defines __stack_chk_fail (and __stack_chk_guard, or a TLS slot holding the
+   canary), so the driver need not link -lssp.  Target headers for libcs that
+   provide it define this to 1.  */
+#ifndef TARGET_LIBC_PROVIDES_SSP
+#define TARGET_LIBC_PROVIDES_SSP 0
 #endif
 
 /* Default value for flag_stack_protect when flag_stack_protect is initialized to -1:

@@ -219,3 +219,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_FORTIFY_SOURCE_DEFAULT_LEVEL linux_fortify_source_default_level
 
 #endif
+
+/* -fhardened wants the whole set of hardening features this target can
+   actually provide.  */
+#define TARGET_FHARDENED_SUPPORTED 1
+
+/* glibc's ld.so honours STB_GNU_UNIQUE, so @gnu_unique_object may be used.
+   This was previously the configure-time HAVE_GAS_GNU_UNIQUE_OBJECT probe,
+   which combined an assembler check with a glibc >= 2.11 version check.  */
+#undef USE_GNU_UNIQUE_OBJECT
+#define USE_GNU_UNIQUE_OBJECT (OPTION_GLIBC ? flag_gnu_unique : 0)

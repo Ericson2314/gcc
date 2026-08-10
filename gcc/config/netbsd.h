@@ -166,3 +166,7 @@ along with GCC; see the file COPYING3.  If not see
   do {									\
     netbsd_patch_builtins ();						\
   } while(0)
+
+/* This target C library provides __stack_chk_fail.  */
+#undef TARGET_LIBC_PROVIDES_SSP
+#define TARGET_LIBC_PROVIDES_SSP 1

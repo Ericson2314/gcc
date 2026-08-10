@@ -87,9 +87,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
 #define TARGET_THREAD_SSP_OFFSET 0x28
-#endif
 
 /* Define if long doubles should be mangled as 'g'.  */
 #define TARGET_ALTERNATE_LONG_DOUBLE_MANGLING

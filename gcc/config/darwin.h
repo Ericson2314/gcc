@@ -1304,3 +1304,7 @@ extern void darwin_driver_init (unsigned int *,struct cl_decoded_option **);
 #define A68_EXPORT_SECTION_NAME "__a68_exports"
 
 #endif /* CONFIG_DARWIN_H */
+
+/* This target C library provides __stack_chk_fail.  */
+#undef TARGET_LIBC_PROVIDES_SSP
+#define TARGET_LIBC_PROVIDES_SSP 1

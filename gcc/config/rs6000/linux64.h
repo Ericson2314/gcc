@@ -524,11 +524,9 @@ extern int dot_symbols;
 #undef DRAFT_V4_STRUCT_RET
 #define DRAFT_V4_STRUCT_RET (!TARGET_64BIT)
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
 /* ppc32 glibc provides __stack_chk_guard in -0x7008(2),
    ppc64 glibc provides it at -0x7010(13).  */
 #define TARGET_THREAD_SSP_OFFSET	(TARGET_64BIT ? -0x7010 : -0x7008)
-#endif
 
 #define POWERPC_LINUX
 

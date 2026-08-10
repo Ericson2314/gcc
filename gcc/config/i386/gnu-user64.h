@@ -79,7 +79,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define MULTILIB_DEFAULTS { "m32" }
 #endif
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
 /* i386 glibc provides __stack_chk_guard in %gs:0x14,
    x32 glibc provides it in %fs:0x18.
    x86_64 glibc provides it in %fs:0x28.  */
@@ -91,7 +90,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    x86_64 glibc provides it in %fs:0x70.  */
 #define TARGET_THREAD_SPLIT_STACK_OFFSET \
   (TARGET_64BIT ? (TARGET_X32 ? 0x40 : 0x70) : 0x30)
-#endif
 
 #undef WCHAR_TYPE
 #define WCHAR_TYPE (TARGET_LP64 ? "int" : "long int")

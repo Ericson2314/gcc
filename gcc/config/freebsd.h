@@ -48,7 +48,11 @@ along with GCC; see the file COPYING3.  If not see
 #define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
 #endif
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
+/* FreeBSD libc provides __stack_chk_fail and __stack_chk_guard.  */
+#undef TARGET_LIBC_PROVIDES_SSP
+#define TARGET_LIBC_PROVIDES_SSP 1
+
+#if TARGET_LIBC_PROVIDES_SSP
 #define LINK_SSP_SPEC "%{fstack-protector|fstack-protector-all" \
 		       "|fstack-protector-strong|fstack-protector-explicit" \
 		       ":-lssp_nonshared}"

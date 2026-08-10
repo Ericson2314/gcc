@@ -1642,7 +1642,7 @@ process_options ()
       flag_associative_math = 0;
     }
 
-  if (flag_hardened && !HAVE_FHARDENED_SUPPORT)
+  if (flag_hardened && !TARGET_FHARDENED_SUPPORTED)
     {
       warning_at (UNKNOWN_LOCATION, 0,
 		  "%<-fhardened%> not supported for this target");

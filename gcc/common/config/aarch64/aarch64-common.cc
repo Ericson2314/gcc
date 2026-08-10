@@ -22,9 +22,9 @@
 #define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "tm-aarch64.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "tm_p-aarch64.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"

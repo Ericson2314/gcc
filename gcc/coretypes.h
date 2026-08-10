@@ -474,7 +474,20 @@ typedef unsigned char uchar;
 
 /* Most source files will require the following headers.  */
 #if !defined (USED_FOR_TARGET)
-#include "insn-modes.h"
+
+/* Multi-target: the machine modes are a property of the back end, not of the
+   build, so the generator programs are built once per back end against that
+   back end's modes.  Which pair of generated headers to use is chosen on the
+   command line; the configured target's is the default, which is what the
+   compiler proper and the single-target build use.  */
+#ifndef INSN_MODES_H
+#define INSN_MODES_H "insn-modes.h"
+#endif
+#ifndef INSN_MODES_INLINE_H
+#define INSN_MODES_INLINE_H "insn-modes-inline.h"
+#endif
+
+#include INSN_MODES_H
 #include "signop.h"
 #include "wide-int.h"
 #include "wide-int-print.h"
@@ -493,7 +506,7 @@ typedef unsigned char uchar;
 
 #include "poly-int.h"
 #include "poly-int-types.h"
-#include "insn-modes-inline.h"
+#include INSN_MODES_INLINE_H
 #include "machmode.h"
 #include "double-int.h"
 #include "align.h"

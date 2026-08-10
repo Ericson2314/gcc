@@ -3831,11 +3831,6 @@ if test x${enable_multilib} = x ; then
   target_configargs="--enable-multilib ${target_configargs}"
 fi
 
-# Source target-specific configuration fragment for GCC
-if test -d ${srcdir}/gcc; then
-  . ${srcdir}/gcc/configure.tgt
-fi
-
 # Pass through with_multi_buildlist to host and target.  'gcc' needs it for the
 # fixed includes which are multilib'd and target libraries need it as they use
 # config-ml.in.

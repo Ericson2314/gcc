@@ -77,46 +77,7 @@ $(srcdir)/config/arm/arm-tables.opt: $(srcdir)/config/arm/parsecpu.awk \
 		$(srcdir)/config/arm/arm-cpus.in > arm-tables.new
 	$(srcdir)/../move-if-change arm-tables.new \
 				    $(srcdir)/config/arm/arm-tables.opt
-
-arm-cpu.h: s-arm-cpu ; @true
-s-arm-cpu: $(srcdir)/config/arm/parsecpu.awk \
-  $(srcdir)/config/arm/arm-cpus.in
-	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=headers \
-		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu.h
-	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu.h arm-cpu.h
-	$(STAMP) s-arm-cpu
-
-arm-isa.h: s-arm-isa ; @true
-s-arm-isa: $(srcdir)/config/arm/parsecpu.awk \
-  $(srcdir)/config/arm/arm-cpus.in
-	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=isa \
-		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-isa.h
-	$(SHELL) $(srcdir)/../move-if-change tmp-arm-isa.h arm-isa.h
-	$(STAMP) s-arm-isa
-
-arm-cpu-data.h: s-arm-data ; @true
-s-arm-data: $(srcdir)/config/arm/parsecpu.awk \
-  $(srcdir)/config/arm/arm-cpus.in
-	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=data \
-		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu-data.h
-	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu-data.h arm-cpu-data.h
-	$(STAMP) s-arm-data
-
-arm-cpu-cdata.h: s-arm-cdata ; @true
-s-arm-cdata: $(srcdir)/config/arm/parsecpu.awk \
-  $(srcdir)/config/arm/arm-cpus.in
-	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=common-data \
-		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-cpu-cdata.h
-	$(SHELL) $(srcdir)/../move-if-change tmp-arm-cpu-cdata.h arm-cpu-cdata.h
-	$(STAMP) s-arm-cdata
-
-arm-native.h: s-arm-native ; @true
-s-arm-native: $(srcdir)/config/arm/parsecpu.awk \
-  $(srcdir)/config/arm/arm-cpus.in
-	$(AWK) -f $(srcdir)/config/arm/parsecpu.awk -v cmd=native \
-		$(srcdir)/config/arm/arm-cpus.in > tmp-arm-native.h
-	$(SHELL) $(srcdir)/../move-if-change tmp-arm-native.h arm-native.h
-	$(STAMP) s-arm-native
+include $(srcdir)/config/arm/t-arm-headers
 
 aarch-common.o: $(srcdir)/config/arm/aarch-common.cc $(CONFIG_H) $(SYSTEM_H) \
     coretypes.h $(TM_H) $(TM_P_H) $(RTL_H) $(TREE_H) output.h $(C_COMMON_H)

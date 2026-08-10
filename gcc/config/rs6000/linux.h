@@ -126,10 +126,8 @@
 #undef	RS6000_ABI_NAME
 #define	RS6000_ABI_NAME "linux"
 
-#ifdef TARGET_LIBC_PROVIDES_SSP
 /* ppc32 glibc provides __stack_chk_guard in -0x7008(2).  */
 #define TARGET_THREAD_SSP_OFFSET	-0x7008
-#endif
 
 #define POWERPC_LINUX
 

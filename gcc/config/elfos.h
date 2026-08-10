@@ -24,6 +24,15 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
+/* ELF has section groups, so COMDAT groups are always available.  This used to
+   be probed at configure time (assembler support for
+   `.section .text,"axG",@progbits,.foo,comdat' plus a GNU ld >= 2.16 version
+   check); both are satisfied by every binutils GCC still builds with.  */
+#define HAVE_COMDAT_GROUP 1
+
+/* ELF systems place constructors and destructors in .init_array/.fini_array.  */
+#define HAVE_INITFINI_ARRAY_SUPPORT 1
+
 #define TARGET_OBJFMT_CPP_BUILTINS()		\
   do						\
     {						\
@@ -319,13 +328,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
   while (0)
 #endif
 
-/* Write the extra assembler code needed to declare an object properly.  */
+/* Write the extra assembler code needed to declare an object properly.
 
-#ifdef HAVE_GAS_GNU_UNIQUE_OBJECT
-#define USE_GNU_UNIQUE_OBJECT flag_gnu_unique
-#else
-#define USE_GNU_UNIQUE_OBJECT 0
-#endif
+   USE_GNU_UNIQUE_OBJECT used to be decided here from the configure-time
+   HAVE_GAS_GNU_UNIQUE_OBJECT probe (assembler support for
+   `.type foo, @gnu_unique_object' plus a glibc >= 2.11 check for ld.so
+   support).  It is now a target-header macro: the libc headers that honour
+   STB_GNU_UNIQUE raise it, and defaults.h supplies 0 otherwise.  It is only
+   referenced from inside the macro body below, which is expanded in varasm.cc
+   after defaults.h, so no definition is needed at this point.  */
 
 #define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
   do									\

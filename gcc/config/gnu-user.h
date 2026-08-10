@@ -158,3 +158,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #undef TARGET_F951_OPTIONS
 #define TARGET_F951_OPTIONS "%{!nostdinc:\
   %:fortran-preinclude-file(-fpre-include= math-vector-fortran.h finclude%s/)}"
+
+/* glibc, musl, uClibc (with SSP configured in) and Bionic all provide
+   __stack_chk_fail and the canary, so the driver must not add -lssp.  */
+#undef TARGET_LIBC_PROVIDES_SSP
+#define TARGET_LIBC_PROVIDES_SSP 1

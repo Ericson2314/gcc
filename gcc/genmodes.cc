@@ -38,6 +38,20 @@ static const char *const mode_class_names[MAX_MODE_CLASS] =
 #undef DEF_MODE_CLASS
 #undef MODE_CLASSES
 
+/* Multi-target: one build tree serves many back ends, so which extra modes
+   file to compile in cannot be settled at configure time.  bconfig.h names
+   the configured target's; -DTARGET_EXTRA_MODES_FILE on the command line
+   overrides it, which is how the per-back-end copies of this program are
+   built.  TARGET_NO_EXTRA_MODES says the back end has no such file at all,
+   which is not the same as leaving both undefined -- that would silently
+   fall back to the configured target's modes.  */
+#ifdef TARGET_NO_EXTRA_MODES
+# undef EXTRA_MODES_FILE
+#elif defined (TARGET_EXTRA_MODES_FILE)
+# undef EXTRA_MODES_FILE
+# define EXTRA_MODES_FILE TARGET_EXTRA_MODES_FILE
+#endif
+
 #ifdef EXTRA_MODES_FILE
 # define HAVE_EXTRA_MODES 1
 #else

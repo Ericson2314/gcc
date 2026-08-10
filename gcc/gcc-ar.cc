@@ -104,19 +104,18 @@ setup_prefixes (const char *exec_path)
     self_libexec_prefix = standard_libexec_prefix;
 
 
-  /* Build the relative path to the target-specific tool directory.  */
-  self_tooldir_prefix = concat (tooldir_base_prefix, target_machine,
-				dir_separator, NULL);
-  self_tooldir_prefix = concat (self_exec_prefix, target_machine,
-				dir_separator, target_version, dir_separator,
+  /* Build the relative path to the tool directory.  These directories are laid
+     out under the version alone: the compiler this wrapper belongs to serves
+     every target it was built for, so there is no one machine to name here.  */
+  self_tooldir_prefix = concat (tooldir_base_prefix, dir_separator, NULL);
+  self_tooldir_prefix = concat (self_exec_prefix, target_version, dir_separator,
 				self_tooldir_prefix, NULL);
 
-  /* Add the target-specific tool bin prefix.  */
+  /* Add the tool bin prefix.  */
   prefix_from_string (concat (self_tooldir_prefix, "bin", NULL), &target_path);
 
-  /* Add the target-specific libexec prefix.  */
-  self_libexec_prefix = concat (self_libexec_prefix, target_machine,
-				dir_separator, target_version,
+  /* Add the libexec prefix.  */
+  self_libexec_prefix = concat (self_libexec_prefix, target_version,
 				dir_separator, NULL);
   prefix_from_string (self_libexec_prefix, &target_path);
 
@@ -198,14 +197,15 @@ main (int ac, char **av)
     }
 #endif
 
-  /* Find the wrapped binutils program.  */
+  /* Find the wrapped binutils program.  Under the compiler's own directories it
+     goes by its plain name; on PATH it may be prefixed with the target it acts
+     on, which is why a target-prefixed name is tried too.  */
   exe_name = find_a_file (&target_path, PERSONALITY, X_OK);
   if (!exe_name)
     {
       const char *real_exe_name = PERSONALITY;
-#ifdef CROSS_DIRECTORY_STRUCTURE
-      real_exe_name = concat (target_machine, "-", PERSONALITY, NULL);
-#endif
+      if (target_machine != NULL && target_machine[0] != '\0')
+	real_exe_name = concat (target_machine, "-", PERSONALITY, NULL);
       exe_name = find_a_file (&path, real_exe_name, X_OK);
       if (!exe_name)
 	{
