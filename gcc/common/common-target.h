@@ -82,4 +82,19 @@ struct default_options
    anything running before that copy would silently see zeroed hooks.  */
 extern struct gcc_targetm_common *targetm_common;
 
+/* One configured target and the hook table it uses.  Several targets may share
+   a table.  */
+struct targetm_common_entry
+{
+  const char *target;
+  struct gcc_targetm_common *table;
+};
+
+/* All configured targets, terminated by a null entry.  */
+extern const struct targetm_common_entry targetm_common_registry[];
+
+/* Make TARGET's table the one in force.  False if TARGET was not configured, in
+   which case the table in force is unchanged.  */
+extern bool targetm_common_select (const char *);
+
 #endif /* GCC_C_TARGET_H */

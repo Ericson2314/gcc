@@ -38,6 +38,44 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "common/common-target.h"
 
+/* Declares every configured target's table and defines TARGETM_COMMON_TABLES
+   listing them.  Written by configure from the target list.  */
+#include "multi-target-common.h"
+
 extern struct gcc_targetm_common TARGETM_COMMON_SYMBOL;
 
+/* Naming every table here is not merely descriptive: these objects are linked
+   from an archive, and an archive member nothing refers to is not pulled in at
+   all.  Without this table only the table named by TARGETM_COMMON_SYMBOL would
+   reach the compiler, however many were compiled.  */
+#define TARGETM_COMMON_ENTRY(NAME, SYM) { NAME, &SYM },
+const struct targetm_common_entry targetm_common_registry[] = {
+  TARGETM_COMMON_TABLES
+  { NULL, NULL }
+};
+#undef TARGETM_COMMON_ENTRY
+
+/* The table in force.  Constant-initialised -- see common-target.h -- so it is
+   valid before anything runs.
+
+   FIXME: this makes the target named by --target the one in effect until
+   something selects another, which is the sort of privileged default that lets
+   a missed target dependency go unnoticed.  It stands only until selection
+   happens early enough that no user of targetm_common runs before it.  */
 struct gcc_targetm_common *targetm_common = &TARGETM_COMMON_SYMBOL;
+
+/* Select by target triple.  Returns false and changes nothing if TARGET was not
+   configured, so a caller can report it rather than silently compiling for the
+   wrong machine.  */
+bool
+targetm_common_select (const char *target)
+{
+  for (const struct targetm_common_entry *e = targetm_common_registry;
+       e->target != NULL; e++)
+    if (strcmp (e->target, target) == 0)
+      {
+	targetm_common = e->table;
+	return true;
+      }
+  return false;
+}
