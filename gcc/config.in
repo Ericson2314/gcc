@@ -12,18 +12,6 @@
 #endif
 
 
-/* Define to the assembler option to enable compressed debug sections. */
-#ifndef USED_FOR_TARGET
-#undef AS_COMPRESS_DEBUG_OPTION
-#endif
-
-
-/* Define to the assembler option to disable compressed debug sections. */
-#ifndef USED_FOR_TARGET
-#undef AS_NO_COMPRESS_DEBUG_OPTION
-#endif
-
-
 /* Define to the root for URLs about GCC changes. */
 #ifndef USED_FOR_TARGET
 #undef CHANGES_ROOT_URL
@@ -62,24 +50,6 @@
 #endif
 
 
-/* Define to enable the use of a default assembler. */
-#ifndef USED_FOR_TARGET
-#undef DEFAULT_ASSEMBLER
-#endif
-
-
-/* Define to enable the use of a default debug linker. */
-#ifndef USED_FOR_TARGET
-#undef DEFAULT_DSYMUTIL
-#endif
-
-
-/* Define to enable the use of a default linker. */
-#ifndef USED_FOR_TARGET
-#undef DEFAULT_LINKER
-#endif
-
-
 /* Define to larger than zero set the default stack clash protector size. */
 #ifndef USED_FOR_TARGET
 #undef DEFAULT_STK_CLASH_GUARD_SIZE
@@ -92,12 +62,6 @@
    __cxa_atexit in libc. */
 #ifndef USED_FOR_TARGET
 #undef DEFAULT_USE_CXA_ATEXIT
-#endif
-
-
-/* Define to enable the use of a default windres. */
-#ifndef USED_FOR_TARGET
-#undef DEFAULT_WINDRES
 #endif
 
 
@@ -173,12 +137,6 @@
    generation. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_EXTRA_CHECKING
-#endif
-
-
-/* Define to 1 to enable fixed-point arithmetic extension to C. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_FIXED_POINT
 #endif
 
 
@@ -415,22 +373,9 @@
 #endif
 
 
-/* Define to the level of your assembler's compressed debug section support.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_COMPRESS_DEBUG
-#endif
-
-
 /* Define if your assembler supports conditional branch relaxation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_COND_BRANCH_RELAXATION
-#endif
-
-
-/* Define if your assembler supports the --debug-prefix-map option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DEBUG_PREFIX_MAP
 #endif
 
 
@@ -486,18 +431,6 @@
 /* Define if your assembler supports explicit relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_EXPLICIT_RELOCS
-#endif
-
-
-/* Define if your assembler supports the --gdwarf2 option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_GDWARF2_DEBUG_FLAG
-#endif
-
-
-/* Define if your assembler supports the --gdwarf-5 option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_GDWARF_5_DEBUG_FLAG
 #endif
 
 
@@ -814,13 +747,6 @@
 /* Define if your assembler supports VSX instructions. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_VSX
-#endif
-
-
-/* Define if your assembler supports --gdwarf-4/--gdwarf-5 even with compiler
-   generated .debug_line. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_WORKING_DWARF_N_FLAG
 #endif
 
 
@@ -1738,12 +1664,6 @@
 #endif
 
 
-/* Define to the level of your linker's compressed debug section support. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_COMPRESS_DEBUG
-#endif
-
-
 /* Define if your linker supports -z ctf. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_LD_CTF
@@ -2355,12 +2275,6 @@
 /* Define to the linker option to ignore unused dependencies. */
 #ifndef USED_FOR_TARGET
 #undef LD_AS_NEEDED_OPTION
-#endif
-
-
-/* Define to the linker option to enable compressed debug sections. */
-#ifndef USED_FOR_TARGET
-#undef LD_COMPRESS_DEBUG_OPTION
 #endif
 
 

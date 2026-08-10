@@ -861,7 +861,6 @@ PKGVERSION
 CONFIGURE_SPECS
 enable_gcov
 enable_shared
-enable_fixed_point
 enable_decimal_float
 DEFAULT_INSNEMIT_PARTITIONS
 DEFAULT_MATCHPD_PARTITIONS
@@ -991,7 +990,6 @@ with_matchpd_partitions
 with_insnemit_partitions
 enable___cxa_atexit
 enable_decimal_float
-enable_fixed_point
 enable_threads
 enable_tls
 enable_vtable_verify
@@ -1739,7 +1737,6 @@ Optional Features:
 			enable decimal float extension to C.  Selecting 'bid'
 			or 'dpd' choses which decimal floating point format
 			to use
-  --enable-fixed-point    enable fixed-point arithmetic extension to C
   --enable-threads[=LIB]  enable thread usage for target GCC, using LIB thread
                           package
   --enable-tls            enable or disable generation of tls code overriding
@@ -7894,40 +7891,6 @@ cat >>confdefs.h <<_ACEOF
 #define ENABLE_DECIMAL_BID_FORMAT $bid
 _ACEOF
 
-
-# Enable C extension for fixed-point arithmetic.
-# Check whether --enable-fixed-point was given.
-if test "${enable_fixed_point+set}" = set; then :
-  enableval=$enable_fixed_point;
-else
-
-  case $target in
-    arm*)
-      enable_fixed_point=yes
-      ;;
-
-    mips*-*-*)
-      enable_fixed_point=yes
-      ;;
-    loongarch*-*-*)
-      enable_fixed_point=yes
-      ;;
-    *)
-      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: fixed-point is not supported for this target, ignored" >&5
-$as_echo "$as_me: WARNING: fixed-point is not supported for this target, ignored" >&2;}
-      enable_fixed_point=no
-      ;;
-  esac
-
-fi
-
-
-
-fixedpoint=`if test $enable_fixed_point = yes; then echo 1; else echo 0; fi`
-
-cat >>confdefs.h <<_ACEOF
-#define ENABLE_FIXED_POINT $fixedpoint
-_ACEOF
 
 
 # Enable threads
@@ -21987,7 +21950,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21990 "configure"
+#line 21953 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22093,7 +22056,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22096 "configure"
+#line 22059 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H

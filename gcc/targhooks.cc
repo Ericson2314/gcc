@@ -677,7 +677,7 @@ default_decimal_float_supported_p (void)
 bool
 default_fixed_point_supported_p (void)
 {
-  return ENABLE_FIXED_POINT;
+  return false;
 }
 
 /* True if the target supports GNU indirect functions.  */

@@ -726,6 +726,9 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P arm_scalar_mode_supported_p
 
+#undef TARGET_FIXED_POINT_SUPPORTED_P
+#define TARGET_FIXED_POINT_SUPPORTED_P hook_bool_void_true
+
 #undef TARGET_COMPUTE_FRAME_LAYOUT
 #define TARGET_COMPUTE_FRAME_LAYOUT arm_compute_frame_layout
 

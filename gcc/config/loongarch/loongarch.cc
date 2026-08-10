@@ -12320,6 +12320,9 @@ loongarch_output_asm_load_canary (rtx reg, rtx canary, rtx tmp)
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P loongarch_scalar_mode_supported_p
 
+#undef TARGET_FIXED_POINT_SUPPORTED_P
+#define TARGET_FIXED_POINT_SUPPORTED_P hook_bool_void_true
+
 #undef TARGET_VECTORIZE_PREFERRED_SIMD_MODE
 #define TARGET_VECTORIZE_PREFERRED_SIMD_MODE loongarch_preferred_simd_mode
 
