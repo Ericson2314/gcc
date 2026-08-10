@@ -343,26 +343,7 @@ case $target in
 	;;
 esac
 
-# With pre-defined ld
-AC_ARG_WITH(ld,
-[AS_HELP_STRING([--with-ld], [arrange to use the specified ld (full pathname)])],
-DEFAULT_LINKER="$with_ld")
-if test x"${DEFAULT_LINKER+set}" = x"set"; then
-  if test ! -x "$DEFAULT_LINKER"; then
-    AC_MSG_ERROR([cannot execute: $DEFAULT_LINKER: check --with-ld or env. var. DEFAULT_LINKER])
-  elif $DEFAULT_LINKER -v < /dev/null 2>&1 | grep 'PROJECT:ld\(64\)*-' > /dev/null; then
-    ld64_flag=yes
-  fi
-  AC_DEFINE_UNQUOTED(DEFAULT_LINKER,"$DEFAULT_LINKER",
-	[Define to enable the use of a default linker.])
-fi
 
-AC_MSG_CHECKING([whether a default linker was specified])
-if test x"${DEFAULT_LINKER+set}" = x"set"; then
-  AC_MSG_RESULT([yes ($DEFAULT_LINKER)])
-else
-  AC_MSG_RESULT(no)
-fi
 
 # With demangler in GNU ld
 AC_ARG_WITH(demangler-in-ld,
@@ -370,74 +351,8 @@ AC_ARG_WITH(demangler-in-ld,
 demangler_in_ld="$with_demangler_in_ld",
 demangler_in_ld=yes)
 
-# Allow the user to specify a dsymutil executable (used on Darwin only, so far)
-AC_ARG_WITH(dsymutil,
-[AS_HELP_STRING([--with-dsymutil], [arrange to use the specified dsymutil (full pathname)])],
-DEFAULT_DSYMUTIL="$with_dsymutil")
-
 dsymutil_vers=
-if test x"${DEFAULT_DSYMUTIL+set}" = x"set"; then
-  if test ! -x "$DEFAULT_DSYMUTIL"; then
-    AC_MSG_ERROR([cannot execute: $DEFAULT_DSYMUTIL: check --with-dsymutil or env. var. DEFAULT_DSYMUTIL])
-  else
-    if dsymutil_vers=`$DEFAULT_DSYMUTIL -v /dev/null 2>&1`; then
-      dsymutil_flag=yes
-    fi
-  fi
-  AC_DEFINE_UNQUOTED(DEFAULT_DSYMUTIL,"$DEFAULT_DSYMUTIL",
-	[Define to enable the use of a default debug linker.])
-fi
 
-AC_MSG_CHECKING([whether a default dsymutil was specified])
-if test x"${DEFAULT_DSYMUTIL+set}" = x"set"; then
-  AC_MSG_RESULT([yes ($DEFAULT_DSYMUTIL)])
-else
-  AC_MSG_RESULT(no)
-fi
-
-# ----------------------
-# Find default assembler
-# ----------------------
-
-AC_ARG_WITH(as,
-[AS_HELP_STRING([--with-as], [arrange to use the specified as (full pathname)])],
-DEFAULT_ASSEMBLER="$with_as")
-if test x"${DEFAULT_ASSEMBLER+set}" = x"set"; then
-  if test ! -x "$DEFAULT_ASSEMBLER"; then
-    AC_MSG_ERROR([cannot execute: $DEFAULT_ASSEMBLER: check --with-as or env. var. DEFAULT_ASSEMBLER])
-  fi
-  AC_DEFINE_UNQUOTED(DEFAULT_ASSEMBLER,"$DEFAULT_ASSEMBLER",
-	[Define to enable the use of a default assembler.])
-fi
-
-AC_MSG_CHECKING([whether a default assembler was specified])
-if test x"${DEFAULT_ASSEMBLER+set}" = x"set"; then
-  AC_MSG_RESULT([yes ($DEFAULT_ASSEMBLER)])
-else
-  AC_MSG_RESULT(no)
-fi
-
-# --------------------
-# Find default windres
-# --------------------
-
-AC_ARG_WITH(windres,
-[AS_HELP_STRING([--with-windres], [arrange to use the specified windres (full pathname)])],
-DEFAULT_WINDRES="$with_windres")
-if test x"${DEFAULT_WINDRES+set}" = x"set"; then
-  if test ! -x "$DEFAULT_WINDRES"; then
-    AC_MSG_ERROR([cannot execute: $DEFAULT_WINDRES: check --with-windres or env. var. DEFAULT_WINDRES])
-  fi
-  AC_DEFINE_UNQUOTED(DEFAULT_WINDRES,"$DEFAULT_WINDRES",
-	[Define to enable the use of a default windres.])
-fi
-
-AC_MSG_CHECKING([whether a default windres was specified])
-if test x"${DEFAULT_WINDRES+set}" = x"set"; then
-  AC_MSG_RESULT([yes ($DEFAULT_WINDRES)])
-else
-  AC_MSG_RESULT(no)
-fi
 
 
 # ---------------
@@ -5883,21 +5798,6 @@ if test x"$insn" != x; then
     fi
  fi
 
- gcc_GAS_CHECK_FEATURE([--gdwarf2 option],
-  gcc_cv_as_gdwarf2_flag,
-  [--gdwarf2], [$insn],,
-  [AC_DEFINE(HAVE_AS_GDWARF2_DEBUG_FLAG, 1,
-[Define if your assembler supports the --gdwarf2 option.])])
-
- gcc_GAS_CHECK_FEATURE([--gdwarf-5 option],
-  gcc_cv_as_gdwarf_5_flag,
-  [--gdwarf-5], [$insn],
-  [if test x$gcc_cv_objdump != x \
-      && $gcc_cv_objdump -Wi conftest.o 2>&1 \
-	 | grep DW_TAG_compile_unit > /dev/null 2>&1; then
-     gcc_cv_as_gdwarf_5_flag=yes;
-   fi],[AC_DEFINE(HAVE_AS_GDWARF_5_DEBUG_FLAG, 1,
-[Define if your assembler supports the --gdwarf-5 option.])])
 
  case $target_os in
    win32 | pe | cygwin* | mingw32*)
@@ -6114,43 +6014,9 @@ foo:
      [--gdwarf-4], [$conftest_s],, [dwarf4_success=yes])
  fi
 
- if test $dwarf4_success = yes; then
-   conftest_s="\
-	.text
-	.globl	foo
-	$function_type
-foo:
-	$insn
-	$function_size
-	.file	1 \"foo.c\"
-"
-   gcc_GAS_CHECK_FEATURE([working --gdwarf-4/--gdwarf-5 for all sources],
-     gcc_cv_as_working_gdwarf_n_flag,
-     [--gdwarf-4],
-     [$conftest_s],
-     [changequote(,)dnl
-      if test x$gcc_cv_objdump != x \
-	 && $gcc_cv_objdump -W conftest.o 2>&1 \
-		| grep 'conftest\.s' > /dev/null 2>&1; then
-	gcc_cv_as_working_gdwarf_n_flag=no
-      else
-	gcc_cv_as_working_gdwarf_n_flag=yes
-      fi
-      changequote([,])dnl])
-   if test $gcc_cv_as_working_gdwarf_n_flag = yes; then
-     AC_DEFINE(HAVE_AS_WORKING_DWARF_N_FLAG, 1,
-[Define if your assembler supports --gdwarf-4/--gdwarf-5 even with
- compiler generated .debug_line.])
-   fi
- fi
 
-dnl --debug-prefix-map is likewise a property of the assembler in use, feeding
-dnl only a spec string; target-specs probes it.
 fi
 
-dnl Compressed debug section support is a property of a particular assembler,
-dnl not of a target, and it feeds nothing but a spec string.  It is probed by
-dnl target-specs, against the assembler actually in use.
 
 gcc_GAS_CHECK_FEATURE([.lcomm with alignment], gcc_cv_as_lcomm_with_alignment,,
 [.lcomm bar,4,16],,
@@ -6469,11 +6335,6 @@ if test x$gcc_cv_ld_eh_gc_sections_bug = xyes; then
 fi
 AC_MSG_RESULT($gcc_cv_ld_eh_gc_sections_bug)
 
-dnl Compressed debug section support is a property of a particular linker, and
-dnl feeds nothing but a spec string.  target-specs probes it, against the linker
-dnl actually in use.  Note the Solaris case that used to live here keyed on
-dnl ${target} for want of a way to ask the linker itself, which is precisely the
-dnl guesswork that asking the real tool removes.
 
 AC_MSG_CHECKING(linker support for -z ctf)
 gcc_cv_ld_ctf=no

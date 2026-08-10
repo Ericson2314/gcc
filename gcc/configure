@@ -975,11 +975,7 @@ with_gxx_include_dir
 with_gxx_libcxx_include_dir
 with_cpp_install_dir
 enable_generated_files_in_srcdir
-with_ld
 with_demangler_in_ld
-with_dsymutil
-with_as
-with_windres
 enable_largefile
 enable_build_format_warnings
 enable_werror_always
@@ -1876,12 +1872,7 @@ Optional Packages:
   --with-cpp-install-dir=DIR
                           install the user visible C preprocessor in DIR
                           (relative to PREFIX) as well as PREFIX/bin
-  --with-ld               arrange to use the specified ld (full pathname)
   --with-demangler-in-ld  try to use demangler in GNU ld
-  --with-dsymutil         arrange to use the specified dsymutil (full
-                          pathname)
-  --with-as               arrange to use the specified as (full pathname)
-  --with-windres          arrange to use the specified windres (full pathname)
   --with-stack-clash-protection-guard-size=size
                           Set the default stack clash protection guard size
                           for specific targets as a power of two in bytes.
@@ -3942,35 +3933,7 @@ case $target in
 	;;
 esac
 
-# With pre-defined ld
 
-# Check whether --with-ld was given.
-if test "${with_ld+set}" = set; then :
-  withval=$with_ld; DEFAULT_LINKER="$with_ld"
-fi
-
-if test x"${DEFAULT_LINKER+set}" = x"set"; then
-  if test ! -x "$DEFAULT_LINKER"; then
-    as_fn_error $? "cannot execute: $DEFAULT_LINKER: check --with-ld or env. var. DEFAULT_LINKER" "$LINENO" 5
-  elif $DEFAULT_LINKER -v < /dev/null 2>&1 | grep 'PROJECT:ld\(64\)*-' > /dev/null; then
-    ld64_flag=yes
-  fi
-
-cat >>confdefs.h <<_ACEOF
-#define DEFAULT_LINKER "$DEFAULT_LINKER"
-_ACEOF
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a default linker was specified" >&5
-$as_echo_n "checking whether a default linker was specified... " >&6; }
-if test x"${DEFAULT_LINKER+set}" = x"set"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes ($DEFAULT_LINKER)" >&5
-$as_echo "yes ($DEFAULT_LINKER)" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
 
 # With demangler in GNU ld
 
@@ -3982,101 +3945,8 @@ else
 fi
 
 
-# Allow the user to specify a dsymutil executable (used on Darwin only, so far)
-
-# Check whether --with-dsymutil was given.
-if test "${with_dsymutil+set}" = set; then :
-  withval=$with_dsymutil; DEFAULT_DSYMUTIL="$with_dsymutil"
-fi
-
-
 dsymutil_vers=
-if test x"${DEFAULT_DSYMUTIL+set}" = x"set"; then
-  if test ! -x "$DEFAULT_DSYMUTIL"; then
-    as_fn_error $? "cannot execute: $DEFAULT_DSYMUTIL: check --with-dsymutil or env. var. DEFAULT_DSYMUTIL" "$LINENO" 5
-  else
-    if dsymutil_vers=`$DEFAULT_DSYMUTIL -v /dev/null 2>&1`; then
-      dsymutil_flag=yes
-    fi
-  fi
 
-cat >>confdefs.h <<_ACEOF
-#define DEFAULT_DSYMUTIL "$DEFAULT_DSYMUTIL"
-_ACEOF
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a default dsymutil was specified" >&5
-$as_echo_n "checking whether a default dsymutil was specified... " >&6; }
-if test x"${DEFAULT_DSYMUTIL+set}" = x"set"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes ($DEFAULT_DSYMUTIL)" >&5
-$as_echo "yes ($DEFAULT_DSYMUTIL)" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-# ----------------------
-# Find default assembler
-# ----------------------
-
-
-# Check whether --with-as was given.
-if test "${with_as+set}" = set; then :
-  withval=$with_as; DEFAULT_ASSEMBLER="$with_as"
-fi
-
-if test x"${DEFAULT_ASSEMBLER+set}" = x"set"; then
-  if test ! -x "$DEFAULT_ASSEMBLER"; then
-    as_fn_error $? "cannot execute: $DEFAULT_ASSEMBLER: check --with-as or env. var. DEFAULT_ASSEMBLER" "$LINENO" 5
-  fi
-
-cat >>confdefs.h <<_ACEOF
-#define DEFAULT_ASSEMBLER "$DEFAULT_ASSEMBLER"
-_ACEOF
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a default assembler was specified" >&5
-$as_echo_n "checking whether a default assembler was specified... " >&6; }
-if test x"${DEFAULT_ASSEMBLER+set}" = x"set"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes ($DEFAULT_ASSEMBLER)" >&5
-$as_echo "yes ($DEFAULT_ASSEMBLER)" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-# --------------------
-# Find default windres
-# --------------------
-
-
-# Check whether --with-windres was given.
-if test "${with_windres+set}" = set; then :
-  withval=$with_windres; DEFAULT_WINDRES="$with_windres"
-fi
-
-if test x"${DEFAULT_WINDRES+set}" = x"set"; then
-  if test ! -x "$DEFAULT_WINDRES"; then
-    as_fn_error $? "cannot execute: $DEFAULT_WINDRES: check --with-windres or env. var. DEFAULT_WINDRES" "$LINENO" 5
-  fi
-
-cat >>confdefs.h <<_ACEOF
-#define DEFAULT_WINDRES "$DEFAULT_WINDRES"
-_ACEOF
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a default windres was specified" >&5
-$as_echo_n "checking whether a default windres was specified... " >&6; }
-if test x"${DEFAULT_WINDRES+set}" = x"set"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes ($DEFAULT_WINDRES)" >&5
-$as_echo "yes ($DEFAULT_WINDRES)" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
 
 
 # ---------------
@@ -22117,7 +21987,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22120 "configure"
+#line 21990 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22223,7 +22093,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 22226 "configure"
+#line 22096 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -32138,73 +32008,6 @@ fi
     fi
  fi
 
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --gdwarf2 option" >&5
-$as_echo_n "checking assembler for --gdwarf2 option... " >&6; }
-if ${gcc_cv_as_gdwarf2_flag+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_gdwarf2_flag=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo "$insn" > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags --gdwarf2 -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_gdwarf2_flag=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_gdwarf2_flag" >&5
-$as_echo "$gcc_cv_as_gdwarf2_flag" >&6; }
-if test $gcc_cv_as_gdwarf2_flag = yes; then
-
-$as_echo "#define HAVE_AS_GDWARF2_DEBUG_FLAG 1" >>confdefs.h
-
-fi
-
-
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --gdwarf-5 option" >&5
-$as_echo_n "checking assembler for --gdwarf-5 option... " >&6; }
-if ${gcc_cv_as_gdwarf_5_flag+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_gdwarf_5_flag=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo "$insn" > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags --gdwarf-5 -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	if test x$gcc_cv_objdump != x \
-      && $gcc_cv_objdump -Wi conftest.o 2>&1 \
-	 | grep DW_TAG_compile_unit > /dev/null 2>&1; then
-     gcc_cv_as_gdwarf_5_flag=yes;
-   fi
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_gdwarf_5_flag" >&5
-$as_echo "$gcc_cv_as_gdwarf_5_flag" >&6; }
-if test $gcc_cv_as_gdwarf_5_flag = yes; then
-
-$as_echo "#define HAVE_AS_GDWARF_5_DEBUG_FLAG 1" >>confdefs.h
-
-fi
-
 
  case $target_os in
    win32 | pe | cygwin* | mingw32*)
@@ -32522,86 +32325,6 @@ fi
 
  fi
 
- if test $dwarf4_success = yes; then
-   conftest_s="\
-	.text
-	.globl	foo
-	$function_type
-foo:
-	$insn
-	$function_size
-	.file	1 \"foo.c\"
-"
-   { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for working --gdwarf-4/--gdwarf-5 for all sources" >&5
-$as_echo_n "checking assembler for working --gdwarf-4/--gdwarf-5 for all sources... " >&6; }
-if ${gcc_cv_as_working_gdwarf_n_flag+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_working_gdwarf_n_flag=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo "$conftest_s" > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags --gdwarf-4 -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	      if test x$gcc_cv_objdump != x \
-	 && $gcc_cv_objdump -W conftest.o 2>&1 \
-		| grep 'conftest\.s' > /dev/null 2>&1; then
-	gcc_cv_as_working_gdwarf_n_flag=no
-      else
-	gcc_cv_as_working_gdwarf_n_flag=yes
-      fi
-          else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_working_gdwarf_n_flag" >&5
-$as_echo "$gcc_cv_as_working_gdwarf_n_flag" >&6; }
-
-
-   if test $gcc_cv_as_working_gdwarf_n_flag = yes; then
-
-$as_echo "#define HAVE_AS_WORKING_DWARF_N_FLAG 1" >>confdefs.h
-
-   fi
- fi
-
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --debug-prefix-map option" >&5
-$as_echo_n "checking assembler for --debug-prefix-map option... " >&6; }
-if ${gcc_cv_as_debug_prefix_map_flag+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_debug_prefix_map_flag=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo "$insn" > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags --debug-prefix-map /a=/b -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_debug_prefix_map_flag=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_debug_prefix_map_flag" >&5
-$as_echo "$gcc_cv_as_debug_prefix_map_flag" >&6; }
-if test $gcc_cv_as_debug_prefix_map_flag = yes; then
-
-$as_echo "#define HAVE_AS_DEBUG_PREFIX_MAP 1" >>confdefs.h
-
-fi
 
 fi
 

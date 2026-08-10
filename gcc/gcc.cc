@@ -930,47 +930,13 @@ proper position among the other output files.  */
    describes one assembler and is supplied by the spec file.  */
 #define ASM_COMPRESS_DEBUG_SPEC ""
 
-/* Define ASM_DEBUG_SPEC to be a spec suitable for translating '-g'
-   to the assembler, when compiling assembly sources only.  */
-#ifndef ASM_DEBUG_SPEC
-# if defined(HAVE_AS_GDWARF_5_DEBUG_FLAG) && defined(HAVE_AS_WORKING_DWARF_N_FLAG)
-/* If --gdwarf-N is supported and as can handle even compiler generated
-   .debug_line with it, supply --gdwarf-N in ASM_DEBUG_OPTION_SPEC rather
-   than in ASM_DEBUG_SPEC, so that it applies to both .s and .c etc.
-   compilations.  */
-#  define ASM_DEBUG_DWARF_OPTION ""
-# elif defined(HAVE_AS_GDWARF_5_DEBUG_FLAG) && !defined(HAVE_LD_BROKEN_PE_DWARF5)
-#  define ASM_DEBUG_DWARF_OPTION "%{%:dwarf-version-gt(4):--gdwarf-5;" \
-	"%:dwarf-version-gt(3):--gdwarf-4;"				\
-	"%:dwarf-version-gt(2):--gdwarf-3;"				\
-	":--gdwarf2}"
-# else
-#  define ASM_DEBUG_DWARF_OPTION "--gdwarf2"
-# endif
-#  if defined(DWARF2_DEBUGGING_INFO) && defined(HAVE_AS_GDWARF2_DEBUG_FLAG)
-#   define ASM_DEBUG_SPEC "%{g*:%{%:debug-level-gt(0):" \
-	ASM_DEBUG_DWARF_OPTION "}}" ASM_MAP
-#  endif
-# endif
+/* Translating '-g' to the assembler depends on which --gdwarf-N flags that
+   assembler takes, and whether it handles compiler-generated .debug_line with
+   them.  Both describe one assembler, so both specs come from the spec file.  */
 #ifndef ASM_DEBUG_SPEC
 # define ASM_DEBUG_SPEC ""
 #endif
 
-/* Define ASM_DEBUG_OPTION_SPEC to be a spec suitable for translating '-g'
-   to the assembler when compiling all sources.  */
-#ifndef ASM_DEBUG_OPTION_SPEC
-# if defined(HAVE_AS_GDWARF_5_DEBUG_FLAG) && defined(HAVE_AS_WORKING_DWARF_N_FLAG)
-#  define ASM_DEBUG_OPTION_DWARF_OPT					\
-	"%{%:dwarf-version-gt(4):--gdwarf-5 ;"				\
-	"%:dwarf-version-gt(3):--gdwarf-4 ;"				\
-	"%:dwarf-version-gt(2):--gdwarf-3 ;"				\
-	":--gdwarf2 }"
-# if defined(DWARF2_DEBUGGING_INFO)
-#   define ASM_DEBUG_OPTION_SPEC "%{g*:%{%:debug-level-gt(0):" \
-	ASM_DEBUG_OPTION_DWARF_OPT "}}"
-#  endif
-# endif
-#endif
 #ifndef ASM_DEBUG_OPTION_SPEC
 # define ASM_DEBUG_OPTION_SPEC ""
 #endif
@@ -3146,27 +3112,9 @@ find_a_file (const struct path_prefix *pprefix, const char *name,
 static char*
 find_a_program (const char *name)
 {
-  /* Do not search if default matches query. */
-
-#ifdef DEFAULT_ASSEMBLER
-  if (! strcmp (name, "as") && access (DEFAULT_ASSEMBLER, X_OK) == 0)
-    return xstrdup (DEFAULT_ASSEMBLER);
-#endif
-
-#ifdef DEFAULT_LINKER
-  if (! strcmp (name, "ld") && access (DEFAULT_LINKER, X_OK) == 0)
-    return xstrdup (DEFAULT_LINKER);
-#endif
-
-#ifdef DEFAULT_DSYMUTIL
-  if (! strcmp (name, "dsymutil") && access (DEFAULT_DSYMUTIL, X_OK) == 0)
-    return xstrdup (DEFAULT_DSYMUTIL);
-#endif
-
-#ifdef DEFAULT_WINDRES
-  if (! strcmp (name, "windres") && access (DEFAULT_WINDRES, X_OK) == 0)
-    return xstrdup (DEFAULT_WINDRES);
-#endif
+  /* Which binary to run for a given tool is a property of an installation, not
+     of the compiler, so no tool path is fixed here; a spec file naming an
+     absolute path is handled by the case just below.  */
 
   /* Find the filename in question (special case for absolute paths).  */
 
@@ -8950,37 +8898,9 @@ driver::maybe_print_and_exit () const
   if (print_prog_name)
     {
       if (use_ld != NULL && ! strcmp (print_prog_name, "ld"))
-	{
-	  /* Append USE_LD to the default linker.  */
-#ifdef DEFAULT_LINKER
-	  char *ld;
-# ifdef HAVE_HOST_EXECUTABLE_SUFFIX
-	  int len = (sizeof (DEFAULT_LINKER)
-		     - sizeof (HOST_EXECUTABLE_SUFFIX));
-	  ld = NULL;
-	  if (len > 0)
-	    {
-	      char *default_linker = xstrdup (DEFAULT_LINKER);
-	      /* Strip HOST_EXECUTABLE_SUFFIX if DEFAULT_LINKER contains
-		 HOST_EXECUTABLE_SUFFIX.  */
-	      if (! strcmp (&default_linker[len], HOST_EXECUTABLE_SUFFIX))
-		{
-		  default_linker[len] = '\0';
-		  ld = concat (default_linker, use_ld,
-			       HOST_EXECUTABLE_SUFFIX, NULL);
-		}
-	    }
-	  if (ld == NULL)
-# endif
-	  ld = concat (DEFAULT_LINKER, use_ld, NULL);
-	  if (access (ld, X_OK) == 0)
-	    {
-	      printf ("%s\n", ld);
-	      return (0);
-	    }
-#endif
-	  print_prog_name = concat (print_prog_name, use_ld, NULL);
-	}
+	/* -fuse-ld=FOO asks for "ld" spelled with a suffix; look that name up
+	   the ordinary way.  */
+	print_prog_name = concat (print_prog_name, use_ld, NULL);
       char *newname = find_a_program (print_prog_name);
       printf ("%s\n", (newname ? newname : print_prog_name));
       return (0);
