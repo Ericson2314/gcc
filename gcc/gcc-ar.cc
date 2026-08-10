@@ -56,9 +56,11 @@ static const char *self_libexec_prefix;
 
 static const char *self_tooldir_prefix;
 
-/* The name of the machine that is being targeted.  */
+/* The machine being targeted.  Empty until one is selected: this wrapper
+   serves whatever targets its compiler does, so it has no machine of its
+   own.  */
 
-static const char *const target_machine = DEFAULT_TARGET_MACHINE;
+static const char *const target_machine = "";
 
 /* The target version.  */
 

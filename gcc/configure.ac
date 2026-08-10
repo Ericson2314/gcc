@@ -2778,9 +2778,7 @@ gcc_cv_as_gas_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/gas
 
 m4_pattern_allow([AS_FOR_TARGET])dnl
 AS_VAR_SET_IF(gcc_cv_as,, [
-if test -x "$DEFAULT_ASSEMBLER"; then
-	gcc_cv_as="$DEFAULT_ASSEMBLER"
-elif test -f $gcc_cv_as_gas_srcdir/configure.ac \
+if test -f $gcc_cv_as_gas_srcdir/configure.ac \
      && test -f ../gas/Makefile \
      && test x$build = x$host; then
 	gcc_cv_as=../gas/as-new$build_exeext
@@ -2880,9 +2878,7 @@ gcc_cv_ld_gold_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/gold
 gcc_cv_ld_bfd_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/bfd
 
 AS_VAR_SET_IF(gcc_cv_ld,, [
-if test -x "$DEFAULT_LINKER"; then
-	gcc_cv_ld="$DEFAULT_LINKER"
-elif test $install_gold_as_default = yes \
+if test $install_gold_as_default = yes \
      && test -f $gcc_cv_ld_gold_srcdir/configure.ac \
      && test -f ../gold/Makefile \
      && test x$build = x$host; then
@@ -3195,9 +3191,7 @@ fi
 
 # Figure out the dsymutil we will use.
 AS_VAR_SET_IF(gcc_cv_dsymutil,, [
-if test -x "$DEFAULT_DSYMUTIL"; then
-    gcc_cv_dsymutil="$DEFAULT_DSYMUTIL"
-elif test -x dsymutil$build_exeext; then
+if test -x dsymutil$build_exeext; then
     gcc_cv_dsymutil=./dsymutil$build_exeext
 elif ( set dummy $DSYMUTIL_FOR_TARGET; test -x $[2] ); then
     gcc_cv_dsymutil=$DSYMUTIL_FOR_TARGET
