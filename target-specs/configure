@@ -657,6 +657,8 @@ with_gxx_include_dir
 with_gxx_tool_include_dir
 with_gxx_backward_include_dir
 with_gxx_libcxx_include_dir
+with_local_prefix
+with_native_system_header_dir
 enable_linker_build_id
 '
       ac_precious_vars='build_alias
@@ -1322,6 +1324,10 @@ Optional Packages:
   --with-gxx-libcxx-include-dir=DIR
                           where this target's libc++ header files are; "no"
                           for none at all
+  --with-local-prefix=DIR where this target's site-local headers are installed
+  --with-native-system-header-dir=DIR
+                          where this target's system headers are; "no" for
+                          none at all
 
 Report bugs to the package provider.
 _ACEOF
@@ -2183,6 +2189,55 @@ if test "${with_gxx_libcxx_include_dir+set}" = set; then :
    esac
 fi
 
+
+
+# Check whether --with-local-prefix was given.
+if test "${with_local_prefix+set}" = set; then :
+  withval=$with_local_prefix; case $withval in
+     no|"") ts_local_prefix= ;;
+     yes)   as_fn_error $? "--with-local-prefix needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_local_prefix=$withval ;;
+   esac
+else
+  ts_local_prefix=/usr/local
+fi
+
+
+if test -n "$ts_local_prefix"; then
+  ts_local_include_dir=$ts_local_prefix/include
+else
+  ts_local_include_dir=
+fi
+
+case $target in
+  *-*-fuchsia*)                 ts_native_system_header_dir=/include ;;
+  *-*-gnu*)                     ts_native_system_header_dir=/include ;;
+  amdgcn-*-amdhsa*)             ts_native_system_header_dir=/include ;;
+  *-*-mingw*)                   ts_native_system_header_dir=/mingw/include ;;
+  *-*-msdosdjgpp*)              ts_native_system_header_dir=/dev/env/DJDIR/include ;;
+  *)                            ts_native_system_header_dir=/usr/include ;;
+esac
+
+case $target in
+  *-*-linux* | *-*-kfreebsd*-gnu | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+    ts_native_system_header_dir=/usr/include ;;
+esac
+
+
+# Check whether --with-native-system-header-dir was given.
+if test "${with_native_system_header_dir+set}" = set; then :
+  withval=$with_native_system_header_dir; case $withval in
+     no|"") ts_native_system_header_dir= ;;
+     yes)   as_fn_error $? "--with-native-system-header-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_native_system_header_dir=$withval ;;
+   esac
+fi
+
+
+case $target in
+  *-*-mingw*) ts_native_system_header_component=MINGW ;;
+  *)          ts_native_system_header_component= ;;
+esac
 
 have_target_tools=yes
 
@@ -4304,6 +4359,335 @@ $as_echo "$gcc_cv_as_arm_option_extensions" >&6; }
     ;;
 esac
 
+gcc_cv_as_ix86_filds=no
+gcc_cv_as_ix86_fildq=no
+gcc_cv_as_ix86_cmov_sun_syntax=no
+gcc_cv_as_ix86_ffreep=no
+gcc_cv_as_ix86_sahf=no
+gcc_cv_as_ix86_interunit_movq=no
+gcc_cv_as_ix86_hle=no
+gcc_cv_as_ix86_rep_lock_prefix=no
+gcc_cv_as_ix86_ud2=no
+gcc_cv_as_ix86_tlsgdplt=no
+gcc_cv_as_ix86_tlsldmplt=no
+gcc_cv_as_ix86_tlsldm=no
+gcc_cv_as_ix86_got32x=no
+gcc_cv_as_x86_64_code_6_gottpoff=no
+gcc_cv_as_ix86_gotoff_in_data=no
+gcc_cv_as_ix86_tls_get_addr_via_got=no
+case ${target} in
+  i?86-*-* | x86_64-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for filds and fists mnemonics" >&5
+$as_echo_n "checking assembler for filds and fists mnemonics... " >&6; }
+gcc_cv_as_ix86_filds=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	filds (%ebp); fists (%ebp)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_filds=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_filds" >&5
+$as_echo "$gcc_cv_as_ix86_filds" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for fildq and fistpq mnemonics" >&5
+$as_echo_n "checking assembler for fildq and fistpq mnemonics... " >&6; }
+gcc_cv_as_ix86_fildq=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	fildq (%ebp); fistpq (%ebp)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_fildq=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_fildq" >&5
+$as_echo "$gcc_cv_as_ix86_fildq" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for Sun syntax for cmov" >&5
+$as_echo_n "checking assembler for Sun syntax for cmov... " >&6; }
+gcc_cv_as_ix86_cmov_sun_syntax=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	cmovl.l %edx, %eax
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_cmov_sun_syntax=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_cmov_sun_syntax" >&5
+$as_echo "$gcc_cv_as_ix86_cmov_sun_syntax" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for ffreep mnemonic" >&5
+$as_echo_n "checking assembler for ffreep mnemonic... " >&6; }
+gcc_cv_as_ix86_ffreep=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	ffreep %st(1)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_ffreep=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_ffreep" >&5
+$as_echo "$gcc_cv_as_ix86_ffreep" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for sahf mnemonic in 64bit mode" >&5
+$as_echo_n "checking assembler for sahf mnemonic in 64bit mode... " >&6; }
+gcc_cv_as_ix86_sahf=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.code64
+	sahf
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_sahf=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_sahf" >&5
+$as_echo "$gcc_cv_as_ix86_sahf" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for interunit movq mnemonic" >&5
+$as_echo_n "checking assembler for interunit movq mnemonic... " >&6; }
+gcc_cv_as_ix86_interunit_movq=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.code64
+	movq %mm0, %rax
+	movq %rax, %xmm0
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_interunit_movq=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_interunit_movq" >&5
+$as_echo "$gcc_cv_as_ix86_interunit_movq" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for HLE prefixes" >&5
+$as_echo_n "checking assembler for HLE prefixes... " >&6; }
+gcc_cv_as_ix86_hle=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	lock xacquire cmpxchg %esi, (%ecx)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_hle=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_hle" >&5
+$as_echo "$gcc_cv_as_ix86_hle" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for rep and lock prefixes" >&5
+$as_echo_n "checking assembler for rep and lock prefixes... " >&6; }
+gcc_cv_as_ix86_rep_lock_prefix=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	rep movsl
+	rep ret
+	rep nop
+	rep bsf %ecx, %eax
+	rep bsr %ecx, %eax
+	lock addl %edi, (%eax,%esi)
+	lock orl $0, (%esp)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_rep_lock_prefix=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_rep_lock_prefix" >&5
+$as_echo "$gcc_cv_as_ix86_rep_lock_prefix" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for ud2 mnemonic" >&5
+$as_echo_n "checking assembler for ud2 mnemonic... " >&6; }
+gcc_cv_as_ix86_ud2=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	ud2
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_ud2=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_ud2" >&5
+$as_echo "$gcc_cv_as_ix86_ud2" >&6; }
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for @tlsgdplt" >&5
+$as_echo_n "checking assembler and linker for @tlsgdplt... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	call    tls_gd@tlsgdplt
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -G > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tlsgdplt=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_tlsgdplt" >&5
+$as_echo "$gcc_cv_as_ix86_tlsgdplt" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for @tlsldmplt" >&5
+$as_echo_n "checking assembler and linker for @tlsldmplt... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.section .tdata,"aw",@progbits
+tls_ld:
+	.section .text,"ax",@progbits
+	call    tls_ld@tlsldmplt
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -G > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tlsldmplt=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_tlsldmplt" >&5
+$as_echo "$gcc_cv_as_ix86_tlsldmplt" >&6; }
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for @tlsldm" >&5
+$as_echo_n "checking assembler and linker for @tlsldm... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.section .text,"ax",@progbits
+	.globl  _start
+	.type   _start, @function
+_start:
+	leal	value@tlsldm(%ebx), %eax
+	call	___tls_get_addr@plt
+
+	.section .tdata,"aw",@progbits
+	.type	value, @object
+value:
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -lc > /dev/null 2>&1; then
+      if "$gcc_cv_objdump" -d conftest 2>/dev/null | grep nop > /dev/null; then
+	gcc_cv_as_ix86_tlsldm=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_tlsldm" >&5
+$as_echo "$gcc_cv_as_ix86_tlsldm" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for calling ___tls_get_addr via GOT" >&5
+$as_echo_n "checking assembler and linker for calling ___tls_get_addr via GOT... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.section .text,"ax",@progbits
+	.globl  _start
+	.type   _start, @function
+_start:
+	leal	ld@tlsldm(%ecx), %eax
+	call	*___tls_get_addr@GOT(%ecx)
+	leal	gd@tlsgd(%ecx), %eax
+	call	*___tls_get_addr@GOT(%ecx)
+
+	.section .tdata,"aw",@progbits
+	.type	ld, @object
+ld:
+	.byte 0
+	.globl  gd
+	.type	gd, @object
+gd:
+	.byte 0
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tls_get_addr_via_got=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_tls_get_addr_via_got" >&5
+$as_echo "$gcc_cv_as_ix86_tls_get_addr_via_got" >&6; }
+
+                        { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for R_386_GOT32X" >&5
+$as_echo_n "checking assembler and linker for R_386_GOT32X... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.data
+bar:
+	.byte 1
+	.text
+	.global _start
+_start:
+	cmpl $0, bar@GOT
+	jmp *_start@GOT
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && test x"$gcc_cv_readelf" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_readelf" --relocs --wide conftest.o 2>&1 \
+	  | grep R_386_GOT32X > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+                  if "$gcc_cv_objdump" -dw conftest 2>&1 | grep 0xffffff > /dev/null 2>&1
+      then :; else
+	gcc_cv_as_ix86_got32x=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_got32x" >&5
+$as_echo "$gcc_cv_as_ix86_got32x" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler and linker for R_X86_64_CODE_6_GOTTPOFF" >&5
+$as_echo_n "checking assembler and linker for R_X86_64_CODE_6_GOTTPOFF... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.text
+	.globl	_start
+	.type _start, @function
+_start:
+	addq	%r23,foo@GOTTPOFF(%rip), %r15
+	.section .tdata,"awT",@progbits
+	.type foo, @object
+foo:
+	.quad 0
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && test x"$gcc_cv_readelf" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_readelf" --relocs --wide conftest.o 2>&1 \
+	  | grep R_X86_64_CODE_6_GOTTPOFF > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+      if "$gcc_cv_objdump" -dw conftest 2>&1 \
+	 | grep "add \+\$0xf\+8,%r23,%r15" > /dev/null 2>&1; then
+	gcc_cv_as_x86_64_code_6_gottpoff=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_x86_64_code_6_gottpoff" >&5
+$as_echo "$gcc_cv_as_x86_64_code_6_gottpoff" >&6; }
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for @GOTOFF in a data section" >&5
+$as_echo_n "checking assembler for @GOTOFF in a data section... " >&6; }
+gcc_cv_as_ix86_gotoff_in_data=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+.L0:
+	nop
+	.data
+	.long .L0@GOTOFF
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ix86_gotoff_in_data=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ix86_gotoff_in_data" >&5
+$as_echo "$gcc_cv_as_ix86_gotoff_in_data" >&6; }
+    ;;
+esac
+
+ts_vms_debug=no
+case ${target} in
+  alpha*-dec-*vms* | ia64-hp-*vms*) ts_vms_debug=yes ;;
+esac
+
 case ${target} in
   mips*-*-* | loongarch*-*-* | *-*-hpux*)
     if "$gcc_cv_as" -v < /dev/null 2>&1 | grep GNU > /dev/null; then :; else
@@ -4496,6 +4880,47 @@ as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"
 as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
 # arm.
 gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
+# i386/x86_64.  Sixteen keys, none of which was written by anything until now,
+# so every one of them was the built-in default on every target.
+as_ix86_filds `ts_bool "$gcc_cv_as_ix86_filds"`
+as_ix86_fildq `ts_bool "$gcc_cv_as_ix86_fildq"`
+as_ix86_cmov_sun_syntax `ts_bool "$gcc_cv_as_ix86_cmov_sun_syntax"`
+as_ix86_ffreep `ts_bool "$gcc_cv_as_ix86_ffreep"`
+as_ix86_sahf `ts_bool "$gcc_cv_as_ix86_sahf"`
+as_ix86_interunit_movq `ts_bool "$gcc_cv_as_ix86_interunit_movq"`
+as_ix86_hle `ts_bool "$gcc_cv_as_ix86_hle"`
+as_ix86_rep_lock_prefix `ts_bool "$gcc_cv_as_ix86_rep_lock_prefix"`
+as_ix86_ud2 `ts_bool "$gcc_cv_as_ix86_ud2"`
+as_ix86_tlsgdplt `ts_bool "$gcc_cv_as_ix86_tlsgdplt"`
+as_ix86_tlsldmplt `ts_bool "$gcc_cv_as_ix86_tlsldmplt"`
+as_ix86_tlsldm `ts_bool "$gcc_cv_as_ix86_tlsldm"`
+as_ix86_got32x `ts_bool "$gcc_cv_as_ix86_got32x"`
+as_r_x86_64_code_6_gottpoff `ts_bool "$gcc_cv_as_x86_64_code_6_gottpoff"`
+as_gotoff_in_data `ts_bool "$gcc_cv_as_ix86_gotoff_in_data"`
+as_ix86_tls_get_addr_got `ts_bool "$gcc_cv_as_ix86_tls_get_addr_via_got"`
+# Solaris.  The same answer already selects link_arch_gnu or link_arch_sun in
+# the spec half below; sol2.cc reads it as a capability.  Write both or neither
+# -- a target whose specs say Sun ld and whose config file says GNU ld is worse
+# than either answer applied consistently.
+solaris_ld `ts_bool "$gcc_cv_solaris_ld"`
+# Whether this target's debugger is VMS DEBUG.  Not a probe; see the note
+# beside the case that sets it.  Getting this wrong in the "yes" direction
+# changes the DWARF 5 line-table file-entry format for whatever target it
+# reaches, and no tool reports it.
+vms_debug `ts_bool "$ts_vms_debug"`
+EOF
+
+cat >> "$target_config_file" <<EOF
+
+# Site-local and system header directories for this target.  STRINGS.  An empty
+# value means "this target has no such directory" and removes the entry;
+# omitting the line would instead leave cppdefault.cc's compile-time fallback in
+# place, which is the answer for whichever target this tree was configured for.
+# The component is the prefix-relocation key of the SAME two table entries as
+# the directory, so the two are always written together.
+local_include_dir ${ts_local_include_dir}
+native_system_header_dir ${ts_native_system_header_dir}
+native_system_header_component ${ts_native_system_header_component}
 EOF
 
 if test x"$ts_emit_gxx" = xyes; then

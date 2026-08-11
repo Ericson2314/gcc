@@ -539,26 +539,19 @@ target optout The configuration's own name, not a capability.  It is read throug
 # emitted, so there is no gap for an exemption to excuse and the stale-entry
 # arm below would fire on them.
 #
-# Declared and read, but target-specs/configure.ac emits nothing for them, so
-# cc1 uses the built-in default on every target.  These are the silent half.
-as_gotoff_in_data bug HAVE_AS_GOTOFF_IN_DATA; no ix86 probe was carried over.
-as_ix86_cmov_sun_syntax bug No ix86 probe was carried over to target-specs.
-as_ix86_ffreep bug No ix86 probe was carried over to target-specs.
-as_ix86_fildq bug No ix86 probe was carried over to target-specs.
-as_ix86_filds bug No ix86 probe was carried over to target-specs.
-as_ix86_got32x bug No ix86 probe was carried over to target-specs.
-as_ix86_hle bug No ix86 probe was carried over to target-specs.
-as_ix86_interunit_movq bug No ix86 probe was carried over to target-specs.
-as_ix86_rep_lock_prefix bug No ix86 probe was carried over to target-specs.
-as_ix86_sahf bug No ix86 probe was carried over to target-specs.
-as_ix86_tls_get_addr_got bug No ix86 probe was carried over to target-specs.
-as_ix86_tlsgdplt bug No ix86 probe was carried over to target-specs.
-as_ix86_tlsldm bug No ix86 probe was carried over to target-specs.
-as_ix86_tlsldmplt bug No ix86 probe was carried over to target-specs.
-as_ix86_ud2 bug No ix86 probe was carried over to target-specs.
-as_r_x86_64_code_6_gottpoff bug No ix86 probe was carried over to target-specs.
-solaris_ld bug gcc_cv_solaris_ld IS probed; the answer reaches spec text only and never the config file.
-vms_debug bug Read by dwarf2out.cc; nothing probes or emits it.
+# The `declared and read, but nothing emits it' half is EMPTY.  It held twenty-
+# one entries: the sixteen ix86 assembler capabilities (whose probes had not
+# been carried over to target-specs at all, so every x86 answer in the tree was
+# the built-in default), solaris_ld (probed, but the answer reached spec text
+# only), vms_debug (read by dwarf2out.cc, written by nobody, so VMS targets got
+# no VMS debug output), and the three cppdefault keys local_include_dir,
+# native_system_header_dir and native_system_header_component.  All twenty-one
+# are emitted by target-specs/configure.ac now.
+#
+# Leave this comment where it is.  When the table above empties too, both arms
+# are simply fatal, which is the end state this design is aiming at -- and the
+# `#' lines here are stripped before the stale-exemption comparison, so nothing
+# written in prose can excuse a key.
 EOF
 
 sed 's/^#.*//' "$work"/exempt | awk 'NF { print $1 }' | sort > "$work"/exempt_keys

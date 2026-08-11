@@ -350,6 +350,89 @@ AC_ARG_WITH([gxx-libcxx-include-dir],
      *)     ts_gxx_libcxx_include_dir=$withval ;;
    esac], [])
 
+dnl Where this target's site-local and system headers live.  These were
+dnl --with-local-prefix and --with-native-system-header-dir in gcc/configure.ac
+dnl -- again ONE answer for the whole compiler -- plus the `native_system_header_dir'
+dnl case in gcc/config.gcc.  Like the gxx keys above they are STRINGS and they
+dnl are not probes: nothing is being asked of an assembler.
+dnl
+dnl THE SAME THREE STATES, AND THE SAME TRAP.  Absent means "nothing said" and
+dnl leaves cppdefault.cc's compile-time fallback in place; a key with nothing
+dnl after its name means "this target has no such directory" and removes the
+dnl entry.  So the =no arms below clear the variable and the key is still
+dnl written -- skipping the line would be silently the opposite of what was
+dnl asked for.
+dnl
+dnl WHY THESE ARE WRITTEN UNCONDITIONALLY while the gxx ones are not.  The gxx
+dnl built-in default is a path derived from OUR OWN prefix, which is right for
+dnl any target installed under it, so saying nothing is a real answer.  These
+dnl two are not: the built-in NATIVE_SYSTEM_HEADER_DIR is whatever config.gcc
+dnl chose for the target this tree was CONFIGURED for, applied to every target
+dnl the compiler can emit for.  That is the project's own bug, in the include
+dnl search path -- a mingw target getting /usr/include because the build was
+dnl configured for linux, with no diagnostic.  Stating the answer per target is
+dnl the fix, so it is stated for every target.
+AC_ARG_WITH([local-prefix],
+  [AS_HELP_STRING([--with-local-prefix=DIR],
+     [where this target's site-local headers are installed])],
+  [case $withval in
+     no|"") ts_local_prefix= ;;
+     yes)   AC_MSG_ERROR([--with-local-prefix needs a directory or "no"]) ;;
+     *)     ts_local_prefix=$withval ;;
+   esac], [ts_local_prefix=/usr/local])
+
+dnl "no" for the prefix means no site-local include directory at all, which is
+dnl the empty key rather than "/include".
+if test -n "$ts_local_prefix"; then
+  ts_local_include_dir=$ts_local_prefix/include
+else
+  ts_local_include_dir=
+fi
+
+dnl The default is the `case $target' in gcc/config.gcc, reproduced here rather
+dnl than approximated: /usr/include everywhere except the six arms that say
+dnl otherwise.  config.gcc lines 277, 965, 980, 1425, 1940, 2225 and 2395 are
+dnl the authority; keep this list and that one in step.
+case $target in
+  *-*-fuchsia*)                 ts_native_system_header_dir=/include ;;
+  *-*-gnu*)                     ts_native_system_header_dir=/include ;;
+  amdgcn-*-amdhsa*)             ts_native_system_header_dir=/include ;;
+  *-*-mingw*)                   ts_native_system_header_dir=/mingw/include ;;
+  *-*-msdosdjgpp*)              ts_native_system_header_dir=/dev/env/DJDIR/include ;;
+  *)                            ts_native_system_header_dir=/usr/include ;;
+esac
+
+dnl `*-*-gnu*' above is the Hurd, and it must not swallow the GNU/Linux and
+dnl GNU/kFreeBSD triples that config.gcc's enclosing arm lists beside it and
+dnl then excludes with an inner case.  Those end in -gnu, so the pattern alone
+dnl would match them and move /usr/include to /include for every glibc target
+dnl in the tree.  Re-assert the exclusion the way config.gcc does.
+case $target in
+  *-*-linux* | *-*-kfreebsd*-gnu | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+    ts_native_system_header_dir=/usr/include ;;
+esac
+
+AC_ARG_WITH([native-system-header-dir],
+  [AS_HELP_STRING([--with-native-system-header-dir=DIR],
+     [where this target's system headers are; "no" for none at all])],
+  [case $withval in
+     no|"") ts_native_system_header_dir= ;;
+     yes)   AC_MSG_ERROR([--with-native-system-header-dir needs a directory or "no"]) ;;
+     *)     ts_native_system_header_dir=$withval ;;
+   esac], [])
+
+dnl The prefix-relocation component of the SAME two table entries, so it moves
+dnl with the directory or not at all.  A config file that sets the directory and
+dnl leaves this alone gets one target's directory keyed under another target's
+dnl component, silently, so it is always written beside it.  The only tm.h in
+dnl the tree that sets NATIVE_SYSTEM_HEADER_COMPONENT is config/mingw/mingw32.h;
+dnl config/openbsd.h only reads it.  Everywhere else it is absent, which is the
+dnl empty value here, NOT an omitted key.
+case $target in
+  *-*-mingw*) ts_native_system_header_component=MINGW ;;
+  *)          ts_native_system_header_component= ;;
+esac
+
 dnl Missing tools are not an error.  When this runs as part of the tree the
 dnl target's binutils may legitimately not be installed yet, and failing the
 dnl whole build for that would be wrong -- the specs for that target simply
@@ -2228,6 +2311,257 @@ case ${target} in
     ;;
 esac
 
+dnl --- i386/x86_64.  SIXTEEN keys, and until now not one of them was written:
+dnl `grep -c gcc_cv_as_ix86' on this file was 0, so every x86 assembler
+dnl capability in target-caps.h had been reading its built-in default on every
+dnl target since the probes left gcc/configure.ac.  This is the largest single
+dnl instance of the nothing-writes-it failure the checker exists to find.
+dnl
+dnl The programs are byte-for-byte the ones gcc/configure.ac used.  Four of them
+dnl need the LINKER as well, and one needs objdump or readelf; where a tool is
+dnl missing the answer stays `no', which is what gcc/configure.ac did too.
+dnl
+dnl gcc/configure.ac passed $as_32_opt/$ld_32_opt/$as_64_opt/$ld_64_opt and
+dnl $tls_section_flag to these probes.  NONE OF THOSE FOUR IS EVER ASSIGNED
+dnl ANYWHERE IN THAT FILE -- checked, on the commit before the probes moved --
+dnl so every one expanded to the empty string and the probes ran with no flags.
+dnl They are dropped here rather than carried over empty, because an empty
+dnl variable that looks like a knob invites someone to set it, and setting
+dnl $as_32_opt would change what these probes mean without changing what the
+dnl compiler does with the answer.
+gcc_cv_as_ix86_filds=no
+gcc_cv_as_ix86_fildq=no
+gcc_cv_as_ix86_cmov_sun_syntax=no
+gcc_cv_as_ix86_ffreep=no
+gcc_cv_as_ix86_sahf=no
+gcc_cv_as_ix86_interunit_movq=no
+gcc_cv_as_ix86_hle=no
+gcc_cv_as_ix86_rep_lock_prefix=no
+gcc_cv_as_ix86_ud2=no
+gcc_cv_as_ix86_tlsgdplt=no
+gcc_cv_as_ix86_tlsldmplt=no
+gcc_cv_as_ix86_tlsldm=no
+gcc_cv_as_ix86_got32x=no
+gcc_cv_as_x86_64_code_6_gottpoff=no
+gcc_cv_as_ix86_gotoff_in_data=no
+gcc_cv_as_ix86_tls_get_addr_via_got=no
+case ${target} in
+  i?86-*-* | x86_64-*-*)
+    TS_AS_CHECK([filds and fists mnemonics], [gcc_cv_as_ix86_filds], [],
+[	filds (%ebp); fists (%ebp)])
+
+    TS_AS_CHECK([fildq and fistpq mnemonics], [gcc_cv_as_ix86_fildq], [],
+[	fildq (%ebp); fistpq (%ebp)])
+
+    TS_AS_CHECK([Sun syntax for cmov], [gcc_cv_as_ix86_cmov_sun_syntax], [],
+[	cmovl.l %edx, %eax])
+
+    TS_AS_CHECK([ffreep mnemonic], [gcc_cv_as_ix86_ffreep], [],
+[	ffreep %st(1)])
+
+    TS_AS_CHECK([sahf mnemonic in 64bit mode], [gcc_cv_as_ix86_sahf], [],
+[	.code64
+	sahf])
+
+    TS_AS_CHECK([interunit movq mnemonic], [gcc_cv_as_ix86_interunit_movq], [],
+[	.code64
+	movq %mm0, %rax
+	movq %rax, %xmm0])
+
+    TS_AS_CHECK([HLE prefixes], [gcc_cv_as_ix86_hle], [],
+[	lock xacquire cmpxchg %esi, (%ecx)])
+
+    TS_AS_CHECK([rep and lock prefixes], [gcc_cv_as_ix86_rep_lock_prefix], [],
+[	rep movsl
+	rep ret
+	rep nop
+	rep bsf %ecx, %eax
+	rep bsr %ecx, %eax
+	lock addl %edi, (%eax,%esi)
+	lock orl $0, (%esp)])
+
+    TS_AS_CHECK([ud2 mnemonic], [gcc_cv_as_ix86_ud2], [], [	ud2])
+
+    dnl The four below assemble AND link, so TS_AS_CHECK cannot express them.
+    AC_MSG_CHECKING([assembler and linker for @tlsgdplt])
+    cat > conftest.s <<'TSEOF'
+	call    tls_gd@tlsgdplt
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -G > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tlsgdplt=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_ix86_tlsgdplt])
+
+    AC_MSG_CHECKING([assembler and linker for @tlsldmplt])
+    cat > conftest.s <<'TSEOF'
+	.section .tdata,"aw",@progbits
+tls_ld:
+	.section .text,"ax",@progbits
+	call    tls_ld@tlsldmplt
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -G > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tlsldmplt=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_ix86_tlsldmplt])
+
+    dnl The original also accepted Solaris `dis' where objdump was absent.  A
+    dnl target-specs run has objdump named for the target or it has nothing, so
+    dnl the fallback would only ever find the HOST's dis and answer for the
+    dnl wrong toolchain -- exactly the confusion this directory exists to end.
+    AC_MSG_CHECKING([assembler and linker for @tlsldm])
+    cat > conftest.s <<'TSEOF'
+	.section .text,"ax",@progbits
+	.globl  _start
+	.type   _start, @function
+_start:
+	leal	value@tlsldm(%ebx), %eax
+	call	___tls_get_addr@plt
+
+	.section .tdata,"aw",@progbits
+	.type	value, @object
+value:
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o -lc > /dev/null 2>&1; then
+      if "$gcc_cv_objdump" -d conftest 2>/dev/null | grep nop > /dev/null; then
+	gcc_cv_as_ix86_tlsldm=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_ix86_tlsldm])
+
+    AC_MSG_CHECKING([assembler and linker for calling ___tls_get_addr via GOT])
+    cat > conftest.s <<'TSEOF'
+	.section .text,"ax",@progbits
+	.globl  _start
+	.type   _start, @function
+_start:
+	leal	ld@tlsldm(%ecx), %eax
+	call	*___tls_get_addr@GOT(%ecx)
+	leal	gd@tlsgd(%ecx), %eax
+	call	*___tls_get_addr@GOT(%ecx)
+
+	.section .tdata,"aw",@progbits
+	.type	ld, @object
+ld:
+	.byte 0
+	.globl  gd
+	.type	gd, @object
+gd:
+	.byte 0
+TSEOF
+    if test x"$gcc_cv_ld" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+      gcc_cv_as_ix86_tls_get_addr_via_got=yes
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_ix86_tls_get_addr_via_got])
+
+    dnl @GOT32X and R_X86_64_CODE_6_GOTTPOFF both assemble on an old assembler
+    dnl and then produce the WRONG relocation, so a plain assemble is not the
+    dnl test: the object has to be read back.  Both start from `no' and only the
+    dnl inspection can raise them, which is why a missing readelf or objdump
+    dnl leaves them `no' rather than defaulting them true.
+    AC_MSG_CHECKING([assembler and linker for R_386_GOT32X])
+    cat > conftest.s <<'TSEOF'
+	.data
+bar:
+	.byte 1
+	.text
+	.global _start
+_start:
+	cmpl $0, bar@GOT
+	jmp *_start@GOT
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && test x"$gcc_cv_readelf" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_readelf" --relocs --wide conftest.o 2>&1 \
+	  | grep R_386_GOT32X > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+      dnl 0xffffff in the disassembly is the unrelaxed form, i.e. the linker
+      dnl kept a GOT load it should have turned into an immediate.
+      if "$gcc_cv_objdump" -dw conftest 2>&1 | grep 0xffffff > /dev/null 2>&1
+      then :; else
+	gcc_cv_as_ix86_got32x=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_ix86_got32x])
+
+    AC_MSG_CHECKING([assembler and linker for R_X86_64_CODE_6_GOTTPOFF])
+    cat > conftest.s <<'TSEOF'
+	.text
+	.globl	_start
+	.type _start, @function
+_start:
+	addq	%r23,foo@GOTTPOFF(%rip), %r15
+	.section .tdata,"awT",@progbits
+	.type foo, @object
+foo:
+	.quad 0
+TSEOF
+    if test x"$gcc_cv_ld" != x && test x"$gcc_cv_objdump" != x \
+       && test x"$gcc_cv_readelf" != x \
+       && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+       && "$gcc_cv_readelf" --relocs --wide conftest.o 2>&1 \
+	  | grep R_X86_64_CODE_6_GOTTPOFF > /dev/null 2>&1 \
+       && "$gcc_cv_ld" -o conftest conftest.o > /dev/null 2>&1; then
+      if "$gcc_cv_objdump" -dw conftest 2>&1 \
+	 | grep "add \+\$0xf\+8,%r23,%r15" > /dev/null 2>&1; then
+	gcc_cv_as_x86_64_code_6_gottpoff=yes
+      fi
+    fi
+    rm -f conftest conftest.o conftest.s
+    AC_MSG_RESULT([$gcc_cv_as_x86_64_code_6_gottpoff])
+
+    dnl Not an assemble-only test either: assemblers accept ".long x@GOTOFF" in
+    dnl .data and then emit a relocation the linker rejects.  The original was a
+    dnl bare assemble and this keeps that, because the failure it looks for is
+    dnl at assembly time.
+    TS_AS_CHECK([@GOTOFF in a data section], [gcc_cv_as_ix86_gotoff_in_data], [],
+[	.text
+.L0:
+	nop
+	.data
+	.long .L0@GOTOFF])
+    ;;
+esac
+
+dnl --- VMS debugging info.  NOT a probe: no assembler is asked anything.  This
+dnl is the configuration saying "this target's debugger is VMS DEBUG", and it
+dnl was VMS_DEBUGGING_INFO in alpha/vms.h and ia64/vms.h.
+dnl
+dnl BE EXACT, BECAUSE THE WRONG ANSWER IS SILENT IN BOTH DIRECTIONS.  Answering
+dnl yes changes the DWARF 5 line table's file-entry FORMAT -- it adds the
+dnl DW_LNCT_timestamp and DW_LNCT_size pairs -- and a consumer reads the extra
+dnl pairs as file entries, so a stray yes corrupts the line table of every
+dnl target it reaches without any tool reporting an error.  It also selects
+dnl DW_AT_VMS_rtnbeg_pd_address, the HP prologue/epilogue attributes 0x2005 and
+dnl 0x2008, DW_FORM_string over DW_FORM_strp, and the VMS debug main pointer
+dnl DIE.  Answering no on a VMS target is the failure that is live right now:
+dnl the capability is read by dwarf2out.cc and written by nobody, so VMS targets
+dnl have been getting no VMS debug output at all.
+dnl
+dnl The two patterns are config.gcc's, not `*-*-vms*'.  config.gcc's `*-*-*vms*'
+dnl arm adds vms/vms.h, which does NOT define VMS_DEBUGGING_INFO; only the
+dnl `alpha*-dec-*vms*' and `ia64-hp-*vms*' arms add the alpha/vms.h and
+dnl ia64/vms.h that do.  vax-*-vms* matches the broad pattern, is on the
+dnl unsupported list, and never had the macro -- so the broad pattern would turn
+dnl this on for a target that has never had it.
+ts_vms_debug=no
+case ${target} in
+  alpha*-dec-*vms* | ia64-hp-*vms*) ts_vms_debug=yes ;;
+esac
+
 dnl --- Toolchain-vendor requirements that used to abort gcc/configure.
 dnl
 dnl All three of these were `exit 1' or AC_MSG_ERROR in gcc/configure.ac, which
@@ -2422,6 +2756,53 @@ as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"
 as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
 # arm.
 gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
+# i386/x86_64.  Sixteen keys, none of which was written by anything until now,
+# so every one of them was the built-in default on every target.
+as_ix86_filds `ts_bool "$gcc_cv_as_ix86_filds"`
+as_ix86_fildq `ts_bool "$gcc_cv_as_ix86_fildq"`
+as_ix86_cmov_sun_syntax `ts_bool "$gcc_cv_as_ix86_cmov_sun_syntax"`
+as_ix86_ffreep `ts_bool "$gcc_cv_as_ix86_ffreep"`
+as_ix86_sahf `ts_bool "$gcc_cv_as_ix86_sahf"`
+as_ix86_interunit_movq `ts_bool "$gcc_cv_as_ix86_interunit_movq"`
+as_ix86_hle `ts_bool "$gcc_cv_as_ix86_hle"`
+as_ix86_rep_lock_prefix `ts_bool "$gcc_cv_as_ix86_rep_lock_prefix"`
+as_ix86_ud2 `ts_bool "$gcc_cv_as_ix86_ud2"`
+as_ix86_tlsgdplt `ts_bool "$gcc_cv_as_ix86_tlsgdplt"`
+as_ix86_tlsldmplt `ts_bool "$gcc_cv_as_ix86_tlsldmplt"`
+as_ix86_tlsldm `ts_bool "$gcc_cv_as_ix86_tlsldm"`
+as_ix86_got32x `ts_bool "$gcc_cv_as_ix86_got32x"`
+as_r_x86_64_code_6_gottpoff `ts_bool "$gcc_cv_as_x86_64_code_6_gottpoff"`
+as_gotoff_in_data `ts_bool "$gcc_cv_as_ix86_gotoff_in_data"`
+as_ix86_tls_get_addr_got `ts_bool "$gcc_cv_as_ix86_tls_get_addr_via_got"`
+# Solaris.  The same answer already selects link_arch_gnu or link_arch_sun in
+# the spec half below; sol2.cc reads it as a capability.  Write both or neither
+# -- a target whose specs say Sun ld and whose config file says GNU ld is worse
+# than either answer applied consistently.
+solaris_ld `ts_bool "$gcc_cv_solaris_ld"`
+# Whether this target's debugger is VMS DEBUG.  Not a probe; see the note
+# beside the case that sets it.  Getting this wrong in the "yes" direction
+# changes the DWARF 5 line-table file-entry format for whatever target it
+# reaches, and no tool reports it.
+vms_debug `ts_bool "$ts_vms_debug"`
+EOF
+
+dnl Where this target's site-local and system headers live.  STRINGS, and the
+dnl empty string is a real answer, exactly as for the gxx keys below.  This is
+dnl its own heredoc only so the three keys stay together with their comment;
+dnl it is UNCONDITIONAL, for the reason given where the values are computed.
+dnl
+dnl NO BACKTICKS IN THE PROSE OF THIS HEREDOC EITHER.  It is unquoted.
+cat >> "$target_config_file" <<EOF
+
+# Site-local and system header directories for this target.  STRINGS.  An empty
+# value means "this target has no such directory" and removes the entry;
+# omitting the line would instead leave cppdefault.cc's compile-time fallback in
+# place, which is the answer for whichever target this tree was configured for.
+# The component is the prefix-relocation key of the SAME two table entries as
+# the directory, so the two are always written together.
+local_include_dir ${ts_local_include_dir}
+native_system_header_dir ${ts_native_system_header_dir}
+native_system_header_component ${ts_native_system_header_component}
 EOF
 
 dnl Where this target's C++ headers live.  STRINGS, and the empty string is a
