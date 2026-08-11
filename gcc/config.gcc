@@ -1875,10 +1875,9 @@ csky-*-*)
 		tm_file="elfos.h gnu-user.h linux.h glibc-stdint.h ${tm_file} csky/csky-linux-elf.h"
 		tmake_file="${tmake_file} csky/t-csky"
 
-		if test "x${enable_multilib}" = xyes ; then
-		    tm_defines="$tm_defines CSKY_ENABLE_MULTILIB"
-		    tmake_file="${tmake_file} csky/t-csky-linux"
-		fi
+		# Multilib is mandatory; ${enable_multilib} no longer exists.
+		tm_defines="$tm_defines CSKY_ENABLE_MULTILIB"
+		tmake_file="${tmake_file} csky/t-csky-linux"
 
 		case ${target} in
 		    csky-*-linux-gnu*)
@@ -2620,11 +2619,11 @@ microblaze*-*-elf)
         ;;
 riscv*-*-linux*)
 	tm_file="elfos.h gnu-user.h linux.h glibc-stdint.h ${tm_file} riscv/linux.h"
-	case "x${enable_multilib}" in
-	xno) ;;
-	xyes) tmake_file="${tmake_file} riscv/t-linux-multilib" ;;
-	*) echo "Unknown value for enable_multilib"; exit 1
-	esac
+	# Multilib is mandatory: --enable-multilib/--disable-multilib are gone, so
+	# ${enable_multilib} is now unset and the old `case' fell to its error arm
+	# and exited 1 -- which made every --enable-targets list containing riscv
+	# fail configure, with an empty message because the echo went to stdout.
+	tmake_file="${tmake_file} riscv/t-linux-multilib"
 	tmake_file="${tmake_file} riscv/t-riscv riscv/t-linux"
 	tm_defines="${tm_defines} TARGET_DEFAULT_ASYNC_UNWIND_TABLES=1"
 	case $target in
@@ -2657,12 +2656,9 @@ riscv*-*-elf* | riscv*-*-rtems*)
 	  tmake_file="${tmake_file} riscv/t-rtems"
 	  ;;
 	*)
+	  # Multilib is mandatory; see the riscv*-*-linux* arm above.
 	  if test "x${with_multilib_generator}" = xdefault; then
-		  case "x${enable_multilib}" in
-		  xno) ;;
-		  xyes) tmake_file="${tmake_file} riscv/t-elf-multilib" ;;
-		  *) echo "Unknown value for enable_multilib"; exit 1
-		  esac
+		  tmake_file="${tmake_file} riscv/t-elf-multilib"
 	  fi
 	esac
 	tmake_file="${tmake_file} riscv/t-riscv"
@@ -4689,10 +4685,13 @@ case "${target}" in
 		with_multilib_default="/march=abi-default"
 
 		# Handle --with-multilib-list.
+		# The `enable_multilib != yes' term is gone: multilib is mandatory
+		# and the variable no longer exists, so with it the test was
+		# ALWAYS true and every loongarch build silently collapsed to the
+		# single default ABI.
 		if test x"${with_multilib_list}" = x \
 		   || test x"${with_multilib_list}" = xno \
-		   || test x"${with_multilib_list}" = xdefault \
-		   || test x"${enable_multilib}" != xyes; then
+		   || test x"${with_multilib_list}" = xdefault; then
 
 			with_multilib_list="${abi_base}/${abi_ext}"
 		fi
@@ -5070,13 +5069,9 @@ case ${target} in
 		# Export canonical triplet.
 		tm_defines="${tm_defines} LA_MULTIARCH_TRIPLET=${la_canonical_triplet}"
 
-		# Define macro LA_DISABLE_MULTILIB if --disable-multilib
+		# Multilib is mandatory, so LA_DISABLE_MULTILIB is never defined.
 		tm_defines="${tm_defines} TM_MULTILIB_LIST=${loongarch_multilib_list_c}"
-		if test x$enable_multilib = xyes; then
-			TM_MULTILIB_CONFIG="${loongarch_multilib_list_make}"
-		else
-			tm_defines="${tm_defines} LA_DISABLE_MULTILIB"
-		fi
+		TM_MULTILIB_CONFIG="${loongarch_multilib_list_make}"
 
 		# Let --with- flags initialize the enum variables from loongarch.opt.
 		# See macro definitions from loongarch-opts.h and loongarch-cpu.h.
