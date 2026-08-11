@@ -96,11 +96,13 @@ along with GCC; see the file COPYING3.  If not see
 
 /* This is a workaround for a tool bug: see PR100340.  */
 
-#ifdef HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN
-#define EXTRA_ASM_OPTS " -mllvm -x86-pad-for-align=false "
-#else
+/* Was gated on HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN.  EXTRA_ASM_OPTS is
+   concatenated into the ASM_SPEC string literal below, so it must be a
+   compile-time constant and cannot become a runtime capability.  This is a
+   workaround for a clang-assembler bug (PR100340) and is only ever wanted when
+   that assembler is in use, so it stays empty by default; a Darwin toolchain
+   that needs it overrides the asm spec.  */
 #define EXTRA_ASM_OPTS ""
-#endif
 
 #undef ASM_SPEC
 #define ASM_SPEC \

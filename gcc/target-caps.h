@@ -152,6 +152,23 @@ struct target_caps
      HAVE_AS_IX86_TLSLDM.  Defaults false for the same reason.  */
   bool as_ix86_tlsldm;
 
+  /* Assembler mnemonics and prefixes the i386 back end emits, all formerly
+     `#ifdef HAVE_AS_IX86_*' guards around a fallback that hand-encodes the
+     instruction.  Each guarded both arms of a C body, so every one converts to
+     an ordinary `if'; none is a spec string or an existence test.
+
+     Defaults follow what auto-host.h answered for GNU as, not a blanket
+     assumption: the two Sun-assembler syntaxes are false.  */
+  bool as_ix86_sahf;
+  bool as_ix86_ud2;
+  bool as_ix86_filds;
+  bool as_ix86_fildq;
+  bool as_ix86_hle;
+  bool as_ix86_rep_lock_prefix;
+  bool as_ix86_ffreep;
+  bool as_ix86_tlsgdplt;
+  bool as_ix86_cmov_sun_syntax;
+
   /* Assembler takes `-relax', and the linker relaxes tail calls into branch-
      always.  Was HAVE_AS_RELAX_OPTION.  Only the codegen half is a runtime
      value: the spec half (ASM_RELAX_SPEC) is a string baked into the driver's

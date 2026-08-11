@@ -14237,32 +14237,33 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	  return;
 
 	case 'O':
-#ifdef HAVE_AS_IX86_CMOV_SUN_SYNTAX
-	  if (ASSEMBLER_DIALECT != ASM_ATT)
-	    return;
-
-	  switch (GET_MODE_SIZE (GET_MODE (x)))
+	  if (HAVE_AS_IX86_CMOV_SUN_SYNTAX)
 	    {
-	    case 2:
-	      putc ('w', file);
-	      break;
+	      if (ASSEMBLER_DIALECT != ASM_ATT)
+		return;
 
-	    case 4:
-	      putc ('l', file);
-	      break;
+	      switch (GET_MODE_SIZE (GET_MODE (x)))
+		{
+		case 2:
+		  putc ('w', file);
+		  break;
 
-	    case 8:
-	      putc ('q', file);
-	      break;
+		case 4:
+		  putc ('l', file);
+		  break;
 
-	    default:
-	      output_operand_lossage ("invalid operand size for operand "
-				      "code 'O'");
-	      return;
+		case 8:
+		  putc ('q', file);
+		  break;
+
+		default:
+		  output_operand_lossage ("invalid operand size for operand "
+					  "code 'O'");
+		  return;
+		}
+
+	      putc ('.', file);
 	    }
-
-	  putc ('.', file);
-#endif
 	  return;
 
 	case 'z':
@@ -14317,9 +14318,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	      switch (GET_MODE_SIZE (GET_MODE (x)))
 		{
 		case 2:
-#ifdef HAVE_AS_IX86_FILDS
-		  putc ('s', file);
-#endif
+		  if (HAVE_AS_IX86_FILDS)
+		    putc ('s', file);
 		  return;
 
 		case 4:
@@ -14327,11 +14327,10 @@ ix86_print_operand (FILE *file, rtx x, int code)
 		  return;
 
 		case 8:
-#ifdef HAVE_AS_IX86_FILDQ
-		  putc ('q', file);
-#else
-		  fputs ("ll", file);
-#endif
+		  if (HAVE_AS_IX86_FILDQ)
+		    putc ('q', file);
+		  else
+		    fputs ("ll", file);
 		  return;
 
 		default:
@@ -14536,11 +14535,9 @@ ix86_print_operand (FILE *file, rtx x, int code)
 
 	case 'F':
 	case 'f':
-#ifdef HAVE_AS_IX86_CMOV_SUN_SYNTAX
-	  if (ASSEMBLER_DIALECT == ASM_ATT)
+	  if (HAVE_AS_IX86_CMOV_SUN_SYNTAX && ASSEMBLER_DIALECT == ASM_ATT)
 	    putc ('.', file);
 	  gcc_fallthrough ();
-#endif
 
 	case 'C':
 	case 'c':
@@ -14588,17 +14585,19 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	    }
 
 	  if (INTVAL (x) & IX86_HLE_ACQUIRE)
-#ifdef HAVE_AS_IX86_HLE
-	    fputs ("xacquire ", file);
-#else
-	    fputs ("\n" ASM_BYTE "0xf2\n\t", file);
-#endif
+	    {
+	      if (HAVE_AS_IX86_HLE)
+		fputs ("xacquire ", file);
+	      else
+		fputs ("\n" ASM_BYTE "0xf2\n\t", file);
+	    }
 	  else if (INTVAL (x) & IX86_HLE_RELEASE)
-#ifdef HAVE_AS_IX86_HLE
-	    fputs ("xrelease ", file);
-#else
-	    fputs ("\n" ASM_BYTE "0xf3\n\t", file);
-#endif
+	    {
+	      if (HAVE_AS_IX86_HLE)
+		fputs ("xrelease ", file);
+	      else
+		fputs ("\n" ASM_BYTE "0xf3\n\t", file);
+	    }
 	  /* We do not want to print value of the operand.  */
 	  return;
 
@@ -14726,9 +14725,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	  }
 
 	case ';':
-#ifndef HAVE_AS_IX86_REP_LOCK_PREFIX
-	  putc (';', file);
-#endif
+	  if (!HAVE_AS_IX86_REP_LOCK_PREFIX)
+	    putc (';', file);
 	  return;
 
 	case '~':
@@ -16017,21 +16015,22 @@ static const char *
 output_387_ffreep (rtx *operands ATTRIBUTE_UNUSED, int opno)
 {
   if (TARGET_USE_FFREEP)
-#ifdef HAVE_AS_IX86_FFREEP
-    return opno ? "ffreep\t%y1" : "ffreep\t%y0";
-#else
     {
-      static char retval[32];
-      int regno = REGNO (operands[opno]);
+      if (HAVE_AS_IX86_FFREEP)
+	return opno ? "ffreep\t%y1" : "ffreep\t%y0";
+      else
+	{
+	  static char retval[32];
+	  int regno = REGNO (operands[opno]);
 
-      gcc_assert (STACK_REGNO_P (regno));
+	  gcc_assert (STACK_REGNO_P (regno));
 
-      regno -= FIRST_STACK_REG;
+	  regno -= FIRST_STACK_REG;
 
-      snprintf (retval, sizeof (retval), ASM_SHORT "0xc%ddf", regno);
-      return retval;
+	  snprintf (retval, sizeof (retval), ASM_SHORT "0xc%ddf", regno);
+	  return retval;
+	}
     }
-#endif
 
   return opno ? "fstp\t%y1" : "fstp\t%y0";
 }

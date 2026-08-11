@@ -1438,6 +1438,24 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_AS_REF (targ_caps.as_ref)
 #undef HAVE_XCOFF_DWARF_EXTRAS
 #define HAVE_XCOFF_DWARF_EXTRAS (targ_caps.xcoff_dwarf_extras)
+#undef HAVE_AS_IX86_SAHF
+#define HAVE_AS_IX86_SAHF (targ_caps.as_ix86_sahf)
+#undef HAVE_AS_IX86_UD2
+#define HAVE_AS_IX86_UD2 (targ_caps.as_ix86_ud2)
+#undef HAVE_AS_IX86_FILDS
+#define HAVE_AS_IX86_FILDS (targ_caps.as_ix86_filds)
+#undef HAVE_AS_IX86_FILDQ
+#define HAVE_AS_IX86_FILDQ (targ_caps.as_ix86_fildq)
+#undef HAVE_AS_IX86_HLE
+#define HAVE_AS_IX86_HLE (targ_caps.as_ix86_hle)
+#undef HAVE_AS_IX86_REP_LOCK_PREFIX
+#define HAVE_AS_IX86_REP_LOCK_PREFIX (targ_caps.as_ix86_rep_lock_prefix)
+#undef HAVE_AS_IX86_FFREEP
+#define HAVE_AS_IX86_FFREEP (targ_caps.as_ix86_ffreep)
+#undef HAVE_AS_IX86_TLSGDPLT
+#define HAVE_AS_IX86_TLSGDPLT (targ_caps.as_ix86_tlsgdplt)
+#undef HAVE_AS_IX86_CMOV_SUN_SYNTAX
+#define HAVE_AS_IX86_CMOV_SUN_SYNTAX (targ_caps.as_ix86_cmov_sun_syntax)
 #undef HAVE_AS_GOTOFF_IN_DATA
 #define HAVE_AS_GOTOFF_IN_DATA (targ_caps.as_gotoff_in_data)
 #undef HAVE_AS_IX86_INTERUNIT_MOVQ

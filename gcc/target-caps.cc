@@ -57,6 +57,15 @@ struct target_caps targ_caps =
   .as_r_x86_64_code_6_gottpoff = true,
   .as_ix86_tlsldmplt = false,
   .as_ix86_tlsldm = false,
+  .as_ix86_sahf = true,
+  .as_ix86_ud2 = true,
+  .as_ix86_filds = true,
+  .as_ix86_fildq = true,
+  .as_ix86_hle = true,
+  .as_ix86_rep_lock_prefix = true,
+  .as_ix86_ffreep = true,
+  .as_ix86_tlsgdplt = false,
+  .as_ix86_cmov_sun_syntax = false,
   .as_relax_option = true,
   .as_offsetable_lo10 = true,
   .as_gnu_attribute = true,
@@ -145,6 +154,24 @@ read_target_caps (const char *file)
 	targ_caps.as_ref = value != 0;
       else if (strcmp (name, "xcoff_dwarf_extras") == 0)
 	targ_caps.xcoff_dwarf_extras = value != 0;
+      else if (strcmp (name, "as_ix86_sahf") == 0)
+	targ_caps.as_ix86_sahf = value != 0;
+      else if (strcmp (name, "as_ix86_ud2") == 0)
+	targ_caps.as_ix86_ud2 = value != 0;
+      else if (strcmp (name, "as_ix86_filds") == 0)
+	targ_caps.as_ix86_filds = value != 0;
+      else if (strcmp (name, "as_ix86_fildq") == 0)
+	targ_caps.as_ix86_fildq = value != 0;
+      else if (strcmp (name, "as_ix86_hle") == 0)
+	targ_caps.as_ix86_hle = value != 0;
+      else if (strcmp (name, "as_ix86_rep_lock_prefix") == 0)
+	targ_caps.as_ix86_rep_lock_prefix = value != 0;
+      else if (strcmp (name, "as_ix86_ffreep") == 0)
+	targ_caps.as_ix86_ffreep = value != 0;
+      else if (strcmp (name, "as_ix86_tlsgdplt") == 0)
+	targ_caps.as_ix86_tlsgdplt = value != 0;
+      else if (strcmp (name, "as_ix86_cmov_sun_syntax") == 0)
+	targ_caps.as_ix86_cmov_sun_syntax = value != 0;
       else if (strcmp (name, "as_gotoff_in_data") == 0)
 	targ_caps.as_gotoff_in_data = value != 0;
       else if (strcmp (name, "as_ix86_interunit_movq") == 0)
