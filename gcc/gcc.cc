@@ -1214,7 +1214,7 @@ static const char *cpp_unique_options =
    options used to set target flags.  Those special target flags settings may
    in turn cause preprocessor symbols to be defined specially.  */
 static const char *cpp_options =
-"%(cc1_target_config) %(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
+"%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
  %{f*} %{g*:%{%:debug-level-gt(0):%{g*}\
  %{!fno-working-directory:-fworking-directory}}} %{O*}\
  %{undef} %{save-temps*:-fpch-preprocess}";
@@ -1354,7 +1354,6 @@ static const char *link_hardening = LINK_HARDENING_SPEC;
 static const char *cc1_options =
 "%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}}\
  %{!iplugindir*:%{fplugin*:%:find-plugindir()}}\
- %(cc1_target_config)\
  %1 %{!Q:-quiet} %(cpp_debug_options) %{m*} %{aux-info*}\
  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs}\
  %{v:-version} %{pg:-p} %{p} %{f*} %{undef}\
@@ -8648,6 +8647,7 @@ driver::main (int argc, char **argv)
   global_initializations ();
   build_multilib_strings ();
   set_up_specs ();
+  carry_target_config_as_switch ();
   putenv_COLLECT_AS_OPTIONS (assembler_options);
   putenv_COLLECT_GCC (argv[0]);
   maybe_putenv_COLLECT_LTO_WRAPPER ();
@@ -8827,6 +8827,65 @@ driver::build_multilib_strings () const
 }
 
 /* Set up the spec-handling machinery.  */
+
+/* Make the target config reach cc1 as a SWITCH rather than as spec text.
+
+   It used to be delivered by embedding %(cc1_target_config) inside the
+   `cpp_options' and `cc1_options' specs.  Those are specs a user is invited to
+   replace -- `-specs=' overriding `*cpp_options' is documented, supported, and
+   has worked for decades -- and the usual way to write such a file is to copy
+   the stock value and edit it.  A stock value has no %(cc1_target_config) in
+   it, because upstream has no such spec, so the copy silently dropped the
+   target and cc1 then died in `option_init_struct' with a hook error naming
+   nothing the user had done.  gcc.dg/pr48524.c does exactly this.
+
+   That is a different failure from the rest of this family.  Everywhere else
+   the value never reached a consumer; here it reaches one, and a user can
+   disconnect it with a supported option.  So the rule "find the stranded value
+   and connect it" is not enough: the carrier must not live somewhere users are
+   invited to replace.
+
+   A switch survives that.  Every spec that forwards `-f' options does so with
+   %{f*}, including the stock `cpp_options' and `cc1_options' a user would copy,
+   so the target rides along even through a replaced spec.  Nothing is embedded
+   in spec text any more, so there is exactly one carrier rather than two that
+   can disagree.
+
+   Only the cc1 side moves here.  collect2 still gets %(link_target_config)
+   from LINK_COMMAND_SPEC, which has no %{f*} to ride; that half of the class is
+   still open.  */
+
+void
+driver::carry_target_config_as_switch () const
+{
+  /* Already given on the command line: it is a switch already, %{f*} already
+     forwards it, and adding a second copy would only be noise.  */
+  for (int i = 0; i < n_switches; i++)
+    if (switches[i].part1 != NULL
+	&& startswith (switches[i].part1, "ftarget-config="))
+      return;
+
+  /* Otherwise take what the spec file supplied.  target-specs writes the whole
+     switch, `-ftarget-config=<path>', so it is used verbatim.  */
+  if (cc1_target_config == NULL || *cc1_target_config == '\0')
+    return;
+
+  const char *p = cc1_target_config;
+  while (ISSPACE ((unsigned char) *p))
+    p++;
+  if (!startswith (p, "-ftarget-config="))
+    {
+      /* Someone wrote something else into the spec.  Say so rather than
+	 passing it on and letting cc1 fail three layers down.  */
+      error ("the %<cc1_target_config%> spec is %qs, which is not a "
+	     "%<-ftarget-config=%> switch; the target cannot be passed to the "
+	     "compiler proper", cc1_target_config);
+      return;
+    }
+
+  save_switch (xstrdup (p), 0, NULL, /*validated=*/true, /*known=*/true);
+}
+
 
 void
 driver::set_up_specs () const

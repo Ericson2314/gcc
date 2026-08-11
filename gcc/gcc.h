@@ -42,6 +42,7 @@ class driver
   void global_initializations ();
   void build_multilib_strings () const;
   void set_up_specs () const;
+  void carry_target_config_as_switch () const;
   void putenv_COLLECT_GCC (const char *argv0) const;
   void maybe_putenv_COLLECT_LTO_WRAPPER () const;
   void maybe_putenv_OFFLOAD_TARGETS () const;
