@@ -23,6 +23,9 @@
 #	tm-preds-<base>.h	predicate declarations	 (genpreds -h)
 #	tm-constrs-<base>.h	constraint accessors	 (genpreds -c)
 #	tm_p-<base>.h		the back end's private protos + the above
+#	insn-flags-<base>.h	HAVE_<pattern>		 (genflags)
+#	insn-conditions-<base>.md  each condition's truth value, or -1
+#				(genconditions -> gencondmd-<base> -> run it)
 #
 # where <base> is the cpu_type.  The single-target tm-preds.h / tm-constrs.h
 # / tm_p.h rules in Makefile.in stay as they are; these are additional files
@@ -33,7 +36,7 @@
 # triple); they also share md_file and tm_p_file, so the first record for a
 # given cpu_type wins and the rest are skipped.
 
-function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
+function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk, condmd) {
   if (cpu == "" || seen[cpu])
     { cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; return }
   seen[cpu] = 1;
@@ -105,7 +108,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # link; they share the library above instead.  genpreds.cc additionally
   # reads a target macro out of tm.h (TARGET_MEM_CONSTRAINT), and genflags.cc
   # is what makes insn-flags-<base>.h, so both want this back end's tm.h.
-  n = split("preds flags", parts, " ");
+  # genconditions.cc wants it for the same reason and for one more: the file
+  # it *writes* names four back-end headers, and which four is settled when
+  # genconditions itself is compiled (see the GENCONDMD_* defines below).
+  n = split("preds flags conditions", parts, " ");
   for (i = 1; i <= n; i++) {
     printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
 	   parts[i], cpu, parts[i], cpu, cpu;
@@ -122,39 +128,97 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
   }
 
+  # genconditions writes a program; the program is what has to be built
+  # against this back end.  The four headers it names in what it writes are
+  # fixed at *its* compile time, so they are settled here rather than by any
+  # flag passed when it runs.  Defaults in genconditions.cc are the plain
+  # single-target names, so the single-target rules in Makefile.in are
+  # untouched.
+  #
+  # Back ends sharing default-common.cc are skipped: tm-<base>.h and the other
+  # three are generated per common-file base, not per cpu_type, and those five
+  # are the only place the two keys come apart, so ft32/moxie/rl78 have no
+  # tm-ft32.h &c to compile against.  Same guard as the asm-ops rules below.
+  if (cof != "default-common.cc") {
+    printf "build/genconditions-%s.o : BUILD_CPPFLAGS += \\\n", cpu;
+    printf "  -DGENCONDMD_TM_H='\"tm-%s.h\"' \\\n", cpu;
+    printf "  -DGENCONDMD_INSN_CONSTANTS_H='\"insn-constants-%s.h\"' \\\n", cpu;
+    printf "  -DGENCONDMD_TM_P_H='\"tm_p-%s.h\"' \\\n", cpu;
+    printf "  -DGENCONDMD_TM_CONSTRS_H='\"tm-constrs-%s.h\"'\n", cpu;
+    printf "build/genconditions-%s.o : $(HASHTAB_H)\n\n", cpu;
+
+    printf "build/gencondmd-%s.cc: s-conditions-%s; @true\n", cpu, cpu;
+    printf "s-conditions-%s: build/genconditions-%s$(build_exeext) \\\n", cpu, cpu;
+    printf "  $(srcdir)/common.md $(srcdir)/config/%s\n", md;
+    printf "\t$(RUN_GEN) build/genconditions-%s$(build_exeext) \\\n", cpu;
+    printf "\t  $(srcdir)/common.md $(srcdir)/config/%s > tmp-condmd-%s.cc\n", md, cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-condmd-%s.cc \\\n", cpu;
+    printf "\t  build/gencondmd-%s.cc\n", cpu;
+    printf "\t$(STAMP) s-conditions-%s\n\n", cpu;
+
+    # As for the single-target build/gencondmd.o: tm_p-<base>.h brings in the
+    # back end's predicate wrappers as inline functions, and keeping them all
+    # would demand definitions this program does not link.
+    printf "build/gencondmd-%s.o : build/gencondmd-%s.cc \\\n", cpu, cpu;
+    printf "  tm-%s.h insn-constants-%s.h tm_p-%s.h tm-constrs-%s.h \\\n",
+	   cpu, cpu, cpu, cpu;
+    printf "  insn-modes-%s.h insn-modes-inline-%s.h \\\n", cpu, cpu;
+    printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
+    printf "build/gencondmd-%s.o : BUILD_CPPFLAGS += \\\n", cpu;
+    printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
+    printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n", cpu;
+    printf "build/gencondmd-%s.o : \\\n", cpu;
+    printf "  BUILD_CFLAGS := $(filter-out -fkeep-inline-functions, $(BUILD_CFLAGS))\n";
+    printf "build/gencondmd-%s$(build_exeext): build/gencondmd-%s.o \\\n", cpu, cpu;
+    printf "  build/errors.o $(BUILD_LIBDEPS)\n";
+    printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
+    printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+
+    printf "insn-conditions-%s.md: s-condmd-%s; @true\n", cpu, cpu;
+    printf "s-condmd-%s: build/gencondmd-%s$(build_exeext)\n", cpu, cpu;
+    printf "\t$(RUN_GEN) build/gencondmd-%s$(build_exeext) > tmp-cond-%s.md\n", cpu, cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-cond-%s.md \\\n", cpu;
+    printf "\t  insn-conditions-%s.md\n", cpu;
+    printf "\t$(STAMP) s-condmd-%s\n\n", cpu;
+
+    condmd = "insn-conditions-" cpu ".md";
+  }
+  else {
+    printf "# no gencondmd-%s: no tm-%s.h (shares default-common.cc).\n\n",
+	   cpu, cpu;
+    condmd = "";
+  }
+
   # tm-<base>.h names this, so that a back end compiled against it gets its own
-  # HAVE_* rather than the configured target's.  Upstream feeds genflags
-  # insn-conditions.md as well, which resolves each pattern's condition to 1 or
-  # 0 up front; that file comes from gencondmd, which is itself built against
-  # one target and is not per-back-end yet.  Without it genflags emits the
-  # condition as the body of the HAVE_* macro, which is what GCC did before
-  # gencondmd existed -- correct, just not pre-evaluated.
+  # HAVE_* rather than the configured target's.  insn-conditions-<base>.md goes
+  # in alongside the machine description, the way upstream feeds genflags
+  # insn-conditions.md: it resolves each pattern's condition to 1 or 0 up front,
+  # so HAVE_<pattern> comes out as a constant wherever the condition is one.
+  # Without it genflags emits the condition itself as the body of the macro --
+  # what GCC did before gencondmd existed, correct but not pre-evaluated.
   #
-  # KNOWN GAP: gencondmd is the last generator in the insn-* pipeline that is
-  # not per-back-end (genmodes, genpreds, genflags and tm_p all are), so
-  # build/gencondmd.cc contains i386 content only.  Deferred deliberately, not
-  # forgotten.  Estimated at half a day for the mechanism -- every input
-  # already exists, and genconditions.cc's write_header hardcodes exactly the
-  # four headers that are already generated per base (tm, insn-constants, tm_p,
-  # tm-constrs), so it is the same -DTM_H_FILE shape used by genpreds.cc and
-  # genflags.cc -- against a day or more for the fallout, with real
-  # uncertainty.  gencondmd.cc is a 35-include TU pulling rtl.h, function.h,
-  # emit-rtl.h, df.h, resource.h, reload.h and recog.h, and making it
-  # per-back-end means compiling that whole stack against all 45 tm-<base>.h
-  # for the first time.  The modes/preds precedent was 23 back-end failures and
-  # most of a session; genflags was cheap only because genpreds had already
-  # paid for the much smaller header set.
+  # The back ends that share default-common.cc have no gencondmd of their own
+  # (see above), so for them genflags still runs without it.
   #
-  # Note this is a correctness/optimality gap, not a verification one.  Do not
-  # grep build/gencondmd.cc to decide whether an .md use is a condition string
-  # or a C body: that file describes one back end, so a zero hit cannot
-  # distinguish "no condition uses this" from "that .md was never read".  Read
-  # the .md structurally instead -- inside `{ ... }' after the condition is a C
-  # body, in the bare condition string is not.
+  # CAVEAT, and it is not small.  Pre-evaluation is only as good as the tm.h it
+  # is done against, and tm-<base>.h is built from the FIRST triple in the
+  # manifest that names this back end -- so tm-i386.h is an i686-apple-darwin
+  # and tm-sparc.h is a 32-bit sparc.  Where a condition turns on an OS or ABI
+  # choice rather than on the back end, folding it here bakes that one triple's
+  # answer, e.g.
+  #	-#define HAVE_adddi3_sp32 (TARGET_ARCH32)
+  #	+#define HAVE_adddi3_sp32 1
+  # and the symbolic form was the more nearly runtime-correct of the two.
+  # Upstream has no such gap because there tm.h *is* the configured target.
+  # So this is a straight win only once tm-<base>.h stops being "whichever
+  # triple came first"; until then it trades deferred evaluation for a
+  # constant chosen by manifest order.  Measured: sparc 1124 changed lines,
+  # i386 4270, rs6000 1423, aarch64 0.
   printf "insn-flags-%s.h: build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s%s\n", md, (condmd == "" ? "" : " " condmd);
   printf "\t$(RUN_GEN) build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s > tmp-flags-%s.h\n", md, cpu;
+  printf "\t  $(srcdir)/config/%s%s > tmp-flags-%s.h\n",
+	 md, (condmd == "" ? "" : " " condmd), cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-flags-%s.h $@\n", cpu;
   printf "%s-common.o: insn-flags-%s.h insn-modes-%s.h\n\n", cpu, cpu, cpu;
 

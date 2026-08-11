@@ -493,6 +493,24 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_FHARDENED_SUPPORTED 0
 #endif
 
+/* Whether the assembler in use is the Solaris one rather than GNU as.
+   Upstream this came from a configure probe of the target's assembler
+   (configure.ac's solaris_as check, AC_DEFINE_UNQUOTED to 0 or 1), which was
+   removed here: it is a property of a particular assembler binary, so it
+   belongs in target-specs and ultimately has to reach the compiler at run
+   time.  Until it does, say 0 explicitly.
+
+   Explicitly, because the alternative is not "no definition" but a silent 0:
+   every other user spells it `#if HAVE_SOLARIS_AS', where an undefined
+   identifier is 0 with no diagnostic, so the removal already had this effect
+   and merely hid it.  config/sparc/sparc.md uses it as a C condition instead,
+   where an undefined identifier is an error -- which is how the gap was
+   found, when gencondmd was first built per back end.  Do not read this
+   default as a decision that no target uses Solaris as.  */
+#ifndef HAVE_SOLARIS_AS
+#define HAVE_SOLARIS_AS 0
+#endif
+
 /* Offsets recorded in opcodes are a multiple of this alignment factor.  */
 #ifndef DWARF_CIE_DATA_ALIGNMENT
 #ifdef STACK_GROWS_DOWNWARD
