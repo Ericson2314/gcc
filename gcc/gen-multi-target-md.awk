@@ -41,6 +41,42 @@ function reset() {
   tmk = "";
 }
 
+# Has this back end been converted to the 2-coefficient poly_int discipline?
+#
+# It declares that by adding -DTARGET_POLY_AWARE to its own objects in
+# config/<cpu>/t-<cpu>, and that declaration is the ONLY source of truth here:
+# a list in this file would be a second place to say the same thing, and the
+# two would drift apart exactly once.
+#
+# The reason this function has to exist at all is the sentence a few lines
+# below: a multi-target build includes no target's tmake_file.  Only the
+# PRIMARY target's fragments are read (-include $(tmake_file)), so an opt-in
+# that lives in a fragment reaches its own back end only when that back end
+# happens to be the one the build was configured for.  That is not a leak --
+# the per-object CFLAGS- scoping fixed the leak -- it is the opposite failure:
+# the flag is WITHHELD from a converted back end, whose sources then no longer
+# compile.  i386 and arm both hit it; arm is simply the first that was ever
+# built as a non-primary target with a converted i386 alongside it.
+#
+# Only build/gencondmd-<triple>.o needs it.  genconditions.cc:74 writes
+# `#define IN_TARGET_CODE 1' into the file it generates, so gencondmd is
+# target code and gets ONLY_FIXED_SIZE_MODES; genconditions.o and
+# genpreds-<cpu>.o are compiled from shared sources that define no such thing,
+# and the compiler proper's per-back-end objects do not exist yet outside the
+# primary target.  Widen this when they do.
+function poly_aware(c,   frag, line, found) {
+  if (c in poly_aware_cache)
+    return poly_aware_cache[c];
+  frag = srcdir "/config/" c "/t-" c;
+  found = 0;
+  while ((getline line < frag) > 0)
+    if (index(line, "-DTARGET_POLY_AWARE") > 0)
+      found = 1;
+  close(frag);
+  poly_aware_cache[c] = found;
+  return found;
+}
+
 # A few triples name a GENERATED header in their tm_file: sysroot-suffix.h or
 # linux-sysroot-suffix.h, built by a tmake_file fragment.  A multi-target build
 # includes no target's tmake_file, so the rule has to be reproduced here -- the
@@ -537,6 +573,8 @@ function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
   printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
   printf "build/gencondmd-%s.o : BUILD_CPPFLAGS += \\\n", key;
   printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
+  if (poly_aware(cpu))
+    printf "  -DTARGET_POLY_AWARE \\\n";
   printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n", cpu;
   printf "build/gencondmd-%s.o : \\\n", key;
   printf "  BUILD_CFLAGS := $(filter-out -fkeep-inline-functions, $(BUILD_CFLAGS))\n";
