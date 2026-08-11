@@ -148,7 +148,18 @@ struct target_caps targ_caps =
   .gxx_include_dir = GPLUSPLUS_INCLUDE_DIR,
   .gxx_tool_include_dir = GPLUSPLUS_TOOL_INCLUDE_DIR,
   .gxx_backward_include_dir = GPLUSPLUS_BACKWARD_INCLUDE_DIR,
-  .gxx_libcxx_include_dir = GPLUSPLUS_LIBCXX_INCLUDE_DIR
+  .gxx_libcxx_include_dir = GPLUSPLUS_LIBCXX_INCLUDE_DIR,
+
+  /* The site-local and system header directories, and the component of the
+     latter.  NULL rather than a string, and that is deliberate: see
+     target-caps.h.  The compile-time answer for these three is not a plain
+     Makefile substitution -- two of them are subject to cppdefault.cc's
+     `#undef' under CROSS_DIRECTORY_STRUCTURE, and the component comes from
+     tm.h, which this file cannot include -- so the fallback is applied there,
+     where those things are visible, and NULL here means "nobody told us".  */
+  .local_include_dir = NULL,
+  .native_system_header_dir = NULL,
+  .native_system_header_component = NULL
 };
 
 /* No built-in default: see target-caps.h.  A compiler that has not been told
@@ -202,7 +213,11 @@ read_target_caps (const char *file)
 	  { "gxx_include_dir", &targ_caps.gxx_include_dir },
 	  { "gxx_tool_include_dir", &targ_caps.gxx_tool_include_dir },
 	  { "gxx_backward_include_dir", &targ_caps.gxx_backward_include_dir },
-	  { "gxx_libcxx_include_dir", &targ_caps.gxx_libcxx_include_dir }
+	  { "gxx_libcxx_include_dir", &targ_caps.gxx_libcxx_include_dir },
+	  { "local_include_dir", &targ_caps.local_include_dir },
+	  { "native_system_header_dir", &targ_caps.native_system_header_dir },
+	  { "native_system_header_component",
+	    &targ_caps.native_system_header_component }
 	};
 	bool matched = false;
 	for (unsigned i = 0; i < ARRAY_SIZE (strs); i++)

@@ -687,6 +687,39 @@ struct target_caps
   const char *gxx_tool_include_dir;
   const char *gxx_backward_include_dir;
   const char *gxx_libcxx_include_dir;
+
+  /* WHERE THIS TARGET'S SITE-LOCAL AND SYSTEM HEADERS LIVE -- /usr/local/include
+     and /usr/include on a typical GNU system.  Formerly the configure options
+     --with-local-prefix and --with-native-system-header-dir, plus config.gcc's
+     `native_system_header_dir', which is a `case $target': /usr/include for
+     most, /include for cygwin and vxworks, /mingw/include for mingw,
+     /dev/env/DJDIR/include for djgpp.  One triple decided it for all 188.
+
+     NATIVE_SYSTEM_HEADER_COMPONENT is the `component' field of the same two
+     entries (see update_path in prefix.cc) and is set by a target's tm.h --
+     openbsd.h and i386/xm-djgpp.h.  It has to travel with the directory or the
+     pair disagrees: a relocated toolchain would rewrite a prefix under a
+     component that belongs to a different target's answer.
+
+     THREE-STATE, AND UNLIKE gxx_* ABOVE THE DEFAULT IS NOT A STRING HERE.
+     NULL means "the config file said nothing", and cppdefault.cc then uses the
+     value compiled in.  It has to work that way round because the compile-time
+     answer is not a plain Makefile string: LOCAL_INCLUDE_DIR and
+     NATIVE_SYSTEM_HEADER_DIR are subject to the `#undef' that cppdefault.cc
+     does under CROSS_DIRECTORY_STRUCTURE && !TARGET_SYSTEM_ROOT, and
+     NATIVE_SYSTEM_HEADER_COMPONENT comes from tm.h, which this file does not
+     include (target-caps.o is in libcommon.a, which collect2 links).
+
+     "" is the third state and is a real answer: this target has no such
+     directory.  The entry is dropped from the include search path entirely
+     rather than searched as "" -- see rule 1 above.  For the component, ""
+     means "no component", i.e. what a NULL component field has always meant.
+     So a target-specs that wants to suppress /usr/include must EMIT AN EMPTY
+     KEY; omitting the key leaves the built-in default in place, which is the
+     opposite of what was asked and is silent.  */
+  const char *local_include_dir;
+  const char *native_system_header_dir;
+  const char *native_system_header_component;
 };
 
 extern struct target_caps targ_caps;

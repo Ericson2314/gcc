@@ -68,6 +68,92 @@ Line numbers are the position each block occupied immediately before it was
 moved out (`a01c1fcc808`), and the code shown under each heading is what the
 block sat above -- that is how to find the site now.
 
+### configure.ac:121
+
+Sat immediately above:
+
+```
+# Specify the local prefix
+local_prefix=
+AC_ARG_WITH(local-prefix,
+...
+AC_ARG_WITH([native-system-header-dir],
+```
+
+`--with-local-prefix` and `--with-native-system-header-dir` are gone from
+`gcc/configure.ac`, together with `configured_native_system_header_dir` and
+`AC_SUBST(local_prefix)`.
+
+Each named an include SEARCH PATH -- `/usr/local/include` and `/usr/include` --
+into the installation this compiler compiles *against*.  Same class as
+`configure.ac:171` above, same consumer, same channel: a fact about the
+toolchain gcc has been pointed at, not about the machine gcc runs on.
+
+**`config.gcc` states the case for this one out loud.**
+`native_system_header_dir` is a `case $target` there: `/usr/include` for most
+targets, `/include` for cygwin and vxworks, `/mingw/include` for mingw,
+`/dev/env/DJDIR/include` for djgpp.  One triple, chosen when gcc was
+configured, decided the question for all 188 -- the standing shape.
+
+They are now the `local_include_dir`, `native_system_header_dir` and
+`native_system_header_component` keys of the per-target config file, read into
+`targ_caps` and applied by `cppdefault.cc`.
+
+**Why the pair had to move together, and it is not the reason the C++ pair
+had.**  `cppdefault.cc` `#undef`s BOTH macros under
+`CROSS_DIRECTORY_STRUCTURE && !TARGET_SYSTEM_ROOT`.  That `#undef` *is* the
+per-target decision "this target has no such directory", taken from the
+privileged target's `tm.h`; converting one of the two would have left it
+covering a macro that no longer exists and a capability that does, and no
+compiler would have complained.  `NATIVE_SYSTEM_HEADER_COMPONENT` had to travel
+with `NATIVE_SYSTEM_HEADER_DIR` for the same reason -- it is the `component`
+field of the *same two entries*, so a compiler that took the directory from one
+target and the component from another would relocate that directory under the
+wrong prefix in `update_path`.
+
+**The default is NULL here, not a string, and that is the one real difference
+from `configure.ac:171`.**  The `gxx_*` capabilities take their built-in
+default in `target-caps.cc` from `PREPROCESSOR_DEFINES`.  These three cannot:
+`LOCAL_INCLUDE_DIR` and `NATIVE_SYSTEM_HEADER_DIR` are subject to the `#undef`
+above, and `NATIVE_SYSTEM_HEADER_COMPONENT` comes from `tm.h`, which
+`target-caps.cc` does not include and must not (it is in `libcommon.a`, which
+`collect2` links).  So `targ_caps` holds NULL for "the config file said
+nothing" and `cppdefault.cc` -- where `tm.h` and the `#undef` are both visible
+-- supplies the compile-time answer.  `""` remains the third state and means
+"no such directory": the entry is compacted out rather than searched as `""`.
+
+Consequence for whoever writes the keys: **suppressing `/usr/include` requires
+emitting an EMPTY key.**  Omitting the key leaves the built-in default in
+place, which is the opposite of what was asked, and is silent.
+
+**`CROSS_DIRECTORY_STRUCTURE` was NOT decided here.**  `gcc/configure.ac` sets
+`CROSS=` unconditionally, so the macro is never defined and that `#if` takes its
+`#else` arm on every build -- the `#undef CROSS_INCLUDE_DIR` arm -- which is why
+this change is behaviour-neutral by construction on anything buildable here.
+Whether `CROSS_DIRECTORY_STRUCTURE` should come back is a deferred user
+decision that three separate queue items now sit behind, and nothing in this
+change touches it.
+
+**What did not move.**  `NATIVE_SYSTEM_HEADER_DIR` is still `AC_SUBST`ed: it is
+the compile-time default above, and separately it is `SYSTEM_HEADER_DIR`, i.e.
+which headers *fixincludes* fixes during this build.  That second use really is
+about the machine being built on.  `local_prefix` is still a `gcc/Makefile.in`
+variable, now the literal `/usr/local` rather than a substitution, because it
+is handed to the target libraries and is the default of `local_include_dir`.
+`fixincludes/configure.ac` keeps its own `--with-local-prefix`, which is a host
+question and stays.
+
+**Two other readers of these macros are deliberately left on the compile-time
+value**, and both are unchanged rather than half-converted:
+`gcc/gcc.cc:11677` builds the Fortran `finclude` prefix by *string-pasting*
+`NATIVE_SYSTEM_HEADER_DIR "/finclude/"`, and the driver does not call
+`read_target_caps` at all -- only `cc1` does -- so a key there would read as
+its default and mean nothing.  `gcc/m2/gm2-lang.cc:611,619` uses both macros
+under `#ifdef`; `cc1gm2` *does* read the config file, so that one is a genuine
+second reader that will now disagree with `cppdefault.cc` when a target sets
+the keys.  It is left because it cannot be built or tested here, and it is
+recorded so it is not mistaken for done.
+
 ### configure.ac:171
 
 Sat immediately above:

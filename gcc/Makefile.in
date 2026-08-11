@@ -780,7 +780,16 @@ prefix = @prefix@
 # gcc as the native cc, `local_prefix' may not be `prefix' which is
 # `/usr'.
 # NOTE: local_prefix *should not* default from prefix.
-local_prefix = @local_prefix@
+#
+# No longer a configure substitution: --with-local-prefix is gone from
+# gcc/configure.ac.
+# $(local_prefix)/include is an include SEARCH PATH into the installation this
+# compiler compiles against, and the per-target answer now reaches cc1 as
+# targ_caps.local_include_dir (gcc/target-caps.h, gcc/cppdefault.cc).  What is
+# left here is the DEFAULT that capability falls back to, plus the value handed
+# to the target libraries below, so it stays -- as the literal that configure
+# could only ever have produced unless someone passed the option.
+local_prefix = /usr/local
 # Directory in which to put host dependent programs and libraries
 exec_prefix = @exec_prefix@
 # Directory in which to put the executable for the command `gcc'

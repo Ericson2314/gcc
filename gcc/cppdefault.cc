@@ -29,6 +29,16 @@
 #define NATIVE_SYSTEM_HEADER_COMPONENT 0
 #endif
 
+/* This block now governs the compile-time DEFAULTS only.  Whether a target has
+   a /usr/local/include and a /usr/include is a per-target answer, and it now
+   arrives as a per-target answer: an empty local_include_dir or
+   native_system_header_dir capability drops the entry, which is what these
+   `#undef's did when the question could only be asked once.
+
+   Note CROSS_DIRECTORY_STRUCTURE is not currently defined by anything --
+   gcc/configure.ac sets CROSS= unconditionally -- so this takes the `#else'
+   arm on every build here.  Whether that should change is a separate,
+   deliberately deferred question; nothing below decides it.  */
 #if defined (CROSS_DIRECTORY_STRUCTURE) && !defined (TARGET_SYSTEM_ROOT)
 # undef LOCAL_INCLUDE_DIR
 # undef NATIVE_SYSTEM_HEADER_DIR
@@ -36,28 +46,80 @@
 # undef CROSS_INCLUDE_DIR
 #endif
 
-/* THE C++ HEADER DIRECTORIES ARE THE ONLY RUNTIME ENTRIES HERE, and this is
-   where they enter the include search path.
+#ifndef INCLUDE_DEFAULTS
+/* Guarded, because a target header that supplies its own INCLUDE_DEFAULTS
+   replaces the whole table below and these two helpers would then be unused
+   statics -- a -Werror=unused-function build failure on openbsd, netbsd,
+   rs6000/sysv4 and linux-under-musl, i.e. on exactly the configurations
+   nobody here can build.  */
 
-   They used to be `--with-gxx-include-dir' and `--with-gxx-libcxx-include-dir'
-   in gcc/configure.ac, i.e. one string chosen when gcc was built.  A path into
-   a libstdc++ or libc++ installation is not a fact about the host gcc runs on;
-   it is a fact about the toolchain gcc has been pointed at, and a compiler
-   serving many targets has one such answer per target.  So the answer arrives
-   in the per-target config file and cc1 has it in targ_caps by the time
+/* The compile-time fallbacks, AFTER the `#undef's above have had their say.
+   "" rather than a missing entry, because the entries below are now
+   unconditional and the compaction at the end of the table is what expresses
+   "no such directory" -- one mechanism for the macro being undefined here and
+   for the target config file saying so, instead of two.  */
+#ifdef LOCAL_INCLUDE_DIR
+# define LOCAL_INCLUDE_DIR_FALLBACK LOCAL_INCLUDE_DIR
+#else
+# define LOCAL_INCLUDE_DIR_FALLBACK ""
+#endif
+#ifdef NATIVE_SYSTEM_HEADER_DIR
+# define NATIVE_SYSTEM_HEADER_DIR_FALLBACK NATIVE_SYSTEM_HEADER_DIR
+#else
+# define NATIVE_SYSTEM_HEADER_DIR_FALLBACK ""
+#endif
+
+/* NULL means the target config file said nothing about this directory, so the
+   value compiled in stands.  "" is NOT nothing: it is this target saying it has
+   no such directory, and it survives to be compacted out below.  Collapsing the
+   two would make `omit the key' and `emit an empty key' mean the same thing,
+   which is the silent half of this interface.  */
+static const char *
+cap_dir (const char *cap, const char *fallback)
+{
+  return cap != NULL ? cap : fallback;
+}
+
+/* The `component' of the /usr/include entries (see update_path in prefix.cc).
+   It travels with the directory: a component naming one target's installation
+   applied to another target's directory would relocate paths under the wrong
+   prefix.  Same three states, except that here the empty answer is spelt NULL
+   on the way out, because that is what a component-less entry has always been
+   and what update_path tests for.  */
+static const char *
+native_system_header_component (void)
+{
+  const char *c = targ_caps.native_system_header_component;
+  if (c == NULL)
+    c = NATIVE_SYSTEM_HEADER_COMPONENT;
+  return (c != NULL && c[0] != '\0') ? c : NULL;
+}
+#endif /* no INCLUDE_DEFAULTS */
+
+/* THE RUNTIME ENTRIES: the C++ header directories, /usr/local/include and
+   /usr/include.  This is where they enter the include search path.
+
+   They used to be `--with-gxx-include-dir', `--with-gxx-libcxx-include-dir',
+   `--with-local-prefix' and `--with-native-system-header-dir' in
+   gcc/configure.ac, i.e. strings chosen when gcc was built.  A path into a
+   libstdc++, libc++ or C library installation is not a fact about the host gcc
+   runs on; it is a fact about the toolchain gcc has been pointed at, and a
+   compiler serving many targets has one such answer per target.  So the answer
+   arrives in the per-target config file and cc1 has it in targ_caps by the time
    add_standard_paths asks for this table.
 
    An empty string means "this target has no such directory" and the entry is
    dropped below, rather than entering the search path as "".  The built-in
-   defaults are still the installation-relative paths gcc/Makefile.in computes
-   from $(libdir)/$(prefix)/$(version), so a compiler told nothing about its
-   target searches exactly what it always did.  */
+   defaults are still what gcc/Makefile.in computes -- the installation-relative
+   C++ paths, $(local_prefix)/include, and config.gcc's
+   $(NATIVE_SYSTEM_HEADER_DIR) -- so a compiler told nothing about its target
+   searches exactly what it always did.  */
 
 const struct default_include *
 cpp_include_defaults_table (void)
 {
   /* FUNCTION-LOCAL, and that is the whole point of this being a function.
-     Four of the initialisers below read targ_caps, and a namespace-scope array
+     Seven of the initialisers below read targ_caps, and a namespace-scope array
      would be dynamically initialised at load time -- before cc1 has opened the
      target config file -- so it would capture the built-in fallbacks and no
      -ftarget-config= would ever have any effect on the include path.  A
@@ -87,11 +149,14 @@ cpp_include_defaults_table (void)
     /* This is the dir for gcc's private headers.  */
     { GCC_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },
 #endif
-#ifdef LOCAL_INCLUDE_DIR
-    /* /usr/local/include comes before the fixincluded header files.  */
-    { LOCAL_INCLUDE_DIR, 0, 0, 1, 1, 2 },
-    { LOCAL_INCLUDE_DIR, 0, 0, 1, 1, 0 },
-#endif
+    /* /usr/local/include comes before the fixincluded header files.  No
+       `#ifdef' any more: the entry is always built and the compaction below
+       removes it when the answer, from either source, is "no such
+       directory".  */
+    { cap_dir (targ_caps.local_include_dir, LOCAL_INCLUDE_DIR_FALLBACK),
+      0, 0, 1, 1, 2 },
+    { cap_dir (targ_caps.local_include_dir, LOCAL_INCLUDE_DIR_FALLBACK),
+      0, 0, 1, 1, 0 },
 #ifdef PREFIX_INCLUDE_DIR
     { PREFIX_INCLUDE_DIR, 0, 0, 1, 0, 0 },
 #endif
@@ -118,11 +183,14 @@ cpp_include_defaults_table (void)
     /* Another place the target system's headers might be.  */
     { TOOL_INCLUDE_DIR, "BINUTILS", 0, 1, 0, 0 },
 #endif
-#ifdef NATIVE_SYSTEM_HEADER_DIR
-    /* /usr/include comes dead last.  */
-    { NATIVE_SYSTEM_HEADER_DIR, NATIVE_SYSTEM_HEADER_COMPONENT, 0, 0, 1, 2 },
-    { NATIVE_SYSTEM_HEADER_DIR, NATIVE_SYSTEM_HEADER_COMPONENT, 0, 0, 1, 0 },
-#endif
+    /* /usr/include comes dead last.  Unconditional for the same reason as
+       LOCAL_INCLUDE_DIR above.  */
+    { cap_dir (targ_caps.native_system_header_dir,
+	       NATIVE_SYSTEM_HEADER_DIR_FALLBACK),
+      native_system_header_component (), 0, 0, 1, 2 },
+    { cap_dir (targ_caps.native_system_header_dir,
+	       NATIVE_SYSTEM_HEADER_DIR_FALLBACK),
+      native_system_header_component (), 0, 0, 1, 0 },
     { 0, 0, 0, 0, 0, 0 }
   };
 #endif /* no INCLUDE_DEFAULTS */

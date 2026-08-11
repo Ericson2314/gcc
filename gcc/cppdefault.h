@@ -31,8 +31,9 @@
    All these directories are treated as `system' include directories
    (they are not subject to pedantic warnings in some cases).  */
 
-/* NOT `const'-qualified member by member, although it used to be.  The G++
-   and libc++ directories are per-target and now arrive at run time in
+/* NOT `const'-qualified member by member, although it used to be.  The G++,
+   libc++, site-local and system header directories are per-target and now
+   arrive at run time in
    targ_caps, so cppdefault.cc builds this table on first use and compacts out
    the entries the target config left empty.  The table it hands back is
    const-qualified as a whole, which is the guarantee callers actually want.  */
@@ -59,9 +60,10 @@ struct default_include
 				     -imultiarch, when set to 2.  */
 };
 
-/* The standard include chain.  A FUNCTION rather than an array because two of
-   its entries -- the libstdc++ and libc++ header directories -- are answers
-   about the C++ INSTALLATION this compiler is compiling against, and reach cc1
+/* The standard include chain.  A FUNCTION rather than an array because several
+   of its entries -- the libstdc++ and libc++ header directories,
+   /usr/local/include and /usr/include -- are answers about the INSTALLATION
+   this compiler is compiling against, and reach cc1
    in the per-target config file (targ_caps).  A namespace-scope array would be
    initialised before read_target_caps ever runs and would silently capture the
    built-in fallbacks instead; building on first use puts construction after

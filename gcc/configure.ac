@@ -118,34 +118,40 @@ fi
 # Directories
 # -----------
 
-# Specify the local prefix
-local_prefix=
-AC_ARG_WITH(local-prefix,
-[AS_HELP_STRING([--with-local-prefix=DIR],
-		[specifies directory to put local include])],
-[case "${withval}" in
-yes)	AC_MSG_ERROR(bad value ${withval} given for local include directory prefix) ;;
-no)	;;
-*)	local_prefix=$with_local_prefix ;;
-esac])
-
-# Default local prefix if it is empty
-if test x$local_prefix = x; then
-	local_prefix=/usr/local
-fi
-
-AC_ARG_WITH([native-system-header-dir],
-  [  --with-native-system-header-dir=dir
-                          use dir as the directory to look for standard
-                          system header files in.  Defaults to /usr/include.],
-[
- case ${with_native_system_header_dir} in
- yes|no) AC_MSG_ERROR([bad value ${withval} given for --with-native-system-header-dir]) ;;
- /* | [[A-Za-z]]:[[\\/]]*) ;;
- *) AC_MSG_ERROR([--with-native-system-header-dir argument ${withval} must be an absolute directory]) ;;
- esac
- configured_native_system_header_dir="${withval}"
-], [configured_native_system_header_dir=])
+dnl `--with-local-prefix' and `--with-native-system-header-dir' are not asked
+dnl here any more.  Each named an include SEARCH PATH -- /usr/local/include and
+dnl /usr/include -- into the installation this compiler compiles AGAINST, which
+dnl is a fact about the toolchain gcc has been pointed at rather than about the
+dnl machine gcc runs on.  A compiler serving 188 targets has 188 answers, and
+dnl config.gcc already shows it: `native_system_header_dir' is /usr/include for
+dnl most targets, /include for cygwin/vxworks, /mingw/include for mingw and
+dnl /dev/env/DJDIR/include for djgpp -- one `case $target' deciding the question
+dnl for every target from one triple.
+dnl
+dnl They are now the `local_include_dir', `native_system_header_dir' and
+dnl `native_system_header_component' keys of the per-target config file, read by
+dnl cc1 into targ_caps and applied in cppdefault.cc.  The compile-time values
+dnl stay as DEFAULTS in gcc/Makefile.in and (for the component) in the target's
+dnl tm.h, so a compiler told nothing about its target searches exactly what it
+dnl always did.
+dnl
+dnl The two moved together because they are one decision: cppdefault.cc
+dnl `#undef's BOTH under CROSS_DIRECTORY_STRUCTURE && !TARGET_SYSTEM_ROOT, and
+dnl converting one would have left that `#undef' covering a macro that no longer
+dnl exists and a capability that does.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:121".
+dnl
+dnl NOTE `NATIVE_SYSTEM_HEADER_DIR' is still AC_SUBSTed further down.  That is
+dnl not a leftover: it is the compile-time default above, and it is also
+dnl SYSTEM_HEADER_DIR, i.e. which headers *fixincludes* fixes during this build.
+dnl That second use really is about the machine being built on.
+dnl
+dnl `local_prefix' is likewise still a gcc/Makefile.in variable, now a literal
+dnl /usr/local rather than a substitution, because it is handed to the target
+dnl libraries and it is the default of `local_include_dir'.
+dnl
+dnl fixincludes/configure.ac keeps its own `--with-local-prefix'.  That one is
+dnl a host question -- whose headers this build fixes -- and stays.
 
 AC_ARG_WITH(build-sysroot, 
   [AS_HELP_STRING([--with-build-sysroot=sysroot],
@@ -1765,9 +1771,11 @@ if test "$host_xm_file" != "$build_xm_file"; then
 	fi
 fi
 
-if test -n "$configured_native_system_header_dir"; then
-  native_system_header_dir=$configured_native_system_header_dir
-fi
+dnl `--with-native-system-header-dir' is gone, so this is config.gcc's value
+dnl and nothing else.  It is the compile-time DEFAULT of the
+dnl targ_caps.native_system_header_dir capability, and separately it is
+dnl SYSTEM_HEADER_DIR, the headers fixincludes fixes during this build.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:121".
 NATIVE_SYSTEM_HEADER_DIR="$native_system_header_dir"
 AC_SUBST(NATIVE_SYSTEM_HEADER_DIR)
 
@@ -3086,7 +3094,6 @@ AC_SUBST(install)
 AC_SUBST(lang_opt_files)
 AC_SUBST(lang_specs_files)
 AC_SUBST(lang_tree_files)
-AC_SUBST(local_prefix)
 AC_SUBST(md_file)
 AC_SUBST(out_file)
 AC_SUBST(out_object_file)
