@@ -509,6 +509,9 @@ ${option_defaults}
 *link_buildid:
 ${link_buildid}
 
+*link_target_config:
+-ftarget-config=${target_config_path}
+
 *cc1_target_config:
 -ftarget-config=${target_config_path}
 
@@ -775,10 +778,45 @@ TSEOF
 esac
 AC_MSG_RESULT([$gcc_cv_ld_no_dot_syms])
 
-AC_MSG_CHECKING([linker for large TOC])
+dnl HAVE_LD_LARGE_TOC was AC_DEFINEd from two places in gcc/configure.ac, both
+dnl setting the same gcc_cv_ld_large_toc cache variable, and they are NOT one
+dnl probe in two arms: they test different things on different object formats.
+dnl
+dnl  - ELF PowerPC64 assembles a TLS sequence and *links* it with
+dnl    --no-toc-sort: a property of the linker, which is what the name says.
+dnl  - AIX assembles XCOFF `addis 9,LC..1@u(2)' and never links at all: a
+dnl    property of the *assembler*, despite the name and the cache variable.
+dnl
+dnl Only one arm can run in a single-target build, so the two never met and the
+dnl misnomer stayed invisible -- the same shape as the alpha/loongarch
+dnl HAVE_AS_EXPLICIT_RELOCS collision.  They have to stay separate here: this
+dnl script runs once per target, so it picks the arm that matches, and applying
+dnl the ELF test to AIX would answer `no' for every AIX target (wrong emulation,
+dnl wrong object format) where the original answered `yes'.  The consumers are
+dnl in mutually exclusive headers -- rs6000/aix7?.h against
+dnl rs6000/{linux64,freebsd64}.h -- so one capability name still serves both.
+AC_MSG_CHECKING([linker/assembler for large TOC])
 gcc_cv_ld_large_toc=no
 case $target in
-  powerpc64*-*-* | powerpc*-*-aix*)
+  *-*-aix*)
+    dnl Assembler-only test: XCOFF large-TOC relocations.
+    cat > conftest.s <<'TSEOF'
+	.toc
+LC..1:
+	.tc a[TC],a[RW]
+	.extern a[RW]
+	.csect .text[PR]
+.largetoctest:
+	addis 9,LC..1@u(2)
+	ld 3,LC..1@l(9)
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_ld_large_toc=yes
+    fi
+    rm -f conftest.s conftest.o
+    ;;
+  powerpc64*-*-*)
+    dnl Link test: ELF TLS sequence through the linker.
     cat > conftest.s <<'TSEOF'
 	.section ".tbss","awT",@nobits
 	.align 3
@@ -786,12 +824,11 @@ ie0:	.space 8
 	.global _start
 	.text
 _start:
-	addis 9,13,ie0@got@tprel@ha
+	addis 9,2,ie0@got@tprel@ha
 	ld 9,ie0@got@tprel@l(9)
 TSEOF
     if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1 \
-       && "$gcc_cv_ld" -melf64ppc --no-toc-optimize -o conftest conftest.o \
-	    > /dev/null 2>&1; then
+       && "$gcc_cv_ld" --no-toc-sort -o conftest conftest.o > /dev/null 2>&1; then
       gcc_cv_ld_large_toc=yes
     fi
     rm -f conftest conftest.s conftest.o
@@ -1206,6 +1243,51 @@ case ${target} in
     ;;
 esac
 
+dnl Windows @secrel32.  A mingw/cygwin ld that emits a runtime .reloc for a
+dnl `.secrel32' reference, instead of resolving it at link time, miscompiles
+dnl thread-local storage (PR80881).
+dnl
+dnl gcc/configure.ac used to test this inside the TLS probe and AC_MSG_ERROR,
+dnl aborting the build.  That is not available here: this script runs after the
+dnl compiler has been built, so there is no build to stop.  It warns loudly and
+dnl records the answer, and i386's TLS expansion refuses to emit TLS when the
+dnl capability says the linker is broken -- an error at compile time rather than
+dnl silently wrong code at run time.
+gcc_cv_ld_broken_secrel32=no
+case $target in
+  *-*-mingw* | *-*-cygwin* | *-*-pe | *-*-win32)
+    AC_MSG_CHECKING([linker for broken @secrel32 relocations])
+    if test x"$gcc_cv_objdump" = x; then
+      AC_MSG_RESULT([cannot tell, no objdump])
+      AC_MSG_WARN([cannot check for broken @secrel32 relocations without objdump; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881])
+    else
+      { echo '	.text'
+        echo 'foo:	nop'
+        echo '	.data'
+        echo '	.secrel32 foo'; } > conftest.s
+      if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+         && "$gcc_cv_ld" -o conftest.exe conftest.o > /dev/null 2>&1; then
+        if "$gcc_cv_objdump" -h conftest.exe 2>/dev/null | grep '\.reloc' > /dev/null; then
+          gcc_cv_ld_broken_secrel32=yes
+        fi
+        AC_MSG_RESULT([$gcc_cv_ld_broken_secrel32])
+      else
+        AC_MSG_RESULT([cannot tell, test link failed])
+        AC_MSG_WARN([could not link the @secrel32 test; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881])
+      fi
+      rm -f conftest.s conftest.o conftest.exe
+    fi
+    if test x"$gcc_cv_ld_broken_secrel32" = xyes; then
+      AC_MSG_WARN([])
+      AC_MSG_WARN([*** $gcc_cv_ld has broken @secrel32 relocations.])
+      AC_MSG_WARN([*** Thread-local storage would be MISCOMPILED with this linker.])
+      AC_MSG_WARN([*** The compiler will refuse to emit TLS for this target.])
+      AC_MSG_WARN([*** Use a linker with the PR80881 fix (GNU ld 2.44 or later).])
+      AC_MSG_WARN([])
+    fi
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1214,6 +1296,7 @@ ts_bool () {
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+ld_broken_secrel32 `ts_bool "$gcc_cv_ld_broken_secrel32"`
 as_ref `ts_bool "$gcc_cv_as_aix_ref"`
 xcoff_dwarf_extras `ts_bool "$gcc_cv_as_aix_dwloc"`
 as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`

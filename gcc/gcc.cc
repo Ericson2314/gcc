@@ -1125,7 +1125,7 @@ proper position among the other output files.  */
 #ifndef LINK_COMMAND_SPEC
 #define LINK_COMMAND_SPEC "\
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
-    %(linker) " \
+    %(linker) %(link_target_config) %(link_buildid) " \
     LINK_PLUGIN_SPEC \
    "%{flto|flto=*:%<fcompare-debug*} \
     %{flto} %{fno-lto} %{flto=*} %l " LINK_PIE_SPEC \
@@ -1259,6 +1259,19 @@ static const char *cpp_debug_options = DUMPS_OPTIONS ("");
    Empty here: a compiler with no spec file for the target keeps the built-in
    defaults in target-caps.h.  target-specs/configure overrides this.  */
 static const char *cc1_target_config = "";
+
+/* The same file, passed to collect2 rather than to cc1.  Deliberately a spec
+   of its own and not a reuse of cc1_target_config: the two have different
+   consumers with different lifetimes -- cc1 compiles, collect2 links -- and a
+   spec file should be able to configure them independently.  Empty by default,
+   and blanked again just before linking if the linker turns out not to be
+   collect2, since nothing else understands the option.  */
+static const char *link_target_config = "";
+
+/* --build-id, when the installation asked for it and the linker has it.
+   Written by target-specs/configure; it was previously emitted into the spec
+   file but never referenced, so it had no effect at all.  */
+static const char *link_buildid = "";
 
 static const char *cc1_options =
 "%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}}\
@@ -1704,6 +1717,8 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("cc1",			&cc1_spec),
   INIT_STATIC_SPEC ("cc1_options",		&cc1_options),
   INIT_STATIC_SPEC ("cc1_target_config",		&cc1_target_config),
+  INIT_STATIC_SPEC ("link_target_config",	&link_target_config),
+  INIT_STATIC_SPEC ("link_buildid",		&link_buildid),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
   INIT_STATIC_SPEC ("link_ssp",			&link_ssp_spec),
@@ -9257,6 +9272,17 @@ driver::maybe_run_linker (const char *argv0) const
 	      if (s == NULL)
 		set_static_spec_shared (&linker_name_spec, "ld");
 	    }
+
+	  /* -ftarget-config= is collect2's, and collect2 strips it before
+	     handing the command line to the real linker.  If we are invoking
+	     a linker directly -- a --disable-collect2 build, a spec file that
+	     overrode %(linker), or the fallback just above -- then it would
+	     reach ld, which has never heard of it, and the link would fail.
+	     Tested at run time rather than compiled out: linker_name_spec is
+	     itself settable from a spec file, so a build-time answer could be
+	     wrong here.  */
+	  if (strcmp (linker_name_spec, "collect2") != 0)
+	    set_static_spec_shared (&link_target_config, "");
 
 #if HAVE_LTO_PLUGIN > 0
 #if HAVE_LTO_PLUGIN == 2

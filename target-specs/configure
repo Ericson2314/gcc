@@ -2352,6 +2352,9 @@ ${option_defaults}
 *link_buildid:
 ${link_buildid}
 
+*link_target_config:
+-ftarget-config=${target_config_path}
+
 *cc1_target_config:
 -ftarget-config=${target_config_path}
 
@@ -2630,24 +2633,39 @@ esac
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_no_dot_syms" >&5
 $as_echo "$gcc_cv_ld_no_dot_syms" >&6; }
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for large TOC" >&5
-$as_echo_n "checking linker for large TOC... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker/assembler for large TOC" >&5
+$as_echo_n "checking linker/assembler for large TOC... " >&6; }
 gcc_cv_ld_large_toc=no
 case $target in
-  powerpc64*-*-* | powerpc*-*-aix*)
-    cat > conftest.s <<'TSEOF'
+  *-*-aix*)
+        cat > conftest.s <<'TSEOF'
+	.toc
+LC..1:
+	.tc aTC,aRW
+	.extern aRW
+	.csect .textPR
+.largetoctest:
+	addis 9,LC..1@u(2)
+	ld 3,LC..1@l(9)
+TSEOF
+    if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_ld_large_toc=yes
+    fi
+    rm -f conftest.s conftest.o
+    ;;
+  powerpc64*-*-*)
+        cat > conftest.s <<'TSEOF'
 	.section ".tbss","awT",@nobits
 	.align 3
 ie0:	.space 8
 	.global _start
 	.text
 _start:
-	addis 9,13,ie0@got@tprel@ha
+	addis 9,2,ie0@got@tprel@ha
 	ld 9,ie0@got@tprel@l(9)
 TSEOF
     if "$gcc_cv_as" -a64 -o conftest.o conftest.s > /dev/null 2>&1 \
-       && "$gcc_cv_ld" -melf64ppc --no-toc-optimize -o conftest conftest.o \
-	    > /dev/null 2>&1; then
+       && "$gcc_cv_ld" --no-toc-sort -o conftest conftest.o > /dev/null 2>&1; then
       gcc_cv_ld_large_toc=yes
     fi
     rm -f conftest conftest.s conftest.o
@@ -3051,6 +3069,53 @@ $as_echo "$gcc_cv_as_riscv_march_b" >&6; }
     ;;
 esac
 
+gcc_cv_ld_broken_secrel32=no
+case $target in
+  *-*-mingw* | *-*-cygwin* | *-*-pe | *-*-win32)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for broken @secrel32 relocations" >&5
+$as_echo_n "checking linker for broken @secrel32 relocations... " >&6; }
+    if test x"$gcc_cv_objdump" = x; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: cannot tell, no objdump" >&5
+$as_echo "cannot tell, no objdump" >&6; }
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: cannot check for broken @secrel32 relocations without objdump; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881" >&5
+$as_echo "$as_me: WARNING: cannot check for broken @secrel32 relocations without objdump; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881" >&2;}
+    else
+      { echo '	.text'
+        echo 'foo:	nop'
+        echo '	.data'
+        echo '	.secrel32 foo'; } > conftest.s
+      if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+         && "$gcc_cv_ld" -o conftest.exe conftest.o > /dev/null 2>&1; then
+        if "$gcc_cv_objdump" -h conftest.exe 2>/dev/null | grep '\.reloc' > /dev/null; then
+          gcc_cv_ld_broken_secrel32=yes
+        fi
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_broken_secrel32" >&5
+$as_echo "$gcc_cv_ld_broken_secrel32" >&6; }
+      else
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: cannot tell, test link failed" >&5
+$as_echo "cannot tell, test link failed" >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: could not link the @secrel32 test; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881" >&5
+$as_echo "$as_me: WARNING: could not link the @secrel32 test; see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881" >&2;}
+      fi
+      rm -f conftest.s conftest.o conftest.exe
+    fi
+    if test x"$gcc_cv_ld_broken_secrel32" = xyes; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: " >&5
+$as_echo "$as_me: WARNING: " >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** $gcc_cv_ld has broken @secrel32 relocations." >&5
+$as_echo "$as_me: WARNING: *** $gcc_cv_ld has broken @secrel32 relocations." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Thread-local storage would be MISCOMPILED with this linker." >&5
+$as_echo "$as_me: WARNING: *** Thread-local storage would be MISCOMPILED with this linker." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** The compiler will refuse to emit TLS for this target." >&5
+$as_echo "$as_me: WARNING: *** The compiler will refuse to emit TLS for this target." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Use a linker with the PR80881 fix (GNU ld 2.44 or later)." >&5
+$as_echo "$as_me: WARNING: *** Use a linker with the PR80881 fix (GNU ld 2.44 or later)." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: " >&5
+$as_echo "$as_me: WARNING: " >&2;}
+    fi
+    ;;
+esac
+
 
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
@@ -3058,6 +3123,7 @@ ts_bool () {
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+ld_broken_secrel32 `ts_bool "$gcc_cv_ld_broken_secrel32"`
 as_ref `ts_bool "$gcc_cv_as_aix_ref"`
 xcoff_dwarf_extras `ts_bool "$gcc_cv_as_aix_dwloc"`
 as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
