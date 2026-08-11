@@ -1030,32 +1030,24 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
    plugin only when LTO is enabled.  We still honor explicit
    -fuse-linker-plugin if the linker used understands -plugin.  */
 
-/* The linker has some plugin support.  */
-#if HAVE_LTO_PLUGIN > 0
-/* The linker used has full plugin support, use LTO plugin by default.  */
-#if HAVE_LTO_PLUGIN == 2
-#define PLUGIN_COND "!fno-use-linker-plugin:%{!fno-lto"
-#define PLUGIN_COND_CLOSE "}"
-#else
-/* The linker used has limited plugin support, use LTO plugin with explicit
-   -fuse-linker-plugin.  */
-#define PLUGIN_COND "fuse-linker-plugin"
-#define PLUGIN_COND_CLOSE ""
-#endif
-#define LINK_PLUGIN_SPEC \
-    "%{" PLUGIN_COND": \
-    -plugin %(linker_plugin_file) \
-    -plugin-opt=%(lto_wrapper) \
-    -plugin-opt=-fresolution=%u.res \
-    " LTO_PLUGIN_SPEC "\
-    %{flinker-output=*:-plugin-opt=-linker-output-known} \
-    %{!nostdlib:%{!nodefaultlibs:%:pass-through-libs(%(link_gcc_c_sequence))}} \
-    }" PLUGIN_COND_CLOSE
-#else
-/* The linker used doesn't support -plugin, reject -fuse-linker-plugin.  */
-#define LINK_PLUGIN_SPEC "%{fuse-linker-plugin:\
-    %e-fuse-linker-plugin is not supported in this configuration}"
-#endif
+/* LINK_PLUGIN_SPEC used to be built here, chosen by `#if HAVE_LTO_PLUGIN > 0'
+   and then by `#if HAVE_LTO_PLUGIN == 2'.  HAVE_LTO_PLUGIN is a configure
+   probe of the linker, and it is not defined in this build at all, so the
+   ladder always fell to the last arm -- the one that passes no -plugin and
+   exists only to reject an explicit -fuse-linker-plugin.
+
+   That is not a cosmetic loss.  -plugin is how the linker learns to call
+   lto-wrapper, so with it gone EVERY LTO LINK FAILS: `plugin needed to handle
+   lto object', then `undefined reference to main'.  It is the `link_eh' story
+   with a much louder symptom, and it stayed invisible because the tests that
+   would have caught it could not link at all and sat in the environmental
+   floor.
+
+   It is the `link_plugin' named spec now, written by target-specs, which has
+   the linker in hand and can ask it.  The default below is the reject-only
+   string -- exactly what the dead ladder produced -- so a driver with no spec
+   file behaves as it does today rather than assuming a plugin nobody probed
+   for.  */
 
 /* Linker command line options for -fsanitize= early on the command line.  */
 #ifndef SANITIZER_EARLY_SPEC
@@ -1118,9 +1110,9 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
 #ifndef LINK_COMMAND_SPEC
 #define LINK_COMMAND_SPEC "\
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
-    %(linker) %(link_target_config) %(link_buildid) %(link_eh) " \
-    LINK_PLUGIN_SPEC \
-   "%{flto|flto=*:%<fcompare-debug*} \
+    %(linker) %(link_target_config) %(link_buildid) %(link_eh) \
+    %(link_plugin) \
+    %{flto|flto=*:%<fcompare-debug*} \
     %{flto} %{fno-lto} %{flto=*} %l " LINK_PIE_SPEC \
    "%{fuse-ld=*:-fuse-ld=%*} %(link_compress_debug) " \
    "%X %{o*} %{e*} %{N} %{n} %{r}\
@@ -1292,6 +1284,20 @@ static const char *link_libatomic = "";
    nothing.  Registering them is what connects the probe to a consumer.  */
 static const char *link_as_needed = "";
 static const char *link_no_as_needed = "";
+
+/* How to hand the LTO plugin to the linker.  Written by target-specs, which
+   asks the linker whether it takes -plugin at all and, if so, whether to use
+   it by default or only under an explicit -fuse-linker-plugin.  The default is
+   the reject-only string the dead `#if HAVE_LTO_PLUGIN' ladder produced, so an
+   unprobed driver keeps refusing rather than passing a -plugin the linker may
+   not understand.  */
+static const char *link_plugin
+  = "%{fuse-linker-plugin:"
+    "%e-fuse-linker-plugin is not supported in this configuration}";
+
+/* Extra -plugin-opt= a target needs; config/vxworks.h is the only definer.
+   Referenced from the link_plugin spec target-specs writes.  */
+static const char *lto_plugin_spec = "";
 
 /* Which libgcc to link once -static and -static-libgcc are out of the way:
    the whole body that USE_LD_AS_NEEDED, its ldscript variant and LINK_EH_SPEC
@@ -1765,6 +1771,8 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_libatomic",		&link_libatomic),
   INIT_STATIC_SPEC ("link_as_needed",		&link_as_needed),
   INIT_STATIC_SPEC ("link_no_as_needed",	&link_no_as_needed),
+  INIT_STATIC_SPEC ("link_plugin",		&link_plugin),
+  INIT_STATIC_SPEC ("lto_plugin",		&lto_plugin_spec),
   INIT_STATIC_SPEC ("libgcc_nonstatic",	&libgcc_nonstatic),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
@@ -9337,13 +9345,10 @@ driver::maybe_run_linker (const char *argv0) const
 
       if (! have_c)
 	{
-#if HAVE_LTO_PLUGIN > 0
-#if HAVE_LTO_PLUGIN == 2
-	  const char *fno_use_linker_plugin = "fno-use-linker-plugin";
-#else
+	  /* Only -fuse-linker-plugin is consulted here now.  Whether the plugin
+	     is used by DEFAULT is expressed in the link_plugin spec, where the
+	     linker's answer belongs, rather than tested here.  */
 	  const char *fuse_linker_plugin = "fuse-linker-plugin";
-#endif
-#endif
 
 	  /* We'll use ld if we can't find collect2.  */
 	  if (! strcmp (linker_name_spec, "collect2"))
@@ -9364,27 +9369,30 @@ driver::maybe_run_linker (const char *argv0) const
 	  if (strcmp (linker_name_spec, "collect2") != 0)
 	    set_static_spec_shared (&link_target_config, "");
 
-#if HAVE_LTO_PLUGIN > 0
-#if HAVE_LTO_PLUGIN == 2
-	  if (!switch_matches (fno_use_linker_plugin,
-			       fno_use_linker_plugin
-			       + strlen (fno_use_linker_plugin), 0))
-#else
-	  if (switch_matches (fuse_linker_plugin,
-			      fuse_linker_plugin
-			      + strlen (fuse_linker_plugin), 0))
-#endif
-	    {
-	      char *temp_spec = find_a_file (&exec_prefixes,
-					     LTOPLUGINSONAME,
-					     false);
-	      if (!temp_spec)
-		fatal_error (input_location,
-			     "%<-fuse-linker-plugin%>, but %s not found",
-			     LTOPLUGINSONAME);
+	  /* Locate the LTO plugin so that %(linker_plugin_file) has something
+	     to expand to.  This used to be gated on the same dead
+	     HAVE_LTO_PLUGIN ladder as the spec, so the variable stayed empty
+	     and a spec file supplying `-plugin %(linker_plugin_file)' would
+	     have passed a bare -plugin with no argument -- the delivery route
+	     would have looked connected and produced a worse failure than the
+	     one it replaced.
+	     Looking for the file is harmless; WHETHER to pass it is the
+	     link_plugin spec's decision, so the two are separated.  Not
+	     finding it is only an error when the user asked for it by name,
+	     which is the one case the old code diagnosed and the only one
+	     where silence would be wrong.  */
+	  {
+	    char *temp_spec = find_a_file (&exec_prefixes, LTOPLUGINSONAME,
+					   false);
+	    if (temp_spec)
 	      linker_plugin_file_spec = convert_white_space (temp_spec);
-	    }
-#endif
+	    else if (switch_matches (fuse_linker_plugin,
+				     fuse_linker_plugin
+				     + strlen (fuse_linker_plugin), 0))
+	      fatal_error (input_location,
+			   "%<-fuse-linker-plugin%>, but %s not found",
+			   LTOPLUGINSONAME);
+	  }
 	  set_static_spec_shared (&lto_gcc_spec, argv0);
 	}
 

@@ -3321,6 +3321,18 @@ else
   link_no_as_needed=
 fi
 
+ts_plugin_body='-plugin %(linker_plugin_file) \
+    -plugin-opt=%(lto_wrapper) \
+    -plugin-opt=-fresolution=%u.res \
+    %(lto_plugin) \
+    %{flinker-output=*:-plugin-opt=-linker-output-known} \
+    %{!nostdlib:%{!nodefaultlibs:%:pass-through-libs(%(link_gcc_c_sequence))}}'
+case $gcc_cv_lto_plugin in
+  2) link_plugin="%{!fno-use-linker-plugin:%{!fno-lto:${ts_plugin_body}}}" ;;
+  1) link_plugin="%{fuse-linker-plugin:${ts_plugin_body}}" ;;
+  *) link_plugin='%{fuse-linker-plugin:%e-fuse-linker-plugin is not supported in this configuration}' ;;
+esac
+
 if test x"$gcc_cv_solaris_ld" = xyes; then
   cat >> "$specs_file" <<EOF
 *link_arch:
@@ -3346,7 +3358,7 @@ ${gcc_cv_ld_dynamic_option}
 %{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
 
 *link_plugin:
-`if test "$gcc_cv_lto_plugin" -gt 0; then echo '%{!fno-use-linker-plugin:%{!fno-lto:-plugin %(linker_plugin_file)}}'; fi`
+${link_plugin}
 
 *link_disable_dynamicbase:
 `if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`

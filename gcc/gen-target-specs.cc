@@ -207,6 +207,12 @@ main (void)
 #ifdef POST_LINK_SPEC
   emit ("post_link", POST_LINK_SPEC);
 #endif
+#ifdef LTO_PLUGIN_SPEC
+  /* Extra -plugin-opt= this target needs; config/vxworks.h is the only definer.
+     Referenced as %(lto_plugin) from the link_plugin spec target-specs writes,
+     so the target keeps the text and the linker probe keeps the choice.  */
+  emit ("lto_plugin", LTO_PLUGIN_SPEC);
+#endif
 #ifdef LINKER_NAME
   emit ("linker", LINKER_NAME);
 #endif

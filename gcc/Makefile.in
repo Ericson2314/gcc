@@ -2922,7 +2922,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	done; \
 	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
 	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"; \
-	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' -print > tmp-specfiles; \
+	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
 	rm -f tmp-specfiles
@@ -2936,7 +2936,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 # not.  Run separately from `target-specs' when you want it on its own.
 .PHONY: check-spec-refs
 check-spec-refs:
-	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' -print \
+	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print \
 	  > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \

@@ -157,11 +157,13 @@ refs_from () {
   done | grep -oh '%([a-z_0-9]*)' 2>/dev/null | sed 's/^%(//; s/)$//'
 }
 
-# reachable NAME -- true if anything in the corpus says %(NAME), or C code reads
-# the variable NAME is registered against, or read_specs special-cases the name.
+# reachable NAME [REFSFILE] -- true if REFSFILE (default: the tree-wide set)
+# says %(NAME), or C code reads the variable NAME is registered against, or
+# read_specs special-cases the name.
 reachable () {
   _n=$1
-  if grep -qx -- "$_n" "$work"/refs; then return 0; fi
+  _r=${2:-"$work"/refs}
+  if grep -qx -- "$_n" "$_r"; then return 0; fi
   _v=`awk -v n="$_n" '$1==n{print $2; exit}' "$work"/table`
   if test -n "$_v" && grep -qw -- "$_v" "$work"/uses; then return 0; fi
   # read_specs handles `*link_command' by name rather than through the table
@@ -172,10 +174,16 @@ reachable () {
   return 1
 }
 
-# The reference set: the driver, target-specs' own emitted spec text, and every
-# spec file being checked.
-refs_from "$gcc_cc" > "$work"/refs
-test -f "$ts_ac" && refs_from "$ts_ac" >> "$work"/refs
+# Two reference sets, because the two kinds of name are judged against
+# different corpora (see the loop below).
+#   driverrefs -- the driver and target-specs' own emitted spec text.  Both are
+#                 target-independent: a reference in either covers every target.
+#   refs       -- driverrefs plus every spec file, i.e. tree-wide.
+refs_from "$gcc_cc" > "$work"/driverrefs
+test -f "$ts_ac" && refs_from "$ts_ac" >> "$work"/driverrefs
+sort -u "$work"/driverrefs -o "$work"/driverrefs
+
+cat "$work"/driverrefs > "$work"/refs
 for f in "$@"; do
   test -f "$f" && refs_from "$f"
 done >> "$work"/refs
@@ -225,14 +233,32 @@ for f in "$@"; do
   files=`expr $files + 1`
   sed -n 's/^# EXTRA_SPECS: \([a-z_0-9]*\).*/\1/p' "$f" | sort -u > "$work"/extra
   sed -n 's/^\*\([a-z_0-9]*\):[ \t]*$/\1/p' "$f" | sort -u > "$work"/names
+
+  # A delivery spec has to be consumed ON THE TARGET IT IS WRITTEN FOR, so it
+  # is judged against the driver plus THIS file only.  The tree-wide set is too
+  # weak for it: `*link_plugin' was emitted into all 183 files and read by
+  # nothing, yet one reference from darwin's link_command would have covered
+  # the other 182 and the check would have passed.  EXTRA_SPECS names keep the
+  # tree-wide set, because a target may publish a name it does not use on every
+  # triple and that is not our business.
+  #
+  # THIS ASSUMES A FILE IS A WHOLE TARGET'S SPECS, not one producer's half.  A
+  # target's file is written by two of them -- gen-target-specs and
+  # target-specs -- and one half can legitimately declare a name the other half
+  # refers to.  The Makefile concatenates them before calling this script and
+  # passes only the merged `specs-<target>', never `specs-src-<target>'.  Hand
+  # a half to this script and it will report the other half's references
+  # missing, which is a fault in the invocation and not in the tree.
+  cat "$work"/driverrefs > "$work"/frefs
+  refs_from "$f" >> "$work"/frefs
+  sort -u "$work"/frefs -o "$work"/frefs
+
   while read -r n; do
     test -n "$n" || continue
-    if ! reachable "$n"; then
-      if grep -qx -- "$n" "$work"/extra; then
-	echo "$n $f" >> "$work"/dead_extra
-      else
-	echo "$n $f" >> "$work"/dead
-      fi
+    if grep -qx -- "$n" "$work"/extra; then
+      reachable "$n" || echo "$n $f" >> "$work"/dead_extra
+    else
+      reachable "$n" "$work"/frefs || echo "$n $f" >> "$work"/dead
     fi
   done < "$work"/names
 done

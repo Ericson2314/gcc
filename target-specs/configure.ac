@@ -1520,6 +1520,39 @@ else
   link_no_as_needed=
 fi
 
+dnl How to hand the LTO plugin to the linker.  This is the whole spec, not just
+dnl the -plugin option: without -plugin-opt=-fresolution= the linker calls
+dnl lto-wrapper without a resolution file and the link still fails, so emitting
+dnl a fragment would have looked like a fix and not been one.  The text is the
+dnl one gcc.cc used to build behind `#if HAVE_LTO_PLUGIN', with that macro's
+dnl two levels preserved as two shapes:
+dnl
+dnl   2  full support -- use the plugin by DEFAULT, unless -fno-use-linker-plugin
+dnl      or -fno-lto.  This is what upstream's configure records for a linker
+dnl      whose plugin interface is complete.
+dnl   1  limited support -- use it only when asked with -fuse-linker-plugin.
+dnl      Upstream reached this for gold 2.20 and nothing else; the probe below
+dnl      cannot tell 1 from 2 by asking, so it never answers 1 today.  The arm
+dnl      is written anyway, because a probe that learns the difference later
+dnl      should not also have to invent the spec.
+dnl   0  no -plugin at all -- reject an explicit -fuse-linker-plugin, which is
+dnl      also the driver's built-in default.
+dnl
+dnl `%(lto_plugin)' is the target's own extra -plugin-opt (config/vxworks.h is
+dnl the only definer); gen-target-specs writes it from LTO_PLUGIN_SPEC, so the
+dnl target keeps the text and this script keeps only the choice.
+ts_plugin_body='-plugin %(linker_plugin_file) \
+    -plugin-opt=%(lto_wrapper) \
+    -plugin-opt=-fresolution=%u.res \
+    %(lto_plugin) \
+    %{flinker-output=*:-plugin-opt=-linker-output-known} \
+    %{!nostdlib:%{!nodefaultlibs:%:pass-through-libs(%(link_gcc_c_sequence))}}'
+case $gcc_cv_lto_plugin in
+  2) link_plugin="%{!fno-use-linker-plugin:%{!fno-lto:${ts_plugin_body}}}" ;;
+  1) link_plugin="%{fuse-linker-plugin:${ts_plugin_body}}" ;;
+  *) link_plugin='%{fuse-linker-plugin:%e-fuse-linker-plugin is not supported in this configuration}' ;;
+esac
+
 dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.  Emitted as a
 dnl reference to the named spec the target header already registers, so the spec
 dnl TEXT stays in config/sol2.h where the target knowledge belongs and only the
@@ -1549,7 +1582,7 @@ ${gcc_cv_ld_dynamic_option}
 %{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
 
 *link_plugin:
-`if test "$gcc_cv_lto_plugin" -gt 0; then echo '%{!fno-use-linker-plugin:%{!fno-lto:-plugin %(linker_plugin_file)}}'; fi`
+${link_plugin}
 
 *link_disable_dynamicbase:
 `if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`
