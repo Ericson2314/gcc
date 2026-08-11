@@ -60,6 +60,13 @@ host=@host@
 host_noncanonical=@host_noncanonical@
 host_os=@host_os@
 
+# The one target triple this build will have a libatomic for, or empty.  Only
+# that target's spec file gets -latomic on its link line: the top level builds
+# target libraries for ${target} alone, so in a compiler serving 183 targets a
+# yes/no answer would have put a hard dependency on a missing library into 182
+# of them.  Consumed by the target-specs rule below.
+libatomic_target=@libatomic_target@
+
 # Normally identical to target_noncanonical, except for compilers built
 # as accelerator targets.
 accel_dir_suffix = @accel_dir_suffix@
@@ -2889,10 +2896,14 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    tct=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="cpu_type"{print $$2;exit}' multi-target.manifest`; \
 	    tdf=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_float"{print $$2;exit}' multi-target.manifest`; \
 	    tdb=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_bid_format"{print $$2;exit}' multi-target.manifest`; \
+	    tla=no; \
+	    if test -n "$(libatomic_target)" \
+	       && test "$$t" = "$(libatomic_target)"; then tla=yes; fi; \
 	    if (cd tmp-ts-$$t && $$tsdir/configure --with-target=$$t \
 	          --with-as="$$tas" --with-ld="$$tld" \
 	          --with-option-defaults="$$tod" --with-cpu-type="$$tct" \
 	          --with-decimal-float="$$tdf" --with-decimal-bid-format="$$tdb" \
+	          --with-libatomic="$$tla" \
 	          --with-specs-file=../specs-$$t > probe.log 2>&1); then \
 	      echo "target-specs: wrote specs-$$t (as=$$tas ld=$$tld)"; \
 	      made=`expr $$made + 1`; \
@@ -2925,7 +2936,12 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
-	rm -f tmp-specfiles
+	rm -f tmp-specfiles; \
+	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
+	if test -s tmp-cfgfiles; then \
+	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles`; \
+	fi; \
+	rm -f tmp-cfgfiles
 
 # Fail the build if a spec file names a spec nothing ever asks for.  Three
 # separate times a spec has been written into every per-target spec file with
@@ -2941,6 +2957,20 @@ check-spec-refs:
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
 	rc=$$?; rm -f tmp-specfiles; exit $$rc
+
+# The same failure, on the other half of what target-specs writes.  A spec file
+# entry nobody asks for is caught above; a `name value' line in the per-target
+# CONFIG file that nothing reads is just as silent, because read_target_caps
+# ignores unknown names on purpose so that a newer spec file does not break an
+# older compiler.  targ_caps.lto_plugin was in exactly that state: probed,
+# written into every config file, and reachable only through a defaults.h macro
+# no translation unit consumed.  Nothing diagnosed it; the twelve LTO testsuite
+# failures did, months later, and only once the testsuite could link at all.
+.PHONY: check-target-caps
+check-target-caps:
+	@find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
+	$(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles`; \
+	rc=$$?; rm -f tmp-cfgfiles; exit $$rc
 
 REFERENCE_SPECS =
 .PHONY: check-target-specs
