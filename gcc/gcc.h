@@ -22,6 +22,10 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "version.h"
 #include "diagnostic-core.h"
+/* For option_proposer, which `class driver' holds by value.  gcc.cc happened
+   to include this first, so gcc.h has never had to be self-contained and was
+   not; the first other file to include it (spec-functions.cc) found out.  */
+#include "opt-suggestions.h"
 
 /* The top-level "main" within the driver would be ~1000 lines long.
    This class breaks it up into smaller functions and contains some
@@ -69,6 +73,22 @@ struct spec_function
   const char *name;
   const char *(*func) (int, const char **);
 };
+
+/* One configured target and the spec-function table it uses.  Several targets
+   of the same back end share a table.  See spec-functions-select.cc for why
+   this is keyed by target rather than being one flat name->function table.  */
+struct spec_functions_entry
+{
+  const char *target;
+  const struct spec_function *table;
+};
+
+/* Install the table belonging to TARGET; false if TARGET was not configured,
+   in which case nothing is installed.  In spec-functions-select.cc.  */
+extern bool spec_functions_select (const char *);
+
+/* Look up a spec function published by the selected target, or NULL.  */
+extern const struct spec_function *lookup_target_spec_function (const char *);
 
 /* These are exported by gcc.cc.  */
 extern int do_spec (const char *);

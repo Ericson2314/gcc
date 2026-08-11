@@ -1885,9 +1885,11 @@ static const struct spec_function static_spec_functions[] =
   { "dwarf-version-gt",		dwarf_version_greater_than_spec_func },
   { "fortran-preinclude-file",	find_fortran_preinclude_file},
   { "join",			join_spec_func},
-#ifdef EXTRA_SPEC_FUNCTIONS
-  EXTRA_SPEC_FUNCTIONS
-#endif
+  /* EXTRA_SPEC_FUNCTIONS used to be spliced in here.  It cannot be: it comes
+     from a target's tm.h, this driver serves several targets, and gcc.cc no
+     longer includes any tm.h -- so the guard was permanently false and every
+     back end's spec functions silently left the driver.  They now live in a
+     per-target table; lookup_spec_function consults it after this one.  */
   { 0, 0 }
 };
 
@@ -7143,7 +7145,19 @@ lookup_spec_function (const char *name)
     if (strcmp (sf->name, name) == 0)
       return sf;
 
-  return NULL;
+  /* Then the selected target's own, which used to reach this table as
+     EXTRA_SPEC_FUNCTIONS out of tm.h and could not once gcc.cc stopped
+     including one.  See spec-functions-select.cc.
+
+     THE STATIC TABLE IS SEARCHED FIRST, DELIBERATELY.  A back end cannot
+     displace a core spec function -- `if-exists', `replace-outfile' and the
+     rest mean the same thing on every target, and code in gcc.cc's own specs
+     calls them.  Letting a target shadow one would be a name meaning two
+     things again, in the direction that is hardest to see because the target's
+     table is the one that varies.  A back end that publishes a colliding name
+     therefore finds its own entry unreachable rather than breaking the driver;
+     no back end does today, and the ordering is what keeps that cheap.  */
+  return lookup_target_spec_function (name);
 }
 
 /* Evaluate a spec function.  */
@@ -8629,6 +8643,16 @@ driver::main (int argc, char **argv)
 	early_fatal_error ("target `%s' is not one of the targets this "
 			   "compiler was configured for", selected_target);
     }
+
+  /* The spec-function table for the same target, installed from the same
+     manifest and so configured for exactly the same set.  Checked rather than
+     assumed: if the two registries ever disagree about which targets exist,
+     the symptom without this would be `unknown spec function' from a target
+     that plainly is configured, which reads as the bug this replaced.  */
+  if (selected_target != NULL && !spec_functions_select (selected_target))
+    early_fatal_error ("no spec-function table for target `%s', which the "
+		       "common hook registry accepted: the two registries "
+		       "disagree about the configured targets", selected_target);
 
   /* Everything that asks this driver what machine it is for is asking about
      the target SELECTED, not about the compiler, which serves several.  That

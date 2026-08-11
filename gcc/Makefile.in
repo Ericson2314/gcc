@@ -662,6 +662,10 @@ enabled_targets=@gcc_manifest_targets@
 TEST_TARGET=$(firstword $(enabled_targets))
 
 gcc_all_common_objects=@gcc_all_common_objects@
+# One spec-functions-<base>.o per configured back end, with the rules that
+# build them in multi-target-common.mk.  Written by the same configure loop as
+# gcc_all_common_objects, from the same manifest.
+gcc_all_spec_fn_objects=@gcc_all_spec_fn_objects@
 gcc_all_common_symbols=@gcc_all_common_symbols@
 
 # Rules to build them, written by configure: the sources live under
@@ -1447,7 +1451,14 @@ FORTRAN_TARGET_OBJS=@fortran_target_objs@
 RUST_TARGET_OBJS=@rust_target_objs@
 
 # Object files for gcc many-languages driver.
-GCC_OBJS = gcc.o gcc-main.o ggc-none.o gcc-urlifier.o options-urls.o
+#
+# The per-back-end spec-function tables and the registry that selects among
+# them go here rather than into libcommon-target.a because gcc.cc is what
+# consults them, and every program that links gcc.o needs them: xgcc, xg++ and
+# cpp all process specs.  See spec-functions-select.cc for why the registry is
+# keyed by target and not one flat table.
+GCC_OBJS = gcc.o gcc-main.o ggc-none.o gcc-urlifier.o options-urls.o \
+  spec-functions-select.o $(gcc_all_spec_fn_objects)
 
 SARIF_REPLAY_OBJS = sarif-replay.o libsarifreplay.o
 
@@ -2957,6 +2968,15 @@ multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
 # which a single-target driver linked in through extra_gcc_objs and a
 # multi-target one cannot.  That is the registry problem, not this one, and it
 # is named here rather than left to surface at someone's first compile.
+#
+# THAT REGISTRY NOW EXISTS -- spec-functions-select.cc, keyed by target -- so
+# the name->function half is no longer the reason a spec file is rejected.  The
+# rejections these three cause are a different and narrower thing: their
+# functions live in config/<cpu>/driver-<cpu>.cc, which is linked through
+# extra_gcc_objs and, for local_cpu_detect, only when host and target agree
+# (config.host).  A back end whose driver object is not linked publishes an
+# empty table, which is the honest answer rather than a resolution to some
+# other back end's function.  Re-measure this count before quoting it.
 target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
   $(MULTI_TARGET_SOURCE_SPECS)
 	@set -e; \
@@ -3277,6 +3297,16 @@ $(out_object_file): $(out_file)
 # target and made the selector fail to link whenever --enable-targets did not
 # name the build's own triple.  It now names no target at all.
 common/common-target-select.o: $(srcdir)/common/common-target-select.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+# The registry of the driver's per-back-end spec-function tables.  Deliberately
+# NO -D naming any target, for the same reason as above: it must not start out
+# holding one back end's table, or a driver that selected nothing would resolve
+# %:local_cpu_detect against whichever back end the build happened to prefer
+# and report the HOST's CPU for every target.
+spec-functions-select.o: $(srcdir)/spec-functions-select.cc \
+  multi-target-spec-functions.h $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(GCC_H)
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
