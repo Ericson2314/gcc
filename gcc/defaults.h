@@ -493,22 +493,55 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_FHARDENED_SUPPORTED 0
 #endif
 
-/* Whether the assembler in use is the Solaris one rather than GNU as.
-   Upstream this came from a configure probe of the target's assembler
-   (configure.ac's solaris_as check, AC_DEFINE_UNQUOTED to 0 or 1), which was
-   removed here: it is a property of a particular assembler binary, so it
-   belongs in target-specs and ultimately has to reach the compiler at run
-   time.  Until it does, say 0 explicitly.
+/* Whether the assembler and linker in use are the Solaris ones rather than
+   GNU as and GNU ld.  Upstream both come from configure probes of the target's
+   tools (configure.ac's solaris_as and ld_flavor checks, AC_DEFINE_UNQUOTED to
+   0 or 1), which were removed here: they are properties of particular
+   assembler and linker binaries, so they belong in target-specs and
+   ultimately have to reach the compiler at run time.
 
-   Explicitly, because the alternative is not "no definition" but a silent 0:
-   every other user spells it `#if HAVE_SOLARIS_AS', where an undefined
-   identifier is 0 with no diagnostic, so the removal already had this effect
-   and merely hid it.  config/sparc/sparc.md uses it as a C condition instead,
-   where an undefined identifier is an error -- which is how the gap was
-   found, when gencondmd was first built per back end.  Do not read this
-   default as a decision that no target uses Solaris as.  */
+   PLACEHOLDERS, not answers.  Do not read these as a decision that no target
+   uses the Solaris tools; they are 0 because nothing can supply the real
+   value yet, and they should become a target capability queried at run time.
+
+   Stated explicitly because the alternative is not "no definition" but a
+   silent 0: nearly every user spells it `#if HAVE_SOLARIS_AS', where an
+   undefined identifier is 0 with no diagnostic.  So the removal already had
+   this effect throughout config/sol2.h, config/{i386,sparc}/sol2.h,
+   config/i386/i386.cc, config/sparc/sparc.cc and go/gospec.cc, and merely hid
+   it.  Note these #defines do NOT reach those sites: defaults.h is included at
+   the END of tm.h, after the OS headers that test them.  Their behaviour is
+   unchanged, and that is the point -- what changes is that the situation is
+   now written down.
+
+   config/sparc/sparc.md is the exception that made it visible, because it uses
+   both as C rather than as preprocessor conditions, where an undefined
+   identifier is a hard error: HAVE_SOLARIS_AS in an insn condition (found when
+   gencondmd was first built per back end) and both in a define_attr symbol_ref
+   at sparc.md:559, which genattrtab will compile when it too goes per back
+   end.  `.md' C conditions are the only place an absent macro is loud; a sweep
+   of every macro this branch has dropped from config.in against every .md file
+   in the tree found exactly these two.  */
 #ifndef HAVE_SOLARIS_AS
 #define HAVE_SOLARIS_AS 0
+#endif
+#ifndef HAVE_SOLARIS_LD
+#define HAVE_SOLARIS_LD 0
+#endif
+
+/* HAVE_SOLARIS_LD has exactly the same history and the same problem, and was
+   still fully silent: nothing defined it anywhere, and all fifteen consumers
+   spell it `#if HAVE_SOLARIS_LD', so it has been 0 with no diagnostic since
+   the probe was removed.  Unlike HAVE_SOLARIS_AS it has no .md condition to
+   make the gap loud, which is why it went unnoticed longer.
+
+   Note what it selects: LD_WHOLE_ARCHIVE_OPTION, LINK_ARCH_SPEC_1,
+   RDYNAMIC_SPEC, LINK_LIBGCC_MAPFILE_SPEC and friends are all spec string
+   literals, so this one cannot become a runtime capability in its present
+   shape -- it is the build-time/spec-override variant, not a targ_caps
+   candidate.  Explicit 0 until target-specs supplies it.  */
+#ifndef HAVE_SOLARIS_LD
+#define HAVE_SOLARIS_LD 0
 #endif
 
 /* Offsets recorded in opcodes are a multiple of this alignment factor.  */
