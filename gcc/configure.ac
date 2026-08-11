@@ -810,24 +810,29 @@ dnl --with-dwarf2 is gone.
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:844".
 dwarf2=no
 
-AC_ARG_ENABLE(shared,
-[AS_HELP_STRING([--disable-shared], [don't provide a shared libgcc])],
-[
-  case $enable_shared in
-  yes | no) ;;
-  *)
-    enable_shared=no
-    IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS="${IFS}:,"
-    for pkg in $enableval; do
-      if test "X$pkg" = "Xgcc" || test "X$pkg" = "Xlibgcc"; then
-        enable_shared=yes
-      fi
-    done
-    IFS="$ac_save_ifs"
-    ;;
-  esac
-], [enable_shared=yes])
-AC_SUBST(enable_shared)
+# --enable-shared/--disable-shared meaning "do (not) provide a shared libgcc"
+# is gone from here.  It was a SECOND AUTHORITY AND-ed on top of a target fact:
+# DRIVER_DEFINES used to read
+#
+#     $(if $(SHLIB),$(if $(filter yes,@enable_shared@),-DENABLE_SHARED_LIBGCC))
+#
+# where $(SHLIB) comes from config/t-slibgcc via the target's tmake_file, and
+# @enable_shared@ came from this option.  Two different questions -- "does this
+# target have a shared libgcc" and "did the builder ask for one" -- sharing one
+# name, in one file, with no way to tell which had produced a given answer.
+#
+# The option half goes because libgcc/configure.ac:52 asks it already, in the
+# place that owns it, and because `--enable-shared' given to a package means
+# THAT PACKAGE's host: given to gcc it has to mean gcc's own host, which is what
+# the option below now means.  Only the $(SHLIB) half remains, so the default
+# (enable_shared=yes) is unchanged; a build that explicitly passed
+# --disable-shared to gcc no longer suppresses shared-libgcc specs, and should
+# pass it to libgcc instead.
+#
+# THE TARGET HALF IS STILL BROKEN AND IS NOT FIXED HERE.  $(SHLIB) reaches the
+# driver from the PRIMARY target's config.gcc, so in an --enable-targets=all
+# build one target's answer is applied to all of them.  See scratchpad/STATE.md,
+# "ENABLE_SHARED_LIBGCC flows through the privileged-target channel".
 
 dnl Whether to build libgcov and the related host tools.
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:871".
@@ -3739,34 +3744,25 @@ fi
 
 # --enable-host-shared, --enable-host-pie.
 #
-# THE `host-' PREFIX IS WRONG AND IS STAYING FOR NOW.  It disambiguates against
-# a target meaning that no longer exists in this file, and the convention it
-# fights is universal: `--enable-shared' given to a package always means THAT
-# PACKAGE's host.  Given to gcc it would mean gcc's host; given to libgcc it
-# means libgcc's host, which is what gcc calls the target.  One rule, resolved
-# against whichever package is being configured.  The prefix is a local
-# invention where a convention already existed.
+# The `host-' prefix is redundant and is on its way out.  `--enable-shared'
+# given to a package means THAT PACKAGE's host: given to gcc it means gcc's own
+# host, given to libgcc it means libgcc's host, which is what gcc calls the
+# target.  One rule, resolved against whichever package is being configured --
+# so the prefix was a local invention where a convention already existed.
 #
-# It WAS renamed to `--enable-shared'/`--enable-pie', and the rename was BACKED
-# OUT.  The reason is worth recording rather than rediscovering:
+# THE BLOCKER IS NOW GONE.  This file used to carry a SECOND
+# AC_ARG_ENABLE(shared) meaning "do not provide a shared libgcc" -- a target
+# question -- so renaming these would have put two authorities behind one name
+# in a single file, the later one silently winning.  That option has been
+# removed (see the note above DRIVER_DEFINES and libgcc/configure.ac:52).
 #
-#   gcc/configure.ac ALREADY HAS AC_ARG_ENABLE(shared) -- near the top of this
-#   file, "do not provide a shared libgcc".  It sets and AC_SUBSTs
-#   `enable_shared', which Makefile.in turns into -DENABLE_SHARED_LIBGCC.  A
-#   second AC_ARG_ENABLE(shared) here silently overwrites it, and being later
-#   in the file it wins.  That is this project's canonical failure -- one name,
-#   two authorities, no diagnostic -- committed inside a single file, and the
-#   rename would have introduced it.
-#
-# So the rename has a PREREQUISITE, not merely a top-level dependency: the
-# libgcc-shared option above has to leave gcc/configure.ac first.  It is a
-# question about libgcc, libgcc/configure.ac:52 already asks it identically,
-# and only then is the name free for the host meaning.
-#
-# Second dependency, unchanged: the top-level configure passes
-# --enable-host-shared and --enable-host-pie down here (22 uses), and the top
-# level ALSO forwards its own --disable-shared into host_configargs, so the two
-# names would meet there too.  scratchpad/STATE.md carries the work item.
+# What is left before the rename is purely the top level: it passes
+# --enable-host-shared and --enable-host-pie down here (22 uses in
+# ../configure.ac), so both files have to change together or the option becomes
+# unrecognised, enable_shared goes unset, and the host is built non-shared --
+# which shows up as a libgccjit link error, not as a configure diagnostic.
+# Acceptance therefore has to be "a build with no flags still produces a shared
+# host where it should", not "the old spelling is rejected".
 AC_ARG_ENABLE(host-shared,
 [AS_HELP_STRING([--enable-host-shared],
 		[build host code as shared libraries])])
