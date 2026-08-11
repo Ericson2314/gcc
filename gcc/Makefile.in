@@ -3055,6 +3055,15 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 # silence, because read_specs accepts an unknown name and waits for a caller
 # that never comes.  A wrong value gets noticed; a value that goes nowhere does
 # not.  Run separately from `target-specs' when you want it on its own.
+# The standing form of the rule that gutted configure.ac in the first place:
+# every --with and --enable in gcc/configure.ac is about the HOST, never about
+# a target.  Cheap, no build products needed, and it is the only one of these
+# checks that keeps the file from silently refilling.  See the header of
+# check-host-only-flags.sh for what it can and cannot see.
+.PHONY: check-host-only-flags
+check-host-only-flags:
+	$(SHELL) $(srcdir)/check-host-only-flags.sh $(srcdir)/configure.ac
+
 .PHONY: check-spec-refs
 check-spec-refs:
 	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print \

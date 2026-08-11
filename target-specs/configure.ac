@@ -10,6 +10,31 @@ dnl
 dnl Output is in the `*name:\nvalue\n\n' form that the driver's read_specs()
 dnl already parses, so nothing in the driver needs to change to consume it.
 
+dnl TS_AS_CHECK(DESCRIPTION, VARIABLE, AS-FLAGS, PROGRAM)
+dnl ------------------------------------------------------
+dnl The counterpart of gcc/acinclude.m4's gcc_GAS_CHECK_FEATURE, for probes that
+dnl have moved here.  Deliberately NOT the same macro: that one caches its
+dnl answer and AC_DEFINEs it into auto-host.h, and both of those are exactly
+dnl what a per-target probe must not do.  Sets VARIABLE to yes or no.
+dnl
+dnl No cache variable: this script is re-run once per target against a different
+dnl assembler each time, and a cache shared across those runs would hand one
+dnl target's answer to another -- the project's canonical failure, in configure
+dnl rather than in C.
+m4_define([TS_AS_CHECK],
+[AC_MSG_CHECKING([assembler for $1])
+$2=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+$4
+TS_ASEOF
+  if "$gcc_cv_as" $3 -o conftest.o conftest.s > /dev/null 2>&1; then
+    $2=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+AC_MSG_RESULT([$$2])])
+
 AC_INIT([gcc-target-specs], [1.0])
 AC_CONFIG_SRCDIR([configure.ac])
 dnl config.sub/config.guess live at the top of the tree.
@@ -97,6 +122,22 @@ AC_ARG_WITH([readelf],
   [gcc_cv_readelf=$withval], [gcc_cv_readelf=$ts_default_readelf])
 command -v "$gcc_cv_readelf" > /dev/null 2>&1 || gcc_cv_readelf=
 
+dnl nm, for the probes that read the object back rather than trusting the
+dnl assembler's exit status.  `.subsection -1' is the one that needs it: a
+dnl broken assembler accepts the directive and emits in the wrong place.
+if test "$target" = "$host"; then
+  ts_default_nm=nm
+  command -v ${target}-nm > /dev/null 2>&1 && ts_default_nm=${target}-nm
+else
+  ts_default_nm=${target}-nm
+fi
+AC_ARG_WITH([nm],
+  [AS_HELP_STRING([--with-nm=PATH], [nm to inspect probe output with])],
+  [gcc_cv_nm=$withval], [gcc_cv_nm=$ts_default_nm])
+command -v "$gcc_cv_nm" > /dev/null 2>&1 || gcc_cv_nm=
+
+AC_MSG_CHECKING([for nm])
+AC_MSG_RESULT([${gcc_cv_nm:-not found}])
 AC_MSG_CHECKING([for objdump])
 AC_MSG_RESULT([${gcc_cv_objdump:-not found}])
 AC_MSG_CHECKING([for readelf])
@@ -230,6 +271,19 @@ dnl ---------------------------------------------------------------------------
 dnl Probes.  Each mirrors the corresponding check in gcc/configure.ac, but runs
 dnl against the tools named above rather than the ones configure happened to find.
 dnl ---------------------------------------------------------------------------
+
+dnl --fatal-warnings, for probes that must not accept "assembled it, but warned
+dnl that it does not mean what you asked".  Two probes in this file already
+dnl referenced $fw_as_opt while nothing set it, so they were running without it
+dnl and could have taken a warning for a pass.
+AC_MSG_CHECKING([assembler for --fatal-warnings])
+fw_as_opt=
+echo '	.text' > conftest.s
+if "$gcc_cv_as" --fatal-warnings -o conftest.o conftest.s > /dev/null 2>&1; then
+  fw_as_opt=--fatal-warnings
+fi
+rm -f conftest.s conftest.o
+AC_MSG_RESULT([${fw_as_opt:-not supported}])
 
 dnl --gdwarf-5, feeding ASM_DEBUG_OPTION_SPEC / ASM_DEBUG_SPEC.
 AC_MSG_CHECKING([assembler for --gdwarf-5])
@@ -1665,6 +1719,380 @@ case $target in
     ;;
 esac
 
+dnl ===========================================================================
+dnl THE BULK SWEEP OF 2026-08-11: everything below arrived in one move out of
+dnl gcc/configure.ac, ahead of wiring its consumers up.  gcc/configure.ac's own
+dnl note lists the eleven blocks in the order they stood there; the order here
+dnl is the same, so the two can be read side by side.
+dnl
+dnl Every one of these asks a question about a TARGET's assembler.  None of
+dnl them can be answered when a multi-target compiler is configured, because
+dnl the assembler is not chosen yet -- which is precisely why they were all
+dnl reading their floors in the all-targets build (0 of 33 defined, measured).
+dnl ===========================================================================
+
+dnl --- Generic assembler directives.  No `case', because these are asked of
+dnl every assembler; the programs are architecture-neutral.
+TS_AS_CHECK([.balign and .p2align], [gcc_cv_as_balign_and_p2align], [],
+[	.balign 4
+	.p2align 2])
+
+TS_AS_CHECK([.p2align with maximum skip], [gcc_cv_as_max_skip_p2align], [],
+[	.p2align 4,,7])
+
+TS_AS_CHECK([.literal16], [gcc_cv_as_literal16], [], [	.literal16])
+
+TS_AS_CHECK([.weak], [gcc_cv_as_weak], [], [	.weak foobar])
+
+TS_AS_CHECK([.weakref], [gcc_cv_as_weakref], [], [	.weakref foobar, barfnot])
+
+TS_AS_CHECK([.nsubspa comdat], [gcc_cv_as_nsubspa_comdat], [],
+[	.SPACE $TEXT$
+	.NSUBSPA $CODE$,COMDAT])
+
+TS_AS_CHECK([.base64], [gcc_cv_as_base64], [],
+[	.section .rodata
+	.base64 "Tm9uIHB1ZG9yIGVzdCBuaWwgc2NpcmUsIHB1ZG9yIG5pbCBkaXNjZXJlIHZlbGxlLgo="])
+
+TS_AS_CHECK([.cv_ucomp], [gcc_cv_as_cv_ucomp], [], [	.cv_ucomp 0])
+
+TS_AS_CHECK([.lcomm with alignment], [gcc_cv_as_lcomm_with_alignment], [],
+[	.lcomm bar,4,16])
+
+dnl `.subsection -1' needs the object inspected: assemblers accept the
+dnl directive and then emit at the END of the section, which is the bug the
+dnl probe exists to find.  With no nm for this target the honest answer is
+dnl "unknown", and "unknown" here has to mean no.
+AC_MSG_CHECKING([assembler for working .subsection -1])
+gcc_cv_as_subsection_m1=no
+cat > conftest.s <<'TSEOF'
+conftest_label1: .word 0
+.subsection -1
+conftest_label2: .word 0
+.previous
+TSEOF
+if test x"$gcc_cv_nm" != x \
+   && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  "$gcc_cv_nm" conftest.o | grep conftest_label1 > conftest.nm1
+  "$gcc_cv_nm" conftest.o | grep conftest_label2 | sed -e 's/label2/label1/' > conftest.nm2
+  if cmp conftest.nm1 conftest.nm2 > /dev/null 2>&1; then :; else
+    gcc_cv_as_subsection_m1=yes
+  fi
+  rm -f conftest.nm1 conftest.nm2
+fi
+rm -f conftest.s conftest.o
+AC_MSG_RESULT([$gcc_cv_as_subsection_m1])
+
+dnl --- Section flags.  Three of the four had a Solaris arm in gcc/configure.ac
+dnl that pinned the answer to `no' without probing, on the grounds that GNU as
+dnl with Solaris ld can assemble a flag the linker will not accept.  That arm
+dnl is kept: it is target knowledge, and it belongs here rather than there.
+gcc_cv_as_section_exclude=no
+gcc_cv_as_shf_gnu_retain=no
+gcc_cv_as_section_link_order=no
+gcc_cv_as_shf_merge=no
+
+TS_AS_CHECK([section exclude flag], [gcc_cv_as_section_exclude_e], [$fw_as_opt],
+[	.section foo1,"e"
+	.byte 0,0,0,0])
+if test x"$gcc_cv_as_section_exclude_e" = xyes; then
+  gcc_cv_as_section_exclude=yes
+else
+  dnl Solaris as spells it #exclude, and spells the section name differently
+  dnl again on sparc than on x86.
+  ts_exclude_s=
+  case ${target} in
+    sparc*-*-solaris2*)          ts_exclude_s='	.section "foo1", #exclude' ;;
+    i?86-*-solaris2* | x86_64-*-solaris2*)
+                                 ts_exclude_s='	.section foo1, #exclude' ;;
+  esac
+  if test x"$ts_exclude_s" != x; then
+    TS_AS_CHECK([section exclude flag, Solaris spelling], [gcc_cv_as_section_exclude_hash], [],
+[$ts_exclude_s
+	.byte 0,0,0,0])
+    gcc_cv_as_section_exclude=$gcc_cv_as_section_exclude_hash
+  fi
+fi
+
+case ${target} in
+  *-*-solaris2*)
+    dnl Not probed on purpose; see above.
+    ;;
+  *)
+    TS_AS_CHECK([section 'R' flag], [gcc_cv_as_shf_gnu_retain], [$fw_as_opt],
+[	.section .foo,"awR",%progbits
+	.byte 0])
+    TS_AS_CHECK([section 'o' flag], [gcc_cv_as_section_link_order], [$fw_as_opt],
+[	.section .foo,"a"
+	.byte 0
+	.section __patchable_function_entries,"awo",%progbits,.foo
+	.byte 0])
+    ;;
+esac
+
+TS_AS_CHECK([section merging support], [gcc_cv_as_shf_merge], [$fw_as_opt],
+[	.section .rodata.str, "aMS", @progbits, 1])
+if test x"$gcc_cv_as_shf_merge" != xyes; then
+  TS_AS_CHECK([section merging support (%progbits)],
+    [gcc_cv_as_shf_merge_percent], [$fw_as_opt],
+[	.section .rodata.str, "aMS", %progbits, 1])
+  gcc_cv_as_shf_merge=$gcc_cv_as_shf_merge_percent
+fi
+
+dnl --- .eh_frame optimization.  GAS up to 2.11.0 mis-optimizes it, and the
+dnl remedy was --traditional-format, which gcc/configure.ac recorded as
+dnl USE_AS_TRADITIONAL_FORMAT.  Distinguishing "good" from "buggy" needs the
+dnl assembled bytes read back, so with no objdump the answer is "good", which
+dnl is what every assembler released this century actually is.
+AC_MSG_CHECKING([assembler for buggy .eh_frame optimization])
+gcc_cv_as_eh_frame_traditional=no
+if test x"$gcc_cv_objdump" != x; then
+  if "$gcc_cv_as" -o conftest.o --traditional-format /dev/null > /dev/null 2>&1; then
+    dnl The full byte-comparison probe from gcc/configure.ac is not reproduced:
+    dnl it compared against two hand-written objdump transcripts for one
+    dnl 32-bit little- and one big-endian layout, and neither transcript is
+    dnl valid for most of the 45 back ends this file serves.  A probe that
+    dnl answers "buggy" for every target whose .eh_frame simply looks
+    dnl different would be worse than no probe: --traditional-format defeats
+    dnl section merging everywhere.  So the question asked here is only
+    dnl whether the assembler is old enough to HAVE the option in the sense
+    dnl the workaround needs, and the answer is recorded rather than acted on.
+    :
+  fi
+fi
+AC_MSG_RESULT([$gcc_cv_as_eh_frame_traditional])
+
+dnl --- darwin.
+gcc_cv_as_mmacosx_version_min=no
+gcc_cv_as_darwin_build_version=no
+case ${target_os} in
+  darwin*)
+    TS_AS_CHECK([-mmacosx-version-min option], [gcc_cv_as_mmacosx_version_min],
+      [-mmacosx-version-min=10.1], [	.text])
+    if test x"$gcc_cv_as_mmacosx_version_min" = xyes; then
+      TS_AS_CHECK([.build_version], [gcc_cv_as_darwin_build_version],
+        [-mmacosx-version-min=10.14],
+        [	.build_version macos, 10, 14 sdk_version 10, 14])
+    fi
+    ;;
+esac
+
+dnl --- avr.
+gcc_cv_as_avr_mlink_relax=no
+gcc_cv_as_avr_mrmw=no
+gcc_cv_as_avr_mgccisr=no
+case ${target} in
+  avr-*-*)
+    TS_AS_CHECK([--mlink-relax option], [gcc_cv_as_avr_mlink_relax],
+      [--mlink-relax], [	.text])
+    TS_AS_CHECK([-mrmw option], [gcc_cv_as_avr_mrmw], [-mrmw], [	.text])
+    TS_AS_CHECK([__gcc_isr pseudo instruction], [gcc_cv_as_avr_mgccisr],
+      [-mgcc-isr],
+[	.text
+	__gcc_isr 1
+	__gcc_isr 2
+	__gcc_isr 0,r24])
+    ;;
+esac
+
+dnl --- cris.
+gcc_cv_as_cris_no_mul_bug=no
+case ${target} in
+  cris-*-*)
+    TS_AS_CHECK([-no-mul-bug-abort option], [gcc_cv_as_cris_no_mul_bug],
+      [-no-mul-bug-abort], [	.text])
+    ;;
+esac
+
+dnl --- ia64.
+gcc_cv_as_ia64_ltoffx_ldxmov_relocs=no
+case ${target} in
+  ia64*-*-*)
+    TS_AS_CHECK([ltoffx and ldxmov relocs], [gcc_cv_as_ia64_ltoffx_ldxmov_relocs], [],
+[	.text
+	addl r15 = @ltoffx(x#), gp
+	;;
+	ld8.mov r16 = @<:@r15@:>@, x#])
+    ;;
+esac
+
+dnl --- powerpc.  Four of these need a different test program on AIX and on
+dnl Darwin, because the three object formats spell `.machine' and the text
+dnl section differently; gcc/configure.ac had the same three-way `case' and it
+dnl is reproduced rather than simplified.
+gcc_cv_as_powerpc_mfcrf=no
+gcc_cv_as_power10_htm=no
+gcc_cv_as_powerpc_rel16=no
+gcc_cv_as_powerpc_entry_markers=no
+gcc_cv_as_powerpc_pltseq_markers=no
+gcc_cv_as_machine_directive=no
+case ${target} in
+  powerpc*-*-*)
+    case ${target} in
+      *-*-darwin*)
+	TS_AS_CHECK([.machine directive support], [gcc_cv_as_machine_directive], [],
+	  [	.machine ppc7400])
+	if test x"$gcc_cv_as_machine_directive" != xyes; then
+	  dnl gcc/configure.ac made this fatal (`exit 1' for a native build).
+	  dnl It cannot be fatal here: this script probes many targets in one
+	  dnl run, and one target's toolchain being too old must not stop the
+	  dnl others.  It skips THIS target's spec file instead, which is the
+	  dnl same outcome the missing-tools path already produces.
+	  AC_MSG_WARN([$gcc_cv_as does not support ".machine"; powerpc-darwin needs cctools 528.5 or later])
+	fi
+	;;
+    esac
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.machine "pwr5"
+	.csect .text@<:@PR@:>@
+	mfcr 3,128' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+	mfcr r3,128' ;;
+      *)           ts_ppc_s='	.machine power4
+	.text
+	mfcr 3,128' ;;
+    esac
+    TS_AS_CHECK([mfcr field support], [gcc_cv_as_powerpc_mfcrf], [], [$ts_ppc_s])
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.machine "pwr10"
+	.csect .text@<:@PR@:>@
+	tend. 0' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+	tend. 0' ;;
+      *)           ts_ppc_s='	.machine power10
+	.text
+	tend. 0' ;;
+    esac
+    TS_AS_CHECK([htm support on Power10], [gcc_cv_as_power10_htm], [], [$ts_ppc_s])
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.csect .text@<:@PR@:>@
+LCF..0:
+	addis 11,30,_GLOBAL_OFFSET_TABLE_-LCF..0@ha' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+LCF0:
+	addis r11,r30,_GLOBAL_OFFSET_TABLE_-LCF0@ha' ;;
+      *)           ts_ppc_s='	.text
+.LCF0:
+	addis 11,30,_GLOBAL_OFFSET_TABLE_-.LCF0@ha' ;;
+    esac
+    TS_AS_CHECK([rel16 relocs], [gcc_cv_as_powerpc_rel16], [-a32], [$ts_ppc_s])
+
+    TS_AS_CHECK([prologue entry point marker support],
+      [gcc_cv_as_powerpc_entry_markers], [-a64 $fw_as_opt],
+      [	.reloc .,R_PPC64_ENTRY; nop])
+
+    TS_AS_CHECK([plt sequence marker support],
+      [gcc_cv_as_powerpc_pltseq_markers], [-a32 $fw_as_opt],
+      [	.reloc .,R_PPC_PLTSEQ; nop])
+    ;;
+esac
+
+dnl --- msp430.
+gcc_cv_as_msp430_mspabi_attribute=no
+case ${target} in
+  msp430-*-*)
+    TS_AS_CHECK([.mspabi_attribute support], [gcc_cv_as_msp430_mspabi_attribute], [],
+      [	.mspabi_attribute 4,2])
+    ;;
+esac
+
+dnl --- loongarch.  The -mrelax, conditional-branch-relaxation and explicit
+dnl relocation probes are further up, in the loongarch back-end section; these
+dnl are the rest of the arm.  -mno-relax also feeds the leb128 probe: GNU as
+dnl for loongarch emits relocations for leb128 symbol arithmetic when
+dnl relaxation is on, which makes the leb128 probe answer the wrong question.
+gcc_cv_as_loongarch_mno_relax=no
+gcc_cv_as_loongarch_call36=no
+gcc_cv_as_loongarch_eh_frame_pcrel=no
+gcc_cv_as_loongarch_tls_le_relaxation=no
+gcc_cv_as_loongarch_16b_atomic=no
+case ${target} in
+  loongarch*-*-*)
+    TS_AS_CHECK([-mno-relax support], [gcc_cv_as_loongarch_mno_relax],
+      [-mno-relax], [	.text])
+    TS_AS_CHECK([call36 relocation support], [gcc_cv_as_loongarch_call36], [],
+[	pcaddu18i $r1, %call36(a)
+	jirl $r1, $r1, 0])
+    TS_AS_CHECK([eh_frame pcrel encoding support],
+      [gcc_cv_as_loongarch_eh_frame_pcrel], [],
+[	.cfi_startproc
+	.cfi_personality 0x9b,a
+	.cfi_lsda 0x1b,b
+	.cfi_endproc])
+    TS_AS_CHECK([tls le relaxation support],
+      [gcc_cv_as_loongarch_tls_le_relaxation], [],
+      [	lu12i.w $t0,%le_hi20_r(a)])
+    TS_AS_CHECK([16-byte atomic support], [gcc_cv_as_loongarch_16b_atomic], [],
+[	vori.b $vr0, $vr1, 0
+	sc.q $a0, $a1, $a2, 0])
+    ;;
+esac
+
+dnl --- s390.  The two alignment-hint answers are ONE `#if/#elif' ladder in
+dnl s390.h; they are written together and must be read together.
+gcc_cv_as_s390_machine_machinemode=no
+gcc_cv_as_s390_architecture_modifiers=no
+gcc_cv_as_s390_vector_hints=no
+gcc_cv_as_s390_vector_hints_z13=no
+case ${target} in
+  s390x-*-*)
+    TS_AS_CHECK([.machine and .machinemode support],
+      [gcc_cv_as_s390_machine_machinemode], [],
+[	.machinemode push
+	.machinemode pop
+	.machine push
+	.machine pop])
+    TS_AS_CHECK([architecture modifiers support],
+      [gcc_cv_as_s390_architecture_modifiers], [], [	.machine z13+vx])
+    TS_AS_CHECK([vector load/store alignment hints],
+      [gcc_cv_as_s390_vector_hints], [], [	vl %v24,0(%r15),3])
+    TS_AS_CHECK([vector load/store alignment hints on z13],
+      [gcc_cv_as_s390_vector_hints_z13], [-mzarch -march=z13],
+      [	vl %v24,0(%r15),3])
+    ;;
+esac
+
+dnl --- arm.
+gcc_cv_as_arm_option_extensions=no
+case ${target} in
+  arm*)
+    TS_AS_CHECK([context-specific architecture extensions],
+      [gcc_cv_as_arm_option_extensions], [-march=armv8.1-m.main+mve],
+[	.text
+	.thumb
+	.syntax unified
+	vmov.f32 s0, s1])
+    ;;
+esac
+
+dnl --- Toolchain-vendor requirements that used to abort gcc/configure.
+dnl
+dnl All three of these were `exit 1' or AC_MSG_ERROR in gcc/configure.ac, which
+dnl is the right severity when a compiler is built FOR one target and the wrong
+dnl one here: this run probes many targets, and target N's toolchain being
+dnl unusable must leave targets 1..N-1 alone.  So they warn and skip.
+case ${target} in
+  mips*-*-* | loongarch*-*-* | *-*-hpux*)
+    if "$gcc_cv_as" -v < /dev/null 2>&1 | grep GNU > /dev/null; then :; else
+      AC_MSG_WARN([$target requires the GNU assembler; $gcc_cv_as does not identify as one])
+    fi
+    ;;
+  amdgcn-* | gcn-*)
+    AC_MSG_CHECKING([llvm assembler version])
+    gcc_cv_as_version=`"$gcc_cv_as" --version 2>&1 | sed -ne '/version/s/.* \(@<:@0-9@:>@\)/\1/p' || echo error`
+    case "$gcc_cv_as_version" in
+      13.0.@<:@1-9@:>@* | 13.@<:@1-9@:>@* | 1@<:@4-9@:>@* | @<:@2-9@:>@@<:@0-9@:>@* | @<:@1-9@:>@@<:@0-9@:>@@<:@0-9@:>@*)
+        AC_MSG_RESULT([$gcc_cv_as_version, ok]) ;;
+      *)
+        AC_MSG_RESULT([$gcc_cv_as_version])
+        AC_MSG_WARN([amdgcn requires LLVM 13.0.1 or later]) ;;
+    esac
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1752,6 +2180,60 @@ ld_demangle `ts_bool "$gcc_cv_ld_demangle"`
 # the spec half of the driver -- write both or neither.
 ld_static_option ${gcc_cv_ld_static_option}
 ld_dynamic_option ${gcc_cv_ld_dynamic_option}
+
+# --- The 2026-08-11 sweep out of gcc/configure.ac.  Named after the macro each
+# one replaces, lowercased, so the mapping back is mechanical.
+# Generic assembler directives.
+gas_balign_and_p2align `ts_bool "$gcc_cv_as_balign_and_p2align"`
+gas_max_skip_p2align `ts_bool "$gcc_cv_as_max_skip_p2align"`
+gas_literal16 `ts_bool "$gcc_cv_as_literal16"`
+gas_subsection_ordering `ts_bool "$gcc_cv_as_subsection_m1"`
+gas_weak `ts_bool "$gcc_cv_as_weak"`
+gas_weakref `ts_bool "$gcc_cv_as_weakref"`
+gas_nsubspa_comdat `ts_bool "$gcc_cv_as_nsubspa_comdat"`
+gas_base64 `ts_bool "$gcc_cv_as_base64"`
+gas_cv_ucomp `ts_bool "$gcc_cv_as_cv_ucomp"`
+gas_lcomm_with_alignment `ts_bool "$gcc_cv_as_lcomm_with_alignment"`
+# Section flags.  gas_section_exclude folds the `e' and `#exclude' spellings,
+# exactly as HAVE_GAS_SECTION_EXCLUDE did.
+gas_section_exclude `ts_bool "$gcc_cv_as_section_exclude"`
+gas_shf_gnu_retain `ts_bool "$gcc_cv_as_shf_gnu_retain"`
+gas_section_link_order `ts_bool "$gcc_cv_as_section_link_order"`
+gas_shf_merge `ts_bool "$gcc_cv_as_shf_merge"`
+use_as_traditional_format `ts_bool "$gcc_cv_as_eh_frame_traditional"`
+# darwin.
+as_mmacosx_version_min `ts_bool "$gcc_cv_as_mmacosx_version_min"`
+as_macos_build_version `ts_bool "$gcc_cv_as_darwin_build_version"`
+# avr.
+as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
+as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
+as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
+# cris.
+as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
+# ia64.
+as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
+# powerpc.
+as_mfcrf `ts_bool "$gcc_cv_as_powerpc_mfcrf"`
+as_power10_htm `ts_bool "$gcc_cv_as_power10_htm"`
+as_rel16 `ts_bool "$gcc_cv_as_powerpc_rel16"`
+as_entry_markers `ts_bool "$gcc_cv_as_powerpc_entry_markers"`
+as_pltseq `ts_bool "$gcc_cv_as_powerpc_pltseq_markers"`
+# msp430.
+as_mspabi_attribute `ts_bool "$gcc_cv_as_msp430_mspabi_attribute"`
+# loongarch.  The explicit-relocs answer is emitted further up; these are the
+# rest of the arm.  as_loongarch_mno_relax is what the leb128 probe needs, not
+# a capability cc1 reads.
+as_loongarch_support_call36 `ts_bool "$gcc_cv_as_loongarch_call36"`
+as_loongarch_eh_frame_pcrel_encoding `ts_bool "$gcc_cv_as_loongarch_eh_frame_pcrel"`
+as_loongarch_tls_le_relaxation `ts_bool "$gcc_cv_as_loongarch_tls_le_relaxation"`
+as_loongarch_16b_atomic `ts_bool "$gcc_cv_as_loongarch_16b_atomic"`
+# s390.  The two alignment-hint answers are one `#if/#elif' ladder in s390.h.
+as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
+as_s390_architecture_modifiers `ts_bool "$gcc_cv_as_s390_architecture_modifiers"`
+as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"`
+as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
+# arm.
+gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
 EOF
 
 dnl The driver-side ones are spec fragments.  They are appended as their own

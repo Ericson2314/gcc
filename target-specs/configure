@@ -643,6 +643,7 @@ with_as
 with_ld
 with_objdump
 with_readelf
+with_nm
 with_option_defaults
 with_cpu_type
 with_decimal_float
@@ -1286,6 +1287,7 @@ Optional Packages:
                           native)
   --with-objdump=PATH     objdump to inspect probe output with
   --with-readelf=PATH     readelf to inspect probe output with
+  --with-nm=PATH          nm to inspect probe output with
   --with-option-defaults=LIST
                           space-separated name=value defaults, as config.gcc
                           infers them
@@ -1956,6 +1958,26 @@ fi
 
 command -v "$gcc_cv_readelf" > /dev/null 2>&1 || gcc_cv_readelf=
 
+if test "$target" = "$host"; then
+  ts_default_nm=nm
+  command -v ${target}-nm > /dev/null 2>&1 && ts_default_nm=${target}-nm
+else
+  ts_default_nm=${target}-nm
+fi
+
+# Check whether --with-nm was given.
+if test "${with_nm+set}" = set; then :
+  withval=$with_nm; gcc_cv_nm=$withval
+else
+  gcc_cv_nm=$ts_default_nm
+fi
+
+command -v "$gcc_cv_nm" > /dev/null 2>&1 || gcc_cv_nm=
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for nm" >&5
+$as_echo_n "checking for nm... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${gcc_cv_nm:-not found}" >&5
+$as_echo "${gcc_cv_nm:-not found}" >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for objdump" >&5
 $as_echo_n "checking for objdump... " >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${gcc_cv_objdump:-not found}" >&5
@@ -2100,6 +2122,17 @@ $as_echo "$as_me: WARNING: linker $gcc_cv_ld not found; specs will not be probed
   have_target_tools=no
 fi
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --fatal-warnings" >&5
+$as_echo_n "checking assembler for --fatal-warnings... " >&6; }
+fw_as_opt=
+echo '	.text' > conftest.s
+if "$gcc_cv_as" --fatal-warnings -o conftest.o conftest.s > /dev/null 2>&1; then
+  fw_as_opt=--fatal-warnings
+fi
+rm -f conftest.s conftest.o
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${fw_as_opt:-not supported}" >&5
+$as_echo "${fw_as_opt:-not supported}" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --gdwarf-5" >&5
 $as_echo_n "checking assembler for --gdwarf-5... " >&6; }
@@ -3390,6 +3423,790 @@ $as_echo "$as_me: WARNING: " >&2;}
 esac
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .balign and .p2align" >&5
+$as_echo_n "checking assembler for .balign and .p2align... " >&6; }
+gcc_cv_as_balign_and_p2align=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.balign 4
+	.p2align 2
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_balign_and_p2align=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_balign_and_p2align" >&5
+$as_echo "$gcc_cv_as_balign_and_p2align" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .p2align with maximum skip" >&5
+$as_echo_n "checking assembler for .p2align with maximum skip... " >&6; }
+gcc_cv_as_max_skip_p2align=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.p2align 4,,7
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_max_skip_p2align=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_max_skip_p2align" >&5
+$as_echo "$gcc_cv_as_max_skip_p2align" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .literal16" >&5
+$as_echo_n "checking assembler for .literal16... " >&6; }
+gcc_cv_as_literal16=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.literal16
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_literal16=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_literal16" >&5
+$as_echo "$gcc_cv_as_literal16" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .weak" >&5
+$as_echo_n "checking assembler for .weak... " >&6; }
+gcc_cv_as_weak=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.weak foobar
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_weak=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_weak" >&5
+$as_echo "$gcc_cv_as_weak" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .weakref" >&5
+$as_echo_n "checking assembler for .weakref... " >&6; }
+gcc_cv_as_weakref=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.weakref foobar, barfnot
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_weakref=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_weakref" >&5
+$as_echo "$gcc_cv_as_weakref" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .nsubspa comdat" >&5
+$as_echo_n "checking assembler for .nsubspa comdat... " >&6; }
+gcc_cv_as_nsubspa_comdat=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.SPACE $TEXT$
+	.NSUBSPA $CODE$,COMDAT
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_nsubspa_comdat=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_nsubspa_comdat" >&5
+$as_echo "$gcc_cv_as_nsubspa_comdat" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .base64" >&5
+$as_echo_n "checking assembler for .base64... " >&6; }
+gcc_cv_as_base64=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section .rodata
+	.base64 "Tm9uIHB1ZG9yIGVzdCBuaWwgc2NpcmUsIHB1ZG9yIG5pbCBkaXNjZXJlIHZlbGxlLgo="
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_base64=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_base64" >&5
+$as_echo "$gcc_cv_as_base64" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .cv_ucomp" >&5
+$as_echo_n "checking assembler for .cv_ucomp... " >&6; }
+gcc_cv_as_cv_ucomp=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.cv_ucomp 0
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_cv_ucomp=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cv_ucomp" >&5
+$as_echo "$gcc_cv_as_cv_ucomp" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .lcomm with alignment" >&5
+$as_echo_n "checking assembler for .lcomm with alignment... " >&6; }
+gcc_cv_as_lcomm_with_alignment=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.lcomm bar,4,16
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_lcomm_with_alignment=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_lcomm_with_alignment" >&5
+$as_echo "$gcc_cv_as_lcomm_with_alignment" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for working .subsection -1" >&5
+$as_echo_n "checking assembler for working .subsection -1... " >&6; }
+gcc_cv_as_subsection_m1=no
+cat > conftest.s <<'TSEOF'
+conftest_label1: .word 0
+.subsection -1
+conftest_label2: .word 0
+.previous
+TSEOF
+if test x"$gcc_cv_nm" != x \
+   && "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  "$gcc_cv_nm" conftest.o | grep conftest_label1 > conftest.nm1
+  "$gcc_cv_nm" conftest.o | grep conftest_label2 | sed -e 's/label2/label1/' > conftest.nm2
+  if cmp conftest.nm1 conftest.nm2 > /dev/null 2>&1; then :; else
+    gcc_cv_as_subsection_m1=yes
+  fi
+  rm -f conftest.nm1 conftest.nm2
+fi
+rm -f conftest.s conftest.o
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_subsection_m1" >&5
+$as_echo "$gcc_cv_as_subsection_m1" >&6; }
+
+gcc_cv_as_section_exclude=no
+gcc_cv_as_shf_gnu_retain=no
+gcc_cv_as_section_link_order=no
+gcc_cv_as_shf_merge=no
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section exclude flag" >&5
+$as_echo_n "checking assembler for section exclude flag... " >&6; }
+gcc_cv_as_section_exclude_e=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section foo1,"e"
+	.byte 0,0,0,0
+TS_ASEOF
+  if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_section_exclude_e=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_section_exclude_e" >&5
+$as_echo "$gcc_cv_as_section_exclude_e" >&6; }
+if test x"$gcc_cv_as_section_exclude_e" = xyes; then
+  gcc_cv_as_section_exclude=yes
+else
+      ts_exclude_s=
+  case ${target} in
+    sparc*-*-solaris2*)          ts_exclude_s='	.section "foo1", #exclude' ;;
+    i?86-*-solaris2* | x86_64-*-solaris2*)
+                                 ts_exclude_s='	.section foo1, #exclude' ;;
+  esac
+  if test x"$ts_exclude_s" != x; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section exclude flag, Solaris spelling" >&5
+$as_echo_n "checking assembler for section exclude flag, Solaris spelling... " >&6; }
+gcc_cv_as_section_exclude_hash=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+$ts_exclude_s
+	.byte 0,0,0,0
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_section_exclude_hash=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_section_exclude_hash" >&5
+$as_echo "$gcc_cv_as_section_exclude_hash" >&6; }
+    gcc_cv_as_section_exclude=$gcc_cv_as_section_exclude_hash
+  fi
+fi
+
+case ${target} in
+  *-*-solaris2*)
+        ;;
+  *)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section 'R' flag" >&5
+$as_echo_n "checking assembler for section 'R' flag... " >&6; }
+gcc_cv_as_shf_gnu_retain=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section .foo,"awR",%progbits
+	.byte 0
+TS_ASEOF
+  if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_shf_gnu_retain=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_shf_gnu_retain" >&5
+$as_echo "$gcc_cv_as_shf_gnu_retain" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section 'o' flag" >&5
+$as_echo_n "checking assembler for section 'o' flag... " >&6; }
+gcc_cv_as_section_link_order=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section .foo,"a"
+	.byte 0
+	.section __patchable_function_entries,"awo",%progbits,.foo
+	.byte 0
+TS_ASEOF
+  if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_section_link_order=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_section_link_order" >&5
+$as_echo "$gcc_cv_as_section_link_order" >&6; }
+    ;;
+esac
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section merging support" >&5
+$as_echo_n "checking assembler for section merging support... " >&6; }
+gcc_cv_as_shf_merge=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section .rodata.str, "aMS", @progbits, 1
+TS_ASEOF
+  if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_shf_merge=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_shf_merge" >&5
+$as_echo "$gcc_cv_as_shf_merge" >&6; }
+if test x"$gcc_cv_as_shf_merge" != xyes; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section merging support (%progbits)" >&5
+$as_echo_n "checking assembler for section merging support (%progbits)... " >&6; }
+gcc_cv_as_shf_merge_percent=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.section .rodata.str, "aMS", %progbits, 1
+TS_ASEOF
+  if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_shf_merge_percent=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_shf_merge_percent" >&5
+$as_echo "$gcc_cv_as_shf_merge_percent" >&6; }
+  gcc_cv_as_shf_merge=$gcc_cv_as_shf_merge_percent
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for buggy .eh_frame optimization" >&5
+$as_echo_n "checking assembler for buggy .eh_frame optimization... " >&6; }
+gcc_cv_as_eh_frame_traditional=no
+if test x"$gcc_cv_objdump" != x; then
+  if "$gcc_cv_as" -o conftest.o --traditional-format /dev/null > /dev/null 2>&1; then
+                                        :
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_eh_frame_traditional" >&5
+$as_echo "$gcc_cv_as_eh_frame_traditional" >&6; }
+
+gcc_cv_as_mmacosx_version_min=no
+gcc_cv_as_darwin_build_version=no
+case ${target_os} in
+  darwin*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mmacosx-version-min option" >&5
+$as_echo_n "checking assembler for -mmacosx-version-min option... " >&6; }
+gcc_cv_as_mmacosx_version_min=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+TS_ASEOF
+  if "$gcc_cv_as" -mmacosx-version-min=10.1 -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_mmacosx_version_min=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_mmacosx_version_min" >&5
+$as_echo "$gcc_cv_as_mmacosx_version_min" >&6; }
+    if test x"$gcc_cv_as_mmacosx_version_min" = xyes; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .build_version" >&5
+$as_echo_n "checking assembler for .build_version... " >&6; }
+gcc_cv_as_darwin_build_version=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.build_version macos, 10, 14 sdk_version 10, 14
+TS_ASEOF
+  if "$gcc_cv_as" -mmacosx-version-min=10.14 -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_darwin_build_version=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_darwin_build_version" >&5
+$as_echo "$gcc_cv_as_darwin_build_version" >&6; }
+    fi
+    ;;
+esac
+
+gcc_cv_as_avr_mlink_relax=no
+gcc_cv_as_avr_mrmw=no
+gcc_cv_as_avr_mgccisr=no
+case ${target} in
+  avr-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --mlink-relax option" >&5
+$as_echo_n "checking assembler for --mlink-relax option... " >&6; }
+gcc_cv_as_avr_mlink_relax=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+TS_ASEOF
+  if "$gcc_cv_as" --mlink-relax -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_avr_mlink_relax=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_avr_mlink_relax" >&5
+$as_echo "$gcc_cv_as_avr_mlink_relax" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mrmw option" >&5
+$as_echo_n "checking assembler for -mrmw option... " >&6; }
+gcc_cv_as_avr_mrmw=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+TS_ASEOF
+  if "$gcc_cv_as" -mrmw -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_avr_mrmw=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_avr_mrmw" >&5
+$as_echo "$gcc_cv_as_avr_mrmw" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for __gcc_isr pseudo instruction" >&5
+$as_echo_n "checking assembler for __gcc_isr pseudo instruction... " >&6; }
+gcc_cv_as_avr_mgccisr=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+	__gcc_isr 1
+	__gcc_isr 2
+	__gcc_isr 0,r24
+TS_ASEOF
+  if "$gcc_cv_as" -mgcc-isr -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_avr_mgccisr=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_avr_mgccisr" >&5
+$as_echo "$gcc_cv_as_avr_mgccisr" >&6; }
+    ;;
+esac
+
+gcc_cv_as_cris_no_mul_bug=no
+case ${target} in
+  cris-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -no-mul-bug-abort option" >&5
+$as_echo_n "checking assembler for -no-mul-bug-abort option... " >&6; }
+gcc_cv_as_cris_no_mul_bug=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+TS_ASEOF
+  if "$gcc_cv_as" -no-mul-bug-abort -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_cris_no_mul_bug=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cris_no_mul_bug" >&5
+$as_echo "$gcc_cv_as_cris_no_mul_bug" >&6; }
+    ;;
+esac
+
+gcc_cv_as_ia64_ltoffx_ldxmov_relocs=no
+case ${target} in
+  ia64*-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for ltoffx and ldxmov relocs" >&5
+$as_echo_n "checking assembler for ltoffx and ldxmov relocs... " >&6; }
+gcc_cv_as_ia64_ltoffx_ldxmov_relocs=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+	addl r15 = @ltoffx(x#), gp
+	;;
+	ld8.mov r16 = [r15], x#
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_ia64_ltoffx_ldxmov_relocs=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ia64_ltoffx_ldxmov_relocs" >&5
+$as_echo "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs" >&6; }
+    ;;
+esac
+
+gcc_cv_as_powerpc_mfcrf=no
+gcc_cv_as_power10_htm=no
+gcc_cv_as_powerpc_rel16=no
+gcc_cv_as_powerpc_entry_markers=no
+gcc_cv_as_powerpc_pltseq_markers=no
+gcc_cv_as_machine_directive=no
+case ${target} in
+  powerpc*-*-*)
+    case ${target} in
+      *-*-darwin*)
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .machine directive support" >&5
+$as_echo_n "checking assembler for .machine directive support... " >&6; }
+gcc_cv_as_machine_directive=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.machine ppc7400
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_machine_directive=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_machine_directive" >&5
+$as_echo "$gcc_cv_as_machine_directive" >&6; }
+	if test x"$gcc_cv_as_machine_directive" != xyes; then
+	  	  	  	  	  	  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $gcc_cv_as does not support \".machine\"; powerpc-darwin needs cctools 528.5 or later" >&5
+$as_echo "$as_me: WARNING: $gcc_cv_as does not support \".machine\"; powerpc-darwin needs cctools 528.5 or later" >&2;}
+	fi
+	;;
+    esac
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.machine "pwr5"
+	.csect .text[PR]
+	mfcr 3,128' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+	mfcr r3,128' ;;
+      *)           ts_ppc_s='	.machine power4
+	.text
+	mfcr 3,128' ;;
+    esac
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for mfcr field support" >&5
+$as_echo_n "checking assembler for mfcr field support... " >&6; }
+gcc_cv_as_powerpc_mfcrf=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+$ts_ppc_s
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_powerpc_mfcrf=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_mfcrf" >&5
+$as_echo "$gcc_cv_as_powerpc_mfcrf" >&6; }
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.machine "pwr10"
+	.csect .text[PR]
+	tend. 0' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+	tend. 0' ;;
+      *)           ts_ppc_s='	.machine power10
+	.text
+	tend. 0' ;;
+    esac
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for htm support on Power10" >&5
+$as_echo_n "checking assembler for htm support on Power10... " >&6; }
+gcc_cv_as_power10_htm=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+$ts_ppc_s
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_power10_htm=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_power10_htm" >&5
+$as_echo "$gcc_cv_as_power10_htm" >&6; }
+
+    case ${target} in
+      *-*-aix*)    ts_ppc_s='	.csect .text[PR]
+LCF..0:
+	addis 11,30,_GLOBAL_OFFSET_TABLE_-LCF..0@ha' ;;
+      *-*-darwin*) ts_ppc_s='	.text
+LCF0:
+	addis r11,r30,_GLOBAL_OFFSET_TABLE_-LCF0@ha' ;;
+      *)           ts_ppc_s='	.text
+.LCF0:
+	addis 11,30,_GLOBAL_OFFSET_TABLE_-.LCF0@ha' ;;
+    esac
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for rel16 relocs" >&5
+$as_echo_n "checking assembler for rel16 relocs... " >&6; }
+gcc_cv_as_powerpc_rel16=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+$ts_ppc_s
+TS_ASEOF
+  if "$gcc_cv_as" -a32 -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_powerpc_rel16=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_rel16" >&5
+$as_echo "$gcc_cv_as_powerpc_rel16" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for prologue entry point marker support" >&5
+$as_echo_n "checking assembler for prologue entry point marker support... " >&6; }
+gcc_cv_as_powerpc_entry_markers=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.reloc .,R_PPC64_ENTRY; nop
+TS_ASEOF
+  if "$gcc_cv_as" -a64 $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_powerpc_entry_markers=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_entry_markers" >&5
+$as_echo "$gcc_cv_as_powerpc_entry_markers" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for plt sequence marker support" >&5
+$as_echo_n "checking assembler for plt sequence marker support... " >&6; }
+gcc_cv_as_powerpc_pltseq_markers=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.reloc .,R_PPC_PLTSEQ; nop
+TS_ASEOF
+  if "$gcc_cv_as" -a32 $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_powerpc_pltseq_markers=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_pltseq_markers" >&5
+$as_echo "$gcc_cv_as_powerpc_pltseq_markers" >&6; }
+    ;;
+esac
+
+gcc_cv_as_msp430_mspabi_attribute=no
+case ${target} in
+  msp430-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .mspabi_attribute support" >&5
+$as_echo_n "checking assembler for .mspabi_attribute support... " >&6; }
+gcc_cv_as_msp430_mspabi_attribute=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.mspabi_attribute 4,2
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_msp430_mspabi_attribute=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_msp430_mspabi_attribute" >&5
+$as_echo "$gcc_cv_as_msp430_mspabi_attribute" >&6; }
+    ;;
+esac
+
+gcc_cv_as_loongarch_mno_relax=no
+gcc_cv_as_loongarch_call36=no
+gcc_cv_as_loongarch_eh_frame_pcrel=no
+gcc_cv_as_loongarch_tls_le_relaxation=no
+gcc_cv_as_loongarch_16b_atomic=no
+case ${target} in
+  loongarch*-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mno-relax support" >&5
+$as_echo_n "checking assembler for -mno-relax support... " >&6; }
+gcc_cv_as_loongarch_mno_relax=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+TS_ASEOF
+  if "$gcc_cv_as" -mno-relax -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_loongarch_mno_relax=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_mno_relax" >&5
+$as_echo "$gcc_cv_as_loongarch_mno_relax" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for call36 relocation support" >&5
+$as_echo_n "checking assembler for call36 relocation support... " >&6; }
+gcc_cv_as_loongarch_call36=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	pcaddu18i $r1, %call36(a)
+	jirl $r1, $r1, 0
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_loongarch_call36=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_call36" >&5
+$as_echo "$gcc_cv_as_loongarch_call36" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for eh_frame pcrel encoding support" >&5
+$as_echo_n "checking assembler for eh_frame pcrel encoding support... " >&6; }
+gcc_cv_as_loongarch_eh_frame_pcrel=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.cfi_startproc
+	.cfi_personality 0x9b,a
+	.cfi_lsda 0x1b,b
+	.cfi_endproc
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_loongarch_eh_frame_pcrel=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_eh_frame_pcrel" >&5
+$as_echo "$gcc_cv_as_loongarch_eh_frame_pcrel" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for tls le relaxation support" >&5
+$as_echo_n "checking assembler for tls le relaxation support... " >&6; }
+gcc_cv_as_loongarch_tls_le_relaxation=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	lu12i.w $t0,%le_hi20_r(a)
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_loongarch_tls_le_relaxation=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_tls_le_relaxation" >&5
+$as_echo "$gcc_cv_as_loongarch_tls_le_relaxation" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for 16-byte atomic support" >&5
+$as_echo_n "checking assembler for 16-byte atomic support... " >&6; }
+gcc_cv_as_loongarch_16b_atomic=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	vori.b $vr0, $vr1, 0
+	sc.q $a0, $a1, $a2, 0
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_loongarch_16b_atomic=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_16b_atomic" >&5
+$as_echo "$gcc_cv_as_loongarch_16b_atomic" >&6; }
+    ;;
+esac
+
+gcc_cv_as_s390_machine_machinemode=no
+gcc_cv_as_s390_architecture_modifiers=no
+gcc_cv_as_s390_vector_hints=no
+gcc_cv_as_s390_vector_hints_z13=no
+case ${target} in
+  s390x-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .machine and .machinemode support" >&5
+$as_echo_n "checking assembler for .machine and .machinemode support... " >&6; }
+gcc_cv_as_s390_machine_machinemode=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.machinemode push
+	.machinemode pop
+	.machine push
+	.machine pop
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_s390_machine_machinemode=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_s390_machine_machinemode" >&5
+$as_echo "$gcc_cv_as_s390_machine_machinemode" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for architecture modifiers support" >&5
+$as_echo_n "checking assembler for architecture modifiers support... " >&6; }
+gcc_cv_as_s390_architecture_modifiers=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.machine z13+vx
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_s390_architecture_modifiers=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_s390_architecture_modifiers" >&5
+$as_echo "$gcc_cv_as_s390_architecture_modifiers" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for vector load/store alignment hints" >&5
+$as_echo_n "checking assembler for vector load/store alignment hints... " >&6; }
+gcc_cv_as_s390_vector_hints=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	vl %v24,0(%r15),3
+TS_ASEOF
+  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_s390_vector_hints=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_s390_vector_hints" >&5
+$as_echo "$gcc_cv_as_s390_vector_hints" >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for vector load/store alignment hints on z13" >&5
+$as_echo_n "checking assembler for vector load/store alignment hints on z13... " >&6; }
+gcc_cv_as_s390_vector_hints_z13=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	vl %v24,0(%r15),3
+TS_ASEOF
+  if "$gcc_cv_as" -mzarch -march=z13 -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_s390_vector_hints_z13=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_s390_vector_hints_z13" >&5
+$as_echo "$gcc_cv_as_s390_vector_hints_z13" >&6; }
+    ;;
+esac
+
+gcc_cv_as_arm_option_extensions=no
+case ${target} in
+  arm*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for context-specific architecture extensions" >&5
+$as_echo_n "checking assembler for context-specific architecture extensions... " >&6; }
+gcc_cv_as_arm_option_extensions=no
+if test x"$gcc_cv_as" != x; then
+  cat > conftest.s <<'TS_ASEOF'
+	.text
+	.thumb
+	.syntax unified
+	vmov.f32 s0, s1
+TS_ASEOF
+  if "$gcc_cv_as" -march=armv8.1-m.main+mve -o conftest.o conftest.s > /dev/null 2>&1; then
+    gcc_cv_as_arm_option_extensions=yes
+  fi
+  rm -f conftest.o conftest.s
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_arm_option_extensions" >&5
+$as_echo "$gcc_cv_as_arm_option_extensions" >&6; }
+    ;;
+esac
+
+case ${target} in
+  mips*-*-* | loongarch*-*-* | *-*-hpux*)
+    if "$gcc_cv_as" -v < /dev/null 2>&1 | grep GNU > /dev/null; then :; else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $target requires the GNU assembler; $gcc_cv_as does not identify as one" >&5
+$as_echo "$as_me: WARNING: $target requires the GNU assembler; $gcc_cv_as does not identify as one" >&2;}
+    fi
+    ;;
+  amdgcn-* | gcn-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking llvm assembler version" >&5
+$as_echo_n "checking llvm assembler version... " >&6; }
+    gcc_cv_as_version=`"$gcc_cv_as" --version 2>&1 | sed -ne '/version/s/.* \([0-9]\)/\1/p' || echo error`
+    case "$gcc_cv_as_version" in
+      13.0.[1-9]* | 13.[1-9]* | 1[4-9]* | [2-9][0-9]* | [1-9][0-9][0-9]*)
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_version, ok" >&5
+$as_echo "$gcc_cv_as_version, ok" >&6; } ;;
+      *)
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_version" >&5
+$as_echo "$gcc_cv_as_version" >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: amdgcn requires LLVM 13.0.1 or later" >&5
+$as_echo "$as_me: WARNING: amdgcn requires LLVM 13.0.1 or later" >&2;} ;;
+    esac
+    ;;
+esac
+
+
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
 }
@@ -3475,6 +4292,60 @@ ld_demangle `ts_bool "$gcc_cv_ld_demangle"`
 # the spec half of the driver -- write both or neither.
 ld_static_option ${gcc_cv_ld_static_option}
 ld_dynamic_option ${gcc_cv_ld_dynamic_option}
+
+# --- The 2026-08-11 sweep out of gcc/configure.ac.  Named after the macro each
+# one replaces, lowercased, so the mapping back is mechanical.
+# Generic assembler directives.
+gas_balign_and_p2align `ts_bool "$gcc_cv_as_balign_and_p2align"`
+gas_max_skip_p2align `ts_bool "$gcc_cv_as_max_skip_p2align"`
+gas_literal16 `ts_bool "$gcc_cv_as_literal16"`
+gas_subsection_ordering `ts_bool "$gcc_cv_as_subsection_m1"`
+gas_weak `ts_bool "$gcc_cv_as_weak"`
+gas_weakref `ts_bool "$gcc_cv_as_weakref"`
+gas_nsubspa_comdat `ts_bool "$gcc_cv_as_nsubspa_comdat"`
+gas_base64 `ts_bool "$gcc_cv_as_base64"`
+gas_cv_ucomp `ts_bool "$gcc_cv_as_cv_ucomp"`
+gas_lcomm_with_alignment `ts_bool "$gcc_cv_as_lcomm_with_alignment"`
+# Section flags.  gas_section_exclude folds the `e' and `#exclude' spellings,
+# exactly as HAVE_GAS_SECTION_EXCLUDE did.
+gas_section_exclude `ts_bool "$gcc_cv_as_section_exclude"`
+gas_shf_gnu_retain `ts_bool "$gcc_cv_as_shf_gnu_retain"`
+gas_section_link_order `ts_bool "$gcc_cv_as_section_link_order"`
+gas_shf_merge `ts_bool "$gcc_cv_as_shf_merge"`
+use_as_traditional_format `ts_bool "$gcc_cv_as_eh_frame_traditional"`
+# darwin.
+as_mmacosx_version_min `ts_bool "$gcc_cv_as_mmacosx_version_min"`
+as_macos_build_version `ts_bool "$gcc_cv_as_darwin_build_version"`
+# avr.
+as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
+as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
+as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
+# cris.
+as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
+# ia64.
+as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
+# powerpc.
+as_mfcrf `ts_bool "$gcc_cv_as_powerpc_mfcrf"`
+as_power10_htm `ts_bool "$gcc_cv_as_power10_htm"`
+as_rel16 `ts_bool "$gcc_cv_as_powerpc_rel16"`
+as_entry_markers `ts_bool "$gcc_cv_as_powerpc_entry_markers"`
+as_pltseq `ts_bool "$gcc_cv_as_powerpc_pltseq_markers"`
+# msp430.
+as_mspabi_attribute `ts_bool "$gcc_cv_as_msp430_mspabi_attribute"`
+# loongarch.  The explicit-relocs answer is emitted further up; these are the
+# rest of the arm.  as_loongarch_mno_relax is what the leb128 probe needs, not
+# a capability cc1 reads.
+as_loongarch_support_call36 `ts_bool "$gcc_cv_as_loongarch_call36"`
+as_loongarch_eh_frame_pcrel_encoding `ts_bool "$gcc_cv_as_loongarch_eh_frame_pcrel"`
+as_loongarch_tls_le_relaxation `ts_bool "$gcc_cv_as_loongarch_tls_le_relaxation"`
+as_loongarch_16b_atomic `ts_bool "$gcc_cv_as_loongarch_16b_atomic"`
+# s390.  The two alignment-hint answers are one `#if/#elif' ladder in s390.h.
+as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
+as_s390_architecture_modifiers `ts_bool "$gcc_cv_as_s390_architecture_modifiers"`
+as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"`
+as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
+# arm.
+gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
 EOF
 
 if test x"$gcc_cv_ld_as_needed" = xyes; then
