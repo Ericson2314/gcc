@@ -3307,6 +3307,7 @@ ld_eh_gc_sections `ts_bool "$gcc_cv_ld_eh_gc_sections"`
 ld_ctf `ts_bool "$gcc_cv_ld_ctf"`
 ld_sysroot `ts_bool "$gcc_cv_ld_sysroot"`
 ld_at_file `ts_bool "$gcc_cv_ld_at_file"`
+ld_pie `ts_bool "$gcc_cv_ld_pie"`
 ld_pie_copyreloc `ts_bool "$gcc_cv_ld_pie_copyreloc"`
 ld_personality_relaxation `ts_bool "$gcc_cv_ld_mips_personality_relaxation"`
 ld_no_dot_syms `ts_bool "$gcc_cv_ld_no_dot_syms"`
