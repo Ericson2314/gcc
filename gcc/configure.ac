@@ -1733,13 +1733,13 @@ fi
 # Non-mingw hosts ignore this option.
 # The shell variables this sets are picked up from the mingw branches
 # of config.host so they have to be set before it gets sourced.
-AC_ARG_ENABLE(host-win32-utf8-manifest,
-[AS_HELP_STRING([--disable-host-win32-utf8-manifest],
+AC_ARG_ENABLE(win32-utf8-manifest,
+[AS_HELP_STRING([--disable-win32-utf8-manifest],
                 [disable embedding a utf8 manifest on mingw hosts])
-AS_HELP_STRING([--enable-host-win32-utf8-manifest],
+AS_HELP_STRING([--enable-win32-utf8-manifest],
                [enable embedding a utf8 manifest on mingw hosts (default)])],,)
 
-if test "x$enable_host_win32_utf8_manifest" != xno; then
+if test "x$enable_win32_utf8_manifest" != xno; then
   host_xmake_mingw=i386/x-mingw32-utf8
   host_extra_gcc_objs_mingw=utf8rc-mingw32.o
   host_extra_objs_mingw=utf8-mingw32.o
@@ -2652,29 +2652,29 @@ esac
 
 
 # Windows32 Registry support for specifying GCC installation paths.
-AC_ARG_ENABLE(host-win32-registry,
-[AS_HELP_STRING([--disable-host-win32-registry],
+AC_ARG_ENABLE(win32-registry,
+[AS_HELP_STRING([--disable-win32-registry],
                 [disable lookup of installation paths in the
                  Registry on Windows hosts])
-AS_HELP_STRING([--enable-host-win32-registry], [enable registry lookup (default)])
-AS_HELP_STRING([--enable-host-win32-registry=KEY],
+AS_HELP_STRING([--enable-win32-registry], [enable registry lookup (default)])
+AS_HELP_STRING([--enable-win32-registry=KEY],
                [use KEY instead of GCC version as the last portion
                 of the registry key])],,)
 
 case $host_os in
   win32 | pe | cygwin* | mingw32*)
-    if test "x$enable_host_win32_registry" != xno; then
-      AC_SEARCH_LIBS(RegOpenKeyExA, advapi32,, [enable_host_win32_registry=no])
+    if test "x$enable_win32_registry" != xno; then
+      AC_SEARCH_LIBS(RegOpenKeyExA, advapi32,, [enable_win32_registry=no])
     fi
 
-    if test "x$enable_host_win32_registry" != xno; then
+    if test "x$enable_win32_registry" != xno; then
       AC_DEFINE(ENABLE_WIN32_REGISTRY, 1,
   [Define to 1 if installation paths should be looked up in the Windows
    Registry. Ignored on non-Windows hosts.])
 
-      if test "x$enable_host_win32_registry" != xyes \
-         && test "x$enable_host_win32_registry" != x; then
-	AC_DEFINE_UNQUOTED(WIN32_REGISTRY_KEY, "$enable_host_win32_registry",
+      if test "x$enable_win32_registry" != xyes \
+         && test "x$enable_win32_registry" != x; then
+	AC_DEFINE_UNQUOTED(WIN32_REGISTRY_KEY, "$enable_win32_registry",
   [Define to be the last component of the Windows registry key under which
    to look for installation paths.  The full key used will be 
    HKEY_LOCAL_MACHINE/SOFTWARE/Free Software Foundation/{WIN32_REGISTRY_KEY}.
@@ -3072,10 +3072,7 @@ fi
 # If build != host, and we aren't building gas in-tree, we identify a
 # build->target linker and hope that it will have the same features
 # as the host->target linker we'll be using.
-gcc_cv_gld_major_version=
-gcc_cv_gld_minor_version=
 gcc_cv_ld_gld_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/ld
-gcc_cv_ld_bfd_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/bfd
 
 AS_VAR_SET_IF(gcc_cv_ld,, [
 if test -f $gcc_cv_ld_gld_srcdir/configure.ac \
@@ -3249,31 +3246,6 @@ if test "$gcc_cv_ld" = ../ld/ld-new$build_exeext \
 	# we'll use what we're building after installation anyway.
 	AC_MSG_RESULT(newly built ld)
 	in_tree_ld=yes
-	in_tree_ld_is_elf=no
-	if (grep 'EMUL = .*elf' ../ld/Makefile \
-	    || grep 'EMUL = .*linux' ../ld/Makefile \
-	    || grep 'EMUL = .*lynx' ../ld/Makefile) > /dev/null; then
-	  in_tree_ld_is_elf=yes
-	elif test "$ld_is_gold" = yes; then
-	  in_tree_ld_is_elf=yes
-	fi
-	for f in $gcc_cv_ld_bfd_srcdir/configure $gcc_cv_ld_gld_srcdir/configure $gcc_cv_ld_gld_srcdir/configure.ac $gcc_cv_ld_gld_srcdir/Makefile.in
-	do
-changequote(,)dnl
-		gcc_cv_gld_version=`sed -n -e 's/^[ 	]*VERSION=[^0-9A-Za-z_]*\([0-9]*\.[0-9]*.*\)/VERSION=\1/p' < $f`
-		if test x$gcc_cv_gld_version != x; then
-			break
-		fi
-	done
-	case $gcc_cv_gld_version in
-	  VERSION=[0-9]*) ;;
-changequote([,])dnl
-	  *) AC_MSG_ERROR([[cannot find version of in-tree linker]]) ;;
-changequote(,)dnl
-	esac
-	gcc_cv_gld_major_version=`expr "$gcc_cv_gld_version" : "VERSION=\([0-9]*\)"`
-	gcc_cv_gld_minor_version=`expr "$gcc_cv_gld_version" : "VERSION=[0-9]*\.\([0-9]*\)"`
-changequote([,])dnl
 	ORIGINAL_LD_BFD_FOR_TARGET=../ld/ld-new$build_exeext
 	ORIGINAL_LD_GOLD_FOR_TARGET=../gold/ld-new$build_exeext
 else
@@ -3320,60 +3292,11 @@ case "$ORIGINAL_NM_FOR_TARGET" in
 esac
 
 
-# Figure out what objdump we will be using.
-AS_VAR_SET_IF(gcc_cv_objdump,, [
-if test -f $gcc_cv_binutils_srcdir/configure.ac \
-     && test -f ../binutils/Makefile \
-     && test x$build = x$host; then
-	# Single tree build which includes binutils.
-	gcc_cv_objdump=../binutils/objdump$build_exeext
-elif test -x objdump$build_exeext; then
-	gcc_cv_objdump=./objdump$build_exeext
-elif ( set dummy $OBJDUMP_FOR_TARGET; test -x $[2] ); then
-        gcc_cv_objdump="$OBJDUMP_FOR_TARGET"
-else
-        AC_PATH_PROG(gcc_cv_objdump, $OBJDUMP_FOR_TARGET)
-fi])
-
-AC_MSG_CHECKING(what objdump to use)
-if test "$gcc_cv_objdump" = ../binutils/objdump$build_exeext; then
-	# Single tree build which includes binutils.
-	AC_MSG_RESULT(newly built objdump)
-elif test x$gcc_cv_objdump = x; then
-	AC_MSG_RESULT(not found)
-else
-	AC_MSG_RESULT($gcc_cv_objdump)
-fi
-
-# Figure out what readelf we will be using.
-AS_VAR_SET_IF(gcc_cv_readelf,, [
-if test -f $gcc_cv_binutils_srcdir/configure.ac \
-     && test -f ../binutils/Makefile \
-     && test x$build = x$host; then
-	# Single tree build which includes binutils.
-	gcc_cv_readelf=../binutils/readelf$build_exeext
-elif test -x readelf$build_exeext; then
-	gcc_cv_readelf=./readelf$build_exeext
-elif ( set dummy $READELF_FOR_TARGET; test -x $[2] ); then
-        gcc_cv_readelf="$READELF_FOR_TARGET"
-else
-        AC_PATH_PROG(gcc_cv_readelf, $READELF_FOR_TARGET)
-fi])
-
-AC_MSG_CHECKING(what readelf to use)
-if test "$gcc_cv_readelf" = ../binutils/readelf$build_exeext; then
-	# Single tree build which includes binutils.
-	AC_MSG_RESULT(newly built readelf)
-elif test x$gcc_cv_readelf = x; then
-	AC_MSG_RESULT(not found)
-else
-	AC_MSG_RESULT($gcc_cv_readelf)
-fi
-
-dnl The otool search is gone with the ld64 block above -- it was found, printed
-dnl and never used again: no AC_SUBST, no Makefile variable, no probe.  It is
-dnl a TARGET tool in any case (the toplevel supplies OTOOL_FOR_TARGET), so if a
-dnl probe ever needs it, it needs it in target-specs where the target is known.
+dnl The objdump, readelf and otool searches are gone.  All three were found,
+dnl printed and never used again -- no AC_SUBST, no Makefile variable, no probe
+dnl left that consults them.  They are TARGET tools in any case, and
+dnl target-specs/configure.ac has its own search for objdump, readelf and nm,
+dnl prefixed for the target it is probing.
 
 # Figure out the dsymutil we will use.
 AS_VAR_SET_IF(gcc_cv_dsymutil,, [
@@ -4099,39 +4022,44 @@ if test x"$enable_plugin" = x"yes"; then
 fi
 
 
-# --enable-shared, --enable-pie, --enable-bind-now.
+# --enable-host-shared, --enable-host-pie.
 #
-# These were spelled --enable-host-shared, --enable-host-pie and
-# --enable-host-bind-now.  The `host-' prefix existed to tell them apart from a
-# TARGET meaning of the same words, and there is no longer a target meaning to
-# tell them apart from: every --with and --enable in this file is now about the
-# host (or, rarely, the build), and anything about a target has moved to
-# target-specs/configure.ac.  So the prefix is noise in the NAME; "host" stays
-# in the DESCRIPTION, where it is still the useful information.
+# THE `host-' PREFIX IS WRONG AND IS STAYING FOR NOW.  It disambiguates against
+# a target meaning that no longer exists in this file, and the convention it
+# fights is universal: `--enable-shared' given to a package always means THAT
+# PACKAGE's host.  Given to gcc it would mean gcc's host; given to libgcc it
+# means libgcc's host, which is what gcc calls the target.  One rule, resolved
+# against whichever package is being configured.  The prefix is a local
+# invention where a convention already existed.
 #
-# NOTE, and it reverses an earlier decision recorded in this project's notes:
-# "host" was deliberately put INTO these names while both meanings still
-# existed in the tree, which was right at the time.  This is a considered
-# change of direction, not drift.
+# It WAS renamed to `--enable-shared'/`--enable-pie', and the rename was BACKED
+# OUT.  The reason is worth recording rather than rediscovering:
 #
-# The old spellings are still accepted, because the TOP-LEVEL configure passes
-# --enable-host-shared / --enable-host-pie down to this script and that file is
-# not renamed yet.  Dropping them here would not fail -- it would silently
-# build a non-shared host and only show up as a link error in libgccjit, which
-# is exactly the class of failure this project keeps finding.  Delete the
-# aliases in the same commit that renames the top-level flags, not before.
-AC_ARG_ENABLE(shared,
-[AS_HELP_STRING([--enable-shared],
+#   gcc/configure.ac ALREADY HAS AC_ARG_ENABLE(shared) -- near the top of this
+#   file, "do not provide a shared libgcc".  It sets and AC_SUBSTs
+#   `enable_shared', which Makefile.in turns into -DENABLE_SHARED_LIBGCC.  A
+#   second AC_ARG_ENABLE(shared) here silently overwrites it, and being later
+#   in the file it wins.  That is this project's canonical failure -- one name,
+#   two authorities, no diagnostic -- committed inside a single file, and the
+#   rename would have introduced it.
+#
+# So the rename has a PREREQUISITE, not merely a top-level dependency: the
+# libgcc-shared option above has to leave gcc/configure.ac first.  It is a
+# question about libgcc, libgcc/configure.ac:52 already asks it identically,
+# and only then is the name free for the host meaning.
+#
+# Second dependency, unchanged: the top-level configure passes
+# --enable-host-shared and --enable-host-pie down here (22 uses), and the top
+# level ALSO forwards its own --disable-shared into host_configargs, so the two
+# names would meet there too.  scratchpad/STATE.md carries the work item.
+AC_ARG_ENABLE(host-shared,
+[AS_HELP_STRING([--enable-host-shared],
 		[build host code as shared libraries])])
-AC_ARG_ENABLE(host-shared, [], [enable_shared=$enableval])
-enable_host_shared=$enable_shared
 AC_SUBST(enable_host_shared)
 
-AC_ARG_ENABLE(pie,
-[AS_HELP_STRING([--enable-pie],
+AC_ARG_ENABLE(host-pie,
+[AS_HELP_STRING([--enable-host-pie],
 		[build host code as PIE])])
-AC_ARG_ENABLE(host-pie, [], [enable_pie=$enableval])
-enable_host_pie=$enable_pie
 AC_SUBST(enable_host_pie)
 
 AC_ARG_ENABLE(libgdiagnostics,
@@ -4147,13 +4075,10 @@ fi
 AC_SUBST(LIBGDIAGNOSTICS)
 
 
-# See the note above --enable-shared for why the `host-' prefix went and why
-# the old spelling is still accepted.
-AC_ARG_ENABLE(bind-now,
-[AS_HELP_STRING([--enable-bind-now],
+# See the note above --enable-host-shared for why the prefix is still here.
+AC_ARG_ENABLE(host-bind-now,
+[AS_HELP_STRING([--enable-host-bind-now],
 		[link host code as BIND_NOW])])
-AC_ARG_ENABLE(host-bind-now, [], [enable_bind_now=$enableval])
-enable_host_bind_now=$enable_bind_now
 AC_SUBST(enable_host_bind_now)
 
 AC_ARG_ENABLE(libquadmath-support,
