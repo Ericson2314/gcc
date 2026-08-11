@@ -73,7 +73,10 @@ struct target_caps targ_caps =
   .ld_avr_avrxmega4_flmap = false,
   .ld_now = true,
   .ld_relro = true,
-  .lto_plugin = true
+  .lto_plugin = true,
+  .as_aarch64_mabi = true,
+  .as_aarch64_small_pic_relocs = true,
+  .as_aarch64_aeabi_build_attributes = true
 };
 
 /* Read capability settings from FILE.  Format is one `name value' pair per
@@ -169,6 +172,12 @@ read_target_caps (const char *file)
 	targ_caps.ld_relro = value != 0;
       else if (strcmp (name, "lto_plugin") == 0)
 	targ_caps.lto_plugin = value != 0;
+      else if (strcmp (name, "as_aarch64_mabi") == 0)
+	targ_caps.as_aarch64_mabi = value != 0;
+      else if (strcmp (name, "as_aarch64_small_pic_relocs") == 0)
+	targ_caps.as_aarch64_small_pic_relocs = value != 0;
+      else if (strcmp (name, "as_aarch64_aeabi_build_attributes") == 0)
+	targ_caps.as_aarch64_aeabi_build_attributes = value != 0;
     }
 
   fclose (f);
