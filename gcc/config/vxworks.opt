@@ -31,8 +31,21 @@ Driver Condition(VXWORKS_KIND == VXWORKS_KIND_NORMAL)
 Xbind-now
 Driver Condition(VXWORKS_KIND == VXWORKS_KIND_NORMAL)
 
+; Kept out of the shared target_flags word deliberately.  target_flags is one
+; 32-bit int for a whole back end, and this file is included by every port that
+; has a VxWorks configuration.  In a single-target build that costs nothing --
+; only one OS's .opt files are ever read.  In a build configured for many
+; triples of one back end, every OS that back end supports contributes its
+; masks at once, and for i386 that is exactly one bit too many: 33 target_flags
+; masks, which opth-gen.awk reports as `#error too many target masks'.
+; Nothing outside this file names MASK_VXWORKS_RTP -- every user goes through
+; TARGET_VXWORKS_RTP, which opth-gen defines the same way either way -- so
+; giving the bit a variable of its own is invisible to the ports.
+TargetVariable
+int vxworks_flags
+
 mrtp
-Target RejectNegative Mask(VXWORKS_RTP) Condition(VXWORKS_KIND == VXWORKS_KIND_NORMAL)
+Target RejectNegative Mask(VXWORKS_RTP) Var(vxworks_flags) Condition(VXWORKS_KIND == VXWORKS_KIND_NORMAL)
 Assume the VxWorks RTP environment.
 
 ; VxWorks AE has two modes: kernel mode and vThreads mode.  In

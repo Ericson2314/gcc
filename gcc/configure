@@ -12442,10 +12442,8 @@ for gcc_mt in ${gcc_manifest_targets}; do
     gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|\\([ ]\\)${gcc_mt_hb}\\.h|\\1${gcc_mt_hb}-${gcc_mt_base}.h|g"`
     gcc_mt_genh_files="${gcc_mt_genh_files} ${gcc_mt_hb}-${gcc_mt_base}.h"
   done
-  gcc_mt_optfiles=
-  for gcc_mt_o in ${gcc_mt_eopts}; do
-    gcc_mt_optfiles="${gcc_mt_optfiles} \$(srcdir)/config/${gcc_mt_o}"
-  done
+  # gcc_mt_eopts is deliberately NOT turned into a make rule here.  It is read
+  # back out of the manifest by the union pass after this loop; see there.
   case " ${gcc_all_common_objects} " in
     *" ${gcc_mt_obj} "*) ;;
     *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
@@ -12459,13 +12457,10 @@ for gcc_mt in ${gcc_manifest_targets}; do
        # other target's macros.  default-common.cc includes no tm.h and so
        # needs none.
        if test x"${gcc_mt_base}" != xdefault; then
-         # This back end's own options header, built from the generic .opt files
-         # plus this target's, so that its HeaderInclude directives bring in the
-         # types its sources use.
-         printf 'optionlist-%s: $(lang_opt_files)%s $(srcdir)/opt-gather.awk\n\tLC_ALL=C; export LC_ALL; \\\n\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@\n\n' \
-           "${gcc_mt_base}" "${gcc_mt_optfiles}" "${gcc_mt_optfiles}" >> ${gcc_common_mk}
-         printf 'options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n' \
-           "${gcc_mt_base}" "${gcc_mt_base}" >> ${gcc_common_mk}
+         # This back end's own options header is NOT emitted here.  It cannot
+         # be: it has to be built from the .opt files of ALL this back end's
+         # triples, and inside this loop only the first one has been seen.  See
+         # the union pass after the loop.
          # ... and this back end's constants, from its own machine description
          # rather than whichever target happened to generate insn-constants.h.
          printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
@@ -12521,6 +12516,84 @@ for gcc_mt in ${gcc_manifest_targets}; do
   printf '  TARGETM_COMMON_ENTRY ("%s", %s) \\\n' "${gcc_mt}" "${gcc_mt_sym}" >> ${gcc_common_ent}
 done
 rm -f ${gcc_mt_err}
+
+# The options header of a back end, built from the UNION of its triples'
+# extra_options.
+#
+# This has to be a second pass.  Every other per-back-end rule above can be
+# emitted the first time a triple of that back end is seen, because what it
+# needs -- the .md file, the cpu_type -- is a property of the back end and every
+# triple reports the same value.  extra_options is not like that: it is a
+# property of the TRIPLE, it is where the OS brings its own options in, and the
+# triples of one back end genuinely disagree.  Emitting the rule from the first
+# triple therefore silently picked one OS's answer for all of them, which is the
+# "first-triple-wins" defect.
+#
+# What it cost, concretely.  rs6000's first manifest triple is a Darwin one,
+# whose extra_options has no rs6000/sysv4.opt.  TARGET_LITTLE_ENDIAN is
+# `Mask(LITTLE_ENDIAN)' in that .opt and so was absent from options-rs6000.h;
+# config/rs6000/sysv4.h:50 defines TARGET_BIG_ENDIAN in terms of it, a
+# constraint in rs6000's .md reaches it through BYTES_BIG_ENDIAN, and
+# gencondmd failed to compile for the twelve rs6000 triples whose tm.h chain
+# includes sysv4.h.  cc1 could not be linked at all.
+#
+# The union is taken WITHIN a back end only.  Across back ends it would not be
+# safe -- the option names genuinely conflict there, and the Mask() bits do not
+# fit -- and that is separate work.  Within a back end it was measured clean:
+# for all 45 back ends the unioned .opt set produces an options-<base>.h with no
+# `#error', because opt-read.awk merges same-named records (which is how an
+# ordinary single-target build already copes with, say, gnu-user.opt and
+# linux.opt both declaring -pthread).  One back end needed help to stay inside
+# the 32-bit target_flags word: see the note in config/vxworks.opt.
+${AWK} '
+  # Manifest stanzas are blank-line separated `key value...` lines.
+  /^common_out_file / {
+    base = $2
+    sub(/.*\//, "", base)
+    sub(/-common\.cc$/, "", base)
+    next
+  }
+  /^extra_options / {
+    for (i = 2; i <= NF; i++)
+      opt[i] = $i
+    n = NF
+    next
+  }
+  /^$/ { flush() }
+  END { flush() }
+
+  function flush(   i, f) {
+    # default-common.cc back ends have no options-<base>.h at all.
+    if (base != "" && base != "default") {
+      for (i = 2; i <= n; i++) {
+	f = opt[i]
+	# Order is preserved and duplicates dropped: opt-gather.awk is fed
+	# each file once, and a file listed twice would be gathered twice.
+	if (!((base SUBSEP f) in seen)) {
+	  seen[base SUBSEP f] = 1
+	  files[base] = files[base] " $(srcdir)/config/" f
+	}
+      }
+      if (!(base in emitted)) {
+	emitted[base] = 1
+	order[++nbase] = base
+      }
+    }
+    base = ""; n = 0
+  }
+
+  END {
+    for (i = 1; i <= nbase; i++) {
+      b = order[i]
+      printf "optionlist-%s: $(lang_opt_files)%s $(srcdir)/opt-gather.awk\n", b, files[b]
+      printf "\tLC_ALL=C; export LC_ALL; \\\n"
+      printf "\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@\n\n", files[b]
+      printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
+      printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
+      printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
+    }
+  }
+' ${gcc_target_manifest} >> ${gcc_common_mk}
 
 # Assemble the registry header from the two pieces.
 {
@@ -21352,7 +21425,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21355 "configure"
+#line 21428 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21458,7 +21531,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21461 "configure"
+#line 21534 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
