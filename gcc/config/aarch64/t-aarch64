@@ -288,3 +288,9 @@ s-check-sve-md: $(srcdir)/config/aarch64/check-sve-md.awk \
 	$(AWK) -f $(srcdir)/config/aarch64/check-sve-md.awk \
 	  $(srcdir)/config/aarch64/aarch64-sme.md
 	$(STAMP) s-check-sve-md
+
+# This back end is already written to the two-coefficient poly_int discipline
+# -- it sets NUM_POLY_INT_COEFFS to 2 in its -modes.def, so it never had the
+# fixed-size shorthand to begin with.  Saying so explicitly costs nothing here
+# and keeps the opt-in a complete record of which back ends are converted.
+T_CFLAGS += -DTARGET_POLY_AWARE

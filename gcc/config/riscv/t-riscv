@@ -298,3 +298,9 @@ s-riscv-mcpu.texi: build/gen-riscv-mcpu-texi$(build_exeext)
 .PHONY: riscv-regen
 
 riscv-regen: s-riscv-ext.texi s-riscv-ext.opt s-riscv-mtune.texi s-riscv-mcpu.texi
+
+# This back end is already written to the two-coefficient poly_int discipline
+# -- it sets NUM_POLY_INT_COEFFS to 2 in its -modes.def, so it never had the
+# fixed-size shorthand to begin with.  Saying so explicitly costs nothing here
+# and keeps the opt-in a complete record of which back ends are converted.
+T_CFLAGS += -DTARGET_POLY_AWARE
