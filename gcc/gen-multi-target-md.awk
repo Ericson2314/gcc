@@ -366,6 +366,32 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   reset();
 }
 
+# EXPECT A CASCADE.  Once one generated header goes per triple, everything it
+# transitively feeds has to follow, or the two disagree.  That is not a series
+# of surprises, it is the shape of the problem: a per-base header is a claim
+# that all of a back end's triples agree about its contents, and moving tm.h
+# down to the triple is precisely the discovery that they do not.
+#
+# The known live instance, and it is NOT the one first guessed (tm-constrs and
+# insn-constants were the suspects; they are innocent, their content is
+# md-derived and the same for every triple):
+#
+#   options-<base>.h is generated from the FIRST triple's extra_options.  For
+#   rs6000 that is the DARWIN triple, whose list has no rs6000/sysv4.opt, so
+#   TARGET_LITTLE_ENDIAN -- `Mask(LITTLE_ENDIAN)' in that .opt -- is absent.
+#   Every rs6000 triple whose tm.h chain reaches config/rs6000/sysv4.h then
+#   fails to compile, because sysv4.h:50 has
+#	#define TARGET_BIG_ENDIAN (! TARGET_LITTLE_ENDIAN)
+#   and tm-constrs-rs6000.h expands it.  2394 errors, one back end, one missing
+#   .opt file.
+#
+#   So options-<base>.h is the next header to follow tm.h down to the triple.
+#   It is NOT a mechanical repeat of this file's work: the OPT_* codes it
+#   declares have to stay consistent with the single shared options.cc table,
+#   which is generated from ALL targets' .opt files at once.  Per-triple
+#   options.h with per-triple numbering would silently disagree with it.  That
+#   needs its own design, not a copy of emit_triple.
+#
 # Everything that has to exist once per configured TRIPLE rather than once per
 # back end: the conditions of a machine description are evaluated against a
 # tm.h, and a back end serving 31 triples the way i386 does has no single one.
