@@ -81,6 +81,63 @@
 # for aarch64.  A per-file rule would demand a key -> back end map that neither
 # side of this interface expresses.
 #
+# THE OTHER DIRECTION, WHICH THIS CHECK WAS BLIND TO UNTIL NOW, AND WHICH IS
+# THE MORE DANGEROUS OF THE TWO.
+#
+# Everything above judges the keys that a config file CONTAINS.  A key nothing
+# reads is caught.  A key nothing WRITES is not even looked at, and its failure
+# is strictly worse:
+#
+#   nothing reads it   -> one probe's answer is discarded.  Behaviour is that of
+#                         the built-in default, which is at least a value
+#                         somebody chose.
+#   nothing writes it  -> read_target_caps never assigns it, so cc1 uses the
+#                         built-in default ON EVERY TARGET, FOREVER, and the
+#                         reader looks completely healthy.  The struct field
+#                         exists, defaults.h defines the macro over it, the back
+#                         end consults the macro, the testsuite passes because
+#                         the default is usually right.  There is no moment at
+#                         which anything is wrong enough to look at.
+#
+# The live instance that prompted this: `f8d15aa7640' added gxx_include_dir,
+# gxx_tool_include_dir, gxx_backward_include_dir and gxx_libcxx_include_dir,
+# all four read by cppdefault.cc and written by nobody.  Behaviour was unchanged
+# -- which is exactly why nobody would ever notice.
+#
+# AND THE THIRD SET, which falls out of the same comparison for free: a key
+# target-specs EMITS for which target-caps.h has no field at all.
+# read_target_caps' strcmp ladder has no arm for it, and the deliberate
+# ignore-unknown-names rule -- correct, so a newer spec file does not break an
+# older compiler -- swallows it in silence.  There are 26 of these today (avr,
+# powerpc, loongarch, s390, darwin, ia64, cris, msp430, hppa, arm), every one a
+# probe that runs against a real assembler and whose answer is dropped on the
+# floor.  The read-direction arm CANNOT see them, and not by oversight: it reads
+# config files, and a config file for a target this build does not enable does
+# not exist.  Its corpus is what this build happens to enable.  The corpus of
+# the two arms below is target-specs/configure.ac -- WHAT THE GENERATOR CAN
+# EMIT -- which is the corpus the question is actually about.
+#
+# THE EXEMPTION TABLE, AND WHY IT IS NOT AN ADVISORY MODE.  There are 48 of
+# these today and they are not mine to fix: the writes belong in
+# target-specs/configure.ac and the fields in target-caps.h.  A check that
+# blocks the work needed to fix what it found is worse than no check -- but the
+# standard remedy, demoting the whole arm to a warning, is what once outlived
+# its fix by minutes and left an arm silently non-enforcing.  So the arms are
+# FATAL, and the backlog is an EXPLICIT, ITEMISED, SELF-EXPIRING table below.
+# Consequences, all of them deliberate:
+#
+#   * a key that lands unwritten TOMORROW is fatal on day one, because it is not
+#     in the table.  The gap closes for new work immediately.
+#   * an entry whose bug has been FIXED is fatal as a stale exemption.  The
+#     table cannot outlive what it excuses; when it empties, the arm is simply
+#     fatal, with no flag anyone has to remember to flip.
+#   * `bug' entries are printed on every run.  An exemption you never see is an
+#     exemption that becomes permanent.
+#
+# `optout' is for a capability whose built-in default no target needs to
+# override.  Each one carries its reason on the line.  Adding an entry is a
+# claim about the tree, so make it a claim someone can check.
+#
 # Usage: check-target-caps.sh GCC_SRCDIR CONFIGFILE...
 
 set -e
@@ -280,6 +337,299 @@ if test ! -s "$work"/uses; then
 fi
 if test "$calib_fail" -ne 0; then
   echo "check-target-caps: refusing to report." >&2
+  exit 1
+fi
+
+# --- Declared keys, and keys the generator can emit. ------------------------
+# Two extractors, each with its own way of being quietly wrong, so each gets its
+# own two-sided calibration below against synthetic input whose answer is known.
+
+# Fields of `struct target_caps'.  Comments are stripped first and the struct is
+# bounded at its closing brace: target-caps.h continues past line 690 with
+# `extern struct target_caps targ_caps;' and a couple of inline functions, and
+# an unbounded scan would take a parameter name for a capability.
+decl_keys () {
+  join_cont "$1" | strip_c_comments \
+    | awk '/^struct target_caps/ { s = 1 } s { print } s && /^};/ { exit }' \
+    | sed -n 's/^[ \t]*\(bool\|int\|unsigned\|long\|const char \*\)[ \t*]*\([a-z_][a-z_0-9]*\)[ \t]*;.*/\2/p' \
+    | sort -u
+}
+
+# Keys target-specs/configure.ac can write.  The config file is produced by
+# heredocs onto $target_config_file, so a `name value' line inside one of those
+# heredocs is an emission and nothing else in the file is.  In particular
+# `gcc_cv_solaris_ld=no' and the sixteen dnl notes about targ_caps are NOT
+# emissions -- the same prose trap the reader arm exists to avoid, and here it
+# is sharper, because a key's shell variable is naturally named after the key.
+emit_keys () {
+  awk '
+    /^[ \t]*cat[ \t]*>>?[ \t]*"?\$\{?target_config_file\}?"?[ \t]*<</ {
+      d = $0; sub(/.*<<[ \t]*/, "", d); gsub(/[^A-Za-z_0-9]/, "", d)
+      inh = 1; delim = d; next }
+    inh && $0 == delim { inh = 0; next }
+    inh && /^[a-z_][a-z_0-9]*[ \t]/ { print $1 }
+  ' "$1" | sort -u
+}
+
+# ANY OTHER WAY OF WRITING TO THAT FILE IS A HOLE IN emit_keys, and a hole here
+# reads as "this key is never written", i.e. a false positive on a live key --
+# the report that gets a checker demoted.  So the shapes are enumerated rather
+# than assumed: a redirection onto $target_config_file that is not one of the
+# heredoc openers emit_keys understands is a hard error, not a missed key.
+emit_guard () {
+  grep -nE '>>?[ \t]*"?\$\{?target_config_file' "$1" > "$work"/g1 || true
+  grep -vE 'cat[ \t]*>>?[ \t]*"?\$\{?target_config_file\}?"?[ \t]*<<' \
+    "$work"/g1 || true
+}
+
+emitter=$srcdir/../target-specs/configure.ac
+if test ! -f "$emitter"; then
+  echo "check-target-caps: no $emitter, so nothing can be said about which" \
+       "capabilities are ever written.  Refusing to report: a missing emitter" \
+       "corpus and an emitter that writes nothing look identical from here." >&2
+  exit 1
+fi
+
+# --- Calibration for the two new arms.  Synthetic, and two-sided. -----------
+# The must-MISSES are drawn from OUTSIDE the class of true positives on purpose.
+# A declared key that IS emitted cannot detect an extractor that calls prose an
+# emission; the stimuli that can are a dnl note, a shell assignment, a heredoc
+# onto a DIFFERENT file, and text after the struct's closing brace -- none of
+# which is a declaration or an emission, and all of which look like one to a
+# grep.  Each arm asserts the extractor's EXACT output, so a stimulus that
+# stops being exercised shows up as a failure rather than as a silent pass.
+cat > "$work"/calib/caps.h <<'EOF'
+/* struct target_caps
+   bool zzz_comment_field;  */
+struct target_caps
+{
+  bool zzz_decl_bool;
+  const char *zzz_decl_str;
+  int zzz_decl_int;
+};
+extern struct target_caps targ_caps;
+inline bool zzz_not_a_field (int zzz_param_int) { return zzz_param_int; }
+EOF
+# Note the outer delimiter: the stimulus CONTAINS `EOF' lines, and writing this
+# heredoc as <<'EOF' would end it at the first of them -- leaving a stimulus
+# that no longer exercises what it claims to.
+cat > "$work"/calib/configure.ac <<'CALIB_AC_EOF'
+dnl zzz_dnl_only 1 -- a note, not an emission.
+zzz_shell_assign=no
+cat > "$other_file" <<XEOF
+zzz_other_file 1
+XEOF
+cat > "$target_config_file" <<EOF
+# zzz_comment_in_heredoc 1
+zzz_emit_first ${zzz_shell_assign}
+EOF
+cat >> "$target_config_file" <<EOF
+zzz_emit_appended `zzz_bool "$x"`
+EOF
+CALIB_AC_EOF
+
+calib_want_decl="zzz_decl_bool
+zzz_decl_int
+zzz_decl_str"
+calib_got_decl=`decl_keys "$work"/calib/caps.h`
+if test "x$calib_got_decl" != "x$calib_want_decl"; then
+  echo "check-target-caps: CALIBRATION FAILED -- the declaration extractor" \
+       "does not read a known struct correctly.  Wanted:" >&2
+  echo "$calib_want_decl" | sed 's/^/    /' >&2
+  echo "  got:" >&2
+  echo "$calib_got_decl" | sed 's/^/    /' >&2
+  calib_fail=1
+fi
+
+calib_want_emit="zzz_emit_appended
+zzz_emit_first"
+calib_got_emit=`emit_keys "$work"/calib/configure.ac`
+if test "x$calib_got_emit" != "x$calib_want_emit"; then
+  echo "check-target-caps: CALIBRATION FAILED -- the emission extractor does" \
+       "not read a known emitter correctly.  A dnl note, a shell assignment," \
+       "a comment inside the heredoc or a heredoc onto another file has been" \
+       "counted as an emission, or a real one has been missed.  Wanted:" >&2
+  echo "$calib_want_emit" | sed 's/^/    /' >&2
+  echo "  got:" >&2
+  echo "$calib_got_emit" | sed 's/^/    /' >&2
+  calib_fail=1
+fi
+
+# emit_guard gets its own two-sided arm, and it needs one more than anything
+# else here: it is the part with no visible output when it works, its whole
+# job is to notice a shape nobody has written yet, and its first draft used an
+# invalid BRE -- `\{\{0,1\}' -- so grep failed on every line, the guard reported
+# nothing, and "nothing" is indistinguishable from "all clear".  That is the
+# grep-exit-status trap in its purest form.  The must-MISS is the emitter shape
+# that IS understood; the must-HIT is a shape from outside that class.
+if test -n "`emit_guard "$work"/calib/configure.ac`"; then
+  echo "check-target-caps: CALIBRATION FAILED -- emit_guard objects to the" \
+       "ordinary heredoc emissions it is supposed to understand, so it would" \
+       "fail every build." >&2
+  calib_fail=1
+fi
+printf 'echo "zzz_sneaky 1" >> "$target_config_file"\n' \
+  > "$work"/calib/configure-sneaky.ac
+if test -z "`emit_guard "$work"/calib/configure-sneaky.ac`"; then
+  echo "check-target-caps: CALIBRATION FAILED -- emit_guard does not notice a" \
+       "write to the target config file that emit_keys cannot follow, so a" \
+       "capability written that way would be reported as never written." >&2
+  calib_fail=1
+fi
+
+if test "$calib_fail" -ne 0; then
+  echo "check-target-caps: refusing to report." >&2
+  exit 1
+fi
+
+declared=`decl_keys "$srcdir/target-caps.h"`
+emitted=`emit_keys "$emitter"`
+if test -z "$declared"; then
+  echo "check-target-caps: no fields extracted from $srcdir/target-caps.h;" \
+       "the header or this parser has changed, and then every key would read" \
+       "as undeclared for a reason that has nothing to do with the tree." >&2
+  exit 1
+fi
+if test -z "$emitted"; then
+  echo "check-target-caps: no emissions extracted from $emitter; the emitter" \
+       "or this parser has changed, and then EVERY capability would read as" \
+       "never written." >&2
+  exit 1
+fi
+stray=`emit_guard "$emitter"`
+if test -n "$stray"; then
+  echo "check-target-caps: $emitter writes the target config file in a way" \
+       "this check cannot follow, so it cannot tell which capabilities are" \
+       "written.  Teach emit_keys the new shape; do not delete this test." >&2
+  echo "$stray" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+printf '%s\n' "$declared" > "$work"/declared
+printf '%s\n' "$emitted" > "$work"/emitted
+
+# --- The backlog.  KEY  KIND  REASON.  See the header for the rules. --------
+# KIND is `bug' (a real defect, reported every run until fixed) or `optout' (a
+# built-in default no target needs to override).  A stale entry is fatal.
+cat > "$work"/exempt <<'EOF'
+# Emitted, but target-caps.h has no field: read_target_caps' strcmp ladder has
+# no arm, so the probe's answer is dropped and the ignore-unknown-names rule
+# hides it.  All of these are probes that run against a real assembler.
+target optout The configuration's own name, not a capability.  It is read through targ_caps_target_name (see the alias table above), which is why it has no struct field and must not grow one.
+as_avr_mgccisr bug avr __gcc_isr probe, answer discarded.
+as_avr_mlink_relax bug avr -mlink-relax probe, answer discarded.
+as_avr_mrmw bug avr -mrmw probe, answer discarded.
+as_entry_markers bug powerpc entry-marker probe, answer discarded.
+as_mfcrf bug powerpc mfcrf probe, answer discarded.
+as_power10_htm bug powerpc power10 HTM probe, answer discarded.
+as_pltseq bug powerpc pltseq-marker probe, answer discarded.
+as_rel16 bug powerpc rel16 probe, answer discarded.
+as_loongarch_16b_atomic bug loongarch probe, answer discarded.
+as_loongarch_eh_frame_pcrel_encoding bug loongarch probe, answer discarded.
+as_loongarch_support_call36 bug loongarch probe, answer discarded.
+as_loongarch_tls_le_relaxation bug loongarch probe, answer discarded.
+as_s390_architecture_modifiers bug s390 probe, answer discarded.
+as_s390_machine_machinemode bug s390 probe, answer discarded.
+as_s390_vector_loadstore_alignment_hints bug s390 probe, answer discarded.
+as_s390_vector_loadstore_alignment_hints_on_z13 bug s390 probe, answer discarded.
+as_macos_build_version bug darwin -mbuild-version probe, answer discarded.
+as_mmacosx_version_min bug darwin -mmacosx-version-min probe, answer discarded.
+as_ltoffx_ldxmov_relocs bug ia64 probe, answer discarded.
+as_no_mul_bug_abort bug cris probe, answer discarded.
+as_mspabi_attribute bug msp430 probe, answer discarded.
+gas_arm_extended_arch bug arm probe, answer discarded.
+gas_literal16 bug darwin .literal16 probe, answer discarded.
+gas_nsubspa_comdat bug hppa probe, answer discarded.
+use_as_traditional_format bug eh_frame traditional-format probe, answer discarded.
+# Declared and read, but target-specs/configure.ac emits nothing for them, so
+# cc1 uses the built-in default on every target.  These are the silent half.
+gxx_include_dir bug Read by cppdefault.cc since f8d15aa7640; no emitter.
+gxx_tool_include_dir bug Read by cppdefault.cc since f8d15aa7640; no emitter.
+gxx_backward_include_dir bug Read by cppdefault.cc since f8d15aa7640; no emitter.
+gxx_libcxx_include_dir bug Read by cppdefault.cc since f8d15aa7640; no emitter.
+as_gotoff_in_data bug HAVE_AS_GOTOFF_IN_DATA; no ix86 probe was carried over.
+as_ix86_cmov_sun_syntax bug No ix86 probe was carried over to target-specs.
+as_ix86_ffreep bug No ix86 probe was carried over to target-specs.
+as_ix86_fildq bug No ix86 probe was carried over to target-specs.
+as_ix86_filds bug No ix86 probe was carried over to target-specs.
+as_ix86_got32x bug No ix86 probe was carried over to target-specs.
+as_ix86_hle bug No ix86 probe was carried over to target-specs.
+as_ix86_interunit_movq bug No ix86 probe was carried over to target-specs.
+as_ix86_rep_lock_prefix bug No ix86 probe was carried over to target-specs.
+as_ix86_sahf bug No ix86 probe was carried over to target-specs.
+as_ix86_tls_get_addr_got bug No ix86 probe was carried over to target-specs.
+as_ix86_tlsgdplt bug No ix86 probe was carried over to target-specs.
+as_ix86_tlsldm bug No ix86 probe was carried over to target-specs.
+as_ix86_tlsldmplt bug No ix86 probe was carried over to target-specs.
+as_ix86_ud2 bug No ix86 probe was carried over to target-specs.
+as_r_x86_64_code_6_gottpoff bug No ix86 probe was carried over to target-specs.
+solaris_ld bug gcc_cv_solaris_ld IS probed; the answer reaches spec text only and never the config file.
+vms_debug bug Read by dwarf2out.cc; nothing probes or emits it.
+EOF
+
+sed 's/^#.*//' "$work"/exempt | awk 'NF { print $1 }' | sort > "$work"/exempt_keys
+if test `wc -l < "$work"/exempt_keys` -ne `sort -u "$work"/exempt_keys | wc -l`
+then
+  echo "check-target-caps: the exemption table lists a key twice; one of the" \
+       "two reasons is not being applied to anything." >&2
+  exit 1
+fi
+exempt_kind () {
+  sed 's/^#.*//' "$work"/exempt | awk -v k="$1" '$1 == k { print $2; exit }'
+}
+
+# Undeclared-and-emitted, undeclared-and-not-emitted, declared-and-not-emitted.
+comm -13 "$work"/declared "$work"/emitted > "$work"/emit_nofield
+comm -23 "$work"/declared "$work"/emitted > "$work"/decl_nowrite
+cat "$work"/emit_nofield "$work"/decl_nowrite | sort -u > "$work"/gaps
+
+# A stale exemption is fatal.  This is the whole reason the table can be
+# trusted: it cannot outlive what it excuses, and when it empties the arms are
+# simply fatal with no flag to remember.  If you have just made a key work,
+# the fix is to delete its line from the table above.
+comm -23 "$work"/exempt_keys "$work"/gaps > "$work"/stale
+if test -s "$work"/stale; then
+  echo "check-target-caps: STALE EXEMPTION(S).  These are listed in the" \
+       "backlog table in $0 as capabilities that are not written, and they" \
+       "now are.  Delete their lines from that table -- an exemption that" \
+       "outlives its fix is how an arm stops enforcing without anyone" \
+       "deciding that it should:" >&2
+  sed 's/^/  /' "$work"/stale >&2
+  exit 1
+fi
+
+: > "$work"/unwritten
+: > "$work"/known
+while read -r k; do
+  test -n "$k" || continue
+  case `exempt_kind "$k"` in
+    bug)    echo "$k" >> "$work"/known ;;
+    optout) ;;
+    *)      echo "$k" >> "$work"/unwritten ;;
+  esac
+done < "$work"/gaps
+
+if test -s "$work"/known; then
+  echo "check-target-caps: `wc -l < "$work"/known | tr -d ' '` known-unwritten" \
+       "capabilit(ies), exempted with a reason in $0.  A probe whose answer" \
+       "never reaches cc1, or a field cc1 never has assigned, is the built-in" \
+       "default on every target forever:" >&2
+  sed 's/^#.*//' "$work"/exempt \
+    | awk 'NR==FNR { want[$0] = 1; next }
+	   NF && ($1 in want) { k = $1; $1 = ""; $2 = ""; sub(/^[ \t]*/, "")
+			        print "  " k " -- " $0 }' \
+	  "$work"/known - >&2
+fi
+
+if test -s "$work"/unwritten; then
+  echo "check-target-caps: capabilit(ies) that no target config file can ever" \
+       "carry -- target-specs/configure.ac emits nothing for them, or emits a" \
+       "name target-caps.h has no field for:" >&2
+  sed 's/^/  /' "$work"/unwritten >&2
+  echo "check-target-caps: emit it from target-specs/configure.ac and give it" \
+       "a field and a strcmp arm, or stop declaring it.  A capability nothing" \
+       "writes is not a default -- it is a reader that looks healthy and is" \
+       "answering a question nobody ever asked the toolchain." >&2
   exit 1
 fi
 

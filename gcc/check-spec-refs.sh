@@ -132,8 +132,50 @@ if test ! -f "$gcc_cc"; then
   exit 1
 fi
 
+# ROUTE 3 HAS A SECOND PRODUCER, AND IT WAS INVISIBLE TO THIS CHECK.
+# The taxonomy above names `%(name) from a spec string in a SPEC FILE' as the
+# third way of consuming a spec, and the reference set does pick those up -- but
+# only the text that is already IN the file being checked.  Half of every
+# per-target file is written by `gen-target-specs', and its spec text is
+# CONDITIONAL:
+#
+#     #ifdef USE_LD_AS_NEEDED
+#       emit ("libgcc_nonstatic",
+#             "...%{!shared-libgcc:-lgcc %(link_as_needed) -lgcc_s ...}");
+#
+# so on a target that does not define USE_LD_AS_NEEDED the merged spec file
+# carries `*link_as_needed:' (target-specs writes it unconditionally, having
+# asked the linker) and no %(link_as_needed) at all -- and this check called it
+# dead.  Verified in both directions before the widening: with the generator out
+# of the reference set, `*link_as_needed' and `*link_no_as_needed' are reported
+# dead on such a file; with it in, they are live and an invented name in the
+# same file is still reported.  They are NOT dead, and deleting them on this
+# check's say-so would have removed the only thing that makes `-lgcc_s' as-
+# needed.  Same corpus rule as the target headers above: what the generator CAN
+# emit, not what this build happens to enable.
+#
+# The widening rides on the comment stripper, and this file is the case that
+# shows why that stripper is load-bearing rather than tidy: raw, it mentions
+# nine %(name)s; stripped, five.  The four it drops are `cc1_cpu', `cpp',
+# `name' and -- exactly -- `lto_plugin', the historical bug.  Adding this file
+# to the corpus without stripping would have re-declared lto_plugin live on the
+# strength of a sentence describing it.
+#
+# The generator is located from `gcc.cc' rather than passed in, and its absence
+# is fatal.  Making it a caller's argument would put the one thing that makes
+# route 3 visible into the same class of wiring that dropped `cp/lang-specs.h'
+# -- a corpus file quietly missing looks exactly like a spec quietly dead.
+
 work=`mktemp -d`
 trap 'rm -rf "$work"' 0
+
+gen_target_specs=`dirname "$gcc_cc"`/gen-target-specs.cc
+if test ! -f "$gen_target_specs"; then
+  echo "check-spec-refs: $gen_target_specs not found.  It writes half of every" \
+       "per-target spec file, so without it every spec referred to only from" \
+       "its conditional spec text reads as dead.  Refusing to report." >&2
+  exit 1
+fi
 
 # The name -> variable table, from the one place that defines it.
 sed -n 's/^[ \t]*INIT_STATIC_SPEC[ \t]*(\"\([a-z_0-9]*\)\"[ \t]*,[ \t]*&\([a-zA-Z_0-9]*\)).*/\1 \2/p' \
@@ -226,6 +268,15 @@ reachable () {
 #                 in any of them covers every target.
 #   refs       -- driverrefs plus every spec file, i.e. tree-wide.
 refs_from "$gcc_cc" > "$work"/driverrefs
+refs_from "$gen_target_specs" > "$work"/genrefs
+if test ! -s "$work"/genrefs; then
+  echo "check-spec-refs: no %(name) reference extracted from" \
+       "$gen_target_specs, which is where route 3's conditional spec text" \
+       "lives.  Either the generator stopped referring to specs or the" \
+       "extraction is broken; the second is the one that passes everything." >&2
+  exit 1
+fi
+cat "$work"/genrefs >> "$work"/driverrefs
 for _rs in $refsrcs; do
   test -f "$_rs" && refs_from "$_rs" >> "$work"/driverrefs
 done
