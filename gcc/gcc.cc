@@ -8351,6 +8351,48 @@ driver::~driver ()
 
 /* driver::main is implemented as a series of driver:: method calls.  */
 
+/* The configured target this driver's own name is for, or NULL.
+
+   Searched by prefix against targetm_common_registry, which is the closed set
+   of targets this compiler was configured for.  PROGNAME must begin with
+   `<triple>-' for some entry of that set: that covers <triple>-gcc,
+   <triple>-g++, <triple>-cpp and <triple>-gcc-<version> without this function
+   having to know any of those suffixes, and it covers nothing else.
+
+   Longest match wins.  Two configured triples where one is a prefix of the
+   other are unlikely but not impossible, and "first in the registry" would
+   make the answer depend on configure's ordering -- a silent dependency on
+   something nobody thinks of as an ordering.
+
+   Deliberately NOT `does the name contain a triple', and deliberately not a
+   parse: see the comment at the call site.  */
+
+static const char *
+target_from_progname (void)
+{
+  const char *found = NULL;
+  size_t found_len = 0;
+
+  if (progname == NULL)
+    return NULL;
+
+  for (const struct targetm_common_entry *e = targetm_common_registry;
+       e->target != NULL; e++)
+    {
+      size_t len = strlen (e->target);
+
+      if (len > found_len
+	  && strncmp (progname, e->target, len) == 0
+	  && progname[len] == '-')
+	{
+	  found = e->target;
+	  found_len = len;
+	}
+    }
+
+  return found;
+}
+
 int
 driver::main (int argc, char **argv)
 {
@@ -8369,17 +8411,58 @@ driver::main (int argc, char **argv)
     if (startswith (argv[i], "-ftarget-config="))
       read_target_caps (argv[i] + strlen ("-ftarget-config="));
 
-  /* Same scan, same reason, for the common hook table: the driver reads
+  /* Failing that, ask our own name.  An installed driver is called
+     <triple>-gcc, and now so is the one in the build directory, so this is
+     the same mechanism in both places rather than two that have to be kept in
+     step.  Resolution order: -ftarget-config= first, then the program name.
+
+     The program name is matched against the CLOSED SET of configured targets
+     and is never parsed.  That distinction is the whole of the design here.  A
+     triple is not a grammar: `x86_64-pc-linux-gnu' has four components,
+     `arm-none-eabi' three, `avr' one, and config.sub exists precisely because
+     the spelling cannot be decided locally.  Anything that split the name on
+     `-' and called the front part a triple would take the leading components
+     of `my-favourite-gcc' just as readily, and then select whichever back end
+     happened to match -- a wrong back end chosen from a name nobody meant as a
+     target, silently.  Asking the registry instead can only ever answer with a
+     target this compiler was actually configured for; a name that matches none
+     of them yields NULL, the empty back end stays in force, and the first hook
+     use says so.  Refusing to guess is the feature.  */
+  const char *selected_target = targ_caps_target_name;
+  const char *name_target = target_from_progname ();
+
+  /* Both said something and they disagree.  Neither is a default -- one is a
+     file the user pointed at, the other is the name the user invoked -- so
+     there is no principled winner, and picking one silently is exactly the
+     "one name, several targets, no diagnostic" failure this compiler exists to
+     remove.  Cannot fire on anything in the tree today: the only in-tree
+     recipe that hands a driver a -ftarget-config= is Makefile.in's
+     target-specs usability probe, and it runs `./xgcc', whose name carries no
+     triple at all.  */
+  if (selected_target != NULL
+      && name_target != NULL
+      && strcmp (selected_target, name_target) != 0)
+    fatal_error (input_location,
+		 "%qs says the target is %qs, but %<-ftarget-config=%> names "
+		 "%qs", progname, name_target, selected_target);
+
+  if (selected_target == NULL)
+    selected_target = name_target;
+
+  /* The common hook table, scanned here for the same reason: the driver reads
      targetm_common (compute_multilib, among others) from build_multilib_strings
      onwards, which is before any spec file has been read.  Until this runs the
      table in force is the EMPTY back end -- see common/common-target-select.cc
      -- so a driver that was told no target reports the hook it needed rather
-     than answering as the build's own triple.  */
-  if (targ_caps_target_name != NULL
-      && !targetm_common_select (targ_caps_target_name))
+     than answering as the build's own triple.
+
+     name_target came out of the registry, so only the -ftarget-config= route
+     can fail here.  */
+  if (selected_target != NULL
+      && !targetm_common_select (selected_target))
     fatal_error (input_location,
 		 "target %qs is not one of the targets this compiler was "
-		 "configured for", targ_caps_target_name);
+		 "configured for", selected_target);
 
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
