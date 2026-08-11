@@ -298,33 +298,24 @@ case ${with_newlib} in
   yes) skipdirs=`echo " ${skipdirs} " | sed -e 's/ target-newlib / /'` ;;
 esac
 
-dnl --enable-multilib and --disable-multilib are REJECTED, not ignored.
+dnl --enable-multilib and --disable-multilib are NOT declared here, and that is
+dnl deliberate.
 dnl
-dnl Multilib is mandatory.  gcc/configure.ac no longer has an enable_multilib at
-dnl all and gcc/Makefile.in passes a hardcoded `yes' to genmultilib, so the
-dnl compiler's multilib tables are always emitted whatever the flag said -- and
-dnl a compiler serving 188 targets has 188 multilib sets, which one flag cannot
-dnl answer for.  The flag was therefore accepted and silently did nothing to the
-dnl compiler, which is the same failure this tree keeps finding elsewhere: an
-dnl interface that lies about the behaviour.  Say so instead.
+dnl Multilib is mandatory.  gcc/configure.ac has no enable_multilib at all and
+dnl gcc/Makefile.in passes a hardcoded `yes' to genmultilib, so the compiler's
+dnl multilib tables are emitted whatever the flag said -- and a compiler serving
+dnl 188 targets has 188 multilib sets, which one flag cannot answer for.
 dnl
-dnl Rejected here, at the top level, because that is where it is typed -- and
-dnl because configure.ac's own argument forwarding (see the -enable-* case in
-dnl the baseargs loop below) passes it down to every host module including gcc,
-dnl so a rejection in gcc alone would fire from inside a subdirectory for a flag
-dnl the user gave to this script.
+dnl With no AC_ARG_ENABLE for it, autoconf already does the honest thing: the
+dnl option lands in ac_unrecognized_opts and the user is told it was not
+dnl recognised.  That is a warning by default and fatal under
+dnl --enable-option-checking=fatal, which leaves the strictness with the caller
+dnl rather than hard-coding it here.  A bespoke AC_MSG_ERROR would only be a
+dnl worse-behaved version of a mechanism autoconf already has.
 dnl
-dnl This does break every existing recipe that passes either flag.  That is the
-dnl accepted cost of one meaning rather than two.
-if test x"${enable_multilib+set}" = xset; then
-  AC_MSG_ERROR([--enable-multilib and --disable-multilib are no longer accepted.
-  Multilib is mandatory: the compiler's multilib tables are per target and are
-  always emitted, so the flag could not change what it appeared to.  Remove it
-  from your configure line.
-  If you meant to avoid building 32-bit target libraries on a 64-bit host, that
-  is a property of the target libraries and not of this flag; build only the
-  targets you want with --enable-targets.])
-fi
+dnl The variable is still READ below: a --disable-multilib on the command line
+dnl continues to reach the target libraries, where the question is real -- which
+dnl is a different question from the compiler's tables.
 
 AC_ARG_ENABLE(as-accelerator-for,
 [AS_HELP_STRING([--enable-as-accelerator-for=ARG],
@@ -3852,12 +3843,14 @@ case "$target:$have_compiler:$host:$target:$enable_multilib" in
       dnl A WARNING now, not an error, and the demotion is forced rather than
       dnl chosen.  This check only ever ran when the user had passed NEITHER
       dnl multilib flag, and its remedy was "rerun with --enable-multilib or
-      dnl --disable-multilib" -- both of which are rejected above.  With
-      dnl multilib mandatory the guard fires on every native x86_64 host, and
-      dnl an early hard error whose only remedies no longer exist is strictly
-      dnl worse than letting the build fail where the real problem is: the
-      dnl compiler itself does not need 32-bit libraries, only the 32-bit
-      dnl target libraries do, and they say so themselves with a better message.
+      dnl --disable-multilib".  Neither is an option this script declares any
+      dnl more, so that advice now means "pass something autoconf will tell you
+      dnl it did not recognise" -- worse than useless.  With the flags gone the
+      dnl guard fires on every native x86_64 host, and an early hard error whose
+      dnl only remedies no longer exist is strictly worse than letting the build
+      dnl fail where the real problem is: the compiler itself does not need
+      dnl 32-bit libraries, only the 32-bit target libraries do, and they say so
+      dnl themselves with a better message.
       AC_MSG_WARN([I suspect your system does not have 32-bit development libraries (libc and headers).
   Multilib is mandatory, so building the 32-bit target libraries will need them.
   The compiler itself does not; configuring will continue.])

@@ -3088,15 +3088,6 @@ case ${with_newlib} in
   yes) skipdirs=`echo " ${skipdirs} " | sed -e 's/ target-newlib / /'` ;;
 esac
 
-if test x"${enable_multilib+set}" = xset; then
-  as_fn_error $? "--enable-multilib and --disable-multilib are no longer accepted.
-  Multilib is mandatory: the compiler's multilib tables are per target and are
-  always emitted, so the flag could not change what it appeared to.  Remove it
-  from your configure line.
-  If you meant to avoid building 32-bit target libraries on a 64-bit host, that
-  is a property of the target libraries and not of this flag; build only the
-  targets you want with --enable-targets." "$LINENO" 5
-fi
 
 # Check whether --enable-as-accelerator-for was given.
 if test "${enable_as_accelerator_for+set}" = set; then :
@@ -11766,7 +11757,7 @@ case "$target:$have_compiler:$host:$target:$enable_multilib" in
     fi
     rm -f conftest*
     if test x${dev64} != xyes ; then
-                                                            { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: I suspect your system does not have 32-bit development libraries (libc and headers).
+                                                                        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: I suspect your system does not have 32-bit development libraries (libc and headers).
   Multilib is mandatory, so building the 32-bit target libraries will need them.
   The compiler itself does not; configuring will continue." >&5
 $as_echo "$as_me: WARNING: I suspect your system does not have 32-bit development libraries (libc and headers).
