@@ -59,7 +59,7 @@ which is why a build directory is created.
 ```bash
 $ mkdir gccrs-build
 $ cd gccrs-build
-$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-multilib --enable-languages=rust
+$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-languages=rust
 $ make
 ```
 
@@ -69,7 +69,7 @@ The path of header dir and sysroot should be specified when you configure the pr
 ```bash
 $ mkdir mac-build
 $ cd mac-build
-$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-multilib --enable-languages=rust --with-native-system-header-dir=/usr/include --with-sysroot=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-languages=rust --with-native-system-header-dir=/usr/include --with-sysroot=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 $ make
 
 ```
@@ -142,7 +142,7 @@ test cases referencing any issues on Github.
 GCC has several internal checks that can be enabled during configuration. In the case of `gccrs`,
 you can enable the following:
 ```bash
-$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-multilib --enable-languages=rust --enable-checking=gimple,tree,types
+$ ../gccrs/configure --prefix=$HOME/gccrs-install --disable-bootstrap --enable-languages=rust --enable-checking=gimple,tree,types
 ```
 
 ### GDB
