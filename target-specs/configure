@@ -3565,6 +3565,23 @@ $as_echo "$as_me: WARNING: $gcc_cv_as does not accept -Aleon; GCC emits it uncon
     ;;
 esac
 
+gcc_cv_aix_as=no
+case $target in
+  *-*-aix*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $gcc_cv_as is the AIX assembler" >&5
+$as_echo_n "checking whether $gcc_cv_as is the AIX assembler... " >&6; }
+    if "$gcc_cv_as" -v < /dev/null 2>&1 | grep '^as V' > /dev/null; then
+      gcc_cv_aix_as=yes
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no, assuming GNU as" >&5
+$as_echo "no, assuming GNU as" >&6; }
+    fi
+    rm -f a.out
+    ;;
+esac
+
 gcc_cv_solaris_ld=no
 case $target in
   *-*-solaris2*)
@@ -5001,6 +5018,14 @@ if test x"$gcc_cv_as_mips_dot_module" = xyes; then
   asm_fp_module='%{mhard-float} %{msoft-float} %{msingle-float} %{mdouble-float}'
 else
   asm_fp_module=''
+fi
+
+if test x"$gcc_cv_aix_as" = xyes; then
+  cat >> "$specs_file" <<'EOF'
+*asm_v:
+%{v} %{w:-W}
+
+EOF
 fi
 
 if test x"$gcc_cv_solaris_ld" = xyes; then

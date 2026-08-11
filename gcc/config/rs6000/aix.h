@@ -181,9 +181,22 @@
 #undef ASM_DEFAULT_SPEC
 #define ASM_DEFAULT_SPEC ""
 
-#ifdef HAVE_AIX_AS
-#define ASM_V_SPEC "%{v} %{w:-W}"
-#endif
+/* ASM_V_SPEC used to be defined here under `#ifdef HAVE_AIX_AS'.  That macro
+   lost its definer when the assembler-flavour probe was removed, so the block
+   has been dead -- and this target has been getting the driver's built-in
+   asm_v, `%{v} %{w:-W} %{I*}', which the IBM assembler does not accept.
+
+   Which assembler is installed is not knowable when a multi-target compiler is
+   configured, so the answer is now probed after the build: target-specs/
+   configure identifies the AIX assembler and writes `*asm_v' with this exact
+   text into that target's spec file.  An AIX target built with gas gets the
+   driver's default instead, which is the correct spec for gas -- something the
+   `#ifdef' could express only because the compiler was configured for one
+   assembler.
+
+   Nothing is defined here in its place on purpose: a definition here would be
+   emitted by gen-target-specs for every AIX target regardless of which
+   assembler it has, which is the same bug with the answer inverted.  */
 
 /* Tell the assembler to assume that all undefined names are external.
 

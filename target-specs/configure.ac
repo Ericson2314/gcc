@@ -1925,6 +1925,40 @@ case $target in
     ;;
 esac
 
+dnl AIX: which assembler is this?  gcc/configure.ac answered this with
+dnl HAVE_AIX_AS, from the `as -v' flavour probe removed in 2b32edf9539.  The
+dnl macro has had no definer since, and its ONE consumer -- ASM_V_SPEC in
+dnl config/rs6000/aix.h -- spells the test `#ifdef HAVE_AIX_AS', where an
+dnl undefined identifier is simply false with no diagnostic.  So every AIX
+dnl build since then has handed the IBM assembler the driver's built-in
+dnl asm_v instead, which is `%{v} %{w:-W} %{I*}'.  The extra `%{I*}' is the
+dnl part that matters: the IBM assembler does not take -I there.
+dnl
+dnl Found from the other end, which is the useful way to notice this class of
+dnl bug: gen-target-specs emits *asm_v for every target whose header chain
+dnl defines ASM_V_SPEC, and it emitted none for AIX.  A header that defines a
+dnl macro under a dead `#ifdef' looks exactly like a header that never defined
+dnl it.
+dnl
+dnl ASM_V_SPEC is a spec, and which assembler is installed for a target is not
+dnl knowable when a multi-target compiler is configured, so the answer belongs
+dnl here rather than in the target header.  aix.h's dead block is removed in
+dnl the same commit that adds this: a bridge without the consumer conversion
+dnl would only turn a silent false into a silent true.
+gcc_cv_aix_as=no
+case $target in
+  *-*-aix*)
+    AC_MSG_CHECKING([whether $gcc_cv_as is the AIX assembler])
+    if "$gcc_cv_as" -v < /dev/null 2>&1 | grep '^as V' > /dev/null; then
+      gcc_cv_aix_as=yes
+      AC_MSG_RESULT([yes])
+    else
+      AC_MSG_RESULT([no, assuming GNU as])
+    fi
+    rm -f a.out
+    ;;
+esac
+
 dnl Solaris: which linker is this?  gcc/configure.ac answered this with
 dnl HAVE_SOLARIS_LD, whose probe was removed; nothing has defined it since, so
 dnl every `#if HAVE_SOLARIS_LD' in config/sol2.h and friends has been silently
@@ -2995,6 +3029,24 @@ if test x"$gcc_cv_as_mips_dot_module" = xyes; then
   asm_fp_module='%{mhard-float} %{msoft-float} %{msingle-float} %{mdouble-float}'
 else
   asm_fp_module=''
+fi
+
+dnl AIX asm_v: how to hand -v and -w to the IBM assembler.  Emitted ONLY when
+dnl that assembler was actually found, for the same reason given at
+dnl `*link_disable_dynamicbase' below -- a name written into all 183 spec files
+dnl that only one target can ever use is 182 names nothing consults, which is
+dnl what check-spec-refs exists to catch.  An AIX target using gas therefore
+dnl falls back to the driver's own asm_v, which is the right answer for gas.
+dnl
+dnl The text is config/rs6000/aix.h's own, restored: `%{v} %{w:-W}', with no
+dnl `%{I*}'.  The heredoc is QUOTED because the value is spec syntax that must
+dnl reach the file verbatim.
+if test x"$gcc_cv_aix_as" = xyes; then
+  cat >> "$specs_file" <<'EOF'
+*asm_v:
+%{v} %{w:-W}
+
+EOF
 fi
 
 dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.  Emitted as a
