@@ -20,10 +20,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
+/* genenums reads no target macro -- it includes tm.h only because rtl.h,
+   which gensupport.h needs, wants FIRST_PSEUDO_REGISTER.  That reaches a
+   structure size, not this program's output, which depends on the md files
+   alone.  gensupport.h is here for print_gen_include, so that the
+   insn-constants.h named below carries GEN_HDR_SUFFIX.  */
+#ifndef TM_H_FILE
+#define TM_H_FILE "tm.h"
+#endif
+#include TM_H_FILE
+#include "rtl.h"
 #include "errors.h"
 #include "statistics.h"
 #include "vec.h"
 #include "read-md.h"
+#include "gensupport.h"
 
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
@@ -59,14 +70,14 @@ main (int argc, const char **argv)
   puts ("   from the machine description file.  */\n");
   puts ("#include \"config.h\"\n");
   puts ("#include \"system.h\"\n");
-  /* Multi-target: NOT yet suffixed with GEN_HDR_SUFFIX, because genenums is
-     still built once rather than once per back end (it is absent from the
-     parts list in gen-multi-target-md.awk).  Whoever makes insn-enums.cc
-     per back end must route this through print_gen_include at the same time:
-     its two exported tables, unspec_strings and unspecv_strings, are read by
-     the middle end, so a stale insn-constants.h here mis-numbers them
-     silently.  */
-  puts ("#include \"insn-constants.h\"\n");
+  /* Suffixed with GEN_HDR_SUFFIX: genenums is now built once per back end
+     (it is in the parts list in gen-multi-target-md.awk), so this must name
+     THIS back end's insn-constants-<base>.h.  Its two exported tables,
+     unspec_strings and unspecv_strings, are read by the middle end, so a
+     stale insn-constants.h here mis-numbers them silently -- the reason the
+     note this replaces asked for print_gen_include rather than a literal.  */
+  print_gen_include (stdout, "insn-constants");
+  putc ('\n', stdout);
 
   reader.traverse_enum_types (print_enum_type, 0);
 

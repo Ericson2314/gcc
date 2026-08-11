@@ -207,6 +207,13 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "min-insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
   printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) -m > tmp-min-modes-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-min-modes-%s.cc $@\n\n", cpu;
+  # The full mode tables, as opposed to the -m subset the generators link
+  # against.  This is a cc1 object, not a build/ one: it carries mode_size,
+  # mode_precision and the rest for THIS back end's numbering, so it has to
+  # exist once per back end for the same reason insn-modes-<base>.h does.
+  printf "insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
+  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) > tmp-modes-%s.cc\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-%s.cc $@\n\n", cpu;
 
   # Everything the generators link against sees the mode enum through
   # coretypes.h, so it all has to be compiled against this back end's modes,
@@ -245,7 +252,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # it *writes* names four back-end headers, and which four is settled when
   # genconditions itself is compiled (see the GENCONDMD_* defines below).
   n = split("preds flags conditions codes config attr attr-common emit recog " \
-	    "output extract peep automata target-def attrtab opinit",
+	    "output extract peep automata target-def attrtab opinit enums",
 	    parts, " ");
   for (i = 1; i <= n; i++) {
     printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
@@ -307,8 +314,21 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # output depends on the .md and not on which tm.h they were compiled with.
   # Intersecting each generator's identifiers with the 689 macros tm-i386.h
   # defines: gencodes, genconfig, genattr, genattr-common, genattrtab, genemit,
-  # genopinit, genextract, genpeep, genautomata, gentarget-def, genflags and
-  # genconditions reference NONE of them.  Only genpreds (SWITCHABLE_TARGET,
+  # genopinit, genextract, genpeep, genautomata, gentarget-def, genflags,
+  # genenums and genconditions reference NONE of them.
+  #
+  # genenums was audited separately when it joined this list: it greps 0 for
+  # TARGET_ and HAVE_, and its output is a function of the md files alone.  It
+  # DOES now include tm.h and rtl.h, but only because gensupport.h needs them
+  # (rtl.h wants FIRST_PSEUDO_REGISTER) -- the same "needs *a* tm.h, but that
+  # reaches a structure size rather than the output" case as the rest.  What it
+  # genuinely needs from gensupport is print_gen_include: genenums NAMES
+  # insn-constants.h in what it writes, so it must carry GEN_HDR_SUFFIX even
+  # though it reads no target macro.  Naming a generated header and reading a
+  # target macro are two independent reasons to be per back end, and genenums
+  # is the one generator that has the first without the second.
+  #
+  # Only genpreds (SWITCHABLE_TARGET,
   # TARGET_MEM_CONSTRAINT, TARGET_SUPPORTS_WIDE_INT) and genoutput
   # (TARGET_MEM_CONSTRAINT) do, and those two are exactly the ones whose rules
   # already say they want this back end's tm.h.  (genrecog matches only
@@ -336,7 +356,13 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # generator that genuinely reads a target macro (TARGET_MEM_CONSTRAINT), so
   # being compiled against this back end's own tm.h is load-bearing for it
   # rather than incidental.
-  n = split("output extract peep automata", parts, " ");
+  # NOTE for the object-naming step (S4): insn-enums-<base>.cc defines
+  # unspec_strings and unspecv_strings as PLAIN globals, so once two back
+  # ends' insn-enums objects are both in OBJS they collide at link -- the same
+  # shape as targetm, and the third thing that will need a per-base symbol
+  # plus a selector.  Generating the files is safe today only because nothing
+  # links them yet.
+  n = split("output extract peep automata enums", parts, " ");
   for (i = 1; i <= n; i++) {
     printf "insn-%s-%s.cc: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu, parts[i], cpu;
@@ -422,6 +448,16 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) -c $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s > tmp-constrs-%s.h\n", md, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-constrs-%s.h $@\n\n", cpu;
+
+  # The predicate FUNCTIONS, as against the two headers above.  Fed the same
+  # inputs as tm-preds-<base>.h and NOT insn-conditions-<base>.md, matching
+  # both the two rules above it and upstream's s-preds: genpreds -h/-c/<none>
+  # must all see one input set, or the bodies compiled here would not be the
+  # ones the prototypes above declare.
+  printf "insn-preds-%s.cc: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
+  printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s > tmp-preds-%s.cc\n", md, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-preds-%s.cc $@\n\n", cpu;
 
   # tm_p_file names headers relative to gcc/config; tm-preds comes last, the
   # way configure builds tm_p_include_list for the single-target case.

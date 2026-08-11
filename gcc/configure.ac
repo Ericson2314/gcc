@@ -2825,7 +2825,18 @@ all_outputs='Makefile'
 # List of language configure and makefile fragments.
 all_lang_configurefrags=
 all_lang_makefrags=
-# Additional files for gengtype
+# Additional files for gengtype.
+#
+# The PRIMARY target's, still.  gcc_gen_target_manifest (called above) leaves
+# the union over every configured back end in ${gcc_all_target_gtfiles}, and
+# gengtype could make one pass over it -- its outputs are named after the
+# source scanned, so gt-arm.h and gt-i386.h cannot collide.  What stops it is
+# the LINK, not gengtype: every file scanned gets a ggc root table entry, so
+# scanning a back end whose objects are not yet in OBJS leaves
+# `gt_ggc_r_gt_arm_mve_builtins_h' undefined.  Measured, not assumed; see the
+# note at @all_gtfiles@ in Makefile.in.  Switch this to
+# ${gcc_all_target_gtfiles} in the same change that puts the back-end objects
+# in OBJS.
 all_gtfiles="$target_gtfiles"
 
 # These are the languages that are set in --enable-languages,

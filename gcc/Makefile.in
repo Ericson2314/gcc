@@ -3828,6 +3828,20 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/calls.cc \
   $(srcdir)/analyzer/analyzer-language.cc \
   @all_gtfiles@
+# STILL THE PRIMARY TARGET'S FILES ONLY, and that is an ordering constraint,
+# not an oversight.  gen-target-manifest.sh already computes the union over
+# every configured back end (gcc_all_target_gtfiles, which also folds in each
+# back end's $(out_file) -- config.gcc's target_gtfiles lists only the extras).
+# Substituting it here was tried and MEASURED to break the link:
+#
+#   ld: c/c-lang.o:(.rodata+0x280): undefined reference to
+#	`gt_ggc_r_gt_arm_mve_builtins_h'
+#
+# gengtype emits a ggc root table entry for every file it scans, so scanning
+# arm-mve-builtins.cc declares a root that only arm-mve-builtins.o defines --
+# and that object is not in OBJS yet.  The union must therefore land WITH the
+# objects (S6), not before them.  The data is recorded now so that step is
+# wiring rather than re-derivation.
 
 # Compute the list of GT header files from the corresponding C sources,
 # possibly nested within config or language subdirectories.  Match gengtype's
@@ -3957,7 +3971,8 @@ build/genconstants.o : genconstants.cc $(BCONFIG_H) $(SYSTEM_H)		\
 build/genemit.o : genemit.cc $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H) internal-fn.def
 build/genenums.o : genenums.cc $(BCONFIG_H) $(SYSTEM_H)			\
-  $(CORETYPES_H) errors.h $(READ_MD_H)
+  $(CORETYPES_H) $(GTM_H) $(RTL_BASE_H) errors.h $(READ_MD_H)		\
+  $(GENSUPPORT_H)
 build/genextract.o : genextract.cc $(RTL_BASE_H) $(BCONFIG_H)		\
   $(SYSTEM_H) $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H)
 build/genflags.o : genflags.cc $(RTL_BASE_H) $(OBSTACK_H) $(BCONFIG_H)	\
@@ -4038,12 +4053,19 @@ build/gencfn-macros.o : gencfn-macros.cc $(BCONFIG_H) $(SYSTEM_H)	\
 # Example: riscv/t-riscv
 
 # All these programs use the RTL reader ($(BUILD_RTL)).
+# `enums' is here for its LINK, not its reader: genenums.cc uses only the md
+# reader, but it now calls print_gen_include (gensupport.cc) so that the
+# insn-constants.h its output names carries GEN_HDR_SUFFIX.  build/gensupport.o
+# is in $(BUILD_RTL) and nowhere smaller, so the alternative to this line is a
+# second copy of the GEN_HDR_SUFFIX default in genenums.cc -- one name, two
+# authorities, which is the failure this suffix exists to prevent.
 genprogrtl += attr attr-common attrtab automata codes conditions config emit \
-	     extract flags mddump opinit output peep preds recog target-def
+	     enums extract flags mddump opinit output peep preds recog \
+	     target-def
 $(genprogrtl:%=build/gen%$(build_exeext)): $(BUILD_RTL)
 
 # All these programs use the MD reader ($(BUILD_MD)).
-genprogmd += $(genprogrtl) mddeps constants enums
+genprogmd += $(genprogrtl) mddeps constants
 $(genprogmd:%=build/gen%$(build_exeext)): $(BUILD_MD)
 
 # All these programs need to report errors.
