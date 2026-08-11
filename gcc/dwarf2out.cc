@@ -4398,25 +4398,6 @@ dwarf_attr_name (unsigned int attr)
 {
   const char *name;
 
-  switch (attr)
-    {
-#if VMS_DEBUGGING_INFO
-    case DW_AT_HP_prologue:
-      return "DW_AT_HP_prologue";
-#else
-    case DW_AT_MIPS_loop_unroll_factor:
-      return "DW_AT_MIPS_loop_unroll_factor";
-#endif
-
-#if VMS_DEBUGGING_INFO
-    case DW_AT_HP_epilogue:
-      return "DW_AT_HP_epilogue";
-#else
-    case DW_AT_MIPS_stride:
-      return "DW_AT_MIPS_stride";
-#endif
-    }
-
   name = get_DW_AT_name (attr);
 
   if (name != NULL)
