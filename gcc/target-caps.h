@@ -312,6 +312,14 @@ struct target_caps
      capability was missing.  */
   bool gas_weakref;
 
+  /* Assembler has working `.subsection -1' / `.previous', so a jump table can
+     be parked at the start of the current section.  Was
+     HAVE_GAS_SUBSECTION_ORDERING.  sparc uses it twice: to bracket address
+     vectors, and -- the only case in this group where a capability reaches code
+     GENERATION rather than an output spelling -- to pick CASE_VECTOR_MODE,
+     since without it a pic jump table needs DImode to avoid a sign extend.  */
+  bool gas_subsection_ordering;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

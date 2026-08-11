@@ -226,12 +226,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define INIT_SECTION_ASM_OP	"\t.section\t.init"
 #define FINI_SECTION_ASM_OP	"\t.section\t.fini"
 
-/* Output assembly directive to move to the beginning of current section.  */
-#ifdef HAVE_GAS_SUBSECTION_ORDERING
-# define ASM_SECTION_START_OP	"\t.subsection\t-1"
-# define ASM_OUTPUT_SECTION_START(FILE)	\
-  fprintf ((FILE), "%s\n", ASM_SECTION_START_OP)
-#endif
+/* ASM_SECTION_START_OP and ASM_OUTPUT_SECTION_START were defined here, under
+   `#ifdef HAVE_GAS_SUBSECTION_ORDERING', to output a directive moving to the
+   beginning of the current section.  Nothing in the tree ever read either one
+   -- not gcc, not a target, not a generator -- so they are gone rather than
+   converted.  sparc.h has the live users of `.subsection -1'.  */
 
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
 

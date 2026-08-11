@@ -10463,7 +10463,10 @@ sparc_output_addr_vec (rtx vec)
   int idx, vlen = XVECLEN (body, 0);
 
 #ifdef ASM_OUTPUT_ADDR_VEC_START
-  ASM_OUTPUT_ADDR_VEC_START (asm_out_file);
+  /* targ_caps.gas_subsection_ordering was the `#ifdef HAVE_GAS_SUBSECTION_ORDERING'
+     that decided whether this macro existed at all.  */
+  if (targ_caps.gas_subsection_ordering)
+    ASM_OUTPUT_ADDR_VEC_START (asm_out_file);
 #endif
 
 #ifdef ASM_OUTPUT_CASE_LABEL
@@ -10480,7 +10483,8 @@ sparc_output_addr_vec (rtx vec)
     }
 
 #ifdef ASM_OUTPUT_ADDR_VEC_END
-  ASM_OUTPUT_ADDR_VEC_END (asm_out_file);
+  if (targ_caps.gas_subsection_ordering)
+    ASM_OUTPUT_ADDR_VEC_END (asm_out_file);
 #endif
 }
 
@@ -10492,7 +10496,10 @@ sparc_output_addr_diff_vec (rtx vec)
   int idx, vlen = XVECLEN (body, 1);
 
 #ifdef ASM_OUTPUT_ADDR_VEC_START
-  ASM_OUTPUT_ADDR_VEC_START (asm_out_file);
+  /* targ_caps.gas_subsection_ordering was the `#ifdef HAVE_GAS_SUBSECTION_ORDERING'
+     that decided whether this macro existed at all.  */
+  if (targ_caps.gas_subsection_ordering)
+    ASM_OUTPUT_ADDR_VEC_START (asm_out_file);
 #endif
 
 #ifdef ASM_OUTPUT_CASE_LABEL
@@ -10512,7 +10519,8 @@ sparc_output_addr_diff_vec (rtx vec)
     }
 
 #ifdef ASM_OUTPUT_ADDR_VEC_END
-  ASM_OUTPUT_ADDR_VEC_END (asm_out_file);
+  if (targ_caps.gas_subsection_ordering)
+    ASM_OUTPUT_ADDR_VEC_END (asm_out_file);
 #endif
 }
 

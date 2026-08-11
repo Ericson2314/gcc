@@ -1359,15 +1359,17 @@ do {									   \
    for the index in the tablejump instruction.  */
 /* If we ever implement any of the full models (such as CM_FULLANY),
    this has to be DImode in that case */
-#ifdef HAVE_GAS_SUBSECTION_ORDERING
-#define CASE_VECTOR_MODE \
-(! TARGET_PTR64 ? SImode : flag_pic ? SImode : TARGET_CM_MEDLOW ? SImode : DImode)
-#else
-/* If assembler does not have working .subsection -1, we use DImode for pic, as otherwise
-   we have to sign extend which slows things down.  */
-#define CASE_VECTOR_MODE \
-(! TARGET_PTR64 ? SImode : flag_pic ? DImode : TARGET_CM_MEDLOW ? SImode : DImode)
-#endif
+/* If the assembler does not have working `.subsection -1', we use DImode for
+   pic, as otherwise we have to sign extend, which slows things down.
+
+   Both arms of the old `#ifdef HAVE_GAS_SUBSECTION_ORDERING' were already
+   run-time C expressions differing in exactly one place -- the flag_pic arm --
+   so the capability simply joins them there.  */
+#define CASE_VECTOR_MODE						\
+  (! TARGET_PTR64 ? SImode						\
+   : flag_pic ? (targ_caps.gas_subsection_ordering ? SImode : DImode)	\
+   : TARGET_CM_MEDLOW ? SImode						\
+   : DImode)
 
 /* Define this as 1 if `char' should by default be signed; else as 0.  */
 #define DEFAULT_SIGNED_CHAR 1
@@ -1551,15 +1553,15 @@ do {									\
    relative and absolute).  If .subsection -1 works, we put case-vectors
    at the beginning of the current section.  */
 
-#ifdef HAVE_GAS_SUBSECTION_ORDERING
-
+/* Defined unconditionally; sparc.cc consults targ_caps.gas_subsection_ordering
+   before emitting either, so an assembler without working `.subsection -1'
+   simply gets neither -- which is what the old `#ifdef' arranged by leaving the
+   macros undefined.  */
 #define ASM_OUTPUT_ADDR_VEC_START(FILE)					\
   fprintf(FILE, "\t.subsection\t-1\n")
 
 #define ASM_OUTPUT_ADDR_VEC_END(FILE)					\
   fprintf(FILE, "\t.previous\n")
-
-#endif
 
 /* This is how to output an assembler line
    that says to advance the location counter

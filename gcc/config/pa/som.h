@@ -315,7 +315,11 @@ do {						\
    be used to remove dead procedures.  Thus, support for named sections
    is not needed and in previous testing caused problems with various
    HP tools.  */
-#if defined HAVE_GAS_WEAK
+/* Defined unconditionally: SOM has a weak-symbol spelling, which is what
+   SUPPORTS_WEAK asks.  Whether the assembler accepts it is
+   targ_caps.gas_weak, ANDed into TARGET_SUPPORTS_WEAK above -- and note
+   TARGET_GAS is already a term there, so HP's assembler answers false
+   regardless.  Was `#if defined HAVE_GAS_WEAK'.  */
 #define ASM_WEAKEN_DECL(FILE,DECL,NAME,VALUE) \
   do									\
     {									\
@@ -345,7 +349,6 @@ do {						\
 	}								\
     }									\
   while (0)
-#endif
 
 /* Although gas accepts .weakref, it doesn't provide the correct symbol
    type for function references.  For now, we use ASM_WEAKEN_DECL instead.
