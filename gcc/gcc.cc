@@ -453,11 +453,6 @@ static int execute (void);
 static void alloc_args (void);
 static void clear_args (void);
 static void fatal_signal (int);
-#if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)
-static void init_gcc_specs (struct obstack *, const char *, const char *,
-			    const char *,
-			    const char *);
-#endif
 #if defined(HAVE_TARGET_OBJECT_SUFFIX) || defined(HAVE_TARGET_EXECUTABLE_SUFFIX)
 static const char *convert_filename (const char *, int, int);
 #endif
@@ -802,17 +797,19 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
 #define LIB_SPEC "%{!shared:%{g*:-lg} %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"
 #endif
 
-/* When using -fsplit-stack we need to wrap pthread_create, in order
-   to initialize the stack guard.  We always use wrapping, rather than
-   shared library ordering, and we keep the wrapper function in
-   libgcc.  This is not yet a real spec, though it could become one;
-   it is currently just stuffed into LINK_SPEC.  FIXME: This wrapping
-   only works with GNU ld and gold.  */
-#ifdef HAVE_GOLD_NON_DEFAULT_SPLIT_STACK
-#define STACK_SPLIT_SPEC " %{fsplit-stack: -fuse-ld=gold --wrap=pthread_create}"
-#else
-#define STACK_SPLIT_SPEC " %{fsplit-stack: --wrap=pthread_create}"
-#endif
+/* When using -fsplit-stack we need to wrap pthread_create, in order to
+   initialize the stack guard.  We always use wrapping, rather than shared
+   library ordering, and we keep the wrapper function in libgcc.  This wrapping
+   only works with GNU ld and gold.
+
+   It IS a real spec now -- `link_split_stack', see the default below.  The
+   choice used to be a `#ifdef HAVE_GOLD_NON_DEFAULT_SPLIT_STACK' around this
+   macro, and that probe asked whether the default linker is NOT gold while a
+   `ld.gold' with split-stack support sits beside it (and, on powerpc64, is new
+   enough).  That is a question about the installed linker, so target-specs
+   asks it per target and writes the answer here.  The probe was dropped in the
+   configure sweep with nothing to replace it, so the gold arm has been
+   unreachable on every target since; this reconnects it.  */
 
 /* How this linker spells "link the following statically" and "back to
    dynamic".  These used to be LD_STATIC_OPTION/LD_DYNAMIC_OPTION, AC_SUBST'd
@@ -1113,7 +1110,7 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
     %{fopenacc|fopenmp|%:gt(%{ftree-parallelize-loops=*:%*} 1):\
 	%:include(libgomp.spec)%(link_gomp)}\
     %{fgnu-tm:%:include(libitm.spec)%(link_itm)}\
-    " STACK_SPLIT_SPEC "\
+     %(link_split_stack)\
     %{fprofile-arcs|fcondition-coverage|fpath-coverage|fprofile-generate*|coverage:-lgcov} " SANITIZER_SPEC " \
     %{!nostdlib:%{!r:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}}}\
     %{!nostdlib:%{!r:%{!nostartfiles:%E}}} %{T*}  \n%(post_link) }}}}}}"
@@ -1268,6 +1265,36 @@ static const char *link_eh = "";
    unconditionally-false guard this replaces already produced.  */
 static const char *link_libatomic = "";
 
+/* What -fsplit-stack has to add to the link line.  The wrapper itself is
+   needed on every linker that can do split stack at all; the `-fuse-ld=gold'
+   in front of it is needed only when the DEFAULT linker cannot, and a usable
+   gold sits beside it.  That was HAVE_GOLD_NON_DEFAULT_SPLIT_STACK, a probe of
+   the installed linker, so target-specs asks it and overrides this default for
+   the targets where the answer is yes.  The default is the `#else' arm
+   verbatim, so an unprobed driver behaves exactly as before.  */
+static const char *link_split_stack
+  = "%{fsplit-stack: --wrap=pthread_create}";
+
+/* Which libgcc libraries to name once LIBGCC_SPEC's `-lgcc' has been reached:
+   the whole shape that ENABLE_SHARED_LIBGCC used to select between.
+
+   ENABLE_SHARED_LIBGCC came from `SHLIB = true' in config/t-slibgcc, reaching
+   gcc/Makefile.in's DRIVER_DEFINES through `-include $(tmake_file)' -- and
+   `tmake_file' is the PRIMARY target's.  gcc.cc is compiled once, so whichever
+   target happened to be primary decided the libgcc link shape for every target
+   the compiler serves, with no diagnostic.  It is per-target data, recorded per
+   target by the manifest (`tmake_file_present'), and it selects SPEC TEXT
+   rather than a runtime expression, so it travels as a named spec.
+
+   The default is the plain `-lgcc' that a `#undef ENABLE_SHARED_LIBGCC' build
+   emitted, i.e. no rewriting at all; target-specs writes the shared shape for a
+   target whose tmake_file has t-slibgcc.  The two names exist because the
+   rewrite has two call sites naming different libraries -- `-lgcc' and
+   `libgcc.a%s' -- and folding them into one name would give one of them the
+   other's libraries.  */
+static const char *libgcc_variants = "-lgcc";
+static const char *libgcc_file_variants = "libgcc.a%s";
+
 /* The linker's spellings for as-needed linking, written by target-specs from
    what it found this linker to accept, and empty when it found nothing.
    target-specs has been emitting both of these for some time; the driver had
@@ -1332,7 +1359,8 @@ static const char *cplusplus_cpp = "%(cpp)";
 
 /* Which libgcc to link once -static and -static-libgcc are out of the way:
    the whole body that USE_LD_AS_NEEDED, its ldscript variant and LINK_EH_SPEC
-   used to vary between (see init_gcc_specs).  The default is the conservative
+   used to vary between.  Referenced from `libgcc_variants', which is the whole
+   string this is the non-static arm of.  The default is the conservative
    body, which is what the driver has been emitting on every target since it
    stopped seeing tm.h.  gen-target-specs overrides it for the targets whose
    headers ask for something else.  */
@@ -1808,6 +1836,9 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("lto_plugin",		&lto_plugin_spec),
   INIT_STATIC_SPEC ("cplusplus_cpp",		&cplusplus_cpp),
   INIT_STATIC_SPEC ("libgcc_nonstatic",	&libgcc_nonstatic),
+  INIT_STATIC_SPEC ("libgcc_variants",		&libgcc_variants),
+  INIT_STATIC_SPEC ("libgcc_file_variants",	&libgcc_file_variants),
+  INIT_STATIC_SPEC ("link_split_stack",		&link_split_stack),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
@@ -1895,16 +1926,49 @@ static const struct spec_function static_spec_functions[] =
 
 static int processing_spec_function;
 
-/* Add appropriate libgcc specs to OBSTACK, taking into account
-   various permutations of -shared-libgcc, -shared, and such.  */
+/* The libgcc shape used to be built here by init_gcc_specs (), behind
+   `#if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)'.  Both
+   halves of that guard were broken, in opposite ways.
 
-#if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)
+   ENABLE_SHARED_LIBGCC was defined by gcc/Makefile.in's DRIVER_DEFINES when
+   $(SHLIB) was set, and $(SHLIB) comes from config/t-slibgcc, which arrives
+   through `-include $(tmake_file)' -- the PRIMARY target's tmake_file.  This
+   file is compiled once for all targets, so whichever target happened to be
+   primary decided, silently and with no diagnostic, whether every other target
+   links -lgcc_s or -lgcc/-lgcc_eh.  24 arms of config.gcc name t-slibgcc and
+   the rest do not: a bare-metal primary gave every target the static shape and
+   an aarch64-linux primary gave every target the shared one.
 
-/* Build the libgcc spec: which of -lgcc / -lgcc_eh / -lgcc_s to link, for each
-   combination of -static, -static-libgcc, -static-pie, -shared and
-   -shared-libgcc.
+   REAL_LIBGCC_SPEC comes from tm.h, which this file no longer includes, so
+   that half was vacuously TRUE on every target.  Its intent -- "a target that
+   spells its whole libgcc spec itself is not rewritten" -- survives without a
+   guard, because such a target's spec file overrides `*libgcc' wholesale and
+   whatever this rewrite produced is then discarded.  See the residue note.
 
-   This used to be three different strings chosen by #if between
+   So the rewrite below is unconditional and the CHOICE travels as spec text:
+   each of its two sites substitutes a named spec whose driver default is
+   exactly what a build WITHOUT ENABLE_SHARED_LIBGCC emitted, i.e. no rewriting
+   at all, and target-specs writes the shared shape for a target whose manifest
+   records t-slibgcc.  Bridging the macro without converting the consumer in the
+   same change would have made the `#ifdef' vacuously true and the shared shape
+   unconditional on all 188 targets, so the two are one change.
+
+   RESIDUE, named rather than left implicit: REAL_LIBGCC_SPEC has no carrier.
+   config/darwin.h, config/i386/cygwin.h and config/i386/mingw-w64.h define it,
+   and gen-target-specs.cc emits only LIBGCC_SPEC, so those three get the
+   driver's generic libgcc spec either way.  That strand predates this change --
+   but it is the reason the second half of the guard could be dropped without a
+   replacement, so it is written down here rather than assumed.  Its fix is one
+   `#ifdef' in gen-target-specs.cc, which this change does not own.
+
+   The shapes themselves, for whoever writes them: -static and -static-libgcc
+   always link the static pair, and EVERYTHING below that differs between the
+   shared and non-shared answers, including where -static-pie belongs.  That is
+   why `libgcc_nonstatic' covers the whole non-static body rather than one arm
+   of it, and why `libgcc_variants' covers the whole rewritten string rather
+   than just the `-lgcc' token.
+
+   The removed init_gcc_specs () chose between three strings on #if between
    USE_LD_AS_NEEDED, USE_LD_AS_NEEDED_LDSCRIPT and neither, with a fourth
    variation on #ifdef LINK_EH_SPEC.  All four macros come from tm.h or from
    probes that no longer run, so every one of the conditionals was
@@ -1912,47 +1976,11 @@ static int processing_spec_function;
    shape -- statically linked -lgcc_eh, on every target, where a stock build
    emits the shared unwinder.
 
-   What they have in common is only the outermost test: -static and
-   -static-libgcc always link the static pair.  EVERYTHING below that differs,
-   including where -static-pie belongs -- the as-needed shape groups it with
-   -static, the conservative one lets it fall through to the -shared-libgcc
-   arm, and those two give different answers for `-static-pie -shared-libgcc'.
-   (That was measured, not reasoned: an earlier version of this function folded
-   static-pie into the static group on the assumption that it reached the same
-   place by a longer route, and the option-by-option comparison against the
-   previous driver caught the one row where it does not.)
-
-   So the named spec covers the whole non-static body rather than one arm of
-   it, and the shapes stay whole instead of being interleaved.  The default is
-   the conservative body verbatim, so a driver with no spec file behaves
-   exactly as it did.  gen-target-specs overrides `libgcc_nonstatic' for a
-   target whose headers set USE_LD_AS_NEEDED, using the %(link_as_needed)
-   spellings target-specs probed from the actual linker.  */
-
-static void
-init_gcc_specs (struct obstack *obstack, const char *shared_name,
-		const char *static_name, const char *eh_name,
-		const char *nonstatic_payload)
-{
-  char *buf;
-  char *dflt = NULL;
-
-  if (nonstatic_payload == NULL)
-    nonstatic_payload = dflt
-      = concat ("%{!shared:"
-		"%{!shared-libgcc:", static_name, " ", eh_name, "}"
-		"%{shared-libgcc:", shared_name, " ", static_name, "}"
-		"}"
-		"%{shared:", shared_name, "}", NULL);
-
-  buf = concat ("%{static|static-libgcc:", static_name, " ", eh_name, "}"
-		"%{!static:%{!static-libgcc:", nonstatic_payload, "}}", NULL);
-
-  obstack_grow (obstack, buf, strlen (buf));
-  free (buf);
-  free (dflt);
-}
-#endif /* ENABLE_SHARED_LIBGCC */
+   That -static-pie difference was measured, not reasoned: an earlier version
+   of init_gcc_specs () folded static-pie into the static group on the
+   assumption that it reached the same place by a longer route, and the
+   option-by-option comparison against the previous driver caught the one row
+   where it does not.  Keep the shapes whole; do not interleave them.  */
 
 /* Initialize the specs lookup routines.  */
 
@@ -1993,7 +2021,6 @@ init_spec (void)
       next = sl;
     }
 
-#if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)
   /* ??? If neither -shared-libgcc nor --static-libgcc was
      seen, then we should be making an educated guess.  Some proposed
      heuristics for ELF include:
@@ -2036,23 +2063,21 @@ init_spec (void)
 	       configure.ac -- so all three were dead.  Removed rather than
 	       carried, since a guard that cannot be true hides the fact that
 	       nothing selects it.  */
-	    init_gcc_specs (&obstack, "-lgcc_s", "-lgcc", "-lgcc_eh",
-			    "%(libgcc_nonstatic)");
-
-	    p += 5;
+	    obstack_grow (&obstack, "%(libgcc_variants)",
+			  strlen ("%(libgcc_variants)"));
+	    p += strlen ("-lgcc");
 	    in_sep = 0;
 	  }
 	else if (in_sep && *p == 'l' && startswith (p, "libgcc.a%s"))
 	  {
 	    /* Ug.  We don't know shared library extensions.  Hope that
 	       systems that use this form don't do shared libraries.  */
-	    /* No named spec for this one: `libgcc_nonstatic' names the -lgcc form's
-	       libraries, and this call site's are different.  The targets that
-	       reach it link libgcc by filename and none of them sets
-	       USE_LD_AS_NEEDED, so NULL takes the built-in default.  */
-	    init_gcc_specs (&obstack, "-lgcc_s", "libgcc.a%s", "libgcc_eh.a%s",
-			    NULL);
-	    p += 10;
+	    /* Its own name, not `libgcc_variants': this site's libraries are
+	       named by FILE (libgcc.a%s, libgcc_eh.a%s) and the other's by -l,
+	       so one name for both would hand one of them the other's.  */
+	    obstack_grow (&obstack, "%(libgcc_file_variants)",
+			  strlen ("%(libgcc_file_variants)"));
+	    p += strlen ("libgcc.a%s");
 	    in_sep = 0;
 	  }
 	else
@@ -2066,7 +2091,6 @@ init_spec (void)
     obstack_1grow (&obstack, '\0');
     libgcc_spec = XOBFINISH (&obstack, const char *);
   }
-#endif
 #ifdef USE_AS_TRADITIONAL_FORMAT
   /* Prepend "--traditional-format" to whatever asm_spec we had before.  */
   {

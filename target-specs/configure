@@ -649,6 +649,7 @@ with_cpu_type
 with_decimal_float
 with_decimal_bid_format
 with_libatomic
+with_shared_libgcc
 with_glibc_version
 with_s390_excess_float_precision
 with_specs_file
@@ -1298,6 +1299,9 @@ Optional Packages:
                           target ABI encodes decimal float as BID rather than
                           DPD
   --with-libatomic=yes|no this build provides a libatomic for the target
+  --with-shared-libgcc=yes|no
+                          this target has a shared libgcc (config.gcc gave it
+                          t-slibgcc)
   --with-glibc-version=M.N
                           target runs glibc version M.N or later
   --with-s390-excess-float-precision=0|1
@@ -2030,6 +2034,14 @@ else
 fi
 
 
+# Check whether --with-shared-libgcc was given.
+if test "${with_shared_libgcc+set}" = set; then :
+  withval=$with_shared_libgcc; spec_shared_libgcc=$withval
+else
+  spec_shared_libgcc=no
+fi
+
+
 # Check whether --with-glibc-version was given.
 if test "${with_glibc_version+set}" = set; then :
   withval=$with_glibc_version; spec_glibc_version=$withval
@@ -2487,6 +2499,38 @@ fi
 rm -f conftest.s conftest.o conftest2.o conftest.at
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_at_file" >&5
 $as_echo "$gcc_cv_ld_at_file" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for a non-default gold with split-stack support" >&5
+$as_echo_n "checking for a non-default gold with split-stack support... " >&6; }
+gcc_cv_ld_gold_split_stack=no
+ts_ld_is_gold=no
+if "$gcc_cv_ld" --version 2>/dev/null | sed 1q | grep "GNU gold" > /dev/null; then
+  ts_ld_is_gold=yes
+fi
+ts_ld_gold=
+if test x"$ts_ld_is_gold" = xno; then
+  if test -x "${gcc_cv_ld}.gold"; then
+    ts_ld_gold="${gcc_cv_ld}.gold"
+  elif command -v "${gcc_cv_ld}.gold" > /dev/null 2>&1; then
+    ts_ld_gold=`command -v "${gcc_cv_ld}.gold"`
+  fi
+fi
+if test x"$ts_ld_gold" != x; then
+  if "$ts_ld_gold" --help 2>/dev/null | grep split-stack-adjust-size > /dev/null; then
+    case $target in
+      powerpc64*-*-*)
+        ts_gold_vers=`"$ts_ld_gold" --version 2>/dev/null | sed 1q | sed -n \
+          -e 's,^[^)]*[ 	]\([0-9][0-9]*\.[0-9][0-9]*[^)]*\)) .*$,\1,p'`
+        case "$ts_gold_vers" in
+          2.25.[1-9]* | 2.2[6-9][.0-9]* | 2.[3-9][.0-9]* | [3-9].[.0-9]*)
+            gcc_cv_ld_gold_split_stack=yes ;;
+        esac
+        ;;
+    esac
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_gold_split_stack" >&5
+$as_echo "$gcc_cv_ld_gold_split_stack" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -z now" >&5
 $as_echo_n "checking linker for -z now... " >&6; }
@@ -4366,6 +4410,20 @@ else
           link_libatomic=
 fi
 
+if test x"$gcc_cv_ld_gold_split_stack" = xyes; then
+  link_split_stack='%{fsplit-stack: -fuse-ld=gold --wrap=pthread_create}'
+else
+  link_split_stack='%{fsplit-stack: --wrap=pthread_create}'
+fi
+
+if test x"$spec_shared_libgcc" = xyes; then
+  libgcc_variants='%{static|static-libgcc:-lgcc -lgcc_eh}%{!static:%{!static-libgcc:%(libgcc_nonstatic)}}'
+  libgcc_file_variants='%{static|static-libgcc:libgcc.a%s libgcc_eh.a%s}%{!static:%{!static-libgcc:%{!shared:%{!shared-libgcc:libgcc.a%s libgcc_eh.a%s}%{shared-libgcc:-lgcc_s libgcc.a%s}}%{shared:-lgcc_s}}}'
+else
+  libgcc_variants='-lgcc'
+  libgcc_file_variants='libgcc.a%s'
+fi
+
 ts_plugin_body='-plugin %(linker_plugin_file) \
     -plugin-opt=%(lto_wrapper) \
     -plugin-opt=-fresolution=%u.res \
@@ -4423,6 +4481,24 @@ ${gcc_cv_ld_dynamic_option}
 *link_libatomic:
 ${link_libatomic}
 
+# What -fsplit-stack adds to the link line; the -fuse-ld=gold arm is taken only
+# when this linker cannot do split stack itself and a usable gold sits beside
+# it.  This is HAVE_GOLD_NON_DEFAULT_SPLIT_STACK.
+*link_split_stack:
+${link_split_stack}
+
+# Which libgcc libraries to name, at each of the driver's two rewrite sites.
+# This is ENABLE_SHARED_LIBGCC, which used to be decided once, by the primary
+# target's tmake_file, for every target the compiler serves.  The two names are
+# NOT interchangeable: the first spells its libraries with -l, the second by
+# filename.  Written from --with-shared-libgcc, i.e. from this target's own
+# tmake_file_present in the manifest.
+*libgcc_variants:
+${libgcc_variants}
+
+*libgcc_file_variants:
+${libgcc_file_variants}
+
 *link_plugin:
 ${link_plugin}
 
@@ -4476,6 +4552,10 @@ $as_echo "$as_me:   ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}" >&6;}
 $as_echo "$as_me:   ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&5
 $as_echo "$as_me:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   non-default gold ......... ${gcc_cv_ld_gold_split_stack}" >&5
+$as_echo "$as_me:   non-default gold ......... ${gcc_cv_ld_gold_split_stack}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   shared libgcc ............ ${spec_shared_libgcc}" >&5
+$as_echo "$as_me:   shared libgcc ............ ${spec_shared_libgcc}" >&6;}
 
 fi
 

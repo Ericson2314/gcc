@@ -3059,11 +3059,22 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    tla=no; \
 	    if test -n "$(libatomic_target)" \
 	       && test "$$t" = "$(libatomic_target)"; then tla=yes; fi; \
+	    tsl=`awk -v t=$$t '$$1=="target"{s=($$2==t)} \
+	           s&&$$1=="tmake_file_present"{r="no"; \
+	             for(i=2;i<=NF;i++) if($$i=="t-slibgcc") r="yes"; \
+	             print r; exit}' multi-target.manifest`; \
+	    if test x"$$tsl" = x; then \
+	      echo "target-specs: $$t has no tmake_file_present line in" \
+	           "multi-target.manifest; regenerate it.  Defaulting here would" \
+	           "hand this target whichever libgcc link specs another target" \
+	           "wanted, which is the bug this field exists to fix." >&2; \
+	      exit 1; \
+	    fi; \
 	    if (cd tmp-ts-$$t && $$tsdir/configure --with-target=$$t \
 	          --with-as="$$tas" --with-ld="$$tld" \
 	          --with-option-defaults="$$tod" --with-cpu-type="$$tct" \
 	          --with-decimal-float="$$tdf" --with-decimal-bid-format="$$tdb" \
-	          --with-libatomic="$$tla" \
+	          --with-libatomic="$$tla" --with-shared-libgcc="$$tsl" \
 	          --with-specs-file=../specs-$$t > probe.log 2>&1); then \
 	      echo "target-specs: wrote specs-$$t (as=$$tas ld=$$tld)"; \
 	      made=`expr $$made + 1`; \

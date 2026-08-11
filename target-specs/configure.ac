@@ -182,6 +182,26 @@ AC_ARG_WITH([libatomic],
   [AS_HELP_STRING([--with-libatomic=yes|no],
      [this build provides a libatomic for the target])],
   [spec_libatomic=$withval], [spec_libatomic=no])
+dnl Whether this target has a SHARED libgcc.  Not probed, for the same reason as
+dnl libatomic: when these probes run libgcc has not been built, so asking the
+dnl linker for -lgcc_s would answer no on a build that is about to have one.
+dnl
+dnl It is config.gcc data -- 24 of its arms put `t-slibgcc' in tmake_file, and
+dnl that fragment sets SHLIB, which used to reach the driver as
+dnl -DENABLE_SHARED_LIBGCC through gcc/Makefile.in's DRIVER_DEFINES.  The
+dnl tmake_file it reached through was the PRIMARY target's, and gcc.cc is
+dnl compiled once, so one target's answer was applied to all of them silently.
+dnl The manifest records tmake_file_present per target; gcc/Makefile.in reads
+dnl t-slibgcc out of it and passes the answer here, per target.
+dnl
+dnl `no' is the conservative default and it matches the driver's own built-in
+dnl `*libgcc_variants' -- an unprobed driver, and a target this is not passed
+dnl for, keep exactly the plain -lgcc that a build without ENABLE_SHARED_LIBGCC
+dnl emitted.
+AC_ARG_WITH([shared-libgcc],
+  [AS_HELP_STRING([--with-shared-libgcc=yes|no],
+     [this target has a shared libgcc (config.gcc gave it t-slibgcc)])],
+  [spec_shared_libgcc=$withval], [spec_shared_libgcc=no])
 dnl The target's GNU C Library version.  gcc/configure used to grep __GLIBC__
 dnl out of the target sysroot's features.h; this step is the right place to ask,
 dnl because it runs per target after the build and whoever runs it knows what
@@ -690,6 +710,59 @@ if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
 fi
 rm -f conftest.s conftest.o conftest2.o conftest.at
 AC_MSG_RESULT([$gcc_cv_ld_at_file])
+
+dnl Is there a usable gold BESIDE a default linker that is not gold?  This was
+dnl HAVE_GOLD_NON_DEFAULT_SPLIT_STACK in gcc/configure.ac, and gcc.cc used it to
+dnl pick between two spellings of STACK_SPLIT_SPEC -- with -fuse-ld=gold and
+dnl without.  The probe was dropped in the configure sweep with nothing put in
+dnl its place, so the gold arm has been unreachable on every target since.  It
+dnl is a question about the installed linker, hence here.
+dnl
+dnl Three conditions, all of them from the original, kept together because the
+dnl answer is only meaningful as a conjunction:
+dnl   1. the DEFAULT linker is not already gold (if it is, -fuse-ld=gold buys
+dnl      nothing and the original skipped the whole check);
+dnl   2. a `<ld>.gold' exists beside it and understands
+dnl      --split-stack-adjust-size, which is how gold advertises the feature;
+dnl   3. on powerpc64 only, that gold is 2.25.1 or newer, because the complete
+dnl      big- and little-endian split-stack support landed there.
+dnl
+dnl AND THE ANSWER IS `no' EVERYWHERE ELSE, which is the original's behaviour
+dnl and not an oversight in transcription: its `case $target' had a powerpc64
+dnl arm and no default arm, over a variable initialised to `no'.  The comment
+dnl above it read "For platforms other than powerpc64*, enable as appropriate",
+dnl i.e. a TODO nobody did.  Reproduced rather than repaired: widening it would
+dnl start passing -fuse-ld=gold on targets that have never had it, which is a
+dnl behaviour change and belongs in its own change with its own evidence.
+AC_MSG_CHECKING([for a non-default gold with split-stack support])
+gcc_cv_ld_gold_split_stack=no
+ts_ld_is_gold=no
+if "$gcc_cv_ld" --version 2>/dev/null | sed 1q | grep "GNU gold" > /dev/null; then
+  ts_ld_is_gold=yes
+fi
+ts_ld_gold=
+if test x"$ts_ld_is_gold" = xno; then
+  if test -x "${gcc_cv_ld}.gold"; then
+    ts_ld_gold="${gcc_cv_ld}.gold"
+  elif command -v "${gcc_cv_ld}.gold" > /dev/null 2>&1; then
+    ts_ld_gold=`command -v "${gcc_cv_ld}.gold"`
+  fi
+fi
+if test x"$ts_ld_gold" != x; then
+  if "$ts_ld_gold" --help 2>/dev/null | grep split-stack-adjust-size > /dev/null; then
+    case $target in
+      powerpc64*-*-*)
+        ts_gold_vers=`"$ts_ld_gold" --version 2>/dev/null | sed 1q | sed -n \
+          -e 's,^[[^)]]*[[ 	]]\([[0-9]][[0-9]]*\.[[0-9]][[0-9]]*[[^)]]*\)) .*$,\1,p'`
+        case "$ts_gold_vers" in
+          2.25.[[1-9]]* | 2.2[[6-9]][[.0-9]]* | 2.[[3-9]][[.0-9]]* | [[3-9]].[[.0-9]]*)
+            gcc_cv_ld_gold_split_stack=yes ;;
+        esac
+        ;;
+    esac
+  fi
+fi
+AC_MSG_RESULT([$gcc_cv_ld_gold_split_stack])
 
 dnl The original counted this in three levels, the middle one meaning "gold
 dnl 2.20, plugin support only when -fuse-linker-plugin is given".  That
@@ -2287,6 +2360,47 @@ else
   link_libatomic=
 fi
 
+dnl What -fsplit-stack adds to the link line.  The wrapper is needed whenever
+dnl the option is used at all; the -fuse-ld=gold in front of it only when the
+dnl default linker cannot do split stack and a usable gold sits beside it.  The
+dnl `no' arm is byte-for-byte the driver's own default, so writing it into every
+dnl spec file changes nothing on a target that answers no -- it is written
+dnl anyway, because a spec file that states the answer is inspectable and one
+dnl that omits it is indistinguishable from a spec file written before the probe
+dnl existed.
+if test x"$gcc_cv_ld_gold_split_stack" = xyes; then
+  link_split_stack='%{fsplit-stack: -fuse-ld=gold --wrap=pthread_create}'
+else
+  link_split_stack='%{fsplit-stack: --wrap=pthread_create}'
+fi
+
+dnl Which libgcc libraries to name.  This is the ENABLE_SHARED_LIBGCC choice,
+dnl which gcc.cc used to make with `#if defined' over a macro that came from the
+dnl PRIMARY target's tmake_file -- see the long note in gcc.cc's init_spec.  The
+dnl answer is per target and it selects SPEC TEXT, so it comes down this channel
+dnl rather than through targ_caps.
+dnl
+dnl TWO names because the driver rewrites libgcc_spec at two sites that name
+dnl DIFFERENT libraries: `-lgcc' (the -l form) and `libgcc.a%s' (the by-filename
+dnl form, LINK_LIBGCC_SPECIAL_1 targets).  One name for both would give one site
+dnl the other's libraries, silently, on exactly the targets that use the rarer
+dnl form.
+dnl
+dnl The `no' arms are the identity: they reproduce the token the driver found,
+dnl which is what a build without ENABLE_SHARED_LIBGCC emitted.  The `yes' arms
+dnl are what init_gcc_specs () used to build.  The -l form defers its non-static
+dnl body to %(libgcc_nonstatic), which gen-target-specs may have already
+dnl overridden for a target whose headers set USE_LD_AS_NEEDED; the filename
+dnl form does not, because that named spec holds the -l form's libraries and no
+dnl target reaching the filename site sets USE_LD_AS_NEEDED.
+if test x"$spec_shared_libgcc" = xyes; then
+  libgcc_variants='%{static|static-libgcc:-lgcc -lgcc_eh}%{!static:%{!static-libgcc:%(libgcc_nonstatic)}}'
+  libgcc_file_variants='%{static|static-libgcc:libgcc.a%s libgcc_eh.a%s}%{!static:%{!static-libgcc:%{!shared:%{!shared-libgcc:libgcc.a%s libgcc_eh.a%s}%{shared-libgcc:-lgcc_s libgcc.a%s}}%{shared:-lgcc_s}}}'
+else
+  libgcc_variants='-lgcc'
+  libgcc_file_variants='libgcc.a%s'
+fi
+
 dnl How to hand the LTO plugin to the linker.  This is the whole spec, not just
 dnl the -plugin option: without -plugin-opt=-fresolution= the linker calls
 dnl lto-wrapper without a resolution file and the link still fails, so emitting
@@ -2381,6 +2495,24 @@ ${gcc_cv_ld_dynamic_option}
 *link_libatomic:
 ${link_libatomic}
 
+# What -fsplit-stack adds to the link line; the -fuse-ld=gold arm is taken only
+# when this linker cannot do split stack itself and a usable gold sits beside
+# it.  This is HAVE_GOLD_NON_DEFAULT_SPLIT_STACK.
+*link_split_stack:
+${link_split_stack}
+
+# Which libgcc libraries to name, at each of the driver's two rewrite sites.
+# This is ENABLE_SHARED_LIBGCC, which used to be decided once, by the primary
+# target's tmake_file, for every target the compiler serves.  The two names are
+# NOT interchangeable: the first spells its libraries with -l, the second by
+# filename.  Written from --with-shared-libgcc, i.e. from this target's own
+# tmake_file_present in the manifest.
+*libgcc_variants:
+${libgcc_variants}
+
+*libgcc_file_variants:
+${libgcc_file_variants}
+
 *link_plugin:
 ${link_plugin}
 
@@ -2437,6 +2569,8 @@ AC_MSG_NOTICE([  ld .hidden ............... ${gcc_cv_ld_hidden}])
 AC_MSG_NOTICE([  ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}])
 AC_MSG_NOTICE([  ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}])
 AC_MSG_NOTICE([  ld -z ctf ................ ${gcc_cv_ld_ctf}])
+AC_MSG_NOTICE([  non-default gold ......... ${gcc_cv_ld_gold_split_stack}])
+AC_MSG_NOTICE([  shared libgcc ............ ${spec_shared_libgcc}])
 
 fi
 
