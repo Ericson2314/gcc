@@ -970,7 +970,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    the target hooks TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P and
    TARGET_ASM_SUPPORTS_ALIASES.  They used to be defined here, derived from
    ASM_OUTPUT_DEF, which baked one target's answer into every target: the files
-   that ask (symtab.cc, ipa-visibility.cc, cp/*.cc, d/decl.cc, ...) are compiled
+   that ask (symtab.cc, ipa-visibility.cc, the cp/ front end, d/decl.cc, ...)
+   are compiled
    once for the whole compiler.  A back end that still defines the old macro
    gets it bridged into the hook by target-def.h; nvptx and i386 Cygwin/MinGW
    are the two that do.  There is deliberately no fallback definition here, so
