@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "ssa.h"
 #include "gimple-streamer.h"
+#include "target-caps.h"
 #include "toplev.h"
 #include "gimple-iterator.h"
 #include "tree-cfg.h"
@@ -2191,25 +2192,25 @@ lto_input_mode_table (struct lto_file_decl_data *file_data)
 	      if (mclass == MODE_FLOAT)
 		fatal_error (UNKNOWN_LOCATION,
 			     "%s - %u-bit-precision floating-point numbers "
-			     "unsupported (mode %qs)", TARGET_MACHINE,
+			     "unsupported (mode %qs)", targ_caps_target_name_for_report (),
 			     prec.to_constant (), mname);
 	      else if (mclass == MODE_DECIMAL_FLOAT)
 		fatal_error (UNKNOWN_LOCATION,
 			     "%s - %u-bit-precision decimal floating-point "
-			     "numbers unsupported (mode %qs)", TARGET_MACHINE,
+			     "numbers unsupported (mode %qs)", targ_caps_target_name_for_report (),
 			     prec.to_constant (), mname);
 	      else if (mclass == MODE_COMPLEX_FLOAT)
 		fatal_error (UNKNOWN_LOCATION,
 			     "%s - %u-bit-precision complex floating-point "
-			     "numbers unsupported (mode %qs)", TARGET_MACHINE,
+			     "numbers unsupported (mode %qs)", targ_caps_target_name_for_report (),
 			     prec.to_constant (), mname);
 	      else if (mclass == MODE_INT)
 		fatal_error (UNKNOWN_LOCATION,
 			     "%s - %u-bit integer numbers unsupported (mode "
-			     "%qs)", TARGET_MACHINE, prec.to_constant (), mname);
+			     "%qs)", targ_caps_target_name_for_report (), prec.to_constant (), mname);
 	      else
 		fatal_error (UNKNOWN_LOCATION, "%s - unsupported mode %qs",
-			     TARGET_MACHINE, mname);
+			     targ_caps_target_name_for_report (), mname);
 	      break;
 	    }
 	}

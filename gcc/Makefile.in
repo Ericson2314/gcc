@@ -2750,16 +2750,15 @@ gcc-ranlib$(exeext): gcc-ranlib.o $(AR_OBJS) $(LIBDEPS)
 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) gcc-ranlib.o -o $@ \
 		$(AR_OBJS) $(LIBS) $(AR_LIBS)
 
+# No -DTARGET_MACHINE: gcc-ar.cc does not reference it.  It was dead, and
+# since $(target_noncanonical) is not substituted it was dead AND empty.
 CFLAGS-gcc-ar.o += $(DRIVER_DEFINES) \
-	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
 	-DPERSONALITY=\"ar\"
 
 CFLAGS-gcc-ranlib.o += $(DRIVER_DEFINES) \
-	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
 	-DPERSONALITY=\"ranlib\"
 
 CFLAGS-gcc-nm.o += $(DRIVER_DEFINES) \
-	-DTARGET_MACHINE=\"$(target_noncanonical)\" \
 	-DPERSONALITY=\"nm\"
 
 # ??? the implicit rules dont trigger if the source file has a different name
@@ -2800,8 +2799,9 @@ lto-wrapper$(exeext): $(LTO_WRAPPER_OBJS) libcommon-target.a $(LIBDEPS)
 
 
 
-CFLAGS-c-family/c-pch.o += -DHOST_MACHINE=\"$(host)\" \
-	-DTARGET_MACHINE=\"$(target)\"
+# c-pch.cc references neither macro; both were dead, and $(target) is not
+# substituted so TARGET_MACHINE was empty as well.
+
 
 default-c.o: config/default-c.cc
 	$(COMPILE) $<
@@ -3176,7 +3176,7 @@ dumpvers: dumpvers.cc
 # lto-compress.o needs $(ZLIBINC) added to the include flags.
 CFLAGS-lto-compress.o += $(ZLIBINC) $(ZSTD_INC)
 
-CFLAGS-lto-streamer-in.o += -DTARGET_MACHINE=\"$(target_noncanonical)\"
+# lto-streamer-in.cc names the SELECTED target in its diagnostics now.
 
 bversion.h: s-bversion; @true
 s-bversion: BASE-VER
@@ -3186,9 +3186,9 @@ s-bversion: BASE-VER
 	echo "#define BUILDING_GCC_VERSION (BUILDING_GCC_MAJOR * 1000 + BUILDING_GCC_MINOR)" >> bversion.h
 	$(STAMP) s-bversion
 
-CFLAGS-toplev.o += -DTARGET_NAME=\"$(target_noncanonical)\"
-CFLAGS-tree-diagnostic-client-data-hooks.o += -DTARGET_NAME=\"$(target_noncanonical)\"
-CFLAGS-optinfo-emit-json.o += -DTARGET_NAME=\"$(target_noncanonical)\" $(ZLIBINC)
+# toplev.cc, optinfo-emit-json.cc and tree-diagnostic-client-data-hooks.cc
+# all report the SELECTED target now, not a macro that expanded to "".
+CFLAGS-optinfo-emit-json.o += $(ZLIBINC)
 CFLAGS-analyzer/engine.o += $(ZLIBINC)
 
 pass-instances.def: $(srcdir)/passes.def $(PASSES_EXTRA) \

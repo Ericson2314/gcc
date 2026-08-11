@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "optinfo.h"
 #include "optinfo-emit-json.h"
+#include "target-caps.h"
 #include "json.h"
 #include "pretty-print.h"
 #include "tree-pretty-print.h"
@@ -62,8 +63,10 @@ optrecord_json_writer::optrecord_json_writer ()
   generator->set_string ("name", lang_hooks.name);
   generator->set_string ("pkgversion", pkgversion_string);
   generator->set_string ("version", version_string);
-  /* TARGET_NAME is passed in by the Makefile.  */
-  generator->set_string ("target", TARGET_NAME);
+  /* The target SELECTED for this compilation.  It used to be TARGET_NAME,
+     a macro built from $(target_noncanonical), which gcc/configure.ac no
+     longer substitutes -- so this field read "" in every dump.  */
+  generator->set_string ("target", targ_caps_target_name_for_report ());
   metadata->set<json::object> ("generator", std::move (generator));
   m_root_tuple->append<json::object> (std::move (metadata));
 

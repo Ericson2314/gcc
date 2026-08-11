@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostics/client-data-hooks.h"
 #include "diagnostics/sarif-sink.h"
 #include "langhooks.h"
+#include "target-caps.h"
 #include "plugin.h"
 #include "timevar.h"
 
@@ -76,14 +77,14 @@ public:
     return lang_hooks.name;
   }
 
-  /* Compare with toplev.cc: print_version.
-     TARGET_NAME is passed in by the Makefile.  */
+  /* Compare with toplev.cc: print_version.  The target SELECTED for this
+     compilation; TARGET_NAME was a macro that expanded to "".  */
   char *
   maybe_make_full_name () const final override
   {
     return xasprintf ("%s %sversion %s (%s)",
 		      get_tool_name (), pkgversion_string, version_string,
-		      TARGET_NAME);
+		      targ_caps_target_name_for_report ());
   }
 
   const char *get_version_string () const final override

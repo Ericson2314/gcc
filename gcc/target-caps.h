@@ -514,6 +514,19 @@ targ_ld_static_dynamic (void)
    target it was invoked for, and a second channel could disagree with it.  */
 extern const char *targ_caps_target_name;
 
+/* The same thing where a STRING is wanted unconditionally -- a diagnostic, a
+   --version banner, a JSON field.  Never NULL, so a report cannot crash, and
+   deliberately not a plausible-looking triple either: a compiler that has not
+   selected a target says so in as many words, rather than printing something
+   a reader would take for an answer.
+
+   NOT for anything that COMPARES targets.  Two compilers that had selected
+   nothing would compare EQUAL through this, and that is precisely the defect
+   that made C++20 module CMIs accept one another -- see cp/module.cc.
+   Comparisons must take targ_caps_target_name and treat NULL as "cannot
+   answer".  */
+extern const char *targ_caps_target_name_for_report (void);
+
 /* Read capabilities from FILE, a `name value' per line text file.  Unknown
    names are ignored, so an older compiler tolerates a newer spec file.  */
 extern void read_target_caps (const char *file);

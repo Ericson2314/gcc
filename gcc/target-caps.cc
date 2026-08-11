@@ -123,6 +123,14 @@ struct target_caps targ_caps =
    which target it is for has not got one.  */
 const char *targ_caps_target_name = NULL;
 
+/* For reports only; see the header for why this must never be compared.  */
+
+const char *
+targ_caps_target_name_for_report (void)
+{
+  return targ_caps_target_name != NULL ? targ_caps_target_name : "(none)";
+}
+
 /* Read capability settings from FILE.  Format is one `name value' pair per
    line; `#' starts a comment.  Unknown names are ignored so that a newer spec
    file does not break an older compiler.  A missing or unreadable file is not

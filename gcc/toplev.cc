@@ -630,7 +630,8 @@ print_version (FILE *file, const char *indent, bool show_global_state)
   fprintf (file,
 	   file == stderr ? _(fmt1) : fmt1,
 	   indent, *indent != 0 ? " " : "",
-	   lang_hooks.name, pkgversion_string, version_string, TARGET_NAME,
+	   lang_hooks.name, pkgversion_string, version_string,
+	   targ_caps_target_name_for_report (),
 	   indent, __VERSION__);
 
   /* We need to stringify the GMP macro values.  Ugh, gmp_version has
