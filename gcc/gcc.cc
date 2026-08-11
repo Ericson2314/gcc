@@ -52,6 +52,7 @@ compilation is specified by a string called a "spec".  */
    target header supplies -- so the one macro the driver took from it is given a
    local fallback below, matching how the 37 spec macros here already work.  */
 #include "options.h"
+#include "spec-names.h"
 #include "xregex.h"
 #include "obstack.h"
 #include "intl.h"
@@ -966,16 +967,15 @@ proper position among the other output files.  */
 
 /* Here is the spec for running the linker, after compiling all files.  */
 
-#if defined(TARGET_PROVIDES_LIBATOMIC) && defined(USE_LD_AS_NEEDED)
-#ifdef USE_LD_AS_NEEDED_LDSCRIPT
-#define LINK_LIBATOMIC_SPEC "%{!fno-link-libatomic:-latomic_asneeded} "
-#else
-#define LINK_LIBATOMIC_SPEC "%{!fno-link-libatomic:" LD_AS_NEEDED_OPTION \
-			    " -latomic " LD_NO_AS_NEEDED_OPTION "} "
-#endif
-#else
-#define LINK_LIBATOMIC_SPEC ""
-#endif
+/* LINK_LIBATOMIC_SPEC used to be defined here, gated on TARGET_PROVIDES_LIBATOMIC
+   and USE_LD_AS_NEEDED.  Both come from tm.h, which this file no longer
+   includes, so the guard was unconditionally false and the macro was always ""
+   -- while a dozen target headers under config/ still built their
+   LINK_GCC_C_SEQUENCE_SPEC out of it.  It is now the `link_libatomic' named
+   spec: gen-target-specs emits %(link_libatomic) where the target header wrote
+   the macro, and target-specs/ fills it in, because whether -latomic can be
+   linked as-needed is a question about the installed linker.  Empty here, which
+   is what the dead guard produced, so nothing changes until it is written.  */
 
 /* This is overridable by the target in case they need to specify the
    -lgcc and -lc order specially, yet not require them to override all
@@ -996,25 +996,9 @@ proper position among the other output files.  */
 #endif
 
 
-#define PIE_SPEC		"pie"
-#define FPIE1_SPEC		"fpie"
-#define NO_FPIE1_SPEC		FPIE1_SPEC ":;"
-#define FPIE2_SPEC		"fPIE"
-#define NO_FPIE2_SPEC		FPIE2_SPEC ":;"
-#define FPIE_SPEC		FPIE1_SPEC "|" FPIE2_SPEC
-#define NO_FPIE_SPEC		FPIE_SPEC ":;"
-#define FPIC1_SPEC		"fpic"
-#define NO_FPIC1_SPEC		FPIC1_SPEC ":;"
-#define FPIC2_SPEC		"fPIC"
-#define NO_FPIC2_SPEC		FPIC2_SPEC ":;"
-#define FPIC_SPEC		FPIC1_SPEC "|" FPIC2_SPEC
-#define NO_FPIC_SPEC		FPIC_SPEC ":;"
-#define FPIE1_OR_FPIC1_SPEC	FPIE1_SPEC "|" FPIC1_SPEC
-#define NO_FPIE1_AND_FPIC1_SPEC	FPIE1_OR_FPIC1_SPEC ":;"
-#define FPIE2_OR_FPIC2_SPEC	FPIE2_SPEC "|" FPIC2_SPEC
-#define NO_FPIE2_AND_FPIC2_SPEC	FPIE1_OR_FPIC2_SPEC ":;"
-#define FPIE_OR_FPIC_SPEC	FPIE_SPEC "|" FPIC_SPEC
-#define NO_FPIE_AND_FPIC_SPEC	FPIE_OR_FPIC_SPEC ":;"
+/* PIE_SPEC and the FPIE/FPIC family now live in spec-names.h, included above,
+   because gen-target-specs.cc expands the same target headers that use them
+   and a second copy of the definitions could drift from this one silently.  */
 
 /* LD_PIE_SPEC is concatenated into the LINK_PIE_SPEC string literal below, so
    it has to be a compile-time constant and cannot consult targ_caps.  It was
@@ -1286,6 +1270,14 @@ static const char *link_buildid = "";
    had the old HAVE_LD_EH_FRAME_HDR guard.  Empty by default, because a linker
    we have not asked is not a linker we may assume; target-specs asks.  */
 static const char *link_eh = "";
+
+/* What to link for libatomic, when the target provides one and the linker can
+   take it as-needed.  Referenced by the *link_gcc_c_sequence spec that
+   gen-target-specs emits for any target whose header used
+   LINK_LIBATOMIC_SPEC.  Written by target-specs, because it is a question
+   about the installed linker; empty until then, which is what the
+   unconditionally-false guard this replaces already produced.  */
+static const char *link_libatomic = "";
 
 /* Linker options -fhardened adds, if this linker has them.  Not referenced
    from any spec string: the driver reads it directly, because whether to
@@ -1744,6 +1736,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_target_config",	&link_target_config),
   INIT_STATIC_SPEC ("link_buildid",		&link_buildid),
   INIT_STATIC_SPEC ("link_eh",			&link_eh),
+  INIT_STATIC_SPEC ("link_libatomic",		&link_libatomic),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
