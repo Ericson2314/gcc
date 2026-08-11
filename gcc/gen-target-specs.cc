@@ -242,7 +242,14 @@ main (void)
     static const struct { const char *name; const char *spec; } extra[] =
       { EXTRA_SPECS };
     for (unsigned i = 0; i < sizeof (extra) / sizeof (extra[0]); i++)
-      emit (extra[i].name, extra[i].spec);
+      {
+	/* Marked so check-spec-refs can tell a name the target PUBLISHES from
+	   one we invented to deliver a value.  An unreferenced name of the
+	   first kind is the target header's business; of the second kind it is
+	   a value we computed and threw away.  */
+	printf ("# EXTRA_SPECS: %s\n", extra[i].name);
+	emit (extra[i].name, extra[i].spec);
+      }
   }
 #endif
 

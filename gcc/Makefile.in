@@ -2598,6 +2598,32 @@ sarif-replay: $(SARIF_REPLAY_OBJS) $(LIBGDIAGNOSTICS_FILENAME)
 # installed) there is no file, and we fall back to the built-in defaults rather
 # than to a spec file synthesised from probes that did not run -- recording
 # "feature absent" everywhere is worse than recording nothing.
+# READ THIS BEFORE ADDING ANYTHING TO A SPEC FILE.
+#
+# There are two kinds of spec file and they are not interchangeable:
+#
+#   a FULL DUMP    -- `xgcc -dumpspecs' output.  Every spec, post-composition.
+#                     Self-contained: it does not need the driver's defaults,
+#                     because it already IS them.
+#   an OVERLAY     -- what specs-<target> is.  target-specs writes the specs it
+#                     probed, gen-target-specs writes the ones the target's
+#                     tm.h defines, and every spec neither mentions is meant to
+#                     keep the value the driver worked out for itself.
+#
+# The `else' branch below picks whichever is available, so this file can be
+# either.  That was a live trap: `driver::set_up_specs' used to read the system
+# specs file INSTEAD OF calling init_spec (), on the assumption that a specs
+# file is always a full dump.  Under that rule an overlay silently switched off
+# composition -- the libgcc shared/static selection, the %(sysroot_spec)
+# prepend and the buildid composition all disappeared the moment a target's
+# spec file existed, so installing our spec file was itself disabling parts of
+# the driver it was written to feed.  Fixed in gcc.cc: init_spec () now always
+# runs first, and a full dump is unaffected because everything composed is
+# overridden anyway.
+#
+# The lesson generalises past that one fix: an overlay is only correct if every
+# spec it does NOT name still gets the driver's own value.  Anything that
+# short-circuits the driver's defaults when a spec file is present breaks it.
 $(SPECS): xgcc$(exeext) target-specs
 	if test -f specs-$(TEST_TARGET); then \
 	  cp specs-$(TEST_TARGET) tmp-specs; \
@@ -2892,7 +2918,26 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	  fi; \
 	done; \
 	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
-	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"
+	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"; \
+	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' -print > tmp-specfiles; \
+	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
+	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
+	rm -f tmp-specfiles
+
+# Fail the build if a spec file names a spec nothing ever asks for.  Three
+# separate times a spec has been written into every per-target spec file with
+# nothing in the driver to read it -- *link_eh for a while, and *link_as_needed
+# and *link_no_as_needed until very recently -- and every time the symptom was
+# silence, because read_specs accepts an unknown name and waits for a caller
+# that never comes.  A wrong value gets noticed; a value that goes nowhere does
+# not.  Run separately from `target-specs' when you want it on its own.
+.PHONY: check-spec-refs
+check-spec-refs:
+	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' -print \
+	  > tmp-specfiles; \
+	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
+	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
+	rc=$$?; rm -f tmp-specfiles; exit $$rc
 
 REFERENCE_SPECS =
 .PHONY: check-target-specs
