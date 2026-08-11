@@ -1753,6 +1753,25 @@ fi
 
 target_gtfiles=
 
+# Canonicalise ${target} before config.gcc dispatches on it.  AC_CANONICAL_TARGET
+# is deliberately gone -- it is what gave one target a privileged position --
+# but autoconf's legacy `target=$target_alias' assignment remains, and that
+# leaves ${target} holding exactly what was typed on the command line.
+# config.gcc matches canonical triples only, and its arms are ordered globs, so
+# an uncanonical name does not fail: it silently matches a LATER arm.
+# --target=aarch64-linux-gnu splits as aarch64/linux/gnu, misses
+# `aarch64*-*-linux*' and hits `aarch64*-*-gnu*' -- the GNU/Hurd port -- while
+# --enable-targets, which does canonicalise, records the Linux one.  The build
+# then had tm.h describing Hurd and tm-aarch64.h describing Linux.
+# The --enable-targets loop below does the same thing for the same reason.
+if test x"${target}" != x; then
+  target_canon=`${srcdir}/../config.sub ${target} 2>/dev/null`
+  if test x"${target_canon}" = x; then
+    AC_MSG_ERROR([${target} is not a recognised target name])
+  fi
+  target=${target_canon}
+fi
+
 # Collect target-machine-specific information.
 . ${srcdir}/config.gcc || exit 1
 
