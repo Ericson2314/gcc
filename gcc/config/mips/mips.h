@@ -235,11 +235,12 @@ struct mips_cpu_info {
 #define TARGET_WRITABLE_EH_FRAME (flag_pic && TARGET_SHARED)
 #endif
 
-/* DSP Rev 1 or 2, depending on whether the assembler takes DSPR1 mult with
-   four accumulators.  Asked of the real assembler at run time; both arms were
-   already runtime expressions, so only the choice between them moved.  */
-#define ISA_HAS_DSP_MULT \
-  (targ_caps.as_mips_dspr1_mult ? ISA_HAS_DSP : ISA_HAS_DSPR2)
+/* Test the assembler to set ISA_HAS_DSP_MULT to DSP Rev 1 or 2.  */
+#ifdef HAVE_AS_DSPR1_MULT
+#define ISA_HAS_DSP_MULT ISA_HAS_DSP
+#else
+#define ISA_HAS_DSP_MULT ISA_HAS_DSPR2
+#endif
 
 /* ISA has LSA available.  */
 #define ISA_HAS_LSA		(mips_isa_rev >= 6 || ISA_HAS_MSA)
@@ -1452,13 +1453,13 @@ struct mips_cpu_info {
    all hard-float instructions which may require some user code to be
    updated.  */
 
-/* Was guarded by HAVE_AS_DOT_MODULE.  A spec is baked into the driver before
-   any target config file is read, so it cannot be a runtime test; every
-   assembler GCC still builds against understands .module, and one that does not
-   is handled by overriding this spec in that target's spec file.  */
+#ifdef HAVE_AS_DOT_MODULE
 #define FP_ASM_SPEC "\
 %{mhard-float} %{msoft-float} \
 %{msingle-float} %{mdouble-float}"
+#else
+#define FP_ASM_SPEC
+#endif
 
 /* SUBTARGET_ASM_SPEC is always passed to the assembler.  It may be
    overridden by subtargets.  */

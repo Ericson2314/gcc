@@ -7502,10 +7502,8 @@ mips_start_function_definition (const char *name, bool mips16_p,
 
   if (TARGET_MICROMIPS)
     fprintf (asm_out_file, "\t.set\tmicromips\n");
-#ifdef HAVE_GAS_MICROMIPS
-  else
+  else if (targ_caps.as_mips_micromips)
     fprintf (asm_out_file, "\t.set\tnomicromips\n");
-#endif
 
   /* Emit the patching area before the entry label, if any.  */
   if (patch_area_entry > 0)
@@ -10339,9 +10337,8 @@ mips_file_start (void)
     fprintf (asm_out_file, "\t.nan\t%s\n",
 	     mips_nan == MIPS_IEEE_754_2008 ? "2008" : "legacy");
 
+#ifdef HAVE_AS_DOT_MODULE
   /* Record the FP ABI.  See below for comments.  */
-  if (targ_caps.as_mips_dot_module)
-    {
   if (TARGET_NO_FLOAT)
     {
       if (HAVE_AS_GNU_ATTRIBUTE)

@@ -275,10 +275,8 @@ struct target_caps
      `case $target'.  True by default for the same reason as the aarch64 group:
      the probes answered "no" when there was no assembler to ask.
 
-     as_mips_dot_module has a spec half too (FP_ASM_SPEC in config/mips/mips.h);
-     HAVE_AS_NO_SHARED was spec-only and needed no field at all.  */
-  bool as_mips_dspr1_mult;
-  bool as_mips_dot_module;
+     HAVE_AS_NO_SHARED was spec-only: a spec cannot be a runtime test, so it
+     needed no field at all, just a sensible default in the spec text.  */
   bool as_mips_nan;
   bool as_mips_micromips;
 };

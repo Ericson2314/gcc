@@ -80,8 +80,6 @@ struct target_caps targ_caps =
   .as_aarch64_mabi = true,
   .as_aarch64_small_pic_relocs = true,
   .as_aarch64_aeabi_build_attributes = true,
-  .as_mips_dspr1_mult = true,
-  .as_mips_dot_module = true,
   .as_mips_nan = true,
   .as_mips_micromips = true
 };
@@ -191,10 +189,6 @@ read_target_caps (const char *file)
 	targ_caps.as_aarch64_small_pic_relocs = value != 0;
       else if (strcmp (name, "as_aarch64_aeabi_build_attributes") == 0)
 	targ_caps.as_aarch64_aeabi_build_attributes = value != 0;
-      else if (strcmp (name, "as_mips_dspr1_mult") == 0)
-	targ_caps.as_mips_dspr1_mult = value != 0;
-      else if (strcmp (name, "as_mips_dot_module") == 0)
-	targ_caps.as_mips_dot_module = value != 0;
       else if (strcmp (name, "as_mips_nan") == 0)
 	targ_caps.as_mips_nan = value != 0;
       else if (strcmp (name, "as_mips_micromips") == 0)
