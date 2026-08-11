@@ -114,7 +114,30 @@ static bool is_redundant_typedef (const_tree);
 #define HAVE_XCOFF_DWARF_EXTRAS 0
 #endif
 
+/* Nonzero when this target emits VMS Debug information alongside DWARF.
+
+   This is the ONLY place in this file that tests VMS_DEBUGGING_INFO, and
+   DWARF2_VMS_DEBUG is always spelled as a VALUE -- `#if DWARF2_VMS_DEBUG`,
+   never `#ifdef`.  That is deliberate and it is load-bearing.
+
+   VMS_DEBUGGING_INFO has no default definition anywhere in GCC, and this
+   file used to test it BOTH ways: ten `#ifdef` sites and six `#if` sites.
+   Giving it the obvious default (`#ifndef VMS_DEBUGGING_INFO / #define
+   VMS_DEBUGGING_INFO 0`) would have been silently catastrophic, because
+   `#ifdef` is TRUE for a macro defined to 0 -- every one of those ten sites
+   would have switched ON for every target, while the six `#if` sites stayed
+   correctly off.  config/vx-common.h:100 `#undef`s the macro, which only
+   makes sense against `#ifdef` semantics, so both spellings were live.
+
+   A single-spelling value macro cannot be got wrong that way: there is
+   nothing to default, and `#ifdef DWARF2_VMS_DEBUG` is never written.  */
 #ifdef VMS_DEBUGGING_INFO
+#define DWARF2_VMS_DEBUG 1
+#else
+#define DWARF2_VMS_DEBUG 0
+#endif
+
+#if DWARF2_VMS_DEBUG
 int vms_file_stats_name (const char *, long long *, long *, char *, int *);
 
 /* Define this macro to be a nonzero value if the directory specifications
@@ -2906,7 +2929,7 @@ const struct gcc_debug_hooks dwarf2_debug_hooks =
   dwarf2out_source_line,
   dwarf2out_set_ignored_loc,
   dwarf2out_begin_prologue,
-#if VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
   dwarf2out_vms_end_prologue,
   dwarf2out_vms_begin_epilogue,
 #else
@@ -3997,7 +4020,7 @@ static void prune_unused_types (void);
 static int maybe_emit_file (struct dwarf_file_data *fd);
 static inline const char *AT_vms_delta1 (dw_attr_node *);
 static inline const char *AT_vms_delta2 (dw_attr_node *);
-#if VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 static inline void add_AT_vms_delta (dw_die_ref, enum dwarf_attribute,
 				     const char *, const char *);
 #endif
@@ -5285,7 +5308,7 @@ AT_file (dw_attr_node *a)
   return a->dw_attr_val.v.val_file;
 }
 
-#if VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 /* Add a vms delta attribute value to a DIE.  */
 
 static inline void
@@ -12603,7 +12626,7 @@ output_file_names (void)
 	  const char *filename0 = get_AT_string (comp_unit_die (), DW_AT_name);
 	  if (filename0 == NULL)
 	    filename0 = "";
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 	  dw2_asm_output_data (1, 4, "File name entry format count");
 #else
 	  dw2_asm_output_data (1, 2, "File name entry format count");
@@ -12615,7 +12638,7 @@ output_file_names (void)
 				       "DW_LNCT_directory_index");
 	  dw2_asm_output_data_uleb128 (DW_FORM_data1, "%s",
 				       get_DW_FORM_name (DW_FORM_data1));
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 	  dw2_asm_output_data_uleb128 (DW_LNCT_timestamp, "DW_LNCT_timestamp");
 	  dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
 	  dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
@@ -12625,7 +12648,7 @@ output_file_names (void)
 
 	  output_line_string (str_form, filename0, "File Entry", 0);
 	  dw2_asm_output_data (1, 0, NULL);
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 	  dw2_asm_output_data_uleb128 (0, NULL);
 	  dw2_asm_output_data_uleb128 (0, NULL);
 #endif
@@ -12843,7 +12866,7 @@ output_file_names (void)
 	  if (sum >= HOST_WIDE_INT_UC (2) * (numfiles + 1))
 	    idx_form = DW_FORM_data2;
 	}
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
       dw2_asm_output_data (1, 4, "File name entry format count");
 #else
       dw2_asm_output_data (1, 2, "File name entry format count");
@@ -12855,7 +12878,7 @@ output_file_names (void)
 				   "DW_LNCT_directory_index");
       dw2_asm_output_data_uleb128 (idx_form, "%s",
 				   get_DW_FORM_name (idx_form));
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
       dw2_asm_output_data_uleb128 (DW_LNCT_timestamp, "DW_LNCT_timestamp");
       dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
       dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
@@ -12872,7 +12895,7 @@ output_file_names (void)
       else
 	dw2_asm_output_data_uleb128 (0, NULL);
 
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
       dw2_asm_output_data_uleb128 (0, NULL);
       dw2_asm_output_data_uleb128 (0, NULL);
 #endif
@@ -12884,7 +12907,7 @@ output_file_names (void)
       int file_idx = backmap[i];
       int dir_idx = dirs[files[file_idx].dir_idx].dir_idx;
 
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 #define MAX_VMS_VERSION_LEN 6 /* ";32768" */
 
       /* Setting these fields can lead to debugger miscomparisons,
@@ -12940,7 +12963,7 @@ output_file_names (void)
 
       /* File length in bytes.  */
       dw2_asm_output_data_uleb128 (0, NULL);
-#endif /* VMS_DEBUGGING_INFO */
+#endif /* DWARF2_VMS_DEBUG */
     }
 
   if (dwarf_version < 5)
@@ -22496,7 +22519,7 @@ add_name_and_src_coords_attributes (dw_die_ref die, tree decl,
   else
     add_desc_attribute (die, decl);
 
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
   /* Get the function's name, as described by its RTL.  This may be different
      from the DECL_NAME name used in the source file.  */
   if (TREE_CODE (decl) == FUNCTION_DECL && TREE_ASM_WRITTEN (decl))
@@ -22505,7 +22528,7 @@ add_name_and_src_coords_attributes (dw_die_ref die, tree decl,
                   XEXP (DECL_RTL (decl), 0), false);
       vec_safe_push (used_rtx_array, XEXP (DECL_RTL (decl), 0));
     }
-#endif /* VMS_DEBUGGING_INFO */
+#endif /* DWARF2_VMS_DEBUG */
 }
 
 /* Add VALUE as a DW_AT_discr_value attribute to DIE.  */
@@ -22546,7 +22569,7 @@ AT_discr_list (dw_attr_node *attr)
   return attr->dw_attr_val.v.val_discr_list;
 }
 
-#ifdef VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
 /* Output the debug main pointer die for VMS */
 
 void
@@ -22575,7 +22598,7 @@ dwarf2out_vms_debug_main_pointer (void)
       comp_unit_die ()->die_child = die;
     }
 }
-#endif /* VMS_DEBUGGING_INFO */
+#endif /* DWARF2_VMS_DEBUG */
 
 /* walk_tree helper function for uses_local_type, below.  */
 
@@ -24284,7 +24307,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
                                  false);
 	    }
 
-#if VMS_DEBUGGING_INFO
+#if DWARF2_VMS_DEBUG
       /* HP OpenVMS Industry Standard 64: DWARF Extensions
 	 Section 2.3 Prologue and Epilogue Attributes:
 	 When a breakpoint is set on entry to a function, it is generally
