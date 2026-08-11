@@ -1871,11 +1871,12 @@ extern int toc_initialized;
     }									  \
 }
 
-#ifdef HAVE_GAS_WEAK
+/* Was `#ifdef HAVE_GAS_WEAK'.  This says the rs6000 ports have a weak-symbol
+   spelling at all, which is a target fact; whether the assembler accepts it is
+   targ_caps.gas_weak, folded into TARGET_SUPPORTS_WEAK by defaults.h.  It must
+   stay a preprocessor constant because it gates a macro DEFINITION below, which
+   is what SUPPORTS_WEAK tests for.  */
 #define RS6000_WEAK 1
-#else
-#define RS6000_WEAK 0
-#endif
 
 #if RS6000_WEAK
 /* Used in lieu of ASM_WEAKEN_LABEL.  */

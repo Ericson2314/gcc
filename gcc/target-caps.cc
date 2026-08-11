@@ -83,6 +83,7 @@ struct target_caps targ_caps =
   .gas_shf_gnu_retain = true,
   .gas_balign_and_p2align = true,
   .gas_max_skip_p2align = true,
+  .gas_weak = true,
   .dwarf2_debug_line = true,
   .dwarf2_debug_view = true,
   .gas_shf_merge = true,
@@ -311,6 +312,8 @@ read_target_caps (const char *file)
 	targ_caps.gas_balign_and_p2align = value != 0;
       else if (strcmp (name, "gas_max_skip_p2align") == 0)
 	targ_caps.gas_max_skip_p2align = value != 0;
+      else if (strcmp (name, "gas_weak") == 0)
+	targ_caps.gas_weak = value != 0;
       else if (strcmp (name, "dwarf2_debug_line") == 0)
 	targ_caps.dwarf2_debug_line = value != 0;
       else if (strcmp (name, "dwarf2_debug_view") == 0)

@@ -297,6 +297,15 @@ struct target_caps
      two directives where the others emit one.  */
   bool gas_max_skip_p2align;
 
+  /* Assembler accepts `.weak'.  Was HAVE_GAS_WEAK.  Note the split it forced
+     into the open: SUPPORTS_WEAK "must be a preprocessor constant" and asks
+     whether the TARGET has a spelling for a weak symbol, while
+     TARGET_SUPPORTS_WEAK "can be any valid C expression" -- so this belongs in
+     the second, and defaults.h ANDs it there.  Target headers that used to gate
+     their ASM_WEAKEN_* definitions on the probe now define them
+     unconditionally.  */
+  bool gas_weak;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

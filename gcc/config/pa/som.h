@@ -264,11 +264,12 @@ do {						\
    support for secondary definitions and are generating code for GAS.
    This is primarily for one-only support as SOM doesn't allow undefined
    weak symbols or weak aliases.  */
-#ifdef HAVE_GAS_WEAK
-#define TARGET_SUPPORTS_WEAK (TARGET_SOM_SDEF && TARGET_GAS)
-#else
-#define TARGET_SUPPORTS_WEAK 0
-#endif
+/* Was `#ifdef HAVE_GAS_WEAK' choosing between this expression and 0.  Since
+   TARGET_SUPPORTS_WEAK may be any C expression, the assembler capability just
+   joins the conjunction.  Note TARGET_GAS is already here: pa with HP's
+   assembler answers false through that term regardless.  */
+#define TARGET_SUPPORTS_WEAK \
+  (targ_caps.gas_weak && TARGET_SOM_SDEF && TARGET_GAS)
 
 /* CVS GAS as of 4/28/04 supports a comdat parameter for the .nsubspa
    directive.  This provides one-only linkage semantics even though we

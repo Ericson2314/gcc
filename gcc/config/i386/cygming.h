@@ -429,8 +429,11 @@ do {						\
       ASM_OUTPUT_DEF (STREAM, alias, IDENTIFIER_POINTER (TARGET));	\
     } while (0)
 
-/* GNU as supports weak symbols on PECOFF. */
-#ifdef HAVE_GAS_WEAK
+/* GNU as supports weak symbols on PECOFF.
+   Defined unconditionally: this says PECOFF HAS a spelling for a weak label,
+   which is a target fact and what SUPPORTS_WEAK asks.  Whether the assembler
+   in use accepts it is targ_caps.gas_weak, which defaults.h folds into
+   TARGET_SUPPORTS_WEAK.  Was `#ifdef HAVE_GAS_WEAK'.  */
 #define ASM_WEAKEN_LABEL(FILE, NAME)  \
   do                                  \
     {                                 \
@@ -439,8 +442,6 @@ do {						\
       fputc ('\n', (FILE));           \
     }                                 \
   while (0)
-
-#endif /* HAVE_GAS_WEAK */
 
 /* Decide whether it is safe to use a local alias for a virtual function
    when constructing thunks.  */

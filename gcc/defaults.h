@@ -285,9 +285,16 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 
 /* This determines whether or not we support weak symbols during target
-   code generation.  TARGET_SUPPORTS_WEAK can be any valid C expression.  */
+   code generation.  TARGET_SUPPORTS_WEAK can be any valid C expression.
+
+   The two macros divide exactly along the line this file already draws:
+   SUPPORTS_WEAK "must be a preprocessor constant" and asks whether the TARGET
+   has a way to spell a weak symbol at all, while this one "can be any valid C
+   expression" and is where the ASSEMBLER's willingness to accept it belongs.
+   That is why HAVE_GAS_WEAK becomes targ_caps.gas_weak here rather than being
+   folded into SUPPORTS_WEAK.  */
 #ifndef TARGET_SUPPORTS_WEAK
-#define TARGET_SUPPORTS_WEAK (SUPPORTS_WEAK)
+#define TARGET_SUPPORTS_WEAK (SUPPORTS_WEAK && targ_caps.gas_weak)
 #endif
 
 /* This determines whether or not we support the discriminator
