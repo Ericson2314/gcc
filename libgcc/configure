@@ -4726,6 +4726,51 @@ $as_echo "#define STDC_HEADERS 1" >>confdefs.h
 fi
 
 
+for ac_header in sys/sdt.h
+do :
+  ac_fn_c_check_header_preproc "$LINENO" "sys/sdt.h" "ac_cv_header_sys_sdt_h"
+if test "x$ac_cv_header_sys_sdt_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_SDT_H 1
+_ACEOF
+
+fi
+done
+
+
+case "$host" in
+  *-*-dragonfly* | *-*-freebsd*)
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/link_elf.h>
+
+_ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "dl_iterate_phdr" >/dev/null 2>&1; then :
+  libgcc_cv_dl_iterate_phdr=yes
+else
+  libgcc_cv_dl_iterate_phdr=no
+fi
+rm -f conftest*
+
+    ;;
+  *-*-solaris2* | *-linux-musl*)
+    libgcc_cv_dl_iterate_phdr=yes
+    ;;
+  *)
+    libgcc_cv_dl_iterate_phdr=unknown
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dl_iterate_phdr in the C library" >&5
+$as_echo_n "checking for dl_iterate_phdr in the C library... " >&6; }
+if test x$libgcc_cv_dl_iterate_phdr = xyes; then
+
+$as_echo "#define TARGET_DL_ITERATE_PHDR 1" >>confdefs.h
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_dl_iterate_phdr" >&5
+$as_echo "$libgcc_cv_dl_iterate_phdr" >&6; }
+
 # Check for decimal float support.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether decimal floating point is supported" >&5
 $as_echo_n "checking whether decimal floating point is supported... " >&6; }

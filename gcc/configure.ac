@@ -2589,28 +2589,23 @@ ALL=all.internal				AC_SUBST(ALL)
 SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
 BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
-dnl target_header_dir is how the target's sysroot reaches this script, and the
-dnl compiler must not care about target sysroots.  Everything the COMPILER took
-dnl from it is gone: the glibc version (was TARGET_GLIBC_MAJOR/MINOR, now
-dnl targ_caps.glibc_major/minor), TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and
-dnl TARGET_LIBC_GNUSTACK.
+dnl target_header_dir is GONE.  It was how the target's sysroot reached this
+dnl script, and the compiler must not care about target sysroots.
 dnl
-dnl WHAT IS LEFT IS NOT THE COMPILER'S -- it is libgcc's, routed through here
-dnl because libgcc has no probe of its own and picks these up from gcc's
-dnl auto-host.h via tconfig.h:
-dnl   HAVE_SYS_SDT_H        libgcc/unwind-dw2.c, unwind-arm-common.inc
-dnl   TARGET_DL_ITERATE_PHDR libgcc/unwind-dw2-fde-dip.c, crtstuff.c
-dnl   inhibit_libc          passed to libgcc through libgcc.mvars
-dnl Nothing in gcc/ reads any of the three.  They cannot simply be deleted:
-dnl doing so would silently turn off the SystemTap unwinder probes and
-dnl USE_PT_GNU_EH_FRAME on the BSDs and Solaris.  They belong in
-dnl libgcc/configure.ac, which runs per target with a working xgcc and can ask
-dnl the question properly.  Until that move, this stays.
+dnl Every one of its consumers has now been moved out, and not one of them was
+dnl the compiler's own question:
+dnl   glibc version                 -> targ_caps.glibc_major/minor
+dnl   TARGET_LIBC_PROVIDES_HWCAP_IN_TCB, TARGET_LIBC_GNUSTACK -> targ_caps
+dnl   HAVE_SYS_SDT_H                -> libgcc/configure.ac  (AC_CHECK_HEADERS)
+dnl   TARGET_DL_ITERATE_PHDR        -> libgcc/configure.ac  (keyed on $host)
+dnl   inhibit_libc                  -> decided from gcc's own options; the
+dnl                                    "are the headers really there" half is
+dnl                                    libgcc's, which can just compile a test
+dnl
+dnl BUILD_SYSTEM_HEADER_DIR stays: fixincludes genuinely does have a directory
+dnl of headers to fix, and it is named, not guessed at.
 if test "x$with_build_sysroot" != x; then
   BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
-  target_header_dir="${with_build_sysroot}${native_system_header_dir}"
-else
-  target_header_dir=${native_system_header_dir}
 fi
 
 dnl The machine whose system headers fixincludes is fixing.
@@ -2641,17 +2636,22 @@ AC_ARG_WITH(fixincludes-machine,
  fi])
 AC_SUBST(fixincludes_machine)
 
-# If this is a cross-compiler that does not
-# have its own set of headers then define
-# inhibit_libc
-
 # If this is using newlib, without having the headers available now,
 # then define inhibit_libc in LIBGCC2_CFLAGS.
 # This prevents libgcc2 from containing any code which requires libc
 # support.
+dnl
+dnl The second half of the old test -- "--with-headers was given but the
+dnl headers are not actually there", which stat'd stdio.h inside the target
+dnl sysroot -- is gone along with that sysroot path.  It is libgcc's question
+dnl anyway: libgcc has a working compiler and can simply try to include
+dnl <stdio.h>, where gcc could only guess at a directory.  What is left here is
+dnl the part gcc genuinely knows, which is what its own options said.
+dnl
+dnl These are dnl comments on purpose, so that grepping the GENERATED configure
+dnl for the old variable name stays a valid check that it is really gone.
 : ${inhibit_libc=false}
-if test x$with_newlib = xyes &&
-   { test "x$with_headers" = xno || test ! -f "$target_header_dir/stdio.h"; } ; then
+if test x$with_newlib = xyes && test "x$with_headers" = xno; then
        inhibit_libc=true
 fi
 AC_SUBST(inhibit_libc)
@@ -4394,18 +4394,13 @@ if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
 	    [Define if libatomic is built for the target.])
 fi
 
-# Test for <sys/sdt.h> on the target.
-GCC_TARGET_TEMPLATE([HAVE_SYS_SDT_H])
-AC_CACHE_CHECK([sys/sdt.h in the target C library], [gcc_cv_sys_sdt_h], [
-  gcc_cv_sys_sdt_h=no
-  if test -f $target_header_dir/sys/sdt.h; then
-    gcc_cv_sys_sdt_h=yes
-  fi
-])
-AS_IF([test x$gcc_cv_sys_sdt_h = xyes], [
-  AC_DEFINE([HAVE_SYS_SDT_H], [1],
-            [Define if your target C library provides sys/sdt.h])
-])
+dnl The <sys/sdt.h> probe is gone.  Nothing in gcc/ ever read HAVE_SYS_SDT_H:
+dnl its only consumers are libgcc/unwind-dw2.c and unwind-arm-common.inc, which
+dnl received it through tconfig.h -> auto-host.h.  It describes the target C
+dnl library, i.e. libgcc's own host, and gcc answered it by looking inside
+dnl $target_header_dir -- a target sysroot a compiler serving many targets has
+dnl no business reading.  libgcc/configure.ac now does AC_CHECK_HEADERS(sys/sdt.h),
+dnl which spells it the same way, and those two files include auto-target.h.
 
 dnl --with-long-double-128 and the probe behind it are gone.  The question --
 dnl does this target.s C library use 128-bit long double -- was answered by
@@ -4432,29 +4427,17 @@ dnl targ_caps.libc_hwcap_in_tcb and targ_caps.libc_gnustack, worked out by
 dnl target-specs -- the step that knows the triple AND the glibc version -- and
 dnl read at run time by config/rs6000/ and config/mips/.
 
-AC_MSG_CHECKING(dl_iterate_phdr in target C library)
-gcc_cv_target_dl_iterate_phdr=unknown
-case "$target" in
-  *-*-solaris2*)
-    gcc_cv_target_dl_iterate_phdr=yes
-    ;;
-  *-*-dragonfly* | *-*-freebsd*)
-    if grep dl_iterate_phdr $target_header_dir/sys/link_elf.h > /dev/null 2>&1; then
-      gcc_cv_target_dl_iterate_phdr=yes
-    else
-      gcc_cv_target_dl_iterate_phdr=no
-    fi
-    ;;
-  *-linux-musl*)
-    gcc_cv_target_dl_iterate_phdr=yes
-    ;;
-esac
-GCC_TARGET_TEMPLATE([TARGET_DL_ITERATE_PHDR])
-if test x$gcc_cv_target_dl_iterate_phdr = xyes; then
-   AC_DEFINE(TARGET_DL_ITERATE_PHDR, 1,
-[Define if your target C library provides the `dl_iterate_phdr' function.])
-fi
-AC_MSG_RESULT($gcc_cv_target_dl_iterate_phdr)
+dnl The dl_iterate_phdr probe is gone, for the same reason and to the same
+dnl place: libgcc/configure.ac.  Nothing in gcc/ reads TARGET_DL_ITERATE_PHDR;
+dnl its consumers are libgcc/unwind-dw2-fde-dip.c and libgcc/crtstuff.c.
+dnl
+dnl It was doubly wrong here.  It keyed on `case "$target"', and $target is
+dnl empty in this tree, so it fell through to `unknown' and the macro was never
+dnl defined for ANY target -- USE_PT_GNU_EH_FRAME silently off on Solaris, the
+dnl BSDs and musl.  And the FreeBSD arm of it grepped
+dnl $target_header_dir/sys/link_elf.h.  libgcc keys on $host, which is the same
+dnl machine under the name that is correct there, and greps the headers it is
+dnl actually compiling against.
 
 # We no longer support different GC mechanisms.  Emit an error if
 # the user configures with --with-gc.

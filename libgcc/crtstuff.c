@@ -50,13 +50,21 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 /* FIXME: Including auto-host is incorrect, but until we have
    identified the set of defines that need to go into auto-target.h,
-   this will have to do.  */
+   this will have to do.
+
+   TARGET_DL_ITERATE_PHDR has now been identified and moved: it is probed by
+   libgcc/configure and comes from auto-target.h below.  What is still taken
+   from gcc's auto-host.h here is HAVE_GAS_HIDDEN and HAVE_LD_EH_FRAME_HDR --
+   assembler and linker capabilities, which this library should also be asking
+   about for itself rather than inheriting the answers gcc got for its own
+   host.  */
 #include "auto-host.h"
 #undef caddr_t
 #undef pid_t
 #undef rlim_t
 #undef ssize_t
 #undef vfork
+#include "auto-target.h"
 #include "tconfig.h"
 #include "tsystem.h"
 #include "coretypes.h"

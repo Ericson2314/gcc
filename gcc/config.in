@@ -313,12 +313,6 @@
 #endif
 
 
-/* Define if your assembler supports DSPR1 mult. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DSPR1_MULT
-#endif
-
-
 /* Define if your assembler supports DTPREL relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_DTPREL_RELOC
@@ -343,106 +337,9 @@
 #endif
 
 
-/* Define true if the assembler supports '.long foo@GOTOFF'. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_GOTOFF_IN_DATA
-#endif
-
-
-/* Define if your assembler supports the Sun syntax for cmov. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_CMOV_SUN_SYNTAX
-#endif
-
-
-/* Define if your assembler supports the ffreep mnemonic. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_FFREEP
-#endif
-
-
-/* Define if your assembler uses fildq and fistq mnemonics. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_FILDQ
-#endif
-
-
-/* Define if your assembler uses filds and fists mnemonics. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_FILDS
-#endif
-
-
-/* Define 0/1 if your assembler and linker support @GOT. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_GOT32X
-#endif
-
-
-/* Define if your assembler supports HLE prefixes. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_HLE
-#endif
-
-
-/* Define if your assembler supports interunit movq mnemonic. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_INTERUNIT_MOVQ
-#endif
-
-
-/* Define if the assembler supports 'rep <insn>, lock <insn>'. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_REP_LOCK_PREFIX
-#endif
-
-
-/* Define if your assembler supports the sahf mnemonic in 64bit mode. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_SAHF
-#endif
-
-
-/* Define if your assembler and linker support @tlsgdplt. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_TLSGDPLT
-#endif
-
-
-/* Define to 1 if your assembler and linker support @tlsldm. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_TLSLDM
-#endif
-
-
-/* Define to 1 if your assembler and linker support @tlsldmplt. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_TLSLDMPLT
-#endif
-
-
-/* Define 0/1 if your assembler and linker support calling ___tls_get_addr via
-   GOT. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_TLS_GET_ADDR_GOT
-#endif
-
-
-/* Define if your assembler supports the 'ud2' mnemonic. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_UD2
-#endif
-
-
 /* Define if your assembler supports the lituse_jsrdirect relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_JSRDIRECT_RELOCS
-#endif
-
-
-/* Define if your assembler supports LEON instructions. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_LEON
 #endif
 
 
@@ -470,12 +367,6 @@
 #endif
 
 
-/* Define if your macOS assembler supports -mllvm -x86-pad-for-align=false. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN
-#endif
-
-
 /* Define if your macOS assembler supports the -mmacos-version-min option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
@@ -500,12 +391,6 @@
 #endif
 
 
-/* Define if your assembler supports offsetable %lo(). */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_OFFSETABLE_LO10
-#endif
-
-
 /* Define if your assembler supports R_PPC*_PLTSEQ relocations. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_PLTSEQ
@@ -521,19 +406,6 @@
 /* Define if your assembler supports R_PPC_REL16 relocs. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_REL16
-#endif
-
-
-/* Define if your assembler supports -relax option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_RELAX_OPTION
-#endif
-
-
-/* Define 0/1 if your assembler and linker support R_X86_64_CODE_6_GOTTPOFF.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_R_X86_64_CODE_6_GOTTPOFF
 #endif
 
 
@@ -1149,13 +1021,6 @@
 #endif
 
 
-/* Define if your assembler supports specifying the alignment of objects
-   allocated using the GAS .comm command. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_ALIGNED_COMM
-#endif
-
-
 /* Define if your Arm assembler permits context-specific feature extensions.
    */
 #ifndef USED_FOR_TARGET
@@ -1618,9 +1483,6 @@
 #endif
 
 
-/* Define if your target C library provides sys/sdt.h */
-#undef HAVE_SYS_SDT_H
-
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_SYS_STAT_H
@@ -1961,9 +1823,6 @@
 #endif
 
 
-/* Define if your target C library provides the `dl_iterate_phdr' function. */
-#undef TARGET_DL_ITERATE_PHDR
-
 /* Define if libatomic is built for the target. */
 #ifndef USED_FOR_TARGET
 #undef TARGET_PROVIDES_LIBATOMIC
@@ -1979,13 +1838,6 @@
 /* Define if your assembler mis-optimizes .eh_frame data. */
 #ifndef USED_FOR_TARGET
 #undef USE_AS_TRADITIONAL_FORMAT
-#endif
-
-
-/* Define if you want to generate code by default that assumes that the Cygwin
-   DLL exports wrappers to support libstdc++ function replacement. */
-#ifndef USED_FOR_TARGET
-#undef USE_CYGWIN_LIBSTDCXX_WRAPPERS
 #endif
 
 

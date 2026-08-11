@@ -31,6 +31,11 @@
 #endif
 
 #include "tconfig.h"
+/* TARGET_DL_ITERATE_PHDR is ours, probed by libgcc/configure against the C
+   library we are being built for.  gcc used to answer it by grepping
+   $target_header_dir/sys/link_elf.h and passing the result down through
+   auto-host.h and tconfig.h.  */
+#include "auto-target.h"
 #include "tsystem.h"
 #if !defined(inhibit_libc) && !defined(__OpenBSD__)
 #include <elf.h>		/* Get DT_CONFIG.  */

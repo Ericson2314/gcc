@@ -23,6 +23,10 @@
    <http://www.gnu.org/licenses/>.  */
 
 #include "tconfig.h"
+/* HAVE_SYS_SDT_H is ours, probed by libgcc/configure against the C library we
+   are being built for.  It used to arrive from gcc's auto-host.h by way of
+   tconfig.h, i.e. from a probe gcc ran by reading a target sysroot.  */
+#include "auto-target.h"
 #include "tsystem.h"
 #include "coretypes.h"
 #include "tm.h"

@@ -234,6 +234,40 @@ AC_CHECK_HEADERS(inttypes.h stdint.h stdlib.h ftw.h \
 	string.h strings.h memory.h sys/auxv.h sys/mman.h)
 AC_HEADER_STDC
 
+dnl sys/sdt.h and dl_iterate_phdr used to be probed by gcc/configure and reached
+dnl this library through tconfig.h -> auto-host.h.  Both describe the target C
+dnl LIBRARY -- which is to say this library's own host -- and gcc answered them
+dnl by poking around inside $target_header_dir, a target sysroot that a compiler
+dnl serving many targets has no business reading.  Ask here instead, where the
+dnl question is ours and the headers are the ones we will actually compile
+dnl against.  AC_CHECK_HEADERS spells it HAVE_SYS_SDT_H, which is exactly the
+dnl name unwind-dw2.c and unwind-arm-common.inc already test.
+AC_CHECK_HEADERS(sys/sdt.h)
+
+dnl The BSDs are the only ones that need looking at: elsewhere the answer
+dnl follows from the C library, and on Solaris and musl it is unconditional.
+dnl A separate cache variable rather than an AC_EGREP_HEADER nested inside an
+dnl AC_MSG_CHECKING, so the "checking" lines do not interleave.
+case "$host" in
+  *-*-dragonfly* | *-*-freebsd*)
+    AC_EGREP_HEADER([dl_iterate_phdr], [sys/link_elf.h],
+		    [libgcc_cv_dl_iterate_phdr=yes],
+		    [libgcc_cv_dl_iterate_phdr=no])
+    ;;
+  *-*-solaris2* | *-linux-musl*)
+    libgcc_cv_dl_iterate_phdr=yes
+    ;;
+  *)
+    libgcc_cv_dl_iterate_phdr=unknown
+    ;;
+esac
+AC_MSG_CHECKING([for dl_iterate_phdr in the C library])
+if test x$libgcc_cv_dl_iterate_phdr = xyes; then
+  AC_DEFINE(TARGET_DL_ITERATE_PHDR, 1,
+    [Define if your C library provides the `dl_iterate_phdr' function.])
+fi
+AC_MSG_RESULT($libgcc_cv_dl_iterate_phdr)
+
 # Check for decimal float support.
 AC_CACHE_CHECK([whether decimal floating point is supported], [libgcc_cv_dfp],
 	       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[

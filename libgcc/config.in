@@ -52,6 +52,9 @@
 /* Define to 1 if you have the <sys/mman.h> header file. */
 #undef HAVE_SYS_MMAN_H
 
+/* Define to 1 if you have the <sys/sdt.h> header file. */
+#undef HAVE_SYS_SDT_H
+
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
@@ -90,6 +93,9 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Define if your C library provides the `dl_iterate_phdr' function. */
+#undef TARGET_DL_ITERATE_PHDR
 
 /* Define to 1 if the target use emutls for thread-local storage. */
 #undef USE_EMUTLS

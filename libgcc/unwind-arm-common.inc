@@ -22,6 +22,9 @@
    <http://www.gnu.org/licenses/>.  */
 
 #include "tconfig.h"
+/* For HAVE_SYS_SDT_H below: ours now, probed by libgcc/configure rather than
+   handed down from gcc's auto-host.h through tconfig.h.  */
+#include "auto-target.h"
 #include "tsystem.h"
 #include "unwind.h"
 
