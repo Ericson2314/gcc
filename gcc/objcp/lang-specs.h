@@ -23,9 +23,10 @@ along with GCC; see the file COPYING3.  If not see
    obj-c++.  It is based on -- and should be kept in sync with -- the g++
    spec (found in cp/lang-specs.h).  */
 
-#ifndef CPLUSPLUS_CPP_SPEC
-#define CPLUSPLUS_CPP_SPEC 0
-#endif
+/* The C++ preprocessor spec is the `cplusplus_cpp' named spec now, not a
+   tm.h macro: the driver includes no tm.h, so CPLUSPLUS_CPP_SPEC was always 0
+   here and -D_GNU_SOURCE stopped being passed on every glibc target.  The
+   driver defaults it to %(cpp), which is what a null field already meant.  */
 
   {".mm",  "@objective-c++", 0, 0, 0},
   {".M",   "@objective-c++", 0, 0, 0},
@@ -38,7 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 	      %{!save-temps*:%{!no-integrated-cpp:%(cpp_unique_options)}}\
 	%(cc1_options) %2\
         -o %g.s %{!o*:--output-pch %i.gch} %W{o*:--output-pch %*}%V}}}",
-     CPLUSPLUS_CPP_SPEC, 0, 0},
+     "%(cplusplus_cpp)", 0, 0},
   {"@objective-c++",
     "%{E|M|MM:cc1objplus -E %(cpp_options) %2 %(cpp_debug_options)}\
      %{!E:%{!M:%{!MM:\
@@ -48,7 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 	      %{!save-temps*:%{!no-integrated-cpp:%(cpp_unique_options)}}\
 	%(cc1_options) %2\
        %{!fsyntax-only:%(invoke_as)}}}}",
-     CPLUSPLUS_CPP_SPEC, 0, 0},
+     "%(cplusplus_cpp)", 0, 0},
   {".mii", "@objective-c++-cpp-output", 0, 0, 0},
   {"@objective-c++-cpp-output",
    "%{!M:%{!MM:%{!E:\

@@ -20,9 +20,10 @@ along with GCC; see the file COPYING3.  If not see
 /* This is the contribution to the `default_compilers' array in gcc.cc for
    g++.  */
 
-#ifndef CPLUSPLUS_CPP_SPEC
-#define CPLUSPLUS_CPP_SPEC 0
-#endif
+/* The C++ preprocessor spec is the `cplusplus_cpp' named spec now, not a
+   tm.h macro: the driver includes no tm.h, so CPLUSPLUS_CPP_SPEC was always 0
+   here and -D_GNU_SOURCE stopped being passed on every glibc target.  The
+   driver defaults it to %(cpp), which is what a null field already meant.  */
 
   {".cc",  "@c++", 0, 0, 0},
   {".cp",  "@c++", 0, 0, 0},
@@ -63,7 +64,7 @@ along with GCC; see the file COPYING3.  If not see
       "    %{!fmodule-*:%{!fmodules*:%{!fdump-ada-spec*:"
       "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
-     CPLUSPLUS_CPP_SPEC, 0, 0},
+     "%(cplusplus_cpp)", 0, 0},
   {"@c++-system-header",
       "%{E|M|MM:cc1plus -E"
       "  %{fmodules*:-fdirectives-only -fmodule-header=system}"
@@ -84,7 +85,7 @@ along with GCC; see the file COPYING3.  If not see
       "    %{!fmodule-*:%{!fmodules*:%{!fdump-ada-spec*:"
       "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
-     CPLUSPLUS_CPP_SPEC, 0, 0},
+     "%(cplusplus_cpp)", 0, 0},
   {"@c++-user-header",
       "%{E|M|MM:cc1plus -E"
       "  %{fmodules*:-fdirectives-only -fmodule-header=user}"
@@ -104,7 +105,7 @@ along with GCC; see the file COPYING3.  If not see
       "    %{!fmodule-*:%{!fmodules*:%{!fdump-ada-spec*:"
       "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
-     CPLUSPLUS_CPP_SPEC, 0, 0},
+     "%(cplusplus_cpp)", 0, 0},
   /* Just for implementing --compile-std-module.  */
   {"@c++-system-module",
       "%{E|M|MM:cc1plus -E %(cpp_options) %2 %(cpp_debug_options)"
@@ -122,7 +123,7 @@ along with GCC; see the file COPYING3.  If not see
       "    %{fmodule-only:%{!S:-o %g.s%V}}"
       "    %{!fmodule-only:%(invoke_as)}}"
       "}}}",
-      CPLUSPLUS_CPP_SPEC, 0, 0},
+      "%(cplusplus_cpp)", 0, 0},
   {"@c++",
       "%{E|M|MM:cc1plus -E %(cpp_options) %2 %(cpp_debug_options)}"
       "%{!E:%{!M:%{!MM:"
@@ -136,7 +137,7 @@ along with GCC; see the file COPYING3.  If not see
       "    %{fmodule-only:%{!S:-o %g.s%V}}"
       "    %{!fmodule-only:%(invoke_as)}}"
       "}}}",
-      CPLUSPLUS_CPP_SPEC, 0, 0},
+      "%(cplusplus_cpp)", 0, 0},
   {".ii", "@c++-cpp-output", 0, 0, 0},
   {"@c++-cpp-output",
       "%{!E:%{!M:%{!MM:"

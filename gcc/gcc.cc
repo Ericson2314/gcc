@@ -1299,6 +1299,21 @@ static const char *link_plugin
    Referenced from the link_plugin spec target-specs writes.  */
 static const char *lto_plugin_spec = "";
 
+/* What %C expands to when the input is C++ rather than C.  Eight target
+   headers define CPLUSPLUS_CPP_SPEC and gnu-user.h's is `-D_GNU_SOURCE %(cpp)'
+   -- so on a glibc target this is where _GNU_SOURCE comes from, and with the
+   driver no longer seeing tm.h it stopped being defined at all.
+
+   That is not a small loss.  Without _GNU_SOURCE glibc's <wchar.h> hides
+   fwide/fwprintf/fwscanf/swprintf, libstdc++'s <cwchar> then does not compile,
+   and every translation unit that includes <string> fails.  1447 g++ tests,
+   with the top offender an ordinary one that merely includes a header.
+
+   The default is `%(cpp)', which is exactly what %C did when the field was
+   null, so a driver with no spec file behaves as it does today.
+   gen-target-specs writes the target's own value.  */
+static const char *cplusplus_cpp = "%(cpp)";
+
 /* Which libgcc to link once -static and -static-libgcc are out of the way:
    the whole body that USE_LD_AS_NEEDED, its ldscript variant and LINK_EH_SPEC
    used to vary between (see init_gcc_specs).  The default is the conservative
@@ -1773,6 +1788,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_no_as_needed",	&link_no_as_needed),
   INIT_STATIC_SPEC ("link_plugin",		&link_plugin),
   INIT_STATIC_SPEC ("lto_plugin",		&lto_plugin_spec),
+  INIT_STATIC_SPEC ("cplusplus_cpp",		&cplusplus_cpp),
   INIT_STATIC_SPEC ("libgcc_nonstatic",	&libgcc_nonstatic),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),

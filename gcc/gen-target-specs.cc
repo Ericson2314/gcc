@@ -145,6 +145,13 @@ main (void)
 #ifdef CC1PLUS_SPEC
   emit ("cc1plus", CC1PLUS_SPEC);
 #endif
+#ifdef CPLUSPLUS_CPP_SPEC
+  /* What %C expands to for a C++ input.  gnu-user.h's is `-D_GNU_SOURCE %(cpp)'
+     and without it libstdc++'s <cwchar> does not compile, so anything including
+     <string> fails.  Eight target headers define it; aix's refers to EXTRA_SPECS
+     names this program also emits, so it arrives whole.  */
+  emit ("cplusplus_cpp", CPLUSPLUS_CPP_SPEC);
+#endif
 
   /* Linking.  */
   emit ("link", LINK_SPEC LIBC_LINK_SPEC);
