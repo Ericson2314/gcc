@@ -113,6 +113,10 @@ struct target_caps targ_caps =
   .solaris_ld = false
 };
 
+/* No built-in default: see target-caps.h.  A compiler that has not been told
+   which target it is for has not got one.  */
+const char *targ_caps_target_name = NULL;
+
 /* Read capability settings from FILE.  Format is one `name value' pair per
    line; `#' starts a comment.  Unknown names are ignored so that a newer spec
    file does not break an older compiler.  A missing or unreadable file is not
@@ -133,6 +137,19 @@ read_target_caps (const char *file)
 
       if (line[0] == '#' || line[0] == '\n')
 	continue;
+
+      /* `target <triple>' names the configuration, not a capability, so it is
+	 the one line whose value is not an integer.  Matched before the
+	 integer parse because that parse would silently drop it.  */
+      {
+	char triple[128];
+	if (sscanf (line, "target %127s", triple) == 1)
+	  {
+	    targ_caps_target_name = xstrdup (triple);
+	    continue;
+	  }
+      }
+
       if (sscanf (line, "%63s %d", name, &value) != 2)
 	continue;
 

@@ -2309,6 +2309,12 @@ $as_echo "$as_me: writing $target_config_file" >&6;}
 cat > "$target_config_file" <<EOF
 # Target assembler/linker capabilities for ${target}.
 # Read by cc1 via -ftarget-config=; see gcc/target-caps.h.
+# Which target this configuration is for.  Not a capability: it is how cc1 and
+# the driver learn their own target identity at all, and it is what selects the
+# common hook table (see gcc/common/common-target-select.cc).  A compiler given
+# no config file selects nothing and fails loudly at the first target hook,
+# which is deliberate -- there is no default target any more.
+target ${target}
 leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
 # Properties of the target rather than of its tools: derived by config.gcc from
 # the triple and passed in, not probed here.

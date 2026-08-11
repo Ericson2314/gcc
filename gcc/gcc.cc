@@ -8360,6 +8360,19 @@ driver::main (int argc, char **argv)
   for (int i = 1; i < argc; i++)
     if (startswith (argv[i], "-ftarget-config="))
       read_target_caps (argv[i] + strlen ("-ftarget-config="));
+
+  /* Same scan, same reason, for the common hook table: the driver reads
+     targetm_common (compute_multilib, among others) from build_multilib_strings
+     onwards, which is before any spec file has been read.  Until this runs the
+     table in force is the EMPTY back end -- see common/common-target-select.cc
+     -- so a driver that was told no target reports the hook it needed rather
+     than answering as the build's own triple.  */
+  if (targ_caps_target_name != NULL
+      && !targetm_common_select (targ_caps_target_name))
+    fatal_error (input_location,
+		 "target %qs is not one of the targets this compiler was "
+		 "configured for", targ_caps_target_name);
+
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
   build_multilib_strings ();

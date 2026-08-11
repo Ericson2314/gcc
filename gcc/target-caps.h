@@ -431,6 +431,20 @@ targ_glibc_at_least (int major, int minor)
 	      && targ_caps.glibc_minor >= minor));
 }
 
+/* The target triple this configuration is for, as named by the `target' line
+   of the target-config file, or NULL if no config file said.
+
+   This is the compiler's ONLY runtime source for its own target identity, and
+   that is the point: there is no built-in default triple any more, because a
+   built-in default is a privileged target.  Consumers that need a back end --
+   targetm_common_select, above all -- select on this and diagnose when it is
+   absent rather than falling back on anything.
+
+   It lives beside the capabilities rather than in a channel of its own because
+   the target-config file is already the one thing cc1 reads that describes the
+   target it was invoked for, and a second channel could disagree with it.  */
+extern const char *targ_caps_target_name;
+
 /* Read capabilities from FILE, a `name value' per line text file.  Unknown
    names are ignored, so an older compiler tolerates a newer spec file.  */
 extern void read_target_caps (const char *file);

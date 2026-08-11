@@ -2341,6 +2341,22 @@ toplev::main (int argc, char **argv)
   /* Initialization of GCC's environment, and diagnostics.  */
   general_init (argv[0], m_init_signals, std::move (original_argv));
 
+  /* Install the common hook table for the target we were told we are for.
+     Until this runs the table in force is the EMPTY back end, whose hooks
+     report themselves by name -- there is no privileged default table, so a
+     compiler that was told nothing compiles nothing rather than compiling for
+     whichever target the build happened to be configured with.
+
+     Placed here rather than in the argv scan above because a target that is
+     not configured has to be reported, and fatal_error needs the diagnostic
+     context general_init sets up.  It is still early enough: the first
+     targetm_common user is init_options_struct, below.  */
+  if (targ_caps_target_name != NULL
+      && !targetm_common_select (targ_caps_target_name))
+    fatal_error (UNKNOWN_LOCATION,
+		 "target %qs is not one of the targets this compiler was "
+		 "configured for", targ_caps_target_name);
+
   /* One-off initialization of options that does not need to be
      repeated when options are added for particular functions.  */
   init_options_once ();
