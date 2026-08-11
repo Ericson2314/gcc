@@ -4805,6 +4805,56 @@ $as_echo "#define HAVE_GAS_WEAK 1" >>confdefs.h
 fi
 
 case "$host" in
+  *-*-cygwin* | *-*-mingw*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker mixes read-only and read-write sections" >&5
+$as_echo_n "checking whether the linker mixes read-only and read-write sections... " >&6; }
+if ${libgcc_cv_ld_ro_rw_mix+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+      cat > conftest_ro.s <<EOF
+	.section .rdata,"dr"
+	.long 1
+EOF
+      cat > conftest_rw.s <<EOF
+	.section .rdata\$zzz,"dr"
+	.long 2
+EOF
+                              if { ac_try='${CC-cc} $CFLAGS -c -o conftest_ro.o conftest_ro.s'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } \
+	 && { ac_try='${CC-cc} $CFLAGS -c -o conftest_rw.o conftest_rw.s'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } \
+	 && { ac_try='${CC-cc} $CFLAGS -nostdlib -r -o conftest_mix.o conftest_ro.o conftest_rw.o'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then
+	libgcc_cv_ld_ro_rw_mix=yes
+      else
+	libgcc_cv_ld_ro_rw_mix=no
+      fi
+      rm -f conftest_ro.s conftest_rw.s conftest_ro.o conftest_rw.o conftest_mix.o
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_ld_ro_rw_mix" >&5
+$as_echo "$libgcc_cv_ld_ro_rw_mix" >&6; }
+    if test x$libgcc_cv_ld_ro_rw_mix = xyes; then
+
+$as_echo "#define HAVE_LD_RO_RW_SECTION_MIXING 1" >>confdefs.h
+
+    fi
+    ;;
+esac
+
+case "$host" in
   *-*-dragonfly* | *-*-freebsd*)
     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */

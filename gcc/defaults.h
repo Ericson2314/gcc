@@ -424,13 +424,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    linker does not have this ability, but your system is such that no
    encoding used with non-PIC code will ever require a runtime
    relocation, then you can define EH_TABLES_CAN_BE_READ_ONLY to 1 in
-   your target configuration file.  */
+   your target configuration file.
+
+   Was `#ifdef HAVE_LD_RO_RW_SECTION_MIXING' choosing between 1 and 0.  That
+   test sat ABOVE the targ_caps redefinition further down this file, so it saw
+   auto-host.h's unconditional `#define ... 1' and was constant-true regardless
+   of the runtime value -- and had the gcc-side define simply been deleted it
+   would have become constant-FALSE, silently.  A runtime read is what it always
+   meant; i386/sol2.h already defines this macro as `(TARGET_64BIT)', so an
+   expression here is nothing new.  */
 #ifndef EH_TABLES_CAN_BE_READ_ONLY
-#ifdef HAVE_LD_RO_RW_SECTION_MIXING
-#define EH_TABLES_CAN_BE_READ_ONLY 1
-#else
-#define EH_TABLES_CAN_BE_READ_ONLY 0
-#endif
+#define EH_TABLES_CAN_BE_READ_ONLY (targ_caps.ld_ro_rw_section_mixing)
 #endif
 
 /* Provide defaults for stuff that may not be defined when using

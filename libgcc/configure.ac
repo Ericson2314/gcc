@@ -281,6 +281,53 @@ if test x$libgcc_cv_as_weak = xyes; then
   AC_DEFINE(HAVE_GAS_WEAK, 1, [Define if your assembler supports .weak.])
 fi
 
+dnl Whether the linker merges read-only and read-write sections into one
+dnl read-write section.  crtbegin/crtend on mingw and cygwin put the EH frame
+dnl registration in .rdata when it does, and in .data when it does not, so
+dnl getting this wrong is a link-time or run-time fault rather than a lost
+dnl optimisation.
+dnl
+dnl This used to come from GCC's own auto-host.h, reaching a target library
+dnl through GCC_TARGET_TEMPLATE -- a host build's recorded answer about somebody
+dnl else's linker.  Asked here it drives $CC's linker, which is the one these
+dnl objects will actually be linked with.  Same move HAVE_GAS_HIDDEN and
+dnl HAVE_GAS_WEAK above already made.
+dnl
+dnl Only the two PE consumers care, so only PE hosts are probed; elsewhere the
+dnl answer is unused and a link test would cost time for nothing.  The probe
+dnl links rather than compiles, because the question is the LINKER's.
+case "$host" in
+  *-*-cygwin* | *-*-mingw*)
+    AC_CACHE_CHECK([whether the linker mixes read-only and read-write sections],
+		   [libgcc_cv_ld_ro_rw_mix], [
+      cat > conftest_ro.s <<EOF
+	.section .rdata,"dr"
+	.long 1
+EOF
+      cat > conftest_rw.s <<EOF
+	.section .rdata\$zzz,"dr"
+	.long 2
+EOF
+      dnl A mixing linker places both inputs in one output section; one that
+      dnl cannot will either error or leave them apart.  Failure to assemble is
+      dnl reported as "no", which is the safe direction: crtbegin then uses
+      dnl .data, which works either way.
+      if AC_TRY_COMMAND([${CC-cc} $CFLAGS -c -o conftest_ro.o conftest_ro.s]) \
+	 && AC_TRY_COMMAND([${CC-cc} $CFLAGS -c -o conftest_rw.o conftest_rw.s]) \
+	 && AC_TRY_COMMAND([${CC-cc} $CFLAGS -nostdlib -r -o conftest_mix.o conftest_ro.o conftest_rw.o]); then
+	libgcc_cv_ld_ro_rw_mix=yes
+      else
+	libgcc_cv_ld_ro_rw_mix=no
+      fi
+      rm -f conftest_ro.s conftest_rw.s conftest_ro.o conftest_rw.o conftest_mix.o])
+    if test x$libgcc_cv_ld_ro_rw_mix = xyes; then
+      AC_DEFINE(HAVE_LD_RO_RW_SECTION_MIXING, 1,
+	[Define if your linker links a mix of read-only
+	 and read-write sections into a read-write section.])
+    fi
+    ;;
+esac
+
 dnl The BSDs are the only ones that need looking at: elsewhere the answer
 dnl follows from the C library, and on Solaris and musl it is unconditional.
 dnl A separate cache variable rather than an AC_EGREP_HEADER nested inside an
