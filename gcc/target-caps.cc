@@ -108,7 +108,8 @@ struct target_caps targ_caps =
   .as_riscv_misa_spec = true,
   .as_riscv_march_zifencei = true,
   .as_riscv_march_zaamo_zalrsc = true,
-  .as_riscv_march_b = true
+  .as_riscv_march_b = true,
+  .solaris_ld = false
 };
 
 /* Read capability settings from FILE.  Format is one `name value' pair per
@@ -274,6 +275,8 @@ read_target_caps (const char *file)
 	targ_caps.as_riscv_march_zaamo_zalrsc = value != 0;
       else if (strcmp (name, "as_riscv_march_b") == 0)
 	targ_caps.as_riscv_march_b = value != 0;
+      else if (strcmp (name, "solaris_ld") == 0)
+	targ_caps.solaris_ld = value != 0;
     }
 
   fclose (f);

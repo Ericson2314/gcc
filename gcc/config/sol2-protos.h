@@ -30,3 +30,9 @@ extern void solaris_register_pragmas (void);
 
 /* In sol2-cxx.cc.  */
 extern tree solaris_cxx_decl_mangling_context (const_tree);
+
+/* In sol2.cc, keyed on targ_caps.solaris_ld.  */
+extern const char *solaris_ctors_section_asm_op (void);
+extern const char *solaris_dtors_section_asm_op (void);
+extern void solaris_asm_out_constructor (rtx, int);
+extern void solaris_asm_out_destructor (rtx, int);

@@ -379,6 +379,25 @@ struct target_caps
   bool as_riscv_march_zifencei;
   bool as_riscv_march_zaamo_zalrsc;
   bool as_riscv_march_b;
+
+  /* The linker for this target is Sun ld rather than GNU ld.  Was
+     HAVE_SOLARIS_LD, which has been silently 0 everywhere since the probe was
+     removed, so every Solaris configuration has been behaving as if it linked
+     with GNU ld.
+
+     Only the constructor/destructor half of the old macro is carried here.
+     Sun ld does not coalesce .ctors.N/.dtors.N, so with it every constructor
+     must go into a single .ctors and the priority ordering GNU ld would have
+     given us is not available; config/sol2.cc dispatches on this.  The other
+     thirteen HAVE_SOLARIS_LD consumers are spec string literals
+     (LD_WHOLE_ARCHIVE_OPTION, RDYNAMIC_SPEC, ...) and belong to target-specs,
+     not here.
+
+     False -- GNU ld -- is deliberately the default: it is what every Solaris
+     build has silently been getting, so this records today's behaviour rather
+     than changing it, and a compiler told nothing about its linker keeps the
+     priority sections that are correct for the linker most people use.  */
+  bool solaris_ld;
 };
 
 extern struct target_caps targ_caps;

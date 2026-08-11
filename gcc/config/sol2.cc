@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h"
 #include "varasm.h"
 #include "output.h"
+#include "target-caps.h"
 #include "opts.h"
 
 tree solaris_pending_aligns, solaris_pending_inits, solaris_pending_finis;
@@ -292,4 +293,56 @@ solaris_file_end (void)
 
   solaris_comdat_htab->traverse <void *, solaris_define_comdat_signature>
     (NULL);
+}
+
+/* The .ctors/.dtors section directives, and the constructor/destructor
+   emitters that must agree with them.
+
+   Sun ld does not coalesce .ctors.N/.dtors.N sections, so on a Sun-ld Solaris
+   every constructor has to land in one .ctors and the priority ordering is
+   simply not available.  GNU ld does coalesce them, and the priority sections
+   are both correct and better there, so that is what we use.
+
+   Which linker it is used to be HAVE_SOLARIS_LD, a configure probe of one
+   linker frozen into the compiler.  A compiler that serves many targets cannot
+   answer that at build time, so it is a runtime capability now.  Since the
+   probe was deleted the macro has been silently 0 -- i.e. every Solaris
+   configuration has been getting the GNU-ld answer with no diagnostic -- which
+   is also why targ_caps.solaris_ld defaults to false: this records the
+   behaviour rather than changing it.
+
+   The section op and the emitter are deliberately driven from the SAME flag
+   and are overridden together in config/sol2.h.  Splitting them is the failure
+   this project keeps finding: an emitter that writes .ctors.N while the
+   section op claims a single .ctors, or the reverse, is worse than either
+   choice made consistently.  */
+
+const char *
+solaris_ctors_section_asm_op (void)
+{
+  return targ_caps.solaris_ld ? SOLARIS_CTORS_SECTION_ASM_OP : NULL;
+}
+
+const char *
+solaris_dtors_section_asm_op (void)
+{
+  return targ_caps.solaris_ld ? SOLARIS_DTORS_SECTION_ASM_OP : NULL;
+}
+
+void
+solaris_asm_out_constructor (rtx symbol, int priority)
+{
+  if (targ_caps.solaris_ld)
+    default_ctor_section_asm_out_constructor (symbol, priority);
+  else
+    default_named_section_asm_out_constructor (symbol, priority);
+}
+
+void
+solaris_asm_out_destructor (rtx symbol, int priority)
+{
+  if (targ_caps.solaris_ld)
+    default_dtor_section_asm_out_destructor (symbol, priority);
+  else
+    default_named_section_asm_out_destructor (symbol, priority);
 }
