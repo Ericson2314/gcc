@@ -253,6 +253,13 @@ struct target_caps
      is textually the same code the `#else' arm used to run.  */
   bool gas_lcomm_with_alignment;
 
+  /* Assembler supports `.cv_ucomp' / `.cv_scomp', the CodeView compressed
+     integer directives.  Was HAVE_GAS_CV_UCOMP.  Unlike the rest of this
+     group its consumers are in dwarf2codeview.cc -- generic code, no target
+     header -- so this one converts to a real runtime branch with no dependence
+     on which target is primary.  */
+  bool gas_cv_ucomp;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

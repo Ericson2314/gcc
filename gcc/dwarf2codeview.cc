@@ -3385,7 +3385,10 @@ write_optimized_static_local_vars (dw_die_ref die)
   while (c != first_child);
 }
 
-#ifdef HAVE_GAS_CV_UCOMP
+/* The two functions below emit `.cv_ucomp'/`.cv_scomp'.  They used to be
+   compiled only under `#ifdef HAVE_GAS_CV_UCOMP'; the capability is a runtime
+   value now (targ_caps.gas_cv_ucomp), so they are always compiled and their
+   only caller decides at run time whether to use them.  */
 
 /* Given a DW_TAG_inlined_subroutine DIE within parent_func, return a pointer
    to the corresponding codeview_function, which is used to map addresses
@@ -3514,8 +3517,6 @@ write_binary_annotations (codeview_function *line_func, uint32_t func_id)
     }
 }
 
-#endif
-
 /* Write an S_INLINESITE symbol, to record that a function has been inlined
    inside another function.  */
 
@@ -3574,17 +3575,17 @@ write_s_inlinesite (dw_die_ref parent_func, dw_die_ref die)
   fprint_whex (asm_out_file, func_id);
   putc ('\n', asm_out_file);
 
-#ifdef HAVE_GAS_CV_UCOMP
-  line_func = find_line_function (parent_func, die);
+  /* The binary annotations are emitted with `.cv_ucomp'/`.cv_scomp'; without
+     them there is nothing to write, and the S_INLINESITE record simply carries
+     no line mapping.  Was `#ifdef HAVE_GAS_CV_UCOMP'.  */
+  line_func = (targ_caps.gas_cv_ucomp
+	       ? find_line_function (parent_func, die) : NULL);
 
   if (line_func)
     {
       write_binary_annotations (line_func, func_id);
       ASM_OUTPUT_ALIGN (asm_out_file, 2);
     }
-#else
-  (void) line_func;
-#endif
 
   targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
 
