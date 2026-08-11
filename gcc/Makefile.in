@@ -2222,6 +2222,7 @@ TREECHECKING = @TREECHECKING@
 FULL_DRIVER_NAME=gcc-$(version)$(exeext)
 
 MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
+ insn-config-union.list insn-config-*.part \
  insn-output.cc $(INSNRECOG_SEQ_SRC) insn-recog.h \
  $(INSNEMIT_SEQ_SRC) insn-extract.cc insn-peep.cc \
  insn-attr.h insn-attr-common.h insn-attrtab.cc insn-dfatab.cc \
@@ -3479,8 +3480,12 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
 # The "; @true" construct forces Make to recheck the timestamp on
 # the target file.
 
+# insn-config.h is NOT in this list: it is the one generated header whose
+# contents must be the same for every configured back end, so its rule passes
+# genconfig `-Uinsn-config-union.list -A$(multi_target_base)'.  See the
+# s-config rule below.
 simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
-			  insn-config.h insn-flags.h insn-target-def.h
+			  insn-flags.h insn-target-def.h
 
 simple_rtl_generated_c	= insn-automata.cc \
 			  insn-extract.cc insn-output.cc \
@@ -3510,6 +3515,55 @@ $(simple_generated_c:insn-%.cc=s-%): s-%: build/gen%$(build_exeext)
 	  $(filter insn-conditions.md,$^) > tmp-$*.cc
 	$(SHELL) $(srcdir)/../move-if-change tmp-$*.cc insn-$*.cc
 	$(STAMP) s-$*
+
+# THE SHARED insn-config ANSWER.
+#
+# `insn-config.h' is included by 90 non-config/ files -- recog.cc, the whole of
+# ira, lra-constraints.cc -- and until this rule existed it was byte-identical
+# to the PRIMARY back end's.  Measured in a two-target (i386 + aarch64) build
+# dir: NUM_REGISTER_FILTERS 0 against 4, MAX_DUP_OPERANDS 14 against 6,
+# MAX_INSNS_PER_SPLIT 5 against 4, MAX_INSNS_PER_PEEP2 6 against 4.  So the
+# middle end was compiled believing register filters do not exist while
+# insn-recog-aarch64-*.o was compiled using them, and insn-extract-i386.o
+# writes up to 14 dup operands into a recog_data whose dup_loc[] a build with
+# aarch64 primary would have sized at 6.  Neither is a link error.
+#
+# Every macro genconfig writes reaches a `#if' line, an array bound or a
+# bitfield width, so NONE of them can become a runtime targ_caps field --
+# ira-int.h:356 does both at once.  The six maxima therefore take the union
+# over every configured back end; `insn-config-union.list' is written by rules
+# multi-target-md.mk emits, and genconfig FAILS rather than defaulting if the
+# list does not name this base or omits a macro (apply_union_list in
+# genconfig.cc).  Grep the generated multi-target-md.mk for `-U', not this
+# comment, to check it is still wired up.
+#
+# The two HAVE_ booleans that reach a `#if defined' line in shared code
+# (HAVE_rotate, HAVE_rotatert) are checked for unanimity there rather than
+# unioned; an OR over booleans would claim a pattern exists for a back end
+# that has none, which is a silent wrong answer rather than a conservative one.
+CONFIG_UNION_FLAGS = -Uinsn-config-union.list -A$(multi_target_base)
+
+# An empty $(multi_target_base) leaves genconfig with a bare `-A' whose
+# argument is then the next word.  genconfig rejects `-A' with no attached
+# text, but it would then be reading `insn-config-union.list' looking for a
+# base named `-U'-something, and the message would point at the wrong thing.
+# Same check, same reason, as check_modes_union_base.
+check_config_union_base = \
+  test -n "$(multi_target_base)" || { \
+    echo "s-config: multi_target_base is empty; genconfig cannot be told" >&2; \
+    echo "  which back end insn-config.h is being generated for." >&2; \
+    echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+    echo "  targetm_common_<base>_common" >&2; \
+    exit 1; }
+
+insn-config.h: s-config; @true
+s-config: $(MD_DEPS) insn-conditions.md build/genconfig$(build_exeext) \
+  insn-config-union.list
+	@$(check_config_union_base)
+	$(RUN_GEN) build/genconfig$(build_exeext) $(CONFIG_UNION_FLAGS) \
+	  $(md_file) insn-conditions.md > tmp-config.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-config.h insn-config.h
+	$(STAMP) s-config
 
 # genemit splits its output into different files and doesn't write to
 # stdout. (but rather to tmp-emit-01.cc..tmp-emit-10.cc)

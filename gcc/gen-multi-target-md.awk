@@ -465,16 +465,45 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # FIRST_PSEUDO_REGISTER -- but that reaches a structure size, not the output.
   n = split("codes config attr attr-common", parts, " ");
   for (i = 1; i <= n; i++) {
+    # genconfig alone is given the SHARED insn-config answer: every macro it
+    # writes lands on a #if line, an array bound or a bitfield width, so none
+    # of them can become a runtime value and all of them must agree across
+    # back ends.  See the long note at the top of genconfig.cc, and
+    # emit_config_union below for how insn-config-union.list is built.
+    ufl = (parts[i] == "config") \
+	  ? sprintf(" -Uinsn-config-union.list -A%s", cpu) : "";
+    udep = (parts[i] == "config") ? " insn-config-union.list" : "";
+
     printf "insn-%s-%s.h: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu, parts[i], cpu;
-    printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
-    printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
-	   parts[i], cpu;
+    printf "  $(srcdir)/config/%s insn-conditions-%s.md%s\n", md, cpu, udep;
+    printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext)%s $(srcdir)/common.md \\\n",
+	   parts[i], cpu, ufl;
     printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
     printf "\t  > tmp-%s-%s.h\n", parts[i], cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.h $@\n\n",
 	   parts[i], cpu;
   }
+
+  # This back end's contribution to the union file, from the same generator
+  # and the same .md files.  Kept as a separate file per back end so that the
+  # union file's rule is a concatenation and cannot half-succeed.
+  printf "insn-config-%s.part: build/genconfig-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	 cpu, cpu;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t$(RUN_GEN) build/genconfig-%s$(build_exeext) -l -A%s \\\n", cpu, cpu;
+  printf "\t  $(srcdir)/common.md $(srcdir)/config/%s insn-conditions-%s.md \\\n",
+	 md, cpu;
+  printf "\t  > tmp-config-%s.part\n", cpu;
+  printf "\t@grep -q '^base %s$$' tmp-config-%s.part || { \\\n", cpu, cpu;
+  printf "\t  echo 'insn-config-%s.part: no \"base %s\" line;' >&2; \\\n", cpu, cpu;
+  printf "\t  echo '  the union would then be taken over the OTHER back ends' >&2; \\\n";
+  printf "\t  echo '  and this one would be sized for somebody else.' >&2; \\\n";
+  printf "\t  exit 1; }\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-config-%s.part $@\n\n",
+	 cpu;
+  config_parts = config_parts " insn-config-" cpu ".part";
+  config_bases = config_bases " " cpu;
 
   # genautomata is the one generator that needs a library the others do not.
   printf "build/genautomata-%s$(build_exeext): BUILD_LIBS += -lm\n\n", cpu;
@@ -1016,7 +1045,50 @@ $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_source_specs();
-		    emit_modes_union(); emit_inc_dirs() }
+		    emit_modes_union(); emit_config_union();
+		    emit_inc_dirs() }
+
+# THE SHARED insn-config ANSWER.  Same shape as the mode numbering below, and
+# for the same reason: `insn-config.h' is included by 90 non-config/ files and
+# was byte-identical to the PRIMARY's, so the middle end was compiled believing
+# whatever the primary happens to say.  Measured in a two-target build dir:
+# NUM_REGISTER_FILTERS 0 for i386 and 4 for aarch64, MAX_DUP_OPERANDS 14 vs 6,
+# MAX_INSNS_PER_SPLIT 5 vs 4, MAX_INSNS_PER_PEEP2 6 vs 4, HAVE_lo_sum 0 vs 1.
+#
+# Unlike the modes this cannot be a selector, ever.  ira-int.h:356 reads
+# NUM_REGISTER_FILTERS with `#ifndef'/`#elif' AND sizes a bitfield with it, and
+# recog.h:69 sizes another; regrename.cc:71 has MAX_RECOG_OPERANDS on a `#if'
+# line.  A preprocessor line cannot read a targ_caps field.  So the six maxima
+# get ONE value, the union over every configured back end, and genconfig fails
+# loudly rather than defaulting -- see apply_union_list in genconfig.cc.
+#
+# Check it is wired up against the GENERATED fragment, never against this file:
+#
+#	grep -c ' -Uinsn-config-union.list ' multi-target-md.mk
+function emit_config_union(   nb, tmp_bases) {
+  nb = split(config_bases, tmp_bases, " ");
+  if (nb == 0) {
+    print "gen-multi-target-md.awk: no back ends for insn-config-union.list" \
+	  > "/dev/stderr";
+    exit 1;
+  }
+
+  printf "# The shared insn-config answer; see emit_config_union in\n";
+  printf "# $(srcdir)/gen-multi-target-md.awk.\n";
+  printf "insn-config-union.list:%s\n", config_parts;
+  printf "\tcat%s > tmp-insn-config-union.list\n", config_parts;
+  # A short list is the failure mode that would otherwise be silent: the union
+  # would be taken over fewer back ends and every insn-config.h would come out
+  # undersized, with nothing said.  genconfig's -U catches the case where the
+  # MISSING base is the one being generated; this catches the rest.
+  printf "\t@test `grep -c '^base ' tmp-insn-config-union.list` -eq %d || { \\\n", nb;
+  printf "\t  echo 'insn-config-union.list: expected %d base lines, got' \\\n", nb;
+  printf "\t       `grep -c '^base ' tmp-insn-config-union.list`; \\\n";
+  printf "\t  echo '  a short list makes the union too small and every'; \\\n";
+  printf "\t  echo '  insn-config.h silently undersized.'; \\\n";
+  printf "\t  exit 1; } >&2\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-insn-config-union.list $@\n\n";
+}
 
 # THE SHARED MODE NUMBERING.
 #
