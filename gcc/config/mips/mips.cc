@@ -10335,12 +10335,13 @@ mips_file_start (void)
 	     "\t.previous\n", TARGET_LONG64 ? 64 : 32);
 
   /* Record the NaN encoding.  */
-  if (HAVE_AS_NAN || mips_nan != MIPS_IEEE_754_DEFAULT)
+  if (targ_caps.as_mips_nan || mips_nan != MIPS_IEEE_754_DEFAULT)
     fprintf (asm_out_file, "\t.nan\t%s\n",
 	     mips_nan == MIPS_IEEE_754_2008 ? "2008" : "legacy");
 
-#ifdef HAVE_AS_DOT_MODULE
   /* Record the FP ABI.  See below for comments.  */
+  if (targ_caps.as_mips_dot_module)
+    {
   if (TARGET_NO_FLOAT)
     {
       if (HAVE_AS_GNU_ATTRIBUTE)
