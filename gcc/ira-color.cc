@@ -2018,9 +2018,7 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
   int saved_nregs;
   enum reg_class rclass;
   int add_cost;
-#ifdef STACK_REGS
   bool no_stack_reg_p;
-#endif
   auto_bitmap allocnos_to_spill;
   HARD_REG_SET soft_conflict_regs = {};
   int entry_freq = REG_FREQ_FROM_BB (ENTRY_BLOCK_PTR_FOR_FN (cfun));
@@ -2040,9 +2038,7 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
   mem_cost = 0;
   memset (costs, 0, sizeof (int) * class_size);
   memset (full_costs, 0, sizeof (int) * class_size);
-#ifdef STACK_REGS
   no_stack_reg_p = false;
-#endif
   if (! retry_p)
     start_update_cost ();
   mem_cost += ALLOCNO_UPDATED_MEMORY_COST (a);
@@ -2062,9 +2058,7 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
   ira_allocate_and_copy_costs (&ALLOCNO_UPDATED_HARD_REG_COSTS (a),
 			       aclass, ALLOCNO_HARD_REG_COSTS (a));
   a_costs = ALLOCNO_UPDATED_HARD_REG_COSTS (a);
-#ifdef STACK_REGS
   no_stack_reg_p = no_stack_reg_p || ALLOCNO_TOTAL_NO_STACK_REG_P (a);
-#endif
   cost = ALLOCNO_UPDATED_CLASS_COST (a);
   for (i = 0; i < class_size; i++)
     if (a_costs != NULL)
@@ -2240,11 +2234,8 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
   for (i = 0; i < class_size; i++)
     {
       hard_regno = ira_class_hard_regs[aclass][i];
-#ifdef STACK_REGS
-      if (no_stack_reg_p
-	  && FIRST_STACK_REG <= hard_regno && hard_regno <= LAST_STACK_REG)
+      if (no_stack_reg_p && targetm.stack_regs ().includes_p (hard_regno))
 	continue;
-#endif
       if (! check_hard_reg_p (a, hard_regno,
 			      conflicting_regs, profitable_hard_regs))
 	continue;
@@ -5316,9 +5307,7 @@ fast_allocation (void)
 {
   int i, j, k, num, class_size, hard_regno, best_hard_regno, cost, min_cost;
   int *costs;
-#ifdef STACK_REGS
   bool no_stack_reg_p;
-#endif
   enum reg_class aclass;
   machine_mode mode;
   ira_allocno_t a;
@@ -5361,9 +5350,7 @@ fast_allocation (void)
 				 conflict_hard_regs))
 	continue;
       mode = ALLOCNO_MODE (a);
-#ifdef STACK_REGS
       no_stack_reg_p = ALLOCNO_NO_STACK_REG_P (a);
-#endif
       class_size = ira_class_hard_regs_num[aclass];
       costs = ALLOCNO_HARD_REG_COSTS (a);
       min_cost = INT_MAX;
@@ -5371,11 +5358,8 @@ fast_allocation (void)
       for (j = 0; j < class_size; j++)
 	{
 	  hard_regno = ira_class_hard_regs[aclass][j];
-#ifdef STACK_REGS
-	  if (no_stack_reg_p && FIRST_STACK_REG <= hard_regno
-	      && hard_regno <= LAST_STACK_REG)
+	  if (no_stack_reg_p && targetm.stack_regs ().includes_p (hard_regno))
 	    continue;
-#endif
 	  if (ira_hard_reg_set_intersection_p (hard_regno, mode, conflict_hard_regs)
 	      || (TEST_HARD_REG_BIT
 		  (ira_prohibited_class_mode_regs[aclass][mode], hard_regno)))

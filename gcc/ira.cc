@@ -748,14 +748,14 @@ static void
 setup_stack_reg_pressure_class (void)
 {
   ira_stack_reg_pressure_class = NO_REGS;
-#ifdef STACK_REGS
   {
+    stack_reg_range sr = targetm.stack_regs ();
     int i, best, size;
     enum reg_class cl;
     HARD_REG_SET temp_hard_regset2;
 
     CLEAR_HARD_REG_SET (temp_hard_regset);
-    for (i = FIRST_STACK_REG; i <= LAST_STACK_REG; i++)
+    for (i = sr.first; i <= sr.last; i++)
       SET_HARD_REG_BIT (temp_hard_regset, i);
     best = 0;
     for (i = 0; i < ira_pressure_classes_num; i++)
@@ -770,7 +770,6 @@ setup_stack_reg_pressure_class (void)
 	  }
       }
   }
-#endif
 }
 
 /* Find pressure classes which are register classes for which we

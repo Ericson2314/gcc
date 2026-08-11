@@ -4495,9 +4495,7 @@ rest_of_clean_state (void)
   reload_completed = 0;
   post_ra_split_completed = false;
   epilogue_completed = 0;
-#ifdef STACK_REGS
   regstack_completed = 0;
-#endif
 
   /* Clear out the insn_length contents now that they are no
      longer valid.  */
@@ -4594,9 +4592,7 @@ static void
 collect_fn_hard_reg_usage (void)
 {
   rtx_insn *insn;
-#ifdef STACK_REGS
   int i;
-#endif
   struct cgraph_rtl_info *node;
   HARD_REG_SET function_used_regs;
 
@@ -4607,13 +4603,11 @@ collect_fn_hard_reg_usage (void)
   /* Be conservative - mark fixed and global registers as used.  */
   function_used_regs = fixed_reg_set;
 
-#ifdef STACK_REGS
-  /* Handle STACK_REGS conservatively, since the df-framework does not
+  /* Handle stack registers conservatively, since the df-framework does not
      provide accurate information for them.  */
 
-  for (i = FIRST_STACK_REG; i <= LAST_STACK_REG; i++)
+  for (i = targetm.stack_regs ().first; i <= targetm.stack_regs ().last; i++)
     SET_HARD_REG_BIT (function_used_regs, i);
-#endif
 
   for (insn = get_insns (); insn != NULL_RTX; insn = next_insn (insn))
     {

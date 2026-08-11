@@ -1317,7 +1317,9 @@ reload (rtx_insn *first, int global)
 static void
 maybe_fix_stack_asms (void)
 {
-#ifdef STACK_REGS
+  if (targetm.stack_regs ().empty_p ())
+    return;
+
   const char *constraints[MAX_RECOG_OPERANDS];
   machine_mode operand_mode[MAX_RECOG_OPERANDS];
   class insn_chain *chain;
@@ -1342,7 +1344,7 @@ maybe_fix_stack_asms (void)
       for (i = 0; i < XVECLEN (pat, 0); i++)
 	{
 	  rtx t = XVECEXP (pat, 0, i);
-	  if (GET_CODE (t) == CLOBBER && STACK_REG_P (XEXP (t, 0)))
+	  if (GET_CODE (t) == CLOBBER && stack_reg_p (XEXP (t, 0)))
 	    SET_HARD_REG_BIT (clobbered, REGNO (XEXP (t, 0)));
 	}
 
@@ -1412,7 +1414,6 @@ maybe_fix_stack_asms (void)
 	}
     }
 
-#endif
 }
 
 /* Copy the global variables n_reloads and rld into the corresponding elts

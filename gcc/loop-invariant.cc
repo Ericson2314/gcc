@@ -1364,7 +1364,7 @@ get_inv_cost (struct invariant *inv, int *comp_cost, unsigned *regs_needed,
       || !inv->def->can_prop_to_addr_uses)
     (*comp_cost) += inv->cost * inv->eqno;
 
-#ifdef STACK_REGS
+  if (!targetm.stack_regs ().empty_p ())
   {
     /* Hoisting constant pool constants into stack regs may cost more than
        just single register.  On x87, the balance is affected both by the
@@ -1393,7 +1393,6 @@ get_inv_cost (struct invariant *inv, int *comp_cost, unsigned *regs_needed,
 	  regs_needed[0] += 2;
       }
   }
-#endif
 
   EXECUTE_IF_SET_IN_BITMAP (inv->depends_on, 0, depno, bi)
     {

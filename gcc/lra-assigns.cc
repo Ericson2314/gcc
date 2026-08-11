@@ -562,11 +562,10 @@ find_hard_regno_for_1 (int regno, int *cost, int try_only_hard_regno,
 	adjust_hard_regno_cost
 	  (hard_regno, -lra_reg_info[regno].preferred_hard_regno_profit2);
     }
-#ifdef STACK_REGS
   if (lra_reg_info[regno].no_stack_p)
-    for (i = FIRST_STACK_REG; i <= LAST_STACK_REG; i++)
+    for (i = targetm.stack_regs ().first;
+	 i <= targetm.stack_regs ().last; i++)
       SET_HARD_REG_BIT (conflict_set, i);
-#endif
   sparseset_clear_bit (conflict_reload_and_inheritance_pseudos, regno);
   val = lra_reg_info[regno].val;
   offset = lra_reg_info[regno].offset;

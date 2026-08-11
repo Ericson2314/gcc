@@ -506,10 +506,8 @@ ira_create_allocno (int regno, bool cap_p,
   ALLOCNO_CHEAP_CALLS_CROSSED_NUM (a) = 0;
   ALLOCNO_CROSSED_CALLS_ABIS (a) = 0;
   CLEAR_HARD_REG_SET (ALLOCNO_CROSSED_CALLS_CLOBBERED_REGS (a));
-#ifdef STACK_REGS
   ALLOCNO_NO_STACK_REG_P (a) = false;
   ALLOCNO_TOTAL_NO_STACK_REG_P (a) = false;
-#endif
   ALLOCNO_DONT_REASSIGN_P (a) = false;
   ALLOCNO_BAD_SPILL_P (a) = false;
   ALLOCNO_ASSIGNED_P (a) = false;
@@ -604,12 +602,10 @@ merge_hard_reg_conflicts (ira_allocno_t from, ira_allocno_t to,
       OBJECT_TOTAL_CONFLICT_HARD_REGS (to_obj)
 	|= OBJECT_TOTAL_CONFLICT_HARD_REGS (from_obj);
     }
-#ifdef STACK_REGS
   if (!total_only && ALLOCNO_NO_STACK_REG_P (from))
     ALLOCNO_NO_STACK_REG_P (to) = true;
   if (ALLOCNO_TOTAL_NO_STACK_REG_P (from))
     ALLOCNO_TOTAL_NO_STACK_REG_P (to) = true;
-#endif
 }
 
 /* Update hard register conflict information for all objects associated with
@@ -2238,7 +2234,6 @@ low_pressure_loop_node_p (ira_loop_tree_node_t node)
   return true;
 }
 
-#ifdef STACK_REGS
 /* Return TRUE if LOOP has a complex enter or exit edge.  We don't
    form a region from such loop if the target use stack register
    because reg-stack.cc cannot deal with such edges.  */
@@ -2263,7 +2258,6 @@ loop_with_complex_edge_p (class loop *loop)
       }
   return res;
 }
-#endif
 
 /* Sort loops for marking them for removal.  We put already marked
    loops first, then less frequent loops next, and then outer loops
@@ -2325,9 +2319,8 @@ mark_loops_for_removal (void)
 	ira_loop_nodes[i].to_remove_p
 	  = ((low_pressure_loop_node_p (ira_loop_nodes[i].parent)
 	      && low_pressure_loop_node_p (&ira_loop_nodes[i]))
-#ifdef STACK_REGS
-	     || loop_with_complex_edge_p (ira_loop_nodes[i].loop)
-#endif
+	     || (!targetm.stack_regs ().empty_p ()
+		 && loop_with_complex_edge_p (ira_loop_nodes[i].loop))
 	     );
       }
   qsort (sorted_loops, n, sizeof (ira_loop_tree_node_t), loop_compare_func);
@@ -2649,10 +2642,8 @@ remove_low_level_allocnos (void)
 	  FOR_EACH_ALLOCNO_OBJECT (a, obj, oi)
 	    OBJECT_CONFLICT_HARD_REGS (obj)
 	      = OBJECT_TOTAL_CONFLICT_HARD_REGS (obj);
-#ifdef STACK_REGS
 	  if (ALLOCNO_TOTAL_NO_STACK_REG_P (a))
 	    ALLOCNO_NO_STACK_REG_P (a) = true;
-#endif
 	}
       else
 	{
@@ -3190,9 +3181,7 @@ ira_flattening (int max_regno_before_emit, int ira_max_point_before_emit)
       FOR_EACH_ALLOCNO_OBJECT (a, obj, oi)
 	OBJECT_TOTAL_CONFLICT_HARD_REGS (obj)
 	  = OBJECT_CONFLICT_HARD_REGS (obj);
-#ifdef STACK_REGS
       ALLOCNO_TOTAL_NO_STACK_REG_P (a) = ALLOCNO_NO_STACK_REG_P (a);
-#endif
     }
   /* Fix final allocno attributes.  */
   for (i = max_regno_before_emit - 1; i >= FIRST_PSEUDO_REGISTER; i--)

@@ -710,6 +710,16 @@ contains_mem_rtx_p (rtx x)
   return false;
 }
 
+/* True if X is a register in the target's stack-register file.  This is the
+   runtime form of i386's STACK_REG_P macro; the range is empty, so the
+   answer is false, on every other target.  */
+
+bool
+stack_reg_p (const_rtx x)
+{
+  return REG_P (x) && targetm.stack_regs ().includes_p (REGNO (x));
+}
+
 /* Return true if X is an address that is known to not be zero.  */
 
 bool

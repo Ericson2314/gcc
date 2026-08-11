@@ -4631,6 +4631,10 @@ extern rtx extract_mem_from_operand (rtx);
 
 extern bool stack_regs_mentioned (const_rtx insn);
 
+/* True if X is a register in the target's stack-register file.  Runtime
+   form of i386's STACK_REG_P; false on every target that has none.  */
+extern bool stack_reg_p (const_rtx x);
+
 /* In toplev.cc */
 extern GTY(()) rtx stack_limit_rtx;
 

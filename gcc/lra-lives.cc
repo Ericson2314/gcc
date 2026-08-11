@@ -1093,12 +1093,14 @@ process_bb_lives (basic_block bb, int &curr_point, bool dead_insn_p)
       HARD_REG_SET clobbers;
 
       CLEAR_HARD_REG_SET (clobbers);
-#ifdef STACK_REGS
-      EXECUTE_IF_SET_IN_SPARSESET (pseudos_live, px)
-	lra_reg_info[px].no_stack_p = true;
-      for (px = FIRST_STACK_REG; px <= LAST_STACK_REG; px++)
-	SET_HARD_REG_BIT (clobbers, px);
-#endif
+      if (!targetm.stack_regs ().empty_p ())
+	{
+	  EXECUTE_IF_SET_IN_SPARSESET (pseudos_live, px)
+	    lra_reg_info[px].no_stack_p = true;
+	  for (px = targetm.stack_regs ().first;
+	       px <= targetm.stack_regs ().last; px++)
+	    SET_HARD_REG_BIT (clobbers, px);
+	}
       /* No need to record conflicts for call clobbered regs if we
 	 have nonlocal labels around, as we don't ever try to
 	 allocate such regs in this case.  */
@@ -1393,9 +1395,7 @@ lra_create_live_ranges_1 (bool all_p, bool dead_insn_p)
       lra_reg_info[i].preferred_hard_regno2 = -1;
       lra_reg_info[i].preferred_hard_regno_profit1 = 0;
       lra_reg_info[i].preferred_hard_regno_profit2 = 0;
-#ifdef STACK_REGS
       lra_reg_info[i].no_stack_p = false;
-#endif
       /* The biggest mode is already set but its value might be to
 	 conservative because of recent transformation.  Here in this
 	 file we recalculate it again as it costs practically

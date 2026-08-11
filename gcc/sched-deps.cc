@@ -2448,18 +2448,17 @@ sched_analyze_1 (class deps_desc *deps, rtx x, rtx_insn *insn)
 
       sched_analyze_reg (deps, regno, mode, code, insn);
 
-#ifdef STACK_REGS
       /* Treat all writes to a stack register as modifying the TOS.  */
-      if (regno >= FIRST_STACK_REG && regno <= LAST_STACK_REG)
+      if (targetm.stack_regs ().includes_p (regno))
 	{
-	  /* Avoid analyzing the same register twice.  */
-	  if (regno != FIRST_STACK_REG)
-	    sched_analyze_reg (deps, FIRST_STACK_REG, mode, code, insn);
+	  int first = targetm.stack_regs ().first;
 
-	  add_to_hard_reg_set (&implicit_reg_pending_uses, mode,
-			       FIRST_STACK_REG);
+	  /* Avoid analyzing the same register twice.  */
+	  if (regno != (unsigned int) first)
+	    sched_analyze_reg (deps, first, mode, code, insn);
+
+	  add_to_hard_reg_set (&implicit_reg_pending_uses, mode, first);
 	}
-#endif
       if (!deps->readonly && regno == STACK_POINTER_REGNUM)
 	{
 	  /* Please see PR114115.  We have insn modifying memory on the stack
@@ -2608,16 +2607,16 @@ sched_analyze_2 (class deps_desc *deps, rtx x, rtx_insn *insn)
 
 	sched_analyze_reg (deps, regno, mode, USE, insn);
 
-#ifdef STACK_REGS
       /* Treat all reads of a stack register as modifying the TOS.  */
-      if (regno >= FIRST_STACK_REG && regno <= LAST_STACK_REG)
+      if (targetm.stack_regs ().includes_p (regno))
 	{
+	  int first = targetm.stack_regs ().first;
+
 	  /* Avoid analyzing the same register twice.  */
-	  if (regno != FIRST_STACK_REG)
-	    sched_analyze_reg (deps, FIRST_STACK_REG, mode, USE, insn);
-	  sched_analyze_reg (deps, FIRST_STACK_REG, mode, SET, insn);
+	  if (regno != (unsigned int) first)
+	    sched_analyze_reg (deps, first, mode, USE, insn);
+	  sched_analyze_reg (deps, first, mode, SET, insn);
 	}
-#endif
 
 	if (cslr_p && sched_deps_info->finish_rhs)
 	  sched_deps_info->finish_rhs ();

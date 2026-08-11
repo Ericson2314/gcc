@@ -807,13 +807,11 @@ static basic_block current_bb;
 static bool
 want_to_gcse_p (rtx x, machine_mode mode, HOST_WIDE_INT *max_distance_ptr)
 {
-#ifdef STACK_REGS
   /* On register stack architectures, don't GCSE constants from the
      constant pool, as the benefits are often swamped by the overhead
      of shuffling the register stack between basic blocks.  */
-  if (IS_STACK_MODE (GET_MODE (x)))
+  if (!targetm.stack_regs ().empty_p () && IS_STACK_MODE (GET_MODE (x)))
     x = avoid_constant_pool_reference (x);
-#endif
 
   /* GCSE'ing constants:
 

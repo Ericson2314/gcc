@@ -305,10 +305,9 @@ struct hard_regs_data
   /* All registers that are used or call used.  */
   HARD_REG_SET regs_ever_used;
 
-#ifdef STACK_REGS
-  /* Stack registers.  */
+  /* Stack registers.  Present unconditionally: this struct must not have a
+     layout that depends on a target macro.  */
   HARD_REG_SET stack_regs;
-#endif
 };
 
 /* Holds the results of computation of available for renaming and
@@ -1127,12 +1126,11 @@ init_hard_regs_data (void)
   for (cur_reg = 0; cur_reg < FIRST_PSEUDO_REGISTER; cur_reg++)
     CLEAR_HARD_REG_SET (sel_hrd.regs_for_rename[cur_reg]);
 
-#ifdef STACK_REGS
   CLEAR_HARD_REG_SET (sel_hrd.stack_regs);
 
-  for (cur_reg = FIRST_STACK_REG; cur_reg <= LAST_STACK_REG; cur_reg++)
+  for (cur_reg = targetm.stack_regs ().first;
+       cur_reg <= targetm.stack_regs ().last; cur_reg++)
     SET_HARD_REG_BIT (sel_hrd.stack_regs, cur_reg);
-#endif
 }
 
 /* Mark hardware regs in REG_RENAME_P that are not suitable
@@ -1204,17 +1202,15 @@ mark_unavailable_hard_regs (def_t def, struct reg_rename *reg_rename_p,
 			     Pmode, HARD_FRAME_POINTER_REGNUM);
     }
 
-#ifdef STACK_REGS
-  /* For the stack registers the presence of FIRST_STACK_REG in USED_REGS
+  /* For the stack registers the presence of the first stack reg in USED_REGS
      is equivalent to as if all stack regs were in this set.
      I.e. no stack register can be renamed, and even if it's an original
      register here we make sure it won't be lifted over it's previous def
-     (it's previous def will appear as if it's a FIRST_STACK_REG def.
+     (it's previous def will appear as if it's a first-stack-reg def.
      The HARD_REGNO_RENAME_OK covers other cases in condition below.  */
-  if (IN_RANGE (REGNO (orig_dest), FIRST_STACK_REG, LAST_STACK_REG)
-      && REGNO_REG_SET_P (used_regs, FIRST_STACK_REG))
+  if (targetm.stack_regs ().includes_p (REGNO (orig_dest))
+      && REGNO_REG_SET_P (used_regs, targetm.stack_regs ().first))
     reg_rename_p->unavailable_hard_regs |= sel_hrd.stack_regs;
-#endif
 
   mode = GET_MODE (orig_dest);
 

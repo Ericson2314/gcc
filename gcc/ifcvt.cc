@@ -184,13 +184,11 @@ cheap_bb_rtx_cost_p (const_basic_block bb,
 	     register stack.  Unfortunately, correctly recognizing and
 	     accounting for this additional overhead is tricky, so for
 	     now we simply prohibit such speculative execution.  */
-#ifdef STACK_REGS
 	  {
 	    rtx set = single_set (insn);
-	    if (set && STACK_REG_P (SET_DEST (set)))
+	    if (set && stack_reg_p (SET_DEST (set)))
 	      return false;
 	  }
-#endif
 
 	  count += cost;
 	  if (count >= max_cost)

@@ -2480,12 +2480,10 @@ deps_init_id_note_reg_set (int regno)
   if (IDATA_TYPE (deps_init_id_data.id) != PC)
     SET_REGNO_REG_SET (IDATA_REG_SETS (deps_init_id_data.id), regno);
 
-#ifdef STACK_REGS
   /* Make instructions that set stack registers to be ineligible for
      renaming to avoid issues with find_used_regs.  */
-  if (IN_RANGE (regno, FIRST_STACK_REG, LAST_STACK_REG))
+  if (targetm.stack_regs ().includes_p (regno))
     deps_init_id_data.force_use_p = true;
-#endif
 }
 
 /* Note a clobber of REGNO.  */
@@ -2634,15 +2632,13 @@ maybe_downgrade_id_to_use (idata_t id, insn_t insn)
           break;
         }
 
-#ifdef STACK_REGS
       /* Make instructions that set stack registers to be ineligible for
 	 renaming to avoid issues with find_used_regs.  */
-      if (IN_RANGE (DF_REF_REGNO (def), FIRST_STACK_REG, LAST_STACK_REG))
+      if (targetm.stack_regs ().includes_p (DF_REF_REGNO (def)))
 	{
 	  must_be_use = true;
 	  break;
 	}
-#endif
     }
 
   if (must_be_use)
@@ -2683,12 +2679,11 @@ setup_id_reg_sets (idata_t id, insn_t insn)
         {
 	  SET_REGNO_REG_SET (IDATA_REG_SETS (id), regno);
 
-#ifdef STACK_REGS
 	  /* For stack registers, treat writes to them as writes
 	     to the first one to be consistent with sched-deps.cc.  */
-	  if (IN_RANGE (regno, FIRST_STACK_REG, LAST_STACK_REG))
-	    SET_REGNO_REG_SET (IDATA_REG_SETS (id), FIRST_STACK_REG);
-#endif
+	  if (targetm.stack_regs ().includes_p (regno))
+	    SET_REGNO_REG_SET (IDATA_REG_SETS (id),
+			       targetm.stack_regs ().first);
 	}
       /* Mark special refs that generate read/write def pair.  */
       if (DF_REF_FLAGS_IS_SET (def, DF_REF_CONDITIONAL)
@@ -2708,12 +2703,11 @@ setup_id_reg_sets (idata_t id, insn_t insn)
 	{
 	  SET_REGNO_REG_SET (IDATA_REG_USES (id), regno);
 
-#ifdef STACK_REGS
 	  /* For stack registers, treat reads from them as reads from
 	     the first one to be consistent with sched-deps.cc.  */
-	  if (IN_RANGE (regno, FIRST_STACK_REG, LAST_STACK_REG))
-	    SET_REGNO_REG_SET (IDATA_REG_USES (id), FIRST_STACK_REG);
-#endif
+	  if (targetm.stack_regs ().includes_p (regno))
+	    SET_REGNO_REG_SET (IDATA_REG_USES (id),
+			       targetm.stack_regs ().first);
 	}
     }
 

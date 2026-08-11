@@ -3209,20 +3209,11 @@ df_print_note (const char *prefix, rtx_insn *insn, rtx note)
    analyze because of all of the pushes, pops and rotations.  Thus, we
    just leave the notes alone. */
 
-#ifdef STACK_REGS
 static inline bool
 df_ignore_stack_reg (int regno)
 {
-  return regstack_completed
-    && IN_RANGE (regno, FIRST_STACK_REG, LAST_STACK_REG);
+  return regstack_completed && targetm.stack_regs ().includes_p (regno);
 }
-#else
-static inline bool
-df_ignore_stack_reg (int regno ATTRIBUTE_UNUSED)
-{
-  return false;
-}
-#endif
 
 
 /* Remove all of the REG_DEAD or REG_UNUSED notes from INSN.  */

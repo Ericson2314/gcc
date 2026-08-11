@@ -1663,7 +1663,7 @@ process_bb_node_lives (ira_loop_tree_node_t loop_tree_node)
 	 edges.  */
       if (bb_has_abnormal_pred (bb))
 	{
-#ifdef STACK_REGS
+	  if (!targetm.stack_regs ().empty_p ())
 	  EXECUTE_IF_SET_IN_SPARSESET (objects_live, px)
 	    {
 	      ira_allocno_t a = OBJECT_ALLOCNO (ira_object_id_map[px]);
@@ -1671,9 +1671,9 @@ process_bb_node_lives (ira_loop_tree_node_t loop_tree_node)
 	      ALLOCNO_NO_STACK_REG_P (a) = true;
 	      ALLOCNO_TOTAL_NO_STACK_REG_P (a) = true;
 	    }
-	  for (px = FIRST_STACK_REG; px <= LAST_STACK_REG; px++)
+	  for (px = targetm.stack_regs ().first;
+	       px <= targetm.stack_regs ().last; px++)
 	    make_hard_regno_live (px);
-#endif
 	  /* No need to record conflicts for call clobbered regs if we
 	     have nonlocal labels around, as we don't ever try to
 	     allocate such regs in this case.  */

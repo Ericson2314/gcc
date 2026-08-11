@@ -929,14 +929,11 @@ collect_non_operand_hard_regs (rtx_insn *insn, rtx *x,
 	    {
 	      /* This is a new hard regno or the info cannot be
 		 integrated into the found structure.	 */
-#ifdef STACK_REGS
 	      early_clobber
 		= (early_clobber
 		   /* This clobber is to inform popping floating
 		      point stack only.  */
-		   && ! (FIRST_STACK_REG <= regno
-			 && regno <= LAST_STACK_REG));
-#endif
+		   && !targetm.stack_regs ().includes_p (regno));
 	      list = new_insn_reg (data->insn, regno, type, mode, subreg_p,
 				   early_clobber ? ALL_ALTERNATIVES : 0, list);
 	    }
@@ -1356,9 +1353,7 @@ static inline void
 initialize_lra_reg_info_element (int i)
 {
   bitmap_initialize (&lra_reg_info[i].insn_bitmap, &reg_obstack);
-#ifdef STACK_REGS
   lra_reg_info[i].no_stack_p = false;
-#endif
   CLEAR_HARD_REG_SET (lra_reg_info[i].conflict_hard_regs);
   CLEAR_HARD_REG_SET (lra_reg_info[i].exclude_start_hard_regs);
   lra_reg_info[i].preferred_hard_regno1 = -1;

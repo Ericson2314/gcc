@@ -739,13 +739,11 @@ globalize_reg (tree decl, int i)
 {
   location_t loc = DECL_SOURCE_LOCATION (decl);
 
-#ifdef STACK_REGS
-  if (IN_RANGE (i, FIRST_STACK_REG, LAST_STACK_REG))
+  if (targetm.stack_regs ().includes_p (i))
     {
       error ("stack register used for global register variable");
       return;
     }
-#endif
 
   if (fixed_regs[i] == 0 && no_global_reg_vars)
     error_at (loc, "global register variable follows a function definition");

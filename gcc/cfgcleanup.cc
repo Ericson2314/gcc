@@ -1239,7 +1239,6 @@ old_insns_match_p (int mode ATTRIBUTE_UNUSED, rtx_insn *i1, rtx_insn *i2)
   if (RTX_FRAME_RELATED_P (i1) && !insns_have_identical_cfa_notes (i1, i2))
     return dir_none;
 
-#ifdef STACK_REGS
   /* If cross_jump_death_matters is not 0, the insn's mode
      indicates whether or not the insn contains any stack-like
      regs.  */
@@ -1257,17 +1256,16 @@ old_insns_match_p (int mode ATTRIBUTE_UNUSED, rtx_insn *i1, rtx_insn *i2)
       CLEAR_HARD_REG_SET (i2_regset);
 
       for (note = REG_NOTES (i1); note; note = XEXP (note, 1))
-	if (REG_NOTE_KIND (note) == REG_DEAD && STACK_REG_P (XEXP (note, 0)))
+	if (REG_NOTE_KIND (note) == REG_DEAD && stack_reg_p (XEXP (note, 0)))
 	  SET_HARD_REG_BIT (i1_regset, REGNO (XEXP (note, 0)));
 
       for (note = REG_NOTES (i2); note; note = XEXP (note, 1))
-	if (REG_NOTE_KIND (note) == REG_DEAD && STACK_REG_P (XEXP (note, 0)))
+	if (REG_NOTE_KIND (note) == REG_DEAD && stack_reg_p (XEXP (note, 0)))
 	  SET_HARD_REG_BIT (i2_regset, REGNO (XEXP (note, 0)));
 
       if (i1_regset != i2_regset)
 	return dir_none;
     }
-#endif
 
   if (reload_completed
       ? rtx_renumbered_equal_p (p1, p2) : rtx_equal_p (p1, p2))
