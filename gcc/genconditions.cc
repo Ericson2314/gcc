@@ -34,6 +34,22 @@
 #include "read-md.h"
 #include "gensupport.h"
 
+/* The back-end-specific headers named in the generated gencondmd.cc.  Set per
+   back end when this program is built once per back end; the defaults are the
+   single-target names.  See write_header.  */
+#ifndef GENCONDMD_TM_H
+#define GENCONDMD_TM_H "tm.h"
+#endif
+#ifndef GENCONDMD_INSN_CONSTANTS_H
+#define GENCONDMD_INSN_CONSTANTS_H "insn-constants.h"
+#endif
+#ifndef GENCONDMD_TM_P_H
+#define GENCONDMD_TM_P_H "tm_p.h"
+#endif
+#ifndef GENCONDMD_TM_CONSTRS_H
+#define GENCONDMD_TM_CONSTRS_H "tm-constrs.h"
+#endif
+
 /* so we can include except.h in the generated file.  */
 static int saw_eh_return;
 
@@ -46,7 +62,7 @@ static int write_one_condition	(void **, void *);
 static void
 write_header (void)
 {
-  puts ("\
+  printf ("\
 /* Generated automatically by the program `genconditions' from the target\n\
    machine description file.  */\n\
 \n\
@@ -70,12 +86,26 @@ write_header (void)
 #undef ENABLE_GC_ALWAYS_COLLECT\n\
 #define USE_ENUM_MODES\n\
 \n\
-#include \"coretypes.h\"\n\
-#include \"tm.h\"\n\
-#include \"insn-constants.h\"\n\
+#include \"coretypes.h\"\n");
+
+  /* The four headers that describe a particular back end.  Everything else in
+     this preamble is target-independent, but these name the target whose
+     conditions the generated gencondmd.cc will evaluate.  Hardcoding them left
+     build/gencondmd.cc describing one back end however many machine
+     descriptions were read.  GENCONDMD_* are set per back end when
+     genconditions itself is built; they default to the plain names, which is
+     what a single-target build wants.  */
+  printf ("\
+#include \"%s\"\n\
+#include \"%s\"\n", GENCONDMD_TM_H, GENCONDMD_INSN_CONSTANTS_H);
+
+  printf ("\
 #include \"rtl.h\"\n\
-#include \"memmodel.h\"\n\
-#include \"tm_p.h\"\n\
+#include \"memmodel.h\"\n");
+
+  printf ("#include \"%s\"\n", GENCONDMD_TM_P_H);
+
+  printf ("\
 #include \"hard-reg-set.h\"\n\
 #include \"function.h\"\n\
 #include \"emit-rtl.h\"\n\
@@ -96,8 +126,9 @@ write_header (void)
 #include \"df.h\"\n\
 #include \"resource.h\"\n\
 #include \"diagnostic-core.h\"\n\
-#include \"reload.h\"\n\
-#include \"tm-constrs.h\"\n");
+#include \"reload.h\"\n");
+
+  printf ("#include \"%s\"\n\n", GENCONDMD_TM_CONSTRS_H);
 
   if (saw_eh_return)
     puts ("#define HAVE_eh_return 1");
