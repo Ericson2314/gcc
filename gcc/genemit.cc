@@ -987,10 +987,8 @@ main (int argc, const char **argv)
     }
 
   /* Everything from here on stays at GLOBAL scope: add_clobbers and
-     added_clobbers_hard_reg_p are declared in the hand-written recog.h, and
-     maybe_gen_* and maybe_code_for_* in insn-opinit.h.  Those are the
-     selector's
-     problem, not the namespace's.  */
+     added_clobbers_hard_reg_p are declared in the hand-written recog.h, so
+     they are the selector's problem, not the namespace's.  */
   for (auto f : output_files)
     print_ns_close (f);
 
@@ -1001,12 +999,22 @@ main (int argc, const char **argv)
   output_add_clobbers (file);
   output_added_clobbers_hard_reg_p (file);
 
+  /* maybe_code_for_* / maybe_gen_* ARE namespaced, unlike the two above:
+     their only declarations are in the generated insn-opinit.h, which
+     genopinit.cc puts in the same namespace and then pulls into scope with
+     a using-directive.  Nothing hand-written declares them, so there is no
+     name for the middle end to have to choose between -- distinguishing is
+     enough.  Note the inline code_for_* / gen_* wrappers in insn-opinit.h
+     have to move with them: those are COMDAT, so two back ends emitting the
+     same wrapper name with different bodies would silently dedupe to one.  */
+  print_ns_open (file);
   for (overloaded_name *oname = rtx_reader_ptr->get_overloads ();
        oname; oname = oname->next)
     {
       handle_overloaded_code_for (oname, file);
       handle_overloaded_gen (oname, file);
     }
+  print_ns_close (file);
 
   int ret = SUCCESS_EXIT_CODE;
   for (FILE *f : output_files)

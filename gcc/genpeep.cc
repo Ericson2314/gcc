@@ -387,8 +387,16 @@ from the machine description file `md'.  */\n\n");
   print_gen_include (stdout, "tm-constrs");
   printf ("\n");
 
-  printf ("extern rtx peep_operand[];\n\n");
-  printf ("#define operands peep_operand\n\n");
+  /* peep_operand is this file's own scratch array -- nothing outside
+     insn-peep.cc ever names it -- so a namespace is enough to keep two back
+     ends' copies apart.  `peephole' itself must stay GLOBAL: the
+     hand-written output.h declares it and final.cc/reorg.cc call it by
+     name, so it needs SELECTING between back ends, not distinguishing.  */
+  print_ns_open (stdout);
+  printf ("extern rtx peep_operand[];\n");
+  print_ns_close (stdout);
+  print_ns_using (stdout);
+  printf ("\n#define operands peep_operand\n\n");
 
   printf ("rtx_insn *\npeephole (rtx_insn *ins1)\n{\n");
   printf ("  rtx_insn *insn ATTRIBUTE_UNUSED;\n");
@@ -418,7 +426,9 @@ from the machine description file `md'.  */\n\n");
   if (max_opno == -1)
     max_opno = 1;
 
+  print_ns_open (stdout);
   printf ("rtx peep_operand[%d];\n", max_opno + 1);
+  print_ns_close (stdout);
 
   fflush (stdout);
   return (ferror (stdout) != 0 ? FATAL_EXIT_CODE : SUCCESS_EXIT_CODE);

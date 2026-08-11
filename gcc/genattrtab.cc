@@ -5256,6 +5256,24 @@ main (int argc, const char **argv)
   dfa_file = open_outfile (dfa_file_name);
   latency_file = open_outfile (latency_file_name);
 
+  /* insn-attrtab.cc only.  Its exports -- get_attr_*, the insn_*_length
+     family, the delay-slot predicates, length_unit_log -- are declared
+     nowhere but in the generated insn-attr.h, which genattr.cc puts in the
+     same namespace and pulls back into scope, so distinguishing them is
+     enough.
+
+     insn-dfatab.cc and insn-latencytab.cc are deliberately NOT namespaced.
+     Their two symbols, internal_dfa_insn_code and insn_default_latency,
+     change KIND with has_tune_attr (genattr.cc:224): a function here, a
+     function POINTER plus init_sched_attrs () there.  haifa-sched.cc calls
+     them through the singular insn-attr.h, i.e. through the primary's
+     shape, so two back ends that disagree give the middle end a call
+     through the wrong indirection -- a miscompile with no diagnostic.  A
+     namespace would remove the link collision and leave that intact, i.e.
+     it would look fixed and not be.  Making the shape uniform first is a
+     selector decision; see the handover.  */
+  print_ns_open (attr_file);
+
   obstack_init (hash_obstack);
   obstack_init (temp_obstack);
 
@@ -5403,6 +5421,8 @@ main (int argc, const char **argv)
   write_const_num_delay_slots (attr_file);
 
   write_length_unit_log (attr_file);
+
+  print_ns_close (attr_file);
 
   if (fclose (attr_file) != 0)
     fatal ("cannot close file %s: %s", attr_file_name, xstrerror (errno));

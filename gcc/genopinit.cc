@@ -278,7 +278,19 @@ main (int argc, const char **argv)
 	   "   the body of that kind of insn.  */\n"
 	   "#define GEN_FCN(CODE) (insn_data[CODE].genfun)\n"
 	   "\n"
-	   "#ifdef NUM_RTX_CODE\n"
+	   "#ifdef NUM_RTX_CODE\n");
+
+  /* From here to the matching close, everything is per back end and is
+     declared NOWHERE but in this generated header, so a namespace is all
+     that is needed to keep two back ends' copies apart.  The inline
+     accessors go inside with the arrays they read: they are COMDAT, and two
+     back ends emitting `code_to_optab' with different bodies would dedupe
+     to whichever the linker saw first -- the silent wrong-target failure,
+     not a link error.  struct target_optabs and the this_*_optabs pointers
+     stay OUTSIDE, because optabs.cc defines them.  */
+  print_ns_open (h_file);
+
+  fprintf (h_file,
 	   "/* Contains the optab used for each rtx code, and vice-versa.  */\n"
 	   "extern const optab code_to_optab_[NUM_RTX_CODE];\n"
 	   "extern const enum rtx_code optab_to_code_[NUM_OPTABS];\n"
@@ -302,15 +314,23 @@ main (int argc, const char **argv)
       handle_overloaded_gen (h_file, oname);
     }
 
+  print_ns_close (h_file);
+
   fprintf (h_file,
-	   "#endif\n"
+	   "#endif\n");
+
+  print_ns_open (h_file);
+  fprintf (h_file,
 	   "\n"
 	   "extern const struct convert_optab_libcall_d convlib_def[NUM_CONVLIB_OPTABS];\n"
 	   "extern const struct optab_libcall_d normlib_def[NUM_NORMLIB_OPTABS];\n"
 	   "\n"
 	   "/* Returns the active icode for the given (encoded) optab.  */\n"
 	   "extern enum insn_code raw_optab_handler (unsigned);\n"
-	   "extern bool swap_optab_enable (optab, machine_mode, bool);\n"
+	   "extern bool swap_optab_enable (optab, machine_mode, bool);\n");
+  print_ns_close (h_file);
+
+  fprintf (h_file,
 	   "\n"
 	   "/* Target-dependent globals.  */\n"
 	   "struct target_optabs {\n"
@@ -322,9 +342,15 @@ main (int argc, const char **argv)
 	   "     1 means yes, -1 means no.  */\n"
 	   "  signed char supports_vec_gather_load[NUM_MACHINE_MODES];\n"
 	   "  signed char supports_vec_scatter_store[NUM_MACHINE_MODES];\n"
-	   "};\n"
+	   "};\n");
+
+  print_ns_open (h_file);
+  fprintf (h_file,
 	   "extern void init_all_optabs (struct target_optabs *);\n"
-	   "extern bool partial_vectors_supported_p (void);\n"
+	   "extern bool partial_vectors_supported_p (void);\n");
+  print_ns_close (h_file);
+
+  fprintf (h_file,
 	   "\n"
 	   "extern struct target_optabs default_target_optabs;\n"
 	   "extern struct target_optabs *this_fn_optabs;\n"
@@ -361,7 +387,13 @@ main (int argc, const char **argv)
 	   "#include \"expr.h\"\n");
   print_gen_include (s_file, "insn-codes");
   fprintf (s_file,
-	   "#include \"optabs.h\"\n"
+	   "#include \"optabs.h\"\n");
+
+  /* The whole body of insn-opinit.cc is this back end's own; nothing in it
+     is named by the middle end except through the header just written.  */
+  print_ns_open (s_file);
+
+  fprintf (s_file,
 	   "\n"
 	   "struct optab_pat {\n"
 	   "  unsigned scode;\n"
@@ -530,6 +562,16 @@ main (int argc, const char **argv)
 	fprintf (s_file, "  unknown_optab,\n");
     }
   fprintf (s_file, "};\n\n");
+
+  print_ns_close (s_file);
+
+  /* This is the header that DECLARES the namespaced entities above, so it
+     is the one that has to pull them into the global scope, exactly as
+     insn-flags.h does for gen_*.  Every hand-written call site --
+     optabs-query.h's inline optab_handler, optabs-libfuncs.cc's convlib_def
+     -- then keeps working unqualified while the definitions carry distinct
+     mangled names.  */
+  print_ns_using (h_file);
 
   fprintf (h_file, "#endif\n");
   return (fclose (h_file) == 0 && fclose (s_file) == 0

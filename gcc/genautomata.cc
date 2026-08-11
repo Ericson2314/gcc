@@ -9672,7 +9672,17 @@ main (int argc, const char **argv)
 		"#include \"emit-rtl.h\"\n\n");
 	         /* FIXME: emit-rtl.h can go away once crtl is in rtl.h.  */
 
+	  /* Every export of insn-automata.cc -- state_transition,
+	     min_issue_delay, dfa_start, max_insn_queue_index, ... -- is
+	     declared only in the generated insn-attr.h, which genattr.cc
+	     namespaces and then pulls back into scope.  Nothing
+	     hand-written declares them, so distinguishing is enough and no
+	     call site changes.  */
+	  print_ns_open (stdout);
+
 	  write_automata ();
+
+	  print_ns_close (stdout);
 	}
     }
   else

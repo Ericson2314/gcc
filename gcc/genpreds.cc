@@ -1279,6 +1279,14 @@ write_tm_constrs_h (void)
 #ifndef GCC_TM_CONSTRS_H\n\
 #define GCC_TM_CONSTRS_H\n");
 
+  /* satisfies_constraint_* are static inline, so they generate no strong
+     symbol and never showed in the sweep -- but they are still one name per
+     back end with a different body each, and `static inline' in C++ still
+     yields a COMDAT if the address is taken.  Namespacing them costs
+     nothing and keeps this header's contents consistent with tm-preds.h,
+     whose enum constraint_num they use.  */
+  print_ns_open (stdout);
+
   FOR_ALL_CONSTRAINTS (c)
     if (!c->is_register)
       {
@@ -1327,6 +1335,10 @@ write_tm_constrs_h (void)
 	write_predicate_stmts (c->exp);
 	fputs ("}\n", stdout);
       }
+
+  print_ns_close (stdout);
+  print_ns_using (stdout);
+
   puts ("#endif /* tm-constrs.h */");
 }
 
@@ -1670,8 +1682,34 @@ write_tm_preds_h (void)
 \n\
 #ifdef HAVE_MACHINE_MODES");
 
-  FOR_ALL_PREDICATES (p)
-    printf ("extern bool %s (rtx, machine_mode);\n", p->name);
+  /* Two kinds here.  A predicate with no p->exp is one of the generic ones
+     (general_operand, register_operand, ...) that recog.cc defines in the
+     middle end; write_one_predicate_function skips exactly those, so
+     insn-preds.cc does not define them and they must NOT be declared inside
+     this back end's namespace -- that would declare an entity nothing ever
+     defines.  The md-defined ones are per back end and go inside.
+
+     The namespace is opened and closed AROUND RUNS rather than by sorting
+     the two kinds apart, so that a single-target build (where the
+     print_ns_* calls emit nothing) still writes the declarations in the
+     original order and the file stays byte-identical.  */
+  {
+    bool in_ns = false;
+    FOR_ALL_PREDICATES (p)
+      {
+	if ((p->exp != 0) != in_ns)
+	  {
+	    in_ns = !in_ns;
+	    if (in_ns)
+	      print_ns_open (stdout);
+	    else
+	      print_ns_close (stdout);
+	  }
+	printf ("extern bool %s (rtx, machine_mode);\n", p->name);
+      }
+    if (in_ns)
+      print_ns_close (stdout);
+  }
 
   puts ("#endif /* HAVE_MACHINE_MODES */\n");
 
@@ -1721,6 +1759,19 @@ write_tm_preds_h (void)
   printf ("}\n"
 	  "#endif\n"
 	  "\n");
+
+  /* Everything from here to the end of tm-preds.h is per back end: the
+     constraint tables, the functions insn-preds.cc defines from them, and
+     the inline wrappers over both.  The wrappers matter as much as the
+     tables -- they are COMDAT, so two back ends emitting `lookup_constraint'
+     with different bodies dedupe to one at link time and the wrong one wins
+     silently.
+
+     default_target_constraints / this_target_constraints deliberately stay
+     OUTSIDE, above: target-globals.h declares the pointer and
+     target-globals.cc assigns it, so that pair is a name the middle end
+     must CHOOSE between back ends, which is the selector's job.  */
+  print_ns_open (stdout);
 
   write_enum_constraint_num ();
   puts ("extern enum constraint_num lookup_constraint_1 (const char *);\n"
@@ -1842,6 +1893,9 @@ write_tm_preds_h (void)
   write_get_register_filter_id ();
   write_dependent_filter_helpers_h ();
 
+  print_ns_close (stdout);
+  print_ns_using (stdout);
+
   puts ("#endif /* tm-preds.h */");
 }
 
@@ -1899,6 +1953,10 @@ write_insn_preds_c (void)
 	  " = &default_target_constraints;\n"
 	  "#endif\n");
 
+  /* The two definitions above stay GLOBAL -- see write_tm_preds_h.  From
+     here on everything is this back end's own.  */
+  print_ns_open (stdout);
+
   FOR_ALL_PREDICATES (p)
     write_one_predicate_function (p);
 
@@ -1914,6 +1972,8 @@ write_insn_preds_c (void)
   write_init_reg_class_start_regs ();
 
   write_dependent_filter_functions_c ();
+
+  print_ns_close (stdout);
 }
 
 /* Argument parsing.  */

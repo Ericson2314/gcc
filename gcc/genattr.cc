@@ -48,6 +48,24 @@ gen_attr (md_rtx_info *info)
 
   printf ("#define HAVE_ATTR_%s 1\n", XSTR (attr, 0));
 
+  /* get_attr_* is defined by insn-attrtab.cc and declared nowhere else, so
+     it only needs distinguishing between back ends, not choosing: it goes
+     in this back end's namespace, which the using-directive at the end of
+     this header pulls back into scope for every existing call site.
+
+     `length' is the exception, and it is the gen_blockage shape again: the
+     hand-written output.h ALSO declares get_attr_length, and final.cc
+     DEFINES it (as a wrapper over insn_default_length).  Namespace this one
+     and every unqualified call becomes `call of overloaded get_attr_length
+     is ambiguous' -- which is how it was found, 49 errors in
+     insn-output-aarch64.cc.  So it stays global and joins the selector's
+     list.  If this escape is ever short by one the failure is again a
+     compile error naming the function, not silence.  */
+  bool attr_is_global_p = !strcmp (XSTR (attr, 0), "length");
+
+  if (!attr_is_global_p)
+    print_ns_open (stdout);
+
   /* If numeric attribute, don't need to write an enum.  */
   if (GET_CODE (attr) == DEFINE_ENUM_ATTR)
     printf ("extern enum %s get_attr_%s (%s);\n\n",
@@ -65,17 +83,25 @@ gen_attr (md_rtx_info *info)
 		(is_const ? "void" : "rtx_insn *"));
     }
 
+  if (!attr_is_global_p)
+    print_ns_close (stdout);
+
   /* If `length' attribute, write additional function definitions and define
      variables used by `insn_current_length'.  */
   if (! strcmp (XSTR (attr, 0), "length"))
     {
+      /* shorten_branches is the middle end's own (final.cc) and stays
+	 global; the insn_*_length family is insn-attrtab.cc's and does not.
+	 The #include has to be outside the namespace too.  */
+      puts ("extern void shorten_branches (rtx_insn *);");
+      print_ns_open (stdout);
       puts ("\
-extern void shorten_branches (rtx_insn *);\n\
 extern int insn_default_length (rtx_insn *);\n\
 extern int insn_min_length (rtx_insn *);\n\
 extern int insn_variable_length_p (rtx_insn *);\n\
-extern int insn_current_length (rtx_insn *);\n\n\
-#include \"insn-addr.h\"\n");
+extern int insn_current_length (rtx_insn *);");
+      print_ns_close (stdout);
+      puts ("\n#include \"insn-addr.h\"\n");
     }
 }
 
@@ -196,6 +222,9 @@ main (int argc, const char **argv)
 	}
     }
 
+  /* All four are defined by insn-attrtab.cc; the interleaved #defines are
+     preprocessor and do not care about scope.  */
+  print_ns_open (stdout);
   printf ("extern int num_delay_slots (rtx_insn *);\n");
   printf ("extern int eligible_for_delay (rtx_insn *, int, rtx_insn *, int);\n\n");
   printf ("extern int const_num_delay_slots (rtx_insn *);\n\n");
@@ -203,6 +232,7 @@ main (int argc, const char **argv)
   printf ("extern int eligible_for_annul_true (rtx_insn *, int, rtx_insn *, int);\n");
   printf ("#define ANNUL_IFFALSE_SLOTS %d\n", have_annul_false);
   printf ("extern int eligible_for_annul_false (rtx_insn *, int, rtx_insn *, int);\n");
+  print_ns_close (stdout);
 
   if (num_insn_reservations > 0)
     {
@@ -239,6 +269,13 @@ main (int argc, const char **argv)
 	  printf ("/* Insn latency time defined in define_insn_reservation. */\n");
 	  printf ("extern int insn_default_latency (rtx_insn *);\n\n");
 	}
+      /* internal_dfa_insn_code / insn_default_latency / init_sched_attrs
+	 just above stay GLOBAL on purpose: their KIND depends on
+	 has_tune_attr (function vs function pointer), so they are a
+	 selector problem and namespacing them would hide that rather than
+	 solve it.  See the note in genattrtab.cc.  Everything below is
+	 genautomata's output, declared nowhere but here.  */
+      print_ns_open (stdout);
       printf ("/* Return nonzero if there is a bypass for given insn\n");
       printf ("   which is a data producer.  */\n");
       printf ("extern int bypass_p (rtx_insn *);\n\n");
@@ -324,6 +361,7 @@ main (int argc, const char **argv)
       printf ("   functions.  */\n");
       printf ("extern void dfa_start (void);\n");
       printf ("extern void dfa_finish (void);\n");
+      print_ns_close (stdout);
     }
   else
     {
@@ -368,6 +406,13 @@ main (int argc, const char **argv)
      Flags are used to hold branch direction for use by eligible_for_...  */
   printf ("\n#define ATTR_FLAG_forward\t0x1\n");
   printf ("#define ATTR_FLAG_backward\t0x2\n");
+
+  /* insn-attr.h is the header that DECLARES everything insn-attrtab.cc and
+     insn-automata.cc define, so it is where the using-directive belongs:
+     every existing call site -- final.cc's insn_default_length,
+     haifa-sched.cc's state_transition, the back ends' get_attr_* -- keeps
+     its unqualified spelling.  */
+  print_ns_using (stdout);
 
   puts ("\n#endif /* GCC_INSN_ATTR_H */");
 
