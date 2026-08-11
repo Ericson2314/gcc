@@ -21,7 +21,9 @@
 # Generate gcc's various configuration headers:
 # config.h, tconfig.h, bconfig.h, tm.h, libgcc_tm.h, and tm_p.h.
 # $1 is the file to generate.  DEFINES, HEADERS, and possibly
-# TARGET_CPU_DEFAULT are expected to be set in the environment.
+# TARGET_CPU_DEFAULT are expected to be set in the environment.  A tm-*.h
+# output additionally requires INSN_BASE, the back end whose insn-flags and
+# insn-modes headers it should include; see the case on $output below.
 
 if [ -z "$1" ]; then
     echo "Usage: DEFINES='list' HEADERS='list' \\" >&2
@@ -144,10 +146,28 @@ case $output in
 	insn_modes_h=insn-modes.h
 	;;
     tm-*.h )
-	# tm-<base>.h -> <base>
-	tm_base=`echo ${output} | sed -e 's/^tm-//' -e 's/\.h$//'`
-	insn_flags_h=insn-flags-${tm_base}.h
-	insn_modes_h=insn-modes-${tm_base}.h
+	# insn-flags and insn-modes are generated from a machine description, so
+	# they exist once per BACK END.  The output name here is not always the
+	# back end: gen-multi-target-md.awk also emits tm-<triple>.h, one per
+	# configured triple, and deriving the base from the file name gave those
+	# `insn-flags-x86_64_pc_linux_gnu.h' -- a file nothing generates and
+	# nothing ever will.  It went unnoticed only because tm-<triple>.h has so
+	# far been read exclusively by generators, which define GENERATOR_FILE and
+	# skip both includes; the first ordinary object compiled against one dies
+	# on a missing header.
+	#
+	# So the caller states the base, exactly as it already rewrites options.h
+	# and insn-constants.h to the <base> names before calling us.  Inferring it
+	# here cannot work: nothing in `tm-x86_64_pc_linux_gnu.h' says `i386'.
+	if test x"$INSN_BASE" = x; then
+	    echo "mkconfig.sh: ${output}: INSN_BASE is not set." >&2
+	    echo "  A tm-*.h needs the BACK END it belongs to, which the file name" >&2
+	    echo "  does not carry for per-triple headers.  Set INSN_BASE to the" >&2
+	    echo "  back end (the same value used for options-<base>.h)." >&2
+	    exit 1
+	fi
+	insn_flags_h=insn-flags-${INSN_BASE}.h
+	insn_modes_h=insn-modes-${INSN_BASE}.h
 	;;
     * )
 	insn_flags_h=

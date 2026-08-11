@@ -327,8 +327,13 @@ for gcc_mt in ${gcc_manifest_targets}; do
                ;;
            esac
          done
-         printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
-           "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" >> ${gcc_common_mk}
+         # INSN_BASE: mkconfig.sh needs the back end told to it rather than
+         # read off the output name.  Here the two coincide, but stating it
+         # keeps this call site and the per-triple one in
+         # gen-multi-target-md.awk the same shape, and mkconfig.sh now refuses
+         # a tm-*.h without it.
+         printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  INSN_BASE="%s" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
+           "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" "${gcc_mt_base}" >> ${gcc_common_mk}
          printf '%s: $(srcdir)/common/config/%s tm-%s.h\n\t$(COMPILE) -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
            "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_base}" "${gcc_mt_sym}" >> ${gcc_common_mk}
          # This back end's driver spec functions, from the same tm-<base>.h.

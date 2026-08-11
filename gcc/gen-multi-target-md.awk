@@ -615,8 +615,12 @@ function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
 
   printf "tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n",
 	 key, cpu, cpu, ssdep;
+  # INSN_BASE is the BACK END, not the triple: insn-flags and insn-modes come
+  # from the machine description and so exist once per back end, exactly like
+  # the options-<cpu>.h and insn-constants-<cpu>.h rewritten just above.
+  # mkconfig.sh cannot infer it from `tm-<triple>.h'.
   printf "\tTARGET_CPU_DEFAULT=\"\" HEADERS=\"%s\" DEFINES=\"%s\" \\\n", hdrs, def;
-  printf "\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n", key;
+  printf "\t  INSN_BASE=\"%s\" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n", cpu, key;
 
   n = split(tmp, parts, " ");
   hdrs = "";
