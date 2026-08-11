@@ -264,10 +264,9 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 %{!mcpu*:%(asm_cpu_default)} \
 "
 
-#if !HAVE_SOLARIS_LD
+/* Unconditional; see the note in config/i386/sol2.h.  */
 #define ARCH32_EMULATION "elf32_sparc_sol2"
 #define ARCH64_EMULATION "elf64_sparc_sol2"
-#endif
 
 #define ARCH64_SUBDIR "sparcv9"
 
@@ -355,11 +354,17 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define SECTION_NAME_FORMAT	"\"%s\""
 #endif /* HAVE_SOLARIS_AS */
 
-/* Undefine this so that attribute((init_priority)) works with GNU ld.  */
-#if !HAVE_SOLARIS_LD
+/* attribute((init_priority)) needs the .ctors.N sections, which GNU ld
+   coalesces and Sun ld does not.  Which linker it is is a runtime capability
+   now (targ_caps.solaris_ld), so the constant macros inherited from
+   sparc/sysv4.h are dropped unconditionally and their strings re-offered to
+   config/sol2.h, which turns them into hooks.  Keeping the macro defined would
+   make target-def.h pick default_ctor_section_asm_out_constructor at compile
+   time and defeat the runtime choice.  */
 #undef CTORS_SECTION_ASM_OP
 #undef DTORS_SECTION_ASM_OP
-#endif
+#define SOLARIS_CTORS_SECTION_ASM_OP "\t.section\t\".ctors\",#alloc,#write"
+#define SOLARIS_DTORS_SECTION_ASM_OP "\t.section\t\".dtors\",#alloc,#write"
 
 
 

@@ -3192,6 +3192,40 @@ $as_echo "$as_me: WARNING: $gcc_cv_as does not accept -Aleon; GCC emits it uncon
     ;;
 esac
 
+gcc_cv_solaris_ld=no
+case $target in
+  *-*-solaris2*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $gcc_cv_ld is Sun ld" >&5
+$as_echo_n "checking whether $gcc_cv_ld is Sun ld... " >&6; }
+    if "$gcc_cv_ld" --version 2>&1 | grep -i 'GNU ld' > /dev/null; then
+      gcc_cv_solaris_ld=no
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no, GNU ld" >&5
+$as_echo "no, GNU ld" >&6; }
+    elif "$gcc_cv_ld" -V 2>&1 | grep -i 'Solaris Link Editors' > /dev/null; then
+      gcc_cv_solaris_ld=yes
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: cannot tell" >&5
+$as_echo "cannot tell" >&6; }
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: " >&5
+$as_echo "$as_me: WARNING: " >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Could not identify $gcc_cv_ld as either GNU ld or Sun ld." >&5
+$as_echo "$as_me: WARNING: *** Could not identify $gcc_cv_ld as either GNU ld or Sun ld." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Assuming GNU ld, which is the compiler's built-in default." >&5
+$as_echo "$as_me: WARNING: *** Assuming GNU ld, which is the compiler's built-in default." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** If this is Sun ld, the link specs will be wrong: no" >&5
+$as_echo "$as_me: WARNING: *** If this is Sun ld, the link specs will be wrong: no" >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: ***   -M /usr/lib/ld/map.below4G for -mcmodel=medlow, and a" >&5
+$as_echo "$as_me: WARNING: ***   -M /usr/lib/ld/map.below4G for -mcmodel=medlow, and a" >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: ***   -m emulation flag that Sun ld does not accept." >&5
+$as_echo "$as_me: WARNING: ***   -m emulation flag that Sun ld does not accept." >&2;}
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: " >&5
+$as_echo "$as_me: WARNING: " >&2;}
+    fi
+    ;;
+esac
+
 
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
@@ -3260,6 +3294,14 @@ if test x"$gcc_cv_ld_as_needed" = xyes; then
 else
   link_as_needed=
   link_no_as_needed=
+fi
+
+if test x"$gcc_cv_solaris_ld" = xyes; then
+  cat >> "$specs_file" <<EOF
+*link_arch:
+%(link_arch_sun)
+
+EOF
 fi
 
 cat >> "$specs_file" <<EOF

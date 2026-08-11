@@ -74,10 +74,11 @@ along with GCC; see the file COPYING3.  If not see
 
 #define ARCH64_SUBDIR "amd64"
 
-#if !HAVE_SOLARIS_LD
+/* Unconditional: both the GNU-ld and Sun-ld forms of LINK_ARCH_SPEC are now
+   built, and target-specs picks between them, so these strings are always
+   needed.  They cost nothing when the Sun form is selected.  */
 #define ARCH32_EMULATION "elf_i386_sol2"
 #define ARCH64_EMULATION "elf_x86_64_sol2"
-#endif
 
 #define ENDFILE_ARCH_SPEC \
   "%{mpc32:crtprec32.o%s} \
@@ -182,11 +183,17 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 
 /* Unlike GNU ld, Sun ld doesn't coalesce .ctors.N/.dtors.N sections, so
-   inhibit their creation.  Also cf. sparc/sysv4.h.  */
-#if HAVE_SOLARIS_LD
-#define CTORS_SECTION_ASM_OP	"\t.section\t.ctors, \"aw\""
-#define DTORS_SECTION_ASM_OP	"\t.section\t.dtors, \"aw\""
-#endif
+   inhibit their creation.  Also cf. sparc/sysv4.h.
+
+   Which linker it is is a runtime capability (targ_caps.solaris_ld), not a
+   configure-time constant, so these are supplied as hooks rather than as
+   CTORS_SECTION_ASM_OP/DTORS_SECTION_ASM_OP.  The macros are deliberately left
+   undefined: several targets use them in `asm (CTORS_SECTION_ASM_OP)' inside
+   libgcc's crtstuff, where a compile-time string constant is required, so the
+   macro cannot become an expression.  config/sol2.h picks up the strings
+   named here and defines the hooks.  */
+#define SOLARIS_CTORS_SECTION_ASM_OP	"\t.section\t.ctors, \"aw\""
+#define SOLARIS_DTORS_SECTION_ASM_OP	"\t.section\t.dtors, \"aw\""
 
 #if HAVE_SOLARIS_AS
 #define LARGECOMM_SECTION_ASM_OP "\t.lbcomm\t"

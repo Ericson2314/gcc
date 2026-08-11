@@ -279,25 +279,31 @@ along with GCC; see the file COPYING3.  If not see
    %{YP,*} \
    %{R*}"
 
-#if HAVE_SOLARIS_LD
-#define LINK_ARCH_SPEC_1 \
-  "%{mcmodel=medlow:-M /usr/lib/ld/map.below4G} " LINK_ARCH_SPEC_BASE
-#else
-#define LINK_ARCH_SPEC_1 LINK_ARCH_SPEC_BASE
-#endif
+/* These two used to be selected by `#if HAVE_SOLARIS_LD'.  That macro has had
+   no definition since its probe was removed, so the guard was silently false
+   and every Solaris build got the GNU-ld form -- which is right for GNU ld and
+   wrong for Sun ld, with no diagnostic either way.
 
-#if !HAVE_SOLARIS_LD
+   Both forms are now built unconditionally and registered as named specs, and
+   target-specs/configure picks between them by emitting `*link_arch:' after
+   probing the real linker.  The built-in link_arch stays the GNU-ld form, so a
+   compiler with no spec file behaves exactly as it does today rather than
+   changing under anyone.  */
+#define LINK_ARCH_SPEC_1_SUN \
+  "%{mcmodel=medlow:-M /usr/lib/ld/map.below4G} " LINK_ARCH_SPEC_BASE
+#define LINK_ARCH_SPEC_1_GNU LINK_ARCH_SPEC_BASE
+
 #if DEFAULT_ARCH32_P
 #define ARCH_DEFAULT_EMULATION ARCH32_EMULATION
 #else
 #define ARCH_DEFAULT_EMULATION ARCH64_EMULATION
 #endif
-#define TARGET_LD_EMULATION "%{m32:-m " ARCH32_EMULATION "}" \
-			    "%{m64:-m " ARCH64_EMULATION "}" \
-			    "%{!m32:%{!m64:-m " ARCH_DEFAULT_EMULATION "}} "
-#else
-#define TARGET_LD_EMULATION ""
-#endif
+
+/* Sun ld has no -m; GNU ld needs one.  */
+#define TARGET_LD_EMULATION_SUN ""
+#define TARGET_LD_EMULATION_GNU "%{m32:-m " ARCH32_EMULATION "}" \
+				"%{m64:-m " ARCH64_EMULATION "}" \
+				"%{!m32:%{!m64:-m " ARCH_DEFAULT_EMULATION "}} "
 
 #if DISABLE_MULTILIB
 #if DEFAULT_ARCH32_P
@@ -309,9 +315,16 @@ along with GCC; see the file COPYING3.  If not see
 #define LINK_ARCH_ERROR_SPEC ""
 #endif
 
+#define LINK_ARCH_SPEC_SUN TARGET_LD_EMULATION_SUN \
+  " " LINK_ARCH_ERROR_SPEC " " LINK_ARCH_SPEC_1_SUN
+#define LINK_ARCH_SPEC_GNU TARGET_LD_EMULATION_GNU \
+  " " LINK_ARCH_ERROR_SPEC " " LINK_ARCH_SPEC_1_GNU
+
+/* Built-in default: the GNU-ld form, i.e. what the silently-false
+   `#if HAVE_SOLARIS_LD' has been producing.  target-specs overrides
+   `*link_arch:' with %(link_arch_sun) when it finds Sun ld.  */
 #undef LINK_ARCH_SPEC
-#define LINK_ARCH_SPEC TARGET_LD_EMULATION \
-  " " LINK_ARCH_ERROR_SPEC " " LINK_ARCH_SPEC_1
+#define LINK_ARCH_SPEC LINK_ARCH_SPEC_GNU
 
 #undef SUBTARGET_EXTRA_SPECS
 #define SUBTARGET_EXTRA_SPECS \
@@ -319,6 +332,8 @@ along with GCC; see the file COPYING3.  If not see
   { "startfile_crtbegin",	STARTFILE_CRTBEGIN_SPEC },	\
   { "startfile_vtv",		STARTFILE_VTV_SPEC },		\
   { "link_arch",	 	LINK_ARCH_SPEC },		\
+  { "link_arch_gnu",		LINK_ARCH_SPEC_GNU },		\
+  { "link_arch_sun",		LINK_ARCH_SPEC_SUN },		\
   { "endfile_arch",	 	ENDFILE_ARCH_SPEC },		\
   { "endfile_crtend",		ENDFILE_CRTEND_SPEC },		\
   { "endfile_vtv",		ENDFILE_VTV_SPEC },		\
@@ -470,3 +485,23 @@ along with GCC; see the file COPYING3.  If not see
 extern GTY(()) tree solaris_pending_aligns;
 extern GTY(()) tree solaris_pending_inits;
 extern GTY(()) tree solaris_pending_finis;
+
+/* Constructor/destructor sections on Solaris, chosen at run time.
+
+   The CPU-level sol2.h (i386/sol2.h, sparc/sol2.h) supplies the two strings;
+   this header, which comes last in the Solaris tm_file chain, turns them into
+   the hooks.  CTORS_SECTION_ASM_OP/DTORS_SECTION_ASM_OP are deliberately NOT
+   defined: target-def.h keys TARGET_ASM_CONSTRUCTOR off `#ifdef
+   CTORS_SECTION_ASM_OP', so defining the macro would pick the emitter at
+   compile time and the section op and the emitter could then disagree.  Both
+   are overridden here, from the one flag, so they cannot.  */
+#ifdef SOLARIS_CTORS_SECTION_ASM_OP
+#undef TARGET_ASM_CTORS_SECTION_ASM_OP
+#define TARGET_ASM_CTORS_SECTION_ASM_OP solaris_ctors_section_asm_op
+#undef TARGET_ASM_DTORS_SECTION_ASM_OP
+#define TARGET_ASM_DTORS_SECTION_ASM_OP solaris_dtors_section_asm_op
+#undef TARGET_ASM_CONSTRUCTOR
+#define TARGET_ASM_CONSTRUCTOR solaris_asm_out_constructor
+#undef TARGET_ASM_DESTRUCTOR
+#define TARGET_ASM_DESTRUCTOR solaris_asm_out_destructor
+#endif

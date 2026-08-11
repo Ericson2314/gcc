@@ -1364,6 +1364,43 @@ case $target in
     ;;
 esac
 
+dnl Solaris: which linker is this?  gcc/configure.ac answered this with
+dnl HAVE_SOLARIS_LD, whose probe was removed; nothing has defined it since, so
+dnl every `#if HAVE_SOLARIS_LD' in config/sol2.h and friends has been silently
+dnl false.  The effect is worth stating plainly, because it is the shape this
+dnl project keeps finding: a Solaris build using GNU ld is ACCIDENTALLY correct,
+dnl and a Solaris build using Sun ld is SILENTLY WRONG.  A deleted probe does
+dnl not produce an error, it produces a configuration that happens to work for
+dnl whoever tested it.
+dnl
+dnl config/sol2.h now builds both forms of LINK_ARCH_SPEC and registers them as
+dnl link_arch_gnu / link_arch_sun.  The built-in default stays the GNU form, so
+dnl nothing changes for the configuration that currently works; this script
+dnl picks the Sun form when it finds Sun ld, and says so loudly when it cannot
+dnl tell.
+gcc_cv_solaris_ld=no
+case $target in
+  *-*-solaris2*)
+    AC_MSG_CHECKING([whether $gcc_cv_ld is Sun ld])
+    if "$gcc_cv_ld" --version 2>&1 | grep -i 'GNU ld' > /dev/null; then
+      gcc_cv_solaris_ld=no
+      AC_MSG_RESULT([no, GNU ld])
+    elif "$gcc_cv_ld" -V 2>&1 | grep -i 'Solaris Link Editors' > /dev/null; then
+      gcc_cv_solaris_ld=yes
+      AC_MSG_RESULT([yes])
+    else
+      AC_MSG_RESULT([cannot tell])
+      AC_MSG_WARN([])
+      AC_MSG_WARN([*** Could not identify $gcc_cv_ld as either GNU ld or Sun ld.])
+      AC_MSG_WARN([*** Assuming GNU ld, which is the compiler's built-in default.])
+      AC_MSG_WARN([*** If this is Sun ld, the link specs will be wrong: no])
+      AC_MSG_WARN([***   -M /usr/lib/ld/map.below4G for -mcmodel=medlow, and a])
+      AC_MSG_WARN([***   -m emulation flag that Sun ld does not accept.])
+      AC_MSG_WARN([])
+    fi
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1435,6 +1472,18 @@ if test x"$gcc_cv_ld_as_needed" = xyes; then
 else
   link_as_needed=
   link_no_as_needed=
+fi
+
+dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.  Emitted as a
+dnl reference to the named spec the target header already registers, so the spec
+dnl TEXT stays in config/sol2.h where the target knowledge belongs and only the
+dnl CHOICE lives here.
+if test x"$gcc_cv_solaris_ld" = xyes; then
+  cat >> "$specs_file" <<EOF
+*link_arch:
+%(link_arch_sun)
+
+EOF
 fi
 
 cat >> "$specs_file" <<EOF
