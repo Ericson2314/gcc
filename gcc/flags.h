@@ -96,11 +96,8 @@ public:
 };
 
 extern class target_flag_state default_target_flag_state;
-#if SWITCHABLE_TARGET
+/* Declared unconditionally -- see the note in cfgloop.h.  */
 extern class target_flag_state *this_target_flag_state;
-#else
-#define this_target_flag_state (&default_target_flag_state)
-#endif
 
 #define align_loops	 (this_target_flag_state->x_align_loops)
 #define align_jumps	 (this_target_flag_state->x_align_jumps)

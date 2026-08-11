@@ -862,11 +862,12 @@ struct target_cfgloop {
 };
 
 extern struct target_cfgloop default_target_cfgloop;
-#if SWITCHABLE_TARGET
+/* Declared unconditionally: SWITCHABLE_TARGET is always 1 (defaults.h), and
+   this header is reached by TUs that do not pull in defaults.h.  Under the
+   old conditional those TUs silently took the "#define this_target_cfgloop
+   (&default_target_cfgloop)" branch and would have bound the unswitched
+   state.  Measured harmless today only because none of them read it.  */
 extern struct target_cfgloop *this_target_cfgloop;
-#else
-#define this_target_cfgloop (&default_target_cfgloop)
-#endif
 
 #define target_avail_regs \
   (this_target_cfgloop->x_target_avail_regs)

@@ -1255,9 +1255,22 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 # define DEFAULT_FLAG_PIE 0
 #endif
 
-#ifndef SWITCHABLE_TARGET
-#define SWITCHABLE_TARGET 0
-#endif
+/* A multi-target compiler holds several back ends' state at once, so the
+   this_target_* indirection must always be a real variable.  The !SWITCHABLE
+   spelling is "#define this_target_X (&default_target_X)", which binds one
+   back end's state at compile time -- precisely the class of baking this
+   compiler exists to remove.  Force the switchable form for every target.
+
+   Cost, accepted deliberately: the 37 back ends that did not set this lose
+   the compile-time-constant address and gain a load through a pointer on
+   every access to target-derived state.  That is a performance regression,
+   not a correctness one.  The 8 back ends that already set it (i386, arm,
+   aarch64, mips, rs6000, riscv, s390, loongarch) have shipped this path for
+   years.
+
+   Deliberately not "#ifndef": a back end must not be able to opt out.  */
+#undef SWITCHABLE_TARGET
+#define SWITCHABLE_TARGET 1
 
 /* If the target supports integers that are wider than two
    HOST_WIDE_INTs on the host compiler, then the target should define

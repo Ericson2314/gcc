@@ -324,11 +324,11 @@ main (int argc, const char **argv)
 	   "\n"
 	   "extern struct target_optabs default_target_optabs;\n"
 	   "extern struct target_optabs *this_fn_optabs;\n"
-	   "#if SWITCHABLE_TARGET\n"
-	   "extern struct target_optabs *this_target_optabs;\n"
-	   "#else\n"
-	   "#define this_target_optabs (&default_target_optabs)\n"
-	   "#endif\n");
+	   /* Declared unconditionally -- see the note in cfgloop.h.  This
+	      header is generated, and generated headers reach tm.h/defaults.h
+	      only through their includer, so the conditional form diverged
+	      here too.  */
+	   "extern struct target_optabs *this_target_optabs;\n");
 
   fprintf (s_file,
 	   "#define IN_TARGET_CODE 1\n"
