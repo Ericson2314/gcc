@@ -111,7 +111,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # genconditions.cc wants it for the same reason and for one more: the file
   # it *writes* names four back-end headers, and which four is settled when
   # genconditions itself is compiled (see the GENCONDMD_* defines below).
-  n = split("preds flags conditions", parts, " ");
+  n = split("preds flags conditions codes config attr attr-common", parts, " ");
   for (i = 1; i <= n; i++) {
     printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
 	   parts[i], cpu, parts[i], cpu, cpu;
@@ -224,6 +224,35 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "\t  $(srcdir)/config/%s > tmp-flags-%s.h\n", md, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-flags-%s.h $@\n", cpu;
   printf "%s-common.o: insn-flags-%s.h insn-modes-%s.h\n\n", cpu, cpu, cpu;
+
+  # The rest of the machine-description headers, same shape.  Upstream builds
+  # these from the `simple_rtl_generated_h' pattern rules in Makefile.in, which
+  # also pass insn-conditions.md; none of these do.
+  #
+  # That is a POLICY, not an oversight, and it has to be the same policy for
+  # every generator or the results disagree with each other.  See the
+  # insn-flags note above for why folding against tm-<base>.h is the wrong
+  # trade here: tm-<base>.h is whichever triple came first in the manifest, so
+  # a condition that turns on an OS or ABI choice gets that arbitrary triple's
+  # answer.  For a header of macros that only cost a wrong constant; for
+  # genemit and genrecog, which actually ELIDE patterns whose condition is
+  # provably false (gensupport.cc's insn_elision, which gencodes and genflags
+  # alone turn off), it would mean a pattern that is unreachable for every
+  # triple of the back end because one triple could not use it.  Passing the
+  # conditions file to none of them keeps every condition deferred to run time,
+  # which is what a multi-target compiler wants, and is exactly how GCC behaved
+  # before gencondmd existed.
+  n = split("codes config attr attr-common", parts, " ");
+  for (i = 1; i <= n; i++) {
+    printf "insn-%s-%s.h: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	   parts[i], cpu, parts[i], cpu;
+    printf "  $(srcdir)/config/%s\n", md;
+    printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	   parts[i], cpu;
+    printf "\t  $(srcdir)/config/%s > tmp-%s-%s.h\n", md, parts[i], cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.h $@\n\n",
+	   parts[i], cpu;
+  }
 
   printf "tm-preds-%s.h: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
   printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) -h $(srcdir)/common.md \\\n", cpu;
