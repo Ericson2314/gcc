@@ -2236,6 +2236,11 @@ ${AWK} '
       printf "\trm -f $@.own $@.stub\n\n"
       printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
+      # A guard of its own.  Sharing one guard across the shared options.h and
+      # the other 44 made a second include of the family a silent no-op instead
+      # of an error, so which options a TU got depended on include ORDER.
+      # See opth-gen.awk.
+      printf "\t  -v guard_name=OPTIONS_%s_H \\\n", toupper(b)
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
     }
   }

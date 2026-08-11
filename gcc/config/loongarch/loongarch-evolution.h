@@ -25,7 +25,22 @@ along with GCC; see the file COPYING3.  If not see
 
 #if !defined(IN_LIBGCC2) && !defined(IN_TARGET_LIBS) && !defined(IN_RTS)
 
+/* This needs OPTION_MASK_ISA_*, which come from an options header -- but which
+   one depends on how this file was reached.  Through tm.h (the compiler
+   proper, and every generator) options-loongarch.h has already been included
+   and naming "options.h" here would pull in a SECOND, wrong one.  Reached from
+   loongarch-cpu.cc or loongarch-evolution.cc, which include no tm.h, nothing
+   has been included yet and "options.h" is the right answer -- it is
+   loongarch's own in a native build.
+
+   So ask whether one is present rather than naming a particular file.  Naming
+   one is what made this line a silent no-op for as long as the whole family
+   shared the guard OPTIONS_H: it did nothing in the tm.h path, and where the
+   primary target's header came first instead it silently gave loongarch the
+   primary's options and lost every OPTION_MASK_ISA_*.  */
+#ifndef OPTIONS_H_INCLUDED
 #include "options.h"
+#endif
 
 static constexpr struct {
   int cpucfg_word;
