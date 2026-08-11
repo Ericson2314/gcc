@@ -2213,14 +2213,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_leb128" >&5
 $as_echo "$gcc_cv_as_leb128" >&6; }
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -Bstatic/-Bdynamic" >&5
-$as_echo_n "checking linker for -Bstatic/-Bdynamic... " >&6; }
-gcc_cv_ld_static_dynamic=no
-if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
-  gcc_cv_ld_static_dynamic=yes
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_static_dynamic" >&5
-$as_echo "$gcc_cv_ld_static_dynamic" >&6; }
 
 rm -f conftest.s conftest.o
 
@@ -2404,8 +2396,6 @@ $as_echo "$as_me:   ld --build-id ............ ${gcc_cv_ld_buildid}" >&6;}
 $as_echo "$as_me:   ld --eh-frame-hdr ........ ${gcc_cv_ld_eh_frame_hdr}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld -pie .................. ${gcc_cv_ld_pie}" >&5
 $as_echo "$as_me:   ld -pie .................. ${gcc_cv_ld_pie}" >&6;}
-{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}" >&5
-$as_echo "$as_me:   ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}" >&6;}
 
 fi
 
@@ -2492,19 +2482,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_lto_plugin" >&5
 $as_echo "$gcc_cv_lto_plugin" >&6; }
 
-gcc_cv_ld_static_option='-Bstatic'
-gcc_cv_ld_dynamic_option='-Bdynamic'
-if test x"$gcc_cv_ld_static_dynamic" != xyes; then
-  if "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
-    gcc_cv_ld_static_dynamic=yes
-    gcc_cv_ld_static_option='-bstatic'
-    gcc_cv_ld_dynamic_option='-bdynamic'
-  elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
-    gcc_cv_ld_static_dynamic=yes
-    gcc_cv_ld_static_option='-aarchive_shared'
-    gcc_cv_ld_dynamic_option='-adefault'
-  fi
-fi
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for .hidden" >&5
@@ -3351,22 +3328,18 @@ ${link_no_as_needed}
 *link_libatomic:
 ${link_libatomic}
 
-*link_static:
-${gcc_cv_ld_static_option}
-
-*link_dynamic:
-${gcc_cv_ld_dynamic_option}
-
-*link_demangle:
-%{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
-
 *link_plugin:
 ${link_plugin}
 
+EOF
+
+if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then
+  cat >> "$specs_file" <<EOF
 *link_disable_dynamicbase:
-`if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`
+%{!shared:%{!mdll:%{no-pie:--disable-dynamicbase}}}
 
 EOF
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&5
 $as_echo "$as_me:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&6;}

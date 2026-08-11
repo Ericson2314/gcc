@@ -344,12 +344,14 @@ if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
 fi
 AC_MSG_RESULT([$gcc_cv_as_leb128])
 
-AC_MSG_CHECKING([linker for -Bstatic/-Bdynamic])
-gcc_cv_ld_static_dynamic=no
-if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
-  gcc_cv_ld_static_dynamic=yes
-fi
-AC_MSG_RESULT([$gcc_cv_ld_static_dynamic])
+dnl The -Bstatic/-Bdynamic probe is gone with the *link_static and
+dnl *link_dynamic specs it fed (see the note further down).  Its OTHER upstream
+dnl consumer is worth naming so nobody re-adds the probe before the channel
+dnl exists: HAVE_LD_STATIC_DYNAMIC picks the shape of LIBASAN_SPEC and its four
+dnl siblings in gcc.cc, and that is an `#elif defined(...)' resolved when gcc.cc
+dnl is COMPILED.  Delivering an answer to it means making those five sanitizer
+dnl specs runtime first; a probe whose answer has nowhere to go is the thing
+dnl this file keeps being caught doing.
 
 rm -f conftest.s conftest.o
 
@@ -562,7 +564,6 @@ AC_MSG_NOTICE([  ld compress-debug ........ ${gcc_cv_ld_compress_debug}])
 AC_MSG_NOTICE([  ld --build-id ............ ${gcc_cv_ld_buildid}])
 AC_MSG_NOTICE([  ld --eh-frame-hdr ........ ${gcc_cv_ld_eh_frame_hdr}])
 AC_MSG_NOTICE([  ld -pie .................. ${gcc_cv_ld_pie}])
-AC_MSG_NOTICE([  ld -Bstatic/-Bdynamic .... ${gcc_cv_ld_static_dynamic}])
 
 fi
 
@@ -605,6 +606,12 @@ if test x"$gcc_cv_ld_as_needed" != xyes \
 fi
 AC_MSG_RESULT([$gcc_cv_ld_use_as_needed_ldscript])
 
+dnl The answer goes to targ_caps.ld_demangle and nowhere else.  There used to be
+dnl a *link_demangle spec beside it, and it was a duplicate with no consumer:
+dnl HAVE_LD_DEMANGLE is read by collect2.cc (`if (!HAVE_LD_DEMANGLE)' at four
+dnl sites), which decides whether COLLECT2 must demangle for itself.  That is a
+dnl C question in a program that never reads a spec file, and it is already
+dnl answered by the config file below.  The spec is gone.
 AC_MSG_CHECKING([linker for --demangle])
 gcc_cv_ld_demangle=no
 if "$gcc_cv_ld" --help 2>&1 | grep -- '--demangle' > /dev/null; then
@@ -655,21 +662,25 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-plugin' > /dev/null; then
 fi
 AC_MSG_RESULT([$gcc_cv_lto_plugin])
 
-dnl -Bstatic/-Bdynamic is probed above; the option *spelling* is not, and AIX
-dnl and HP-UX spell it differently.  Ask for the spelling the linker admits to.
-gcc_cv_ld_static_option='-Bstatic'
-gcc_cv_ld_dynamic_option='-Bdynamic'
-if test x"$gcc_cv_ld_static_dynamic" != xyes; then
-  if "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
-    gcc_cv_ld_static_dynamic=yes
-    gcc_cv_ld_static_option='-bstatic'
-    gcc_cv_ld_dynamic_option='-bdynamic'
-  elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
-    gcc_cv_ld_static_dynamic=yes
-    gcc_cv_ld_static_option='-aarchive_shared'
-    gcc_cv_ld_dynamic_option='-adefault'
-  fi
-fi
+dnl -Bstatic/-Bdynamic is probed above.  The option SPELLING (AIX -bstatic,
+dnl HP-UX -aarchive_shared) used to be probed here too and written out as the
+dnl *link_static and *link_dynamic specs.  Both are gone, and this is a DELETE
+dnl rather than a wire-up on purpose:
+dnl
+dnl   LD_STATIC_OPTION and LD_DYNAMIC_OPTION are not stranded.  They are live
+dnl   compile-time macros (gcc.cc, defaults.h, defaulting to the GNU spellings)
+dnl   that target headers override -- and, decisively, that EIGHT language
+dnl   driver programs use from C: g++spec.cc, gfortranspec.cc, gospec.cc,
+dnl   d-spec.cc, gm2spec.cc, a68spec.cc, gcobolspec.cc and the freebsd/gnu-user
+dnl   sanitizer specs.  `append_option (OPT_Wl_, LD_STATIC_OPTION, 1)' cannot
+dnl   read a spec string, so a named spec could never have carried this to all
+dnl   of its consumers; the honest carrier is a targ_caps STRING field, and
+dnl   targ_caps has no string fields yet.  Emitting a spec that reaches at most
+dnl   half the consumers would have looked connected and left the other half on
+dnl   the GNU default -- the shape this project keeps paying for.
+dnl
+dnl   Re-add when targ_caps grows strings, and convert all eight callers at
+dnl   once.  Until then the GNU spellings are what every consumer already uses.
 
 dnl --- Consulted by cc1: these go in the target config file. ----------------
 
@@ -1617,22 +1628,32 @@ ${link_no_as_needed}
 *link_libatomic:
 ${link_libatomic}
 
-*link_static:
-${gcc_cv_ld_static_option}
-
-*link_dynamic:
-${gcc_cv_ld_dynamic_option}
-
-*link_demangle:
-%{!no-demangle:`if test x"$gcc_cv_ld_demangle" = xyes; then echo --demangle; fi`}
-
 *link_plugin:
 ${link_plugin}
 
+EOF
+
+dnl `*link_disable_dynamicbase' is emitted ONLY when the linker takes the
+dnl option, and that condition is not cosmetic: the spec is referenced by
+dnl mingw's LINK_SPEC and by nothing else, so writing it into all 183 files
+dnl would be 182 names nothing consults -- the exact thing check-spec-refs
+dnl exists to catch.  `*link_arch' above uses the same shape for the same
+dnl reason.  A mingw target whose linker lacks the option therefore falls back
+dnl to the driver's empty default, which is what the dead
+dnl `#if HAVE_LD_PE_DISABLE_DYNAMICBASE' produced.
+dnl
+dnl The condition inside the spec is the target header's own, restored:
+dnl `%{!shared:%{!mdll:%{no-pie:...}}}'.  What used to be written here was
+dnl `%{shared|pie:...}', which is very nearly the NEGATION of it -- an unread
+dnl spec is not checked against the header it is supposed to replace, so it had
+dnl drifted into being wrong as well as unused.
+if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then
+  cat >> "$specs_file" <<EOF
 *link_disable_dynamicbase:
-`if test x"$gcc_cv_ld_disable_dynamicbase" = xyes; then echo '%{shared|pie:--disable-dynamicbase}'; fi`
+%{!shared:%{!mdll:%{no-pie:--disable-dynamicbase}}}
 
 EOF
+fi
 
 AC_MSG_NOTICE([  ld --as-needed ........... ${gcc_cv_ld_as_needed}])
 AC_MSG_NOTICE([  libatomic on link line ... ${spec_libatomic}])

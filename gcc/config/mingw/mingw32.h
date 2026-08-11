@@ -162,12 +162,13 @@ along with GCC; see the file COPYING3.  If not see
   "%{!shared:%{!mdll:%{!m64:--large-address-aware}}}"
 #endif
 
-#if HAVE_LD_PE_DISABLE_DYNAMICBASE
-# define LINK_SPEC_DISABLE_DYNAMICBASE \
-  "%{!shared:%{!mdll:%{no-pie:--disable-dynamicbase}}}"
-#else
-# define LINK_SPEC_DISABLE_DYNAMICBASE ""
-#endif
+/* Whether the PE linker takes --disable-dynamicbase used to be
+   HAVE_LD_PE_DISABLE_DYNAMICBASE, an auto-host macro this compiler no longer
+   has, so the #if was unconditionally false and the option had quietly stopped
+   being passed on every mingw target.  It is now the `link_disable_dynamicbase'
+   named spec: target-specs asks the linker and emits the spec only when it says
+   yes, so a linker without the option leaves the driver's empty default.  */
+#define LINK_SPEC_DISABLE_DYNAMICBASE "%(link_disable_dynamicbase)"
 
 #define LINK_SPEC "%{mwindows:--subsystem windows} \
   %{mconsole:--subsystem console} \
