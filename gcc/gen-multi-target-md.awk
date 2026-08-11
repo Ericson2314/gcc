@@ -1024,9 +1024,26 @@ END		  { flush(); emit_condition_intersections();
 #     identically, which reads as "the mechanism does not work".
 #   * `$(COMPILE) $<' is the whole recipe.  See frag_source_for for why the
 #     fragments' own recipes are ignored.
-#   * `<cpu>-inc/s-inc' is a sufficient single prerequisite: it already names
-#     all 16 forwarders and, since scan_hdr_frag, the t-<...>-headers outputs
-#     too.
+#   * `<cpu>-inc/s-inc' covers the headers this back end generates: it already
+#     names all 16 forwarders and, since scan_hdr_frag, the t-<...>-headers
+#     outputs too.
+#   * `s-gtype' is the second and last prerequisite.  A back end's main source
+#     and several of its extra_objs sources `#include "gt-<file>.h"', and those
+#     headers are NOT per-base: gengtype names its output after the source
+#     scanned with the directory stripped, parses the source text without ever
+#     preprocessing it against a tm.h, and no two back ends have a gt--using
+#     source with the same basename.  So one build-root copy is correct -- the
+#     `mt-<cpu>/' hazard does NOT apply here -- and ORDER is all that is
+#     wanted.  Depending on the stamp rather than on $(ALL_GTFILES_H) keeps
+#     this to one name and matches how every other consumer of gengtype's
+#     output in Makefile.in is written.
+#
+#     Necessary, not yet sufficient: until configure's all_gtfiles is the union
+#     over every back end (see the long note at that line), gengtype is never
+#     ASKED to scan a non-primary source, so aarch64.o, aarch64-builtins.o and
+#     aarch64-acle-builtins.o still fail on `gt-<file>.h: No such file'.
+#     Flipping that one line makes all 94 objects compile and breaks the cc1
+#     link; it belongs with OBJS + the selector.
 #
 # The config objects go in `mt-<cpu>/' rather than being renamed.  Measured
 # over all 188 targets: 153 distinct object names, and the number with more
@@ -1145,7 +1162,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
 	continue;
       }
     }
-    printf "mt-%s/%s.o: %s %s-inc/s-inc\n", cpu, obj, src, cpu;
+    printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", cpu, obj, src, cpu;
     printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
     printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
     objs = objs " mt-" cpu "/" obj ".o";

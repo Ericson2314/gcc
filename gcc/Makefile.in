@@ -3865,17 +3865,28 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
 # STILL THE PRIMARY TARGET'S FILES ONLY, and that is an ordering constraint,
 # not an oversight.  gen-target-manifest.sh already computes the union over
 # every configured back end (gcc_all_target_gtfiles, which also folds in each
-# back end's $(out_file) -- config.gcc's target_gtfiles lists only the extras).
-# Substituting it here was tried and MEASURED to break the link:
+# back end's $(out_file) -- config.gcc's target_gtfiles lists only the extras),
+# and the switch is one line in configure.ac; the long note at that line
+# records everything the two builds of it established.  The short of it:
 #
-#   ld: c/c-lang.o:(.rodata+0x280): undefined reference to
-#	`gt_ggc_r_gt_arm_mve_builtins_h'
+#  * With the union, all 94 per-base objects compile -- including the three
+#    that fail on `gt-<file>.h: No such file' without it.
+#  * The union is NOT enough on its own, and the per-base object rules did NOT
+#    make it enough.  Every file gengtype scans gets a ggc root table entry
+#    that the singular gtype-<lang>.h names, so the union leaves six symbols
+#    undefined at the cc1 link (gt_ggc_r_gt_aarch64{,_builtins,_acle_builtins}_h
+#    and their gt_pch_rs_ counterparts).  They are satisfiable only by linking
+#    mt-aarch64/*.o, because those root tables take the addresses of aarch64's
+#    own globals.  The union and OBJS membership are ONE step, not two.
+#  * If the union is ever substituted here, DROP `$(out_file)' from the
+#    $(srcdir)/targhooks.cc line above: the union already contains the
+#    primary's out_file, and a file listed twice is parsed twice.
 #
-# gengtype emits a ggc root table entry for every file it scans, so scanning
-# arm-mve-builtins.cc declares a root that only arm-mve-builtins.o defines --
-# and that object is not in OBJS yet.  The union must therefore land WITH the
-# objects (S6), not before them.  The data is recorded now so that step is
-# wiring rather than re-derivation.
+# Note also that the substituted list ends with the [lang] markers appended by
+# configure's language loop.  Anything target-side has to reach GTFILES ABOVE
+# this line, or gengtype scopes it to the last language and says "specified
+# more than once for language rust".  A late `GTFILES +=' does not work either:
+# ALL_GTFILES_H below is an IMMEDIATE (`:=') assignment.
 
 # Compute the list of GT header files from the corresponding C sources,
 # possibly nested within config or language subdirectories.  Match gengtype's

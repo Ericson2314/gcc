@@ -25061,15 +25061,47 @@ all_lang_makefrags=
 # Additional files for gengtype.
 #
 # The PRIMARY target's, still.  gcc_gen_target_manifest (called above) leaves
-# the union over every configured back end in ${gcc_all_target_gtfiles}, and
-# gengtype could make one pass over it -- its outputs are named after the
-# source scanned, so gt-arm.h and gt-i386.h cannot collide.  What stops it is
-# the LINK, not gengtype: every file scanned gets a ggc root table entry, so
-# scanning a back end whose objects are not yet in OBJS leaves
-# `gt_ggc_r_gt_arm_mve_builtins_h' undefined.  Measured, not assumed; see the
-# note at @all_gtfiles@ in Makefile.in.  Switch this to
-# ${gcc_all_target_gtfiles} in the same change that puts the back-end objects
-# in OBJS.
+# the union over every configured back end in ${gcc_all_target_gtfiles}: each
+# target's target_gtfiles plus its $(out_file), deduplicated.  The switch is
+#
+#	all_gtfiles="$gcc_all_target_gtfiles"
+#
+# and it has been BUILT, twice.  Everything about it except the link is settled;
+# what is written here is measured, not reasoned:
+#
+#  * It goes HERE, above the language loop that appends `[[$subdir]] $gtfiles'.
+#    Reaching GTFILES any later scopes the files to the last language and
+#    gengtype says "specified more than once for language rust".  Note also
+#    that ALL_GTFILES_H in Makefile.in is an IMMEDIATE (`:=') assignment, so a
+#    late `GTFILES +=' is silently too late.
+#  * gengtype's outputs cannot collide.  A gt- header is named after the source
+#    scanned with the directory stripped; of the 54 sources under config/ that
+#    include a gt- header, ZERO share a basename.
+#  * A gt- header is target-INDEPENDENT -- gengtype parses the source text and
+#    never preprocesses it against a tm.h -- so ONE build-root copy is correct,
+#    and the `mt-<base>/' hazard that forced the per-base generated sources out
+#    of the build root does NOT apply.  Verified by a symmetric poison: an
+#    `#error' in gt-aarch64.h fails aarch64's objects (2 hits) and leaves
+#    i386's clean, and the mirror arm behaves the same way.
+#  * With the union in place all 94 per-base objects compile, including the
+#    three -- aarch64.o, aarch64-builtins.o, aarch64-acle-builtins.o -- that
+#    otherwise fail on `gt-<file>.h: No such file'.
+#
+# What still stops it is the LINK, and this was RE-MEASURED after the per-base
+# object rules landed, because those rules were expected to remove the
+# objection and do NOT: they build MULTI_TARGET_OBJS, which is not in OBJS.
+# gengtype gives every scanned file a ggc root table entry, and the singular
+# gtype-<lang>.h then names it:
+#
+#   ld: c/c-lang.o:(.rodata+0x2d8): undefined reference to
+#	`gt_ggc_r_gt_aarch64_builtins_h'      (+5 more: _aarch64_h,
+#	 _aarch64_acle_builtins_h, and the three gt_pch_rs_ counterparts)
+#
+# The six cannot be supplied by anything short of linking the objects: the root
+# table in gt-aarch64.h takes the addresses of aarch64's own globals
+# (aarch64_sls_shared_thunks, aarch64_previous_fndecl, ...), which only
+# mt-aarch64/aarch64.o defines.  So the union and OBJS membership are not two
+# steps but one, and this line flips in the same change as OBJS + the selector.
 all_gtfiles="$target_gtfiles"
 
 # These are the languages that are set in --enable-languages,
