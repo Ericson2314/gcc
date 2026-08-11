@@ -99,6 +99,15 @@ struct mode_data
 				   this run defines this mode.  The record
 				   exists only to occupy the ordinal that the
 				   shared enum gave it.  */
+  const char *bare;		/* Namespaced modes: the UNQUALIFIED spelling.
+				   `name' is the numbering key and the enum
+				   name and has to be unique; `bare' is what
+				   `GET_MODE_NAME' answers and what the back
+				   end's own sources write.  Equal for every
+				   mode that does not collide.  */
+  const char *arch;		/* Union run: the back end whose modes file
+				   defined this mode, or null for a mode
+				   `machmode.def' defines for everybody.  */
 };
 
 static struct mode_data *modes[MAX_MODE_CLASS];
@@ -110,10 +119,18 @@ static const struct mode_data blank_mode = {
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
   "<unknown>", 0, 0, 0, 0, false, false, 0,
-  false, false, false
+  false, false, false, 0, 0
 };
 
 static htab_t modes_by_name;
+
+/* Union run: the back end whose modes file is being read right now.  The
+   generated union input announces it before each `#include'; see
+   `union_note_arch'.  Null while `machmode.def' itself is being read, which
+   is exactly the distinction that decides whether a mode may be qualified:
+   `SImode' is shared vocabulary and must mean one thing everywhere, `PSI'
+   is one back end's and need not.  */
+static const char *union_cur_arch ATTRIBUTE_UNUSED;
 
 /* Data structure for recording target-specified runtime adjustments
    to a particular mode.  We support varying the byte size, the
@@ -170,12 +187,33 @@ vector_class (enum mode_class cl)
 
 /* Utility routines.  */
 static inline struct mode_data *
-find_mode (const char *name)
+find_mode_key (const char *key_name)
 {
   struct mode_data key;
 
-  key.name = name;
+  key.name = key_name;
   return (struct mode_data *) htab_find (modes_by_name, &key);
+}
+
+static inline struct mode_data *
+find_mode (const char *name)
+{
+#ifdef GENMODES_UNION
+  /* Inside a back end's own modes file, a bare name means THAT back end's
+     mode.  `INT_N (PSI, 24)' in `avr-modes.def' must reach avr's PSI even
+     though the name is now qualified, or the qualification would silently
+     redirect the back end's own references to another back end's mode --
+     which is the bug this exists to prevent, arriving through the fix.  */
+  if (union_cur_arch)
+    {
+      char *q = concat (union_cur_arch, "_", name, NULL);
+      struct mode_data *m = find_mode_key (q);
+      free (q);
+      if (m)
+	return m;
+    }
+#endif
+  return find_mode_key (name);
 }
 
 static struct mode_data *
@@ -207,10 +245,49 @@ new_mode (enum mode_class cl, const char *name,
 	 one entry, so that is the one disagreement worth a diagnostic.  */
       if (m->cl != cl)
 	{
-	  error ("%s:%d: mode \"%s\" is %s here but %s at %s:%d",
-		 trim_filename (file), line, name, mode_class_names[cl],
-		 mode_class_names[m->cl], m->file, m->line);
-	  return m;
+	  /* Two back ends, one name, two classes.  `PSI' is MODE_INT in avr
+	     (24-bit) and MODE_PARTIAL_INT in msp430 (20-bit).  The class
+	     decides which contiguous run of the enum a mode lands in and
+	     `MIN_MODE_<CLASS>'/`MAX_MODE_<CLASS>' are that run's endpoints,
+	     so one entry cannot serve both.
+
+	     Neither is wrong and neither gets renamed: the name is
+	     arch-specific, and only the flat numbering forced them together.
+	     Give each its own ordinal under a qualified KEY and leave
+	     `bare' -- what `GET_MODE_NAME' answers -- alone.  That is what
+	     keeps `optabs-libfuncs.cc' building `__mulpsi3' from `psi' and
+	     keeps every libgcc symbol where it is.
+
+	     Only a mode a back end's own file defines may be qualified.  A
+	     name from `machmode.def' is shared vocabulary; `SImode' meaning
+	     one thing everywhere is the entire point of the union, so a
+	     class disagreement there is still an error.  */
+	  if (!union_cur_arch || !m->arch)
+	    {
+	      error ("%s:%d: mode \"%s\" is %s here but %s at %s:%d",
+		     trim_filename (file), line, name, mode_class_names[cl],
+		     mode_class_names[m->cl], m->file, m->line);
+	      return m;
+	    }
+
+	  /* The FIRST claimant was registered under the bare name before
+	     anyone knew it collided.  Retro-qualify it too, so that neither
+	     back end silently keeps the unqualified ordinal -- a first-wins
+	     asymmetry here would be invisible and would decide which back end
+	     `__attribute__((mode(PSI)))' resolves to.  */
+	  if (!strcmp (m->name, m->bare))
+	    {
+	      htab_remove_elt (modes_by_name, m);
+	      m->name = concat (m->arch, "_", m->bare, NULL);
+	      *htab_find_slot (modes_by_name, m, INSERT) = m;
+	    }
+
+	  {
+	    char *q = concat (union_cur_arch, "_", name, NULL);
+	    struct mode_data *n = new_mode (cl, q, file, line);
+	    n->bare = name;
+	    return n;
+	  }
 	}
 
       /* Hand back a throwaway copy.  The caller is about to fill in the
@@ -234,6 +311,10 @@ new_mode (enum mode_class cl, const char *name,
   memcpy (m, &blank_mode, sizeof (struct mode_data));
   m->cl = cl;
   m->name = name;
+  m->bare = name;
+#ifdef GENMODES_UNION
+  m->arch = union_cur_arch;
+#endif
   if (file)
     m->file = trim_filename (file);
   m->line = line;
@@ -246,6 +327,33 @@ new_mode (enum mode_class cl, const char *name,
   *htab_find_slot (modes_by_name, m, INSERT) = m;
 
   return m;
+}
+
+/* Make a mode DERIVED from M -- its complex, its vectors.  If M is
+   qualified its derivatives must be too: avr's and msp430's PSI both derive
+   a complex named `CPSI', and letting those merge would hand one back end
+   the other's precision under a name they agree on.  This is also the hook
+   that covers the four SIZE-only collisions (`XF', `XC', `V4BI', `V8BI')
+   when the tables unify at M3, without a redesign.  */
+static struct mode_data *
+new_derived_mode (enum mode_class cl, struct mode_data *m ATTRIBUTE_UNUSED,
+		  const char *name, const char *file, unsigned int line)
+{
+  struct mode_data *c;
+#ifdef GENMODES_UNION
+  if (m->arch && strcmp (m->name, m->bare))
+    {
+      c = new_mode (cl, concat (m->arch, "_", name, NULL), file, line);
+      c->bare = xstrdup (name);
+      /* `union_cur_arch' is already back to null by the time `machmode.def'
+	 derives complex and vector modes, so a derivative has to inherit the
+	 attribution from its component rather than read the cursor.  */
+      c->arch = m->arch;
+      return c;
+    }
+#endif
+  c = new_mode (cl, xstrdup (name), file, line);
+  return c;
 }
 
 static hashval_t
@@ -524,7 +632,7 @@ make_complex_modes (enum mode_class cl,
       if (m->boolean)
 	continue;
 
-      m_len = strlen (m->name);
+      m_len = strlen (m->bare);
       /* The leading "1 +" is in case we prepend a "C" below.  */
       buf = (char *) xmalloc (1 + m_len + 1);
 
@@ -534,7 +642,7 @@ make_complex_modes (enum mode_class cl,
       p = 0;
       if (cl == MODE_FLOAT)
 	{
-	  memcpy (buf, m->name, m_len + 1);
+	  memcpy (buf, m->bare, m_len + 1);
 	  p = strchr (buf, 'F');
 	  if (p == 0 && strchr (buf, 'D') == 0)
 	    {
@@ -549,10 +657,10 @@ make_complex_modes (enum mode_class cl,
       else
 	{
 	  buf[0] = 'C';
-	  memcpy (buf + 1, m->name, m_len + 1);
+	  memcpy (buf + 1, m->bare, m_len + 1);
 	}
 
-      c = new_mode (cclass, buf, file, line);
+      c = new_derived_mode (cclass, m, buf, file, line);
       c->component = m;
       m->complex = c;
     }
@@ -597,14 +705,14 @@ make_vector_modes (enum mode_class cl, const char *prefix, unsigned int width,
 	continue;
 
       if ((size_t) snprintf (buf, sizeof buf, "%s%u%s", prefix,
-			     ncomponents, m->name) >= sizeof buf)
+			     ncomponents, m->bare) >= sizeof buf)
 	{
 	  error ("%s:%d: mode name \"%s\" is too long",
 		 m->file, m->line, m->name);
 	  continue;
 	}
 
-      v = new_mode (vclass, xstrdup (buf), file, line);
+      v = new_derived_mode (vclass, m, buf, file, line);
       v->order = order;
       v->component = m;
       v->ncomponents = ncomponents;
@@ -917,6 +1025,18 @@ static int max_bitsize_mode_any_mode;
 static int union_max_any_int;
 static int union_max_any_mode;
 
+/* The generated union input announces each back end before including its
+   modes file, so that a name defined there can be attributed to it.  The
+   attribution is what makes qualification TARGETED: only a name two back
+   ends define, and disagree about, is qualified.  The 123 names they define
+   and AGREE about -- `V4SI' across twelve back ends, `TF' across twelve --
+   stay one ordinal, which is the compression the union exists for.  */
+static void ATTRIBUTE_UNUSED
+union_note_arch (const char *arch)
+{
+  union_cur_arch = arch;
+}
+
 static void ATTRIBUTE_UNUSED
 union_note_max_bitsize (int any_int, int any_mode)
 {
@@ -1140,12 +1260,15 @@ calc_wider_mode (void)
    the back end's own modes, so `FOR_EACH_MODE*' never walks into a hole.  */
 
 static const char *union_list_file;
+static const char *union_arch;
 static bool gen_union_list;
 
 struct union_slot
 {
-  const char *name;
+  const char *name;		/* the numbering key, unique */
   enum mode_class cl;
+  const char *arch;		/* owning back end, or null if shared */
+  const char *bare;		/* unqualified spelling; == name if shared */
 };
 
 static struct union_slot *union_slots;
@@ -1160,14 +1283,18 @@ emit_union_list (void)
   struct mode_data *m;
 
   for_all_modes (c, m)
-    printf ("%s %s\n", m->name, mode_class_names[m->cl]);
+    if (strcmp (m->name, m->bare))
+      printf ("%s %s %s %s\n", m->name, mode_class_names[m->cl],
+	      m->arch, m->bare);
+    else
+      printf ("%s %s\n", m->name, mode_class_names[m->cl]);
 }
 
 static void
 read_union_list (void)
 {
   FILE *f = fopen (union_list_file, "r");
-  char name[256], cl[64];
+  char name[256], cl[64], arch[64], bare[256], line[640];
   unsigned int alloc = 64;
 
   if (!f)
@@ -1177,9 +1304,17 @@ read_union_list (void)
     }
 
   union_slots = XNEWVEC (struct union_slot, alloc);
-  while (fscanf (f, "%255s %63s", name, cl) == 2)
+  while (fgets (line, sizeof line, f))
     {
-      int c;
+      int c, nf;
+
+      nf = sscanf (line, "%255s %63s %63s %255s", name, cl, arch, bare);
+      if (nf != 2 && nf != 4)
+	{
+	  if (nf > 0)
+	    error ("%s: malformed line \"%s\"", union_list_file, name);
+	  break;
+	}
 
       if (n_union_slots == alloc)
 	{
@@ -1197,6 +1332,9 @@ read_union_list (void)
 	}
       union_slots[n_union_slots].name = xstrdup (name);
       union_slots[n_union_slots].cl = (enum mode_class) c;
+      union_slots[n_union_slots].arch = nf == 4 ? xstrdup (arch) : 0;
+      union_slots[n_union_slots].bare
+	= xstrdup (nf == 4 ? bare : name);
       n_union_slots++;
     }
   fclose (f);
@@ -1236,7 +1374,21 @@ apply_union_order (void)
   for (i = 0; i < n_union_slots; i++)
     {
       c = union_slots[i].cl;
-      m = find_mode (union_slots[i].name);
+      /* A qualified ordinal belongs to ONE back end.  For anybody else it
+	 is a hole and there is nothing to look up -- looking up the bare
+	 name would find this back end's own mode of that name and then trip
+	 the class check below, turning another back end's ordinal into a
+	 spurious error about this one.  */
+      if (union_slots[i].arch
+	  && (!union_arch || strcmp (union_slots[i].arch, union_arch)))
+	m = 0;
+      else
+	m = find_mode (union_slots[i].bare);
+
+      /* This back end's mode takes the qualified key as its enum name, and
+	 keeps `bare' for `GET_MODE_NAME'.  */
+      if (m && union_slots[i].arch)
+	m->name = union_slots[i].name;
 
       /* The class is the one thing the shared numbering fixes, because it
 	 decides which run of the enum a mode lands in and
@@ -1255,6 +1407,13 @@ apply_union_order (void)
 	  m = XNEW (struct mode_data);
 	  *m = blank_mode;
 	  m->name = union_slots[i].name;
+	  /* A hole keeps the QUALIFIED spelling as its `mode_name'.  A hole is
+	     a mode this back end does not have, so no name a user can write
+	     may match it: `__attribute__((mode(PSI)))' scans `mode_name' by
+	     string and takes the FIRST match (c-attribs.cc:2460), so a hole
+	     answering "PSI" would capture avr's own attribute for msp430's
+	     ordinal, with no diagnostic anywhere.  */
+	  m->bare = union_slots[i].name;
 	  m->cl = (enum mode_class) c;
 	  m->precision = 0;
 	  m->bytesize = 0;
@@ -1598,6 +1757,24 @@ enum machine_mode\n{");
 	  printf ("#define %smode ((void) 0, E_%smode)\n",
 		  m->name, m->name);
 	printf ("#endif\n");
+	/* The back end's own sources say `PSImode', not `avr_PSImode', and
+	   are not going to be edited.  Alias the unqualified spelling to
+	   this back end's ordinal.  Holes get no alias: nothing may reach
+	   another back end's mode by its plain name.  */
+	if (!m->is_hole && strcmp (m->name, m->bare))
+	  {
+	    printf ("#define HAVE_%smode\n", m->bare);
+	    printf ("#ifdef USE_ENUM_MODES\n");
+	    printf ("#define %smode E_%smode\n", m->bare, m->name);
+	    printf ("#else\n");
+	    if (const char *mc = get_mode_class (m))
+	      printf ("#define %smode (%s ((%s::from_int) E_%smode))\n",
+		      m->bare, mc, mc, m->name);
+	    else
+	      printf ("#define %smode ((void) 0, E_%smode)\n",
+		      m->bare, m->name);
+	    printf ("#endif\n");
+	  }
       }
 
   puts ("  MAX_MACHINE_MODE,\n");
@@ -1756,8 +1933,13 @@ emit_mode_name (void)
 
   print_decl ("char *const", "mode_name", "NUM_MACHINE_MODES");
 
+  /* `GET_MODE_NAME' answers the UNQUALIFIED name.  It is what
+     `optabs-libfuncs.cc:159' lowercases to build `__mulpsi3', so a
+     qualified name here would rename libgcc symbols -- which is the one
+     thing this whole approach exists to avoid.  Holes are the exception,
+     above.  */
   for_all_modes (c, m)
-    printf ("  \"%s\",\n", m->name);
+    printf ("  \"%s\",\n", m->bare);
 
   print_closer ();
 }
@@ -2447,9 +2629,12 @@ main (int argc, char **argv)
 	gen_union_list = true;
       else if (!strcmp (argv[i], "-U") && i + 1 < argc)
 	union_list_file = argv[++i];
+      else if (!strcmp (argv[i], "-A") && i + 1 < argc)
+	union_arch = argv[++i];
       else
 	{
-	  error ("usage: %s [-h|-i|-m|-l] [-U numbering] > file", progname);
+	  error ("usage: %s [-h|-i|-m|-l] [-U numbering [-A arch]] > file",
+		 progname);
 	  return FATAL_EXIT_CODE;
 	}
     }
