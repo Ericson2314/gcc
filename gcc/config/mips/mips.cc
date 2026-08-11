@@ -23585,10 +23585,14 @@ mips_print_patchable_function_entry (FILE *file ATTRIBUTE_UNUSED,
 #undef  TARGET_COMP_TYPE_ATTRIBUTES
 #define TARGET_COMP_TYPE_ATTRIBUTES mips_comp_type_attributes
 
-#ifdef HAVE_AS_DTPRELWORD
+/* Registering a target hook is a compile-time construct, so this cannot be a
+   runtime test.  It was guarded by HAVE_AS_DTPRELWORD; .dtprelword has been in
+   gas for mips since long before any binutils GCC still builds against.  If an
+   assembler somehow lacked it the result is a loud assembler error, whereas
+   leaving the hook unregistered makes dwarf2out silently omit DTP-relative
+   debug info -- the hook default is NULL and the caller tests the pointer.  */
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL mips_output_dwarf_dtprel
-#endif
 #undef TARGET_DWARF_REGISTER_SPAN
 #define TARGET_DWARF_REGISTER_SPAN mips_dwarf_register_span
 #undef TARGET_DWARF_FRAME_REG_MODE

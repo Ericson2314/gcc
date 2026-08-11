@@ -12359,10 +12359,12 @@ loongarch_output_asm_load_canary (rtx reg, rtx canary, rtx tmp)
 #undef TARGET_USE_BLOCKS_FOR_CONSTANT_P
 #define TARGET_USE_BLOCKS_FOR_CONSTANT_P hook_bool_mode_const_rtx_true
 
-#ifdef HAVE_AS_DTPRELWORD
+/* See the matching note in config/mips/mips.cc: hook registration is a
+   compile-time construct, and the .dtprelword probe that used to guard it had
+   an in-tree floor of binutils 2.18, while loongarch support only arrived in
+   2.38 -- so the gate was true for every loongarch assembler that exists.  */
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL loongarch_output_dwarf_dtprel
-#endif
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P loongarch_legitimate_address_p

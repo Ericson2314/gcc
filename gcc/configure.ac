@@ -3935,15 +3935,8 @@ LCF0:
 
     dnl .micromips moved to target-specs; targ_caps.as_mips_micromips.
 
-    gcc_GAS_CHECK_FEATURE([.dtprelword support],
-      gcc_cv_as_mips_dtprelword,,
-      [.section .tdata,"awT",@progbits
-x:
-	.word 2
-	.text
-	.dtprelword x+0x8000],,
-      [AC_DEFINE(HAVE_AS_DTPRELWORD, 1,
-	  [Define if your assembler supports .dtprelword.])])
+    dnl .dtprelword settled as a build-time constant: it guards hook-table
+    dnl registration, which cannot be a runtime test.  See config/mips/mips.cc.
 
     gcc_GAS_CHECK_FEATURE([DSPR1 mult with four accumulators support],
       gcc_cv_as_mips_dspr1_mult,,
@@ -4018,15 +4011,7 @@ x:
     dnl every supported assembler takes.
     ;;
     loongarch*-*-*)
-    gcc_GAS_CHECK_FEATURE([.dtprelword support],
-      gcc_cv_as_loongarch_dtprelword, [2,18,0],,
-      [.section .tdata,"awT",@progbits
-x:
-	.word 2
-	.text
-	.dtprelword x+0x8000],,
-      [AC_DEFINE(HAVE_AS_DTPRELWORD, 1,
-	  [Define if your assembler supports .dtprelword.])])
+    dnl .dtprelword settled as a build-time constant; see the mips arm above.
     gcc_GAS_CHECK_FEATURE([explicit relocation support],
       gcc_cv_as_loongarch_explicit_relocs,,
       [a:pcalau12i $t0,%pc_hi20(a)],,
