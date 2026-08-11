@@ -509,6 +509,9 @@ ${option_defaults}
 *link_buildid:
 ${link_buildid}
 
+*link_hardening:
+${link_hardening}
+
 *link_target_config:
 -ftarget-config=${target_config_path}
 
@@ -1287,6 +1290,17 @@ case $target in
     fi
     ;;
 esac
+
+dnl The options -fhardened asks the linker for.  Read directly by the driver
+dnl rather than referenced from another spec: an empty value means "this
+dnl linker has neither", and the driver still decides whether to apply them.
+link_hardening=
+if test x"$gcc_cv_ld_now" = xyes; then
+  link_hardening="-z now"
+fi
+if test x"$gcc_cv_ld_relro" = xyes; then
+  link_hardening="${link_hardening} -z relro"
+fi
 
 dnl --- Emit. -----------------------------------------------------------------
 

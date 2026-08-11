@@ -1273,6 +1273,16 @@ static const char *link_target_config = "";
    file but never referenced, so it had no effect at all.  */
 static const char *link_buildid = "";
 
+/* Linker options -fhardened adds, if this linker has them.  Not referenced
+   from any spec string: the driver reads it directly, because whether to
+   apply it depends on driver state a spec cannot see.  The default is what
+   every current GNU ld supports; target-specs/configure replaces it with the
+   answer for the actual linker.  */
+#ifndef LINK_HARDENING_SPEC
+#define LINK_HARDENING_SPEC "-z now -z relro"
+#endif
+static const char *link_hardening = LINK_HARDENING_SPEC;
+
 static const char *cc1_options =
 "%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}}\
  %{!iplugindir*:%{fplugin*:%:find-plugindir()}}\
@@ -1719,6 +1729,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("cc1_target_config",		&cc1_target_config),
   INIT_STATIC_SPEC ("link_target_config",	&link_target_config),
   INIT_STATIC_SPEC ("link_buildid",		&link_buildid),
+  INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
   INIT_STATIC_SPEC ("link_ssp",			&link_ssp_spec),
@@ -5050,22 +5061,6 @@ process_command (unsigned int decoded_options_count,
 #endif
     }
 
-  /* -z now / -z relro for -fhardened.  These were HAVE_LD_NOW_SUPPORT and
-   HAVE_LD_RELRO_SUPPORT out of auto-host.h.  They are runtime capabilities now
-   (targ_caps.ld_now / ld_relro) -- but targ_caps lives in cc1, and the driver
-   deliberately includes no tm.h and no defaults.h, so it cannot read them.
-
-   Until these move to a spec fragment the way link_buildid did, the driver uses
-   the answer every current GNU ld gives.  Emitting -z now / -z relro to a
-   linker that does not know them is the failure mode this trades against, and
-   it only arises for -fhardened on a pre-2000s linker.  */
-#ifndef HAVE_LD_NOW_SUPPORT_DRIVER
-#define HAVE_LD_NOW_SUPPORT_DRIVER 1
-#endif
-#ifndef HAVE_LD_RELRO_SUPPORT_DRIVER
-#define HAVE_LD_RELRO_SUPPORT_DRIVER 1
-#endif
-
 /* TODO: check if -static -pie works and maybe use it.  */
   if (flag_hardened)
     {
@@ -5074,17 +5069,29 @@ process_command (unsigned int decoded_options_count,
 #if defined HAVE_LD_PIE && defined LD_PIE_SPEC
 	  save_switch (LD_PIE_SPEC, 0, NULL, /*validated=*/true, /*known=*/false);
 #endif
-	  /* These are passed straight down to collect2 so we have to break
-	     it up like this.  */
-	  if (HAVE_LD_NOW_SUPPORT_DRIVER)
+	  /* The linker hardening options, which were HAVE_LD_NOW_SUPPORT and
+	     HAVE_LD_RELRO_SUPPORT out of auto-host.h.  The spec supplies both
+	     the capability and the option spelling -- an empty spec means this
+	     linker has neither -- and target-specs/configure fills it in from
+	     probing the real linker.
+
+	     The decision stays here on purpose.  Whether to harden at all is
+	     driver policy, not a linker property: if the user passed their own
+	     link options we deliberately skip these AND warn, and a spec cannot
+	     see avoid_linker_hardening_p.  Silently hardening a link the user
+	     was told would not be hardened, or dropping the warning, would both
+	     be worse than splitting the logic this way.
+
+	     Split on whitespace and added one word at a time because these go
+	     straight down to collect2.  The spec is a plain option list, not a
+	     %-construct.  */
+	  if (link_hardening != NULL && link_hardening[0] != '\0')
 	    {
-	      add_infile ("-z", "*");
-	      add_infile ("now", "*");
-	    }
-	  if (HAVE_LD_RELRO_SUPPORT_DRIVER)
-	    {
-	      add_infile ("-z", "*");
-	      add_infile ("relro", "*");
+	      char *opts = xstrdup (link_hardening);
+	      for (char *p = strtok (opts, " \t"); p != NULL;
+		   p = strtok (NULL, " \t"))
+		add_infile (xstrdup (p), "*");
+	      free (opts);
 	    }
 	}
       /* We can't use OPT_Whardened yet.  Sigh.  */

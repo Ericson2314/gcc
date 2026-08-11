@@ -2352,6 +2352,9 @@ ${option_defaults}
 *link_buildid:
 ${link_buildid}
 
+*link_hardening:
+${link_hardening}
+
 *link_target_config:
 -ftarget-config=${target_config_path}
 
@@ -3115,6 +3118,14 @@ $as_echo "$as_me: WARNING: " >&2;}
     fi
     ;;
 esac
+
+link_hardening=
+if test x"$gcc_cv_ld_now" = xyes; then
+  link_hardening="-z now"
+fi
+if test x"$gcc_cv_ld_relro" = xyes; then
+  link_hardening="${link_hardening} -z relro"
+fi
 
 
 ts_bool () {
