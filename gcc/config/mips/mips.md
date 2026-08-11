@@ -7754,11 +7754,11 @@
   gcc_assert (GET_CODE (operands[0]) == CONST_DOUBLE);
   assemble_real (*CONST_DOUBLE_REAL_VALUE (operands[0]),
 		 as_a <scalar_float_mode> (GET_MODE (operands[0])),
-		 GET_MODE_BITSIZE (GET_MODE (operands[0])));
+		 GET_MODE_BITSIZE (GET_MODE (operands[0])).to_constant ());
   return "";
 }
   [(set (attr "length")
-	(symbol_ref "GET_MODE_SIZE (GET_MODE (operands[0]))"))])
+	(symbol_ref "GET_MODE_SIZE (GET_MODE (operands[0])).to_constant ()"))])
 
 (define_insn "align"
   [(unspec_volatile [(match_operand 0 "const_int_operand" "")] UNSPEC_ALIGN)]

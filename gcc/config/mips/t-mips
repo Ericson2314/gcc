@@ -28,3 +28,42 @@ frame-header-opt.o: $(srcdir)/config/mips/frame-header-opt.cc
 mips-d.o: $(srcdir)/config/mips/mips-d.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+
+# mips's sources have been converted to the 2-coefficient poly_int discipline:
+# they say known_lt/maybe_ne/to_constant () rather than relying on the
+# fixed-size shorthand that target code gets while NUM_POLY_INT_COEFFS is 1.
+# Ask for the discipline now, so that the eventual flip to 2 coefficients is a
+# no-op here.  See coretypes.h.
+#
+# PER OBJECT, not T_CFLAGS -- T_CFLAGS is one variable for the whole gcc/
+# directory and would hand mips's opt-in to every other back end.  See the
+# same comment in config/i386/t-i386 for the full reasoning.
+mips_poly_objs = mips.o mips-d.o driver-native.o frame-header-opt.o
+
+$(foreach o,$(mips_poly_objs),$(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+
+# The machine description's conditions are mips target code too, and they are
+# compiled inside the generated insn-* files, whose names differ between a
+# single-target build (insn-recog.o) and a multi-target one
+# (insn-recog-mips.o).  Match both shapes.
+mips_poly_gen = insn-attrtab.o insn-automata.o insn-dfatab.o insn-emit.o \
+  insn-enums.o insn-extract.o insn-latencytab.o insn-modes.o insn-opinit.o \
+  insn-output.o insn-peep.o insn-preds.o insn-recog.o
+
+$(foreach o,$(mips_poly_gen),$(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+$(foreach o,$(mips_poly_gen),$(eval CFLAGS-$(o:.o=)-mips.o += -DTARGET_POLY_AWARE))
+
+# insn-emit and insn-recog are split into a configured number of files.  Use
+# the Makefile's own lists rather than a pattern: a pattern-specific variable
+# propagates to the target's PREREQUISITES and would reach build/genemit.o and
+# build/genrecog.o, generators shared by every back end.
+$(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
+  $(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+$(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
+  $(eval CFLAGS-$(o:.o=)-mips.o += -DTARGET_POLY_AWARE))
+
+# gencondmd is target code -- genconditions.cc writes `#define IN_TARGET_CODE
+# 1' into the file it generates -- so it needs the opt-in too.  Only the
+# single-target object is named here; gen-multi-target-md.awk flags each
+# configured triple, reading the declaration above to decide.  See t-i386.
+build/gencondmd.o : T_CFLAGS += -DTARGET_POLY_AWARE

@@ -1808,7 +1808,7 @@ FP_ASM_SPEC "\
 
 #define PROMOTE_MODE(MODE, UNSIGNEDP, TYPE)	\
   if (GET_MODE_CLASS (MODE) == MODE_INT		\
-      && GET_MODE_SIZE (MODE) < UNITS_PER_WORD) \
+      && known_lt (GET_MODE_SIZE (MODE), UNITS_PER_WORD)) \
     {                                           \
       if ((MODE) == SImode)                     \
         (UNSIGNEDP) = 0;                        \
@@ -2489,7 +2489,7 @@ enum reg_class
 /* True if MODE is vector and supported in a MSA vector register.  */
 #define MSA_SUPPORTED_MODE_P(MODE)			\
   (ISA_HAS_MSA						\
-   && GET_MODE_SIZE (MODE) == UNITS_PER_MSA_REG		\
+   && known_eq (GET_MODE_SIZE (MODE), UNITS_PER_MSA_REG)		\
    && (GET_MODE_CLASS (MODE) == MODE_VECTOR_INT		\
        || GET_MODE_CLASS (MODE) == MODE_VECTOR_FLOAT))
 

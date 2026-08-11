@@ -2022,7 +2022,7 @@ mips_const_vector_bitimm_clr_p (rtx op, machine_mode mode)
 bool
 mips_const_vector_same_val_p (rtx op, machine_mode mode)
 {
-  int i, nunits = GET_MODE_NUNITS (mode);
+  int i, nunits = GET_MODE_NUNITS (mode).to_constant ();
   rtx first;
 
   if (GET_CODE (op) != CONST_VECTOR || GET_MODE (op) != mode)
@@ -2091,7 +2091,7 @@ mips_const_vector_same_int_p (rtx op, machine_mode mode, HOST_WIDE_INT low,
 bool
 mips_const_vector_shuffle_set_p (rtx op, machine_mode mode)
 {
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   int nsets = nunits / 4;
   int set = 0;
   int i, j;
@@ -2180,7 +2180,7 @@ mips_rtx_constant_in_small_data_p (machine_mode mode)
 {
   return (!TARGET_EMBEDDED_DATA
 	  && TARGET_LOCAL_SDATA
-	  && GET_MODE_SIZE (mode) <= mips_small_data_threshold);
+	  && known_le (GET_MODE_SIZE (mode), mips_small_data_threshold));
 }
 
 /* Return true if X should not be moved directly into register $25.
@@ -2470,8 +2470,8 @@ mips_symbol_insns_1 (enum mips_symbol_type type, machine_mode mode)
       /* PC-relative constants can be only be used with ADDIUPC,
 	 DADDIUPC, LWPC and LDPC.  */
       if (mode == MAX_MACHINE_MODE
-	  || GET_MODE_SIZE (mode) == 4
-	  || GET_MODE_SIZE (mode) == 8)
+	  || known_eq (GET_MODE_SIZE (mode), 4)
+	  || known_eq (GET_MODE_SIZE (mode), 8))
 	return 1;
 
       /* The constant must be loaded using ADDIUPC or DADDIUPC first.  */
@@ -2636,10 +2636,10 @@ mips_regno_mode_ok_for_base_p (int regno, machine_mode mode,
   /* In MIPS16 mode, the stack pointer can only address word and doubleword
      values, nothing smaller.  */
   if (TARGET_MIPS16 && regno == STACK_POINTER_REGNUM)
-    return GET_MODE_SIZE (mode) == 4 || GET_MODE_SIZE (mode) == 8;
+    return known_eq (GET_MODE_SIZE (mode), 4) || known_eq (GET_MODE_SIZE (mode), 8);
 
   if (MIPS16_GP_LOADS && regno == GLOBAL_POINTER_REGNUM)
-    return (UNITS_PER_WORD > 4 ? GET_MODE_SIZE (mode) <= 4 : true);
+    return (UNITS_PER_WORD > 4 ? known_le (GET_MODE_SIZE (mode), 4) : true);
 
   return TARGET_MIPS16 ? M16_REG_P (regno) : GP_REG_P (regno);
 }
@@ -2669,8 +2669,8 @@ mips_valid_offset_p (rtx x, machine_mode mode)
 
   /* We may need to split multiword moves, so make sure that every word
      is accessible.  */
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD
-      && !SMALL_OPERAND (INTVAL (x) + GET_MODE_SIZE (mode) - UNITS_PER_WORD))
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD)
+      && !SMALL_OPERAND (INTVAL (x) + GET_MODE_SIZE (mode).to_constant () - UNITS_PER_WORD))
     return false;
 
   /* MSA LD.* and ST.* supports 10-bit signed offsets.  */
@@ -2701,8 +2701,8 @@ mips_valid_lo_sum_p (enum mips_symbol_type symbol_type, machine_mode mode)
      can be accessed without inducing a carry.  This is mainly needed
      for o64, which has historically only guaranteed 64-bit alignment
      for 128-bit types.  */
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD
-      && GET_MODE_BITSIZE (mode) > GET_MODE_ALIGNMENT (mode))
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD)
+      && known_gt (GET_MODE_BITSIZE (mode), GET_MODE_ALIGNMENT (mode)))
     return false;
 
   /* MSA LD.* and ST.* cannot support loading symbols via %lo($base).  */
@@ -2857,12 +2857,12 @@ static bool
 mips16_unextended_reference_p (machine_mode mode, rtx base,
 			       unsigned HOST_WIDE_INT offset)
 {
-  if (mode != BLKmode && offset % GET_MODE_SIZE (mode) == 0
+  if (mode != BLKmode && offset % GET_MODE_SIZE (mode).to_constant () == 0
       && REGNO (base) != GLOBAL_POINTER_REGNUM)
     {
-      if (GET_MODE_SIZE (mode) == 4 && base == stack_pointer_rtx)
-	return offset < 256U * GET_MODE_SIZE (mode);
-      return offset < 32U * GET_MODE_SIZE (mode);
+      if (known_eq (GET_MODE_SIZE (mode), 4) && base == stack_pointer_rtx)
+	return known_lt (offset, 256U * GET_MODE_SIZE (mode));
+      return known_lt (offset, 32U * GET_MODE_SIZE (mode));
     }
   return false;
 }
@@ -2886,7 +2886,7 @@ mips_address_insns (rtx x, machine_mode mode, bool might_split_p)
      meaningless, so we have to single it out as a special case one way
      or the other.)  */
   if (mode != BLKmode && might_split_p)
-    factor = (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+    factor = (GET_MODE_SIZE (mode).to_constant () + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
   else
     factor = 1;
 
@@ -3154,7 +3154,7 @@ mips_load_store_insns (rtx mem, rtx_insn *insn)
   mode = GET_MODE (mem);
 
   /* Try to prove that INSN does not need to be split.  */
-  might_split_p = GET_MODE_SIZE (mode) > UNITS_PER_WORD;
+  might_split_p = known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD);
   if (might_split_p)
     {
       set = single_set (insn);
@@ -4155,7 +4155,7 @@ mips_binary_cost (rtx x, int single_cost, int double_cost, bool speed)
 {
   int cost;
 
-  if (GET_MODE_SIZE (GET_MODE (x)) == UNITS_PER_WORD * 2)
+  if (known_eq (GET_MODE_SIZE (GET_MODE (x)), UNITS_PER_WORD * 2))
     cost = double_cost;
   else
     cost = single_cost;
@@ -4234,7 +4234,7 @@ mips_zero_extend_cost (machine_mode mode, rtx op)
 static int
 mips_set_reg_reg_piece_cost (machine_mode mode, unsigned int units)
 {
-  return COSTS_N_INSNS ((GET_MODE_SIZE (mode) + units - 1) / units);
+  return COSTS_N_INSNS ((GET_MODE_SIZE (mode).to_constant () + units - 1) / units);
 }
 
 /* Return the cost of moving between two registers of mode MODE.  */
@@ -4245,7 +4245,7 @@ mips_set_reg_reg_cost (machine_mode mode)
   switch (GET_MODE_CLASS (mode))
     {
     case MODE_CC:
-      return mips_set_reg_reg_piece_cost (mode, GET_MODE_SIZE (CCmode));
+      return mips_set_reg_reg_piece_cost (mode, GET_MODE_SIZE (CCmode).to_constant ());
 
     case MODE_FLOAT:
     case MODE_COMPLEX_FLOAT:
@@ -4429,7 +4429,7 @@ mips_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case NOT:
-      *total = COSTS_N_INSNS (GET_MODE_SIZE (mode) > UNITS_PER_WORD ? 2 : 1);
+      *total = COSTS_N_INSNS (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD) ? 2 : 1);
       return false;
 
     case AND:
@@ -4462,7 +4462,7 @@ mips_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  && GET_CODE (XEXP (x, 0)) == NOT
 	  && GET_CODE (XEXP (x, 1)) == NOT)
 	{
-	  cost = GET_MODE_SIZE (mode) > UNITS_PER_WORD ? 2 : 1;
+	  cost = known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD) ? 2 : 1;
           *total = (COSTS_N_INSNS (cost)
 		    + set_src_cost (XEXP (XEXP (x, 0), 0), mode, speed)
 		    + set_src_cost (XEXP (XEXP (x, 1), 0), mode, speed));
@@ -4615,7 +4615,7 @@ mips_rtx_costs (rtx x, machine_mode mode, int outer_code,
       if (float_mode_p)
 	*total = mips_cost->fp_add;
       else
-	*total = COSTS_N_INSNS (GET_MODE_SIZE (mode) > UNITS_PER_WORD ? 4 : 1);
+	*total = COSTS_N_INSNS (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD) ? 4 : 1);
       return false;
 
     case FMA:
@@ -4984,7 +4984,7 @@ mips_mult_move_p (rtx dest, rtx src, enum mips_split_type split_type)
 	   || mips_tuning_info.fast_mult_zero_zero_p)
 	  && src == const0_rtx
 	  && REG_P (dest)
-	  && GET_MODE_SIZE (GET_MODE (dest)) == 2 * UNITS_PER_WORD
+	  && known_eq (GET_MODE_SIZE (GET_MODE (dest)), 2 * UNITS_PER_WORD)
 	  && (ISA_HAS_DSP_MULT
 	      ? ACC_REG_P (REGNO (dest))
 	      : MD_REG_P (REGNO (dest))));
@@ -5002,7 +5002,7 @@ mips_split_move_p (rtx dest, rtx src, enum mips_split_type split_type)
 
   /* FPR-to-FPR moves can be done in a single instruction, if they're
      allowed at all.  */
-  unsigned int size = GET_MODE_SIZE (GET_MODE (dest));
+  unsigned int size = GET_MODE_SIZE (GET_MODE (dest)).to_constant ();
   if (size == 8 && FP_REG_RTX_P (src) && FP_REG_RTX_P (dest))
     return false;
 
@@ -5353,7 +5353,7 @@ mips_output_move (rtx dest, rtx src)
   enum rtx_code dest_code = GET_CODE (dest);
   enum rtx_code src_code = GET_CODE (src);
   machine_mode mode = GET_MODE (dest);
-  bool dbl_p = (GET_MODE_SIZE (mode) == 8);
+  bool dbl_p = (known_eq (GET_MODE_SIZE (mode), 8));
   bool msa_p = MSA_SUPPORTED_MODE_P (mode);
   enum mips_symbol_type symbol_type;
 
@@ -5418,7 +5418,7 @@ mips_output_move (rtx dest, rtx src)
 	    }
 	}
       if (dest_code == MEM)
-	switch (GET_MODE_SIZE (mode))
+	switch (GET_MODE_SIZE (mode).to_constant ())
 	  {
 	  case 1: return "sb\t%z1,%0";
 	  case 2: return "sh\t%z1,%0";
@@ -5468,7 +5468,7 @@ mips_output_move (rtx dest, rtx src)
 	}
 
       if (src_code == MEM)
-	switch (GET_MODE_SIZE (mode))
+	switch (GET_MODE_SIZE (mode).to_constant ())
 	  {
 	  case 1: return "lbu\t%0,%1";
 	  case 2: return "lhu\t%0,%1";
@@ -6132,7 +6132,7 @@ mips_get_arg_info (struct mips_arg_info *info, const CUMULATIVE_ARGS *cum,
   unsigned int num_bytes, num_words, max_regs;
 
   /* Work out the size of the argument.  */
-  num_bytes = type ? int_size_in_bytes (type) : GET_MODE_SIZE (mode);
+  num_bytes = type ? int_size_in_bytes (type) : GET_MODE_SIZE (mode).to_constant ();
   num_words = (num_bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 
   /* Decide whether it should go in a floating-point register, assuming
@@ -6147,7 +6147,7 @@ mips_get_arg_info (struct mips_arg_info *info, const CUMULATIVE_ARGS *cum,
 	 of TYPE_MODE, regardless of the actual type.  */
       info->fpr_p = ((GET_MODE_CLASS (mode) == MODE_FLOAT
 		      || mode == V2SFmode)
-		     && GET_MODE_SIZE (mode) <= UNITS_PER_FPVALUE);
+		     && known_le (GET_MODE_SIZE (mode), UNITS_PER_FPVALUE));
       break;
 
     case ABI_32:
@@ -6163,7 +6163,7 @@ mips_get_arg_info (struct mips_arg_info *info, const CUMULATIVE_ARGS *cum,
 			 || VECTOR_FLOAT_TYPE_P (type))
 		     && (GET_MODE_CLASS (mode) == MODE_FLOAT
 			 || mode == V2SFmode)
-		     && GET_MODE_SIZE (mode) <= UNITS_PER_FPVALUE);
+		     && known_le (GET_MODE_SIZE (mode), UNITS_PER_FPVALUE));
       break;
 
     case ABI_N32:
@@ -6404,7 +6404,7 @@ mips_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 
       inner = GET_MODE_INNER (arg.mode);
       regno = FP_ARG_FIRST + info.reg_offset;
-      if (info.reg_words * UNITS_PER_WORD == GET_MODE_SIZE (inner))
+      if (known_eq (info.reg_words * UNITS_PER_WORD, GET_MODE_SIZE (inner)))
 	{
 	  /* Real part in registers, imaginary part on stack.  */
 	  gcc_assert (info.stack_words == info.reg_words);
@@ -6419,7 +6419,7 @@ mips_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	  imag = gen_rtx_EXPR_LIST (VOIDmode,
 				    gen_rtx_REG (inner,
 						 regno + info.reg_words / 2),
-				    GEN_INT (GET_MODE_SIZE (inner)));
+				    GEN_INT (GET_MODE_SIZE (inner).to_constant ()));
 	  return gen_rtx_PARALLEL (arg.mode, gen_rtvec (2, real, imag));
 	}
     }
@@ -6553,7 +6553,7 @@ mips_function_arg_padding (machine_mode mode, const_tree type)
 
   /* Arguments smaller than a stack slot are padded downward.  */
   if (mode != BLKmode
-      ? GET_MODE_BITSIZE (mode) >= PARM_BOUNDARY
+      ? known_ge (GET_MODE_BITSIZE (mode), PARM_BOUNDARY)
       : int_size_in_bytes (type) >= (PARM_BOUNDARY / BITS_PER_UNIT))
     return PAD_UPWARD;
 
@@ -6591,7 +6591,7 @@ mips_pass_by_reference (cumulative_args_t, const function_arg_info &arg)
 	  || arg.mode == DAmode || arg.mode == UDAmode)
 	return 0;
 
-      size = arg.type_size_in_bytes ();
+      size = arg.type_size_in_bytes ().to_constant ();
       return size == -1 || size > UNITS_PER_WORD;
     }
   else
@@ -6891,7 +6891,7 @@ mips_function_value_1 (const_tree valtype, const_tree fn_decl_or_type,
       if (mode == TFmode)
 	return mips_return_fpr_pair (mode,
 				     DImode, 0,
-				     DImode, GET_MODE_SIZE (mode) / 2);
+				     DImode, GET_MODE_SIZE (mode).to_constant () / 2);
 
       if (mips_return_mode_in_fpr_p (mode))
 	{
@@ -6899,7 +6899,7 @@ mips_function_value_1 (const_tree valtype, const_tree fn_decl_or_type,
 	    return mips_return_fpr_pair (mode,
 					 GET_MODE_INNER (mode), 0,
 					 GET_MODE_INNER (mode),
-					 GET_MODE_SIZE (mode) / 2);
+					 GET_MODE_SIZE (mode).to_constant () / 2);
 	  else
 	    return gen_rtx_REG (mode, FP_RETURN);
 	}
@@ -7355,7 +7355,7 @@ mips_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
       size = int_size_in_bytes (type);
 
       if (GET_MODE_CLASS (TYPE_MODE (type)) == MODE_FLOAT
-	  && GET_MODE_SIZE (TYPE_MODE (type)) <= UNITS_PER_FPVALUE)
+	  && known_le (GET_MODE_SIZE (TYPE_MODE (type)), UNITS_PER_FPVALUE))
 	{
 	  top = build3 (COMPONENT_REF, TREE_TYPE (f_ftop),
 			unshare_expr (valist), f_ftop, NULL_TREE);
@@ -7383,7 +7383,7 @@ mips_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 	     -fshort-double.  Doubles passed in registers will then take
 	     up 4 (UNITS_PER_HWFPVALUE) bytes, but those passed on the
 	     stack take up UNITS_PER_WORD bytes.  */
-	  osize = MAX (GET_MODE_SIZE (TYPE_MODE (type)), UNITS_PER_WORD);
+	  osize = MAX (GET_MODE_SIZE (TYPE_MODE (type)).to_constant (), UNITS_PER_WORD);
 	}
       else
 	{
@@ -8944,7 +8944,7 @@ mips_mem_fits_mode_p (machine_mode mode, rtx x)
 {
   return (MEM_P (x)
 	  && MEM_SIZE_KNOWN_P (x)
-	  && MEM_SIZE (x) == GET_MODE_SIZE (mode));
+	  && known_eq (MEM_SIZE (x), GET_MODE_SIZE (mode)));
 }
 
 /* Return true if (zero_extract OP WIDTH BITPOS) can be used as the
@@ -8964,13 +8964,13 @@ mips_use_ins_ext_p (rtx op, HOST_WIDE_INT width, HOST_WIDE_INT bitpos)
 {
   if (!ISA_HAS_EXT_INS
       || !register_operand (op, VOIDmode)
-      || GET_MODE_BITSIZE (GET_MODE (op)) > BITS_PER_WORD)
+      || known_gt (GET_MODE_BITSIZE (GET_MODE (op)), BITS_PER_WORD))
     return false;
 
-  if (!IN_RANGE (width, 1, GET_MODE_BITSIZE (GET_MODE (op)) - 1))
+  if (!IN_RANGE (width, 1, GET_MODE_BITSIZE (GET_MODE (op)).to_constant () - 1))
     return false;
 
-  if (bitpos < 0 || bitpos + width > GET_MODE_BITSIZE (GET_MODE (op)))
+  if (bitpos < 0 || known_gt (bitpos + width, GET_MODE_BITSIZE (GET_MODE (op))))
     return false;
 
   return true;
@@ -9019,7 +9019,7 @@ mask_low_and_shift_len (machine_mode mode, rtx mask, rtx shift)
 {
   HOST_WIDE_INT shval;
 
-  shval = INTVAL (shift) & (GET_MODE_BITSIZE (mode) - 1);
+  shval = INTVAL (shift) & (GET_MODE_BITSIZE (mode).to_constant () - 1);
   return exact_log2 ((UINTVAL (mask) >> shval) + 1);
 }
 
@@ -9986,7 +9986,7 @@ mips_dwarf_register_span (rtx reg)
   mode = GET_MODE (reg);
   if (FP_REG_P (REGNO (reg))
       && TARGET_FLOATXX
-      && GET_MODE_SIZE (mode) > UNITS_PER_FPREG)
+      && known_gt (GET_MODE_SIZE (mode), UNITS_PER_FPREG))
     {
       return gen_rtx_PARALLEL (VOIDmode, gen_rtvec (1, reg));
     }
@@ -9996,9 +9996,9 @@ mips_dwarf_register_span (rtx reg)
   else if (FP_REG_P (REGNO (reg))
 	   && TARGET_BIG_ENDIAN
 	   && MAX_FPRS_PER_FMT > 1
-	   && GET_MODE_SIZE (mode) > UNITS_PER_FPREG)
+	   && known_gt (GET_MODE_SIZE (mode), UNITS_PER_FPREG))
     {
-      gcc_assert (GET_MODE_SIZE (mode) == UNITS_PER_HWFPVALUE);
+      gcc_assert (known_eq (GET_MODE_SIZE (mode), UNITS_PER_HWFPVALUE));
       high = mips_subword (reg, true);
       low = mips_subword (reg, false);
       return gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, high, low));
@@ -11475,7 +11475,7 @@ mips_compute_frame_info (void)
 
   frame = &cfun->machine->frame;
   memset (frame, 0, sizeof (*frame));
-  size = get_frame_size ();
+  size = get_frame_size ().to_constant ();
 
   /* The first two blocks contain the outgoing argument area and the $gp save
      slot.  This area isn't needed in leaf functions.  We can also skip it
@@ -11500,7 +11500,7 @@ mips_compute_frame_info (void)
     }
   else
     {
-      frame->args_size = crtl->outgoing_args_size;
+      frame->args_size = crtl->outgoing_args_size.to_constant ();
       frame->cprestore_size = MIPS_GP_SAVE_AREA_SIZE;
     }
 
@@ -12150,7 +12150,7 @@ mips_for_each_saved_gpr_and_fpr (HOST_WIDE_INT sp_offset,
 	  }
 	else
 	  mips_save_restore_reg (fpr_mode, regno, offset, fn);
-	offset -= GET_MODE_SIZE (fpr_mode);
+	offset -= GET_MODE_SIZE (fpr_mode).to_constant ();
       }
 }
 
@@ -13299,7 +13299,7 @@ mips_hard_regno_mode_ok_uncached (unsigned int regno, machine_mode mode)
   if (mode == CCmode || mode == CCEmode)
     return ISA_HAS_8CC ? ST_REG_P (regno) : regno == FPSW_REGNUM;
 
-  size = GET_MODE_SIZE (mode);
+  size = GET_MODE_SIZE (mode).to_constant ();
   mclass = GET_MODE_CLASS (mode);
 
   if (GP_REG_P (regno) && mode != CCFmode && !MSA_SUPPORTED_MODE_P (mode))
@@ -13437,7 +13437,7 @@ mips_hard_regno_call_part_clobbered (unsigned int, unsigned int regno,
       && (regno & 1) != 0)
     return true;
 
-  if (ISA_HAS_MSA && FP_REG_P (regno) && GET_MODE_SIZE (mode) > 8)
+  if (ISA_HAS_MSA && FP_REG_P (regno) && known_gt (GET_MODE_SIZE (mode), 8))
     return true;
 
   return false;
@@ -13451,18 +13451,18 @@ mips_hard_regno_nregs (unsigned int regno, machine_mode mode)
   if (ST_REG_P (regno))
     /* The size of FP status registers is always 4, because they only hold
        CCmode values, and CCmode is always considered to be 4 bytes wide.  */
-    return (GET_MODE_SIZE (mode) + 3) / 4;
+    return (GET_MODE_SIZE (mode).to_constant () + 3) / 4;
 
   if (FP_REG_P (regno))
     {
       if (MSA_SUPPORTED_MODE_P (mode))
 	return 1;
 
-      return (GET_MODE_SIZE (mode) + UNITS_PER_FPREG - 1) / UNITS_PER_FPREG;
+      return (GET_MODE_SIZE (mode).to_constant () + UNITS_PER_FPREG - 1) / UNITS_PER_FPREG;
     }
 
   /* All other registers are word-sized.  */
-  return (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+  return (GET_MODE_SIZE (mode).to_constant () + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 }
 
 /* Implement CLASS_MAX_NREGS, taking the maximum of the cases
@@ -13497,7 +13497,7 @@ mips_class_max_nregs (enum reg_class rclass, machine_mode mode)
     }
   if (!hard_reg_set_empty_p (left))
     size = MIN (size, UNITS_PER_WORD);
-  return (GET_MODE_SIZE (mode) + size - 1) / size;
+  return (GET_MODE_SIZE (mode).to_constant () + size - 1) / size;
 }
 
 /* Implement TARGET_CAN_CHANGE_MODE_CLASS.  */
@@ -13508,7 +13508,7 @@ mips_can_change_mode_class (machine_mode from,
 {
   /* Allow conversions between different Loongson integer vectors,
      and between those vectors and DImode.  */
-  if (GET_MODE_SIZE (from) == 8 && GET_MODE_SIZE (to) == 8
+  if (known_eq (GET_MODE_SIZE (from), 8) && known_eq (GET_MODE_SIZE (to), 8)
       && INTEGRAL_MODE_P (from) && INTEGRAL_MODE_P (to))
     return true;
 
@@ -13779,7 +13779,7 @@ mips_secondary_memory_needed (machine_mode mode, reg_class_t class1,
   if (((class1 == FP_REGS) != (class2 == FP_REGS))
       && ((TARGET_FLOATXX && !ISA_HAS_MXHC1)
 	  || TARGET_O32_FP64A_ABI)
-      && GET_MODE_SIZE (mode) >= 8)
+      && known_ge (GET_MODE_SIZE (mode), 8))
     return true;
 
   return false;
@@ -13823,7 +13823,7 @@ mips_secondary_reload_class (enum reg_class rclass,
     {
       if (regno < 0
 	  || (MEM_P (x)
-	      && (GET_MODE_SIZE (mode) == 4 || GET_MODE_SIZE (mode) == 8)))
+	      && (known_eq (GET_MODE_SIZE (mode), 4) || known_eq (GET_MODE_SIZE (mode), 8))))
 	/* In this case we can use lwc1, swc1, ldc1 or sdc1.  We'll use
 	   pairs of lwc1s and swc1s if ldc1 and sdc1 are not supported.  */
 	return NO_REGS;
@@ -14621,7 +14621,7 @@ mips_process_sync_loop (rtx_insn *insn, rtx *operands)
   /* Read the memory.  */
   READ_OPERAND (mem, 0);
   gcc_assert (mem);
-  is_64bit_p = (GET_MODE_BITSIZE (GET_MODE (mem)) == 64);
+  is_64bit_p = (known_eq (GET_MODE_BITSIZE (GET_MODE (mem)), 64));
 
   /* Read the other attributes.  */
   at = gen_rtx_REG (GET_MODE (mem), AT_REGNUM);
@@ -17226,9 +17226,9 @@ mips_builtin_vectorized_function (unsigned int fn, tree type_out, tree type_in)
     return NULL_TREE;
 
   out_mode = TYPE_MODE (TREE_TYPE (type_out));
-  out_n = TYPE_VECTOR_SUBPARTS (type_out);
+  out_n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
 
   /* INSN is the name of the associated instruction pattern, without
      the leading CODE_FOR_.  */
@@ -17502,7 +17502,7 @@ mips_expand_builtin_insn (enum insn_code icode, unsigned int nops,
       ops[1].value = lowpart_subreg (imode, ops[1].value, ops[1].mode);
       ops[1].mode = imode;
       rangelo = 0;
-      rangehi = GET_MODE_NUNITS (ops[0].mode) - 1;
+      rangehi = GET_MODE_NUNITS (ops[0].mode).to_constant () - 1;
       if (CONST_INT_P (ops[3].value)
 	  && IN_RANGE (INTVAL (ops[3].value), rangelo, rangehi))
 	ops[3].value = GEN_INT (1 << INTVAL (ops[3].value));
@@ -17520,7 +17520,7 @@ mips_expand_builtin_insn (enum insn_code icode, unsigned int nops,
       std::swap (ops[1], ops[2]);
       std::swap (ops[1], ops[3]);
       rangelo = 0;
-      rangehi = GET_MODE_NUNITS (ops[0].mode) - 1;
+      rangehi = GET_MODE_NUNITS (ops[0].mode).to_constant () - 1;
       if (CONST_INT_P (ops[3].value)
 	  && IN_RANGE (INTVAL (ops[3].value), rangelo, rangehi))
 	ops[3].value = GEN_INT (1 << INTVAL (ops[3].value));
@@ -17897,9 +17897,9 @@ mips16_add_constant (struct mips16_constant_pool *pool,
     {
       if (mode == (*p)->mode && rtx_equal_p (value, (*p)->value))
 	return (*p)->label;
-      if (GET_MODE_SIZE (mode) < GET_MODE_SIZE ((*p)->mode))
+      if (known_lt (GET_MODE_SIZE (mode), GET_MODE_SIZE ((*p)->mode)))
 	break;
-      if (GET_MODE_SIZE (mode) == GET_MODE_SIZE ((*p)->mode))
+      if (known_eq (GET_MODE_SIZE (mode), GET_MODE_SIZE ((*p)->mode)))
 	first_of_size_p = false;
     }
 
@@ -17917,10 +17917,10 @@ mips16_add_constant (struct mips16_constant_pool *pool,
        case here; namely that the PC-relative instruction occupies the
        last 2 bytes in an aligned word.  */
     pool->highest_address = pool->insn_address - (UNITS_PER_WORD - 2) + 0x8000;
-  pool->highest_address -= GET_MODE_SIZE (mode);
+  pool->highest_address -= GET_MODE_SIZE (mode).to_constant ();
   if (first_of_size_p)
     /* Take into account the worst possible padding due to alignment.  */
-    pool->highest_address -= GET_MODE_SIZE (mode) - 1;
+    pool->highest_address -= GET_MODE_SIZE (mode).to_constant () - 1;
 
   /* Create a new entry.  */
   c = XNEW (struct mips16_constant);
@@ -17941,7 +17941,7 @@ mips16_emit_constants_1 (machine_mode mode, rtx value, rtx_insn *insn)
 {
   if (SCALAR_INT_MODE_P (mode) || ALL_SCALAR_FIXED_POINT_MODE_P (mode))
     {
-      rtx size = GEN_INT (GET_MODE_SIZE (mode));
+      rtx size = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
       return emit_insn_after (gen_consttable_int (value, size), insn);
     }
 
@@ -17952,7 +17952,7 @@ mips16_emit_constants_1 (machine_mode mode, rtx value, rtx_insn *insn)
     {
       int i;
 
-      for (i = 0; i < CONST_VECTOR_NUNITS (value); i++)
+      for (i = 0; known_lt (i, CONST_VECTOR_NUNITS (value)); i++)
 	insn = mips16_emit_constants_1 (GET_MODE_INNER (mode),
 					CONST_VECTOR_ELT (value, i), insn);
       return insn;
@@ -17980,12 +17980,12 @@ mips16_emit_constants (struct mips16_constant *constants, rtx_insn *insn)
   for (c = constants; c != NULL; c = next)
     {
       /* If necessary, increase the alignment of PC.  */
-      if (align < GET_MODE_SIZE (c->mode))
+      if (known_lt (align, GET_MODE_SIZE (c->mode)))
 	{
-	  int align_log = floor_log2 (GET_MODE_SIZE (c->mode));
+	  int align_log = floor_log2 (GET_MODE_SIZE (c->mode).to_constant ());
 	  insn = emit_insn_after (gen_align (GEN_INT (align_log)), insn);
 	}
-      align = GET_MODE_SIZE (c->mode);
+      align = GET_MODE_SIZE (c->mode).to_constant ();
 
       insn = emit_label_after (c->label, insn);
       insn = mips16_emit_constants_1 (c->mode, c->value, insn);
@@ -18008,9 +18008,9 @@ mips16_insn_length (rtx_insn *insn)
     {
       rtx body = PATTERN (insn);
       if (GET_CODE (body) == ADDR_VEC)
-	return GET_MODE_SIZE (GET_MODE (body)) * XVECLEN (body, 0);
+	return GET_MODE_SIZE (GET_MODE (body)).to_constant () * XVECLEN (body, 0);
       else if (GET_CODE (body) == ADDR_DIFF_VEC)
-	return GET_MODE_SIZE (GET_MODE (body)) * XVECLEN (body, 1);
+	return GET_MODE_SIZE (GET_MODE (body)).to_constant () * XVECLEN (body, 1);
       else
 	gcc_unreachable ();
     }
@@ -18317,7 +18317,7 @@ r10k_safe_mem_expr_p (tree expr, unsigned HOST_WIDE_INT offset)
   if (!DECL_P (inner) || !DECL_SIZE_UNIT (inner) || var_offset)
     return false;
 
-  offset += bitoffset / BITS_PER_UNIT;
+  offset += bitoffset.to_constant () / BITS_PER_UNIT;
   return offset < tree_to_uhwi (DECL_SIZE_UNIT (inner));
 }
 
@@ -18335,7 +18335,7 @@ r10k_needs_protection_p_1 (rtx x, rtx_insn *insn)
 	{
 	  if ((MEM_EXPR (mem)
 	       && MEM_OFFSET_KNOWN_P (mem)
-	       && r10k_safe_mem_expr_p (MEM_EXPR (mem), MEM_OFFSET (mem)))
+	       && r10k_safe_mem_expr_p (MEM_EXPR (mem), MEM_OFFSET (mem).to_constant ()))
 	      || r10k_safe_address_p (XEXP (mem, 0), insn))
 	    iter.skip_subrtxes ();
 	  else
@@ -21509,7 +21509,7 @@ mips_load_store_bonding_p (rtx *operands, machine_mode mode, bool load_p)
       && !reg_class_subset_p (rc2, rc1))
     return false;
 
-  if (abs (offset1 - offset2) != GET_MODE_SIZE (mode))
+  if (maybe_ne (abs (offset1 - offset2), GET_MODE_SIZE (mode)))
     return false;
 
   return true;
@@ -21868,7 +21868,7 @@ mips_shift_truncation_mask (machine_mode mode)
   if (TARGET_LOONGSON_MMI && VECTOR_MODE_P (mode))
     return 0;
 
-  return GET_MODE_BITSIZE (mode) - 1;
+  return GET_MODE_BITSIZE (mode).to_constant () - 1;
 }
 
 /* Implement TARGET_PREPARE_PCH_SAVE.  */
@@ -22213,7 +22213,7 @@ mips_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   d.vmode = vmode;
   gcc_assert (VECTOR_MODE_P (vmode));
-  d.nelt = nelt = GET_MODE_NUNITS (vmode);
+  d.nelt = nelt = GET_MODE_NUNITS (vmode).to_constant ();
   d.testing_p = !target;
 
   /* This is overly conservative, but ensures we don't get an
@@ -22221,7 +22221,7 @@ mips_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
   memset (orig_perm, 0, MAX_VECT_LEN);
   for (i = which = 0; i < nelt; ++i)
     {
-      int ei = sel[i] & (2 * nelt - 1);
+      int ei = sel[i].to_constant () & (2 * nelt - 1);
       which |= (ei < nelt ? 1 : 2);
       orig_perm[i] = ei;
     }
@@ -22294,7 +22294,7 @@ mips_expand_msa_reduc (rtx (*fn) (rtx, rtx, rtx), rtx dest, rtx in)
   rtx swap, vec = in;
   machine_mode mode = GET_MODE (in);
   unsigned int i, gelt;
-  const unsigned nelt = GET_MODE_BITSIZE (mode) / GET_MODE_UNIT_BITSIZE (mode);
+  const unsigned nelt = GET_MODE_BITSIZE (mode).to_constant () / GET_MODE_UNIT_BITSIZE (mode);
   unsigned char perm[MAX_VECT_LEN];
 
   /* We have no SHF.d.  */
@@ -22441,7 +22441,7 @@ mips_expand_vec_unpack (rtx operands[2], bool unsigned_p, bool high_p)
 rtx
 mips_msa_vec_parallel_const_half (machine_mode mode, bool high_p)
 {
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   rtvec v = rtvec_alloc (nunits / 2);
   int base;
   int i;
@@ -22580,7 +22580,7 @@ mips_expand_vi_broadcast (machine_mode vmode, rtx target, rtx elt)
   d.op0 = t1;
   d.op1 = t1;
   d.vmode = vmode;
-  d.nelt = GET_MODE_NUNITS (vmode);
+  d.nelt = GET_MODE_NUNITS (vmode).to_constant ();
   d.one_vector_p = true;
 
   ok = mips_expand_vec_perm_const_1 (&d);
@@ -22602,7 +22602,7 @@ mips_gen_const_int_vector (machine_mode mode, HOST_WIDE_INT val)
 static rtx
 mips_gen_const_int_vector_shuffle (machine_mode mode, int val)
 {
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   int nsets = nunits / 4;
   rtx elts[MAX_VECT_LEN];
   int set = 0;
@@ -22656,7 +22656,7 @@ mips_expand_vi_general (machine_mode vmode, machine_mode imode,
 			unsigned nelt, unsigned nvar, rtx target, rtx vals)
 {
   rtx mem = assign_stack_temp (vmode, GET_MODE_SIZE (vmode));
-  unsigned int i, isize = GET_MODE_SIZE (imode);
+  unsigned int i, isize = GET_MODE_SIZE (imode).to_constant ();
 
   if (nvar < nelt)
     mips_expand_vi_constant (vmode, nelt, mem, vals);
@@ -22678,7 +22678,7 @@ mips_expand_vector_init (rtx target, rtx vals)
 {
   machine_mode vmode = GET_MODE (target);
   machine_mode imode = GET_MODE_INNER (vmode);
-  unsigned i, nelt = GET_MODE_NUNITS (vmode);
+  unsigned i, nelt = GET_MODE_NUNITS (vmode).to_constant ();
   unsigned nvar = 0, one_var = -1u;
   bool all_same = true;
   rtx x;
@@ -22719,7 +22719,7 @@ mips_expand_vector_init (rtx target, rtx vals)
 	  temp = gen_reg_rtx (imode);
 	  if (imode == GET_MODE (same))
 	    temp2 = same;
-	  else if (GET_MODE_SIZE (imode) >= UNITS_PER_WORD)
+	  else if (known_ge (GET_MODE_SIZE (imode), UNITS_PER_WORD))
 	    temp2 = simplify_gen_subreg (imode, same, GET_MODE (same), 0);
 	  else
 	    temp2 = lowpart_subreg (imode, same, GET_MODE (same));
@@ -23243,7 +23243,7 @@ mips_promote_function_mode (const_tree type ATTRIBUTE_UNUSED,
 static bool
 mips_truly_noop_truncation (poly_uint64 outprec, poly_uint64 inprec)
 {
-  return !TARGET_64BIT || inprec <= 32 || outprec > 32;
+  return !TARGET_64BIT || known_le (inprec, 32) || known_gt (outprec, 32);
 }
 
 /* Implement TARGET_CONSTANT_ALIGNMENT.  */
@@ -23277,7 +23277,7 @@ mips_starting_frame_offset (void)
 {
   if (FRAME_GROWS_DOWNWARD)
     return 0;
-  return crtl->outgoing_args_size + MIPS_GP_SAVE_AREA_SIZE;
+  return crtl->outgoing_args_size.to_constant () + MIPS_GP_SAVE_AREA_SIZE;
 }
 
 static void
@@ -23307,9 +23307,9 @@ mips_bit_clear_info (enum machine_mode mode, unsigned HOST_WIDE_INT m,
   unsigned int change_count = 0;
   unsigned int prev_val = 1;
   unsigned int curr_val = 0;
-  unsigned int end_pos = GET_MODE_SIZE (mode) * BITS_PER_UNIT;
+  unsigned int end_pos = GET_MODE_SIZE (mode).to_constant () * BITS_PER_UNIT;
 
-  for (shift = 0 ; shift < (GET_MODE_SIZE (mode) * BITS_PER_UNIT) ; shift++)
+  for (shift = 0 ; known_lt (shift, (GET_MODE_SIZE (mode) * BITS_PER_UNIT)) ; shift++)
     {
       curr_val = (unsigned int)((m & (unsigned int)(1 << shift)) >> shift);
       if (curr_val != prev_val)

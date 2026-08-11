@@ -391,7 +391,7 @@
 
   /* Don't handle multi-word moves this way; we don't want to introduce
      the individual word-mode moves until after reload.  */
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     return false;
 
   /* Otherwise check whether the constant can be loaded in a single

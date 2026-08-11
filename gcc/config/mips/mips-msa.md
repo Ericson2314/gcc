@@ -351,8 +351,8 @@
       rtx wd = gen_reg_rtx (V16QImode);
       rtx ws = gen_reg_rtx (V16QImode);
       emit_move_insn (ws, gen_lowpart (V16QImode, operands[1]));
-      rtx n = GEN_INT (val * GET_MODE_SIZE (<UNITMODE>mode));
-      gcc_assert (INTVAL (n) < GET_MODE_NUNITS (V16QImode));
+      rtx n = GEN_INT (val * GET_MODE_SIZE ((machine_mode) <UNITMODE>mode).to_constant ());
+      gcc_assert (known_lt (INTVAL (n), GET_MODE_NUNITS (V16QImode)));
       emit_insn (gen_msa_sldi_b (wd, ws, ws, n));
       temp = gen_reg_rtx (<MODE>mode);
       emit_move_insn (temp, gen_lowpart (<MODE>mode, wd));
@@ -417,7 +417,7 @@
    (match_operand:MSA 2 "reg_or_0_operand")
    (match_operand:IMSA 3 "register_operand")]
   "ISA_HAS_MSA
-   && (GET_MODE_NUNITS (<MSA:MODE>mode) == GET_MODE_NUNITS (<IMSA:MODE>mode))"
+   && known_eq (GET_MODE_NUNITS (<MSA:MODE>mode), GET_MODE_NUNITS (<IMSA:MODE>mode))"
 {
   mips_expand_vec_cond_expr (<MSA:MODE>mode, <MSA:VIMODE>mode, operands, true);
   DONE;
@@ -432,7 +432,7 @@
      [(match_operand:IMSA 4 "register_operand")
       (match_operand:IMSA 5 "register_operand")])]
   "ISA_HAS_MSA
-   && (GET_MODE_NUNITS (<MSA:MODE>mode) == GET_MODE_NUNITS (<IMSA:MODE>mode))"
+   && known_eq (GET_MODE_NUNITS (<MSA:MODE>mode), GET_MODE_NUNITS (<IMSA:MODE>mode))"
 {
   mips_expand_vec_cond_expr (<MSA:MODE>mode, <MSA:VIMODE>mode, operands, false);
   DONE;
@@ -446,7 +446,7 @@
      [(match_operand:MSA_2 4 "register_operand")
       (match_operand:MSA_2 5 "register_operand")])]
   "ISA_HAS_MSA
-   && (GET_MODE_NUNITS (<MSA:MODE>mode) == GET_MODE_NUNITS (<MSA_2:MODE>mode))"
+   && known_eq (GET_MODE_NUNITS (<MSA:MODE>mode), GET_MODE_NUNITS (<MSA_2:MODE>mode))"
 {
   mips_expand_vec_cond_expr (<MSA:MODE>mode, <MSA:VIMODE>mode, operands, false);
   DONE;
