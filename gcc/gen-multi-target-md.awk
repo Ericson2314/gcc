@@ -572,6 +572,43 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t$(mkinstalldirs) %s-inc\n", cpu;
     printf "\tfor stem in $(MULTI_TARGET_INC_STEMS); do \\\n";
     printf "\t  echo \"#include \\\"$${stem}-%s.h\\\"\" > tmp-inc-%s.h; \\\n", cpu, cpu;
+    # ...and then re-establish the PLAIN include guard.  This is not tidiness:
+    # a per-base header guards itself after its own name -- tm-aarch64.h says
+    # `#ifndef GCC_TM_AARCH64_H' -- so a source reaching it only through this
+    # forwarder never defines GCC_TM_H, and every `#ifdef GCC_TM_H' block in
+    # the tree silently disappears.
+    #
+    # MEASURED, and it is not a corner: target.h:390 wraps get_cumulative_args
+    # and pack_cumulative_args in `#ifdef GCC_TM_H', so aarch64.cc compiled
+    # against aarch64-inc failed with 22 `get_cumulative_args was not declared'
+    # errors -- while the other 19 aarch64 objects compiled clean, which is
+    # exactly the shape that gets misread as one broken source file.  Six of
+    # the sixteen stems have a guard that something in the tree TESTS rather
+    # than merely defines (tm, insn-modes, insn-codes, insn-config, insn-flags,
+    # tm-preds, tm-constrs), so this is not special-cased to tm.h.
+    #
+    # The guard is DERIVED from the per-base header rather than computed from
+    # the stem, and emitted only when the two differ.  Computing it would mean
+    # inventing GCC_OPTIONS_H and GCC_INSN_RECOG_H, which nothing in the tree
+    # defines -- options.h and insn-recog.h carry no guard at all -- and a
+    # macro this file invents is a name with no authority behind it, which is
+    # the bug class this branch exists to remove.  A stem whose header has no
+    # guard therefore gets no #define, and that is visible in the output.
+    # `$$( )', not backticks: a backtick substitution cannot span the `\'
+    # continuations a make recipe is written in -- the shell reports only
+    # `unexpected EOF while looking for matching ```, naming neither the rule
+    # nor the stem.  gen-target-manifest.sh made the same choice for the same
+    # reason.
+    printf "\t  mtguard=$$(sed -n \"1,20s/^#ifndef \\\\(GCC_[A-Z0-9_]*\\\\)$$/\\\\1/p\" $${stem}-%s.h | sed -n 1p); \\\n", cpu;
+    # The infix the per-base header added, in the form mkconfig.sh writes it.
+    ucpu = toupper(cpu); gsub(/[-.]/, "_", ucpu);
+    printf "\t  mtplain=$$(echo \"$${mtguard}\" | sed \"s/_%s_H$$/_H/\"); \\\n",
+	   ucpu;
+    printf "\t  if test -n \"$${mtguard}\" && test x\"$${mtguard}\" != x\"$${mtplain}\"; then \\\n";
+    printf "\t    echo \"#ifndef $${mtplain}\" >> tmp-inc-%s.h; \\\n", cpu;
+    printf "\t    echo \"#define $${mtplain}\" >> tmp-inc-%s.h; \\\n", cpu;
+    printf "\t    echo \"#endif\" >> tmp-inc-%s.h; \\\n", cpu;
+    printf "\t  fi; \\\n";
     printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
     printf "\tdone\n";
