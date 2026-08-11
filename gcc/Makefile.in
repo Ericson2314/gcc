@@ -1367,7 +1367,22 @@ multi-target-md.mk: multi-target.manifest multi-target.multilib \
 # -I$(@D) and -I$(srcdir)/$(@D) cause the subdirectory of the file
 # currently being compiled, in both source trees, to be examined as well.
 # libintl.h will be found in ../intl if we are using the included libintl.
-INCLUDES = -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
+
+# The per-back-end forwarding-header directory, empty for every object that is
+# not compiled for a particular back end.  Set with a target-specific
+# assignment -- `foo-arm.o: MULTI_TARGET_INC = -Iarm-inc' -- by the rules that
+# build a back end's objects; see MULTI_TARGET_INC_STEMS in
+# gen-multi-target-md.awk for what the directory holds and why it exists.
+#
+# It has to come BEFORE -I. and it has to be a variable rather than an addition
+# to CPPFLAGS, because both of those decide the answer.  `#include "insn-attr.h"'
+# searches the includer's own directory first and then the -I list IN ORDER, so
+# a -I appended after -I. would still find the primary target's copy in the
+# build root and would do so silently: the wrong header compiles perfectly
+# well, it just describes another target.
+MULTI_TARGET_INC =
+
+INCLUDES = $(MULTI_TARGET_INC) -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 	   -I$(srcdir)/../include $(INCINTL) \
 	   $(CPPINC) $(CODYINC) $(GMPINC) $(DECNUMINC) $(BACKTRACEINC) \
 	   $(ISLINC)
@@ -4753,6 +4768,13 @@ mostlyclean: lang.mostlyclean
 # Delete the stamp and temporary files.
 	-rm -f s-* tmp-* stamp-* stmp-*
 	-rm -f */stamp-* */tmp-*
+# Delete the per-back-end forwarding-header directories.  These are whole
+# directories rather than files, so MOSTLYCLEANFILES cannot carry them, and
+# `rm -f */s-inc' would leave 48 empty directories behind.
+# Guarded because the variable is empty in a single-target build, where
+# multi-target-md.mk does not exist, and `rm -rf' with no operand is an error
+# rather than a no-op.
+	$(if $(MULTI_TARGET_INC_DIRS),-rm -rf $(MULTI_TARGET_INC_DIRS))
 # Delete debugging dump files.
 	-rm -f *.[0-9][0-9].* */*.[0-9][0-9].*
 # Delete some files made during installation.

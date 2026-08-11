@@ -546,6 +546,38 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     asm_ops_bases = asm_ops_bases " " cpu;
   }
 
+  # The include directory described at MULTI_TARGET_INC_STEMS in BEGIN.  Put
+  # `-I<base>-inc' ahead of `-I.' -- that is what MULTI_TARGET_INC in
+  # Makefile.in is for -- and this back end's objects see their OWN generated
+  # headers under the plain names their sources actually write.
+  #
+  # Skipped for the back ends that share default-common.cc, for the same reason
+  # target-asm-ops-<base>.o is: tm-<base>.h, options-<base>.h and
+  # insn-constants-<base>.h are generated per COMMON FILE base, not per
+  # cpu_type, so those five have no tm-<base>.h for a forwarder to point at.
+  # Emitting the directory anyway would give them a `tm.h' whose target has no
+  # rule, i.e. a build that stops later and further from the cause.
+  if (cof == "default-common.cc")
+    printf "# %s-inc omitted: no tm-%s.h (shares default-common.cc).\n\n",
+	   cpu, cpu;
+  else {
+    printf "MULTI_TARGET_INC_HDRS_%s = \\\n", cpu;
+    printf "  $(patsubst %%,%%-%s.h,$(MULTI_TARGET_INC_STEMS))\n", cpu;
+    printf "MULTI_TARGET_INC_DIRS += %s-inc\n", cpu;
+    # Written through move-if-change so that a rebuild of, say, insn-attr-arm.h
+    # does not restamp 16 forwarders and recompile the whole back end: the
+    # forwarders' CONTENT never changes once written, only their timestamps
+    # would.  The stamp is what the rest of the build depends on.
+    printf "%s-inc/s-inc: $(MULTI_TARGET_INC_HDRS_%s) Makefile\n", cpu, cpu;
+    printf "\t$(mkinstalldirs) %s-inc\n", cpu;
+    printf "\tfor stem in $(MULTI_TARGET_INC_STEMS); do \\\n";
+    printf "\t  echo \"#include \\\"$${stem}-%s.h\\\"\" > tmp-inc-%s.h; \\\n", cpu, cpu;
+    printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
+    printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
+    printf "\tdone\n";
+    printf "\t$(STAMP) %s-inc/s-inc\n\n", cpu;
+  }
+
   emit_triple();
 
   reset();
@@ -775,6 +807,44 @@ BEGIN {
 	{ sub(/^multilib_osdirnames */, "", line); ml_osdir[mlt] = line }
     }
   close(multilib);
+
+  # THE PER-BACK-END INCLUDE DIRECTORY.
+  #
+  # 90 back-end sources include a generated per-base header under its PLAIN
+  # name -- `#include "insn-attr.h"', not through tm.h -- so in a multi-target
+  # build they resolve, via `-I.', to the PRIMARY target's copy.  Measured:
+  # config/arm/aarch-common.cc fails with `CC_Cmode was not declared; did you
+  # mean CCGCmode' -- an i386 mode suggested for an arm file -- because its
+  # bare `#include "insn-modes.h"' bypasses the tm.h it was given.
+  #
+  # The tree's existing idiom for this is macro indirection (-DTM_H_FILE=,
+  # -DINSN_MODES_H=).  That is right for the ~10 generators, which name a
+  # handful of headers each, and it does not scale here: every one of the 90
+  # sources would need an `#ifndef X / #include X' edit, and it CANNOT catch a
+  # TRANSITIVE include, which is most of them.
+  #
+  # So each back end gets a directory of forwarding headers instead, put ahead
+  # of `-I.' on the include path.  A source saying `insn-attr.h' then gets
+  # <base>-inc/insn-attr.h, which is one line including insn-attr-<base>.h.  No
+  # source edits, works transitively, works for all 90.
+  #
+  # The plain-to-per-base transform is uniform for every header in the family
+  # -- strip `.h', append `-<base>.h' -- which is why a stem list is enough:
+  # tm.h/tm-<base>.h, tm_p.h/tm_p-<base>.h, insn-modes-inline.h/
+  # insn-modes-inline-<base>.h all follow it.
+  #
+  # A stem is listed here ONLY if some rule in this file (or in Makefile.in)
+  # generates <stem>-<base>.h.  There is deliberately no fallback to the plain
+  # name for a stem that has no per-base rule: a forwarder pointing at the
+  # primary's copy is exactly the bug being fixed, and it would be silent.
+  # Instead the stamp rule below names every per-base header as a prerequisite,
+  # so a stem with no rule stops the build with `No rule to make target
+  # <stem>-<base>.h' -- refuse rather than guess, as INSN_BASE does in
+  # mkconfig.sh.
+  printf "MULTI_TARGET_INC_STEMS = tm tm_p tm-preds tm-constrs options \\\n";
+  printf "  insn-constants insn-attr insn-attr-common insn-codes insn-config \\\n";
+  printf "  insn-flags insn-modes insn-modes-inline insn-opinit insn-recog \\\n";
+  printf "  insn-target-def\n\n";
 }
 
 $1 == "target"	  { trg = $2 }
@@ -790,7 +860,17 @@ $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
-		    emit_asm_ops_registry(); emit_source_specs() }
+		    emit_asm_ops_registry(); emit_source_specs();
+		    emit_inc_dirs() }
+
+# One target that materialises every back end's forwarding-header directory, so
+# that anything wanting per-back-end compilation can depend on it by name
+# rather than on 48 stamps.  MULTI_TARGET_INC_DIRS is accumulated with `+=' as
+# each back end is emitted above.
+function emit_inc_dirs() {
+  printf ".PHONY: multi-target-incdirs\n";
+  printf "multi-target-incdirs: $(patsubst %%,%%/s-inc,$(MULTI_TARGET_INC_DIRS))\n\n";
+}
 
 # The list every source-derived spec file is reachable from, so that one make
 # target builds them all and the target-specs rule can depend on it.
