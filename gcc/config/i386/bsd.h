@@ -66,12 +66,18 @@ along with GCC; see the file COPYING3.  If not see
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u\n", (int)(ROUNDED)))
 
-#ifdef HAVE_GAS_LCOMM_WITH_ALIGNMENT
+/* Whether `.lcomm' takes a third operand giving the alignment is a property of
+   the assembler, not of the target, so it is a runtime read now.  This used to
+   be `#ifdef HAVE_GAS_LCOMM_WITH_ALIGNMENT' around the definition below; that
+   cannot survive, because a runtime value cannot appear on a `#if' line and
+   because the macro's mere existence is what varasm.cc tested.  So the macro is
+   defined unconditionally and varasm.cc consults ASM_OUTPUT_ALIGNED_LOCAL_P
+   before using it, falling back to the plain `.lcomm' form otherwise.  */
+#define ASM_OUTPUT_ALIGNED_LOCAL_P (targ_caps.gas_lcomm_with_alignment)
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGNMENT)  \
 ( fputs (".lcomm ", (FILE)),			\
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u,%u\n", (int)(SIZE), (int)(ALIGNMENT) / BITS_PER_UNIT))
-#endif
 
 /* This is how to output an assembler line
    that says to advance the location counter

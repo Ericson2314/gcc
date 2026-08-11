@@ -241,6 +241,18 @@ struct target_caps
   /* Assembler tolerates `# 0 "" 2' line markers.  Was HAVE_AS_LINE_ZERO.  */
   bool as_line_zero;
 
+  /* Assembler's `.lcomm' takes a third operand giving the alignment.  Was
+     HAVE_GAS_LCOMM_WITH_ALIGNMENT, which gated whether i386/bsd.h defined
+     ASM_OUTPUT_ALIGNED_LOCAL at all.
+
+     Note this one could NOT be converted by a defaults.h bridge: its consumer
+     tested it with `#ifdef' to decide whether a target macro EXISTS, and a
+     runtime value cannot appear on a `#if' line.  The macro is now defined
+     unconditionally and varasm.cc branches on this field at the call site,
+     where `rounded' is in scope for the unaligned fallback -- so the fallback
+     is textually the same code the `#else' arm used to run.  */
+  bool gas_lcomm_with_alignment;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

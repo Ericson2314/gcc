@@ -1541,6 +1541,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    Checked, not assumed; these were the only uses in the tree.  */
 #undef HAVE_GAS_SHF_MERGE
 #define HAVE_GAS_SHF_MERGE (targ_caps.gas_shf_merge)
+/* A target that defines ASM_OUTPUT_ALIGNED_LOCAL only when its assembler
+   accepts an alignment operand on `.lcomm' redefines this to the matching
+   targ_caps read; see i386/bsd.h.  Defaulted here rather than in the
+   unconditional block below because a target header may set it first.  */
+#ifndef ASM_OUTPUT_ALIGNED_LOCAL_P
+#define ASM_OUTPUT_ALIGNED_LOCAL_P true
+#endif
 #undef HAVE_GAS_SECTION_LINK_ORDER
 #define HAVE_GAS_SECTION_LINK_ORDER (targ_caps.gas_section_link_order)
 #undef HAVE_LD_EH_GC_SECTIONS

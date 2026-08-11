@@ -2353,9 +2353,20 @@ emit_local (tree decl ATTRIBUTE_UNUSED,
 				 size, align);
   return true;
 #elif defined ASM_OUTPUT_ALIGNED_LOCAL
-  unsigned int align = symtab_node::get (decl)->definition_alignment ();
-  ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, align);
-  return true;
+  /* ASM_OUTPUT_ALIGNED_LOCAL_P is 1 unless the target makes it a runtime read
+     of an assembler capability -- see i386/bsd.h, where `.lcomm' only takes an
+     alignment operand on some assemblers.  It used to be an `#ifdef' around the
+     macro's definition, which a runtime value cannot replace, so the choice
+     moved here.  The false arm is the code the `#else' arm below used to run,
+     and `rounded' is in scope for it.  */
+  if (ASM_OUTPUT_ALIGNED_LOCAL_P)
+    {
+      unsigned int align = symtab_node::get (decl)->definition_alignment ();
+      ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, align);
+      return true;
+    }
+  ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
+  return false;
 #else
   ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
   return false;
@@ -2989,8 +3000,10 @@ assemble_static_space (unsigned HOST_WIDE_INT size)
 				 BIGGEST_ALIGNMENT);
 #else
 #ifdef ASM_OUTPUT_ALIGNED_LOCAL
-  ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, BIGGEST_ALIGNMENT);
-#else
+  if (ASM_OUTPUT_ALIGNED_LOCAL_P)
+    ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, BIGGEST_ALIGNMENT);
+  else
+#endif
   {
     /* Round size up to multiple of BIGGEST_ALIGNMENT bits
        so that each uninitialized object starts on such a boundary.  */
@@ -3001,7 +3014,6 @@ assemble_static_space (unsigned HOST_WIDE_INT size)
 	 * (BIGGEST_ALIGNMENT / BITS_PER_UNIT));
     ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
   }
-#endif
 #endif
   return x;
 }
