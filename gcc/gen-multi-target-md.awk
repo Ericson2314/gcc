@@ -64,14 +64,37 @@ function reset() {
 # genpreds-<cpu>.o are compiled from shared sources that define no such thing,
 # and the compiler proper's per-back-end objects do not exist yet outside the
 # primary target.  Widen this when they do.
+#
+# MEASURED, so that "widen this when they do" is a schedule item and not a
+# worry: in an x86_64-primary + nds32 build the only compiler-proper object
+# built for the non-primary back end is common/config/nds32/nds32-common.o,
+# and `nm -C cc1' finds four nds32 symbols, all of them from that file,
+# against 694 ix86_* ones.  config/nds32/nds32.cc is not compiled and not
+# linked.  So the withheld flag currently has nowhere to land on the .cc side
+# -- the code is absent, not mis-flagged -- and no build can be constructed
+# that would fail for want of it.  Whoever adds the per-back-end compiler
+# objects to OBJS must call this function when they do; that is the moment the
+# hazard becomes reachable.
+#
+# A COMMENT IS NOT A DECLARATION.  This used to match anywhere on the line, so
+# a fragment that merely MENTIONED the flag -- "do not add -DTARGET_POLY_AWARE
+# until the .md is converted" is the obvious thing to write -- would be read
+# as an opt-in, and that back end's gencondmd would be compiled poly-aware
+# against unconverted conditions.  No fragment does that today, which is
+# exactly why it had to be fixed today: the must-hit control for this function
+# is drawn from the ten fragments that DO declare it, and by rule 20 no member
+# of that population can exhibit the misclassification.  Calibrated against a
+# synthetic fragment instead -- see scratchpad/pz-polyaware-selftest.sh.
 function poly_aware(c,   frag, line, found) {
   if (c in poly_aware_cache)
     return poly_aware_cache[c];
   frag = srcdir "/config/" c "/t-" c;
   found = 0;
-  while ((getline line < frag) > 0)
+  while ((getline line < frag) > 0) {
+    sub(/#.*/, "", line);
     if (index(line, "-DTARGET_POLY_AWARE") > 0)
       found = 1;
+  }
   close(frag);
   poly_aware_cache[c] = found;
   return found;
