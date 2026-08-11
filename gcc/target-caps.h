@@ -102,6 +102,18 @@ struct target_caps
      original probes answered "no" for a cross build with no assembler to ask,
      which silently cost debug quality rather than failing.  */
 
+  /* Assembler accepts the AIX `.ref' pseudo-op, which creates a reference to
+     a DWARF table label so a garbage-collecting link keeps the frame tables
+     for function bodies it kept.  Was HAVE_AS_REF, probed only in the
+     `*-*-aix*' arm, so every other target already answered 0 -- which is why
+     the default here is false rather than "what a modern assembler does".  */
+  bool as_ref;
+
+  /* Assembler accepts the AIX DWARF location-list section pseudo-ops
+     (`.dwsect', `.vbyte').  Was HAVE_XCOFF_DWARF_EXTRAS, likewise AIX-only,
+     and dwarf2out.cc already supplied 0 for everyone else.  */
+  bool xcoff_dwarf_extras;
+
   /* Assembler accepts .gnu_attribute.  Was HAVE_AS_GNU_ATTRIBUTE, probed
      separately in the powerpc, mips, msp430 and s390 arms of the big
      `case "$target"' -- four copies of the same test, because each port
@@ -258,6 +270,17 @@ struct target_caps
   bool as_aarch64_mabi;
   bool as_aarch64_small_pic_relocs;
   bool as_aarch64_aeabi_build_attributes;
+
+  /* mips back-end assembler capabilities, from the mips arm of the same
+     `case $target'.  True by default for the same reason as the aarch64 group:
+     the probes answered "no" when there was no assembler to ask.
+
+     as_mips_dot_module has a spec half too (FP_ASM_SPEC in config/mips/mips.h);
+     HAVE_AS_NO_SHARED was spec-only and needed no field at all.  */
+  bool as_mips_dspr1_mult;
+  bool as_mips_dot_module;
+  bool as_mips_nan;
+  bool as_mips_micromips;
 };
 
 extern struct target_caps targ_caps;

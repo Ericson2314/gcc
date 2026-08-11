@@ -1527,10 +1527,8 @@ main (int argc, char **argv)
        will remain to be scanned there.  */
 
     scanfilter this_filter = ld1_filter;
-#if HAVE_AS_REF
-    if (!shared_obj)
+    if (HAVE_AS_REF && !shared_obj)
       this_filter &= ~SCAN_DWEH;
-#endif
 
     /* Scan object files.  */
     while (export_object_lst < object)

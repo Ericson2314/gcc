@@ -105,9 +105,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #undef  LIB_SPEC
 #define LIB_SPEC GNU_USER_TARGET_LIB_SPEC
 
-#if defined(HAVE_LD_EH_FRAME_HDR)
+/* Was #if defined(HAVE_LD_EH_FRAME_HDR).  That macro came from a configure
+   probe of one linker, and a multi-target compiler has no such linker to
+   probe; with the probe gone the guard was silently false, which dropped
+   --eh-frame-hdr from every GNU-user link line.  Every linker that can link a
+   GNU-user target supports it, so it is unconditional here, and the answer for
+   a linker that does not is delivered by overriding the spec (see
+   target-specs/configure.ac) rather than by omitting the option.  */
 #define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
-#endif
 
 
 #define GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC \
@@ -117,10 +122,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC
 
-/* Use --as-needed -lgcc_s for eh support.  */
-#ifdef HAVE_LD_AS_NEEDED
+/* Use --as-needed -lgcc_s for eh support.  Was #ifdef HAVE_LD_AS_NEEDED; see
+   the note on LINK_EH_SPEC above for why the guard is gone.  */
 #define USE_LD_AS_NEEDED 1
-#endif
 
 #define TARGET_POSIX_IO
 
@@ -132,7 +136,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    in that case, and for executable link with --{,no-}whole-archive around
    it to force everything into the executable.  And similarly for -ltsan,
    -lhwasan, and -llsan.  */
-#if defined(HAVE_LD_STATIC_DYNAMIC)
+/* Was #if defined(HAVE_LD_STATIC_DYNAMIC); see the note on LINK_EH_SPEC.
+   LD_STATIC_OPTION and LD_DYNAMIC_OPTION default to the GNU spellings in
+   gcc.cc, and a linker that spells them differently -- AIX, HP-UX -- says so
+   through the target config rather than by losing the specs entirely.  */
 #undef LIBASAN_EARLY_SPEC
 #define LIBASAN_EARLY_SPEC "%{!shared:libasan_preinit%O%s} " \
   "%{static-libasan:%{!shared:" \
@@ -153,7 +160,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
   "%{static-liblsan:%{!shared:" \
   LD_STATIC_OPTION " --whole-archive -llsan --no-whole-archive " \
   LD_DYNAMIC_OPTION "}}%{!static-liblsan:-llsan}"
-#endif
 
 #undef TARGET_F951_OPTIONS
 #define TARGET_F951_OPTIONS "%{!nostdinc:\

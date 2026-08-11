@@ -2828,6 +2828,24 @@ esac
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_sections_directive" >&5
 $as_echo "$gcc_cv_as_cfi_sections_directive" >&6; }
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for AIX .ref" >&5
+$as_echo_n "checking assembler for AIX .ref... " >&6; }
+gcc_cv_as_aix_ref=`ts_asm_ok '	.csect stuff[rw]
+stuff:
+	.long 1
+	.extern sym
+	.ref sym'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aix_ref" >&5
+$as_echo "$gcc_cv_as_aix_ref" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for AIX DWARF location lists" >&5
+$as_echo_n "checking assembler for AIX DWARF location lists... " >&6; }
+gcc_cv_as_aix_dwloc=`ts_asm_ok '	.dwsect 0xA0000
+Lframe..0:
+	.vbyte 4,Lframe..0'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aix_dwloc" >&5
+$as_echo "$gcc_cv_as_aix_dwloc" >&6; }
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute" >&5
 $as_echo_n "checking assembler for .gnu_attribute... " >&6; }
 gcc_cv_as_gnu_attribute=`ts_asm_ok '	.gnu_attribute 4,1'`
@@ -2958,6 +2976,8 @@ ts_bool () {
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+as_ref `ts_bool "$gcc_cv_as_aix_ref"`
+xcoff_dwarf_extras `ts_bool "$gcc_cv_as_aix_dwloc"`
 as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
 cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
 cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`

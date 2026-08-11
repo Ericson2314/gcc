@@ -1409,6 +1409,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "target-caps.h"
 #undef HAVE_AS_LEB128
 #define HAVE_AS_LEB128 (targ_caps.leb128)
+#undef HAVE_AS_REF
+#define HAVE_AS_REF (targ_caps.as_ref)
+#undef HAVE_XCOFF_DWARF_EXTRAS
+#define HAVE_XCOFF_DWARF_EXTRAS (targ_caps.xcoff_dwarf_extras)
 #undef HAVE_AS_GNU_ATTRIBUTE
 #define HAVE_AS_GNU_ATTRIBUTE (targ_caps.as_gnu_attribute)
 #undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE

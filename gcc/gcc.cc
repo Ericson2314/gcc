@@ -806,6 +806,26 @@ proper position among the other output files.  */
 #define STACK_SPLIT_SPEC " %{fsplit-stack: --wrap=pthread_create}"
 #endif
 
+/* How this linker spells "link the following statically" and "back to
+   dynamic".  These were AC_SUBST'd from a configure probe of one linker
+   (gcc_cv_ld_static_option), which a multi-target driver cannot have.  The GNU
+   spellings are the default; AIX (-bstatic/-bdynamic) and HP-UX
+   (-aarchive_shared/-adefault) are reported through the target config, which
+   probes the real linker.
+
+   HAVE_LD_STATIC_DYNAMIC likewise: with the probe gone the guards below were
+   silently false, which dropped -Bstatic/-Bdynamic from the sanitizer link
+   specs on every target rather than choosing a different spelling.  */
+#ifndef LD_STATIC_OPTION
+#define LD_STATIC_OPTION "-Bstatic"
+#endif
+#ifndef LD_DYNAMIC_OPTION
+#define LD_DYNAMIC_OPTION "-Bdynamic"
+#endif
+#ifndef HAVE_LD_STATIC_DYNAMIC
+#define HAVE_LD_STATIC_DYNAMIC 1
+#endif
+
 #ifndef LIBASAN_SPEC
 #define STATIC_LIBASAN_LIBS \
   " %{static-libasan|static:%:include(libsanitizer.spec)%(link_libasan)}"

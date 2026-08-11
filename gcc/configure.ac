@@ -4288,25 +4288,10 @@ LCF0:
 
     case $target in
       *-*-aix*)
-	gcc_GAS_CHECK_FEATURE([AIX .ref support],
-	  gcc_cv_as_aix_ref,,
-	  [	.csect stuff[[rw]]
-	     stuff:
-		.long 1
-		.extern sym
-		.ref sym
-	  ],,
-	  [AC_DEFINE(HAVE_AS_REF, 1,
-	    [Define if your assembler supports .ref])])
-
-	gcc_GAS_CHECK_FEATURE([AIX DWARF location lists section support],
-	  gcc_cv_as_aix_dwloc,,
-	  [	.dwsect 0xA0000
-	Lframe..0:
-		.vbyte 4,Lframe..0
-	  ],,
-	  [AC_DEFINE(HAVE_XCOFF_DWARF_EXTRAS, 1,
-	    [Define if your assembler supports AIX debug frame section label reference.])])
+	dnl The AIX `.ref' and `.dwsect'/`.vbyte' probes moved to
+	dnl target-specs/configure.ac.  HAVE_AS_REF and HAVE_XCOFF_DWARF_EXTRAS
+	dnl are runtime capabilities (targ_caps.as_ref, .xcoff_dwarf_extras);
+	dnl both were AIX-only, so every other target already answered 0.
 	;;
     esac
     ;;

@@ -985,6 +985,23 @@ dnl .gnu_attribute.  gcc/configure.ac probed this four separate times, once each
 dnl in the powerpc, mips, msp430 and s390 arms of `case "$target"' -- the same
 dnl directive every time (s390 used tag 8 rather than 4, which tests nothing
 dnl different).  One probe here serves all four ports.
+dnl AIX `.ref' and the DWARF location-list pseudo-ops.  Both were probed only
+dnl inside the `*-*-aix*' arm in gcc/configure.ac, so non-AIX targets always
+dnl answered 0; the capability defaults preserve that.
+AC_MSG_CHECKING([assembler for AIX .ref])
+gcc_cv_as_aix_ref=`ts_asm_ok '	.csect stuff[[rw]]
+stuff:
+	.long 1
+	.extern sym
+	.ref sym'`
+AC_MSG_RESULT([$gcc_cv_as_aix_ref])
+
+AC_MSG_CHECKING([assembler for AIX DWARF location lists])
+gcc_cv_as_aix_dwloc=`ts_asm_ok '	.dwsect 0xA0000
+Lframe..0:
+	.vbyte 4,Lframe..0'`
+AC_MSG_RESULT([$gcc_cv_as_aix_dwloc])
+
 AC_MSG_CHECKING([assembler for .gnu_attribute])
 gcc_cv_as_gnu_attribute=`ts_asm_ok '	.gnu_attribute 4,1'`
 AC_MSG_RESULT([$gcc_cv_as_gnu_attribute])
@@ -1116,6 +1133,8 @@ ts_bool () {
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+as_ref `ts_bool "$gcc_cv_as_aix_ref"`
+xcoff_dwarf_extras `ts_bool "$gcc_cv_as_aix_dwloc"`
 as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
 cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
 cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`

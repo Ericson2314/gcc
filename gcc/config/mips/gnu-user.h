@@ -97,13 +97,13 @@ along with GCC; see the file COPYING3.  If not see
 #undef LIB_SPEC
 #define LIB_SPEC GNU_USER_TARGET_LIB_SPEC
 
-#ifdef HAVE_AS_NO_SHARED
-/* Default to -mno-shared for non-PIC.  */
-# define NO_SHARED_SPECS \
+/* Default to -mno-shared for non-PIC.  This was guarded by HAVE_AS_NO_SHARED,
+   but a spec string is baked into the driver's built-in defaults before any
+   target config file is read, so it cannot be a runtime test.  Every assembler
+   GCC still builds against takes -mno-shared; one that does not is handled by
+   overriding this spec in that target's spec file.  */
+#define NO_SHARED_SPECS \
   " %{mshared|mno-shared:;:%{" NO_FPIE_AND_FPIC_SPEC ":-mno-shared}}"
-#else
-# define NO_SHARED_SPECS ""
-#endif
 
 /* -march=native handling only makes sense with compiler running on
    a MIPS chip.  */

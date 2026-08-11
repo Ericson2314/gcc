@@ -47,6 +47,8 @@ struct target_caps targ_caps =
   .glibc_minor = 0,
   .libc_hwcap_in_tcb = false,
   .libc_gnustack = false,
+  .as_ref = false,
+  .xcoff_dwarf_extras = false,
   .as_gnu_attribute = true,
   .cfi_directive = true,
   .cfi_personality = true,
@@ -77,7 +79,11 @@ struct target_caps targ_caps =
   .lto_plugin = true,
   .as_aarch64_mabi = true,
   .as_aarch64_small_pic_relocs = true,
-  .as_aarch64_aeabi_build_attributes = true
+  .as_aarch64_aeabi_build_attributes = true,
+  .as_mips_dspr1_mult = true,
+  .as_mips_dot_module = true,
+  .as_mips_nan = true,
+  .as_mips_micromips = true
 };
 
 /* Read capability settings from FILE.  Format is one `name value' pair per
@@ -119,6 +125,10 @@ read_target_caps (const char *file)
 	targ_caps.libc_hwcap_in_tcb = value != 0;
       else if (strcmp (name, "libc_gnustack") == 0)
 	targ_caps.libc_gnustack = value != 0;
+      else if (strcmp (name, "as_ref") == 0)
+	targ_caps.as_ref = value != 0;
+      else if (strcmp (name, "xcoff_dwarf_extras") == 0)
+	targ_caps.xcoff_dwarf_extras = value != 0;
       else if (strcmp (name, "as_gnu_attribute") == 0)
 	targ_caps.as_gnu_attribute = value != 0;
       else if (strcmp (name, "cfi_directive") == 0)
@@ -181,6 +191,14 @@ read_target_caps (const char *file)
 	targ_caps.as_aarch64_small_pic_relocs = value != 0;
       else if (strcmp (name, "as_aarch64_aeabi_build_attributes") == 0)
 	targ_caps.as_aarch64_aeabi_build_attributes = value != 0;
+      else if (strcmp (name, "as_mips_dspr1_mult") == 0)
+	targ_caps.as_mips_dspr1_mult = value != 0;
+      else if (strcmp (name, "as_mips_dot_module") == 0)
+	targ_caps.as_mips_dot_module = value != 0;
+      else if (strcmp (name, "as_mips_nan") == 0)
+	targ_caps.as_mips_nan = value != 0;
+      else if (strcmp (name, "as_mips_micromips") == 0)
+	targ_caps.as_mips_micromips = value != 0;
     }
 
   fclose (f);

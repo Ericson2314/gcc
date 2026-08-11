@@ -113,13 +113,17 @@
 #define COLLECT_SHARED_FINI_FUNC(STREAM, FUNC) \
 	  fprintf ((STREAM), "void %s() {\n\t%s();\n}\n", aix_shared_fininame, (FUNC))
 
-#if HAVE_AS_REF
 /* Issue assembly directives that create a reference to the given DWARF table
    identifier label from the current function section.  This is defined to
    ensure we drag frame tables associated with needed function bodies in
-   a link with garbage collection activated.  */
+   a link with garbage collection activated.
+
+   This used to be gated on HAVE_AS_REF.  dwarf2out.cc:715 tests this macro
+   with `#ifdef', so whether it exists has to be decided when GCC is built and
+   cannot become a runtime capability.  Every AIX assembler GCC supports takes
+   `.ref', so it is defined unconditionally; an assembler that does not would
+   be handled by overriding the hook, not by omitting the macro.  */
 #define ASM_OUTPUT_DWARF_TABLE_REF rs6000_aix_asm_output_dwarf_table_ref
-#endif
 
 /* This is the only version of nm that collect2 can work with.  */
 #define REAL_NM_FILE_NAME "/usr/ucb/nm"
