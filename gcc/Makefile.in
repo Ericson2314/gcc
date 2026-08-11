@@ -2921,7 +2921,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	  echo "target-specs: $$tsdir/configure not generated; run autoconf there" >&2; \
 	  exit 1; \
 	fi; \
-	made=0; skipped=0; srcmade=0; unusable=0; \
+	made=0; skipped=0; srcmade=0; unusable=0; mlibmade=0; \
 	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
 	  tas=$$t-as; tld=$$t-ld; \
 	  if ! command -v "$$tas" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
@@ -2957,8 +2957,18 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    rm -f specs-$$t; \
 	    skipped=`expr $$skipped + 1`; \
 	  fi; \
+	  rm -f mlib-specs-$$t; \
+	  if $(SHELL) $(srcdir)/gen-multilib-specs.sh $(srcdir) \
+	       multi-target.multilib $$t > tmp-mlib-specs-$$t; then \
+	    mv tmp-mlib-specs-$$t mlib-specs-$$t; \
+	    mlibmade=`expr $$mlibmade + 1`; \
+	  else \
+	    rm -f tmp-mlib-specs-$$t; \
+	    echo "target-specs: no multilib tables for $$t" >&2; \
+	  fi; \
 	  if test -f specs-src-$$t; then \
 	    cat specs-src-$$t > tmp-specs-$$t; \
+	    if test -f mlib-specs-$$t; then cat mlib-specs-$$t >> tmp-specs-$$t; fi; \
 	    if test -f specs-$$t; then cat specs-$$t >> tmp-specs-$$t; fi; \
 	    mv tmp-specs-$$t specs-$$t; \
 	    srcmade=`expr $$srcmade + 1`; \
@@ -2972,6 +2982,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	  fi; \
 	done; \
 	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
+	echo "target-specs: $$mlibmade with their own multilib tables"; \
 	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"; \
 	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \

@@ -100,8 +100,19 @@ emit () {
     done
     # Tab-indented recipe lines.
     echo 'multilib-show:'
+    # All eight inputs genmultilib takes, not just the five the sysroot-suffix
+    # work needed.  Running genmultilib per target -- which is what turns this
+    # data into the driver's multilib tables -- needs the whole argument list,
+    # and a fragment that sets only MULTILIB_DIRNAMES or MULTILIB_REQUIRED
+    # would otherwise silently produce a different multilib set than the one
+    # the target actually has.
     printf '\t@echo "multilib_options $(MULTILIB_OPTIONS)"\n'
+    printf '\t@echo "multilib_dirnames $(MULTILIB_DIRNAMES)"\n'
     printf '\t@echo "multilib_matches $(MULTILIB_MATCHES)"\n'
+    printf '\t@echo "multilib_exceptions $(MULTILIB_EXCEPTIONS)"\n'
+    printf '\t@echo "multilib_extra_opts $(MULTILIB_EXTRA_OPTS)"\n'
+    printf '\t@echo "multilib_exclusions $(MULTILIB_EXCLUSIONS)"\n'
+    printf '\t@echo "multilib_required $(MULTILIB_REQUIRED)"\n'
     printf '\t@echo "multilib_reuse $(MULTILIB_REUSE)"\n'
     printf '\t@echo "multilib_osdirnames $(MULTILIB_OSDIRNAMES)"\n'
     printf '\t@echo "multiarch_dirname $(MULTIARCH_DIRNAME)"\n'
