@@ -687,10 +687,6 @@ host_xm_defines
 host_xm_include_list
 host_xm_file_list
 host_exeext
-gcc_gxx_libcxx_include_dir_add_sysroot
-gcc_gxx_libcxx_include_dir
-gcc_gxx_include_dir_add_sysroot
-gcc_gxx_include_dir
 gcc_config_arguments
 float_h_file
 extra_programs
@@ -951,8 +947,6 @@ with_build_libsubdir
 with_local_prefix
 with_native_system_header_dir
 with_build_sysroot
-with_gxx_include_dir
-with_gxx_libcxx_include_dir
 with_cpp_install_dir
 enable_generated_files_in_srcdir
 enable_largefile
@@ -1726,10 +1720,6 @@ Optional Packages:
                           system header files in.  Defaults to /usr/include.
   --with-build-sysroot=sysroot
                           use sysroot as the system root during the build
-  --with-gxx-include-dir=DIR
-                          specifies directory to put g++ header files
-  --with-gxx-libcxx-include-dir=DIR
-                          specifies directory to find libc++ header files
   --with-cpp-install-dir=DIR
                           install the user visible C preprocessor in DIR
                           (relative to PREFIX) as well as PREFIX/bin
@@ -3519,78 +3509,9 @@ else
 fi
 
 
-# Don't set gcc_gxx_include_dir to gxx_include_dir since that's only
-# passed in by the toplevel make and thus we'd get different behavior
-# depending on where we built the sources.
-gcc_gxx_include_dir=
-# Specify the g++ header file directory
 
-# Check whether --with-gxx-include-dir was given.
-if test "${with_gxx_include_dir+set}" = set; then :
-  withval=$with_gxx_include_dir; case "${withval}" in
-yes)	as_fn_error $? "bad value ${withval} given for g++ include directory" "$LINENO" 5 ;;
-no)	;;
-*)	gcc_gxx_include_dir=$with_gxx_include_dir ;;
-esac
-fi
+$as_echo "#define ENABLE_STDLIB_OPTION 1" >>confdefs.h
 
-
-# If both --with-sysroot and --with-gxx-include-dir are passed, we interpolate
-# the former in the latter and, upon success, compute gcc_gxx_include_dir as
-# relative to the sysroot.
-gcc_gxx_include_dir_add_sysroot=0
-
-# This logic must match libstdc++-v3/acinclude.m4:GLIBCXX_EXPORT_INSTALL_INFO.
-if test x${gcc_gxx_include_dir} = x; then
-  gcc_gxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)include/c++/\$(version)"
-fi
-
-# Configuration for an alternate set of C++ headers.
-gcc_gxx_libcxx_include_dir=
-# Specify the alternate g++ header file directory
-
-# Check whether --with-gxx-libcxx-include-dir was given.
-if test "${with_gxx_libcxx_include_dir+set}" = set; then :
-  withval=$with_gxx_libcxx_include_dir; case "${withval}" in
-yes)	as_fn_error $? "bad value ${withval} given for libc++ include directory" "$LINENO" 5 ;;
-*)	gcc_gxx_libcxx_include_dir=$with_gxx_libcxx_include_dir ;;
-esac
-fi
-
-
-# --with-gxx-libcxx-include-dir controls the enabling of the -stdlib option.
-# if --with-gxx-libcxx-include-dir is 'no' we disable the stdlib option.
-# if --with-gxx-libcxx-include-dir is unset we enable the stdlib option
-# based on the platform (to be available on platform versions where it is the
-# default for the system tools). We also use a default path within the compiler
-# install tree.
-# Otherwise, we use the path provided and enable the stdlib option.
-# If both --with-sysroot and --with-gxx-libcxx-include-dir are passed, we
-# check to see if the latter starts with the former and, upon success, compute
-# gcc_gxx_libcxx_include_dir as relative to the sysroot.
-gcc_gxx_libcxx_include_dir_add_sysroot=0
-gcc_enable_stdlib_opt=0
-if test x${gcc_gxx_libcxx_include_dir} != x; then
-  if test x${gcc_gxx_libcxx_include_dir} = xno; then
-    # set defaults for the dir, but the option is disabled anyway.
-    gcc_gxx_libcxx_include_dir=
-  else
-    gcc_enable_stdlib_opt=1
-  fi
-else
-                gcc_enable_stdlib_opt=1
-fi
-
-cat >>confdefs.h <<_ACEOF
-#define ENABLE_STDLIB_OPTION $gcc_enable_stdlib_opt
-_ACEOF
-
-
-if test x${gcc_gxx_libcxx_include_dir} = x; then
-  # default path, embedded in the compiler tree.
-  libcxx_incdir='include/c++/v1'
-  gcc_gxx_libcxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)$libcxx_incdir"
-fi
 
 
 # Check whether --with-cpp_install_dir was given.
@@ -21062,7 +20983,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21065 "configure"
+#line 20986 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21168,7 +21089,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21171 "configure"
+#line 21092 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -25410,10 +25331,6 @@ gcc_tooldir='$(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)'
 # Find a directory in which to install a shared libgcc.
 
 # Substitute configuration variables
-
-
-
-
 
 
 

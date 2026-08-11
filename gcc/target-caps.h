@@ -658,6 +658,35 @@ struct target_caps
      targ_ld_static_dynamic ().  */
   const char *ld_static_option;
   const char *ld_dynamic_option;
+
+  /* WHERE THIS TARGET'S C++ HEADERS LIVE.  Formerly the configure options
+     --with-gxx-include-dir and --with-gxx-libcxx-include-dir, i.e. one string
+     baked into the compiler.  They are include SEARCH PATHS into a libstdc++
+     or libc++ INSTALLATION -- a fact about the toolchain gcc has been pointed
+     at, not about the machine gcc runs on -- so a compiler serving 188 targets
+     has 188 answers and cannot hold them in a compile-time constant.
+
+     Read by cppdefault.cc, which is linked into cc1.  That is why they are
+     here and NOT named specs: the driver's spec file never reaches cc1, and
+     the include chain is built inside cc1.
+
+     "" means this target has no such directory and the entry is dropped from
+     the search path entirely -- see rule 1 above; the empty case is the one
+     that matters, and cppdefault.cc compacts rather than searching "".
+
+     The defaults are the installation-relative paths gcc/Makefile.in computes
+     ($(libsubdir)/$(libsubdir_to_prefix)include/c++/$(version) and friends),
+     reaching this file as the GPLUSPLUS_* macros in PREPROCESSOR_DEFINES, so
+     a compiler told nothing about its target searches what it always did.
+
+     There is deliberately no add_sysroot companion: gcc has no --with-sysroot
+     any more, so the two flags these replace were unconditionally 0 with
+     nothing able to set them.  Add one when target-specs can actually probe a
+     per-target sysroot -- do not resurrect a constant.  */
+  const char *gxx_include_dir;
+  const char *gxx_tool_include_dir;
+  const char *gxx_backward_include_dir;
+  const char *gxx_libcxx_include_dir;
 };
 
 extern struct target_caps targ_caps;

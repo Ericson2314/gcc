@@ -857,12 +857,22 @@ gcc_tooldir = @gcc_tooldir@
 # paths that name the exec prefix itself and silently find nothing target-
 # specific, rather than failing.
 build_tooldir = $(exec_prefix)/$(build_target_triple)
-# Directory in which the compiler finds target-independent g++ includes.
-gcc_gxx_include_dir = @gcc_gxx_include_dir@
-gcc_gxx_include_dir_add_sysroot = @gcc_gxx_include_dir_add_sysroot@
-# Directory in which the compiler finds libc++ includes.
-gcc_gxx_libcxx_include_dir = @gcc_gxx_libcxx_include_dir@
-gcc_gxx_libcxx_include_dir_add_sysroot = @gcc_gxx_libcxx_include_dir_add_sysroot@
+# Where the compiler looks for C++ headers when the per-target config file has
+# not told it otherwise.  These used to come from configure, via
+# --with-gxx-include-dir / --with-gxx-libcxx-include-dir; a search path into a
+# libstdc++ or libc++ installation is not a fact about this host, so the
+# per-target answer now arrives at cc1 as targ_caps.gxx_include_dir and
+# targ_caps.gxx_libcxx_include_dir (gcc/target-caps.h, gcc/cppdefault.cc).
+#
+# What is left here is purely INSTALLATION layout -- $(libdir), $(prefix) and
+# $(version) -- which autoconf legitimately owns, so it stays.  It is also the
+# value handed to the target libraries below as gxx_include_dir, and it must go
+# on matching libstdc++-v3/acinclude.m4:GLIBCXX_EXPORT_INSTALL_INFO.
+#
+# The two former _add_sysroot flags are gone rather than relocated: gcc has no
+# --with-sysroot any more, so both were hard 0 with nothing able to change them.
+gcc_gxx_include_dir = $(libsubdir)/$(libsubdir_to_prefix)include/c++/$(version)
+gcc_gxx_libcxx_include_dir = $(libsubdir)/$(libsubdir_to_prefix)include/c++/v1
 # Directory to search for site-specific includes.
 local_includedir = $(local_prefix)/include
 includedir = $(prefix)/include
@@ -4107,24 +4117,36 @@ CFLAGS-intl.o += -DLOCALEDIR=\"$(localedir)\"
 #
 # Remake cpp.
 
-# GPLUSPLUS_TOOL_INCLUDE_DIR below is UNRESOLVED, AND KNOWN EMPTY.
+# The four GPLUSPLUS_* values below are now DEFAULTS, not the answer.  They are
+# what a compiler searches when nothing has told it which target it is for; the
+# real per-target values arrive in the config file as targ_caps.gxx_*, which
+# cppdefault.cc prefers.  See gcc/target-caps.h.
+#
+# GPLUSPLUS_TOOL_INCLUDE_DIR is still UNRESOLVED AND KNOWN EMPTY as a default:
 # $(target_noncanonical) is unsubstituted, so it expands to
 # $(gcc_gxx_include_dir) with a trailing slash -- i.e. a duplicate of
 # GPLUSPLUS_INCLUDE_DIR, entered twice into cpp's include chain, instead of
-# naming the per-target C++ header directory it exists for.  Not fixable here:
-# cppdefault.cc is compiled once for all targets and this directory is
-# per-target by construction, so any single value would reinstate exactly the
-# privileged target this branch removed.  Same for TOOL_INCLUDE_DIR, whose
-# $(gcc_tooldir) is set in configure.ac and has the same hole in it.
+# naming the per-target C++ header directory it exists for.  That could never be
+# fixed here, because cppdefault.cc is compiled once for all targets and this
+# directory is per-target by construction, so any single value would reinstate
+# exactly the privileged target this branch removed.  It is now fixable in the
+# place it belongs: a target config file that sets gxx_tool_include_dir.
+# TOOL_INCLUDE_DIR, whose $(gcc_tooldir) has the same hole in it, still has not
+# got such a key and remains a compile-time default only.
+#
+# GPLUSPLUS_*_ADD_SYSROOT are literal 0 and no longer configurable: gcc has no
+# --with-sysroot, so the configure variables they came from could only ever be
+# 0.  They are still spelled out because config/linux.h (musl), openbsd.h and
+# rs6000/sysv4.h build INCLUDE_DEFAULTS out of them.
 PREPROCESSOR_DEFINES = \
   -DGCC_INCLUDE_DIR=\"$(libsubdir)/include\" \
   -DFIXED_INCLUDE_DIR=\"$(libsubdir)/include-fixed\" \
   -DGPLUSPLUS_INCLUDE_DIR=\"$(gcc_gxx_include_dir)\" \
-  -DGPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT=$(gcc_gxx_include_dir_add_sysroot) \
+  -DGPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT=0 \
   -DGPLUSPLUS_TOOL_INCLUDE_DIR=\"$(gcc_gxx_include_dir)/$(target_noncanonical)\" \
   -DGPLUSPLUS_BACKWARD_INCLUDE_DIR=\"$(gcc_gxx_include_dir)/backward\" \
   -DGPLUSPLUS_LIBCXX_INCLUDE_DIR=\"$(gcc_gxx_libcxx_include_dir)\" \
-  -DGPLUSPLUS_LIBCXX_INCLUDE_DIR_ADD_SYSROOT=$(gcc_gxx_libcxx_include_dir_add_sysroot) \
+  -DGPLUSPLUS_LIBCXX_INCLUDE_DIR_ADD_SYSROOT=0 \
   -DLOCAL_INCLUDE_DIR=\"$(local_includedir)\" \
   -DCROSS_INCLUDE_DIR=\"$(CROSS_SYSTEM_HEADER_DIR)\" \
   -DTOOL_INCLUDE_DIR=\"$(gcc_tooldir)/include\" \
@@ -4136,6 +4158,13 @@ CFLAGS-cppbuiltin.o += $(PREPROCESSOR_DEFINES) -DBASEVER=$(BASEVER_s)
 cppbuiltin.o: $(BASEVER)
 
 CFLAGS-cppdefault.o += $(PREPROCESSOR_DEFINES)
+
+# target-caps.o needs the same defines, and only for the four GPLUSPLUS_*: the
+# built-in default of each gxx_* capability IS the installation-relative path,
+# so that "compiler told nothing about its target" and "compiler as configured
+# before this moved" are the same string by construction rather than by two
+# copies staying in step.
+CFLAGS-target-caps.o += $(PREPROCESSOR_DEFINES)
 
 # Note for the stamp targets, we run the program `true' instead of
 # having an empty command (nothing following the semicolon).

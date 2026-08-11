@@ -23,6 +23,7 @@
 #include "coretypes.h"
 #include "tm.h"
 #include "cppdefault.h"
+#include "target-caps.h"
 
 #ifndef NATIVE_SYSTEM_HEADER_COMPONENT
 #define NATIVE_SYSTEM_HEADER_COMPONENT 0
@@ -35,31 +36,53 @@
 # undef CROSS_INCLUDE_DIR
 #endif
 
-const struct default_include cpp_include_defaults[]
+/* THE C++ HEADER DIRECTORIES ARE THE ONLY RUNTIME ENTRIES HERE, and this is
+   where they enter the include search path.
+
+   They used to be `--with-gxx-include-dir' and `--with-gxx-libcxx-include-dir'
+   in gcc/configure.ac, i.e. one string chosen when gcc was built.  A path into
+   a libstdc++ or libc++ installation is not a fact about the host gcc runs on;
+   it is a fact about the toolchain gcc has been pointed at, and a compiler
+   serving many targets has one such answer per target.  So the answer arrives
+   in the per-target config file and cc1 has it in targ_caps by the time
+   add_standard_paths asks for this table.
+
+   An empty string means "this target has no such directory" and the entry is
+   dropped below, rather than entering the search path as "".  The built-in
+   defaults are still the installation-relative paths gcc/Makefile.in computes
+   from $(libdir)/$(prefix)/$(version), so a compiler told nothing about its
+   target searches exactly what it always did.  */
+
+const struct default_include *
+cpp_include_defaults_table (void)
+{
+  /* FUNCTION-LOCAL, and that is the whole point of this being a function.
+     Four of the initialisers below read targ_caps, and a namespace-scope array
+     would be dynamically initialised at load time -- before cc1 has opened the
+     target config file -- so it would capture the built-in fallbacks and no
+     -ftarget-config= would ever have any effect on the include path.  A
+     function-local static is initialised on first call, which is after
+     read_target_caps.  */
+  static struct default_include table[]
 #ifdef INCLUDE_DEFAULTS
+/* A handful of target headers (config/linux.h under musl, openbsd.h,
+   netbsd.h, rs6000/sysv4.h) supply their own ordering, built from the
+   GPLUSPLUS_* macros.  Those are left alone deliberately: they are per-target
+   headers stating a per-target answer, and reaching into them is the separate
+   job of getting INCLUDE_DEFAULTS itself out of the privileged target's tm.h.
+   Converting them here would change netbsd's hard-coded /usr/include/g++ on a
+   build no one here can test.  */
 = INCLUDE_DEFAULTS;
 #else
 = {
-#ifdef GPLUSPLUS_INCLUDE_DIR
     /* Pick up GNU C++ generic include files.  */
-    { GPLUSPLUS_INCLUDE_DIR, "G++", 1, 1,
-      GPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT, 0 },
-#endif
-#ifdef GPLUSPLUS_TOOL_INCLUDE_DIR
+    { targ_caps.gxx_include_dir, "G++", 1, 1, 0, 0 },
     /* Pick up GNU C++ target-dependent include files.  */
-    { GPLUSPLUS_TOOL_INCLUDE_DIR, "G++", 1, 1,
-      GPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT, 1 },
-#endif
-#ifdef GPLUSPLUS_BACKWARD_INCLUDE_DIR
+    { targ_caps.gxx_tool_include_dir, "G++", 1, 1, 0, 1 },
     /* Pick up GNU C++ backward and deprecated include files.  */
-    { GPLUSPLUS_BACKWARD_INCLUDE_DIR, "G++", 1, 1,
-      GPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT, 0 },
-#endif
-#ifdef GPLUSPLUS_LIBCXX_INCLUDE_DIR
+    { targ_caps.gxx_backward_include_dir, "G++", 1, 1, 0, 0 },
     /* Pick up libc++ include files, if we have -stdlib=libc++.  */
-    { GPLUSPLUS_LIBCXX_INCLUDE_DIR, "G++", 2, 1,
-      GPLUSPLUS_LIBCXX_INCLUDE_DIR_ADD_SYSROOT, 0 },
-#endif
+    { targ_caps.gxx_libcxx_include_dir, "G++", 2, 1, 0, 0 },
 #ifdef GCC_INCLUDE_DIR
     /* This is the dir for gcc's private headers.  */
     { GCC_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },
@@ -103,6 +126,25 @@ const struct default_include cpp_include_defaults[]
     { 0, 0, 0, 0, 0, 0 }
   };
 #endif /* no INCLUDE_DEFAULTS */
+
+  /* Drop the directories the target config file left empty.  "" is a valid
+     capability value meaning "this target has no such directory"; letting it
+     through would add the current working directory to every system include
+     search, which is a silent wrong answer rather than a missing one.  Done
+     once, guarded, because the caller loops over this on every compilation.  */
+  static bool compacted = false;
+  if (!compacted)
+    {
+      compacted = true;
+      unsigned j = 0;
+      for (unsigned i = 0; table[i].fname != NULL; i++)
+	if (table[i].fname[0] != '\0')
+	  table[j++] = table[i];
+      memset (&table[j], 0, sizeof table[j]);
+    }
+
+  return table;
+}
 
 #ifdef GCC_INCLUDE_DIR
 const char cpp_GCC_INCLUDE_DIR[] = GCC_INCLUDE_DIR;

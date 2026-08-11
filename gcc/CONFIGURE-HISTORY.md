@@ -68,6 +68,97 @@ Line numbers are the position each block occupied immediately before it was
 moved out (`a01c1fcc808`), and the code shown under each heading is what the
 block sat above -- that is how to find the site now.
 
+### configure.ac:171
+
+Sat immediately above:
+
+```
+AC_ARG_WITH(gxx-include-dir,
+...
+AC_ARG_WITH(gxx-libcxx-include-dir,
+```
+
+`--with-gxx-include-dir` and `--with-gxx-libcxx-include-dir` are gone from
+`gcc/configure.ac`, together with `gcc_gxx_include_dir_add_sysroot` and
+`gcc_gxx_libcxx_include_dir_add_sysroot` and their four `AC_SUBST`s.
+
+Each named an include SEARCH PATH -- a fact about the libstdc++ or libc++
+INSTALLATION this compiler will be compiling against, not about the machine
+gcc itself runs on.  The triple is how such an installation is *located*; it
+is not what *determines* the answer, and one build-time string cannot serve
+188 targets.  Both interpolated `--with-sysroot`, which is per target, which
+is the symptom that made this visible.
+
+They are now the `gxx_include_dir`, `gxx_tool_include_dir`,
+`gxx_backward_include_dir` and `gxx_libcxx_include_dir` keys of the per-target
+config file, read into `targ_caps` and applied by `cppdefault.cc`.
+
+**The channel is targ_caps and NOT a named spec, and that is forced rather
+than chosen.**  `cppdefault.cc` is linked into `cc1`, and `cc1` never sees a
+spec file -- the include chain is built inside the compiler proper, after
+`read_target_caps`.  This is the same boundary that put the 92 probe macros
+into a runtime config file instead of the specs channel.
+
+**`cpp_include_defaults` had to stop being an array.**  Four of its entries now
+read `targ_caps`, and a namespace-scope array is dynamically initialised at
+load time -- *before* `cc1` opens the target config file.  It would have
+captured the built-in fallbacks and no `-ftarget-config=` would ever have
+changed the include path, silently and on every target.  It is now
+`cpp_include_defaults_table ()`, whose function-local static is initialised on
+first call; the header keeps a macro of the old name so that the four existing
+`for (p = cpp_include_defaults; p->fname; p++)` loops (`incpath.cc` twice,
+`d/d-incpath.cc`, `m2/gm2-lang.cc`) are unchanged AND cannot reach the table
+without going through the initialisation.
+
+The `struct default_include` members lost their `const` qualifiers for the
+same reason: the table is compacted in place, dropping entries whose directory
+the target config left empty.  `""` is a legitimate capability value meaning
+"this target has no such directory", and letting it through would have added
+the *current working directory* to every system include search -- a silent
+wrong answer where a missing one was wanted.
+
+**The `_add_sysroot` pair was deliberately NOT transcribed.**  `gcc` has no
+`--with-sysroot` at all any more, so both variables were unconditionally `0`
+here with no remaining code path able to set them: a computation whose every
+answer is a constant.  Transcribing that faithfully into the new home is the
+dead-code mistake this campaign keeps finding, so the two `-D...ADD_SYSROOT`
+flags in `gcc/Makefile.in` are now literal `0`, kept only because
+`config/linux.h` (musl), `openbsd.h` and `rs6000/sysv4.h` build
+`INCLUDE_DEFAULTS` out of them.  When `target-specs` can genuinely probe a
+per-target sysroot, that is a NEW `targ_caps` field, not a revival of this one.
+
+**What did not move, and why.**  The installation-relative defaults --
+`$(libsubdir)/$(libsubdir_to_prefix)include/c++/$(version)` and its
+`include/c++/v1` sibling -- stay in `gcc/Makefile.in`, where they were already
+expressed.  That part is about `--prefix` and `--libdir`, which autoconf owns,
+and it must go on matching
+`libstdc++-v3/acinclude.m4:GLIBCXX_EXPORT_INSTALL_INFO`.  `target-caps.o` is
+compiled with `PREPROCESSOR_DEFINES` so that the built-in default of each
+capability *is* that string rather than a second copy of it that has to be
+kept in step.
+
+**Left alone on purpose:** the target headers that supply their own
+`INCLUDE_DEFAULTS` (`config/linux.h` under musl only -- the enclosing
+`#if DEFAULT_LIBC == LIBC_MUSL` is why a normal glibc build never reaches it,
+`openbsd.h`, `netbsd.h`, `rs6000/sysv4.h`).  Those state a per-target answer in
+a per-target header, and `netbsd.h` hard-codes `/usr/include/g++`; rerouting
+them through `targ_caps` would change that on a build nobody here can test.
+Getting `INCLUDE_DEFAULTS` itself out of the privileged target's `tm.h` is a
+separate job, and `TOOL_INCLUDE_DIR`/`CROSS_INCLUDE_DIR`/
+`NATIVE_SYSTEM_HEADER_DIR` -- which have exactly the same defect and no key
+yet -- belong to it.
+
+**Why the pair had to move together.**  `--with-gxx-libcxx-include-dir=no`
+disabled the `-stdlib` option and unset enabled it, so half a conversion would
+have given a compiler offering `-stdlib` while pointing at a path that was
+never configured.  It turned out not to be a coupling at all once looked at:
+`-stdlib=` is enabled unconditionally on this branch already (see
+`configure.ac:227` above), because `Condition(ENABLE_STDLIB_OPTION)` decides
+whether the option EXISTS at `options.cc` compile time rather than what it
+defaults to.  So the directory moved and the option's existence stayed, and
+the `AC_DEFINE_UNQUOTED` of a variable that could only be `1` became a plain
+`AC_DEFINE ... 1`.
+
 ### configure.ac:227
 
 Sat immediately above:

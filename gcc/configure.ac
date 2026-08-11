@@ -168,78 +168,26 @@ else
 fi
 
 
-# Don't set gcc_gxx_include_dir to gxx_include_dir since that's only
-# passed in by the toplevel make and thus we'd get different behavior
-# depending on where we built the sources.
-gcc_gxx_include_dir=
-# Specify the g++ header file directory
-AC_ARG_WITH(gxx-include-dir,
-[AS_HELP_STRING([--with-gxx-include-dir=DIR],
-                [specifies directory to put g++ header files])],
-[case "${withval}" in
-yes)	AC_MSG_ERROR(bad value ${withval} given for g++ include directory) ;;
-no)	;;
-*)	gcc_gxx_include_dir=$with_gxx_include_dir ;;
-esac])
-
-# If both --with-sysroot and --with-gxx-include-dir are passed, we interpolate
-# the former in the latter and, upon success, compute gcc_gxx_include_dir as
-# relative to the sysroot.
-gcc_gxx_include_dir_add_sysroot=0
-
-# This logic must match libstdc++-v3/acinclude.m4:GLIBCXX_EXPORT_INSTALL_INFO.
-if test x${gcc_gxx_include_dir} = x; then
-  gcc_gxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)include/c++/\$(version)"
-fi
-
-# Configuration for an alternate set of C++ headers.
-gcc_gxx_libcxx_include_dir=
-# Specify the alternate g++ header file directory
-AC_ARG_WITH(gxx-libcxx-include-dir,
-[AS_HELP_STRING([--with-gxx-libcxx-include-dir=DIR],
-                [specifies directory to find libc++ header files])],
-[case "${withval}" in
-yes)	AC_MSG_ERROR(bad value ${withval} given for libc++ include directory) ;;
-*)	gcc_gxx_libcxx_include_dir=$with_gxx_libcxx_include_dir ;;
-esac])
-
-# --with-gxx-libcxx-include-dir controls the enabling of the -stdlib option.
-# if --with-gxx-libcxx-include-dir is 'no' we disable the stdlib option.
-# if --with-gxx-libcxx-include-dir is unset we enable the stdlib option
-# based on the platform (to be available on platform versions where it is the
-# default for the system tools). We also use a default path within the compiler
-# install tree.
-# Otherwise, we use the path provided and enable the stdlib option.
-# If both --with-sysroot and --with-gxx-libcxx-include-dir are passed, we
-# check to see if the latter starts with the former and, upon success, compute
-# gcc_gxx_libcxx_include_dir as relative to the sysroot.
-gcc_gxx_libcxx_include_dir_add_sysroot=0
-gcc_enable_stdlib_opt=0
-if test x${gcc_gxx_libcxx_include_dir} != x; then
-  if test x${gcc_gxx_libcxx_include_dir} = xno; then
-    # set defaults for the dir, but the option is disabled anyway.
-    gcc_gxx_libcxx_include_dir=
-  else
-    gcc_enable_stdlib_opt=1
-  fi
-else
-  dnl -stdlib= is enabled unconditionally.  It cannot be a per-target answer:
-  dnl c-family/c.opt carries `Condition(ENABLE_STDLIB_OPTION)', which the option
-  dnl machinery resolves when options.cc is COMPILED, so it decides whether the
-  dnl option EXISTS rather than what it defaults to.  A target with no libc++
-  dnl then has nothing to select, which is a rejected argument rather than a
-  dnl silently wrong default.
-  dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:227".
-  gcc_enable_stdlib_opt=1
-fi
-AC_DEFINE_UNQUOTED(ENABLE_STDLIB_OPTION, $gcc_enable_stdlib_opt,
+dnl The g++ and libc++ header directories are not asked here any more: an
+dnl include search path into a libstdc++ or libc++ installation is a fact about
+dnl the toolchain gcc was pointed at, not about this host.  They are now the
+dnl `gxx_include_dir', `gxx_tool_include_dir', `gxx_backward_include_dir' and
+dnl `gxx_libcxx_include_dir' keys of the per-target config file, read by cc1
+dnl into targ_caps and applied in cppdefault.cc; the installation-relative
+dnl fallbacks stay in gcc/Makefile.in, which is where they were computed
+dnl already and where --prefix and --libdir legitimately live.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:171".
+dnl
+dnl -stdlib= is enabled unconditionally, and that is why it does NOT move with
+dnl the directory even though one option used to control both.  c-family/c.opt
+dnl carries `Condition(ENABLE_STDLIB_OPTION)', which the option machinery
+dnl resolves when options.cc is COMPILED, so it decides whether the option
+dnl EXISTS rather than what it defaults to.  A target with no libc++ then has
+dnl nothing to select, which is a rejected argument rather than a silently
+dnl wrong default.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:227".
+AC_DEFINE(ENABLE_STDLIB_OPTION, 1,
           [Define if the -stdlib= option should be enabled.])
-
-if test x${gcc_gxx_libcxx_include_dir} = x; then
-  # default path, embedded in the compiler tree.
-  libcxx_incdir='include/c++/v1'
-  gcc_gxx_libcxx_include_dir="\$(libsubdir)/\$(libsubdir_to_prefix)$libcxx_incdir"
-fi
 
 AC_ARG_WITH(cpp_install_dir,
 [AS_HELP_STRING([--with-cpp-install-dir=DIR],
@@ -3129,10 +3077,6 @@ AC_SUBST(extra_objs)
 AC_SUBST(extra_programs)
 AC_SUBST(float_h_file)
 AC_SUBST(gcc_config_arguments)
-AC_SUBST(gcc_gxx_include_dir)
-AC_SUBST(gcc_gxx_include_dir_add_sysroot)
-AC_SUBST(gcc_gxx_libcxx_include_dir)
-AC_SUBST(gcc_gxx_libcxx_include_dir_add_sysroot)
 AC_SUBST(host_exeext)
 AC_SUBST(host_xm_file_list)
 AC_SUBST(host_xm_include_list)

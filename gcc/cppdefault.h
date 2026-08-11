@@ -31,30 +31,46 @@
    All these directories are treated as `system' include directories
    (they are not subject to pedantic warnings in some cases).  */
 
+/* NOT `const'-qualified member by member, although it used to be.  The G++
+   and libc++ directories are per-target and now arrive at run time in
+   targ_caps, so cppdefault.cc builds this table on first use and compacts out
+   the entries the target config left empty.  The table it hands back is
+   const-qualified as a whole, which is the guarantee callers actually want.  */
 struct default_include
 {
-  const char *const fname;	/* The name of the directory.  */
-  const char *const component;	/* The component containing the directory
+  const char *fname;		/* The name of the directory.  */
+  const char *component;	/* The component containing the directory
 				   (see update_path in prefix.cc) */
-  const char cplusplus;		/* When this is non-zero, we should only
+  char cplusplus;		/* When this is non-zero, we should only
 				   consider this if we're compiling C++.
 				   When the -stdlib option is configured, this
 				   may take values greater than 1 to indicate
 				   which C++ standard library should be
 				   used.  */
-  const char cxx_aware;		/* Includes in this directory don't need to
+  char cxx_aware;		/* Includes in this directory don't need to
 				   be wrapped in extern "C" when compiling
 				   C++.  */
-  const char add_sysroot;	/* FNAME should be prefixed by
+  char add_sysroot;		/* FNAME should be prefixed by
 				   cpp_SYSROOT.  */
-  const char multilib;		/* FNAME should have appended
+  char multilib;		/* FNAME should have appended
 				   - the multilib path specified with -imultilib
 				     when set to 1,
 				   - the multiarch path specified with
 				     -imultiarch, when set to 2.  */
 };
 
-extern const struct default_include cpp_include_defaults[];
+/* The standard include chain.  A FUNCTION rather than an array because two of
+   its entries -- the libstdc++ and libc++ header directories -- are answers
+   about the C++ INSTALLATION this compiler is compiling against, and reach cc1
+   in the per-target config file (targ_caps).  A namespace-scope array would be
+   initialised before read_target_caps ever runs and would silently capture the
+   built-in fallbacks instead; building on first use puts construction after
+   the config file is read.  Every caller already writes
+   `for (p = cpp_include_defaults; p->fname; p++)', so the macro keeps them
+   working unchanged and, more to the point, makes it impossible to reach the
+   table without going through the initialisation.  */
+extern const struct default_include *cpp_include_defaults_table (void);
+#define cpp_include_defaults (cpp_include_defaults_table ())
 extern const char cpp_GCC_INCLUDE_DIR[];
 extern const size_t cpp_GCC_INCLUDE_DIR_len;
 

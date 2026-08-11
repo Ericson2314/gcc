@@ -137,7 +137,18 @@ struct target_caps targ_caps =
      GNU spellings compiled into it, and HAVE_LD_STATIC_DYNAMIC defaulted to 1,
      so a compiler told nothing about its linker keeps doing exactly that.  */
   .ld_static_option = "-Bstatic",
-  .ld_dynamic_option = "-Bdynamic"
+  .ld_dynamic_option = "-Bdynamic",
+
+  /* The C++ header directories.  Defaults are the installation-relative paths
+     gcc/Makefile.in computes; see target-caps.h.  This file is compiled with
+     PREPROCESSOR_DEFINES for exactly these four macros, so that the default
+     really is the string a normally-configured compiler used to have compiled
+     into cppdefault.cc, rather than a second, separately-maintained copy of
+     it.  */
+  .gxx_include_dir = GPLUSPLUS_INCLUDE_DIR,
+  .gxx_tool_include_dir = GPLUSPLUS_TOOL_INCLUDE_DIR,
+  .gxx_backward_include_dir = GPLUSPLUS_BACKWARD_INCLUDE_DIR,
+  .gxx_libcxx_include_dir = GPLUSPLUS_LIBCXX_INCLUDE_DIR
 };
 
 /* No built-in default: see target-caps.h.  A compiler that has not been told
@@ -187,7 +198,11 @@ read_target_caps (const char *file)
 	static const struct { const char *name; const char **slot; } strs[] = {
 	  { "target", &targ_caps_target_name },
 	  { "ld_static_option", &targ_caps.ld_static_option },
-	  { "ld_dynamic_option", &targ_caps.ld_dynamic_option }
+	  { "ld_dynamic_option", &targ_caps.ld_dynamic_option },
+	  { "gxx_include_dir", &targ_caps.gxx_include_dir },
+	  { "gxx_tool_include_dir", &targ_caps.gxx_tool_include_dir },
+	  { "gxx_backward_include_dir", &targ_caps.gxx_backward_include_dir },
+	  { "gxx_libcxx_include_dir", &targ_caps.gxx_libcxx_include_dir }
 	};
 	bool matched = false;
 	for (unsigned i = 0; i < ARRAY_SIZE (strs); i++)
