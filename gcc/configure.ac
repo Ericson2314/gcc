@@ -1834,6 +1834,23 @@ for gcc_mt in ${gcc_manifest_targets}; do
     echo "tm_file ${tm_file}"
     echo "tm_p_file ${tm_p_file}"
     echo "tmake_file ${tmake_file}"
+    # Which of those fragments actually exist.  tmake_file names some that do
+    # not -- sh-unknown-elf asks for sh/t-elf, which is not in the tree -- and
+    # an include of a missing file is a hard error in make, so everything that
+    # feeds these to make has to filter them first.  (No backtick in this
+    # comment: the whole block is one command substitution, and a stray one
+    # closes it while the file is parsed, long before the comment applies.)
+    # Filtered once here, where
+    # the answer is already known, rather than by each consumer in turn: this
+    # is the same test the primary target's own tmake_file loop applies further
+    # down, and it was the last fact the manifest left its readers to re-derive.
+    mt_tmake_present=
+    for mt_tf in ${tmake_file}; do
+      if test -f ${srcdir}/config/${mt_tf}; then
+	mt_tmake_present="${mt_tmake_present} ${mt_tf}"
+      fi
+    done
+    echo "tmake_file_present ${mt_tmake_present}"
     echo "extra_objs ${extra_objs}"
     echo "extra_options ${extra_options}"
     echo "out_file ${out_file}"

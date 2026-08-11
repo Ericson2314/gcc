@@ -59,15 +59,27 @@ echo "# Generated from $manifest; do not edit."
 echo "# One stanza per target: the multilib set its tmake_file fragments define."
 
 # Read the manifest one stanza at a time.  Blank line ends a stanza.
-target= tmake= tmconf= tcd=
+target= tmake= tmconf= tcd= seen_present=
 emit () {
   test -n "$target" || return 0
 
-  # The build only includes fragments that exist -- see the tmake_file loop in
-  # configure.ac -- and tmake_file does name some that do not (sh-unknown-elf
-  # asks for sh/t-elf, which is not in the tree).  Applying the same filter
-  # matters: `include' of a missing file is a hard error in make, so without
-  # it this stops on the first such target instead of reporting it.
+  # A manifest written by a configure older than the tmake_file_present field
+  # would leave $tmake empty, and an empty fragment list evaluates perfectly
+  # happily to an empty multilib set -- "this target has no multilibs", stated
+  # confidently, for all 188 of them.  Refuse instead: the field is not
+  # optional, and a stale configure is exactly the window in which this would
+  # otherwise pass silently.
+  if test -z "$seen_present"; then
+    echo "$0: $manifest has no tmake_file_present for $target;" >&2
+    echo "  re-run configure -- the manifest predates that field." >&2
+    exit 1
+  fi
+
+  # tmake_file_present is tmake_file with the fragments that do not exist
+  # dropped -- tmake_file names some that do not (sh-unknown-elf asks for
+  # sh/t-elf), and `include' of a missing file is a hard error in make.
+  # configure already knows which exist, so it records the filtered list and
+  # this script does not repeat the test.
   {
     echo "srcdir = $srcdir"
     echo "AWK = $awk_prog"
@@ -84,9 +96,7 @@ emit () {
     # complete and whether to use it stays a decision for later.
     echo 'if_multiarch = $(1)'
     for f in $tmake; do
-      if test -f "$srcdir/config/$f"; then
-	echo "include \$(srcdir)/config/$f"
-      fi
+      echo "include \$(srcdir)/config/$f"
     done
     # Tab-indented recipe lines.
     echo 'multilib-show:'
@@ -108,13 +118,13 @@ emit () {
     echo "$0: could not evaluate multilib fragments for $target" >&2
   fi
 
-  target= tmake= tmconf= tcd=
+  target= tmake= tmconf= tcd= seen_present=
 }
 
 while IFS= read -r line; do
   case $line in
     "target "*)             target=${line#target } ;;
-    "tmake_file "*)         tmake=${line#tmake_file } ;;
+    "tmake_file_present "*) tmake=${line#tmake_file_present }; seen_present=1 ;;
     "tm_multilib_config "*) tmconf=${line#tm_multilib_config } ;;
     "target_cpu_default "*) tcd=${line#target_cpu_default } ;;
     "")                     emit ;;
