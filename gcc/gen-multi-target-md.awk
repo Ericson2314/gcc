@@ -36,9 +36,23 @@
 # triple); they also share md_file and tm_p_file, so the first record for a
 # given cpu_type wins and the rest are skipped.
 
+function reset() {
+  trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
+}
+
 function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
-  if (cpu == "" || seen[cpu])
-    { cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; return }
+  if (cpu == "")
+    { reset(); return }
+
+  # Every record gets its per-triple conditions rules; only the first record
+  # for a back end gets the per-back-end ones.  The per-triple rules name
+  # $(MULTI_TARGET_GEN_OBJS_<base>) as a prerequisite, and make expands
+  # prerequisites as it reads the file, so they have to come AFTER the
+  # assignment below -- emitting them first left the first triple of every back
+  # end linking against nothing and failing on `undefined reference to
+  # progname'.
+  if (seen[cpu])
+    { emit_triple(); reset(); return }
   seen[cpu] = 1;
 
   # Reading a back end's .md means knowing its machine modes: the md files
@@ -135,156 +149,40 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
   }
 
-  # genconditions writes a program; the program is what has to be built
-  # against this back end.  The four headers it names in what it writes are
-  # fixed at *its* compile time, so they are settled here rather than by any
-  # flag passed when it runs.  Defaults in genconditions.cc are the plain
-  # single-target names, so the single-target rules in Makefile.in are
-  # untouched.
+  # THE CONDITIONS FILE.  Every one of these generators is fed
+  # insn-conditions-<base>.md, as upstream feeds them insn-conditions.md, and
+  # they must ALL be fed it or none: gencodes consults a condition's truth
+  # value even with elision off, so passing the file to some and not others
+  # would have them disagree about what every insn code means (measured on
+  # i386: NUM_INSN_CODES 15874 vs 15429, 8555 renumbered CODE_FOR_ lines).
   #
-  # Back ends sharing default-common.cc are skipped: tm-<base>.h and the other
-  # three are generated per common-file base, not per cpu_type, and those five
-  # are the only place the two keys come apart, so ft32/moxie/rl78 have no
-  # tm-ft32.h &c to compile against.  Same guard as the asm-ops rules below.
-  if (cof != "default-common.cc") {
-    printf "build/genconditions-%s.o : BUILD_CPPFLAGS += \\\n", cpu;
-    printf "  -DGENCONDMD_TM_H='\"tm-%s.h\"' \\\n", cpu;
-    printf "  -DGENCONDMD_INSN_CONSTANTS_H='\"insn-constants-%s.h\"' \\\n", cpu;
-    printf "  -DGENCONDMD_TM_P_H='\"tm_p-%s.h\"' \\\n", cpu;
-    printf "  -DGENCONDMD_TM_CONSTRS_H='\"tm-constrs-%s.h\"'\n", cpu;
-    printf "build/genconditions-%s.o : $(HASHTAB_H)\n\n", cpu;
-
-    printf "build/gencondmd-%s.cc: s-conditions-%s; @true\n", cpu, cpu;
-    printf "s-conditions-%s: build/genconditions-%s$(build_exeext) \\\n", cpu, cpu;
-    printf "  $(srcdir)/common.md $(srcdir)/config/%s\n", md;
-    printf "\t$(RUN_GEN) build/genconditions-%s$(build_exeext) \\\n", cpu;
-    printf "\t  $(srcdir)/common.md $(srcdir)/config/%s > tmp-condmd-%s.cc\n", md, cpu;
-    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-condmd-%s.cc \\\n", cpu;
-    printf "\t  build/gencondmd-%s.cc\n", cpu;
-    printf "\t$(STAMP) s-conditions-%s\n\n", cpu;
-
-    # As for the single-target build/gencondmd.o: tm_p-<base>.h brings in the
-    # back end's predicate wrappers as inline functions, and keeping them all
-    # would demand definitions this program does not link.
-    printf "build/gencondmd-%s.o : build/gencondmd-%s.cc \\\n", cpu, cpu;
-    printf "  tm-%s.h insn-constants-%s.h tm_p-%s.h tm-constrs-%s.h \\\n",
-	   cpu, cpu, cpu, cpu;
-    printf "  insn-modes-%s.h insn-modes-inline-%s.h \\\n", cpu, cpu;
-    printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
-    printf "build/gencondmd-%s.o : BUILD_CPPFLAGS += \\\n", cpu;
-    printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
-    printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n", cpu;
-    printf "build/gencondmd-%s.o : \\\n", cpu;
-    printf "  BUILD_CFLAGS := $(filter-out -fkeep-inline-functions, $(BUILD_CFLAGS))\n";
-    printf "build/gencondmd-%s$(build_exeext): build/gencondmd-%s.o \\\n", cpu, cpu;
-    printf "  build/errors.o $(BUILD_LIBDEPS)\n";
-    printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
-    printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
-
-    printf "insn-conditions-%s.md: s-condmd-%s; @true\n", cpu, cpu;
-    printf "s-condmd-%s: build/gencondmd-%s$(build_exeext)\n", cpu, cpu;
-    printf "\t$(RUN_GEN) build/gencondmd-%s$(build_exeext) > tmp-cond-%s.md\n", cpu, cpu;
-    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-cond-%s.md \\\n", cpu;
-    printf "\t  insn-conditions-%s.md\n", cpu;
-    printf "\t$(STAMP) s-condmd-%s\n\n", cpu;
-
-  }
-  else {
-    printf "# no gencondmd-%s: no tm-%s.h (shares default-common.cc).\n\n",
-	   cpu, cpu;
-  }
-
-  # tm-<base>.h names this, so that a back end compiled against it gets its own
-  # HAVE_* rather than the configured target's.
+  # What makes it safe to pass is that insn-conditions-<base>.md is no longer
+  # one triple's answer.  It is the INTERSECTION over all of the back end's
+  # configured triples -- see emit_triple and intersect-conditions.awk -- so a
+  # condition is recorded constant only where every triple agrees, and anything
+  # that turns on an OS or ABI choice stays -1 and is decided at run time.
+  # Folding against a single first-triple-wins tm-<base>.h was tried and backed
+  # out: it turned `HAVE_adddi3_sp32 (TARGET_ARCH32)' into `1' across 1124
+  # lines of sparc, and `!TARGET_MACHO' from -1 into 0 for i386.
   #
-  # DELIBERATELY NOT FED insn-conditions-<base>.md.  Upstream passes genflags
-  # the conditions file so that each pattern's condition is resolved to 1 or 0
-  # up front; here that would be a bad trade, and the measurement is worth
-  # keeping because the change is a two-line one and looks like a free win.
-  #
-  # Pre-evaluation is only as good as the tm.h it is done against, and
-  # tm-<base>.h is built from whichever triple came FIRST in the manifest --
-  # tm-i386.h is an i686-apple-darwin, tm-sparc.h is a 32-bit sparc.  Folding a
-  # condition that turns on an OS or ABI choice rather than on the back end
-  # therefore bakes that arbitrary triple's answer:
-  #	-#define HAVE_adddi3_sp32 (TARGET_ARCH32)
-  #	+#define HAVE_adddi3_sp32 1
-  # and the symbolic form is the more nearly runtime-correct of the two.  In
-  # insn-conditions-i386.md the same cause turns `!TARGET_MACHO' from -1
-  # (unknown, decided later) into 0, i.e. "definitely not Mach-O" recorded for
-  # a back end whose representative triple is Darwin -- wrong in both
-  # directions at once.  Upstream has no such gap because there tm.h *is* the
-  # configured target.
-  #
-  # Cost of turning it on, measured: 1124 changed lines in insn-flags-sparc.h,
-  # 4270 in i386, 1423 in rs6000, 0 in aarch64.  That is 4270 lines of one
-  # arbitrary target choice baked in, in the name of an optimisation, in a
-  # tree whose purpose is to remove exactly that.
-  #
-  # Turn it back on once tm-<base>.h is keyed properly rather than by
-  # first-triple-wins: append insn-conditions-<base>.md to both the
-  # prerequisites and the command line below, and skip it for the back ends
-  # that share default-common.cc, which have no gencondmd of their own.
+  # Passing it is also not optional.  gensupport ELIDES patterns whose
+  # condition is provably false, and gcn depends on that for well-formedness,
+  # not for size: config/gcn/gcn-valu.md:836's
+  # vec_extract<V_1REG:mode><V_1REG_ALT:mode>_nop is a cross product of two
+  # mode iterators whose condition
+  #	MODE_VF (<V_1REG_ALT:MODE>mode) < MODE_VF (<V_1REG:MODE>mode)
+  #	&& <V_1REG_ALT:SCALAR_MODE>mode == <V_1REG:SCALAR_MODE>mode
+  # IS the filter over that product, and without it genrecog rejects gcn with
+  # 831 `element mode mismatch' errors.  Those conditions are mode arithmetic
+  # and so are invariant across gcn's triples: the intersection keeps them.
+  # That is the whole point of intersecting rather than choosing.
   printf "insn-flags-%s.h: build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s > tmp-flags-%s.h\n", md, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md > tmp-flags-%s.h\n", md, cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-flags-%s.h $@\n", cpu;
   printf "%s-common.o: insn-flags-%s.h insn-modes-%s.h\n\n", cpu, cpu, cpu;
 
-  # The rest of the machine-description headers, same shape.  Upstream builds
-  # these from the `simple_rtl_generated_h' pattern rules in Makefile.in, which
-  # also pass insn-conditions.md; none of these do.
-  #
-  # That is a POLICY, not an oversight, and it has to be the same policy for
-  # every generator or the results disagree with each other.  See the
-  # insn-flags note above for why folding against tm-<base>.h is the wrong
-  # trade: tm-<base>.h is whichever triple came first in the manifest, so a
-  # condition that turns on an OS or ABI choice gets that arbitrary triple's
-  # answer.  For a header of macros that costs a wrong constant.  For genemit
-  # and genrecog it costs the pattern: gensupport.cc ELIDES patterns whose
-  # condition is provably false, and only gencodes and genflags turn that off
-  # (insn_elision = 0), so one triple's inability to use a pattern would delete
-  # it for every triple of the back end.  That is wrong code, not a missed
-  # optimisation.
-  #
-  # UNIFORMITY IS MANDATORY, and measurably so: gencodes consults the truth
-  # value even with elision off, emitting `= CODE_FOR_nothing' for a pattern it
-  # can prove dead.  Feeding it the conditions file moves NUM_INSN_CODES for
-  # i386 from 15874 to 15429 and renumbers 8555 lines of CODE_FOR_.  A build
-  # where some generators saw the file and others did not would disagree about
-  # what every insn code means.
-  #
-  # KNOWN FAILURE, deliberately not worked around: **gcn does not build under
-  # this policy.**  genrecog-gcn rejects config/gcn/gcn-valu.md:836 with 831
-  # `element mode mismatch between vec_select QImode and its operand HImode'
-  # and friends.  The pattern is vec_extract<V_1REG:mode><V_1REG_ALT:mode>_nop,
-  # a cross product of two mode iterators whose condition
-  #	MODE_VF (<V_1REG_ALT:MODE>mode) < MODE_VF (<V_1REG:MODE>mode)
-  #	&& <V_1REG_ALT:SCALAR_MODE>mode == <V_1REG:SCALAR_MODE>mode
-  # IS the filter that removes the invalid pairs from the product.  gcn writes
-  # a deliberately over-broad product and relies on the condition being
-  # statically false to keep genrecog from ever seeing a mismatched pair.
-  # Measured with one binary and one .md: exit 0 with insn-conditions-gcn.md,
-  # exit 1 without.  So elision is not purely an optimisation for every back
-  # end, and this policy is not the final answer.
-  #
-  # It is left FAILING rather than special-cased.  A back end that visibly does
-  # not build is safer than one whose patterns are silently deleted, and the
-  # fix in flight is to fold only what is invariant across all of a back end's
-  # triples -- run gencondmd once per triple and intersect, so a condition is
-  # recorded false only if it is false for every triple.  gcn's conditions
-  # above are pure mode arithmetic and are invariant, so they would still fold;
-  # sparc's TARGET_ARCH32 and i386's TARGET_MACHO vary and would not.
-  #
-  # Passing it to none keeps every condition deferred to run time, which is
-  # what a multi-target compiler wants, and is how GCC behaved before gencondmd
-  # existed.  Elision is then inert by construction rather than by our
-  # restraint: condition_table is populated only by add_c_test, called only
-  # from read-rtl.cc's define_conditions handler, which only an
-  # insn-conditions.md contains.  With no such file every non-empty condition
-  # is -1 (unknown) and nothing is ever elided.
-  #
   # AUDITED, because "these generators are per back end" is only safe if their
   # output depends on the .md and not on which tm.h they were compiled with.
   # Intersecting each generator's identifiers with the 689 macros tm-i386.h
@@ -301,10 +199,11 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   for (i = 1; i <= n; i++) {
     printf "insn-%s-%s.h: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu, parts[i], cpu;
-    printf "  $(srcdir)/config/%s\n", md;
+    printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
     printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu;
-    printf "\t  $(srcdir)/config/%s > tmp-%s-%s.h\n", md, parts[i], cpu;
+    printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+    printf "\t  > tmp-%s-%s.h\n", parts[i], cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.h $@\n\n",
 	   parts[i], cpu;
   }
@@ -321,18 +220,19 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   for (i = 1; i <= n; i++) {
     printf "insn-%s-%s.cc: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu, parts[i], cpu;
-    printf "  $(srcdir)/config/%s\n", md;
+    printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
     printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu;
-    printf "\t  $(srcdir)/config/%s > tmp-%s-%s.cc\n", md, parts[i], cpu;
+    printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+    printf "\t  > tmp-%s-%s.cc\n", parts[i], cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.cc $@\n\n",
 	   parts[i], cpu;
   }
 
   printf "insn-target-def-%s.h: build/gentarget-def-%s$(build_exeext) \\\n", cpu, cpu;
-  printf "  $(srcdir)/common.md $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/common.md $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/gentarget-def-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s > tmp-target-def-%s.h\n", md, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md > tmp-target-def-%s.h\n", md, cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-target-def-%s.h $@\n\n", cpu;
 
   # genattrtab writes three files, genopinit two; neither uses stdout.
@@ -340,10 +240,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 	 cpu, cpu, cpu;
   printf "  s-attrtab-%s; @true\n", cpu;
   printf "s-attrtab-%s: build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s -Atmp-attrtab-%s.cc -Dtmp-dfatab-%s.cc \\\n",
-	 md, cpu, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+  printf "\t  -Atmp-attrtab-%s.cc -Dtmp-dfatab-%s.cc \\\n", cpu, cpu;
   printf "\t  -Ltmp-latencytab-%s.cc\n", cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-attrtab-%s.cc insn-attrtab-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-dfatab-%s.cc insn-dfatab-%s.cc\n", cpu, cpu;
@@ -352,9 +252,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 
   printf "insn-opinit-%s.cc insn-opinit-%s.h: s-opinit-%s; @true\n", cpu, cpu, cpu;
   printf "s-opinit-%s: build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s -htmp-opinit-%s.h -ctmp-opinit-%s.cc\n", md, cpu, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+  printf "\t  -htmp-opinit-%s.h -ctmp-opinit-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.h insn-opinit-%s.h\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.cc insn-opinit-%s.cc\n", cpu, cpu;
   printf "\t$(STAMP) s-opinit-%s\n\n", cpu;
@@ -368,9 +269,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "INSNEMIT_SEQ_TMP_%s = $(patsubst %%, tmp-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu;
   printf "$(INSNEMIT_SEQ_SRC_%s): s-tmp-emit-%s; @true\n", cpu, cpu;
   printf "s-tmp-emit-%s: build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s $(addprefix -O,$(INSNEMIT_SEQ_TMP_%s))\n", md, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+  printf "\t  $(addprefix -O,$(INSNEMIT_SEQ_TMP_%s))\n", cpu;
   printf "\t$(foreach id, $(INSNEMIT_SPLITS_SEQ), \\\n";
   printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-emit-%s-$(id).cc \\\n", cpu;
   printf "\t  insn-emit-%s-$(id).cc;)\n", cpu;
@@ -381,9 +283,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "$(INSNRECOG_SEQ_SRC_%s): s-tmp-recog-%s; @true\n", cpu, cpu;
   printf "insn-recog-%s.h: s-tmp-recog-%s; @true\n", cpu, cpu;
   printf "s-tmp-recog-%s: build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s\n", md;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
   printf "\t$(RUN_GEN) build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s -Hinsn-recog-%s.h \\\n", md, cpu;
+  printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
+  printf "\t  -Hinsn-recog-%s.h \\\n", cpu;
   printf "\t  $(addprefix -O,$(INSNRECOG_SEQ_TMP_%s))\n", cpu;
   printf "\t$(foreach id, $(INSNRECOG_SPLITS_SEQ), \\\n";
   printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-recog-%s-$(id).cc \\\n", cpu;
@@ -458,7 +361,115 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     asm_ops_bases = asm_ops_bases " " cpu;
   }
 
-  cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = "";
+  emit_triple();
+
+  reset();
+}
+
+# Everything that has to exist once per configured TRIPLE rather than once per
+# back end: the conditions of a machine description are evaluated against a
+# tm.h, and a back end serving 31 triples the way i386 does has no single one.
+# So each triple gets its own tm.h, its own gencondmd, and its own conditions
+# file; emit_condition_intersections then reduces a back end's triples to what
+# they agree on.  See intersect-conditions.awk for why that is the right
+# answer rather than picking one triple.
+#
+# Skipped for the back ends that share default-common.cc: they have no
+# options-<base>.h or insn-constants-<base>.h to build a tm.h against.
+function emit_triple(	key, hdrs, i, n, parts) {
+  if (cof == "default-common.cc")
+    return;
+
+  key = trg;
+  gsub(/[^A-Za-z0-9_]/, "_", key);
+
+  # tm_include_list names options.h and insn-constants.h generically; those two
+  # are per back end, not per triple, so they resolve to the <base> names.  The
+  # rest of the list is this triple's own header chain, which is the whole
+  # point.
+  hdrs = inc;
+  sub(/(^| )options\.h( |$)/, " options-" cpu ".h ", hdrs);
+  sub(/(^| )insn-constants\.h( |$)/, " insn-constants-" cpu ".h ", hdrs);
+
+  printf "tm-%s.h: options-%s.h insn-constants-%s.h Makefile\n", key, cpu, cpu;
+  printf "\tTARGET_CPU_DEFAULT=\"\" HEADERS=\"%s\" DEFINES=\"%s\" \\\n", hdrs, def;
+  printf "\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n", key;
+
+  n = split(tmp, parts, " ");
+  hdrs = "";
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "")
+      hdrs = hdrs "config/" parts[i] " ";
+  hdrs = hdrs "tm-preds-" cpu ".h";
+  printf "tm_p-%s.h: tm-preds-%s.h $(srcdir)/mkconfig.sh Makefile\n", key, cpu;
+  printf "\tHEADERS=\"%s\" DEFINES=\"\" \\\n", hdrs;
+  printf "\t  $(SHELL) $(srcdir)/mkconfig.sh tm_p-%s.h\n\n", key;
+
+  printf "build/genconditions-%s.o : genconditions.cc tm-%s.h insn-modes-%s.h \\\n",
+	 key, key, cpu;
+  printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_BASE_H) $(GTM_H) \\\n";
+  printf "  errors.h $(READ_MD_H) $(GENSUPPORT_H) $(OBSTACK_H) $(HASHTAB_H)\n";
+  printf "build/genconditions-%s.o : BUILD_CPPFLAGS += \\\n", key;
+  printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
+  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"' \\\n", cpu;
+  printf "  -DTM_H_FILE='\"tm-%s.h\"' \\\n", key;
+  printf "  -DGENCONDMD_TM_H='\"tm-%s.h\"' \\\n", key;
+  printf "  -DGENCONDMD_INSN_CONSTANTS_H='\"insn-constants-%s.h\"' \\\n", cpu;
+  printf "  -DGENCONDMD_TM_P_H='\"tm_p-%s.h\"' \\\n", key;
+  printf "  -DGENCONDMD_TM_CONSTRS_H='\"tm-constrs-%s.h\"'\n", cpu;
+  printf "build/genconditions-%s$(build_exeext): build/genconditions-%s.o \\\n", key, key;
+  printf "  $(MULTI_TARGET_GEN_OBJS_%s) $(BUILD_LIBDEPS)\n", cpu;
+  printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
+  printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+
+  printf "build/gencondmd-%s.cc: s-conditions-%s; @true\n", key, key;
+  printf "s-conditions-%s: build/genconditions-%s$(build_exeext) \\\n", key, key;
+  printf "  $(srcdir)/common.md $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genconditions-%s$(build_exeext) \\\n", key;
+  printf "\t  $(srcdir)/common.md $(srcdir)/config/%s > tmp-condmd-%s.cc\n", md, key;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-condmd-%s.cc \\\n", key;
+  printf "\t  build/gencondmd-%s.cc\n", key;
+  printf "\t$(STAMP) s-conditions-%s\n\n", key;
+
+  printf "build/gencondmd-%s.o : build/gencondmd-%s.cc \\\n", key, key;
+  printf "  tm-%s.h insn-constants-%s.h tm_p-%s.h tm-constrs-%s.h \\\n",
+	 key, cpu, key, cpu;
+  printf "  insn-modes-%s.h insn-modes-inline-%s.h \\\n", cpu, cpu;
+  printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
+  printf "build/gencondmd-%s.o : BUILD_CPPFLAGS += \\\n", key;
+  printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
+  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n", cpu;
+  printf "build/gencondmd-%s.o : \\\n", key;
+  printf "  BUILD_CFLAGS := $(filter-out -fkeep-inline-functions, $(BUILD_CFLAGS))\n";
+  printf "build/gencondmd-%s$(build_exeext): build/gencondmd-%s.o \\\n", key, key;
+  printf "  build/errors.o $(BUILD_LIBDEPS)\n";
+  printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
+  printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+
+  printf "insn-conditions-%s.md: s-condmd-%s; @true\n", key, key;
+  printf "s-condmd-%s: build/gencondmd-%s$(build_exeext)\n", key, key;
+  printf "\t$(RUN_GEN) build/gencondmd-%s$(build_exeext) > tmp-cond-%s.md\n", key, key;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-cond-%s.md \\\n", key;
+  printf "\t  insn-conditions-%s.md\n", key;
+  printf "\t$(STAMP) s-condmd-%s\n\n", key;
+
+  condfiles[cpu] = condfiles[cpu] " insn-conditions-" key ".md";
+  ntriples[cpu]++;
+}
+
+# One insn-conditions-<base>.md per back end, holding what all of that back
+# end's triples agree on.  A back end with a single configured triple still
+# goes through the merge: the script is the identity on one file, and having
+# one code path is worth more than skipping an awk run.
+function emit_condition_intersections(	c) {
+  for (c in condfiles) {
+    printf "insn-conditions-%s.md:%s $(srcdir)/intersect-conditions.awk\n",
+	   c, condfiles[c];
+    printf "\t$(AWK) -f $(srcdir)/intersect-conditions.awk%s \\\n", condfiles[c];
+    printf "\t  > tmp-cond-%s.md\n", c;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-cond-%s.md $@\n\n", c;
+    printf "# %s: merged from %d configured triple(s).\n\n", c, ntriples[c];
+  }
 }
 
 # The registry the selector includes: one declaration per back end plus a list
@@ -485,10 +496,14 @@ function emit_asm_ops_registry(	i, n, parts) {
   printf "target-asm-ops-select.o: multi-target-asm-ops.h\n\n";
 }
 
+$1 == "target"	  { trg = $2 }
 $1 == "cpu_type"  { cpu = $2 }
 $1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
+$1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
+$1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
-END		  { flush(); emit_asm_ops_registry() }
+END		  { flush(); emit_condition_intersections();
+		    emit_asm_ops_registry() }
