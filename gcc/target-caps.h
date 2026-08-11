@@ -102,6 +102,14 @@ struct target_caps
      original probes answered "no" for a cross build with no assembler to ask,
      which silently cost debug quality rather than failing.  */
 
+  /* The target linker mishandles `@secrel32' relocations, so thread-local
+     storage would be miscompiled (PR80881).  gcc/configure.ac used to detect
+     this inside the TLS probe and AC_MSG_ERROR out of the build; that probe is
+     gone, so target-specs asks the real linker and records the answer here.
+     Note the polarity: true means BROKEN, so the safe default is false --
+     a compiler that has not been told anything must not refuse to compile.  */
+  bool ld_broken_secrel32;
+
   /* Assembler accepts the AIX `.ref' pseudo-op, which creates a reference to
      a DWARF table label so a garbage-collecting link keeps the frame tables
      for function bodies it kept.  Was HAVE_AS_REF, probed only in the

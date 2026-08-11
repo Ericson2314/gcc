@@ -12727,6 +12727,23 @@ legitimize_tls_address (rtx x, enum tls_model model, bool for_mov)
   /* Windows implements a single form of TLS.  */
   if (TARGET_WIN32_TLS)
     {
+      /* A linker that mishandles @secrel32 relocations miscompiles TLS
+	 (PR80881).  gcc/configure.ac used to catch that during the TLS probe
+	 and abort the build; target-specs probes the real linker instead and
+	 records the answer, so refuse here rather than emit silently wrong
+	 code.  */
+      if (targ_caps.ld_broken_secrel32)
+	{
+	  static bool secrel32_reported = false;
+	  if (!secrel32_reported)
+	    {
+	      secrel32_reported = true;
+	      error ("the target linker mishandles %<@secrel32%> relocations, "
+		     "so thread-local storage would be miscompiled; see "
+		     "PR80881");
+	    }
+	}
+
       /* Load the 32-bit index.  */
       rtx ind = gen_const_mem (SImode, ix86_tls_index ());
       set_mem_alias_set (ind, GOT_ALIAS_SET);
