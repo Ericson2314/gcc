@@ -234,6 +234,21 @@ assemblers do not require anything to be output in this case.",
  void, (FILE *stream, const char *name, const_tree decl),
  hook_void_FILEptr_constcharptr_const_tree)
 
+/* Output any pseudo-op needed to declare an external symbol.  */
+DEFHOOK
+(output_external,
+ "This target hook is a function to output to the stdio stream @var{stream}\n\
+any text needed to declare the external symbol @var{name}, the assembler\n\
+name of @var{decl}, which is referenced but not defined in the current\n\
+translation unit.  Most assemblers need nothing here, which is why the\n\
+default does nothing.\n\
+\n\
+This hook is the replacement for the old @code{ASM_OUTPUT_EXTERNAL} target\n\
+macro; a back end that still defines that macro gets it bridged into this\n\
+hook automatically.",
+ void, (FILE *stream, tree decl, const char *name),
+ hook_void_FILEptr_tree_constcharptr)
+
 /* Output code that will emit a label for unwind info, if this
    target requires such labels.  Second argument is the decl the
    unwind info is associated with, third is a boolean: true if

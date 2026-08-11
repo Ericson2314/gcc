@@ -9313,7 +9313,23 @@ declaration.
 
 This macro need not be defined if it does not need to output anything.
 The GNU assembler and most Unix assemblers don't require anything.
+
+Defining this macro is equivalent to defining
+@code{TARGET_ASM_OUTPUT_EXTERNAL}; the macro is bridged into that hook
+automatically.
 @end defmac
+
+@deftypefn {Target Hook} void TARGET_ASM_OUTPUT_EXTERNAL (FILE *@var{stream}, tree @var{decl}, const char *@var{name})
+This target hook is a function to output to the stdio stream @var{stream}
+any text needed to declare the external symbol @var{name}, the assembler
+name of @var{decl}, which is referenced but not defined in the current
+translation unit.  Most assemblers need nothing here, which is why the
+default does nothing.
+
+This hook is the replacement for the old @code{ASM_OUTPUT_EXTERNAL} target
+macro; a back end that still defines that macro gets it bridged into this
+hook automatically.
+@end deftypefn
 
 @deftypefn {Target Hook} void TARGET_ASM_EXTERNAL_LIBCALL (rtx @var{symref})
 This target hook is a function to output to @var{asm_out_file} an assembler

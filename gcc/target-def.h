@@ -118,6 +118,24 @@
 #define TARGET_FUNCTION_INCOMING_ARG TARGET_FUNCTION_ARG
 #endif
 
+/* Carry the target's ASM_OUTPUT_EXTERNAL into
+   targetm.asm_out.output_external.  varasm.cc is compiled once for the whole
+   compiler, so it cannot read ASM_OUTPUT_EXTERNAL directly without baking one
+   target's answer into every target; targetm, by contrast, is instantiated per
+   back end.  This file is included only by the config/<cpu>/<cpu>.cc that
+   instantiates targetm, and after tm.h, so the macro already has its final
+   value (several OS headers, e.g. config/rx/linux.h, #undef and redefine it).  */
+#if defined (ASM_OUTPUT_EXTERNAL) && !defined (TARGET_ASM_OUTPUT_EXTERNAL)
+static void
+target_def_output_external (FILE *stream ATTRIBUTE_UNUSED,
+			    tree decl ATTRIBUTE_UNUSED,
+			    const char *name ATTRIBUTE_UNUSED)
+{
+  ASM_OUTPUT_EXTERNAL (stream, decl, name);
+}
+#define TARGET_ASM_OUTPUT_EXTERNAL target_def_output_external
+#endif
+
 /* Declare a target attribute table called NAME that only has GNU attributes.
    There should be no null trailing element.  E.g.:
 

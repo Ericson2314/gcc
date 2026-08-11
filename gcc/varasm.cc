@@ -106,9 +106,7 @@ static bool saw_no_split_stack;
 
 static const char *strip_reg_name (const char *);
 static bool contains_pointers_p (tree);
-#ifdef ASM_OUTPUT_EXTERNAL
 static bool incorporeal_function_p (tree);
-#endif
 static void decode_addr_const (tree, class addr_const *);
 static hashval_t const_hash_1 (const tree);
 static bool compare_constant (const tree, const tree);
@@ -2726,7 +2724,6 @@ static GTY(()) tree pending_assemble_externals;
    symbols that are actually used in the final assembly.  */
 static GTY(()) rtx pending_libcall_symbols;
 
-#ifdef ASM_OUTPUT_EXTERNAL
 /* Some targets delay some output to final using TARGET_ASM_FILE_END.
    As a result, assemble_external can be called after the list of externals
    is processed and the pointer set destroyed.  */
@@ -2760,7 +2757,7 @@ incorporeal_function_p (tree decl)
 }
 
 /* Actually do the tests to determine if this is necessary, and invoke
-   ASM_OUTPUT_EXTERNAL.  */
+   TARGET_ASM_OUTPUT_EXTERNAL.  */
 static void
 assemble_external_real (tree decl)
 {
@@ -2772,15 +2769,14 @@ assemble_external_real (tree decl)
     {
       /* Some systems do require some output.  */
       SYMBOL_REF_USED (XEXP (rtl, 0)) = 1;
-      ASM_OUTPUT_EXTERNAL (asm_out_file, decl, XSTR (XEXP (rtl, 0), 0));
+      targetm.asm_out.output_external (asm_out_file, decl,
+				       XSTR (XEXP (rtl, 0), 0));
     }
 }
-#endif
 
 void
 process_pending_assemble_externals (void)
 {
-#ifdef ASM_OUTPUT_EXTERNAL
   tree list;
   for (list = pending_assemble_externals; list; list = TREE_CHAIN (list))
     assemble_external_real (TREE_VALUE (list));
@@ -2799,7 +2795,6 @@ process_pending_assemble_externals (void)
   pending_libcall_symbols = NULL_RTX;
   delete pending_assemble_externals_set;
   pending_assemble_externals_set = nullptr;
-#endif
 }
 
 /* This TREE_LIST contains any weak symbol declarations waiting
@@ -2849,7 +2844,6 @@ assemble_external (tree decl ATTRIBUTE_UNUSED)
       && value_member (decl, weak_decls) == NULL_TREE)
     weak_decls = tree_cons (NULL, decl, weak_decls);
 
-#ifdef ASM_OUTPUT_EXTERNAL
   if (pending_assemble_externals_processed)
     {
       assemble_external_real (decl);
@@ -2859,7 +2853,6 @@ assemble_external (tree decl ATTRIBUTE_UNUSED)
   if (! pending_assemble_externals_set->add (decl))
     pending_assemble_externals = tree_cons (NULL, decl,
 					    pending_assemble_externals);
-#endif
 }
 
 /* Similar, for calling a library function FUN.  */
@@ -2870,9 +2863,7 @@ assemble_external_libcall (rtx fun)
   /* Declare library function name external when first used, if nec.  */
   if (! SYMBOL_REF_USED (fun))
     {
-#ifdef ASM_OUTPUT_EXTERNAL
       gcc_assert (!pending_assemble_externals_processed);
-#endif
       SYMBOL_REF_USED (fun) = 1;
       /* Make sure the libcall symbol is in the symtab so any
          reference to it will mark its tree node as referenced, via
@@ -7034,9 +7025,7 @@ init_varasm_once (void)
   if (readonly_data_section == NULL)
     readonly_data_section = text_section;
 
-#ifdef ASM_OUTPUT_EXTERNAL
   pending_assemble_externals_set = new hash_set<tree>;
-#endif
 }
 
 /* Determine whether SYMBOL is used in any optimized function.  */
@@ -9128,11 +9117,9 @@ varasm_cc_finalize ()
   pending_assemble_externals = NULL_TREE;
   pending_libcall_symbols = nullptr;
 
-#ifdef ASM_OUTPUT_EXTERNAL
   pending_assemble_externals_processed = false;
   delete pending_assemble_externals_set;
   pending_assemble_externals_set = nullptr;
-#endif
 
   weak_decls = NULL_TREE;
   initial_trampoline = nullptr;

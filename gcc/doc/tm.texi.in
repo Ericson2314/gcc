@@ -5862,7 +5862,13 @@ declaration.
 
 This macro need not be defined if it does not need to output anything.
 The GNU assembler and most Unix assemblers don't require anything.
+
+Defining this macro is equivalent to defining
+@code{TARGET_ASM_OUTPUT_EXTERNAL}; the macro is bridged into that hook
+automatically.
 @end defmac
+
+@hook TARGET_ASM_OUTPUT_EXTERNAL
 
 @hook TARGET_ASM_EXTERNAL_LIBCALL
 
