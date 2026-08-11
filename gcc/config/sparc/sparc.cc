@@ -522,16 +522,14 @@ struct processor_costs m8_costs = {
 
 static const struct processor_costs *sparc_costs = &cypress_costs;
 
-#ifdef HAVE_AS_RELAX_OPTION
 /* If 'as' and 'ld' are relaxing tail call insns into branch always, use
    "or %o7,%g0,X; call Y; or X,%g0,%o7" always, so that it can be optimized.
    With sethi/jmp, neither 'as' nor 'ld' has an easy way how to find out if
    somebody does not branch between the sethi and jmp.  */
-#define LEAF_SIBCALL_SLOT_RESERVED_P 1
-#else
-#define LEAF_SIBCALL_SLOT_RESERVED_P \
-  ((TARGET_ARCH64 && !TARGET_CM_MEDLOW) || flag_pic)
-#endif
+#define LEAF_SIBCALL_SLOT_RESERVED_P					\
+  (targ_caps.as_relax_option						\
+   ? 1									\
+   : ((TARGET_ARCH64 && !TARGET_CM_MEDLOW) || flag_pic))
 
 /* Vector, indexed by hard register number, which contains 1
    for a register that is allowable in a candidate for leaf
@@ -1890,10 +1888,11 @@ sparc_option_override (void)
     }
 
   target_flags &= ~cpu->disable;
+  /* The MASK_LEON/MASK_LEON3 clearing here was gated on !HAVE_AS_LEON, for an
+     assembler that could not assemble LEON insns.  AS_LEON_FLAG is a
+     compile-time constant now (see sparc.h), so the LEON cores are always
+     available and nothing is masked out.  */
   target_flags |= (cpu->enable
-#ifndef HAVE_AS_LEON
-		   & ~(MASK_LEON | MASK_LEON3)
-#endif
 		   & ~(target_flags_explicit & MASK_FEATURES)
 		   );
 

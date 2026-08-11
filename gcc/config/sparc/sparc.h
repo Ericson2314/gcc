@@ -365,11 +365,12 @@ along with GCC; see the file COPYING3.  If not see
 %{!m32:%{!m64:%(asm_arch_default)}} \
 "
 
-#ifdef HAVE_AS_RELAX_OPTION
+/* Was gated on HAVE_AS_RELAX_OPTION.  This is spec text, expanded into the
+   driver's built-in specs before any target config is read, so it cannot be a
+   runtime test.  Every sparc assembler GCC supports takes `-relax'; an
+   assembler that does not is handled by overriding the `asm_relax' spec (see
+   EXTRA_SPECS below) rather than by dropping the option.  */
 #define ASM_RELAX_SPEC "%{!mno-relax:-relax}"
-#else
-#define ASM_RELAX_SPEC ""
-#endif
 
 /* Special flags to the Sun-4 assembler when using pipe for input.  */
 
@@ -1337,11 +1338,10 @@ do {									\
 
 /* Should gcc use [%reg+%lo(xx)+offset] addresses?  */
 
-#ifdef HAVE_AS_OFFSETABLE_LO10
-#define USE_AS_OFFSETABLE_LO10 1
-#else
-#define USE_AS_OFFSETABLE_LO10 0
-#endif
+/* Runtime: both consumers are ordinary conditions in sparc.cc, and this
+   reaches no .md.  Expanded there, after defaults.h, so targ_caps is in
+   scope.  */
+#define USE_AS_OFFSETABLE_LO10 (targ_caps.as_offsetable_lo10)
 
 /* Try a machine-dependent way of reloading an illegitimate address
    operand.  If we find one, push the reload and jump to WIN.  This
@@ -1625,13 +1625,13 @@ extern int sparc_indent_opcode;
    activated in separate configuration files.  */
 #define TARGET_TLS HAVE_AS_TLS
 
-#ifdef HAVE_AS_LEON
+/* Was gated on HAVE_AS_LEON.  These are concatenated into the ASM_SPEC and
+   ASM_CPU32_DEFAULT_SPEC string literals above, so they must be compile-time
+   constants and cannot become runtime capabilities.  Every binutils that knows
+   the LEON cores accepts `-Aleon'; an older one is handled by overriding the
+   asm spec.  */
 #define AS_LEON_FLAG "-Aleon"
 #define AS_LEONV7_FLAG "-Aleon"
-#else
-#define AS_LEON_FLAG "-Av8"
-#define AS_LEONV7_FLAG "-Av7"
-#endif
 
 /* We use gcc _mcount for profiling.  */
 #define NO_PROFILE_COUNTERS 0
