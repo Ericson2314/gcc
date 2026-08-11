@@ -2405,11 +2405,6 @@ with it, as well as defining these macros.
 Define this if the machine has any stack-like registers.
 @end defmac
 
-@defmac STACK_REG_COVER_CLASS
-This is a cover class containing the stack registers.  Define this if
-the machine has any stack-like registers.
-@end defmac
-
 @defmac FIRST_STACK_REG
 The number of the first stack-like register.  This one is the top
 of the stack.
@@ -3506,6 +3501,9 @@ array covering the stack range that needs scrubbing before clearing it.
 Allocating the array tends to make scrubbing slower, but it enables the
 scrubbing to be safely implemented with a @code{memset} call, which
 could make up for the difference.
+
+This macro is consumed by libgcc (@file{libgcc/strub.c}), not by the
+compiler proper; it appears in no @file{gcc/} source file.
 @end defmac
 
 @defmac TARGET_STRUB_MAY_USE_MEMSET
@@ -3653,6 +3651,9 @@ This macro is called from @code{uw_update_context} in libgcc's
 for the abi and context in the @code{.unwabi} directive.  If the
 @code{.unwabi} directive can be handled, the register save addresses should
 be updated in @var{fs}.
+
+This macro is consumed by libgcc, not by the compiler proper; it appears
+in no @file{gcc/} source file.
 @end defmac
 
 @defmac TARGET_USES_WEAK_UNWIND_INFO
@@ -3916,6 +3917,9 @@ for backward compatibility in pre GCC 3.0 compiled code.
 
 If this macro is not defined, it defaults to
 @code{DWARF_FRAME_REGISTERS}.
+
+This macro is consumed by libgcc (@file{libgcc/unwind-dw2.c}), not by the
+compiler proper; it appears in no @file{gcc/} source file.
 @end defmac
 
 @defmac DWARF_REG_TO_UNWIND_COLUMN (@var{regno})
@@ -3968,6 +3972,10 @@ Define this macro if the target has pseudo DWARF registers whose
 values need to be computed lazily on demand by the unwinder (such as when
 referenced in a CFA expression).  The macro returns true if @var{regno}
 is such a register and stores its value in @samp{*@var{value}} if so.
+
+This macro is consumed by libgcc (@file{libgcc/unwind-dw2.c}, via the
+per-target @file{value-unwind.h}), not by the compiler proper; it appears
+in no @file{gcc/} source file.
 @end defmac
 
 @node Elimination
@@ -12680,7 +12688,7 @@ systems, this is used for Framework includes, which have semantics
 that are different from @option{-I}.
 @end deftypefn
 
-@defmac bool TARGET_USE_LOCAL_THUNK_ALIAS_P (tree @var{fndecl})
+@defmac TARGET_USE_LOCAL_THUNK_ALIAS_P (@var{fndecl})
 This target macro returns @code{true} if it is safe to use a local alias
 for a virtual function @var{fndecl} when constructing thunks,
 @code{false} otherwise.  By default, the macro returns @code{true} for all
