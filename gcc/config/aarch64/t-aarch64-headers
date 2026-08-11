@@ -1,0 +1,20 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_aarch64_headers_included
+t_aarch64_headers_included := 1
+
+# Headers generated from iterators.md.  Factored out of t-aarch64 so that a
+# multi-target build -- which includes no single target's tmake_file -- can
+# generate them too; see gen-multi-target-md.awk.  Without this the header
+# exists only as whatever a previous single-target build left behind, and
+# aarch64-builtins.cc is compiled against a stale copy without a diagnostic.
+
+aarch64-builtin-iterators.h: $(srcdir)/config/aarch64/geniterators.sh \
+	$(srcdir)/config/aarch64/iterators.md
+	$(SHELL) $(srcdir)/config/aarch64/geniterators.sh \
+		$(srcdir)/config/aarch64/iterators.md > \
+		aarch64-builtin-iterators.h
+generated_files += aarch64-builtin-iterators.h
+
+endif

@@ -32,8 +32,7 @@ s390-d.o: $(srcdir)/config/s390/s390-d.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-s390-gen-builtins.h: $(srcdir)/config/s390/s390-builtins.h
-	$(COMPILER) -E -P $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< > $@
+include $(srcdir)/config/s390/t-s390-headers
 
 # s390's sources have been converted to the 2-coefficient poly_int discipline:
 # they say known_lt/maybe_ne/to_constant () rather than relying on the

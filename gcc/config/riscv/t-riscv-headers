@@ -1,0 +1,32 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_riscv_headers_included
+t_riscv_headers_included := 1
+
+# riscv-vector-type-indexer.gen.def, which riscv-vector-builtins.def includes.
+# Factored out of t-riscv so that a multi-target build -- which includes no
+# single target's tmake_file -- can generate it too; see gen-multi-target-md.awk.
+#
+# The generator program comes with it.  Unlike the other splits this one is not
+# purely a rule move: without `genprog += rvv-type-indexer' there is no link
+# rule for build/genrvv-type-indexer, so the header rule below would have a
+# prerequisite nothing can build.  Adding to genprog only creates a build-time
+# program's link rule, which costs nothing in a build that never asks for it --
+# unlike EXTRA_HEADERS or EXTRA_GTYPE_DEPS, which change what gets installed or
+# scanned and are therefore left in t-riscv.
+
+build/genrvv-type-indexer.o: $(srcdir)/config/riscv/genrvv-type-indexer.cc $(BCONFIG_H) $(SYSTEM_H)	\
+  $(CORETYPES_H) $(GTM_H) errors.h $(GENSUPPORT_H)
+
+riscv-vector-type-indexer.gen.def: s-riscv-vector-type-indexer.gen.defs ; @true
+
+s-riscv-vector-type-indexer.gen.defs: build/genrvv-type-indexer$(build_exeext)
+	$(RUN_GEN) build/genrvv-type-indexer$(build_exeext) tmp-riscv-vector-type-indexer.gen.def
+	$(SHELL) $(srcdir)/../move-if-change tmp-riscv-vector-type-indexer.gen.def    riscv-vector-type-indexer.gen.def
+	$(STAMP) s-riscv-vector-type-indexer.gen.defs
+
+genprog += rvv-type-indexer
+generated_files += riscv-vector-type-indexer.gen.def
+
+endif

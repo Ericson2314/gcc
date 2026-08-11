@@ -38,7 +38,7 @@
 
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
-  tmk = "";
+  tmk = ""; tmkp = "";
 }
 
 # Has this back end been converted to the 2-coefficient poly_int discipline?
@@ -183,7 +183,32 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # unique across back ends, so nothing collides.
   if ((getline junk < (srcdir "/config/" cpu "/t-" cpu "-headers")) >= 0) {
     close(srcdir "/config/" cpu "/t-" cpu "-headers");
-    printf "include $(srcdir)/config/%s/t-%s-headers\n", cpu, cpu;
+    if (!((cpu "/t-" cpu "-headers") in seen_hdr_frag)) {
+      seen_hdr_frag[cpu "/t-" cpu "-headers"] = 1;
+      printf "include $(srcdir)/config/%s/t-%s-headers\n", cpu, cpu;
+    }
+  }
+
+  # ... and the same for any OTHER fragment this target uses.  Keying only on
+  # cpu_type is not enough: vms generates vms-crtlmap.h from config/vms/t-vms,
+  # but alpha-dec-vms has cpu_type `alpha', so a cpu-keyed include never
+  # reaches config/vms/t-vms-headers and the header has no rule at all.  OS and
+  # vendor fragments are as entitled to generate a header as cpu ones are.
+  #
+  # tmake_file_present is used rather than tmake_file because it is already
+  # filtered to the fragments that exist, and it is per target, so this walks
+  # every triple's list -- deduplicated here since several triples of one back
+  # end name the same fragments and a second `include' would give every rule a
+  # duplicate recipe.
+  n = split(tmkp, parts, " ");
+  for (i = 2; i <= n; i++) {
+    if ((getline junk < (srcdir "/config/" parts[i] "-headers")) >= 0) {
+      close(srcdir "/config/" parts[i] "-headers");
+      if (!((parts[i] "-headers") in seen_hdr_frag)) {
+	seen_hdr_frag[parts[i] "-headers"] = 1;
+	printf "include $(srcdir)/config/%s-headers\n", parts[i];
+      }
+    }
   }
 
   if (xmodes != "") {
@@ -750,6 +775,8 @@ BEGIN {
 
 $1 == "target"	  { trg = $2 }
 $1 == "tmake_file" { tmk = $0 }
+# Already filtered to the fragments that exist; see the t-<...>-headers loop.
+$1 == "tmake_file_present" { tmkp = $0 }
 $1 == "cpu_type"  { cpu = $2 }
 $1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }

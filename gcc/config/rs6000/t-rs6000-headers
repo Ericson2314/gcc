@@ -1,0 +1,53 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_rs6000_headers_included
+t_rs6000_headers_included := 1
+
+# rs6000-builtins.h and rs6000-vecdefines.h, which rs6000-internal.h and
+# altivec.h include, together with the rs6000-builtins.cc they are produced
+# alongside.  Factored out of t-rs6000 so that a multi-target build -- which
+# includes no single target's tmake_file -- can generate them too; see
+# gen-multi-target-md.awk.
+#
+# The generator program comes with them, because the header rule's only
+# prerequisite is that program.  What does NOT come with them:
+#
+#   EXTRA_GTYPE_DEPS += rs6000-builtins.h
+#   EXTRA_HEADERS    += rs6000-vecdefines.h
+#
+# Those are appends to variables gcc/Makefile.in consumes to decide what is
+# SCANNED and what is INSTALLED, and both are still driven by the primary
+# target.  Moving them would make a build that merely configures rs6000 install
+# a powerpc header, which is a different decision from giving the header a rule
+# -- and the wrong one to make silently.  They stay in t-rs6000.
+
+build/rs6000-gen-builtins.o: $(srcdir)/config/rs6000/rs6000-gen-builtins.cc
+build/rbtree.o: $(srcdir)/config/rs6000/rbtree.cc
+
+build/rs6000-gen-builtins$(build_exeext): build/rs6000-gen-builtins.o \
+					  build/rbtree.o $(BUILD_LIBDEPS)
+	$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
+	    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)
+
+# TODO: Whenever GNU make 4.3 is the minimum required, we should use
+# grouped targets on this:
+#    rs6000-builtins.cc rs6000-builtins.h rs6000-vecdefines.h &: <deps>
+#       <recipe>
+# For now, the header files depend on rs6000-builtins.cc, which avoids
+# races because the .c file is closed last in rs6000-gen-builtins.cc.
+rs6000-builtins.cc: build/rs6000-gen-builtins$(build_exeext) \
+		   $(srcdir)/config/rs6000/rs6000-builtins.def \
+		   $(srcdir)/config/rs6000/rs6000-overload.def
+	$(RUN_GEN) ./build/rs6000-gen-builtins$(build_exeext) \
+		$(srcdir)/config/rs6000/rs6000-builtins.def \
+		$(srcdir)/config/rs6000/rs6000-overload.def rs6000-builtins.h \
+		rs6000-builtins.cc rs6000-vecdefines.h
+
+rs6000-builtins.h: rs6000-builtins.cc
+
+rs6000-vecdefines.h: rs6000-builtins.cc
+
+generated_files += rs6000-builtins.cc rs6000-builtins.h rs6000-vecdefines.h
+
+endif

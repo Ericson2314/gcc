@@ -1,0 +1,22 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_i386_headers_included
+t_i386_headers_included := 1
+
+# i386-builtin-types.inc is included into i386-builtins.h.  Factored out of
+# t-i386 so that a multi-target build -- which includes no single target's
+# tmake_file -- can generate it too; see gen-multi-target-md.awk.  The rules
+# that say which i386 OBJECTS need it stay in t-i386: they are only meaningful
+# once those objects are built, whereas the header itself is needed by any
+# build that compiles i386 sources at all.
+
+i386-builtin-types.inc: s-i386-bt ; @true
+s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
+  $(srcdir)/config/i386/i386-builtin-types.def
+	$(AWK) -f $^ > tmp-bt.inc
+	$(SHELL) $(srcdir)/../move-if-change tmp-bt.inc i386-builtin-types.inc
+	$(STAMP) $@
+generated_files += i386-builtin-types.inc
+
+endif

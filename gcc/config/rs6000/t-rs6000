@@ -46,34 +46,11 @@ rs6000-builtin.o: $(srcdir)/config/rs6000/rs6000-builtin.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-build/rs6000-gen-builtins.o: $(srcdir)/config/rs6000/rs6000-gen-builtins.cc
-build/rbtree.o: $(srcdir)/config/rs6000/rbtree.cc
-
-build/rs6000-gen-builtins$(build_exeext): build/rs6000-gen-builtins.o \
-					  build/rbtree.o $(BUILD_LIBDEPS)
-	$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \
-	    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)
-
-# TODO: Whenever GNU make 4.3 is the minimum required, we should use
-# grouped targets on this:
-#    rs6000-builtins.cc rs6000-builtins.h rs6000-vecdefines.h &: <deps>
-#       <recipe>
-# For now, the header files depend on rs6000-builtins.cc, which avoids
-# races because the .c file is closed last in rs6000-gen-builtins.cc.
-rs6000-builtins.cc: build/rs6000-gen-builtins$(build_exeext) \
-		   $(srcdir)/config/rs6000/rs6000-builtins.def \
-		   $(srcdir)/config/rs6000/rs6000-overload.def
-	$(RUN_GEN) ./build/rs6000-gen-builtins$(build_exeext) \
-		$(srcdir)/config/rs6000/rs6000-builtins.def \
-		$(srcdir)/config/rs6000/rs6000-overload.def rs6000-builtins.h \
-		rs6000-builtins.cc rs6000-vecdefines.h
-
-rs6000-builtins.h: rs6000-builtins.cc
+include $(srcdir)/config/rs6000/t-rs6000-headers
 
 rs6000.o: rs6000-builtins.h
 
 EXTRA_HEADERS += rs6000-vecdefines.h
-rs6000-vecdefines.h: rs6000-builtins.cc
 
 rs6000-builtins.o: rs6000-builtins.cc
 	$(COMPILE) $<

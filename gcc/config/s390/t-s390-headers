@@ -1,0 +1,22 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_s390_headers_included
+t_s390_headers_included := 1
+
+# The preprocessed form of s390-builtins.h that s390's build-time builtin
+# tables are generated from.  Factored out of t-s390 so that a multi-target
+# build -- which includes no single target's tmake_file -- can generate it
+# too; see gen-multi-target-md.awk.
+#
+# EXTRA_GTYPE_DEPS is deliberately NOT moved here: it is an append to a
+# variable gcc/Makefile.in consumes for the gengtype pass, and that pass is
+# still driven by the primary target alone.  Moving it would change what a
+# build that merely CONFIGURES s390 scans, which is a different decision from
+# giving the header a rule.
+
+s390-gen-builtins.h: $(srcdir)/config/s390/s390-builtins.h
+	$(COMPILER) -E -P $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< > $@
+generated_files += s390-gen-builtins.h
+
+endif

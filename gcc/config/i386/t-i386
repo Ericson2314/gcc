@@ -77,12 +77,7 @@ i386-builtins.o: i386-builtin-types.inc
 i386-expand.o: i386-builtin-types.inc
 i386-features.o: i386-builtin-types.inc
 
-i386-builtin-types.inc: s-i386-bt ; @true
-s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
-  $(srcdir)/config/i386/i386-builtin-types.def
-	$(AWK) -f $^ > tmp-bt.inc
-	$(SHELL) $(srcdir)/../move-if-change tmp-bt.inc i386-builtin-types.inc
-	$(STAMP) $@
+include $(srcdir)/config/i386/t-i386-headers
 
 # i386's sources have been converted to the 2-coefficient poly_int
 # discipline: they say known_lt/maybe_ne/to_constant () rather than relying

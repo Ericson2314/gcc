@@ -1,0 +1,17 @@
+# Both a target's own tmake_file and the multi-target rules can pull this
+# in -- an --enable-targets=all build hosted on this target does both -- and
+# including it twice would give every rule below a duplicate recipe.
+ifndef t_vms_headers_included
+t_vms_headers_included := 1
+
+# The CRTL name map vms.cc includes.  Factored out of t-vms so that a
+# multi-target build -- which includes no single target's tmake_file -- can
+# generate it too; see gen-multi-target-md.awk.
+
+vms-crtlmap.h: $(srcdir)/config/vms/vms-crtlmap.map  \
+  $(srcdir)/config/vms/make-crtlmap.awk
+	$(AWK) -f $(srcdir)/config/vms/make-crtlmap.awk \
+	  $(srcdir)/config/vms/vms-crtlmap.map > $@
+generated_files += vms-crtlmap.h
+
+endif

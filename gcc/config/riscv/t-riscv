@@ -200,22 +200,12 @@ $(common_out_file): $(srcdir)/config/riscv/riscv-cores.def \
     $(srcdir)/config/riscv/riscv-protos.h \
     $(srcdir)/config/riscv/riscv-subset.h
 
-build/genrvv-type-indexer.o: $(srcdir)/config/riscv/genrvv-type-indexer.cc $(BCONFIG_H) $(SYSTEM_H)	\
-  $(CORETYPES_H) $(GTM_H) errors.h $(GENSUPPORT_H)
+include $(srcdir)/config/riscv/t-riscv-headers
 
 $(srcdir)/config/riscv/riscv-vector-builtins.def: riscv-vector-type-indexer.gen.def
 $(srcdir)/config/riscv/riscv-vector-builtins.h: $(srcdir)/config/riscv/riscv-vector-builtins.def
 $(srcdir)/config/riscv/sifive-vector-builtins-functions.def: riscv-vector-type-indexer.gen.def
 $(srcdir)/config/riscv/riscv-vector-builtins.h: $(srcdir)/config/riscv/sifive-vector-builtins-functions.def
-
-riscv-vector-type-indexer.gen.def: s-riscv-vector-type-indexer.gen.defs ; @true
-
-s-riscv-vector-type-indexer.gen.defs: build/genrvv-type-indexer$(build_exeext)
-	$(RUN_GEN) build/genrvv-type-indexer$(build_exeext) tmp-riscv-vector-type-indexer.gen.def
-	$(SHELL) $(srcdir)/../move-if-change tmp-riscv-vector-type-indexer.gen.def    riscv-vector-type-indexer.gen.def
-	$(STAMP) s-riscv-vector-type-indexer.gen.defs
-
-genprog += rvv-type-indexer
 
 RISCV_EXT_DEFS = \
   $(srcdir)/config/riscv/riscv-ext.def \
