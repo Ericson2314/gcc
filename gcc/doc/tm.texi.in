@@ -951,7 +951,12 @@ is needed.  In the last case, the extension is done by the target's
 
 You need not define this macro if the @code{ptr_mode}, @code{Pmode}
 and @code{word_mode} are all the same width.
+
+The middle end reads this macro through
+@code{TARGET_POINTERS_EXTEND_KIND} rather than directly.
 @end defmac
+
+@hook TARGET_POINTERS_EXTEND_KIND
 
 @defmac PROMOTE_MODE (@var{m}, @var{unsignedp}, @var{type})
 A macro to update @var{m} and @var{unsignedp} when an object whose type

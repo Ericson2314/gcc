@@ -2399,13 +2399,12 @@ emit_block_move_via_oriented_loop (rtx x, rtx y, rtx size,
       else
 	mode = xmode;
 
-#ifndef POINTERS_EXTEND_UNSIGNED
-      const int POINTERS_EXTEND_UNSIGNED = 1;
-#endif
-      x_addr = convert_modes (mode, GET_MODE (x_addr), x_addr,
-			      POINTERS_EXTEND_UNSIGNED);
-      y_addr = convert_modes (mode, GET_MODE (y_addr), y_addr,
-			      POINTERS_EXTEND_UNSIGNED);
+      /* An unset POINTERS_EXTEND_UNSIGNED used to stand in as 1 here.  */
+      ptr_extend_kind peu = targetm.pointers_extend_kind ();
+      const int peu_unsignedp
+	= peu == PTR_EXTEND_NONE ? 1 : ptr_extend_unsignedp (peu);
+      x_addr = convert_modes (mode, GET_MODE (x_addr), x_addr, peu_unsignedp);
+      y_addr = convert_modes (mode, GET_MODE (y_addr), y_addr, peu_unsignedp);
     }
 
   /* Test for overlap: if (x >= y || x + size <= y) goto upw_label.  */
@@ -10194,11 +10193,11 @@ expand_expr_real_2 (const_sepops ops, rtx target, machine_mode tmode,
 	       pointer invokes undefined behavior.  We truncate or extend the
 	       value as if we'd converted via integers, which handles 0 as
 	       required, and all others as the programmer likely expects.  */
-#ifndef POINTERS_EXTEND_UNSIGNED
-	    const int POINTERS_EXTEND_UNSIGNED = 1;
-#endif
-	    op0 = convert_modes (mode, TYPE_MODE (treeop0_type),
-				 op0, POINTERS_EXTEND_UNSIGNED);
+	    /* An unset POINTERS_EXTEND_UNSIGNED used to stand in as 1 here.  */
+	    ptr_extend_kind peu = targetm.pointers_extend_kind ();
+	    op0 = convert_modes (mode, TYPE_MODE (treeop0_type), op0,
+				 peu == PTR_EXTEND_NONE
+				 ? 1 : ptr_extend_unsignedp (peu));
 	  }
 	gcc_assert (op0);
 	return op0;

@@ -3596,14 +3596,12 @@ verify_gimple_assign_unary (gassign *stmt)
 	    || (POINTER_TYPE_P (rhs1_type)
 		&& INTEGRAL_TYPE_P (lhs_type)
 		&& (TYPE_PRECISION (rhs1_type) >= TYPE_PRECISION (lhs_type)
-#if defined(POINTERS_EXTEND_UNSIGNED)
-		    || (TYPE_MODE (rhs1_type) == ptr_mode
+		    || (targetm.pointers_extend_kind () != PTR_EXTEND_NONE
+			&& TYPE_MODE (rhs1_type) == ptr_mode
 			&& (TYPE_PRECISION (lhs_type)
 			      == BITS_PER_WORD /* word_mode */
 			    || (TYPE_PRECISION (lhs_type)
-				  == GET_MODE_PRECISION (Pmode))))
-#endif
-		   )))
+				  == GET_MODE_PRECISION (Pmode)))))))
 	  return false;
 
 	/* Allow conversion from integral to offset type and vice versa.  */

@@ -297,6 +297,17 @@ default_unwind_word_mode (void)
   return word_mode;
 }
 
+/* The default implementation of TARGET_POINTERS_EXTEND_KIND.  A target that
+   defines POINTERS_EXTEND_UNSIGNED gets an overriding definition from
+   target-def.h; everything else says nothing, which is a state of its own and
+   not a synonym for PTR_EXTEND_SIGN.  */
+
+enum ptr_extend_kind
+default_pointers_extend_kind (void)
+{
+  return PTR_EXTEND_NONE;
+}
+
 /* The default implementation of TARGET_SHIFT_TRUNCATION_MASK.  */
 
 unsigned HOST_WIDE_INT

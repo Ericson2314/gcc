@@ -1340,11 +1340,13 @@ sjlj_emit_dispatch_table (rtx_code_label *dispatch_label, int num_dispatch)
   mem = adjust_address (fc, unwind_word_mode, sjlj_fc_data_ofs);
   if (unwind_word_mode != ptr_mode)
     {
-#ifdef POINTERS_EXTEND_UNSIGNED
-      mem = convert_memory_address (ptr_mode, mem);
-#else
-      mem = convert_to_mode (ptr_mode, mem, 0);
-#endif
+      /* NB: the two arms differ in SIGN, not only in whether the conversion
+	 is done at all -- with no POINTERS_EXTEND_UNSIGNED this is a SIGNED
+	 conversion.  Preserved verbatim.  */
+      if (targetm.pointers_extend_kind () != PTR_EXTEND_NONE)
+	mem = convert_memory_address (ptr_mode, mem);
+      else
+	mem = convert_to_mode (ptr_mode, mem, 0);
     }
   exc_ptr_reg = force_reg (ptr_mode, mem);
 
@@ -2208,11 +2210,11 @@ expand_builtin_extract_return_addr (tree addr_tree)
   if (GET_MODE (addr) != Pmode
       && GET_MODE (addr) != VOIDmode)
     {
-#ifdef POINTERS_EXTEND_UNSIGNED
-      addr = convert_memory_address (Pmode, addr);
-#else
-      addr = convert_to_mode (Pmode, addr, 0);
-#endif
+      /* As above: the fallback is a SIGNED conversion.  */
+      if (targetm.pointers_extend_kind () != PTR_EXTEND_NONE)
+	addr = convert_memory_address (Pmode, addr);
+      else
+	addr = convert_to_mode (Pmode, addr, 0);
     }
 
   /* First mask out any unwanted bits.  */
@@ -2349,13 +2351,15 @@ expand_builtin_extend_pointer (tree addr_tree)
   rtx addr = expand_expr (addr_tree, NULL_RTX, ptr_mode, EXPAND_NORMAL);
   int extend;
 
-#ifdef POINTERS_EXTEND_UNSIGNED
-  extend = POINTERS_EXTEND_UNSIGNED;
-#else
-  /* The previous EH code did an unsigned extend by default, so we do this also
-     for consistency.  */
-  extend = 1;
-#endif
+  ptr_extend_kind peu = targetm.pointers_extend_kind ();
+  if (peu != PTR_EXTEND_NONE)
+    extend = ptr_extend_unsignedp (peu);
+  else
+    /* The previous EH code did an unsigned extend by default, so we do this
+       also for consistency.  (Note this contradicts the two sites above, which
+       fall back to a signed conversion.  Both behaviours are preserved as
+       they were.)  */
+    extend = 1;
 
   return convert_modes (targetm.unwind_word_mode (), ptr_mode, addr, extend);
 }

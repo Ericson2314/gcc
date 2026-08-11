@@ -2441,6 +2441,23 @@ The default is to use @code{word_mode}.",
  scalar_int_mode, (void),
  default_unwind_word_mode)
 
+/* Runtime form of the POINTERS_EXTEND_UNSIGNED target macro.  */
+DEFHOOK
+(pointers_extend_kind,
+ "Return how a value of @code{ptr_mode} is to be extended to @code{Pmode}\n\
+when the two modes differ.  This is the run-time form of the\n\
+@code{POINTERS_EXTEND_UNSIGNED} target macro, and the default definition\n\
+returns whatever that macro says: @code{PTR_EXTEND_ZERO} if it is positive,\n\
+@code{PTR_EXTEND_SIGN} if it is zero, @code{PTR_EXTEND_INSN} if it is\n\
+negative, and @code{PTR_EXTEND_NONE} if the target does not define it at\n\
+all.\n\
+\n\
+@code{PTR_EXTEND_NONE} is not the same as @code{PTR_EXTEND_SIGN}: it means\n\
+the target has made no statement, and the middle end then declines to\n\
+convert between the modes rather than choosing an extension.",
+ enum ptr_extend_kind, (void),
+ default_pointers_extend_kind)
+
 /* Given two decls, merge their attributes and return the result.  */
 DEFHOOK
 (merge_decl_attributes,

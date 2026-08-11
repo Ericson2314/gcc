@@ -2549,9 +2549,7 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
   machine_mode address_mode = GET_MODE (y);
   if (address_mode == VOIDmode)
     address_mode = targetm.addr_space.address_mode (as);
-#ifdef POINTERS_EXTEND_UNSIGNED
   machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
-#endif
 
   /* ??? How much offset does an offsettable BLKmode reference need?
      Clearly that depends on the situation in which it's being used.
@@ -2592,15 +2590,13 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
     z = gen_rtx_LO_SUM (address_mode, XEXP (y, 0),
 			plus_constant (address_mode, XEXP (y, 1),
 				       mode_sz - 1));
-#ifdef POINTERS_EXTEND_UNSIGNED
   /* Likewise for a ZERO_EXTEND from pointer_mode.  */
-  else if (POINTERS_EXTEND_UNSIGNED > 0
+  else if (targetm.pointers_extend_kind () == PTR_EXTEND_ZERO
 	   && GET_CODE (y) == ZERO_EXTEND
 	   && GET_MODE (XEXP (y, 0)) == pointer_mode)
     z = gen_rtx_ZERO_EXTEND (address_mode,
 			     plus_constant (pointer_mode, XEXP (y, 0),
 					    mode_sz - 1));
-#endif
   else
     z = plus_constant (address_mode, y, mode_sz - 1);
 

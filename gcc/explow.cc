@@ -298,10 +298,14 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
 				     bool in_const ATTRIBUTE_UNUSED,
 				     bool no_emit ATTRIBUTE_UNUSED)
 {
-#ifndef POINTERS_EXTEND_UNSIGNED
-  gcc_assert (GET_MODE (x) == to_mode || GET_MODE (x) == VOIDmode);
-  return x;
-#else /* defined(POINTERS_EXTEND_UNSIGNED) */
+  ptr_extend_kind peu = targetm.pointers_extend_kind ();
+
+  if (peu == PTR_EXTEND_NONE)
+    {
+      gcc_assert (GET_MODE (x) == to_mode || GET_MODE (x) == VOIDmode);
+      return x;
+    }
+
   scalar_int_mode pointer_mode, address_mode, from_mode;
   rtx temp;
   enum rtx_code code;
@@ -321,9 +325,9 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
     CASE_CONST_SCALAR_INT:
       if (GET_MODE_SIZE (to_mode) < GET_MODE_SIZE (from_mode))
 	code = TRUNCATE;
-      else if (POINTERS_EXTEND_UNSIGNED < 0)
+      else if (peu == PTR_EXTEND_INSN)
 	break;
-      else if (POINTERS_EXTEND_UNSIGNED > 0)
+      else if (peu == PTR_EXTEND_ZERO)
 	code = ZERO_EXTEND;
       else
 	code = SIGN_EXTEND;
@@ -370,11 +374,11 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
       if (GET_MODE_SIZE (to_mode) < GET_MODE_SIZE (from_mode)
 	  || (GET_CODE (x) == PLUS
 	      && CONST_INT_P (XEXP (x, 1))
-	      && ((in_const && POINTERS_EXTEND_UNSIGNED != 0)
+	      && ((in_const && peu != PTR_EXTEND_SIGN)
 		  || XEXP (x, 1) == convert_memory_address_addr_space_1
 				     (to_mode, XEXP (x, 1), as, in_const,
 				      no_emit)
-                  || POINTERS_EXTEND_UNSIGNED < 0)))
+                  || peu == PTR_EXTEND_INSN)))
 	{
 	  temp = convert_memory_address_addr_space_1 (to_mode, XEXP (x, 0),
 						      as, in_const, no_emit);
@@ -411,9 +415,7 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
   if (no_emit)
     return NULL_RTX;
 
-  return convert_modes (to_mode, from_mode,
-			x, POINTERS_EXTEND_UNSIGNED);
-#endif /* defined(POINTERS_EXTEND_UNSIGNED) */
+  return convert_modes (to_mode, from_mode, x, ptr_extend_unsignedp (peu));
 }
 
 /* Given X, a memory address in address space AS' pointer mode, convert it to
@@ -928,13 +930,19 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
       *punsignedp = unsignedp;
       return smode;
 
-#ifdef POINTERS_EXTEND_UNSIGNED
     case REFERENCE_TYPE:
     case POINTER_TYPE:
-      *punsignedp = POINTERS_EXTEND_UNSIGNED;
-      return targetm.addr_space.address_mode
-	       (TYPE_ADDR_SPACE (TREE_TYPE (type)));
-#endif
+      {
+	ptr_extend_kind peu = targetm.pointers_extend_kind ();
+	if (peu == PTR_EXTEND_NONE)
+	  /* The target says nothing about pointer extension, so pointer
+	     types are not promoted at all and *punsignedp is left alone --
+	     which is what the unset macro used to do here.  */
+	  return mode;
+	*punsignedp = ptr_extend_unsignedp (peu);
+	return targetm.addr_space.address_mode
+		 (TYPE_ADDR_SPACE (TREE_TYPE (type)));
+      }
 
     default:
       return mode;

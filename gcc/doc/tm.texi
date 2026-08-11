@@ -1015,7 +1015,24 @@ is needed.  In the last case, the extension is done by the target's
 
 You need not define this macro if the @code{ptr_mode}, @code{Pmode}
 and @code{word_mode} are all the same width.
+
+The middle end reads this macro through
+@code{TARGET_POINTERS_EXTEND_KIND} rather than directly.
 @end defmac
+
+@deftypefn {Target Hook} {enum ptr_extend_kind} TARGET_POINTERS_EXTEND_KIND (void)
+Return how a value of @code{ptr_mode} is to be extended to @code{Pmode}
+when the two modes differ.  This is the run-time form of the
+@code{POINTERS_EXTEND_UNSIGNED} target macro, and the default definition
+returns whatever that macro says: @code{PTR_EXTEND_ZERO} if it is positive,
+@code{PTR_EXTEND_SIGN} if it is zero, @code{PTR_EXTEND_INSN} if it is
+negative, and @code{PTR_EXTEND_NONE} if the target does not define it at
+all.
+
+@code{PTR_EXTEND_NONE} is not the same as @code{PTR_EXTEND_SIGN}: it means
+the target has made no statement, and the middle end then declines to
+convert between the modes rather than choosing an extension.
+@end deftypefn
 
 @defmac PROMOTE_MODE (@var{m}, @var{unsignedp}, @var{type})
 A macro to update @var{m} and @var{unsignedp} when an object whose type

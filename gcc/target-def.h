@@ -220,6 +220,31 @@ target_def_use_local_thunk_alias_p (tree decl ATTRIBUTE_UNUSED)
 #define TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P target_def_use_local_thunk_alias_p
 #endif
 
+/* Carry the target's POINTERS_EXTEND_UNSIGNED into
+   targetm.pointers_extend_kind.  The middle-end files that used to read the
+   macro (explow.cc, expr.cc, except.cc, emit-rtl.cc, ...) are compiled once for
+   the whole compiler, so they cannot read it directly without baking one back
+   end's answer into every target.
+
+   Note that the macro's *absence* is a fourth state, distinct from any of its
+   values, and is what PTR_EXTEND_NONE records.  Collapsing it onto
+   PTR_EXTEND_SIGN (value 0) or PTR_EXTEND_ZERO (value 1) would silently change
+   the extension sign on the ~32 targets that do not define the macro.
+
+   This bridge belongs here rather than in defaults.h: defaults.h is included at
+   the end of tm.h, i.e. *before* target-def.h, so a definition there would win
+   and this wrapper would never run.  Never have both.  */
+#if defined (POINTERS_EXTEND_UNSIGNED) && !defined (TARGET_POINTERS_EXTEND_KIND)
+static enum ptr_extend_kind
+target_def_pointers_extend_kind (void)
+{
+  return ((POINTERS_EXTEND_UNSIGNED) > 0 ? PTR_EXTEND_ZERO
+	  : (POINTERS_EXTEND_UNSIGNED) < 0 ? PTR_EXTEND_INSN
+	  : PTR_EXTEND_SIGN);
+}
+#define TARGET_POINTERS_EXTEND_KIND target_def_pointers_extend_kind
+#endif
+
 /* Declare a target attribute table called NAME that only has GNU attributes.
    There should be no null trailing element.  E.g.:
 

@@ -1704,12 +1704,11 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 	      & ~(GET_MODE_MASK (op_mode) >> 1)) == 0)
 	return SUBREG_REG (op);
 
-#if defined(POINTERS_EXTEND_UNSIGNED)
       /* As we do not know which address space the pointer is referring to,
 	 we can do this only if the target does not support different pointer
 	 or address modes depending on the address space.  */
       if (target_default_pointer_address_modes_p ()
-	  && ! POINTERS_EXTEND_UNSIGNED
+	  && targetm.pointers_extend_kind () == PTR_EXTEND_SIGN
 	  && mode == Pmode && GET_MODE (op) == ptr_mode
 	  && (CONSTANT_P (op)
 	      || (GET_CODE (op) == SUBREG
@@ -1725,7 +1724,6 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 	  if (temp)
 	    return temp;
 	}
-#endif
       break;
 
     case ZERO_EXTEND:
@@ -1900,12 +1898,11 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 				    gen_int_mode (mask, mode));
       }
 
-#if defined(POINTERS_EXTEND_UNSIGNED)
       /* As we do not know which address space the pointer is referring to,
 	 we can do this only if the target does not support different pointer
 	 or address modes depending on the address space.  */
       if (target_default_pointer_address_modes_p ()
-	  && POINTERS_EXTEND_UNSIGNED > 0
+	  && targetm.pointers_extend_kind () == PTR_EXTEND_ZERO
 	  && mode == Pmode && GET_MODE (op) == ptr_mode
 	  && (CONSTANT_P (op)
 	      || (GET_CODE (op) == SUBREG
@@ -1921,7 +1918,6 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
 	  if (temp)
 	    return temp;
 	}
-#endif
       break;
 
     case VEC_DUPLICATE:

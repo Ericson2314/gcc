@@ -16327,10 +16327,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
       if (is_a <scalar_int_mode> (mode, &int_mode)
 	  && is_a <scalar_int_mode> (GET_MODE (inner), &inner_mode)
 	  && (GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
-#ifdef POINTERS_EXTEND_UNSIGNED
-	      || (int_mode == Pmode && mem_mode != VOIDmode)
-#endif
-	     )
+	      || (targetm.pointers_extend_kind () != PTR_EXTEND_NONE
+		  && int_mode == Pmode && mem_mode != VOIDmode))
 	  && GET_MODE_SIZE (inner_mode) <= DWARF2_ADDR_SIZE)
 	{
 	  mem_loc_result = mem_loc_descriptor (inner,
@@ -16382,10 +16380,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	  || (GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE
 	      && rtl != arg_pointer_rtx
 	      && rtl != frame_pointer_rtx
-#ifdef POINTERS_EXTEND_UNSIGNED
-	      && (int_mode != Pmode || mem_mode == VOIDmode)
-#endif
-	      ))
+	      && (targetm.pointers_extend_kind () == PTR_EXTEND_NONE
+		  || int_mode != Pmode || mem_mode == VOIDmode)))
 	{
 	  dw_die_ref type_die;
 	  unsigned int debugger_regnum;
@@ -16557,10 +16553,8 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case UNSPEC:
       if (!is_a <scalar_int_mode> (mode, &int_mode)
 	  || (GET_MODE_SIZE (int_mode) > DWARF2_ADDR_SIZE
-#ifdef POINTERS_EXTEND_UNSIGNED
-	      && (int_mode != Pmode || mem_mode == VOIDmode)
-#endif
-	      ))
+	      && (targetm.pointers_extend_kind () == PTR_EXTEND_NONE
+		  || int_mode != Pmode || mem_mode == VOIDmode)))
 	break;
 
       if (GET_CODE (rtl) == UNSPEC)
@@ -16920,12 +16914,10 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case CONST_INT:
       if (!is_a <scalar_int_mode> (mode, &int_mode)
 	  || GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
-#ifdef POINTERS_EXTEND_UNSIGNED
-	  || (int_mode == Pmode
+	  || (targetm.pointers_extend_kind () != PTR_EXTEND_NONE
+	      && int_mode == Pmode
 	      && mem_mode != VOIDmode
-	      && trunc_int_for_mode (INTVAL (rtl), ptr_mode) == INTVAL (rtl))
-#endif
-	  )
+	      && trunc_int_for_mode (INTVAL (rtl), ptr_mode) == INTVAL (rtl)))
 	{
 	  mem_loc_result = int_loc_descriptor (INTVAL (rtl));
 	  break;

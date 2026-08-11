@@ -3478,11 +3478,9 @@ expand_builtin_strlen (tree exp, rtx target,
   rtx pat = expand_expr (src, src_reg, Pmode, EXPAND_NORMAL);
   if (pat != src_reg)
     {
-#ifdef POINTERS_EXTEND_UNSIGNED
-      if (GET_MODE (pat) != Pmode)
-	pat = convert_to_mode (Pmode, pat,
-			       POINTERS_EXTEND_UNSIGNED);
-#endif
+      ptr_extend_kind peu = targetm.pointers_extend_kind ();
+      if (peu != PTR_EXTEND_NONE && GET_MODE (pat) != Pmode)
+	pat = convert_to_mode (Pmode, pat, ptr_extend_unsignedp (peu));
       emit_move_insn (src_reg, pat);
     }
   pat = end_sequence ();
@@ -5481,11 +5479,16 @@ expand_builtin_frame_address (tree fndecl, tree exp)
 # define STACK_TOPS LT
 #endif
 
-#ifdef POINTERS_EXTEND_UNSIGNED
-# define STACK_UNSIGNED POINTERS_EXTEND_UNSIGNED
-#else
-# define STACK_UNSIGNED true
-#endif
+/* The `unsignedp' to use when converting the stack pointer to ptr_mode.
+   Historically this was POINTERS_EXTEND_UNSIGNED where the macro was defined,
+   and an unconditional `true' (i.e. unsigned) where it was not.  */
+
+static int
+stack_address_unsignedp ()
+{
+  ptr_extend_kind peu = targetm.pointers_extend_kind ();
+  return peu == PTR_EXTEND_NONE ? 1 : ptr_extend_unsignedp (peu);
+}
 
 /* Expand a call to builtin function __builtin_stack_address.  */
 
@@ -5493,7 +5496,7 @@ static rtx
 expand_builtin_stack_address ()
 {
   rtx ret = convert_to_mode (ptr_mode, copy_to_reg (stack_pointer_rtx),
-			     STACK_UNSIGNED);
+			     stack_address_unsignedp ());
 
 #ifdef STACK_ADDRESS_OFFSET
   /* Unbias the stack pointer, bringing it to the boundary between the
@@ -5620,7 +5623,8 @@ expand_builtin_strub_update (tree exp)
   rtx wmarkr = force_reg (ptr_mode, wmark);
 
   rtx_code_label *lab = gen_label_rtx ();
-  do_compare_rtx_and_jump (stktop, wmarkr, STACK_TOPS, STACK_UNSIGNED,
+  do_compare_rtx_and_jump (stktop, wmarkr, STACK_TOPS,
+			   stack_address_unsignedp (),
 			   ptr_mode, NULL_RTX, lab, NULL,
 			   profile_probability::very_likely ());
   emit_move_insn (wmark, stktop);
@@ -5644,7 +5648,8 @@ expand_builtin_strub_update (tree exp)
       wmark = expand_expr (wmtree, NULL_RTX, ptr_mode, EXPAND_MEMORY);
       wmarkr = force_reg (ptr_mode, wmark);
 
-      do_compare_rtx_and_jump (stktop, wmarkr, STACK_TOPS, STACK_UNSIGNED,
+      do_compare_rtx_and_jump (stktop, wmarkr, STACK_TOPS,
+			       stack_address_unsignedp (),
 			       ptr_mode, NULL_RTX, lab, NULL,
 			       profile_probability::very_likely ());
       emit_move_insn (wmark, stktop);
@@ -5703,7 +5708,7 @@ expand_builtin_strub_leave (tree exp)
   base = copy_to_reg (base);
 
   rtx_code_label *done = gen_label_rtx ();
-  do_compare_rtx_and_jump (base, end, LT, STACK_UNSIGNED,
+  do_compare_rtx_and_jump (base, end, LT, stack_address_unsignedp (),
 			   ptr_mode, NULL_RTX, done, NULL,
 			   profile_probability::very_likely ());
 
@@ -5743,7 +5748,7 @@ expand_builtin_strub_leave (tree exp)
       emit_move_insn (end, force_operand (decr, NULL_RTX));
       emit_move_insn (dstm, zero);
 #endif
-      do_compare_rtx_and_jump (base, end, LT, STACK_UNSIGNED,
+      do_compare_rtx_and_jump (base, end, LT, stack_address_unsignedp (),
 			       Pmode, NULL_RTX, NULL, loop,
 			       profile_probability::very_likely ());
     }

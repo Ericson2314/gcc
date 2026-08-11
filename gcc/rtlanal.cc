@@ -4871,19 +4871,21 @@ nonzero_bits1 (const_rtx x, scalar_int_mode mode, const_rtx known_x,
   switch (code)
     {
     case REG:
-#if defined(POINTERS_EXTEND_UNSIGNED)
       /* If pointers extend unsigned and this is a pointer in Pmode, say that
 	 all the bits above ptr_mode are known to be zero.  */
       /* As we do not know which address space the pointer is referring to,
 	 we can do this only if the target does not support different pointer
 	 or address modes depending on the address space.  */
-      if (target_default_pointer_address_modes_p ()
-	  && POINTERS_EXTEND_UNSIGNED
-	  && xmode == Pmode
-	  && REG_POINTER (x)
-	  && !targetm.have_ptr_extend ())
-	nonzero &= GET_MODE_MASK (ptr_mode);
-#endif
+      {
+	ptr_extend_kind peu = targetm.pointers_extend_kind ();
+	if (target_default_pointer_address_modes_p ()
+	    && peu != PTR_EXTEND_NONE
+	    && ptr_extend_unsignedp (peu)
+	    && xmode == Pmode
+	    && REG_POINTER (x)
+	    && !targetm.have_ptr_extend ())
+	  nonzero &= GET_MODE_MASK (ptr_mode);
+      }
 
       /* Include declared information about alignment of pointers.  */
       /* ??? We don't properly preserve REG_POINTER changes across
@@ -5426,18 +5428,17 @@ num_sign_bit_copies1 (const_rtx x, scalar_int_mode mode, const_rtx known_x,
     {
     case REG:
 
-#if defined(POINTERS_EXTEND_UNSIGNED)
       /* If pointers extend signed and this is a pointer in Pmode, say that
 	 all the bits above ptr_mode are known to be sign bit copies.  */
       /* As we do not know which address space the pointer is referring to,
 	 we can do this only if the target does not support different pointer
 	 or address modes depending on the address space.  */
       if (target_default_pointer_address_modes_p ()
-	  && ! POINTERS_EXTEND_UNSIGNED && xmode == Pmode
+	  && targetm.pointers_extend_kind () == PTR_EXTEND_SIGN
+	  && xmode == Pmode
 	  && mode == Pmode && REG_POINTER (x)
 	  && !targetm.have_ptr_extend ())
 	return GET_MODE_PRECISION (Pmode) - GET_MODE_PRECISION (ptr_mode) + 1;
-#endif
 
       {
 	unsigned int copies_for_hook = 1, copies = 1;

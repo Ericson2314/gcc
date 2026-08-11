@@ -4680,11 +4680,16 @@ static rtx
 convert_debug_memory_address (scalar_int_mode mode, rtx x,
 			      addr_space_t as)
 {
-#ifndef POINTERS_EXTEND_UNSIGNED
-  gcc_assert (mode == Pmode
-	      || mode == targetm.addr_space.address_mode (as));
-  gcc_assert (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode);
-#else
+  ptr_extend_kind peu = targetm.pointers_extend_kind ();
+
+  if (peu == PTR_EXTEND_NONE)
+    {
+      gcc_assert (mode == Pmode
+		  || mode == targetm.addr_space.address_mode (as));
+      gcc_assert (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode);
+      return x;
+    }
+
   rtx temp;
 
   gcc_assert (targetm.addr_space.valid_pointer_mode (mode, as));
@@ -4696,9 +4701,9 @@ convert_debug_memory_address (scalar_int_mode mode, rtx x,
   scalar_int_mode xmode = as_a <scalar_int_mode> (GET_MODE (x));
   if (GET_MODE_PRECISION (mode) < GET_MODE_PRECISION (xmode))
     x = lowpart_subreg (mode, x, xmode);
-  else if (POINTERS_EXTEND_UNSIGNED > 0)
+  else if (peu == PTR_EXTEND_ZERO)
     x = gen_rtx_ZERO_EXTEND (mode, x);
-  else if (!POINTERS_EXTEND_UNSIGNED)
+  else if (peu == PTR_EXTEND_SIGN)
     x = gen_rtx_SIGN_EXTEND (mode, x);
   else
     {
@@ -4742,7 +4747,6 @@ convert_debug_memory_address (scalar_int_mode mode, rtx x,
       /* Don't know how to express ptr_extend as operation in debug info.  */
       return NULL;
     }
-#endif /* POINTERS_EXTEND_UNSIGNED */
 
   return x;
 }

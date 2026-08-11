@@ -270,6 +270,38 @@ enum unwind_info_type
   UI_TARGET
 };
 
+/* How the target extends a ptr_mode value to Pmode, i.e. the runtime form
+   of the POINTERS_EXTEND_UNSIGNED target macro.  Presence and value are one
+   field on purpose: "the target says nothing" (PTR_EXTEND_NONE) is a distinct
+   state from "the target says sign-extend" (PTR_EXTEND_SIGN, the macro's 0),
+   and the two are not interchangeable -- see convert_memory_address_addr_space_1
+   and promote_mode, which behave differently for each.  */
+
+enum ptr_extend_kind
+{
+  /* Macro not defined: ptr_mode and Pmode are expected to agree, and the
+     conversions below are not performed at all.  */
+  PTR_EXTEND_NONE,
+  /* POINTERS_EXTEND_UNSIGNED == 0 (also spelled `false'): sign-extend.  */
+  PTR_EXTEND_SIGN,
+  /* POINTERS_EXTEND_UNSIGNED > 0: zero-extend.  */
+  PTR_EXTEND_ZERO,
+  /* POINTERS_EXTEND_UNSIGNED < 0: neither; the target has a ptr_extend
+     instruction that must be used instead.  */
+  PTR_EXTEND_INSN
+};
+
+/* The integer the POINTERS_EXTEND_UNSIGNED macro used to have, for the call
+   sites that pass it on as an `unsignedp' argument (convert_modes,
+   convert_to_mode, SUBREG_CHECK_PROMOTED_SIGN).  -1 is SRP_POINTER.
+   Not meaningful for PTR_EXTEND_NONE; such sites must test for that first.  */
+
+inline int
+ptr_extend_unsignedp (enum ptr_extend_kind kind)
+{
+  return kind == PTR_EXTEND_ZERO ? 1 : kind == PTR_EXTEND_INSN ? -1 : 0;
+}
+
 /* Callgraph node profile representation.  */
 enum node_frequency {
   /* This function most likely won't be executed at all.

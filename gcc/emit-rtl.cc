@@ -1336,16 +1336,18 @@ set_reg_attrs_from_value (rtx reg, rtx x)
 	 || GET_CODE (x) == TRUNCATE
 	 || (GET_CODE (x) == SUBREG && subreg_lowpart_p (x)))
     {
-#if defined(POINTERS_EXTEND_UNSIGNED)
-      if (((GET_CODE (x) == SIGN_EXTEND && POINTERS_EXTEND_UNSIGNED)
-	   || (GET_CODE (x) == ZERO_EXTEND && ! POINTERS_EXTEND_UNSIGNED)
-	   || (paradoxical_subreg_p (x)
-	       && ! (SUBREG_PROMOTED_VAR_P (x)
-		     && SUBREG_CHECK_PROMOTED_SIGN (x,
-						    POINTERS_EXTEND_UNSIGNED))))
-	  && !targetm.have_ptr_extend ())
-	can_be_reg_pointer = false;
-#endif
+      ptr_extend_kind peu = targetm.pointers_extend_kind ();
+      if (peu != PTR_EXTEND_NONE)
+	{
+	  int peu_unsignedp = ptr_extend_unsignedp (peu);
+	  if (((GET_CODE (x) == SIGN_EXTEND && peu_unsignedp)
+	       || (GET_CODE (x) == ZERO_EXTEND && ! peu_unsignedp)
+	       || (paradoxical_subreg_p (x)
+		   && ! (SUBREG_PROMOTED_VAR_P (x)
+			 && SUBREG_CHECK_PROMOTED_SIGN (x, peu_unsignedp))))
+	      && !targetm.have_ptr_extend ())
+	    can_be_reg_pointer = false;
+	}
       x = XEXP (x, 0);
     }
 
@@ -2384,10 +2386,8 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
   scalar_int_mode address_mode;
   class mem_attrs attrs (*get_mem_attrs (memref)), *defattrs;
   unsigned HOST_WIDE_INT max_align;
-#ifdef POINTERS_EXTEND_UNSIGNED
   scalar_int_mode pointer_mode
     = targetm.addr_space.pointer_mode (attrs.addrspace);
-#endif
 
   /* VOIDmode means no mode change for change_address_1.  */
   if (mode == VOIDmode)
@@ -2429,18 +2429,16 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
 	addr = gen_rtx_LO_SUM (address_mode, XEXP (addr, 0),
 			       plus_constant (address_mode,
 					      XEXP (addr, 1), offset));
-#ifdef POINTERS_EXTEND_UNSIGNED
       /* If MEMREF is a ZERO_EXTEND from pointer_mode and the offset is valid
 	 in that mode, we merge it into the ZERO_EXTEND.  We take advantage of
 	 the fact that pointers are not allowed to overflow.  */
-      else if (POINTERS_EXTEND_UNSIGNED > 0
+      else if (targetm.pointers_extend_kind () == PTR_EXTEND_ZERO
 	       && GET_CODE (addr) == ZERO_EXTEND
 	       && GET_MODE (XEXP (addr, 0)) == pointer_mode
 	       && known_eq (trunc_int_for_mode (offset, pointer_mode), offset))
 	addr = gen_rtx_ZERO_EXTEND (address_mode,
 				    plus_constant (pointer_mode,
 						   XEXP (addr, 0), offset));
-#endif
       else
 	addr = plus_constant (address_mode, addr, offset);
     }
