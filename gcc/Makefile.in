@@ -594,6 +594,16 @@ BUILD_SYSTEM_HEADER_DIR = `echo @BUILD_SYSTEM_HEADER_DIR@ | sed -e :a -e 's,[^/]
 # machine whose fixincludes fixes apply to them.  Not the compiler's target:
 # gcc/ has none, and this was never a question about the compiler.  See
 # configure.ac.  Empty is a hard error, never a default -- see stmp-fixinc.
+#
+# FIXME: taking this from gcc's $host is correct for a native build and refuses
+# rather than guesses for --with-build-sysroot, but it is still gcc answering a
+# question that is not gcc's.  These headers are the ones the *target library*
+# will be compiled against, and what gcc calls the target is what libgcc calls
+# its host.  The answer should come from libgcc's own configure, along with the
+# other facts libgcc currently borrows from gcc's auto-host.h through
+# tconfig.h -- HAVE_GAS_HIDDEN, HAVE_SYS_SDT_H, TARGET_DL_ITERATE_PHDR, and the
+# whole GCC_TARGET_TEMPLATE list.  Do not "fix" this by putting back
+# target=@target@; that is the privileged target this project removed.
 FIXINCLUDES_MACHINE = @fixincludes_machine@
 
 # Control whether to run fixincludes.
