@@ -63,13 +63,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    target headers can compose spec strings.  A default for one consumer had
    quietly become the answer for another.
 
-   What remains, and why this include cannot go yet: DEFAULT_USE_CXA_ATEXIT
-   below.  That is a gcc CONFIGURATION CHOICE (--enable-__cxa_atexit) rather
-   than a fact about a machine, so moving it is a decision about who owns the
-   choice, not a re-probe -- and getting it wrong changes what this file
-   registers at startup.  The five #undef lines under this include are the
-   damage from reading the wrong file: auto-host.h's host typedefs land in a
-   target compile and have to be swept back out.  */
+   DEFAULT_USE_CXA_ATEXIT has now gone the same way: this file asks
+   LIBGCC_USE_CXA_ATEXIT, which libgcc/configure probes against the C library
+   these objects will be linked with, falling back to a declared value (and
+   recording that it did) for the bootstrap case where there is no C library
+   yet to ask.
+
+   So nothing this file reads comes from auto-host.h any more, and the include
+   and the five #undef lines below -- which sweep out the host typedefs that
+   arrive through it, the damage from reading the wrong file -- are next.  */
 #include "auto-host.h"
 #undef caddr_t
 #undef pid_t
@@ -346,7 +348,7 @@ register_tm_clones (void)
 
 #ifdef OBJECT_FORMAT_ELF
 
-#if DEFAULT_USE_CXA_ATEXIT
+#if LIBGCC_USE_CXA_ATEXIT
 /* Declare the __dso_handle variable.  It should have a unique value
    in every shared-object; in a main program its value is zero.  The
    object should in any case be protected.  This means the instance
@@ -366,7 +368,7 @@ void *__dso_handle = &__dso_handle;
 #else
 void *__dso_handle = 0;
 #endif
-#endif /* DEFAULT_USE_CXA_ATEXIT */
+#endif /* LIBGCC_USE_CXA_ATEXIT */
 
 /* The __cxa_finalize function may not be available so we use only a
    weak declaration.  */
@@ -403,7 +405,7 @@ __do_global_dtors_aux (void)
   if (__builtin_expect (completed, 0))
     return;
 
-#if DEFAULT_USE_CXA_ATEXIT
+#if LIBGCC_USE_CXA_ATEXIT
 #ifdef CRTSTUFFS_O
   if (__cxa_finalize)
     __cxa_finalize (__dso_handle);

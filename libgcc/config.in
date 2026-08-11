@@ -77,9 +77,20 @@
 /* Define to 1 if __getauxval is available. */
 #undef HAVE___GETAUXVAL
 
+/* Where LIBGCC_USE_CXA_ATEXIT came from: "probed" (the C library was asked),
+   "declared" (--enable/--disable-__cxa_atexit), or "unavailable" (no C
+   library to ask and nothing declared, so the conservative 0 was used). */
+#undef LIBGCC_CXA_ATEXIT_PROVENANCE
+
 /* Define to 1 if the linker produces a PT_GNU_EH_FRAME segment, 0 if not.
    Always given a value: a bare #undef would let gcc's tm.h supply 1. */
 #undef LIBGCC_HAVE_LD_EH_FRAME_HDR
+
+/* Define to 1 if __cxa_atexit is to be used to register destructors, 0 if
+   not. Always given a value: a bare #undef would let gcc's defaults.h supply
+   0, so "nobody could answer" would be recorded as "this target does not have
+   it". */
+#undef LIBGCC_USE_CXA_ATEXIT
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT

@@ -713,6 +713,7 @@ enable_maintainer_mode
 with_build_libsubdir
 enable_gcov
 enable_largefile
+enable___cxa_atexit
 enable_decimal_float
 with_system_libunwind
 enable_cet
@@ -1353,6 +1354,9 @@ Optional Features:
                           sometimes confusing) to the casual installer
   --disable-gcov          don't provide libgcov and related host tools
   --disable-largefile     omit support for large files
+  --enable-__cxa_atexit   declare whether __cxa_atexit is available, for when
+                          there is no C library to probe (a from-scratch
+                          bootstrap builds libgcc first)
   --enable-decimal-float={no,yes,bid,dpd}
 			enable decimal float extension to C.  Selecting 'bid'
 			or 'dpd' choses which decimal floating point format
@@ -4912,6 +4916,77 @@ cat >>confdefs.h <<_ACEOF
 #define LIBGCC_HAVE_LD_EH_FRAME_HDR $libgcc_eh_frame_hdr
 _ACEOF
 
+
+# Check whether --enable-__cxa_atexit was given.
+if test "${enable___cxa_atexit+set}" = set; then :
+  enableval=$enable___cxa_atexit;
+else
+  enable___cxa_atexit=
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the C library provides __cxa_atexit" >&5
+$as_echo_n "checking whether the C library provides __cxa_atexit... " >&6; }
+if ${libgcc_cv_cxa_atexit+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_cxa_atexit=unavailable
+  libgcc_cxa_link="$CC $CFLAGS $CPPFLAGS $LDFLAGS -nostdlib -nostartfiles"
+  cat > conftest.c <<'_LIBGCC_EOF'
+void _start (void) { }
+_LIBGCC_EOF
+  if $libgcc_cxa_link conftest.c -lc -o conftest$ac_exeext \
+       >&5 2>&1; then
+    cat > conftest.c <<'_LIBGCC_EOF'
+extern int __cxa_atexit (void (*) (void *), void *, void *);
+void _start (void) { __cxa_atexit (0, 0, 0); }
+_LIBGCC_EOF
+    if $libgcc_cxa_link conftest.c -lc -o conftest$ac_exeext \
+	 >&5 2>&1; then
+      libgcc_cv_cxa_atexit=yes
+    else
+      libgcc_cv_cxa_atexit=no
+    fi
+  fi
+  rm -f conftest.c conftest$ac_exeext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_cxa_atexit" >&5
+$as_echo "$libgcc_cv_cxa_atexit" >&6; }
+
+if test x$enable___cxa_atexit = xno; then
+      libgcc_use_cxa_atexit=0
+  libgcc_cxa_atexit_provenance=declared
+else
+  case $libgcc_cv_cxa_atexit in
+    yes)
+      libgcc_use_cxa_atexit=1
+      libgcc_cxa_atexit_provenance=probed ;;
+    no)
+      libgcc_use_cxa_atexit=0
+      libgcc_cxa_atexit_provenance=probed ;;
+    *)
+      if test x$enable___cxa_atexit = xyes; then
+	libgcc_use_cxa_atexit=1
+	libgcc_cxa_atexit_provenance=declared
+      else
+	libgcc_use_cxa_atexit=0
+	libgcc_cxa_atexit_provenance=unavailable
+      fi ;;
+  esac
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define LIBGCC_USE_CXA_ATEXIT $libgcc_use_cxa_atexit
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define LIBGCC_CXA_ATEXIT_PROVENANCE "$libgcc_cxa_atexit_provenance"
+_ACEOF
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: __cxa_atexit: LIBGCC_USE_CXA_ATEXIT=$libgcc_use_cxa_atexit (provenance: $libgcc_cxa_atexit_provenance)" >&5
+$as_echo "$as_me: __cxa_atexit: LIBGCC_USE_CXA_ATEXIT=$libgcc_use_cxa_atexit (provenance: $libgcc_cxa_atexit_provenance)" >&6;}
 
 # Check for decimal float support.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether decimal floating point is supported" >&5

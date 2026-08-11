@@ -397,6 +397,109 @@ AC_DEFINE_UNQUOTED(LIBGCC_HAVE_LD_EH_FRAME_HDR, [$libgcc_eh_frame_hdr],
   [Define to 1 if the linker produces a PT_GNU_EH_FRAME segment, 0 if not.
    Always given a value: a bare #undef would let gcc's tm.h supply 1.])
 
+dnl Does the C library these objects will be linked against provide
+dnl __cxa_atexit?  crtstuff.c uses the answer to decide whether it defines
+dnl __dso_handle and calls __cxa_finalize from the startup files -- what runs
+dnl at program startup and shutdown, compiled permanently into crtbegin.o.
+dnl
+dnl Until now it read gcc's DEFAULT_USE_CXA_ATEXIT out of auto-host.h, which is
+dnl gcc's answer for the machine the COMPILER runs on, and which for every cross
+dnl build is not a probe at all: gcc/configure.ac says in as many words that it
+dnl cannot check when building a cross and assumes it is available.
+dnl
+dnl THREE OUTCOMES, NOT TWO, and the third is why this is not a plain probe.
+dnl A from-scratch toolchain builds libgcc BEFORE it has a C library, so the
+dnl question often cannot be asked at all.  An ordinary AC_DEFINE emits nothing
+dnl in that case, gcc/defaults.h:1035 floors the macro to 0, and libgcc would
+dnl record "this target has no __cxa_atexit" because nobody was there to answer.
+dnl That is the same trap as LIBGCC_HAVE_LD_EH_FRAME_HDR above with the floor
+dnl the other way up: there the floor promoted no to yes, here it converts
+dnl unknown to no.  Same rule both times -- never let the absence of an answer
+dnl BE an answer.  So the macro is ours, always valued, and carries its
+dnl PROVENANCE, which is also printed by configure: two sources for one answer
+dnl are only dangerous when they can disagree SILENTLY.
+dnl
+dnl The probe is a LINK, because the question is whether the symbol exists, not
+dnl whether a header declares it -- __cxa_atexit is a C++ ABI entry point and is
+dnl not reliably declared in <stdlib.h>, so a declaration test would report a
+dnl present symbol as absent.  The test declares the function itself.
+dnl GCC_NO_EXECUTABLES makes AC_LINK_IFELSE an m4 error, so the link is run by
+dnl hand, and a control link runs FIRST: if that fails there is no usable C
+dnl library and the probe reports unavailable rather than no.
+dnl
+dnl `-nostdlib -nostartfiles ... -lc' AND ITS OWN `_start' ARE THE WHOLE TRICK,
+dnl and were arrived at by the probe failing first.  An ordinary link here is
+dnl NOT a probe that sometimes cannot answer -- it can NEVER answer: libgcc's
+dnl configure runs before libgcc is built, so the driver's own link spec asks
+dnl for crtbegin.o and libgcc.a, which this very directory has not produced yet.
+dnl Measured, on a perfectly ordinary native glibc build:
+dnl   ld: cannot find crtbegin.o -> control fails -> "unavailable" -> 0
+dnl A green build, a plausible provenance, and the answer taken from nobody.
+dnl Dropping the start files and asking for -lc alone removes gcc's own
+dnl not-yet-built artefacts from the question and leaves exactly the question
+dnl asked: does the C LIBRARY resolve this symbol.  If -lc itself cannot be
+dnl linked there is no C library, which is the real "unavailable".
+AC_ARG_ENABLE([__cxa_atexit],
+  [AS_HELP_STRING([--enable-__cxa_atexit],
+    [declare whether __cxa_atexit is available, for when there is no C library
+     to probe (a from-scratch bootstrap builds libgcc first)])],
+  [], [enable___cxa_atexit=])
+
+AC_CACHE_CHECK([whether the C library provides __cxa_atexit],
+	       [libgcc_cv_cxa_atexit], [
+  libgcc_cv_cxa_atexit=unavailable
+  libgcc_cxa_link="$CC $CFLAGS $CPPFLAGS $LDFLAGS -nostdlib -nostartfiles"
+  cat > conftest.c <<'_LIBGCC_EOF'
+void _start (void) { }
+_LIBGCC_EOF
+  if $libgcc_cxa_link conftest.c -lc -o conftest$ac_exeext \
+       >&AS_MESSAGE_LOG_FD 2>&1; then
+    cat > conftest.c <<'_LIBGCC_EOF'
+extern int __cxa_atexit (void (*) (void *), void *, void *);
+void _start (void) { __cxa_atexit (0, 0, 0); }
+_LIBGCC_EOF
+    if $libgcc_cxa_link conftest.c -lc -o conftest$ac_exeext \
+	 >&AS_MESSAGE_LOG_FD 2>&1; then
+      libgcc_cv_cxa_atexit=yes
+    else
+      libgcc_cv_cxa_atexit=no
+    fi
+  fi
+  rm -f conftest.c conftest$ac_exeext])
+
+if test x$enable___cxa_atexit = xno; then
+  dnl An explicit choice outranks a measurement: --disable- means do not use it
+  dnl even where it exists, which is what gcc has always meant by the flag.
+  libgcc_use_cxa_atexit=0
+  libgcc_cxa_atexit_provenance=declared
+else
+  case $libgcc_cv_cxa_atexit in
+    yes)
+      libgcc_use_cxa_atexit=1
+      libgcc_cxa_atexit_provenance=probed ;;
+    no)
+      libgcc_use_cxa_atexit=0
+      libgcc_cxa_atexit_provenance=probed ;;
+    *)
+      if test x$enable___cxa_atexit = xyes; then
+	libgcc_use_cxa_atexit=1
+	libgcc_cxa_atexit_provenance=declared
+      else
+	libgcc_use_cxa_atexit=0
+	libgcc_cxa_atexit_provenance=unavailable
+      fi ;;
+  esac
+fi
+AC_DEFINE_UNQUOTED(LIBGCC_USE_CXA_ATEXIT, [$libgcc_use_cxa_atexit],
+  [Define to 1 if __cxa_atexit is to be used to register destructors, 0 if not.
+   Always given a value: a bare #undef would let gcc's defaults.h supply 0, so
+   "nobody could answer" would be recorded as "this target does not have it".])
+AC_DEFINE_UNQUOTED(LIBGCC_CXA_ATEXIT_PROVENANCE, ["$libgcc_cxa_atexit_provenance"],
+  [Where LIBGCC_USE_CXA_ATEXIT came from: "probed" (the C library was asked),
+   "declared" (--enable/--disable-__cxa_atexit), or "unavailable" (no C library
+   to ask and nothing declared, so the conservative 0 was used).])
+AC_MSG_NOTICE([__cxa_atexit: LIBGCC_USE_CXA_ATEXIT=$libgcc_use_cxa_atexit (provenance: $libgcc_cxa_atexit_provenance)])
+
 # Check for decimal float support.
 AC_CACHE_CHECK([whether decimal floating point is supported], [libgcc_cv_dfp],
 	       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
