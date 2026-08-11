@@ -10454,16 +10454,29 @@ This will suppress generation of the normal debug frame unwind information.
 @end deftypefn
 
 @defmac DWARF2_ASM_LINE_DEBUG_INFO
-Define this macro to be a nonzero value if the assembler can generate Dwarf 2
-line debug info sections.  This will result in much more compact line number
-tables, and hence is desirable if it works.
+Nonzero if the assembler can generate Dwarf 2 line debug info sections.
+This results in much more compact line number tables, and hence is
+desirable if it works.
+
+This is not a compile-time constant.  Unless a target header overrides it,
+it expands to a runtime query of the assembler capability that
+@file{target-specs/configure} probed and recorded in the target
+configuration file, which the driver passes to @command{cc1} as
+@option{-ftarget-config=}.  A target header may still define it, either to a
+constant or --- as @file{config/ia64/ia64.h} and @file{config/frv/frv.h} do
+--- to an expression evaluated at run time.  Because it need not be a
+constant, it must be tested with an ordinary @code{if} and never with
+@code{#if}.
 @end defmac
 
 @defmac DWARF2_ASM_VIEW_DEBUG_INFO
-Define this macro to be a nonzero value if the assembler supports view
-assignment and verification in @code{.loc}.  If it does not, but the
-user enables location views, the compiler may have to fallback to
-internal line number tables.
+Nonzero if the assembler supports view assignment and verification in
+@code{.loc}.  If it does not, but the user enables location views, the
+compiler may have to fall back to internal line number tables.
+
+Like @code{DWARF2_ASM_LINE_DEBUG_INFO}, this defaults to a runtime query of
+a probed assembler capability rather than a compile-time constant, and must
+be tested with an ordinary @code{if}.
 @end defmac
 
 @deftypefn {Target Hook} int TARGET_RESET_LOCATION_VIEW (rtx_insn *@var{})

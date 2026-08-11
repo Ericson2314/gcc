@@ -72,6 +72,36 @@ AC_ARG_WITH([ld],
   [AS_HELP_STRING([--with-ld=PATH], [linker to probe (default: TARGET-ld, or ld if native)])],
   [gcc_cv_ld=$withval], [gcc_cv_ld=$ts_default_ld])
 
+dnl objdump and readelf.  Several probes below inspect the object a test
+dnl assembly produced rather than trusting the assembler exit status -- some
+dnl assemblers accept a directive and then encode it wrongly.  These were
+dnl referenced but never set, so every probe that consults them silently took
+dnl its "no tool, assume the worst" branch.
+if test "$target" = "$host"; then
+  ts_default_objdump=objdump
+  ts_default_readelf=readelf
+  command -v ${target}-objdump > /dev/null 2>&1 && ts_default_objdump=${target}-objdump
+  command -v ${target}-readelf > /dev/null 2>&1 && ts_default_readelf=${target}-readelf
+else
+  ts_default_objdump=${target}-objdump
+  ts_default_readelf=${target}-readelf
+fi
+
+AC_ARG_WITH([objdump],
+  [AS_HELP_STRING([--with-objdump=PATH], [objdump to inspect probe output with])],
+  [gcc_cv_objdump=$withval], [gcc_cv_objdump=$ts_default_objdump])
+command -v "$gcc_cv_objdump" > /dev/null 2>&1 || gcc_cv_objdump=
+
+AC_ARG_WITH([readelf],
+  [AS_HELP_STRING([--with-readelf=PATH], [readelf to inspect probe output with])],
+  [gcc_cv_readelf=$withval], [gcc_cv_readelf=$ts_default_readelf])
+command -v "$gcc_cv_readelf" > /dev/null 2>&1 || gcc_cv_readelf=
+
+AC_MSG_CHECKING([for objdump])
+AC_MSG_RESULT([${gcc_cv_objdump:-not found}])
+AC_MSG_CHECKING([for readelf])
+AC_MSG_RESULT([${gcc_cv_readelf:-not found}])
+
 dnl This target's CPU/ABI defaults.  gcc/configure used to freeze one target's
 dnl answers into configure_default_options[[]] and pair them with that target's
 dnl OPTION_DEFAULT_SPECS templates inside the driver; here they are ordinary
@@ -102,6 +132,58 @@ AC_ARG_WITH([decimal-bid-format],
   [AS_HELP_STRING([--with-decimal-bid-format=0|1],
      [target ABI encodes decimal float as BID rather than DPD])],
   [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=0])
+dnl The target's GNU C Library version.  gcc/configure used to grep __GLIBC__
+dnl out of the target sysroot's features.h; this step is the right place to ask,
+dnl because it runs per target after the build and whoever runs it knows what
+dnl the target actually is.  Unset means unknown (0.0), which is what a cross
+dnl build with no target headers has always recorded, and every consumer treats
+dnl unknown as "assume nothing newer".
+AC_ARG_WITH([glibc-version],
+  [AS_HELP_STRING([--with-glibc-version=M.N],
+     [target runs glibc version M.N or later])],
+  [spec_glibc_version=$withval], [spec_glibc_version=])
+spec_glibc_major=0
+spec_glibc_minor=0
+if test x"$spec_glibc_version" != x; then
+  if echo "$spec_glibc_version" | grep '^[[0-9]][[0-9]]*\.[[0-9]][[0-9]]*$' > /dev/null; then
+    spec_glibc_major=`echo "$spec_glibc_version" | sed -e 's/\..*//'`
+    spec_glibc_minor=`echo "$spec_glibc_version" | sed -e 's/.*\.//'`
+  else
+    AC_MSG_ERROR([--with-glibc-version requires a version number M.N])
+  fi
+fi
+
+dnl Two libc facts that combine the triple with that version.  Worked out here
+dnl rather than in gcc/config.gcc because config.gcc knows the triple but has no
+dnl way to learn the glibc version, and cc1 knows neither.
+ts_glibc_at_least () {
+  # $1 major, $2 minor
+  if test "$spec_glibc_major" -gt "$1"; then
+    return 0
+  fi
+  if test "$spec_glibc_major" -eq "$1" && test "$spec_glibc_minor" -ge "$2"; then
+    return 0
+  fi
+  return 1
+}
+
+spec_libc_hwcap_in_tcb=0
+case ${target} in
+  powerpc*-*-linux*)
+    if ts_glibc_at_least 2 23; then spec_libc_hwcap_in_tcb=1; fi
+    ;;
+esac
+
+spec_libc_gnustack=0
+case ${target} in
+  mips*-*-linux-musl*)
+    spec_libc_gnustack=1
+    ;;
+  mips*-*-linux*)
+    if ts_glibc_at_least 2 31; then spec_libc_gnustack=1; fi
+    ;;
+esac
+
 AC_ARG_WITH([s390-excess-float-precision],
   [AS_HELP_STRING([--with-s390-excess-float-precision=0|1],
      [s390 target C library typedefs float_t to double])],
@@ -384,6 +466,12 @@ leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
 decimal_float ${spec_decimal_float}
 decimal_bid_format ${spec_decimal_bid_format}
 s390_excess_float_precision ${spec_s390_excess_fp}
+# Target C library.  0.0 means "not glibc, or not told"; consumers treat that as
+# "assume nothing newer", which is what a build with no target headers got.
+glibc_major ${spec_glibc_major}
+glibc_minor ${spec_glibc_minor}
+libc_hwcap_in_tcb ${spec_libc_hwcap_in_tcb}
+libc_gnustack ${spec_libc_gnustack}
 EOF
 
 dnl Absolute path, because the driver's cwd is not the spec file's directory.
@@ -506,6 +594,20 @@ dnl The original counted this in three levels, the middle one meaning "gold
 dnl 2.20, plugin support only when -fuse-linker-plugin is given".  That
 dnl distinction was a version-number judgement about one long-obsolete linker;
 dnl here a linker either takes -plugin or it does not.
+AC_MSG_CHECKING([linker for -z now])
+gcc_cv_ld_now=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z now' > /dev/null; then
+  gcc_cv_ld_now=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_now])
+
+AC_MSG_CHECKING([linker for -z relro])
+gcc_cv_ld_relro=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z relro' > /dev/null; then
+  gcc_cv_ld_relro=yes
+fi
+AC_MSG_RESULT([$gcc_cv_ld_relro])
+
 AC_MSG_CHECKING([linker for -plugin])
 gcc_cv_lto_plugin=0
 if "$gcc_cv_ld" --help 2>&1 | grep -- '-plugin' > /dev/null; then
@@ -770,6 +872,181 @@ case $target in
 esac
 AC_MSG_RESULT([$gcc_cv_ld_avr_avrxmega3_rodata_in_flash/$gcc_cv_ld_avr_avrxmega2_flmap/$gcc_cv_ld_avr_avrxmega4_flmap])
 
+dnl ---------------------------------------------------------------------------
+dnl ASSEMBLER DEBUG SECTION
+dnl
+dnl The DWARF and CFI probes from gcc/configure.ac.  These must come after the
+dnl linker section: the Solaris arm of the CFI probe reads gcc_cv_ld_ro_rw_mix,
+dnl which is established there.
+dnl ---------------------------------------------------------------------------
+
+ts_asm_ok () {
+  # $1 is the assembly text; assemble it and report yes/no.
+  echo "$1" > conftest.s
+  if "$gcc_cv_as" $ts_as_flags -o conftest.o conftest.s > /dev/null 2>&1; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
+ts_as_flags=
+
+dnl .cfi_startproc and friends.  gcc/configure.ac decided this with a
+dnl `case "$target"': hppa-hpux forced no (its dynamic linker relocates text
+dnl and data separately, so CFI difference expressions break), Darwin forced no
+dnl (its assembler accepts them but then emits compact unwind that GCC's output
+dnl disagrees with), and Solaris consulted the linker's read-only/read-write
+dnl section merging plus an objdump check on whether .eh_frame came out
+dnl read-only.  All of that is a property of the toolchain in front of us, so
+dnl it is asked rather than assumed -- except the two "assembler lies" cases,
+dnl which no probe can detect and which stay keyed on the target.
+AC_MSG_CHECKING([assembler for cfi directives])
+gcc_cv_as_cfi_directive=`ts_asm_ok '	.text
+	.cfi_startproc
+	.cfi_offset 0, 0
+	.cfi_same_value 1
+	.cfi_def_cfa 1, 2
+	.cfi_escape 1, 2, 3, 4, 5
+	.cfi_endproc'`
+case "$target" in
+  hppa*-*-hpux*)
+    gcc_cv_as_cfi_directive=no ;;
+  x86_64-*-darwin* | i?86-*-darwin* | powerpc*-darwin-*)
+    gcc_cv_as_cfi_directive=no ;;
+  *-*-solaris*)
+    if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then
+      :
+    elif test x"$gcc_cv_objdump" = x; then
+      gcc_cv_as_cfi_directive=no
+    else
+      # .eh_frame must come out read-write, or GCC and the assembler disagree.
+      if "$gcc_cv_objdump" -h conftest.o 2>/dev/null \
+	 | sed -e '/.eh_frame/!d' -e N | grep READONLY > /dev/null; then
+	gcc_cv_as_cfi_directive=no
+      fi
+    fi
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_as_cfi_directive])
+
+dnl Some assemblers accept .cfi_adjust_cfa_offset and then encode the advance
+dnl wrongly, so this checks the emitted DW_CFA_advance_loc rather than the exit
+dnl status.  Without objdump there is no way to tell, and the safe answer is no.
+AC_MSG_CHECKING([assembler for working cfi advance])
+gcc_cv_as_cfi_advance_working=no
+if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_objdump" != x; then
+  cat > conftest.s <<'TSEOF'
+	.text
+	.cfi_startproc
+	.cfi_adjust_cfa_offset 64
+	.skip 75040, 0
+	.cfi_adjust_cfa_offset 128
+	.cfi_endproc
+TSEOF
+  if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+     && "$gcc_cv_objdump" -Wf conftest.o 2>/dev/null \
+	| grep 'DW_CFA_advance_loc[[24]]:[[ 	]][[ 	]]*75040[[ 	]]' >/dev/null; then
+    gcc_cv_as_cfi_advance_working=yes
+  fi
+fi
+AC_MSG_RESULT([$gcc_cv_as_cfi_advance_working])
+
+AC_MSG_CHECKING([assembler for .cfi_personality])
+gcc_cv_as_cfi_personality_directive=`ts_asm_ok '	.text
+	.cfi_startproc
+	.cfi_personality 0, symbol
+	.cfi_endproc'`
+AC_MSG_RESULT([$gcc_cv_as_cfi_personality_directive])
+
+dnl .cfi_sections.  On PE the directive is accepted by older assemblers that
+dnl then emit the wrong .debug_frame relocation (binutils < 2.21), so there the
+dnl emitted relocation is inspected instead of trusting the exit status.
+AC_MSG_CHECKING([assembler for .cfi_sections])
+gcc_cv_as_cfi_sections_directive=`ts_asm_ok '	.text
+	.cfi_sections .debug_frame, .eh_frame
+	.cfi_startproc
+	.cfi_endproc'`
+case $target in
+  *-*-mingw* | *-*-cygwin* | *-*-pe | *-*-win32)
+    if test x"$gcc_cv_as_cfi_sections_directive" = xyes; then
+      gcc_cv_as_cfi_sections_directive=no
+      if test x"$gcc_cv_objdump" != x \
+	 && "$gcc_cv_objdump" -j .debug_frame -r conftest.o 2>/dev/null \
+	    | grep -i secrel > /dev/null; then
+	gcc_cv_as_cfi_sections_directive=yes
+      fi
+    fi
+    ;;
+esac
+AC_MSG_RESULT([$gcc_cv_as_cfi_sections_directive])
+
+AC_MSG_CHECKING([assembler for .loc is_stmt])
+gcc_cv_as_is_stmt=`ts_asm_ok '	.text
+	.file 1 "conf.c"
+	.loc 1 1 0 is_stmt 1'`
+AC_MSG_RESULT([$gcc_cv_as_is_stmt])
+
+AC_MSG_CHECKING([assembler for .loc discriminator])
+gcc_cv_as_discriminator=`ts_asm_ok '	.text
+	.file 1 "conf.c"
+	.loc 1 1 0 discriminator 1'`
+AC_MSG_RESULT([$gcc_cv_as_discriminator])
+
+dnl `# 0 "" 2' line markers.  Note this one is checked by assembling and
+dnl requiring *no diagnostic output*, not merely a zero exit status: the
+dnl assemblers that mishandle it warn rather than fail.
+AC_MSG_CHECKING([assembler for tolerance to line number 0])
+gcc_cv_as_line_zero=no
+{ echo '# 1 "test.s" 1'; echo '# 0 "" 2'; } > conftest.s
+if "$gcc_cv_as" -o conftest.o conftest.s 2>conftest.out > /dev/null \
+   && test "x`cat conftest.out`" = x; then
+  gcc_cv_as_line_zero=yes
+fi
+rm -f conftest.out
+AC_MSG_RESULT([$gcc_cv_as_line_zero])
+
+dnl dwarf2 .file/.loc.  The .debug_line file table has to come out in exactly
+dnl the order given, because DW_AT_decl_file indexes into it; the second probe
+dnl approximates that by checking the assembler rejects a duplicated index.
+AC_MSG_CHECKING([assembler for dwarf2 .file/.loc])
+gcc_cv_as_dwarf2_debug_line=no
+cat > conftest.s <<'TSEOF'
+	.file 1 "conftest.s"
+	.loc 1 3 0
+	nop
+TSEOF
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  if test x"$gcc_cv_objdump" != x; then
+    "$gcc_cv_objdump" -h conftest.o 2>/dev/null | grep debug_line > /dev/null 2>&1 \
+      && gcc_cv_as_dwarf2_debug_line=yes
+  else
+    gcc_cv_as_dwarf2_debug_line=yes
+  fi
+fi
+gcc_cv_as_dwarf2_file_buggy=`ts_asm_ok '	.file 1 "foo.s"
+	.file 1 "bar.s"'`
+if test x"$gcc_cv_as_dwarf2_file_buggy" = xyes; then
+  # Accepting the duplicate index is the bug.
+  gcc_cv_as_dwarf2_debug_line=no
+fi
+AC_MSG_RESULT([$gcc_cv_as_dwarf2_debug_line])
+
+AC_MSG_CHECKING([assembler for .loc views])
+gcc_cv_as_dwarf2_debug_view=no
+if test x"$gcc_cv_as_dwarf2_debug_line" = xyes \
+   && test x"$gcc_cv_as_leb128" = xyes; then
+  gcc_cv_as_dwarf2_debug_view=`ts_asm_ok '	.file 1 "conftest.s"
+	.loc 1 3 0 view .LVU1
+	nop
+	.data
+	.uleb128 .LVU1
+	.uleb128 .LVU1'`
+fi
+AC_MSG_RESULT([$gcc_cv_as_dwarf2_debug_view])
+
+rm -f conftest.s conftest.o
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -777,6 +1054,16 @@ ts_bool () {
 }
 
 cat >> "$target_config_file" <<EOF
+# Assembler debug/CFI capabilities.
+cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
+cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`
+cfi_sections `ts_bool "$gcc_cv_as_cfi_sections_directive"`
+gas_loc_stmt `ts_bool "$gcc_cv_as_is_stmt"`
+gas_discriminator `ts_bool "$gcc_cv_as_discriminator"`
+as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
+dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
+dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
+
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
 ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
@@ -794,6 +1081,9 @@ ld_broken_pe_dwarf5 `ts_bool "$gcc_cv_ld_broken_pe_dwarf5"`
 ld_avr_avrxmega3_rodata_in_flash `ts_bool "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash"`
 ld_avr_avrxmega2_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega2_flmap"`
 ld_avr_avrxmega4_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega4_flmap"`
+ld_now `ts_bool "$gcc_cv_ld_now"`
+ld_relro `ts_bool "$gcc_cv_ld_relro"`
+lto_plugin `if test "$gcc_cv_lto_plugin" -gt 0; then echo 1; else echo 0; fi`
 EOF
 
 dnl The driver-side ones are spec fragments.  They are appended as their own

@@ -366,10 +366,12 @@ GLUE(.L,name): \
 #endif
 
 #ifdef IN_GCC
-/* For HAVE_GAS_CFI_DIRECTIVE.  */
-#include "auto-host.h"
 
-#ifdef HAVE_GAS_CFI_DIRECTIVE
+/* CFI directives.  These used to be gated on HAVE_GAS_CFI_DIRECTIVE out of
+   auto-host.h.  That probe has moved to target-specs/configure.ac and become a
+   runtime capability, which assembly cannot consult, so this is unconditional:
+   every binutils GCC still builds with accepts .cfi_startproc and friends.  */
+#if 1
 # define CFI_STARTPROC			.cfi_startproc
 # define CFI_ENDPROC			.cfi_endproc
 # define CFI_OFFSET(reg, off)		.cfi_offset reg, off

@@ -145,9 +145,6 @@
 #define TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P \
   rs6000_linux_float_exceptions_rounding_supported_p
 
-/* Support for TARGET_ATOMIC_ASSIGN_EXPAND_FENV without FPRs depends
-   on glibc 2.19 or greater.  */
-#if TARGET_GLIBC_MAJOR > 2 \
-  || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR >= 19)
-#define RS6000_GLIBC_ATOMIC_FENV 1
-#endif
+/* The glibc 2.19 test that used to define RS6000_GLIBC_ATOMIC_FENV here is now
+   a runtime one in rs6000_atomic_assign_expand_fenv: the target glibc version
+   is supplied per target rather than frozen in when GCC was configured.  */

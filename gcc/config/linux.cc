@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "linux-protos.h"
 #include "target.h"
 #include "targhooks.h"
+#include "target-caps.h"
 
 bool
 linux_libc_has_function (enum function_class fn_class,
@@ -53,7 +54,11 @@ linux_libm_function_max_error (unsigned cfn, machine_mode mode,
 unsigned
 linux_fortify_source_default_level ()
 {
-  if (OPTION_GLIBC && TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR >= 35)
+  /* _FORTIFY_SOURCE=3 needs __builtin_dynamic_object_size support in glibc,
+     which arrived in 2.35.  The version is no longer read out of the target's
+     features.h at configure time; an unknown version means level 2, which is
+     what a cross build with no target headers has always produced.  */
+  if (OPTION_GLIBC && targ_glibc_at_least (2, 35))
     return 3;
 
   return 2;

@@ -641,10 +641,13 @@ with_target
 with_tools_dir
 with_as
 with_ld
+with_objdump
+with_readelf
 with_option_defaults
 with_cpu_type
 with_decimal_float
 with_decimal_bid_format
+with_glibc_version
 with_s390_excess_float_precision
 with_specs_file
 enable_linker_build_id
@@ -1280,6 +1283,8 @@ Optional Packages:
                           native)
   --with-ld=PATH          linker to probe (default: TARGET-ld, or ld if
                           native)
+  --with-objdump=PATH     objdump to inspect probe output with
+  --with-readelf=PATH     readelf to inspect probe output with
   --with-option-defaults=LIST
                           space-separated name=value defaults, as config.gcc
                           infers them
@@ -1289,6 +1294,8 @@ Optional Packages:
   --with-decimal-bid-format=0|1
                           target ABI encodes decimal float as BID rather than
                           DPD
+  --with-glibc-version=M.N
+                          target runs glibc version M.N or later
   --with-s390-excess-float-precision=0|1
                           s390 target C library typedefs float_t to double
   --with-specs-file=PATH  where to write the spec file
@@ -1917,6 +1924,45 @@ else
 fi
 
 
+if test "$target" = "$host"; then
+  ts_default_objdump=objdump
+  ts_default_readelf=readelf
+  command -v ${target}-objdump > /dev/null 2>&1 && ts_default_objdump=${target}-objdump
+  command -v ${target}-readelf > /dev/null 2>&1 && ts_default_readelf=${target}-readelf
+else
+  ts_default_objdump=${target}-objdump
+  ts_default_readelf=${target}-readelf
+fi
+
+
+# Check whether --with-objdump was given.
+if test "${with_objdump+set}" = set; then :
+  withval=$with_objdump; gcc_cv_objdump=$withval
+else
+  gcc_cv_objdump=$ts_default_objdump
+fi
+
+command -v "$gcc_cv_objdump" > /dev/null 2>&1 || gcc_cv_objdump=
+
+
+# Check whether --with-readelf was given.
+if test "${with_readelf+set}" = set; then :
+  withval=$with_readelf; gcc_cv_readelf=$withval
+else
+  gcc_cv_readelf=$ts_default_readelf
+fi
+
+command -v "$gcc_cv_readelf" > /dev/null 2>&1 || gcc_cv_readelf=
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for objdump" >&5
+$as_echo_n "checking for objdump... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${gcc_cv_objdump:-not found}" >&5
+$as_echo "${gcc_cv_objdump:-not found}" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for readelf" >&5
+$as_echo_n "checking for readelf... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${gcc_cv_readelf:-not found}" >&5
+$as_echo "${gcc_cv_readelf:-not found}" >&6; }
+
 
 # Check whether --with-option-defaults was given.
 if test "${with_option_defaults+set}" = set; then :
@@ -1950,6 +1996,53 @@ if test "${with_decimal_bid_format+set}" = set; then :
 else
   spec_decimal_bid_format=0
 fi
+
+
+# Check whether --with-glibc-version was given.
+if test "${with_glibc_version+set}" = set; then :
+  withval=$with_glibc_version; spec_glibc_version=$withval
+else
+  spec_glibc_version=
+fi
+
+spec_glibc_major=0
+spec_glibc_minor=0
+if test x"$spec_glibc_version" != x; then
+  if echo "$spec_glibc_version" | grep '^[0-9][0-9]*\.[0-9][0-9]*$' > /dev/null; then
+    spec_glibc_major=`echo "$spec_glibc_version" | sed -e 's/\..*//'`
+    spec_glibc_minor=`echo "$spec_glibc_version" | sed -e 's/.*\.//'`
+  else
+    as_fn_error $? "--with-glibc-version requires a version number M.N" "$LINENO" 5
+  fi
+fi
+
+ts_glibc_at_least () {
+  # $1 major, $2 minor
+  if test "$spec_glibc_major" -gt "$1"; then
+    return 0
+  fi
+  if test "$spec_glibc_major" -eq "$1" && test "$spec_glibc_minor" -ge "$2"; then
+    return 0
+  fi
+  return 1
+}
+
+spec_libc_hwcap_in_tcb=0
+case ${target} in
+  powerpc*-*-linux*)
+    if ts_glibc_at_least 2 23; then spec_libc_hwcap_in_tcb=1; fi
+    ;;
+esac
+
+spec_libc_gnustack=0
+case ${target} in
+  mips*-*-linux-musl*)
+    spec_libc_gnustack=1
+    ;;
+  mips*-*-linux*)
+    if ts_glibc_at_least 2 31; then spec_libc_gnustack=1; fi
+    ;;
+esac
 
 
 # Check whether --with-s390-excess-float-precision was given.
@@ -2216,6 +2309,12 @@ leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
 decimal_float ${spec_decimal_float}
 decimal_bid_format ${spec_decimal_bid_format}
 s390_excess_float_precision ${spec_s390_excess_fp}
+# Target C library.  0.0 means "not glibc, or not told"; consumers treat that as
+# "assume nothing newer", which is what a build with no target headers got.
+glibc_major ${spec_glibc_major}
+glibc_minor ${spec_glibc_minor}
+libc_hwcap_in_tcb ${spec_libc_hwcap_in_tcb}
+libc_gnustack ${spec_libc_gnustack}
 EOF
 
 case $target_config_file in
@@ -2334,6 +2433,24 @@ fi
 rm -f conftest.s conftest.o conftest2.o conftest.at
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_at_file" >&5
 $as_echo "$gcc_cv_ld_at_file" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -z now" >&5
+$as_echo_n "checking linker for -z now... " >&6; }
+gcc_cv_ld_now=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z now' > /dev/null; then
+  gcc_cv_ld_now=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_now" >&5
+$as_echo "$gcc_cv_ld_now" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -z relro" >&5
+$as_echo_n "checking linker for -z relro... " >&6; }
+gcc_cv_ld_relro=no
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-z relro' > /dev/null; then
+  gcc_cv_ld_relro=yes
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_relro" >&5
+$as_echo "$gcc_cv_ld_relro" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -plugin" >&5
 $as_echo_n "checking linker for -plugin... " >&6; }
@@ -2617,11 +2734,186 @@ esac
 $as_echo "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash/$gcc_cv_ld_avr_avrxmega2_flmap/$gcc_cv_ld_avr_avrxmega4_flmap" >&6; }
 
 
+ts_asm_ok () {
+  # $1 is the assembly text; assemble it and report yes/no.
+  echo "$1" > conftest.s
+  if "$gcc_cv_as" $ts_as_flags -o conftest.o conftest.s > /dev/null 2>&1; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
+ts_as_flags=
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for cfi directives" >&5
+$as_echo_n "checking assembler for cfi directives... " >&6; }
+gcc_cv_as_cfi_directive=`ts_asm_ok '	.text
+	.cfi_startproc
+	.cfi_offset 0, 0
+	.cfi_same_value 1
+	.cfi_def_cfa 1, 2
+	.cfi_escape 1, 2, 3, 4, 5
+	.cfi_endproc'`
+case "$target" in
+  hppa*-*-hpux*)
+    gcc_cv_as_cfi_directive=no ;;
+  x86_64-*-darwin* | i?86-*-darwin* | powerpc*-darwin-*)
+    gcc_cv_as_cfi_directive=no ;;
+  *-*-solaris*)
+    if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then
+      :
+    elif test x"$gcc_cv_objdump" = x; then
+      gcc_cv_as_cfi_directive=no
+    else
+      # .eh_frame must come out read-write, or GCC and the assembler disagree.
+      if "$gcc_cv_objdump" -h conftest.o 2>/dev/null \
+	 | sed -e '/.eh_frame/!d' -e N | grep READONLY > /dev/null; then
+	gcc_cv_as_cfi_directive=no
+      fi
+    fi
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_directive" >&5
+$as_echo "$gcc_cv_as_cfi_directive" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for working cfi advance" >&5
+$as_echo_n "checking assembler for working cfi advance... " >&6; }
+gcc_cv_as_cfi_advance_working=no
+if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_objdump" != x; then
+  cat > conftest.s <<'TSEOF'
+	.text
+	.cfi_startproc
+	.cfi_adjust_cfa_offset 64
+	.skip 75040, 0
+	.cfi_adjust_cfa_offset 128
+	.cfi_endproc
+TSEOF
+  if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+     && "$gcc_cv_objdump" -Wf conftest.o 2>/dev/null \
+	| grep 'DW_CFA_advance_loc[24]:[ 	][ 	]*75040[ 	]' >/dev/null; then
+    gcc_cv_as_cfi_advance_working=yes
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_advance_working" >&5
+$as_echo "$gcc_cv_as_cfi_advance_working" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .cfi_personality" >&5
+$as_echo_n "checking assembler for .cfi_personality... " >&6; }
+gcc_cv_as_cfi_personality_directive=`ts_asm_ok '	.text
+	.cfi_startproc
+	.cfi_personality 0, symbol
+	.cfi_endproc'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_personality_directive" >&5
+$as_echo "$gcc_cv_as_cfi_personality_directive" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .cfi_sections" >&5
+$as_echo_n "checking assembler for .cfi_sections... " >&6; }
+gcc_cv_as_cfi_sections_directive=`ts_asm_ok '	.text
+	.cfi_sections .debug_frame, .eh_frame
+	.cfi_startproc
+	.cfi_endproc'`
+case $target in
+  *-*-mingw* | *-*-cygwin* | *-*-pe | *-*-win32)
+    if test x"$gcc_cv_as_cfi_sections_directive" = xyes; then
+      gcc_cv_as_cfi_sections_directive=no
+      if test x"$gcc_cv_objdump" != x \
+	 && "$gcc_cv_objdump" -j .debug_frame -r conftest.o 2>/dev/null \
+	    | grep -i secrel > /dev/null; then
+	gcc_cv_as_cfi_sections_directive=yes
+      fi
+    fi
+    ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_sections_directive" >&5
+$as_echo "$gcc_cv_as_cfi_sections_directive" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .loc is_stmt" >&5
+$as_echo_n "checking assembler for .loc is_stmt... " >&6; }
+gcc_cv_as_is_stmt=`ts_asm_ok '	.text
+	.file 1 "conf.c"
+	.loc 1 1 0 is_stmt 1'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_is_stmt" >&5
+$as_echo "$gcc_cv_as_is_stmt" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .loc discriminator" >&5
+$as_echo_n "checking assembler for .loc discriminator... " >&6; }
+gcc_cv_as_discriminator=`ts_asm_ok '	.text
+	.file 1 "conf.c"
+	.loc 1 1 0 discriminator 1'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_discriminator" >&5
+$as_echo "$gcc_cv_as_discriminator" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for tolerance to line number 0" >&5
+$as_echo_n "checking assembler for tolerance to line number 0... " >&6; }
+gcc_cv_as_line_zero=no
+{ echo '# 1 "test.s" 1'; echo '# 0 "" 2'; } > conftest.s
+if "$gcc_cv_as" -o conftest.o conftest.s 2>conftest.out > /dev/null \
+   && test "x`cat conftest.out`" = x; then
+  gcc_cv_as_line_zero=yes
+fi
+rm -f conftest.out
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_line_zero" >&5
+$as_echo "$gcc_cv_as_line_zero" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for dwarf2 .file/.loc" >&5
+$as_echo_n "checking assembler for dwarf2 .file/.loc... " >&6; }
+gcc_cv_as_dwarf2_debug_line=no
+cat > conftest.s <<'TSEOF'
+	.file 1 "conftest.s"
+	.loc 1 3 0
+	nop
+TSEOF
+if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+  if test x"$gcc_cv_objdump" != x; then
+    "$gcc_cv_objdump" -h conftest.o 2>/dev/null | grep debug_line > /dev/null 2>&1 \
+      && gcc_cv_as_dwarf2_debug_line=yes
+  else
+    gcc_cv_as_dwarf2_debug_line=yes
+  fi
+fi
+gcc_cv_as_dwarf2_file_buggy=`ts_asm_ok '	.file 1 "foo.s"
+	.file 1 "bar.s"'`
+if test x"$gcc_cv_as_dwarf2_file_buggy" = xyes; then
+  # Accepting the duplicate index is the bug.
+  gcc_cv_as_dwarf2_debug_line=no
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_dwarf2_debug_line" >&5
+$as_echo "$gcc_cv_as_dwarf2_debug_line" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .loc views" >&5
+$as_echo_n "checking assembler for .loc views... " >&6; }
+gcc_cv_as_dwarf2_debug_view=no
+if test x"$gcc_cv_as_dwarf2_debug_line" = xyes \
+   && test x"$gcc_cv_as_leb128" = xyes; then
+  gcc_cv_as_dwarf2_debug_view=`ts_asm_ok '	.file 1 "conftest.s"
+	.loc 1 3 0 view .LVU1
+	nop
+	.data
+	.uleb128 .LVU1
+	.uleb128 .LVU1'`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_dwarf2_debug_view" >&5
+$as_echo "$gcc_cv_as_dwarf2_debug_view" >&6; }
+
+rm -f conftest.s conftest.o
+
+
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
 }
 
 cat >> "$target_config_file" <<EOF
+# Assembler debug/CFI capabilities.
+cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
+cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`
+cfi_sections `ts_bool "$gcc_cv_as_cfi_sections_directive"`
+gas_loc_stmt `ts_bool "$gcc_cv_as_is_stmt"`
+gas_discriminator `ts_bool "$gcc_cv_as_discriminator"`
+as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
+dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
+dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
+
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
 ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
@@ -2639,6 +2931,9 @@ ld_broken_pe_dwarf5 `ts_bool "$gcc_cv_ld_broken_pe_dwarf5"`
 ld_avr_avrxmega3_rodata_in_flash `ts_bool "$gcc_cv_ld_avr_avrxmega3_rodata_in_flash"`
 ld_avr_avrxmega2_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega2_flmap"`
 ld_avr_avrxmega4_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega4_flmap"`
+ld_now `ts_bool "$gcc_cv_ld_now"`
+ld_relro `ts_bool "$gcc_cv_ld_relro"`
+lto_plugin `if test "$gcc_cv_lto_plugin" -gt 0; then echo 1; else echo 0; fi`
 EOF
 
 if test x"$gcc_cv_ld_as_needed" = xyes; then

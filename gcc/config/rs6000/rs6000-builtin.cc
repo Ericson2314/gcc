@@ -28,6 +28,7 @@
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+#include "target-caps.h"
 #include "backend.h"
 #include "rtl.h"
 #include "tree.h"
@@ -2629,8 +2630,21 @@ cpu_expand_builtin (enum rs6000_gen_builtins fcode,
   if (target == 0 || GET_MODE (target) != SImode)
     target = gen_reg_rtx (SImode);
 
-  /* TODO: Factor the #ifdef'd code into a separate function.  */
-#ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
+  /* The target C library must export the hardware capability bits for this
+     to work at all; glibc has since 2.23.  Whether it does is a per-target
+     fact supplied at run time, not something GCC can be configured with.  */
+  if (!targ_caps.libc_hwcap_in_tcb)
+    {
+      warning (0, "builtin %qs needs GLIBC (2.23 and newer) that exports "
+	       "hardware capability bits",
+	       rs6000_builtin_info[(size_t) fcode].bifname);
+
+      /* For old LIBCs, always return FALSE.  */
+      emit_move_insn (target, GEN_INT (0));
+      return target;
+    }
+
+  /* TODO: Factor this into a separate function.  */
   tree arg = TREE_OPERAND (CALL_EXPR_ARG (exp, 0), 0);
   /* Target clones creates an ARRAY_REF instead of STRING_CST, convert it back
      to a STRING_CST.  */
@@ -2716,14 +2730,6 @@ cpu_expand_builtin (enum rs6000_gen_builtins fcode,
      emit a reference to the special symbol exported by LIBC to ensure we
      do not link against an old LIBC that doesn't support this feature.  */
   cpu_builtin_p = true;
-
-#else
-  warning (0, "builtin %qs needs GLIBC (2.23 and newer) that exports hardware "
-	   "capability bits", rs6000_builtin_info[(size_t) fcode].bifname);
-
-  /* For old LIBCs, always return FALSE.  */
-  emit_move_insn (target, GEN_INT (0));
-#endif /* TARGET_LIBC_PROVIDES_HWCAP_IN_TCB */
 
   return target;
 }

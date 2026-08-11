@@ -2513,6 +2513,23 @@ ALL=all.internal				AC_SUBST(ALL)
 SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
 BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
+dnl target_header_dir is how the target's sysroot reaches this script, and the
+dnl compiler must not care about target sysroots.  Everything the COMPILER took
+dnl from it is gone: the glibc version (was TARGET_GLIBC_MAJOR/MINOR, now
+dnl targ_caps.glibc_major/minor), TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and
+dnl TARGET_LIBC_GNUSTACK.
+dnl
+dnl WHAT IS LEFT IS NOT THE COMPILER'S -- it is libgcc's, routed through here
+dnl because libgcc has no probe of its own and picks these up from gcc's
+dnl auto-host.h via tconfig.h:
+dnl   HAVE_SYS_SDT_H        libgcc/unwind-dw2.c, unwind-arm-common.inc
+dnl   TARGET_DL_ITERATE_PHDR libgcc/unwind-dw2-fde-dip.c, crtstuff.c
+dnl   inhibit_libc          passed to libgcc through libgcc.mvars
+dnl Nothing in gcc/ reads any of the three.  They cannot simply be deleted:
+dnl doing so would silently turn off the SystemTap unwinder probes and
+dnl USE_PT_GNU_EH_FRAME on the BSDs and Solaris.  They belong in
+dnl libgcc/configure.ac, which runs per target with a working xgcc and can ask
+dnl the question properly.  Until that move, this stays.
 if test "x$with_build_sysroot" != x; then
   BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
   target_header_dir="${with_build_sysroot}${native_system_header_dir}"
@@ -4865,30 +4882,17 @@ gcc_GAS_CHECK_FEATURE([.lcomm with alignment], gcc_cv_as_lcomm_with_alignment,,
   [Define if your assembler supports .lcomm with an alignment field.])])
 
 
-# Determine the version of glibc, if any, used on the target.
-AC_MSG_CHECKING([for target glibc version])
-AC_ARG_WITH([glibc-version],
-  [AS_HELP_STRING([--with-glibc-version=M.N],
-    [assume GCC used with glibc version M.N or later])], [
-if [echo "$with_glibc_version" | grep '^[0-9][0-9]*\.[0-9][0-9]*$']; then
-  glibc_version_major=`echo "$with_glibc_version" | sed -e 's/\..*//'`
-  glibc_version_minor=`echo "$with_glibc_version" | sed -e 's/.*\.//'`
-else
-  AC_MSG_ERROR([option --with-glibc-version requires a version number M.N])
-fi], [
-glibc_version_major=0
-glibc_version_minor=0
-[if test -f $target_header_dir/features.h \
-  && glibc_version_major_define=`$EGREP '^[ 	]*#[ 	]*define[ 	]+__GLIBC__[ 	]+[0-9]' $target_header_dir/features.h` \
-  && glibc_version_minor_define=`$EGREP '^[ 	]*#[ 	]*define[ 	]+__GLIBC_MINOR__[ 	]+[0-9]' $target_header_dir/features.h`; then
-  glibc_version_major=`echo "$glibc_version_major_define" | sed -e 's/.*__GLIBC__[ 	]*//'`
-  glibc_version_minor=`echo "$glibc_version_minor_define" | sed -e 's/.*__GLIBC_MINOR__[ 	]*//'`
-fi]])
-AC_MSG_RESULT([$glibc_version_major.$glibc_version_minor])
-AC_DEFINE_UNQUOTED([TARGET_GLIBC_MAJOR], [$glibc_version_major],
-[GNU C Library major version number used on the target, or 0.])
-AC_DEFINE_UNQUOTED([TARGET_GLIBC_MINOR], [$glibc_version_minor],
-[GNU C Library minor version number used on the target, or 0.])
+dnl --with-glibc-version is gone, and so is the probe that stood in for it: a
+dnl grep for __GLIBC__ in $target_header_dir/features.h, i.e. gcc/configure
+dnl opening the target sysroot and freezing what it found into TARGET_GLIBC_MAJOR
+dnl and TARGET_GLIBC_MINOR.  The compiler must not care about target sysroots,
+dnl and the failure mode was the familiar one: no target headers meant no
+dnl answer, so it recorded 0.0 and silently changed behaviour (this is what made
+dnl --with-long-double-128 flip an ABI).
+dnl
+dnl The version is now targ_caps.glibc_major/minor, supplied per target through
+dnl the target config file; target-specs takes --with-glibc-version.  0.0 still
+dnl means unknown, and every consumer tests `>= X.Y' so unknown enables nothing.
 
 dnl --enable-gnu-unique-object and its probe lived here.  The probe assembled
 dnl `.type foo, @gnu_unique_object' using $target_type_format_char from
@@ -5112,33 +5116,12 @@ dnl which is what a build that did not pass the option always got, so nothing
 dnl changes for anyone who did not use it.  -mabi=ieeelongdouble still selects it
 dnl per compilation.
 
-# Check if the target LIBC supports exporting the AT_PLATFORM and AT_HWCAP
-# values in the TCB.  Currently, only GLIBC 2.23 and later support this.
-gcc_cv_libc_provides_hwcap_in_tcb=no
-case "$target" in
-  powerpc*-*-linux*)
-    GCC_GLIBC_VERSION_GTE_IFELSE([2], [23], [gcc_cv_libc_provides_hwcap_in_tcb=yes], )
-    ;;
-esac
-if test x$gcc_cv_libc_provides_hwcap_in_tcb = xyes; then
-  AC_DEFINE(TARGET_LIBC_PROVIDES_HWCAP_IN_TCB, 1,
-	    [Define if your target C Library provides the AT_HWCAP value in the TCB])
-fi
-
-# Check if the target LIBC handles PT_GNU_STACK.
-gcc_cv_libc_gnustack=unknown
-case "$target" in
-  mips*-*-linux-musl*)
-    gcc_cv_libc_gnustack=yes
-    ;;
-  mips*-*-linux*)
-    GCC_GLIBC_VERSION_GTE_IFELSE([2], [31], [gcc_cv_libc_gnustack=yes], )
-    ;;
-esac
-if test x$gcc_cv_libc_gnustack = xyes; then
-  AC_DEFINE(TARGET_LIBC_GNUSTACK, 1,
-            [Define if your target C Library properly handles PT_GNU_STACK])
-fi
+dnl TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and TARGET_LIBC_GNUSTACK are gone from
+dnl here.  Both combined a `case $target' with a glibc version test, and both
+dnl described the target's C library rather than this compiler.  They are now
+dnl targ_caps.libc_hwcap_in_tcb and targ_caps.libc_gnustack, worked out by
+dnl target-specs -- the step that knows the triple AND the glibc version -- and
+dnl read at run time by config/rs6000/ and config/mips/.
 
 AC_MSG_CHECKING(dl_iterate_phdr in target C library)
 gcc_cv_target_dl_iterate_phdr=unknown

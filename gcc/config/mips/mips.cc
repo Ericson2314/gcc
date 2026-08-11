@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "flags.h"
 #include "opts.h"
+#include "target-caps.h"
 
 /* This file should be included last.  */
 #include "target-def.h"

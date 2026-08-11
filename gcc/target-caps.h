@@ -55,17 +55,44 @@ struct target_caps
      --enable-decimal-float, whose default was a `case $target' listing the
      handful of CPU/OS pairs that qualify.  Default false: a compiler that has
      not been told anything about the target cannot know that its libgcc
-     carries __bid_*/__dpd_*, and claiming the modes exist turns a clean "mode
-     not supported" into a link failure.  */
+     carries the __bid_ and __dpd_ entry points, and claiming the modes exist
+     turns a clean "mode not supported" into a link failure.  */
   bool decimal_float;
 
   /* Decimal float uses the BID encoding rather than DPD.  This is fixed by the
      target's ABI -- x86 and aarch64 are BID, powerpc and s390 are DPD -- and
-     picks which half of libgcc's __bid_*/__dpd_* entry points is called, so it
+     picks which half of libgcc's __bid_ and __dpd_ entry points is called, so it
      is derived from the target rather than probed.  DPD is the format the
      standard describes and what everything other than x86/aarch64 uses, so it
      is the default.  Only meaningful when decimal_float is true.  */
   bool decimal_bid_format;
+
+  /* Version of the GNU C Library on the target, or 0.0 for "not glibc, or not
+     known".  Was --with-glibc-version, and failing that a grep for __GLIBC__ in
+     $target_header_dir/features.h -- gcc/configure reaching into the target's
+     sysroot and freezing what it found.  Nothing about a sysroot can be a
+     property of a compiler that serves many targets, so the version is supplied
+     per target instead.
+
+     0.0 is deliberately the default and is what a cross build with no target
+     headers installed has always got: every consumer tests `>= some version' to
+     turn NEWER behaviour on, so an unknown version turns none of it on.  That is
+     the safe direction -- guessing a version we have not been told would enable
+     behaviour the target's libc may not support.  */
+  int glibc_major;
+  int glibc_minor;
+
+  /* powerpc only: the target C library exports AT_PLATFORM and AT_HWCAP in the
+     TCB, which __builtin_cpu_supports and target_clones need.  glibc has done
+     so since 2.23.  Both this and libc_gnustack below combine a triple test
+     with a glibc version test, so target-specs works them out -- it is the step
+     that knows both.  */
+  bool libc_hwcap_in_tcb;
+
+  /* mips only: the target C library honours PT_GNU_STACK, so a non-executable
+     stack can be requested rather than inferred from -msoft-float.  musl always
+     has; glibc since 2.31.  */
+  bool libc_gnustack;
 
   /* Assembler debug/CFI capabilities.  Was the DWARF half of the
      gcc_GAS_CHECK_FEATURE block in gcc/configure.ac; see the ASSEMBLER DEBUG
@@ -74,6 +101,15 @@ struct target_caps
      unconfigured compiler behaves like a normally configured one.  The
      original probes answered "no" for a cross build with no assembler to ask,
      which silently cost debug quality rather than failing.  */
+
+  /* Assembler accepts .cfi_startproc and friends, and encodes cfi advances
+     correctly.  Was HAVE_GAS_CFI_DIRECTIVE, which seeded flag_dwarf2_cfi_asm
+     through Init() in common.opt.  Init() needs a compile-time constant, so
+     the option initialises to 1 and toplev re-seeds it from this once the
+     target config has been read, unless the user passed -fdwarf2-cfi-asm or
+     -fno-dwarf2-cfi-asm.  That is the shape dwarf2out_do_cfi_asm() already
+     expected.  */
+  bool cfi_directive;
 
   /* Assembler accepts .cfi_personality.  Was
      HAVE_GAS_CFI_PERSONALITY_DIRECTIVE.  */
@@ -187,9 +223,32 @@ struct target_caps
   bool ld_avr_avrxmega3_rodata_in_flash;
   bool ld_avr_avrxmega2_flmap;
   bool ld_avr_avrxmega4_flmap;
+
+  /* Linker understands -z now and -z relro.  Were HAVE_LD_NOW_SUPPORT and
+     HAVE_LD_RELRO_SUPPORT, both already consumed with a runtime `if' rather
+     than an #ifdef, so only the value had to move.  */
+  bool ld_now;
+  bool ld_relro;
+
+  /* Linker takes -plugin, so LTO can use the linker plugin rather than
+     needing fat objects.  Was HAVE_LTO_PLUGIN, which counted 0/1/2 to
+     distinguish gold 2.20's "only with -fuse-linker-plugin"; that middle case
+     was a judgement about one obsolete linker and is not reproduced.  */
+  bool lto_plugin;
 };
 
 extern struct target_caps targ_caps;
+
+/* True if the target's GNU C Library is known to be at least MAJOR.MINOR.
+   An unknown version (0.0) is never "at least" anything, so callers that use
+   this to enable newer behaviour leave it off until they are told otherwise.  */
+inline bool
+targ_glibc_at_least (int major, int minor)
+{
+  return (targ_caps.glibc_major > major
+	  || (targ_caps.glibc_major == major
+	      && targ_caps.glibc_minor >= minor));
+}
 
 /* Read capabilities from FILE, a `name value' per line text file.  Unknown
    names are ignored, so an older compiler tolerates a newer spec file.  */

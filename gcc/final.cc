@@ -2611,10 +2611,8 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 		  fprintf (asm_out_file, "%s %i \"%s\" 1\n",
 			   ASM_COMMENT_START, loc.line, loc.file);
 		fprintf (asm_out_file, "\t%s\n", string);
-#if HAVE_AS_LINE_ZERO
-		if (*loc.file && loc.line)
+		if (HAVE_AS_LINE_ZERO && *loc.file && loc.line)
 		  fprintf (asm_out_file, "%s 0 \"\" 2\n", ASM_COMMENT_START);
-#endif
 	      }
 	    break;
 	  }
@@ -2650,10 +2648,8 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 		  fprintf (asm_out_file, "%s %i \"%s\" 1\n",
 			   ASM_COMMENT_START, expanded.line, expanded.file);
 	        output_asm_insn (string, ops);
-#if HAVE_AS_LINE_ZERO
-		if (expanded.file && expanded.line)
+		if (HAVE_AS_LINE_ZERO && expanded.file && expanded.line)
 		  fprintf (asm_out_file, "%s 0 \"\" 2\n", ASM_COMMENT_START);
-#endif
 	      }
 
 	    if (targetm.asm_out.final_postscan_insn)

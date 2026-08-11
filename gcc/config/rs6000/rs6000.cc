@@ -80,6 +80,7 @@
 #include "ppc-auxv.h"
 #include "rs6000-internal.h"
 #include "opts.h"
+#include "target-caps.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -3604,8 +3605,9 @@ static bool
 glibc_supports_ieee_128bit (void)
 {
 #ifdef OPTION_GLIBC
-  if (OPTION_GLIBC && !BYTES_BIG_ENDIAN
-      && ((TARGET_GLIBC_MAJOR * 1000) + TARGET_GLIBC_MINOR) >= 2032)
+  /* The glibc version is supplied per target at run time now, rather than
+     grepped out of the target sysroot when GCC was configured.  */
+  if (OPTION_GLIBC && !BYTES_BIG_ENDIAN && targ_glibc_at_least (2, 32))
     return true;
 #endif /* OPTION_GLIBC.  */
 
@@ -25575,13 +25577,14 @@ rs6000_get_function_versions_dispatcher (void *decl)
   if (!is_function_default_version (default_node->decl))
     return NULL;
 
-#ifndef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
-  error_at (DECL_SOURCE_LOCATION (default_node->decl),
-	    "%<target_clones%> attribute needs GLIBC (2.23 and newer) that "
-	    "exports hardware capability bits");
-#else
-
-  if (targetm.has_ifunc_p ())
+  /* Dispatching needs the hardware capability bits the target C library
+     exports (glibc 2.23 and newer); that is a per-target fact told to us at
+     run time rather than one this compiler was built with.  */
+  if (!targ_caps.libc_hwcap_in_tcb)
+    error_at (DECL_SOURCE_LOCATION (default_node->decl),
+	      "%<target_clones%> attribute needs GLIBC (2.23 and newer) that "
+	      "exports hardware capability bits");
+  else if (targetm.has_ifunc_p ())
     {
       struct cgraph_function_version_info *it_v = NULL;
 
@@ -25602,7 +25605,6 @@ rs6000_get_function_versions_dispatcher (void *decl)
 		"multiversioning needs %<ifunc%> which is not supported "
 		"on this target");
     }
-#endif
 
   return dispatch_decl;
 }
@@ -28395,8 +28397,8 @@ emit_fusion_gpr_load (rtx target, rtx mem)
   return "";
 }
 
-/* This is not inside an  #ifdef RS6000_GLIBC_ATOMIC_FENV  because gengtype
-   ignores it then.  */
+/* Declared unconditionally: gengtype does not look inside conditionals, and
+   the glibc version test that used to guard these is now a runtime one.  */
 static GTY(()) tree atomic_hold_decl;
 static GTY(()) tree atomic_clear_decl;
 static GTY(()) tree atomic_update_decl;
@@ -28407,7 +28409,13 @@ rs6000_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
 {
   if (!TARGET_HARD_FLOAT)
     {
-#ifdef RS6000_GLIBC_ATOMIC_FENV
+      /* The soft-float path calls into glibc's __atomic_fe* helpers, which
+	 only exist from glibc 2.19.  Which glibc the target has is supplied at
+	 run time now rather than tested for when GCC was configured, so this
+	 is an ordinary condition.  */
+      if (!targ_glibc_at_least (2, 19))
+	return;
+
       if (atomic_hold_decl == NULL_TREE)
 	{
 	  atomic_hold_decl
@@ -28456,7 +28464,6 @@ rs6000_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
       *clear = build_call_expr (atomic_clear_decl, 0);
       *update = build_call_expr (atomic_update_decl, 1,
 				 fold_convert (const_double_ptr, fenv_addr));
-#endif
       return;
     }
 

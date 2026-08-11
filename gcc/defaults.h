@@ -26,23 +26,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #ifndef GCC_DEFAULTS_H
 #define GCC_DEFAULTS_H
 
-/* Assembler and linker capabilities that used to be frozen into auto-host.h by
-   configure-time probes of one specific toolchain.  They are runtime values
-   now; see target-caps.h.  Generators and target-library builds never consult
-   them and must not pull in compiler internals, so they are guarded out --
-   which also means any use has to be an ordinary `if', never a `#if'.  */
+/* Runtime target capabilities.  Included this early because SUPPORTS_DISCRIMINATOR
+   below needs targ_caps; the macro redefinitions themselves live with the rest
+   of the capability block further down.  Generators and target-library builds
+   must not pull in compiler internals, so it is guarded out for them.  */
 #if !defined (GENERATOR_FILE) && !defined (USED_FOR_TARGET)
 #include "target-caps.h"
-#undef HAVE_AS_LEB128
-#define HAVE_AS_LEB128 (targ_caps.leb128)
-#undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
-#define HAVE_GAS_CFI_PERSONALITY_DIRECTIVE (targ_caps.cfi_personality)
-#undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE
-#define HAVE_GAS_CFI_SECTIONS_DIRECTIVE (targ_caps.cfi_sections)
-#undef HAVE_GAS_LOC_STMT
-#define HAVE_GAS_LOC_STMT (targ_caps.gas_loc_stmt)
-#undef HAVE_AS_LINE_ZERO
-#define HAVE_AS_LINE_ZERO (targ_caps.as_line_zero)
 #endif
 
 /* How to start an assembler comment.  */
@@ -1420,6 +1409,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "target-caps.h"
 #undef HAVE_AS_LEB128
 #define HAVE_AS_LEB128 (targ_caps.leb128)
+#undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
+#define HAVE_GAS_CFI_PERSONALITY_DIRECTIVE (targ_caps.cfi_personality)
+#undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE
+#define HAVE_GAS_CFI_SECTIONS_DIRECTIVE (targ_caps.cfi_sections)
+#undef HAVE_GAS_LOC_STMT
+#define HAVE_GAS_LOC_STMT (targ_caps.gas_loc_stmt)
+#undef HAVE_AS_LINE_ZERO
+#define HAVE_AS_LINE_ZERO (targ_caps.as_line_zero)
 
 /* The linker half, same treatment.  These were answered by probing one ld
    while GCC was configured; a compiler serving many toolchains has to ask at
@@ -1459,6 +1456,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_LD_AVR_AVRXMEGA2_FLMAP (targ_caps.ld_avr_avrxmega2_flmap)
 #undef HAVE_LD_AVR_AVRXMEGA4_FLMAP
 #define HAVE_LD_AVR_AVRXMEGA4_FLMAP (targ_caps.ld_avr_avrxmega4_flmap)
+#undef HAVE_LD_NOW_SUPPORT
+#define HAVE_LD_NOW_SUPPORT (targ_caps.ld_now)
+#undef HAVE_LD_RELRO_SUPPORT
+#define HAVE_LD_RELRO_SUPPORT (targ_caps.ld_relro)
+/* Was 0/1/2; only "any plugin support at all" is distinguished now, and 2 is
+   the value every caller compares against.  */
+#undef HAVE_LTO_PLUGIN
+#define HAVE_LTO_PLUGIN (targ_caps.lto_plugin ? 2 : 0)
 
 /* Not a flag but a byte count: the alignment the linker forces on .TOC..
    rs6000.cc supplies 8 when this is undefined, and the probe only ever chose

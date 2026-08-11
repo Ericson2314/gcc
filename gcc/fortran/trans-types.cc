@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+#include "target-caps.h"
 #include "tree.h"
 #include "gfortran.h"
 #include "trans.h"
@@ -604,10 +605,9 @@ gfc_init_kinds (void)
 	  {
 	    gfc_real_kinds[i].abi_kind = 17;
 	    if (flag_building_libgfortran
-		&& (TARGET_GLIBC_MAJOR < 2
-		    || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR < 32)))
+		&& !targ_glibc_at_least (2, 32))
 	      {
-		if (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR >= 26)
+		if (targ_glibc_at_least (2, 26))
 		  {
 		    gfc_real16_use_iec_60559 = true;
 		    gfc_real_kinds[i].use_iec_60559 = 1;
@@ -1011,8 +1011,7 @@ gfc_build_real_type (gfc_real_info *info)
       /* TODO: see PR101835.  */
       info->c_float128 = 1;
       gfc_real16_is_float128 = true;
-      if (TARGET_GLIBC_MAJOR > 2
-	  || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR >= 26))
+      if (targ_glibc_at_least (2, 26))
 	{
 	  info->use_iec_60559 = 1;
 	  gfc_real16_use_iec_60559 = true;

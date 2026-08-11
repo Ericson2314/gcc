@@ -65,10 +65,12 @@ along with GCC; see the file COPYING3.  If not see
 /* Static stack checking is supported by means of probes.  */
 #define STACK_CHECK_STATIC_BUILTIN 1
 
-/* We only build the -fsplit-stack support in libgcc if the
-   assembler has full support for the CFI directives.  Also
-   we only support -fsplit-stack on glibc targets.  */
-#if (DEFAULT_LIBC == LIBC_GLIBC) && HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
+/* We only support -fsplit-stack on glibc targets.  This used to also require
+   HAVE_GAS_CFI_PERSONALITY_DIRECTIVE, a configure-time probe; .cfi_personality
+   is now a runtime capability (targ_caps.cfi_personality) and cannot be tested
+   in a #if.  Every assembler GCC still builds with has it, so the glibc test
+   alone stands.  */
+#if (DEFAULT_LIBC == LIBC_GLIBC)
 #define TARGET_CAN_SPLIT_STACK
 #endif
 

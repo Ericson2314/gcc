@@ -172,8 +172,16 @@ extern int dot_symbols;
 #define MULTILIB_DEFAULTS { "m32" }
 #endif
 
-/* Split stack is only supported for 64 bit, and requires glibc >= 2.18.  */
-#if TARGET_GLIBC_MAJOR * 1000 + TARGET_GLIBC_MINOR >= 2018
+/* Split stack is only supported for 64 bit, and requires glibc >= 2.18.
+   UNCONVERTED: the rest of the TARGET_GLIBC_MAJOR/MINOR users became runtime
+   tests on targ_caps, but these two are consumed by `#ifdef' in go/gospec.cc --
+   a driver, which does not read the target config file the way cc1 does -- so
+   they have to stay preprocessor macros until gospec.cc gets the same
+   treatment.  Rather than leave the test reading two now-undefined identifiers
+   as 0 (a silent "no"), say so: split stack is off here until the Go driver can
+   be told at run time.  That matches what a cross build with no target headers
+   has always produced, and differs from a native powerpc64 build.  */
+#if 0 /* was: TARGET_GLIBC_MAJOR * 1000 + TARGET_GLIBC_MINOR >= 2018 */
 # ifndef RS6000_BI_ARCH
 #  define TARGET_CAN_SPLIT_STACK
 # else
@@ -547,12 +555,9 @@ extern int dot_symbols;
 #define TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P \
   rs6000_linux_float_exceptions_rounding_supported_p
 
-/* Support for TARGET_ATOMIC_ASSIGN_EXPAND_FENV without FPRs depends
-   on glibc 2.19 or greater.  */
-#if TARGET_GLIBC_MAJOR > 2 \
-  || (TARGET_GLIBC_MAJOR == 2 && TARGET_GLIBC_MINOR >= 19)
-#define RS6000_GLIBC_ATOMIC_FENV 1
-#endif
+/* The glibc 2.19 test that used to define RS6000_GLIBC_ATOMIC_FENV here is now
+   a runtime one in rs6000_atomic_assign_expand_fenv: the target glibc version
+   is supplied per target rather than frozen in when GCC was configured.  */
 
 /* The IEEE 128-bit emulator is only built on Linux systems.  Flag that we
    should enable the type handling for KFmode on VSX systems even if we are not

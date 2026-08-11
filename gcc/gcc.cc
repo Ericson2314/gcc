@@ -5015,7 +5015,23 @@ process_command (unsigned int decoded_options_count,
 #endif
     }
 
-  /* TODO: check if -static -pie works and maybe use it.  */
+  /* -z now / -z relro for -fhardened.  These were HAVE_LD_NOW_SUPPORT and
+   HAVE_LD_RELRO_SUPPORT out of auto-host.h.  They are runtime capabilities now
+   (targ_caps.ld_now / ld_relro) -- but targ_caps lives in cc1, and the driver
+   deliberately includes no tm.h and no defaults.h, so it cannot read them.
+
+   Until these move to a spec fragment the way link_buildid did, the driver uses
+   the answer every current GNU ld gives.  Emitting -z now / -z relro to a
+   linker that does not know them is the failure mode this trades against, and
+   it only arises for -fhardened on a pre-2000s linker.  */
+#ifndef HAVE_LD_NOW_SUPPORT_DRIVER
+#define HAVE_LD_NOW_SUPPORT_DRIVER 1
+#endif
+#ifndef HAVE_LD_RELRO_SUPPORT_DRIVER
+#define HAVE_LD_RELRO_SUPPORT_DRIVER 1
+#endif
+
+/* TODO: check if -static -pie works and maybe use it.  */
   if (flag_hardened)
     {
       if (!avoid_linker_hardening_p && !static_p)
@@ -5025,12 +5041,12 @@ process_command (unsigned int decoded_options_count,
 #endif
 	  /* These are passed straight down to collect2 so we have to break
 	     it up like this.  */
-	  if (HAVE_LD_NOW_SUPPORT)
+	  if (HAVE_LD_NOW_SUPPORT_DRIVER)
 	    {
 	      add_infile ("-z", "*");
 	      add_infile ("now", "*");
 	    }
-	  if (HAVE_LD_RELRO_SUPPORT)
+	  if (HAVE_LD_RELRO_SUPPORT_DRIVER)
 	    {
 	      add_infile ("-z", "*");
 	      add_infile ("relro", "*");

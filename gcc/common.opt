@@ -1711,7 +1711,7 @@ Common Var(flag_dump_unnumbered_links)
 Suppress output of previous and next insn numbers in debugging dumps.
 
 fdwarf2-cfi-asm
-Common Var(flag_dwarf2_cfi_asm) Init(HAVE_GAS_CFI_DIRECTIVE)
+Common Var(flag_dwarf2_cfi_asm) Init(1)
 Enable CFI tables via GAS assembler directives.
 
 fearly-inlining

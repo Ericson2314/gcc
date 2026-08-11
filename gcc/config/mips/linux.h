@@ -53,8 +53,8 @@ along with GCC; see the file COPYING3.  If not see
 
 #undef NEED_INDICATE_EXEC_STACK
 
-#ifdef TARGET_LIBC_GNUSTACK
-#define NEED_INDICATE_EXEC_STACK 1
-#else
-#define NEED_INDICATE_EXEC_STACK TARGET_SOFT_FLOAT
-#endif
+/* If the target C library honours PT_GNU_STACK -- musl always, glibc from 2.31
+   -- say so explicitly; otherwise the note is only emitted for soft float, as
+   it always was.  Which libc the target has is supplied at run time now, so
+   this is an expression rather than a configure-time #ifdef.  */
+#define NEED_INDICATE_EXEC_STACK (targ_caps.libc_gnustack || TARGET_SOFT_FLOAT)

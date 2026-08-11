@@ -1042,122 +1042,6 @@ internal_error_function (diagnostics::context *, const char *, va_list *)
   emergency_dump_function ();
 }
 
-/* Target assembler/linker capabilities.  Initialised to what a modern GNU
-   toolchain supports, so a compiler invoked without a target-config file
-   behaves like a normally-configured one.  */
-struct target_caps targ_caps =
-{
-  /* leb128 */ true,
-  /* s390_excess_float_precision */ false,
-  /* decimal_float */ false,
-  /* decimal_bid_format */ false,
-  /* cfi_personality */ true,
-  /* cfi_sections */ true,
-  /* gas_loc_stmt */ true,
-  /* gas_discriminator */ true,
-  /* as_line_zero */ true,
-  /* dwarf2_debug_line */ true,
-  /* dwarf2_debug_view */ true,
-  /* gas_hidden */ true,
-  /* ld_ro_rw_section_mixing */ true,
-  /* ld_eh_gc_sections */ true,
-  /* ld_ctf */ false,
-  /* ld_sysroot */ true,
-  /* ld_at_file */ true,
-  /* ld_pie_copyreloc */ true,
-  /* ld_personality_relaxation */ false,
-  /* ld_no_dot_syms */ false,
-  /* ld_large_toc */ false,
-  /* ld_toc_align */ false,
-  /* ld_ppc_attr */ false,
-  /* ld_broken_pe_dwarf5 */ false,
-  /* ld_avr_avrxmega3_rodata_in_flash */ false,
-  /* ld_avr_avrxmega2_flmap */ false,
-  /* ld_avr_avrxmega4_flmap */ false
-};
-
-/* Read capability settings from FILE.  Format is one `name value' pair per
-   line; `#' starts a comment.  Unknown names are ignored so that a newer spec
-   file does not break an older compiler.  A missing or unreadable file is not
-   an error -- the built-in defaults stand.  */
-
-void
-read_target_caps (const char *file)
-{
-  FILE *f = fopen (file, "r");
-  if (f == NULL)
-    return;
-
-  char line[256];
-  while (fgets (line, sizeof (line), f) != NULL)
-    {
-      char name[64];
-      int value;
-
-      if (line[0] == '#' || line[0] == '\n')
-	continue;
-      if (sscanf (line, "%63s %d", name, &value) != 2)
-	continue;
-
-      if (strcmp (name, "leb128") == 0)
-	targ_caps.leb128 = value != 0;
-      else if (strcmp (name, "s390_excess_float_precision") == 0)
-	targ_caps.s390_excess_float_precision = value != 0;
-      else if (strcmp (name, "decimal_float") == 0)
-	targ_caps.decimal_float = value != 0;
-      else if (strcmp (name, "decimal_bid_format") == 0)
-	targ_caps.decimal_bid_format = value != 0;
-      else if (strcmp (name, "cfi_personality") == 0)
-	targ_caps.cfi_personality = value != 0;
-      else if (strcmp (name, "cfi_sections") == 0)
-	targ_caps.cfi_sections = value != 0;
-      else if (strcmp (name, "gas_loc_stmt") == 0)
-	targ_caps.gas_loc_stmt = value != 0;
-      else if (strcmp (name, "gas_discriminator") == 0)
-	targ_caps.gas_discriminator = value != 0;
-      else if (strcmp (name, "as_line_zero") == 0)
-	targ_caps.as_line_zero = value != 0;
-      else if (strcmp (name, "dwarf2_debug_line") == 0)
-	targ_caps.dwarf2_debug_line = value != 0;
-      else if (strcmp (name, "dwarf2_debug_view") == 0)
-	targ_caps.dwarf2_debug_view = value != 0;
-      else if (strcmp (name, "gas_hidden") == 0)
-	targ_caps.gas_hidden = value != 0;
-      else if (strcmp (name, "ld_ro_rw_section_mixing") == 0)
-	targ_caps.ld_ro_rw_section_mixing = value != 0;
-      else if (strcmp (name, "ld_eh_gc_sections") == 0)
-	targ_caps.ld_eh_gc_sections = value != 0;
-      else if (strcmp (name, "ld_ctf") == 0)
-	targ_caps.ld_ctf = value != 0;
-      else if (strcmp (name, "ld_sysroot") == 0)
-	targ_caps.ld_sysroot = value != 0;
-      else if (strcmp (name, "ld_at_file") == 0)
-	targ_caps.ld_at_file = value != 0;
-      else if (strcmp (name, "ld_pie_copyreloc") == 0)
-	targ_caps.ld_pie_copyreloc = value != 0;
-      else if (strcmp (name, "ld_personality_relaxation") == 0)
-	targ_caps.ld_personality_relaxation = value != 0;
-      else if (strcmp (name, "ld_no_dot_syms") == 0)
-	targ_caps.ld_no_dot_syms = value != 0;
-      else if (strcmp (name, "ld_large_toc") == 0)
-	targ_caps.ld_large_toc = value != 0;
-      else if (strcmp (name, "ld_toc_align") == 0)
-	targ_caps.ld_toc_align = value != 0;
-      else if (strcmp (name, "ld_ppc_attr") == 0)
-	targ_caps.ld_ppc_attr = value != 0;
-      else if (strcmp (name, "ld_broken_pe_dwarf5") == 0)
-	targ_caps.ld_broken_pe_dwarf5 = value != 0;
-      else if (strcmp (name, "ld_avr_avrxmega3_rodata_in_flash") == 0)
-	targ_caps.ld_avr_avrxmega3_rodata_in_flash = value != 0;
-      else if (strcmp (name, "ld_avr_avrxmega2_flmap") == 0)
-	targ_caps.ld_avr_avrxmega2_flmap = value != 0;
-      else if (strcmp (name, "ld_avr_avrxmega4_flmap") == 0)
-	targ_caps.ld_avr_avrxmega4_flmap = value != 0;
-    }
-
-  fclose (f);
-}
-
 /* Initialization of the front end environment, before command line
    options are parsed.  Signal handlers, internationalization etc.
    ARGV0 is main's argv[0].  */
@@ -2482,6 +2366,13 @@ toplev::main (int argc, char **argv)
      pass consults targ_caps.  */
   if (target_config_file != NULL)
     read_target_caps (target_config_file);
+
+  /* .cfi_* output is only possible if the assembler takes the directives.
+     common.opt has to Init() this to a constant, so the real answer is applied
+     here, once the target config is known -- but never over an explicit
+     -fdwarf2-cfi-asm or -fno-dwarf2-cfi-asm.  */
+  if (!global_options_set.x_flag_dwarf2_cfi_asm)
+    flag_dwarf2_cfi_asm = targ_caps.cfi_directive;
 
   handle_common_deferred_options ();
 

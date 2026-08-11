@@ -1922,6 +1922,7 @@ OBJS = \
 # Objects in libcommon.a, potentially used by all host binaries and with
 # no target dependencies.
 OBJS-libcommon = \
+	target-caps.o \
 	custom-sarif-properties/cfg.o \
 	custom-sarif-properties/digraphs.o \
 	custom-sarif-properties/state-graphs.o \
@@ -2650,6 +2651,13 @@ collect2$(exeext): $(COLLECT2_OBJS) $(LIBDEPS)
 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o T$@ \
 		$(COLLECT2_OBJS) $(LIBS) $(COLLECT2_LIBS)
 	mv -f T$@ $@
+
+# targ_caps is initialised with designated initializers on purpose -- three
+# people have now mis-assigned a field by appending to a positional list, and
+# only designators make that a compile error rather than a silent wrong
+# default.  They are a C++20 feature and this tree builds as C++17, so the
+# extension warning is turned off here rather than the safety given up.
+CFLAGS-target-caps.o += -Wno-c++20-extensions
 
 CFLAGS-collect2.o += -DTARGET_MACHINE=\"$(target_noncanonical)\" \
 

@@ -26,6 +26,7 @@
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+#include "target-caps.h"
 #include "c-family/c-common.h"
 #include "memmodel.h"
 #include "tm_p.h"
@@ -623,9 +624,10 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__SIZEOF_IBM128__=16");
   if (ieee128_float_type_node)
     builtin_define ("__SIZEOF_IEEE128__=16");
-#ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
-  builtin_define ("__BUILTIN_CPU_SUPPORTS__");
-#endif
+  /* Only meaningful if the target C library exports the hardware capability
+     bits (glibc 2.23 and newer); that is told to us per target now.  */
+  if (targ_caps.libc_hwcap_in_tcb)
+    builtin_define ("__BUILTIN_CPU_SUPPORTS__");
 
   if (TARGET_EXTRA_BUILTINS && cpp_get_options (pfile)->lang != CLK_ASM)
     {

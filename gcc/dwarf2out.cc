@@ -3325,20 +3325,12 @@ skeleton_chain_node;
 
 /* Use assembler line directives if available.  */
 #ifndef DWARF2_ASM_LINE_DEBUG_INFO
-#ifdef HAVE_AS_DWARF2_DEBUG_LINE
-#define DWARF2_ASM_LINE_DEBUG_INFO 1
-#else
-#define DWARF2_ASM_LINE_DEBUG_INFO 0
-#endif
+#define DWARF2_ASM_LINE_DEBUG_INFO (targ_caps.dwarf2_debug_line)
 #endif
 
 /* Use assembler views in line directives if available.  */
 #ifndef DWARF2_ASM_VIEW_DEBUG_INFO
-#ifdef HAVE_AS_DWARF2_DEBUG_VIEW
-#define DWARF2_ASM_VIEW_DEBUG_INFO 1
-#else
-#define DWARF2_ASM_VIEW_DEBUG_INFO 0
-#endif
+#define DWARF2_ASM_VIEW_DEBUG_INFO (targ_caps.dwarf2_debug_view)
 #endif
 
 /* Return true if GCC configure detected assembler support for .loc.  */
@@ -29313,10 +29305,11 @@ dwarf2out_source_line (unsigned int line, unsigned int column,
 
       if (is_stmt != table->is_stmt)
 	{
-#if HAVE_GAS_LOC_STMT
-	  fputs (" is_stmt ", asm_out_file);
-	  putc (is_stmt ? '1' : '0', asm_out_file);
-#endif
+	  if (HAVE_GAS_LOC_STMT)
+	    {
+	      fputs (" is_stmt ", asm_out_file);
+	      putc (is_stmt ? '1' : '0', asm_out_file);
+	    }
 	}
       if (SUPPORTS_DISCRIMINATOR && discriminator != 0)
 	{
