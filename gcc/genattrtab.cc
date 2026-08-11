@@ -4971,6 +4971,10 @@ find_tune_attr (rtx exp)
    Write the DFA and latency function prototypes to  the files that
    need to have them, and write the init_sched_attrs().  */
 
+/* Variant suffix used when the machine description has no tuning
+   attribute, so that the one worker is named like the many.  */
+#define DFA_SINGLE_VARIANT "single"
+
 static void
 make_automaton_attrs (void)
 {
@@ -5149,8 +5153,39 @@ make_automaton_attrs (void)
 	  XVECEXP (lats_exp, 0, i+1)
 	    = make_numeric_value (decl->default_latency);
 	}
-      make_internal_attr ("*internal_dfa_insn_code", code_exp, ATTR_NONE);
-      make_internal_attr ("*insn_default_latency",   lats_exp, ATTR_NONE);
+      /* Same shape as the tune-attr arm above, with exactly one variant:
+	 the two workers get the _<variant> suffix and live in
+	 insn-dfatab.cc / insn-latencytab.cc, and the bare names are
+	 pointers here in insn-attrtab.cc that init_sched_attrs ()
+	 assigns.  Upstream emits plain functions here and #defines
+	 init_sched_attrs () away, which makes the KIND of two extern
+	 names depend on the machine description -- unusable when the
+	 middle end is compiled once against a single insn-attr.h.  */
+      make_internal_attr ("*internal_dfa_insn_code_" DFA_SINGLE_VARIANT,
+			  code_exp, ATTR_NONE);
+      make_internal_attr ("*insn_default_latency_" DFA_SINGLE_VARIANT,
+			  lats_exp, ATTR_NONE);
+
+      fprintf (dfa_file,
+	       "extern int internal_dfa_insn_code_%s (rtx_insn *);\n\n",
+	       DFA_SINGLE_VARIANT);
+      fprintf (latency_file,
+	       "extern int insn_default_latency_%s (rtx_insn *);\n\n",
+	       DFA_SINGLE_VARIANT);
+      fprintf (attr_file,
+	       "extern int internal_dfa_insn_code_%s (rtx_insn *);\n"
+	       "extern int insn_default_latency_%s (rtx_insn *);\n\n",
+	       DFA_SINGLE_VARIANT, DFA_SINGLE_VARIANT);
+      fprintf (attr_file, "int (*internal_dfa_insn_code) (rtx_insn *);\n");
+      fprintf (attr_file, "int (*insn_default_latency) (rtx_insn *);\n\n");
+      fprintf (attr_file, "void\ninit_sched_attrs (void)\n{\n");
+      fprintf (attr_file, "  internal_dfa_insn_code\n"
+			  "    = internal_dfa_insn_code_%s;\n",
+	       DFA_SINGLE_VARIANT);
+      fprintf (attr_file, "  insn_default_latency\n"
+			  "    = insn_default_latency_%s;\n",
+	       DFA_SINGLE_VARIANT);
+      fprintf (attr_file, "}\n\n");
     }
 
   if (n_bypasses == 0)
@@ -5262,17 +5297,18 @@ main (int argc, const char **argv)
      same namespace and pulls back into scope, so distinguishing them is
      enough.
 
-     insn-dfatab.cc and insn-latencytab.cc are deliberately NOT namespaced.
-     Their two symbols, internal_dfa_insn_code and insn_default_latency,
-     change KIND with has_tune_attr (genattr.cc:224): a function here, a
-     function POINTER plus init_sched_attrs () there.  haifa-sched.cc calls
-     them through the singular insn-attr.h, i.e. through the primary's
-     shape, so two back ends that disagree give the middle end a call
-     through the wrong indirection -- a miscompile with no diagnostic.  A
-     namespace would remove the link collision and leave that intact, i.e.
-     it would look fixed and not be.  Making the shape uniform first is a
-     selector decision; see the handover.  */
+     insn-dfatab.cc and insn-latencytab.cc are namespaced too.  That is only
+     safe now that make_automaton_attrs () below gives them a uniform shape:
+     they export internal_dfa_insn_code_<variant> / insn_default_latency_<
+     variant> whether or not the back end has a tuning attribute, and the
+     bare names are function POINTERS defined here in insn-attrtab.cc and
+     assigned by init_sched_attrs ().  Namespacing them WITHOUT that would
+     have cleared the link collision and left the kind mismatch intact --
+     the middle end includes the singular insn-attr.h, so it would call
+     through the primary's indirection for every back end.  */
   print_ns_open (attr_file);
+  print_ns_open (dfa_file);
+  print_ns_open (latency_file);
 
   obstack_init (hash_obstack);
   obstack_init (temp_obstack);
@@ -5423,6 +5459,8 @@ main (int argc, const char **argv)
   write_length_unit_log (attr_file);
 
   print_ns_close (attr_file);
+  print_ns_close (dfa_file);
+  print_ns_close (latency_file);
 
   if (fclose (attr_file) != 0)
     fatal ("cannot close file %s: %s", attr_file_name, xstrerror (errno));

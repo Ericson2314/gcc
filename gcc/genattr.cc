@@ -105,68 +105,6 @@ extern int insn_current_length (rtx_insn *);");
     }
 }
 
-/* Check that attribute NAME is used in define_insn_reservation condition
-   EXP.  Return true if it is.  */
-static bool
-check_tune_attr (const char *name, rtx exp)
-{
-  switch (GET_CODE (exp))
-    {
-    case AND:
-      if (check_tune_attr (name, XEXP (exp, 0)))
-	return true;
-      return check_tune_attr (name, XEXP (exp, 1));
-
-    case IOR:
-      return (check_tune_attr (name, XEXP (exp, 0))
-	      && check_tune_attr (name, XEXP (exp, 1)));
-
-    case EQ_ATTR:
-      return strcmp (XSTR (exp, 0), name) == 0;
-
-    default:
-      return false;
-    }
-}
-
-/* Try to find a const attribute (usually cpu or tune) that is used
-   in all define_insn_reservation conditions.  */
-static bool
-find_tune_attr (rtx exp)
-{
-  unsigned int i;
-  rtx attr;
-
-  switch (GET_CODE (exp))
-    {
-    case AND:
-    case IOR:
-      if (find_tune_attr (XEXP (exp, 0)))
-	return true;
-      return find_tune_attr (XEXP (exp, 1));
-
-    case EQ_ATTR:
-      if (strcmp (XSTR (exp, 0), "alternative") == 0)
-	return false;
-
-      FOR_EACH_VEC_ELT (const_attrs, i, attr)
-	if (strcmp (XSTR (attr, 0), XSTR (exp, 0)) == 0)
-	  {
-	    unsigned int j;
-	    rtx resv;
-
-	    FOR_EACH_VEC_ELT (reservations, j, resv)
-	      if (! check_tune_attr (XSTR (attr, 0), XEXP (resv, 2)))
-		return false;
-	    return true;
-	  }
-      return false;
-
-    default:
-      return false;
-    }
-}
-
 int
 main (int argc, const char **argv)
 {
@@ -236,8 +174,6 @@ main (int argc, const char **argv)
 
   if (num_insn_reservations > 0)
     {
-      bool has_tune_attr
-	= find_tune_attr (XEXP (reservations[0], 2));
       /* Output interface for pipeline hazards recognition based on
 	 DFA (deterministic finite state automata.  */
       printf ("\n/* DFA based pipeline interface.  */");
@@ -250,32 +186,30 @@ main (int argc, const char **argv)
       printf ("#ifndef CPU_UNITS_QUERY\n");
       printf ("#define CPU_UNITS_QUERY 0\n");
       printf ("#endif\n\n");
-      /* Interface itself: */
-      if (has_tune_attr)
-	{
-	  printf ("/* Initialize fn pointers for internal_dfa_insn_code\n");
-	  printf ("   and insn_default_latency.  */\n");
-	  printf ("extern void init_sched_attrs (void);\n\n");
-	  printf ("/* Internal insn code number used by automata.  */\n");
-	  printf ("extern int (*internal_dfa_insn_code) (rtx_insn *);\n\n");
-	  printf ("/* Insn latency time defined in define_insn_reservation. */\n");
-	  printf ("extern int (*insn_default_latency) (rtx_insn *);\n\n");
-	}
-      else
-	{
-	  printf ("#define init_sched_attrs() do { } while (0)\n\n");
-	  printf ("/* Internal insn code number used by automata.  */\n");
-	  printf ("extern int internal_dfa_insn_code (rtx_insn *);\n\n");
-	  printf ("/* Insn latency time defined in define_insn_reservation. */\n");
-	  printf ("extern int insn_default_latency (rtx_insn *);\n\n");
-	}
-      /* internal_dfa_insn_code / insn_default_latency / init_sched_attrs
-	 just above stay GLOBAL on purpose: their KIND depends on
-	 has_tune_attr (function vs function pointer), so they are a
-	 selector problem and namespacing them would hide that rather than
-	 solve it.  See the note in genattrtab.cc.  Everything below is
-	 genautomata's output, declared nowhere but here.  */
+      /* Interface itself.
+
+	 internal_dfa_insn_code and insn_default_latency are function
+	 POINTERS unconditionally, and init_sched_attrs () is always a real
+	 function that assigns them.  Upstream these change KIND with
+	 has_tune_attr -- pointers plus an init for a back end with a tuning
+	 attribute, plain functions and a no-op init otherwise.  That is not
+	 expressible here: the middle end includes the SINGULAR insn-attr.h,
+	 gets whichever shape the primary happens to have, and would call
+	 through the wrong indirection for every other back end -- a
+	 miscompile with no diagnostic, and one that a symbol sweep cannot
+	 see because the two shapes mangle differently.  The pointer is also
+	 the shape the per-base selector needs, so the tune-attr case is the
+	 general one and the single-automaton case is a one-armed instance
+	 of it.  Cost: one indirection per query on back ends that would
+	 otherwise have called direct.  */
       print_ns_open (stdout);
+      printf ("/* Initialize fn pointers for internal_dfa_insn_code\n");
+      printf ("   and insn_default_latency.  */\n");
+      printf ("extern void init_sched_attrs (void);\n\n");
+      printf ("/* Internal insn code number used by automata.  */\n");
+      printf ("extern int (*internal_dfa_insn_code) (rtx_insn *);\n\n");
+      printf ("/* Insn latency time defined in define_insn_reservation. */\n");
+      printf ("extern int (*insn_default_latency) (rtx_insn *);\n\n");
       printf ("/* Return nonzero if there is a bypass for given insn\n");
       printf ("   which is a data producer.  */\n");
       printf ("extern int bypass_p (rtx_insn *);\n\n");
