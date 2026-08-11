@@ -2168,11 +2168,11 @@ ${AWK} '
       # opts.cc then names a different option.  That is what made
       # default_options_optimization walk this back end
       # option_optimization_table straight into parse_sanitizer_options.
-      printf "optionlist-%s: $(lang_opt_files)%s optionlist-vocab $(srcdir)/opt-gather.awk $(srcdir)/opt-stub.awk\n", b, files[[b]]
+      printf "optionlist-%s: $(lang_opt_files)%s optionlist-vocab $(srcdir)/opt-gather.awk $(srcdir)/opt-functions.awk $(srcdir)/opt-stub.awk\n", b, files[[b]]
       printf "\tLC_ALL=C; export LC_ALL; \\\n"
       printf "\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@.own\n", files[[b]]
-      printf "\t$(AWK) -f $(srcdir)/opt-stub.awk -v vocab=optionlist-vocab \\\n"
-      printf "\t  optionlist-vocab $@.own > $@.stub\n"
+      printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-stub.awk \\\n"
+      printf "\t  -v vocab=optionlist-vocab optionlist-vocab $@.own > $@.stub\n"
       printf "\t@echo \"$@: `wc -l < $@.own` own + `wc -l < $@.stub` placeholder records\"\n"
       printf "\tLC_ALL=C; export LC_ALL; \\\n"
       printf "\tcat $@.own $@.stub | sort > $@\n"

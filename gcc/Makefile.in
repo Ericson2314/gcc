@@ -3027,11 +3027,11 @@ s-options-vocab: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) $(MT_OPT_UNION_FILES) \
 
 optionlist: s-options ; @true
 s-options: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) optionlist-vocab Makefile \
-    $(srcdir)/opt-gather.awk $(srcdir)/opt-stub.awk
+    $(srcdir)/opt-gather.awk $(srcdir)/opt-functions.awk $(srcdir)/opt-stub.awk
 	LC_ALL=C ; export LC_ALL ; \
 	$(AWK) -f $(srcdir)/opt-gather.awk $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) > tmp-optionlist-own
-	$(AWK) -f $(srcdir)/opt-stub.awk -v vocab=optionlist-vocab \
-	  optionlist-vocab tmp-optionlist-own > tmp-optionlist-stub
+	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-stub.awk \
+	  -v vocab=optionlist-vocab optionlist-vocab tmp-optionlist-own > tmp-optionlist-stub
 	@echo "optionlist: `wc -l < tmp-optionlist-own` own + `wc -l < tmp-optionlist-stub` placeholder records"
 	LC_ALL=C ; export LC_ALL ; \
 	cat tmp-optionlist-own tmp-optionlist-stub | sort > tmp-optionlist

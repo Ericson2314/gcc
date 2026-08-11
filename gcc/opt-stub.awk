@@ -92,6 +92,19 @@ BEGIN {
 	reserved["EnumValue"] = 1
 }
 
+# True when opth-gen.awk would comment this option's enumerator out.  This is
+# opth-gen.awk's own condition, kept in step with it deliberately; flag_set_p
+# comes from opt-functions.awk, which the make rule loads before this file so
+# that the two cannot drift apart in how a flag is recognised.
+function suppressed(flags)
+{
+	if (flag_set_p("Ignore", flags))
+		return 1
+	if (flag_set_p("Alias.*", flags) && !flag_set_p("SeparateAlias", flags))
+		return 1
+	return 0
+}
+
 function is_option(name)
 {
 	if (name in reserved)
@@ -108,21 +121,74 @@ FNR == 1 { nfile++ }
 # is empty (awk never opens it, so the consumer's file becomes the first one
 # seen), and the name alone is wrong when the same path is passed twice.
 nfile == 1 && FILENAME == vocab {
-	if (is_option($1))
+	if (is_option($1)) {
 		vocabulary[$1] = 1
+		# Accumulate the flags of every record with this name, the way
+		# opth-gen.awk merges consecutive identical options.  Only one
+		# thing is read back out of them: whether the name gets a live
+		# enumerator.  See the END block.
+		vflags[$1] = vflags[$1] " " $2
+	}
 	next
 }
 
 # Everything else: what this consumer already has.
-{ own[$1] = 1 }
+{
+	own[$1] = 1
+	# Which C identifiers this consumer's OWN options already claim.  Two
+	# different option names can sanitise to one identifier -- see the
+	# collision note in the END block.
+	claimed[opt_sanitized_name($1)] = 1
+}
 
 END {
 	if (failed)
 		exit 1
+	# How many placeholders would want each C identifier.  `enum opt_code'
+	# names are the option name with every non-alphanumeric character turned
+	# into `_', so DIFFERENT options can want the SAME enumerator:
+	# rs6000 spells one `-mlong-double-' and avr spells another
+	# `-mlong-double=', and both become OPT_mlong_double_.  A single-target
+	# build never sees both, so the clash has always been latent; padding
+	# every header up to the union is what makes them meet.
+	for (name in vocabulary)
+		if (!(name in own))
+			want[opt_sanitized_name(name)]++
+
 	n = 0
 	for (name in vocabulary)
 		if (!(name in own)) {
-			print name SUBSEP "Target Undocumented"
+			# LIVENESS IS PART OF THE VOCABULARY, not part of the
+			# data, and a placeholder has to reproduce it.
+			# opth-gen.awk gives no enumerator to an alias or an
+			# Ignore-d option -- it emits the line commented out --
+			# but the ordinal is still consumed, so this does not
+			# move any number.  What it does prevent is a
+			# REDEFINITION: v850 spells `-msda-' as
+			# `Alias(msda=)', and both names sanitise to
+			# `OPT_msda_'.  In v850's own header one of the pair is
+			# a comment.  An unconditionally live placeholder made
+			# both of them enumerators in the other 45 headers, and
+			# `redefinition of OPT_msda_' is a compile error --
+			# which is how another agent's build hit this before I
+			# did.  Same for -Wlarger-than-, -Wshadow-local,
+			# -finline-limit- and -ftemplate-depth-.
+			#
+			# The rule for a clash is the same one the rest of this
+			# file follows: a placeholder never takes anything from
+			# the back end that really owns the name.  If this
+			# consumer already claims the identifier, or if two
+			# placeholders want it, the placeholder gives it up.
+			# The ordinal is still consumed either way -- that is
+			# the whole point of suppression rather than omission --
+			# so the numbering is untouched, and the enumerator ends
+			# up live in exactly the header whose back end declares
+			# the option.
+			e = opt_sanitized_name(name)
+			flags = "Target Undocumented"
+			if (suppressed(vflags[name]) || (e in claimed) || want[e] > 1)
+				flags = flags " Ignore"
+			print name SUBSEP flags
 			n++
 		}
 	# The caller counts the lines it got; a silent zero here would be
