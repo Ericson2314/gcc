@@ -252,6 +252,17 @@ struct target_caps
      emits .uleb128 of a view symbol.  Feeds DWARF2_ASM_VIEW_DEBUG_INFO.  */
   bool dwarf2_debug_view;
 
+  /* Assembler supports SHF_MERGE section flags (`.section .rodata.str1.1,
+     "aMS",@progbits,1').  Was HAVE_GAS_SHF_MERGE, whose probe folded the
+     `%progbits' spelling in.  Read by varasm.cc and dwarf2out.cc, both in
+     value position, so this needs no consumer change.  */
+  bool gas_shf_merge;
+
+  /* Assembler supports the `o' section flag, linking one section's lifetime
+     to another (`.section .foo,"ao",@progbits,.bar').  Was
+     HAVE_GAS_SECTION_LINK_ORDER, read by targhooks.cc in value position.  */
+  bool gas_section_link_order;
+
   /* Linker capabilities.  Was the gcc_cv_ld_* half of the configure probes;
      see the LINKER SECTION of target-specs/configure.ac, which now asks the
      real linker rather than deciding from its version number or from a

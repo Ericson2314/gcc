@@ -3578,7 +3578,7 @@ if test x${gcc_gxx_libcxx_include_dir} != x; then
     gcc_enable_stdlib_opt=1
   fi
 else
-                              gcc_enable_stdlib_opt=1
+                gcc_enable_stdlib_opt=1
 fi
 
 cat >>confdefs.h <<_ACEOF

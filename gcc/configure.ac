@@ -223,20 +223,13 @@ if test x${gcc_gxx_libcxx_include_dir} != x; then
     gcc_enable_stdlib_opt=1
   fi
 else
-  dnl A `case $target' turned -stdlib= on by default for Darwin 11 and later,
-  dnl on the grounds that those releases default to libc++.  That is a statement
-  dnl about a target, made before any target is chosen, and in a compiler
-  dnl serving 183 of them it decided the question for all of them from one
-  dnl triple.
-  dnl
-  dnl It is NOT replaced by a target-specs probe, because the consumer cannot
-  dnl take a runtime answer: c-family/c.opt:2882 carries
-  dnl `Condition(ENABLE_STDLIB_OPTION)' on -stdlib=, which the option machinery
-  dnl resolves when options.cc is COMPILED -- it decides whether the option
-  dnl EXISTS, not what it defaults to.  So the option is enabled
-  dnl unconditionally: a target whose C++ runtime has no libc++ then has
-  dnl nothing to select with it, which is a rejected argument rather than a
-  dnl silently wrong default, and that is the direction to fail in.
+  dnl -stdlib= is enabled unconditionally.  It cannot be a per-target answer:
+  dnl c-family/c.opt carries `Condition(ENABLE_STDLIB_OPTION)', which the option
+  dnl machinery resolves when options.cc is COMPILED, so it decides whether the
+  dnl option EXISTS rather than what it defaults to.  A target with no libc++
+  dnl then has nothing to select, which is a rejected argument rather than a
+  dnl silently wrong default.
+  dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:227".
   gcc_enable_stdlib_opt=1
 fi
 AC_DEFINE_UNQUOTED(ENABLE_STDLIB_OPTION, $gcc_enable_stdlib_opt,
@@ -562,33 +555,20 @@ if test x$ac_gimple_checking != x ; then
 the high-level optimizers) to be checked for dynamic type safety at
 runtime.  This is moderately expensive.])
 fi
-dnl Two assembler/linker capabilities that the target libraries read, and that
-dnl therefore cannot be runtime values.  libgcc compiles with USED_FOR_TARGET,
-dnl which is exactly the case defaults.h guards its targ_caps redefinitions out
-dnl of -- deliberately, since target-library code cannot reach targ_caps at all
-dnl -- so for those TUs auto-host.h is the only source.  When the probes were
-dnl deleted the macros became undefined there, and crtstuff.c (7 sites),
-dnl libgcc2.c, libgcov.h, offloadstuff.c and the visium and stormy16
-dnl lib2funcs.c silently stopped emitting `.hidden' for __dso_handle,
-dnl __EH_FRAME_BEGIN__ and __TMC_END__, making them globally visible.  That is a
-dnl linkage and interposition change, and `make all-gcc' cannot see it because
-dnl it never builds libgcc.
+dnl HAVE_LD_RO_RW_SECTION_MIXING is defined here, unconditionally, for LIBGCC's
+dnl benefit and not for gcc's: the compiler proper reads
+dnl targ_caps.ld_ro_rw_section_mixing (defaults.h).  GCC_TARGET_TEMPLATE lifts
+dnl the `#ifndef USED_FOR_TARGET' guard so the value reaches libgcc's
+dnl i386/cygming-crtbegin.c and cygming-crtend.c through auto-host.h, which is a
+dnl target library reading a host build's answers.  1 is what a stock build's
+dnl auto-host.h contained, so this preserves behaviour exactly.
 dnl
-dnl Defined unconditionally rather than probed.  Restoring the probe is not an
-dnl option -- removing it is the point -- and there is no runtime alternative on
-dnl this side, so the choice is between 1 and 0.  1 is what a stock build's
-dnl auto-host.h contains on every supported host, so it preserves behaviour
-dnl exactly; 0 would silently change it everywhere.  GCC_TARGET_TEMPLATE lifts
-dnl the `#ifndef USED_FOR_TARGET' guard that would otherwise keep them out of
-dnl the target-library build.  The compiler proper still gets the runtime value:
-dnl defaults.h #undefs both and redefines them in terms of targ_caps.
-dnl HAVE_GAS_HIDDEN is gone from here entirely.  The compiler proper reads
-dnl targ_caps.gas_hidden (defaults.h), so this AC_DEFINE existed for exactly one
-dnl reason: to push a value across GCC_TARGET_TEMPLATE into libgcc, which had no
-dnl probe of its own.  libgcc/configure.ac now has one -- and a better one, since
-dnl it runs the assembler that will actually assemble libgcc's objects.
-dnl Consumers were libgcc's crtstuff.c, libgcc2.c, libgcov.h, offloadstuff.c and
-dnl the visium and stormy16 lib2funcs; none in gcc/.
+dnl IT DOES NOT BELONG HERE, and the fix is already demonstrated: its sibling
+dnl HAVE_GAS_WEAK left in exactly this way, and libgcc/configure.ac:276 now
+dnl probes .weak itself -- with a better probe, since it runs the assembler that
+dnl will assemble libgcc.  This one needs the same treatment: a linker probe in
+dnl libgcc/configure.ac, after which these two lines go.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:571".
 GCC_TARGET_TEMPLATE([HAVE_LD_RO_RW_SECTION_MIXING])
 AC_DEFINE(HAVE_LD_RO_RW_SECTION_MIXING, 1,
   [Define if your linker links a mix of read-only

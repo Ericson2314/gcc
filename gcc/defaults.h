@@ -1533,6 +1533,16 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_GAS_HIDDEN (targ_caps.gas_hidden)
 #undef HAVE_LD_RO_RW_SECTION_MIXING
 #define HAVE_LD_RO_RW_SECTION_MIXING (targ_caps.ld_ro_rw_section_mixing)
+/* These two are tested in VALUE position by their consumers -- varasm.cc and
+   dwarf2out.cc say `if (HAVE_GAS_SHF_MERGE && ...)', targhooks.cc says
+   `if (HAVE_GAS_SECTION_LINK_ORDER)' -- because configure emitted them as 0/1
+   rather than defined/undefined.  So the bridge converts them outright: there
+   is no #ifdef anywhere to become vacuously true, and no source change needed.
+   Checked, not assumed; these were the only uses in the tree.  */
+#undef HAVE_GAS_SHF_MERGE
+#define HAVE_GAS_SHF_MERGE (targ_caps.gas_shf_merge)
+#undef HAVE_GAS_SECTION_LINK_ORDER
+#define HAVE_GAS_SECTION_LINK_ORDER (targ_caps.gas_section_link_order)
 #undef HAVE_LD_EH_GC_SECTIONS
 #define HAVE_LD_EH_GC_SECTIONS (targ_caps.ld_eh_gc_sections)
 #undef HAVE_LD_CTF
