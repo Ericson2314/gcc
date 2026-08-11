@@ -6871,7 +6871,14 @@ void
 default_assemble_visibility (tree decl ATTRIBUTE_UNUSED,
 			     int vis ATTRIBUTE_UNUSED)
 {
-#ifdef HAVE_GAS_HIDDEN
+  if (!HAVE_GAS_HIDDEN)
+    {
+      if (!DECL_ARTIFICIAL (decl))
+	warning (OPT_Wattributes, "visibility attribute not supported "
+		 "in this configuration; ignored");
+      return;
+    }
+
   static const char * const visibility_types[] = {
     NULL, "protected", "hidden", "internal"
   };
@@ -6888,11 +6895,6 @@ default_assemble_visibility (tree decl ATTRIBUTE_UNUSED,
   fprintf (asm_out_file, "\t.%s\t", type);
   assemble_name (asm_out_file, name);
   fprintf (asm_out_file, "\n");
-#else
-  if (!DECL_ARTIFICIAL (decl))
-    warning (OPT_Wattributes, "visibility attribute not supported "
-	     "in this configuration; ignored");
-#endif
 }
 
 /* A helper function to call assemble_visibility when needed for a decl.  */

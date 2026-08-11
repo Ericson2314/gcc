@@ -4390,12 +4390,13 @@ get_tls_wrapper_fn (tree var)
       if (TREE_PUBLIC (var))
 	{
 	  comdat_linkage (fn);
-#ifdef HAVE_GAS_HIDDEN
-	  /* Make the wrapper bind locally; there's no reason to share
-	     the wrapper between multiple shared objects.  */
-	  DECL_VISIBILITY (fn) = VISIBILITY_INTERNAL;
-	  DECL_VISIBILITY_SPECIFIED (fn) = true;
-#endif
+	  if (HAVE_GAS_HIDDEN)
+	    {
+	      /* Make the wrapper bind locally; there's no reason to share
+		 the wrapper between multiple shared objects.  */
+	      DECL_VISIBILITY (fn) = VISIBILITY_INTERNAL;
+	      DECL_VISIBILITY_SPECIFIED (fn) = true;
+	    }
 	}
       if (!TREE_PUBLIC (fn))
 	DECL_INTERFACE_KNOWN (fn) = true;

@@ -17383,11 +17383,9 @@ s390_asan_shadow_offset (void)
   return HOST_WIDE_INT_1U << 52;
 }
 
-#ifdef HAVE_GAS_HIDDEN
-# define USE_HIDDEN_LINKONCE 1
-#else
-# define USE_HIDDEN_LINKONCE 0
-#endif
+/* Was #ifdef HAVE_GAS_HIDDEN; a runtime value now, so the macro carries
+   the test rather than selecting between two definitions.  */
+#define USE_HIDDEN_LINKONCE (HAVE_GAS_HIDDEN)
 
 /* Output an indirect branch trampoline for target register REGNO.  */
 

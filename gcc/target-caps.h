@@ -235,6 +235,19 @@ struct target_caps
      distinguish gold 2.20's "only with -fuse-linker-plugin"; that middle case
      was a judgement about one obsolete linker and is not reproduced.  */
   bool lto_plugin;
+
+  /* aarch64 back-end assembler capabilities.  These were the HAVE_AS_* macros
+     the aarch64 arm of the `case $target' assembler checks in gcc/configure.ac
+     produced.  All default true: every binutils GCC still builds against has
+     had them for years, and the original probes answered "no" whenever there
+     was no assembler to ask -- quietly costing code quality on a cross build
+     rather than failing.
+
+     as_aarch64_mabi has a spec half as well; see ASM_MABI_SPEC in
+     config/aarch64/aarch64-elf.h.  */
+  bool as_aarch64_mabi;
+  bool as_aarch64_small_pic_relocs;
+  bool as_aarch64_aeabi_build_attributes;
 };
 
 extern struct target_caps targ_caps;

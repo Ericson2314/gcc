@@ -926,11 +926,11 @@ static GTY(()) hash_map<const char *, tree> *indirect_pool;
 
 static GTY(()) int dw2_const_labelno;
 
-#if defined(HAVE_GAS_HIDDEN)
-# define USE_LINKONCE_INDIRECT (SUPPORTS_ONE_ONLY && !XCOFF_DEBUGGING_INFO)
-#else
-# define USE_LINKONCE_INDIRECT 0
-#endif
+/* Was gated on #ifdef HAVE_GAS_HIDDEN; that is a runtime value now, so the
+   assembler's answer joins the other two terms instead of selecting between
+   two definitions of the macro.  */
+#define USE_LINKONCE_INDIRECT \
+  (HAVE_GAS_HIDDEN && SUPPORTS_ONE_ONLY && !XCOFF_DEBUGGING_INFO)
 
 /* Compare two std::pair<const char *, tree> by their first element.
    Returns <0, 0, or

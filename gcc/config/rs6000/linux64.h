@@ -172,26 +172,24 @@ extern int dot_symbols;
 #define MULTILIB_DEFAULTS { "m32" }
 #endif
 
-/* Split stack is only supported for 64 bit, and requires glibc >= 2.18.
-   UNCONVERTED: the rest of the TARGET_GLIBC_MAJOR/MINOR users became runtime
-   tests on targ_caps, but these two are consumed by `#ifdef' in go/gospec.cc --
-   a driver, which does not read the target config file the way cc1 does -- so
-   they have to stay preprocessor macros until gospec.cc gets the same
-   treatment.  Rather than leave the test reading two now-undefined identifiers
-   as 0 (a silent "no"), say so: split stack is off here until the Go driver can
-   be told at run time.  That matches what a cross build with no target headers
-   has always produced, and differs from a native powerpc64 build.  */
-#if 0 /* was: TARGET_GLIBC_MAJOR * 1000 + TARGET_GLIBC_MINOR >= 2018 */
-# ifndef RS6000_BI_ARCH
-#  define TARGET_CAN_SPLIT_STACK
-# else
-#  if DEFAULT_ARCH64_P
+/* Split stack is only supported for 64 bit, and requires glibc >= 2.18: it uses
+   a field in the TCB.  The glibc version is no longer known when GCC is built,
+   so the macros below say only that this target has the support in principle,
+   and the version test happens where the answer is available at run time --
+   rs6000_supports_split_stack in common/config/rs6000/rs6000-common.cc for the
+   compiler, and the marker just below for the Go driver, which reaches
+   TARGET_CAN_SPLIT_STACK by #ifdef.  */
+#define TARGET_SPLIT_STACK_NEEDS_GLIBC_2_18 1
+
+#ifndef RS6000_BI_ARCH
+# define TARGET_CAN_SPLIT_STACK
+#else
+# if DEFAULT_ARCH64_P
 /* Supported, and the default is -m64  */
-#   define TARGET_CAN_SPLIT_STACK_64BIT 1
-#  else
+#  define TARGET_CAN_SPLIT_STACK_64BIT 1
+# else
 /* Supported, and the default is -m32  */
-#   define TARGET_CAN_SPLIT_STACK_64BIT 0
-#  endif
+#  define TARGET_CAN_SPLIT_STACK_64BIT 0
 # endif
 #endif
 

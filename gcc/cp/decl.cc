@@ -11570,13 +11570,11 @@ get_dso_handle_node (void)
   dso_handle_node = declare_global_var (get_identifier ("__dso_handle"),
 					ptr_type_node);
 
-#ifdef HAVE_GAS_HIDDEN
-  if (dso_handle_node != error_mark_node)
+  if (HAVE_GAS_HIDDEN && dso_handle_node != error_mark_node)
     {
       DECL_VISIBILITY (dso_handle_node) = VISIBILITY_HIDDEN;
       DECL_VISIBILITY_SPECIFIED (dso_handle_node) = 1;
     }
-#endif
 
   return dso_handle_node;
 }

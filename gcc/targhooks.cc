@@ -1007,9 +1007,9 @@ default_external_stack_protect_fail (void)
 tree
 default_hidden_stack_protect_fail (void)
 {
-#ifndef HAVE_GAS_HIDDEN
-  return default_external_stack_protect_fail ();
-#else
+  if (!HAVE_GAS_HIDDEN)
+    return default_external_stack_protect_fail ();
+
   tree t = stack_chk_fail_decl;
 
   if (!flag_pic)
@@ -1035,7 +1035,6 @@ default_hidden_stack_protect_fail (void)
     }
 
   return build_call_expr (t, 0);
-#endif
 }
 
 bool

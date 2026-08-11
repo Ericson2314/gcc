@@ -4312,11 +4312,9 @@ output_load_pcrel_sym (rtx *operands)
   return "";
 }
 
-#ifdef HAVE_GAS_HIDDEN
-# define USE_HIDDEN_LINKONCE 1
-#else
-# define USE_HIDDEN_LINKONCE 0
-#endif
+/* Was #ifdef HAVE_GAS_HIDDEN; a runtime value now, so the macro carries
+   the test rather than selecting between two definitions.  */
+#define USE_HIDDEN_LINKONCE (HAVE_GAS_HIDDEN)
 
 /* Emit code to load the GOT register.  */
 

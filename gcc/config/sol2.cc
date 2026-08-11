@@ -128,7 +128,14 @@ solaris_output_init_fini (FILE *file, tree decl)
 void
 solaris_assemble_visibility (tree decl, int vis ATTRIBUTE_UNUSED)
 {
-#ifdef HAVE_GAS_HIDDEN
+  if (!HAVE_GAS_HIDDEN)
+    {
+      if (!DECL_ARTIFICIAL (decl))
+	warning (OPT_Wattributes, "visibility attribute not supported "
+				  "in this configuration; ignored");
+      return;
+    }
+
   /* Sun as uses .symbolic for STV_PROTECTED.  STV_INTERNAL is marked as
      `currently reserved', but the linker treats it like STV_HIDDEN.  Sun
      Studio 12.1 cc emits .hidden instead.
@@ -155,11 +162,6 @@ solaris_assemble_visibility (tree decl, int vis ATTRIBUTE_UNUSED)
   fprintf (asm_out_file, "\t.%s\t", type);
   assemble_name (asm_out_file, name);
   fprintf (asm_out_file, "\n");
-#else
-  if (!DECL_ARTIFICIAL (decl))
-    warning (OPT_Wattributes, "visibility attribute not supported "
-			      "in this configuration; ignored");
-#endif
 }
 
 /* Group section information entry stored in solaris_comdat_htab.  */

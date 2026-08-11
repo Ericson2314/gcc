@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "opts.h"
+#include "target-caps.h"
 
 /* This bit is set if we saw a `-xfoo' language specification.  */
 #define LANGSPEC	(1<<1)
@@ -272,6 +273,16 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 #ifdef TARGET_CAN_SPLIT_STACK_64BIT
   if (is_m64)
     supports_split_stack = 1;
+#endif
+
+#ifdef TARGET_SPLIT_STACK_NEEDS_GLIBC_2_18
+  /* powerpc puts the split-stack field in the TCB, which needs glibc 2.18.
+     That used to be a configure-time test against the target sysroot; the
+     version is supplied per target at run time now, and an unknown version
+     means do not offer it -- the same answer a cross build with no target
+     headers always gave.  */
+  if (!targ_glibc_at_least (2, 18))
+    supports_split_stack = 0;
 #endif
 
   /* If we are linking, pass -fsplit-stack if it is supported.  */

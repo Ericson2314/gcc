@@ -2944,12 +2944,10 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 
   if (exception_section
   /* Don't use the cached section for comdat if it will be different. */
-#ifdef HAVE_LD_EH_GC_SECTIONS
-      && !(targetm_common->have_named_sections
+      && !(HAVE_LD_EH_GC_SECTIONS
+	   && targetm_common->have_named_sections
 	   && DECL_COMDAT_GROUP (current_function_decl)
-	   && HAVE_COMDAT_GROUP)
-#endif
-     )
+	   && HAVE_COMDAT_GROUP))
     s = exception_section;
   else
     {
@@ -2971,9 +2969,10 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 	 unless it depends on the function name.  */
       if (targetm_common->have_named_sections)
 	{
-#ifdef HAVE_LD_EH_GC_SECTIONS
-	  if (flag_function_sections
-	      || (DECL_COMDAT_GROUP (current_function_decl) && HAVE_COMDAT_GROUP))
+	  if (HAVE_LD_EH_GC_SECTIONS
+	      && (flag_function_sections
+		  || (DECL_COMDAT_GROUP (current_function_decl)
+		      && HAVE_COMDAT_GROUP)))
 	    {
 	      char *section_name = XNEWVEC (char, strlen (fnname) + 32);
 	      /* The EH table must match the code section, so only mark
@@ -2985,7 +2984,6 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
 	      free (section_name);
 	    }
 	  else
-#endif
 	    exception_section
 	      = s = get_section (".gcc_except_table", flags, NULL);
 	}

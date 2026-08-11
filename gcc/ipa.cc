@@ -1078,13 +1078,11 @@ build_dso_handle_decl ()
   TREE_PUBLIC (dso_handle_decl) = true;
   DECL_EXTERNAL (dso_handle_decl) = true;
   DECL_ARTIFICIAL (dso_handle_decl) = true;
-#ifdef HAVE_GAS_HIDDEN
-  if (dso_handle_decl != error_mark_node)
+  if (HAVE_GAS_HIDDEN && dso_handle_decl != error_mark_node)
     {
       DECL_VISIBILITY (dso_handle_decl) = VISIBILITY_HIDDEN;
       DECL_VISIBILITY_SPECIFIED (dso_handle_decl) = true;
     }
-#endif
   return dso_handle_decl;
 }
 

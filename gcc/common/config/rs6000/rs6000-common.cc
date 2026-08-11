@@ -25,6 +25,7 @@
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"
+#include "target-caps.h"
 #include "flags.h"
 
 /* Implement TARGET_OPTION_OPTIMIZATION_TABLE.  */
@@ -243,14 +244,11 @@ static bool
 rs6000_supports_split_stack (bool report,
 			     struct gcc_options *opts ATTRIBUTE_UNUSED)
 {
-#ifndef TARGET_GLIBC_MAJOR
-#define TARGET_GLIBC_MAJOR 0
-#endif
-#ifndef TARGET_GLIBC_MINOR
-#define TARGET_GLIBC_MINOR 0
-#endif
+  /* The target glibc version is supplied per target at run time rather than
+     grepped out of a sysroot when GCC was configured.  common/config/ can read
+     targ_caps now that it lives in libcommon.  */
   /* Note: Can't test DEFAULT_ABI here, it isn't set until later.  */
-  if (TARGET_GLIBC_MAJOR * 1000 + TARGET_GLIBC_MINOR >= 2018
+  if (targ_glibc_at_least (2, 18)
       && TARGET_64BIT
       && TARGET_ELF)
     return true;
