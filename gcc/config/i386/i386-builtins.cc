@@ -1583,9 +1583,9 @@ ix86_builtin_vectorized_function (unsigned int fn, tree type_out,
     return NULL_TREE;
 
   out_mode = TYPE_MODE (TREE_TYPE (type_out));
-  out_n = TYPE_VECTOR_SUBPARTS (type_out);
+  out_n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
 
   switch (fn)
     {

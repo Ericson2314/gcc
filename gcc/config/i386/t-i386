@@ -83,3 +83,10 @@ s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
 	$(AWK) -f $^ > tmp-bt.inc
 	$(SHELL) $(srcdir)/../move-if-change tmp-bt.inc i386-builtin-types.inc
 	$(STAMP) $@
+
+# i386's sources have been converted to the 2-coefficient poly_int
+# discipline: they say known_lt/maybe_ne/to_constant () rather than relying
+# on the fixed-size shorthand that target code gets while
+# NUM_POLY_INT_COEFFS is 1.  Ask for the discipline now, so that the
+# eventual flip to 2 coefficients is a no-op here.  See coretypes.h.
+T_CFLAGS += -DTARGET_POLY_AWARE

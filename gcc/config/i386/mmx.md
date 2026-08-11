@@ -427,7 +427,7 @@
   [(set (reg:P SP_REG) (plus:P (reg:P SP_REG) (match_dup 2)))
    (set (match_dup 0) (match_dup 1))]
 {
-  operands[2] = GEN_INT (-PUSH_ROUNDING (GET_MODE_SIZE (<V_32:MODE>mode)));
+  operands[2] = GEN_INT (-PUSH_ROUNDING (GET_MODE_SIZE (<V_32:MODE>mode)).to_constant ());
   /* Preserve memory attributes. */
   operands[0] = replace_equiv_address (operands[0], stack_pointer_rtx);
 })
@@ -638,7 +638,7 @@
   [(set (reg:P SP_REG) (plus:P (reg:P SP_REG) (match_dup 2)))
    (set (match_dup 0) (match_dup 1))]
 {
-  operands[2] = GEN_INT (-PUSH_ROUNDING (GET_MODE_SIZE (V2QImode)));
+  operands[2] = GEN_INT (-PUSH_ROUNDING (GET_MODE_SIZE (V2QImode)).to_constant ());
   /* Preserve memory attributes. */
   operands[0] = replace_equiv_address (operands[0], stack_pointer_rtx);
 })
@@ -5298,8 +5298,8 @@
 	  (match_operand:V2SI 1 "register_operand" "0,Yv")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE4_1 && TARGET_MMX_WITH_SSE
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V2SImode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V2SImode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
   switch (which_alternative)
@@ -5330,8 +5330,8 @@
 	  (match_operand:SI 3 "const_int_operand")))]
   "(TARGET_MMX || TARGET_MMX_WITH_SSE)
    && (TARGET_SSE || TARGET_3DNOW_A)
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V4HImode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V4HImode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
   switch (which_alternative)
@@ -5369,8 +5369,8 @@
 	  (match_operand:V4FI_64 1 "sse_reg_operand")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_MMX_WITH_SSE && TARGET_SSE4_1 && reload_completed
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (<MODE>mode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (<MODE>mode))"
   [(set (match_dup 0)
 	(vec_duplicate:V4FI_64 (match_dup 2)))
    (set (match_dup 0)
@@ -5385,8 +5385,8 @@
 	  (match_operand:V8QI 1 "register_operand" "0,YW")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE4_1 && TARGET_MMX_WITH_SSE
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V8QImode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V8QImode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
   switch (which_alternative)
@@ -6008,8 +6008,8 @@
 	  (match_operand:V2FI_32 1 "register_operand" "0,YW,x")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE2
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V2HImode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V2HImode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
   switch (which_alternative)
@@ -6045,8 +6045,8 @@
 	  (match_operand:V2FI_32 1 "sse_reg_operand")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE4_1 && reload_completed
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (<MODE>mode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (<MODE>mode))"
   [(set (match_dup 0)
 	(vec_duplicate:V2FI_32 (match_dup 2)))
    (set (match_dup 0)
@@ -6062,8 +6062,8 @@
 	  (match_operand:V4QI 1 "register_operand" "0,YW")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE4_1
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V4QImode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V4QImode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
   switch (which_alternative)

@@ -2045,7 +2045,7 @@ type_natural_mode (const_tree type, const CUMULATIVE_ARGS *cum,
       HOST_WIDE_INT size = int_size_in_bytes (type);
       if ((size == 8 || size == 16 || size == 32 || size == 64)
 	  /* ??? Generic code allows us to create width 1 vectors.  Ignore.  */
-	  && known_gt (TYPE_VECTOR_SUBPARTS (type), 1))
+	  && known_gt (TYPE_VECTOR_SUBPARTS (type), 1U))
 	{
 	  machine_mode innermode = TYPE_MODE (TREE_TYPE (type));
 
@@ -2249,7 +2249,7 @@ classify_argument (machine_mode mode, const_tree type,
 		   int &zero_width_bitfields)
 {
   HOST_WIDE_INT bytes
-    = mode == BLKmode ? int_size_in_bytes (type) : (int) GET_MODE_SIZE (mode);
+    = mode == BLKmode ? int_size_in_bytes (type) : (int) GET_MODE_SIZE (mode).to_constant ();
   int words = CEIL (bytes + (bit_offset % 64) / 8, UNITS_PER_WORD);
 
   /* Variable sized entities are always passed/returned in memory.  */
@@ -2486,7 +2486,7 @@ classify_argument (machine_mode mode, const_tree type,
      exception of XFmode that is aligned to 64bits.  */
   if (mode != VOIDmode && mode != BLKmode)
     {
-      int mode_alignment = GET_MODE_BITSIZE (mode);
+      int mode_alignment = GET_MODE_BITSIZE (mode).to_constant ();
 
       if (mode == XFmode)
 	mode_alignment = 128;
@@ -2523,7 +2523,7 @@ classify_argument (machine_mode mode, const_tree type,
     case E_CHImode:
     case E_CQImode:
       {
-	int size = bit_offset + (int) GET_MODE_BITSIZE (mode);
+	int size = bit_offset + (int) GET_MODE_BITSIZE (mode).to_constant ();
 
 	/* Analyze last 128 bits only.  */
 	size = (size - 1) & 0x7f;
@@ -2794,7 +2794,7 @@ construct_container (machine_mode mode, machine_mode orig_mode,
 
   machine_mode tmpmode;
   int bytes
-    = mode == BLKmode ? int_size_in_bytes (type) : (int) GET_MODE_SIZE (mode);
+    = mode == BLKmode ? int_size_in_bytes (type) : (int) GET_MODE_SIZE (mode).to_constant ();
   enum x86_64_reg_class regclass[MAX_CLASSES];
   int n;
   int i;
@@ -3257,7 +3257,7 @@ ix86_function_arg_advance (cumulative_args_t cum_v,
   if (!cum->caller && cfun->machine->func_type != TYPE_NORMAL)
     return;
 
-  bytes = arg.promoted_size_in_bytes ();
+  bytes = arg.promoted_size_in_bytes ().to_constant ();
   words = CEIL (bytes, UNITS_PER_WORD);
 
   if (arg.type)
@@ -3586,7 +3586,7 @@ ix86_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
       return reg;
     }
 
-  bytes = arg.promoted_size_in_bytes ();
+  bytes = arg.promoted_size_in_bytes ().to_constant ();
   words = CEIL (bytes, UNITS_PER_WORD);
 
   /* To simplify the code below, represent vector types with a vector mode
@@ -3630,7 +3630,7 @@ ix86_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
       /* See Windows x64 Software Convention.  */
       if (call_abi == MS_ABI)
 	{
-	  HOST_WIDE_INT msize = GET_MODE_SIZE (arg.mode);
+	  HOST_WIDE_INT msize = GET_MODE_SIZE (arg.mode).to_constant ();
 
 	  if (tree type = arg.type)
 	    {
@@ -4338,7 +4338,7 @@ function_value_ms_64 (machine_mode orig_mode, machine_mode mode,
 
   if (TARGET_SSE)
     {
-      unsigned int mode_size = GET_MODE_SIZE (mode);
+      unsigned int mode_size = GET_MODE_SIZE (mode).to_constant ();
 
       switch (mode_size)
 	{
@@ -5146,7 +5146,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 	      tree src_addr, src;
 	      int src_offset;
 	      tree dest_addr, dest;
-	      int cur_size = GET_MODE_SIZE (mode);
+	      int cur_size = GET_MODE_SIZE (mode).to_constant ();
 
 	      gcc_assert (prev_size <= INTVAL (XEXP (slot, 1)));
 	      prev_size = INTVAL (XEXP (slot, 1));
@@ -5474,7 +5474,7 @@ standard_sse_constant_p (rtx x, machine_mode pred_mode)
       if (mode == VOIDmode)
 	mode = pred_mode;
 
-      switch (GET_MODE_SIZE (mode))
+      switch (GET_MODE_SIZE (mode).to_constant ())
 	{
 	case 64:
 	  if (TARGET_AVX512F)
@@ -6061,7 +6061,7 @@ ix86_can_use_return_insn_p (void)
 
   /* Don't allow more than 32k pop, since that's all we can do
      with one instruction.  */
-  if (crtl->args.pops_args && crtl->args.size >= 32768)
+  if (maybe_ne (crtl->args.pops_args, 0) && known_ge (crtl->args.size, 32768))
     return 0;
 
   struct ix86_frame &frame = cfun->machine->frame;
@@ -6077,7 +6077,7 @@ static HOST_WIDE_INT
 ix86_get_frame_size (void)
 {
   if (cfun->machine->stack_frame_required)
-    return get_frame_size ();
+    return get_frame_size ().to_constant ();
   else
     return 0;
 }
@@ -7257,8 +7257,8 @@ ix86_compute_frame_layout (void)
       && (!crtl->is_leaf || cfun->calls_alloca
 	  || ix86_current_function_calls_tls_descriptor))
     {
-      offset += crtl->outgoing_args_size;
-      frame->outgoing_arguments_size = crtl->outgoing_args_size;
+      offset += crtl->outgoing_args_size.to_constant ();
+      frame->outgoing_arguments_size = crtl->outgoing_args_size.to_constant ();
     }
   else
     frame->outgoing_arguments_size = 0;
@@ -7751,7 +7751,7 @@ ix86_emit_save_sse_regs_using_mov (HOST_WIDE_INT cfa_offset)
     if (SSE_REGNO_P (regno) && ix86_save_reg (regno, true, true))
       {
 	ix86_emit_save_reg_using_mov (V4SFmode, regno, cfa_offset);
-	cfa_offset -= GET_MODE_SIZE (V4SFmode);
+	cfa_offset -= GET_MODE_SIZE (V4SFmode).to_constant ();
       }
 }
 
@@ -10121,7 +10121,7 @@ ix86_emit_restore_sse_regs_using_mov (HOST_WIDE_INT cfa_offset,
 
 	ix86_add_cfa_restore_note (NULL, reg, cfa_offset);
 
-	cfa_offset -= GET_MODE_SIZE (V4SFmode);
+	cfa_offset -= GET_MODE_SIZE (V4SFmode).to_constant ();
       }
 }
 
@@ -10333,7 +10333,7 @@ ix86_expand_epilogue (int style)
 
   /* Determine the CFA offset of the end of the red-zone.  */
   m->fs.red_zone_offset = 0;
-  if (ix86_using_red_zone () && crtl->args.pops_args < 65536)
+  if (ix86_using_red_zone () && known_lt (crtl->args.pops_args, 65536))
     {
       /* The red-zone begins below return address and error code in
 	 exception handler.  */
@@ -10415,7 +10415,8 @@ ix86_expand_epilogue (int style)
 
   if (m->call_ms2sysv)
     {
-      int pop_incoming_args = crtl->args.pops_args && crtl->args.size;
+      int pop_incoming_args = (maybe_ne (crtl->args.pops_args, 0)
+			       && maybe_ne (crtl->args.size, 0));
 
       /* We cannot use a tail-call for the stub if:
 	 1. We have to pop incoming args,
@@ -10660,14 +10661,14 @@ ix86_expand_epilogue (int style)
 
   if (cfun->machine->func_type != TYPE_NORMAL)
     emit_jump_insn (gen_interrupt_return ());
-  else if (crtl->args.pops_args && crtl->args.size)
+  else if (maybe_ne (crtl->args.pops_args, 0) && maybe_ne (crtl->args.size, 0))
     {
-      rtx popc = GEN_INT (crtl->args.pops_args);
+      rtx popc = GEN_INT (crtl->args.pops_args.to_constant ());
 
       /* i386 can only pop 64K bytes.  If asked to pop more, pop return
 	 address, do explicit add, and jump indirectly to the caller.  */
 
-      if (crtl->args.pops_args >= 65536)
+      if (known_ge (crtl->args.pops_args, 65536))
 	{
 	  rtx ecx = gen_rtx_REG (SImode, CX_REG);
 	  rtx_insn *insn;
@@ -11019,7 +11020,8 @@ ix86_expand_split_stack_prologue (void)
      anyhow.  In 64-bit mode we pass the parameters in r10 and
      r11.  */
   allocate_rtx = GEN_INT (allocate);
-  args_size = crtl->args.size >= 0 ? (HOST_WIDE_INT) crtl->args.size : 0;
+  args_size = (known_ge (crtl->args.size, 0)
+	       ? crtl->args.size.to_constant () : 0);
   call_fusage = NULL_RTX;
   rtx pop = NULL_RTX;
   if (TARGET_64BIT)
@@ -11150,9 +11152,9 @@ ix86_expand_split_stack_prologue (void)
      For flow purposes gcc must not see this as a return
      instruction--we need control flow to continue at the subsequent
      label.  Therefore, we use an unspec.  */
-  gcc_assert (crtl->args.pops_args < 65536);
+  gcc_assert (known_lt (crtl->args.pops_args, 65536));
   rtx_insn *ret_insn
-    = emit_insn (gen_split_stack_return (GEN_INT (crtl->args.pops_args)));
+    = emit_insn (gen_split_stack_return (GEN_INT (crtl->args.pops_args.to_constant ())));
 
   if ((flag_cf_protection & CF_BRANCH))
     {
@@ -11710,12 +11712,13 @@ ix86_legitimate_constant_p (machine_mode mode, rtx x)
 	case E_OImode:
 	case E_XImode:
 	  if (!standard_sse_constant_p (x, mode)
-	      && GET_MODE_SIZE (TARGET_AVX512F
-				? XImode
-				: (TARGET_AVX
-				   ? OImode
-				   : (TARGET_SSE2
-				      ? TImode : DImode))) < GET_MODE_SIZE (mode))
+	      && known_lt (GET_MODE_SIZE (TARGET_AVX512F
+					  ? XImode
+					  : (TARGET_AVX
+					     ? OImode
+					     : (TARGET_SSE2
+						? TImode : DImode))),
+			   GET_MODE_SIZE (mode)))
 	    return false;
 	default:
 	  break;
@@ -12017,7 +12020,7 @@ ix86_validate_address_register (rtx op)
       /* Don't allow SUBREGs that span more than a word.  It can
 	 lead to spill failures when the register is one word out
 	 of a two word structure.  */
-      if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	return NULL_RTX;
 
       /* Allow only SUBREGs of non-eliminable hard registers.  */
@@ -14007,7 +14010,7 @@ print_reg (rtx x, int code, FILE *file)
   else if (code == 'g')
     msize = 64;
   else
-    msize = GET_MODE_SIZE (GET_MODE (x));
+    msize = GET_MODE_SIZE (GET_MODE (x)).to_constant ();
 
   regno = REGNO (x);
 
@@ -14242,7 +14245,7 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	      if (ASSEMBLER_DIALECT != ASM_ATT)
 		return;
 
-	      switch (GET_MODE_SIZE (GET_MODE (x)))
+	      switch (GET_MODE_SIZE (GET_MODE (x)).to_constant ())
 		{
 		case 2:
 		  putc ('w', file);
@@ -14273,7 +14276,7 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	      if (ASSEMBLER_DIALECT == ASM_INTEL)
 		return;
 
-	      switch (GET_MODE_SIZE (GET_MODE (x)))
+	      switch (GET_MODE_SIZE (GET_MODE (x)).to_constant ())
 		{
 		case 1:
 		  putc ('b', file);
@@ -14315,7 +14318,7 @@ ix86_print_operand (FILE *file, rtx x, int code)
 
 	  if (GET_MODE_CLASS (GET_MODE (x)) == MODE_INT)
 	    {
-	      switch (GET_MODE_SIZE (GET_MODE (x)))
+	      switch (GET_MODE_SIZE (GET_MODE (x)).to_constant ())
 		{
 		case 2:
 		  if (HAVE_AS_IX86_FILDS)
@@ -14344,7 +14347,7 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	      if (STACK_REG_P (x))
 		return;
 
-	      switch (GET_MODE_SIZE (GET_MODE (x)))
+	      switch (GET_MODE_SIZE (GET_MODE (x)).to_constant ())
 		{
 		case 4:
 		  putc ('s', file);
@@ -14800,7 +14803,7 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	    /* ... or BLKmode operands, when not overridden.  */
 	    size = NULL;
 	  else
-	    switch (GET_MODE_SIZE (mode))
+	    switch (GET_MODE_SIZE (mode).to_constant ())
 	      {
 	      case 1: size = "BYTE"; break;
 	      case 2: size = "WORD"; break;
@@ -16838,7 +16841,7 @@ ix86_build_const_vector (machine_mode mode, bool vect, rtx value)
     case E_V8BFmode:
     case E_V4BFmode:
     case E_V2BFmode:
-      n_elt = GET_MODE_NUNITS (mode);
+      n_elt = GET_MODE_NUNITS (mode).to_constant ();
       v = rtvec_alloc (n_elt);
       scalar_mode = GET_MODE_INNER (mode);
 
@@ -16916,8 +16919,8 @@ ix86_build_signbit_mask (machine_mode mode, bool vect, bool invert)
     }
 
   machine_mode inner_mode = GET_MODE_INNER (mode);
-  w = wi::set_bit_in_zero (GET_MODE_BITSIZE (inner_mode) - 1,
-			   GET_MODE_BITSIZE (inner_mode));
+  w = wi::set_bit_in_zero (GET_MODE_BITSIZE (inner_mode).to_constant () - 1,
+			   GET_MODE_BITSIZE (inner_mode).to_constant ());
   if (invert)
     w = wi::bit_not (w);
 
@@ -16937,13 +16940,13 @@ ix86_build_signbit_mask (machine_mode mode, bool vect, bool invert)
 HOST_WIDE_INT
 ix86_convert_const_vector_to_integer (rtx op, machine_mode mode)
 {
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     gcc_unreachable ();
 
-  int nunits = GET_MODE_NUNITS (mode);
-  wide_int val = wi::zero (GET_MODE_BITSIZE (mode));
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
+  wide_int val = wi::zero (GET_MODE_BITSIZE (mode).to_constant ());
   machine_mode innermode = GET_MODE_INNER (mode);
-  unsigned int innermode_bits = GET_MODE_BITSIZE (innermode);
+  unsigned int innermode_bits = GET_MODE_BITSIZE (innermode).to_constant ();
 
   switch (mode)
     {
@@ -19324,7 +19327,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	  if (TREE_CODE (args[0]) == VECTOR_CST)
 	    {
 	      HOST_WIDE_INT res = 0;
-	      for (unsigned i = 0; i < VECTOR_CST_NELTS (args[0]); ++i)
+	      for (unsigned i = 0; known_lt (i, VECTOR_CST_NELTS (args[0])); ++i)
 		{
 		  tree e = VECTOR_CST_ELT (args[0], i);
 		  if (TREE_CODE (e) == INTEGER_CST && !TREE_OVERFLOW (e))
@@ -19514,7 +19517,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 		  || TREE_SIDE_EFFECTS (args[n_args - 2]))
 		break;
 	      mask = tree_to_uhwi (args[n_args - 1]);
-	      unsigned elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0]));
+	      unsigned elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])).to_constant ();
 	      mask |= HOST_WIDE_INT_M1U << elems;
 	      if (mask != HOST_WIDE_INT_M1U
 		  && TREE_CODE (args[n_args - 2]) != VECTOR_CST)
@@ -19550,7 +19553,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	      tree_vector_builder builder;
 	      if (mask != HOST_WIDE_INT_M1U || is_vshift)
 		builder.new_vector (TREE_TYPE (args[0]),
-				    TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])),
+				    TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])).to_constant (),
 				    1);
 	      else
 		builder.new_unary_operation (TREE_TYPE (args[0]), args[0],
@@ -19663,7 +19666,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 		  || TREE_SIDE_EFFECTS (args[2]))
 		break;
 	      mask = TREE_INT_CST_LOW (args[3]);
-	      unsigned elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0]));
+	      unsigned elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])).to_constant ();
 	      mask |= HOST_WIDE_INT_M1U << elems;
 	      if (mask != HOST_WIDE_INT_M1U
 		  && TREE_CODE (args[2]) != VECTOR_CST)
@@ -19701,7 +19704,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	      break;
 	    if (mask != HOST_WIDE_INT_M1U)
 	      {
-		unsigned nelts = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0]));
+		unsigned nelts = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])).to_constant ();
 		vec_perm_builder sel (nelts, nelts, 1);
 		for (unsigned int i = 0; i < nelts; i++)
 		  if (mask & (HOST_WIDE_INT_1U << i))
@@ -19716,7 +19719,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	      }
 	    if (is_scalar)
 	      {
-		unsigned nelts = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0]));
+		unsigned nelts = TYPE_VECTOR_SUBPARTS (TREE_TYPE (args[0])).to_constant ();
 		vec_perm_builder sel (nelts, nelts, 1);
 		sel.quick_push (0);
 		for (unsigned int i = 1; i < nelts; i++)
@@ -20107,7 +20110,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	}
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
-      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)).to_constant ();
       /* For masked shift, only optimize if the mask is all ones.  */
       if (n_args > 2
 	  && !ix86_masked_all_ones (elems, gimple_call_arg (stmt, n_args - 1)))
@@ -20122,7 +20125,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	  else if (rcode == ASHIFTRT)
 	    break;
 	  else
-	    for (unsigned int i = 0; i < VECTOR_CST_NELTS (arg1); ++i)
+	    for (unsigned int i = 0; known_lt (i, VECTOR_CST_NELTS (arg1)); ++i)
 	      {
 		tree elt = VECTOR_CST_ELT (arg1, i);
 		if (!wi::neg_p (wi::to_wide (elt))
@@ -20167,7 +20170,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case IX86_BUILTIN_SHUFPS:
     case IX86_BUILTIN_SHUFPS256:
       arg0 = gimple_call_arg (stmt, 0);
-      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)).to_constant ();
       /* This is masked shuffle.  Only optimize if the mask is all ones.  */
       if (n_args > 3
 	  && !ix86_masked_all_ones (elems,
@@ -20255,7 +20258,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	  return true;
 	}
       arg0 = gimple_call_arg (stmt, 0);
-      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)).to_constant ();
       /* For masked ABS, only optimize if the mask is all ones.  */
       if (n_args > 1
 	  && !ix86_masked_all_ones (elems, gimple_call_arg (stmt, n_args - 1)))
@@ -20313,7 +20316,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	break;
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
-      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+      elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)).to_constant ();
       /* For masked minmax, only optimize if the mask is all ones.  */
       if (n_args > 2
 	  && !ix86_masked_all_ones (elems, gimple_call_arg (stmt, 3)))
@@ -20368,9 +20371,9 @@ ix86_veclibabi_svml (combined_fn fn, tree type_out, tree type_in)
     return NULL_TREE;
 
   el_mode = TYPE_MODE (TREE_TYPE (type_out));
-  n = TYPE_VECTOR_SUBPARTS (type_out);
+  n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
   if (el_mode != in_mode
       || n != in_n)
     return NULL_TREE;
@@ -20464,9 +20467,9 @@ ix86_veclibabi_acml (combined_fn fn, tree type_out, tree type_in)
     return NULL_TREE;
 
   el_mode = TYPE_MODE (TREE_TYPE (type_out));
-  n = TYPE_VECTOR_SUBPARTS (type_out);
+  n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
   if (el_mode != in_mode
       || n != in_n)
     return NULL_TREE;
@@ -20543,9 +20546,9 @@ ix86_veclibabi_aocl (combined_fn fn, tree type_out, tree type_in)
     return NULL_TREE;
 
   el_mode = TYPE_MODE (TREE_TYPE (type_out));
-  n = TYPE_VECTOR_SUBPARTS (type_out);
+  n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
   if (el_mode != in_mode
       || n != in_n)
     return NULL_TREE;
@@ -20795,7 +20798,7 @@ use_rsqrt_p (machine_mode mode)
 int
 avx_vpermilp_parallel (rtx par, machine_mode mode)
 {
-  unsigned i, nelt = GET_MODE_NUNITS (mode);
+  unsigned i, nelt = GET_MODE_NUNITS (mode).to_constant ();
   unsigned mask = 0;
   unsigned char ipar[16] = {};  /* Silence -Wuninitialized warning.  */
 
@@ -20902,7 +20905,7 @@ avx_vpermilp_parallel (rtx par, machine_mode mode)
 int
 avx_vperm2f128_parallel (rtx par, machine_mode mode)
 {
-  unsigned i, nelt = GET_MODE_NUNITS (mode), nelt2 = nelt / 2;
+  unsigned i, nelt = GET_MODE_NUNITS (mode).to_constant (), nelt2 = nelt / 2;
   unsigned mask = 0;
   unsigned char ipar[8] = {};  /* Silence -Wuninitialized warning.  */
 
@@ -21129,7 +21132,7 @@ ix86_secondary_reload (bool in_p, rtx x, reg_class_t rclass,
      references (zero-extended addresses) require special handling.  */
   if (TARGET_64BIT
       && MEM_P (x)
-      && GET_MODE_SIZE (mode) > UNITS_PER_WORD
+      && known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD)
       && INTEGER_CLASS_P (rclass)
       && !offsettable_memref_p (x))
     {
@@ -21325,7 +21328,7 @@ inline_secondary_memory_needed (machine_mode mode, reg_class_t class1,
   if (MASK_CLASS_P (class1) != MASK_CLASS_P (class2))
     {
       if (!(INTEGER_CLASS_P (class1) || INTEGER_CLASS_P (class2))
-	  || GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+	  || known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	return true;
     }
 
@@ -21350,7 +21353,7 @@ inline_secondary_memory_needed (machine_mode mode, reg_class_t class1,
 	  && (TARGET_64BIT ? mode == TImode : mode == DImode))
 	return false;
 
-      int msize = GET_MODE_SIZE (mode);
+      int msize = GET_MODE_SIZE (mode).to_constant ();
 
       /* Between SSE and general, we have moves no larger than word size.  */
       if (msize > UNITS_PER_WORD)
@@ -21405,7 +21408,7 @@ ix86_class_max_nregs (reg_class_t rclass, machine_mode mode)
       else if (mode == XCmode)
 	return (TARGET_64BIT ? 4 : 6);
       else
-	return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
+	return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
     }
   else
     {
@@ -21461,7 +21464,7 @@ sse_store_index (machine_mode mode)
   if (mode == E_HFmode)
     mode = E_SFmode;
 
-  switch (GET_MODE_SIZE (mode))
+  switch (GET_MODE_SIZE (mode).to_constant ())
     {
     case 4:
       return 0;
@@ -21535,7 +21538,7 @@ inline_memory_move_cost (machine_mode mode, enum reg_class regclass, int in)
   if (MASK_CLASS_P (regclass))
     {
       int index;
-      switch (GET_MODE_SIZE (mode))
+      switch (GET_MODE_SIZE (mode).to_constant ())
 	{
 	case 1:
 	  index = 0;
@@ -21561,7 +21564,7 @@ inline_memory_move_cost (machine_mode mode, enum reg_class regclass, int in)
   if (MMX_CLASS_P (regclass))
     {
       int index;
-      switch (GET_MODE_SIZE (mode))
+      switch (GET_MODE_SIZE (mode).to_constant ())
 	{
 	  case 4:
 	    index = 0;
@@ -21578,7 +21581,7 @@ inline_memory_move_cost (machine_mode mode, enum reg_class regclass, int in)
       return in ? ix86_cost->hard_register.mmx_load [index]
 		: ix86_cost->hard_register.mmx_store [index];
     }
-  switch (GET_MODE_SIZE (mode))
+  switch (GET_MODE_SIZE (mode).to_constant ())
     {
       case 1:
 	if (Q_CLASS_P (regclass) || TARGET_64BIT)
@@ -21641,7 +21644,7 @@ inline_memory_move_cost (machine_mode mode, enum reg_class regclass, int in)
 	else
 	  cost = ix86_cost->hard_register.int_store[2];
 	/* Multiply with the number of GPR moves needed.  */
-	return cost * CEIL ((int) GET_MODE_SIZE (mode), UNITS_PER_WORD);
+	return cost * CEIL ((int) GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
     }
 }
 
@@ -21680,7 +21683,7 @@ ix86_register_move_cost (machine_mode mode, reg_class_t class1_i,
       /* In case of copying from general_purpose_register we may emit multiple
          stores followed by single load causing memory size mismatch stall.
          Count this as arbitrarily high cost of 20.  */
-      if (GET_MODE_BITSIZE (mode) > BITS_PER_WORD
+      if (known_gt (GET_MODE_BITSIZE (mode), BITS_PER_WORD)
 	  && TARGET_MEMORY_MISMATCH_STALL
 	  && targetm.class_max_nregs (class1, mode)
 	     > targetm.class_max_nregs (class2, mode))
@@ -21747,7 +21750,7 @@ ix86_hard_regno_nregs (unsigned int regno, machine_mode mode)
 	return TARGET_64BIT ? 2 : 3;
       if (mode == XCmode)
 	return TARGET_64BIT ? 4 : 6;
-      return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
+      return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
     }
   if (COMPLEX_MODE_P (mode))
     return 2;
@@ -21763,7 +21766,7 @@ unsigned int
 ix86_regmode_natural_size (machine_mode mode)
 {
   if (mode == P2HImode || mode == P2QImode)
-    return GET_MODE_SIZE (mode) / 2;
+    return GET_MODE_SIZE (mode).to_constant () / 2;
   return UNITS_PER_WORD;
 }
 
@@ -22276,7 +22279,7 @@ ix86_set_reg_reg_cost (machine_mode mode)
       break;
 
     case MODE_CC:
-      units = GET_MODE_SIZE (CCmode);
+      units = GET_MODE_SIZE (CCmode).to_constant ();
       break;
 
     case MODE_FLOAT:
@@ -22284,7 +22287,7 @@ ix86_set_reg_reg_cost (machine_mode mode)
 	  || (TARGET_80387 && mode == XFmode)
 	  || ((TARGET_80387 || TARGET_SSE2) && mode == DFmode)
 	  || ((TARGET_80387 || TARGET_SSE) && mode == SFmode))
-	units = GET_MODE_SIZE (mode);
+	units = GET_MODE_SIZE (mode).to_constant ();
       break;
 
     case MODE_COMPLEX_FLOAT:
@@ -22292,7 +22295,7 @@ ix86_set_reg_reg_cost (machine_mode mode)
 	  || (TARGET_80387 && mode == XCmode)
 	  || ((TARGET_80387 || TARGET_SSE2) && mode == DCmode)
 	  || ((TARGET_80387 || TARGET_SSE) && mode == SCmode))
-	units = GET_MODE_SIZE (mode);
+	units = GET_MODE_SIZE (mode).to_constant ();
       break;
 
     case MODE_VECTOR_INT:
@@ -22303,12 +22306,12 @@ ix86_set_reg_reg_cost (machine_mode mode)
 	  || (TARGET_SSE && VALID_SSE_REG_MODE (mode))
 	  || ((TARGET_MMX || TARGET_MMX_WITH_SSE)
 	      && VALID_MMX_REG_MODE (mode)))
-	units = GET_MODE_SIZE (mode);
+	units = GET_MODE_SIZE (mode).to_constant ();
     }
 
   /* Return the cost of moving between two registers of mode MODE,
      assuming that the move will be in pieces of at most UNITS bytes.  */
-  return COSTS_N_INSNS (CEIL (GET_MODE_SIZE (mode), units));
+  return COSTS_N_INSNS (CEIL (GET_MODE_SIZE (mode).to_constant (), units));
 }
 
 /* Return cost of vector operation in MODE given that scalar version has
@@ -22322,13 +22325,13 @@ ix86_vec_cost (machine_mode mode, int cost)
 
   if (known_eq (GET_MODE_BITSIZE (mode), 128)
       && TARGET_SSE_SPLIT_REGS)
-    return cost * GET_MODE_BITSIZE (mode) / 64;
+    return cost * GET_MODE_BITSIZE (mode).to_constant () / 64;
   else if (known_gt (GET_MODE_BITSIZE (mode), 128)
       && TARGET_AVX256_SPLIT_REGS)
-    return cost * GET_MODE_BITSIZE (mode) / 128;
+    return cost * GET_MODE_BITSIZE (mode).to_constant () / 128;
   else if (known_gt (GET_MODE_BITSIZE (mode), 256)
       && TARGET_AVX512_SPLIT_REGS)
-    return cost * GET_MODE_BITSIZE (mode) / 256;
+    return cost * GET_MODE_BITSIZE (mode).to_constant () / 256;
   return cost;
 }
 
@@ -22673,7 +22676,7 @@ ix86_shift_rotate_cost (const struct processor_costs *cost,
 	}
     }
 
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     {
       if (constant_op1)
 	{
@@ -22911,7 +22914,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 
     case ASHIFT:
       if (SCALAR_INT_MODE_P (mode)
-	  && GET_MODE_SIZE (mode) < UNITS_PER_WORD
+	  && known_lt (GET_MODE_SIZE (mode), UNITS_PER_WORD)
 	  && CONST_INT_P (XEXP (x, 1)))
 	{
 	  HOST_WIDE_INT value = INTVAL (XEXP (x, 1));
@@ -22996,8 +22999,8 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 
 	  /* Compute costs correctly for widening multiplication.  */
 	  if ((GET_CODE (op0) == SIGN_EXTEND || GET_CODE (op0) == ZERO_EXTEND)
-	      && GET_MODE_SIZE (GET_MODE (XEXP (op0, 0))) * 2
-	         == GET_MODE_SIZE (mode))
+	      && known_eq (GET_MODE_SIZE (GET_MODE (XEXP (op0, 0))) * 2,
+			   GET_MODE_SIZE (mode)))
 	    {
 	      int is_mulwiden = 0;
 	      machine_mode inner_mode = GET_MODE (op0);
@@ -23019,7 +23022,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 
 	  int mult_init;
 	  // Double word multiplication requires 3 mults and 2 adds.
-	  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+	  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	    {
 	      mult_init = 3 * cost->mult_init[MODE_INDEX (word_mode)]
 			  + 2 * cost->add;
@@ -23046,7 +23049,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 
     case PLUS:
       if (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
+	  && known_le (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	{
 	  if (GET_CODE (XEXP (x, 0)) == PLUS
 	      && GET_CODE (XEXP (XEXP (x, 0), 0)) == MULT
@@ -23107,7 +23110,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case MINUS:
       /* Subtract with borrow, ignore the cost of subtracting a carry flag.  */
       if (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) <= UNITS_PER_WORD
+	  && known_le (GET_MODE_SIZE (mode), UNITS_PER_WORD)
 	  && GET_CODE (XEXP (x, 0)) == MINUS
 	  && (ix86_carry_flag_operator (XEXP (XEXP (x, 0), 1), mode)
 	      || ix86_carry_flag_unset_operator (XEXP (XEXP (x, 0), 1), mode)))
@@ -23128,7 +23131,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	*total = ix86_vec_cost (mode, cost->addss);
       else if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
 	*total = ix86_vec_cost (mode, cost->sse_op);
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	*total = cost->add * 2;
       else
 	*total = cost->add;
@@ -23199,7 +23202,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 		    : set_src_cost (op, DImode, speed);
 	  return true;
 	}
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	*total = cost->add * 2;
       else
 	*total = cost->add;
@@ -23209,7 +23212,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
       if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT
 	  || SSE_FLOAT_MODE_P (mode))
 	*total = ix86_vec_cost (mode, cost->sse_op);
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	*total = cost->add * 2;
       else
 	*total = cost->add;
@@ -23254,7 +23257,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	    }
 	  *total = ix86_vec_cost (mode, cost->sse_op);
 	}
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	{
 	  if (TARGET_BMI && GET_CODE (XEXP (x,0)) == NOT)
 	    {
@@ -23317,7 +23320,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	  // vnot is pxor -1.
 	  *total = ix86_vec_cost (mode, cost->sse_op) + 1;
 	}
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	*total = cost->add * 2;
       else
 	*total = cost->add;
@@ -23332,7 +23335,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	*total = ix86_vec_cost (mode, cost->sse_op);
       else if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
 	*total = ix86_vec_cost (mode, cost->sse_op);
-      else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      else if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	*total = cost->add * 3;
       else
 	*total = cost->add;
@@ -23413,7 +23416,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	}
 
       if (SCALAR_INT_MODE_P (GET_MODE (op0))
-	  && GET_MODE_SIZE (GET_MODE (op0)) > UNITS_PER_WORD)
+	  && known_gt (GET_MODE_SIZE (GET_MODE (op0)), UNITS_PER_WORD))
 	{
 	  if (op1 == const0_rtx)
 	    *total = cost->add
@@ -23436,14 +23439,14 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
       if (!SSE_FLOAT_MODE_SSEMATH_OR_HFBF_P (mode))
 	*total = 0;
       else
-	*total = vec_fp_conversion_cost (cost, GET_MODE_BITSIZE (mode));
+	*total = vec_fp_conversion_cost (cost, GET_MODE_BITSIZE (mode).to_constant ());
       return false;
 
     case FLOAT_TRUNCATE:
       if (!SSE_FLOAT_MODE_SSEMATH_OR_HFBF_P (mode))
 	*total = cost->fadd;
       else
-	*total = vec_fp_conversion_cost (cost, GET_MODE_BITSIZE (mode));
+	*total = vec_fp_conversion_cost (cost, GET_MODE_BITSIZE (mode).to_constant ());
       return false;
     case FLOAT:
     case UNSIGNED_FLOAT:
@@ -23745,7 +23748,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case IF_THEN_ELSE:
       if (TARGET_XOP
 	  && VECTOR_MODE_P (mode)
-	  && (known_eq (GET_MODE_SIZE (mode), 16) || GET_MODE_SIZE (mode) == 32))
+	  && (known_eq (GET_MODE_SIZE (mode), 16) || known_eq (GET_MODE_SIZE (mode), 32)))
 	{
 	  /* vpcmov.  */
 	  *total = speed ? COSTS_N_INSNS (2) : COSTS_N_BYTES (6);
@@ -23759,7 +23762,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	}
       else if (TARGET_CMOVE
 	       && SCALAR_INT_MODE_P (mode)
-	       && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
+	       && known_le (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	{
 	  /* cmov.  */
 	  *total = COSTS_N_INSNS (1);
@@ -25879,15 +25882,16 @@ static int
 ix86_vector_cd_cost (machine_mode vecmode, machine_mode elmode)
 {
   if (known_lt (GET_MODE_BITSIZE (vecmode), 128))
-    return ((GET_MODE_BITSIZE (vecmode) / GET_MODE_BITSIZE (elmode) - 1)
+    return ((GET_MODE_BITSIZE (vecmode).to_constant ()
+	     / GET_MODE_BITSIZE (elmode).to_constant () - 1)
 	    * ix86_cost->sse_op);
 
-  int n = GET_MODE_BITSIZE (vecmode) / 128;
+  int n = GET_MODE_BITSIZE (vecmode).to_constant () / 128;
   int cost = 0;
   /* Element inserts/extracts into/from N SSE vectors, the possible
      GPR <-> XMM moves have to be accounted for elsewhere.  */
   if (known_lt (GET_MODE_BITSIZE (elmode), 128))
-    cost += n * (128 / GET_MODE_BITSIZE (elmode) - 1) * ix86_cost->sse_op;
+    cost += n * (128 / GET_MODE_BITSIZE (elmode).to_constant () - 1) * ix86_cost->sse_op;
   if (known_ge (GET_MODE_BITSIZE (vecmode), 256)
       && known_lt (GET_MODE_BITSIZE (elmode), 256))
     /* N/2 vinserti128/vextracti128 for SSE <-> AVX256.  */
@@ -25964,14 +25968,14 @@ ix86_default_vector_cost (enum vect_cost_for_stmt type_of_cost,
 			      COSTS_N_INSNS
 				 (ix86_cost->gather_static
 				  + ix86_cost->gather_per_elt
-				    * GET_MODE_NUNITS (mode)) / 2);
+				    * GET_MODE_NUNITS (mode).to_constant ()) / 2);
 
       case vector_scatter_store:
         return ix86_vec_cost (mode,
 			      COSTS_N_INSNS
 				 (ix86_cost->scatter_static
 				  + ix86_cost->scatter_per_elt
-				    * GET_MODE_NUNITS (mode)) / 2);
+				    * GET_MODE_NUNITS (mode).to_constant ()) / 2);
 
       case cond_branch_taken:
         return ix86_cost->cond_taken_branch_cost;
@@ -26139,11 +26143,11 @@ ix86_reassociation_width (tree_code op, machine_mode mode)
 
       /* Account for targets that splits wide vectors into multiple parts.  */
       if (TARGET_AVX512_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 256))
-	div = GET_MODE_BITSIZE (mode) / 256;
+	div = GET_MODE_BITSIZE (mode).to_constant () / 256;
       else if (TARGET_AVX256_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 128))
-	div = GET_MODE_BITSIZE (mode) / 128;
+	div = GET_MODE_BITSIZE (mode).to_constant () / 128;
       else if (TARGET_SSE_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 64))
-	div = GET_MODE_BITSIZE (mode) / 64;
+	div = GET_MODE_BITSIZE (mode).to_constant () / 64;
       width = (width + div - 1) / div;
     }
   /* Scalar part.  */
@@ -26291,8 +26295,8 @@ ix86_autovectorize_vector_modes (vector_modes *modes, bool all)
 static opt_machine_mode
 ix86_get_mask_mode (machine_mode data_mode)
 {
-  unsigned vector_size = GET_MODE_SIZE (data_mode);
-  unsigned nunits = GET_MODE_NUNITS (data_mode);
+  unsigned vector_size = GET_MODE_SIZE (data_mode).to_constant ();
+  unsigned nunits = GET_MODE_NUNITS (data_mode).to_constant ();
   unsigned elem_size = vector_size / nunits;
 
   /* Scalar mask case.  */
@@ -26637,7 +26641,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	    stmt_cost = 0;
 	  else if (fp)
 	    stmt_cost = vec_fp_conversion_cost
-			  (ix86_tune_cost, GET_MODE_BITSIZE (mode));
+			  (ix86_tune_cost, GET_MODE_BITSIZE (mode).to_constant ());
 	  break;
 
 	case FLOAT_EXPR:
@@ -26984,7 +26988,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 
       if (fp && inner_fp)
 	stmt_cost = vec_fp_conversion_cost
-			  (ix86_tune_cost, GET_MODE_BITSIZE (mode));
+			  (ix86_tune_cost, GET_MODE_BITSIZE (mode).to_constant ());
       else if (fp && !inner_fp)
 	stmt_cost = ix86_vec_cost (mode, ix86_cost->cvtpi2ps);
       else if (!fp && inner_fp)
@@ -27019,8 +27023,8 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	= lsdata->ls_eltype ? lsdata->ls_eltype : TREE_TYPE (ls_type);
       stmt_cost = ix86_vector_cd_cost (TYPE_MODE (ls_type),
 				       TYPE_MODE (ls_eltype));
-      stmt_cost *= (GET_MODE_BITSIZE (TYPE_MODE (ls_type))
-		    / GET_MODE_BITSIZE (TYPE_MODE (ls_eltype)) + 1);
+      stmt_cost *= (GET_MODE_BITSIZE (TYPE_MODE (ls_type)).to_constant ()
+		    / GET_MODE_BITSIZE (TYPE_MODE (ls_eltype)).to_constant () + 1);
     }
   else if ((kind == vec_construct || kind == scalar_to_vec)
 	   && node
@@ -27097,8 +27101,8 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
   /* BIT_FIELD_REF <vect_**, 64, 0> with count 0 costs 0 in body.  */
   if (kind == vec_perm && vectype && count != 0)
     {
-      unsigned vec_size = GET_MODE_SIZE (TYPE_MODE (vectype));
-      unsigned nunits = TYPE_VECTOR_SUBPARTS (vectype);
+      unsigned vec_size = GET_MODE_SIZE (TYPE_MODE (vectype)).to_constant ();
+      unsigned nunits = TYPE_VECTOR_SUBPARTS (vectype).to_constant ();
       unsigned *num_vec_perm = NULL;
 
       if (vec_size == 32)
@@ -27275,7 +27279,7 @@ ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
       && LOOP_VINFO_VECT_FACTOR (loop_vinfo).to_constant () > 2
       /* Avoid a masked epilog if cascaded epilogues eventually get us
 	 to one with VF 1 as that means no scalar epilog at all.  */
-      && !((GET_MODE_SIZE (loop_vinfo->vector_mode)
+      && !((GET_MODE_SIZE (loop_vinfo->vector_mode).to_constant ()
 	    / LOOP_VINFO_VECT_FACTOR (loop_vinfo).to_constant () == 16)
 	   && ix86_tune_features[X86_TUNE_AVX512_TWO_EPILOGUES])
       && ix86_tune_features[X86_TUNE_AVX512_MASKED_EPILOGUES]
@@ -27406,8 +27410,8 @@ ix86_vector_costs::better_epilogue_loop_than_p (const vector_costs *other,
      THIS has a VF of one which means no further epilog needed.  */
   int tem;
   if (known_gt (LOOP_VINFO_VECT_FACTOR (this_loop_info), 1U)
-      && (GET_MODE_SIZE (other->suggested_epilogue_mode (tem))
-	  == GET_MODE_SIZE (this_loop_info->vector_mode)))
+      && known_eq (GET_MODE_SIZE (other->suggested_epilogue_mode (tem)),
+		    GET_MODE_SIZE (this_loop_info->vector_mode)))
     return false;
   return vector_costs::better_epilogue_loop_than_p (other, main_loop);
 }
@@ -27459,10 +27463,11 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 {
   int ret = 1;
 
-  if (clonei->simdlen
-      && (known_lt (clonei->simdlen, 2)
-	  || known_gt (clonei->simdlen, 1024)
-	  || (clonei->simdlen & (clonei->simdlen - 1)) != 0))
+  if (maybe_ne (clonei->simdlen, 0U)
+      && (known_lt (clonei->simdlen, 2U)
+	  || known_gt (clonei->simdlen, 1024U)
+	  || (clonei->simdlen.to_constant ()
+	      & (clonei->simdlen.to_constant () - 1)) != 0))
     {
       if (explicit_p)
 	warning_at (DECL_SOURCE_LOCATION (node->decl), 0,
@@ -27567,14 +27572,14 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 	clonei->mask_mode = SImode;
       break;
     }
-  if (known_eq (clonei->simdlen, 0))
+  if (known_eq (clonei->simdlen, 0U))
     {
       if (SCALAR_INT_MODE_P (TYPE_MODE (base_type)))
 	clonei->simdlen = clonei->vecsize_int;
       else
 	clonei->simdlen = clonei->vecsize_float;
-      clonei->simdlen = clonei->simdlen
-			/ GET_MODE_BITSIZE (TYPE_MODE (base_type));
+      clonei->simdlen = (clonei->simdlen.to_constant ()
+			 / GET_MODE_BITSIZE (TYPE_MODE (base_type)).to_constant ());
     }
   else if (known_gt (clonei->simdlen, 16))
     {
@@ -27588,11 +27593,12 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
       tree ctype = ret_type;
       if (VOID_TYPE_P (ret_type))
 	ctype = base_type;
-      int cnt = GET_MODE_BITSIZE (TYPE_MODE (ctype)) * clonei->simdlen;
+      int cnt = (GET_MODE_BITSIZE (TYPE_MODE (ctype)).to_constant ()
+		 * clonei->simdlen.to_constant ());
       if (SCALAR_INT_MODE_P (TYPE_MODE (ctype)))
-	cnt /= clonei->vecsize_int;
+	cnt /= clonei->vecsize_int.to_constant ();
       else
-	cnt /= clonei->vecsize_float;
+	cnt /= clonei->vecsize_float.to_constant ();
       if (cnt > (TARGET_64BIT ? 16 : 8))
 	{
 	  if (explicit_p)
@@ -27679,7 +27685,7 @@ ix86_loop_unroll_adjust (unsigned nunroll, class loop *loop)
 	    if (MEM_P (x))
 	      {
 		machine_mode mode = GET_MODE (x);
-		unsigned int n_words = GET_MODE_SIZE (mode) / UNITS_PER_WORD;
+		unsigned int n_words = GET_MODE_SIZE (mode).to_constant () / UNITS_PER_WORD;
 		if (n_words > 4)
 		  mem_count += 2;
 		else
@@ -27979,7 +27985,7 @@ ix86_operands_ok_for_move_multiple (rtx *operands, bool load,
 
   offval_1 = INTVAL (offset_1);
   offval_2 = INTVAL (offset_2);
-  msize = GET_MODE_SIZE (mode);
+  msize = GET_MODE_SIZE (mode).to_constant ();
   /* Check if mem_1 is adjacent to mem_2 and mem_1 has lower address.  */
   if (offval_1 + msize != offval_2)
     return false;
@@ -28189,7 +28195,7 @@ ix86_cxx_adjust_cdtor_callabi_fntype (tree fntype)
 poly_int64
 ix86_push_rounding (poly_int64 bytes)
 {
-  return ROUND_UP (bytes, UNITS_PER_WORD);
+  return aligned_upper_bound (bytes, UNITS_PER_WORD);
 }
 
 /* Use 8 bits metadata start from bit48 for LAM_U48,
@@ -28429,9 +28435,9 @@ ix86_test_loading_dump_fragment_1 ()
       ASSERT_STREQ ("i", IDENTIFIER_POINTER (DECL_NAME (mem_expr)));
       /* "+0".  */
       ASSERT_TRUE (MEM_OFFSET_KNOWN_P (dest));
-      ASSERT_EQ (0, MEM_OFFSET (dest));
+      ASSERT_TRUE (known_eq (MEM_OFFSET (dest), 0));
       /* "S4".  */
-      ASSERT_EQ (4, MEM_SIZE (dest));
+      ASSERT_TRUE (known_eq (MEM_SIZE (dest), 4));
       /* "A32.  */
       ASSERT_EQ (32, MEM_ALIGN (dest));
     }

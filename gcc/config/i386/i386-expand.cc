@@ -129,7 +129,7 @@ split_double_mode (machine_mode mode, rtx operands[],
       gcc_unreachable ();
     }
 
-  byte = GET_MODE_SIZE (half_mode);
+  byte = GET_MODE_SIZE (half_mode).to_constant ();
 
   while (num--)
     {
@@ -300,7 +300,7 @@ ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
   if (!TARGET_INTER_UNIT_MOVES_TO_VEC)
     return nullptr;
 
-  unsigned int msize = GET_MODE_SIZE (mode);
+  unsigned int msize = GET_MODE_SIZE (mode).to_constant ();
 
   /* Only optimized for vpbroadcast[bwsd]/vbroadcastss with xmm/ymm/zmm.  */
   if (msize != 16 && msize != 32 && msize != 64)
@@ -311,8 +311,8 @@ ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
   if (!TARGET_AVX
       || !CONST_WIDE_INT_P (op)
       || standard_sse_constant_p (op, mode)
-      || (CONST_WIDE_INT_NUNITS (op) * HOST_BITS_PER_WIDE_INT
-	  != GET_MODE_BITSIZE (mode)))
+      || maybe_ne (CONST_WIDE_INT_NUNITS (op) * HOST_BITS_PER_WIDE_INT,
+		   GET_MODE_BITSIZE (mode)))
     return nullptr;
 
   HOST_WIDE_INT val = CONST_WIDE_INT_ELT (op, 0);
@@ -346,7 +346,7 @@ ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
     if (val != CONST_WIDE_INT_ELT (op, i))
       return nullptr;
 
-  unsigned int nunits = (GET_MODE_SIZE (mode)
+  unsigned int nunits = (GET_MODE_SIZE (mode).to_constant ()
 			 / GET_MODE_SIZE (broadcast_mode));
   machine_mode vector_mode;
   if (!mode_for_vector (broadcast_mode, nunits).exists (&vector_mode))
@@ -453,7 +453,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 	  && mode == TImode
 	  && SUBREG_P (op1)
 	  && GET_MODE (SUBREG_REG (op1)) == DImode
-	  && SUBREG_BYTE (op1) == 0)
+	  && known_eq (SUBREG_BYTE (op1), 0))
 	op1 = gen_rtx_ZERO_EXTEND (TImode, SUBREG_REG (op1));
       /* As not all values in XFmode are representable in real_value,
 	 we might be called with unfoldable SUBREGs of constants.  */
@@ -511,7 +511,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
   else
     {
       if (MEM_P (op0)
-	  && (PUSH_ROUNDING (GET_MODE_SIZE (mode)) != GET_MODE_SIZE (mode)
+	  && (maybe_ne (PUSH_ROUNDING (GET_MODE_SIZE (mode)), GET_MODE_SIZE (mode))
 	      || !push_operand (op0, mode))
 	  && MEM_P (op1))
 	op1 = force_reg (mode, op1);
@@ -561,7 +561,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
       && REG_P (op1))
     {
       /* Use *insvti_lowpart_1 to set lowpart.  */
-      if (SUBREG_BYTE (op0) == 0)
+      if (known_eq (SUBREG_BYTE (op0), 0))
 	{
 	  wide_int mask = wi::mask (64, true, 128);
 	  tmp = immed_wide_int_const (mask, TImode);
@@ -573,7 +573,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 	  op1 = gen_rtx_IOR (TImode, tmp, op1);
 	}
       /* Use *insvti_highpart_1 to set highpart.  */
-      else if (SUBREG_BYTE (op0) == 8)
+      else if (known_eq (SUBREG_BYTE (op0), 8))
 	{
 	  wide_int mask = wi::mask (64, false, 128);
 	  tmp = immed_wide_int_const (mask, TImode);
@@ -595,7 +595,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 rtx
 ix86_broadcast_from_constant (machine_mode mode, rtx op)
 {
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   if (nunits < 2)
     return nullptr;
 
@@ -648,7 +648,7 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
   /* Use GET_MODE_BITSIZE instead of GET_MODE_ALIGNMENT for IA MCU
      psABI since the biggest alignment is 4 byte for IA MCU psABI.  */
   unsigned int align = (TARGET_IAMCU
-			? GET_MODE_BITSIZE (mode)
+			? GET_MODE_BITSIZE (mode).to_constant ()
 			: GET_MODE_ALIGNMENT (mode));
 
   if (push_operand (op0, VOIDmode))
@@ -1078,14 +1078,14 @@ ix86_split_mmx_pack (rtx operands[], enum rtx_code code)
   machine_mode inner_smode = GET_MODE_INNER (smode);
 
   /* Get the corresponding SSE mode for destination.  */
-  int nunits = 16 / GET_MODE_SIZE (inner_dmode);
+  int nunits = 16 / GET_MODE_SIZE (inner_dmode).to_constant ();
   machine_mode sse_dmode = mode_for_vector (GET_MODE_INNER (dmode),
 					    nunits).require ();
   machine_mode sse_half_dmode = mode_for_vector (GET_MODE_INNER (dmode),
 						 nunits / 2).require ();
 
   /* Get the corresponding SSE mode for source.  */
-  nunits = 16 / GET_MODE_SIZE (inner_smode);
+  nunits = 16 / GET_MODE_SIZE (inner_smode).to_constant ();
   machine_mode sse_smode = mode_for_vector (GET_MODE_INNER (smode),
 					    nunits).require ();
 
@@ -1203,7 +1203,7 @@ ix86_split_mmx_punpck (rtx operands[], bool high_p)
 	}
       else
 	{
-	  int sz = GET_MODE_SIZE (mode);
+	  int sz = GET_MODE_SIZE (mode).to_constant ();
 
 	  if (sz == 4)
 	    mask = gen_rtx_PARALLEL (VOIDmode,
@@ -1400,10 +1400,10 @@ ix86_expand_vector_logical_operator (enum rtx_code code, machine_mode mode,
       && (SUBREG_P (op2) || CONST_VECTOR_P (op2))
       && GET_MODE_CLASS (GET_MODE (SUBREG_REG (op1))) == MODE_VECTOR_FLOAT
       && known_eq (GET_MODE_SIZE (GET_MODE (SUBREG_REG (op1))), GET_MODE_SIZE (mode))
-      && SUBREG_BYTE (op1) == 0
+      && known_eq (SUBREG_BYTE (op1), 0)
       && (CONST_VECTOR_P (op2)
 	  || (GET_MODE (SUBREG_REG (op1)) == GET_MODE (SUBREG_REG (op2))
-	      && SUBREG_BYTE (op2) == 0))
+	      && known_eq (SUBREG_BYTE (op2), 0)))
       && can_create_pseudo_p ())
     {
       rtx dst;
@@ -2474,7 +2474,7 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
       || mode == OImode
       || known_eq (GET_MODE_SIZE (mode), 64))
     {
-      unsigned msize = GET_MODE_SIZE (mode);
+      unsigned msize = GET_MODE_SIZE (mode).to_constant ();
       machine_mode p_mode
 	= msize == 64 ? V16SImode : msize == 32 ? V4DImode : V2DImode;
       /* kortest set CF when result is 0xFFFF (op0 == op1).  */
@@ -3106,7 +3106,7 @@ ix86_expand_int_compare (enum rtx_code code, rtx op0, rtx op1)
   if (op1 == const0_rtx
       && SUBREG_P (op0)
       && cmpmode == CCZmode
-      && SUBREG_BYTE (op0) == 0
+      && known_eq (SUBREG_BYTE (op0), 0)
       && REG_P (SUBREG_REG (op0))
       && VECTOR_MODE_P (GET_MODE (SUBREG_REG (op0)))
       && TARGET_SSE4_1
@@ -3465,14 +3465,14 @@ ix86_expand_carry_flag_compare (enum rtx_code code, rtx op0, rtx op1, rtx *pop)
     case GE:
       if (mode == DImode || op1 != const0_rtx)
 	return false;
-      op1 = gen_int_mode (1 << (GET_MODE_BITSIZE (mode) - 1), mode);
+      op1 = gen_int_mode (1 << (GET_MODE_BITSIZE (mode).to_constant () - 1), mode);
       code = (code == LT ? GEU : LTU);
       break;
     case LE:
     case GT:
       if (mode == DImode || op1 != constm1_rtx)
 	return false;
-      op1 = gen_int_mode (1 << (GET_MODE_BITSIZE (mode) - 1), mode);
+      op1 = gen_int_mode (1 << (GET_MODE_BITSIZE (mode).to_constant () - 1), mode);
       code = (code == LE ? GEU : LTU);
       break;
 
@@ -4232,7 +4232,7 @@ ix86_valid_mask_cmp_mode (machine_mode mode)
   /* AVX512BW is needed for vector QI/HImode,
      AVX512VL is needed for 128/256-bit vector.  */
   machine_mode inner_mode = GET_MODE_INNER (mode);
-  int vector_size = GET_MODE_SIZE (mode);
+  int vector_size = GET_MODE_SIZE (mode).to_constant ();
   if ((inner_mode == QImode || inner_mode == HImode) && !TARGET_AVX512BW)
     return false;
 
@@ -4244,7 +4244,7 @@ static bool
 ix86_use_mask_cmp_p (machine_mode mode, machine_mode cmp_mode,
 		     rtx op_true, rtx op_false)
 {
-  int vector_size = GET_MODE_SIZE (mode);
+  int vector_size = GET_MODE_SIZE (mode).to_constant ();
 
   if (cmp_mode == HFmode)
     return true;
@@ -4294,7 +4294,7 @@ ix86_expand_sse_cmp (rtx dest, enum rtx_code code, rtx cmp_op0, rtx cmp_op1,
 
   if (ix86_use_mask_cmp_p (mode, cmp_ops_mode, op_true, op_false))
     {
-      unsigned int nbits = GET_MODE_NUNITS (cmp_ops_mode);
+      unsigned int nbits = GET_MODE_NUNITS (cmp_ops_mode).to_constant ();
       maskcmp = true;
       cmp_mode = nbits > 8 ? int_mode_for_size (nbits, 0).require () : E_QImode;
     }
@@ -4945,7 +4945,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	  if (CONST_VECTOR_P (cop1)
 	      && GET_MODE_INNER (mode) != TImode)
 	    {
-	      unsigned int n_elts = GET_MODE_NUNITS (mode), i;
+	      unsigned int n_elts = GET_MODE_NUNITS (mode).to_constant (), i;
 	      machine_mode eltmode = GET_MODE_INNER (mode);
 	      for (i = 0; i < n_elts; ++i)
 		{
@@ -4989,7 +4989,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	  if (CONST_VECTOR_P (cop1)
 	      && GET_MODE_INNER (mode) != TImode)
 	    {
-	      unsigned int n_elts = GET_MODE_NUNITS (mode), i;
+	      unsigned int n_elts = GET_MODE_NUNITS (mode).to_constant (), i;
 	      machine_mode eltmode = GET_MODE_INNER (mode);
 	      for (i = 0; i < n_elts; ++i)
 		{
@@ -5567,7 +5567,7 @@ ix86_expand_vec_perm (rtx operands[])
   bool one_operand_shuffle = rtx_equal_p (op0, op1);
 
   /* Number of elements in the vector.  */
-  w = GET_MODE_NUNITS (mode);
+  w = GET_MODE_NUNITS (mode).to_constant ();
   e = GET_MODE_UNIT_SIZE (mode);
   gcc_assert (w <= 64);
 
@@ -6143,7 +6143,7 @@ ix86_expand_sse_unpack (rtx dest, rtx src, bool unsigned_p, bool high_p)
 	}
       else if (high_p)
 	{
-	  switch (GET_MODE_SIZE (imode))
+	  switch (GET_MODE_SIZE (imode).to_constant ())
 	    {
 	    case 16:
 	      /* Shift higher 8 bytes to lower 8 bytes.  */
@@ -6238,7 +6238,7 @@ bool
 ix86_extract_perm_from_pool_constant (int* perm, rtx mem)
 {
   machine_mode mode = GET_MODE (mem);
-  int nelt = GET_MODE_NUNITS (mode);
+  int nelt = GET_MODE_NUNITS (mode).to_constant ();
 
   if (!INTEGRAL_MODE_P (mode))
     return false;
@@ -6282,9 +6282,9 @@ ix86_split_to_parts (rtx operand, rtx *parts, machine_mode mode)
   int size;
 
   if (!TARGET_64BIT)
-    size = mode==XFmode ? 3 : GET_MODE_SIZE (mode) / 4;
+    size = mode==XFmode ? 3 : GET_MODE_SIZE (mode).to_constant () / 4;
   else
-    size = (GET_MODE_SIZE (mode) + 4) / 8;
+    size = (GET_MODE_SIZE (mode).to_constant () + 4) / 8;
 
   gcc_assert (!REG_P (operand) || !MMX_REGNO_P (REGNO (operand)));
   gcc_assert (size >= 2 && size <= 4);
@@ -6671,7 +6671,7 @@ ix86_split_ashl (rtx *operands, rtx scratch, machine_mode mode)
 {
   rtx (*gen_ashl3)(rtx, rtx, rtx);
   rtx (*gen_shld)(rtx, rtx, rtx);
-  int half_width = GET_MODE_BITSIZE (mode) >> 1;
+  int half_width = GET_MODE_BITSIZE (mode).to_constant () >> 1;
   machine_mode half_mode;
 
   rtx low[2], high[2];
@@ -6680,7 +6680,7 @@ ix86_split_ashl (rtx *operands, rtx scratch, machine_mode mode)
   if (CONST_INT_P (operands[2]))
     {
       split_double_mode (mode, operands, 2, low, high);
-      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode) - 1);
+      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode).to_constant () - 1);
 
       if (count >= half_width)
 	{
@@ -6827,7 +6827,7 @@ ix86_split_ashr (rtx *operands, rtx scratch, machine_mode mode)
   rtx (*gen_ashr3)(rtx, rtx, rtx)
     = mode == DImode ? gen_ashrsi3 : gen_ashrdi3;
   rtx (*gen_shrd)(rtx, rtx, rtx);
-  int half_width = GET_MODE_BITSIZE (mode) >> 1;
+  int half_width = GET_MODE_BITSIZE (mode).to_constant () >> 1;
 
   rtx low[2], high[2];
   int count;
@@ -6835,7 +6835,7 @@ ix86_split_ashr (rtx *operands, rtx scratch, machine_mode mode)
   if (CONST_INT_P (operands[2]))
     {
       split_double_mode (mode, operands, 2, low, high);
-      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode) - 1);
+      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode).to_constant () - 1);
 
       if (known_eq (count, GET_MODE_BITSIZE (mode) - 1))
 	{
@@ -6918,7 +6918,7 @@ ix86_split_lshr (rtx *operands, rtx scratch, machine_mode mode)
   rtx (*gen_lshr3)(rtx, rtx, rtx)
     = mode == DImode ? gen_lshrsi3 : gen_lshrdi3;
   rtx (*gen_shrd)(rtx, rtx, rtx);
-  int half_width = GET_MODE_BITSIZE (mode) >> 1;
+  int half_width = GET_MODE_BITSIZE (mode).to_constant () >> 1;
 
   rtx low[2], high[2];
   int count;
@@ -6926,7 +6926,7 @@ ix86_split_lshr (rtx *operands, rtx scratch, machine_mode mode)
   if (CONST_INT_P (operands[2]))
     {
       split_double_mode (mode, operands, 2, low, high);
-      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode) - 1);
+      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode).to_constant () - 1);
 
       if (count >= half_width)
 	{
@@ -7966,15 +7966,15 @@ expand_set_or_cpymem_via_loop (rtx destmem, rtx srcmem,
   rtx_code_label *top_label = nullptr;
   rtx iter, tmp;
   machine_mode iter_mode = counter_mode (count);
-  int piece_size_n = GET_MODE_SIZE (mode) * unroll;
+  int piece_size_n = GET_MODE_SIZE (mode).to_constant () * unroll;
   rtx piece_size = GEN_INT (piece_size_n);
-  rtx piece_size_mask = GEN_INT (~((GET_MODE_SIZE (mode) * unroll) - 1));
+  rtx piece_size_mask = GEN_INT (~((GET_MODE_SIZE (mode).to_constant () * unroll) - 1));
   rtx size;
   int i;
   int loop_count;
 
   if (expected_size != -1 && CONST_INT_P (count))
-    loop_count = INTVAL (count) / GET_MODE_SIZE (mode) / unroll;
+    loop_count = INTVAL (count) / GET_MODE_SIZE (mode).to_constant () / unroll;
   else
     loop_count = -1;
 
@@ -8072,7 +8072,7 @@ expand_set_or_cpymem_via_loop (rtx destmem, rtx srcmem,
 			       true, top_label);
       if (expected_size != -1)
 	{
-	  expected_size /= GET_MODE_SIZE (mode) * unroll;
+	  expected_size /= GET_MODE_SIZE (mode).to_constant () * unroll;
 	  if (expected_size == 0)
 	    predict_jump (0);
 	  else if (expected_size > REG_BR_PROB_BASE)
@@ -8148,11 +8148,11 @@ expand_set_or_cpymem_via_rep (rtx destmem, rtx srcmem,
     destmem = adjust_automodify_address_nv (destmem, BLKmode, destptr, 0);
 
   countreg = ix86_zero_extend_to_Pmode (scale_counter (count,
-						       GET_MODE_SIZE (mode)));
+						       GET_MODE_SIZE (mode).to_constant ()));
   if (mode != QImode)
     {
       destexp = gen_rtx_ASHIFT (Pmode, countreg,
-				GEN_INT (exact_log2 (GET_MODE_SIZE (mode))));
+				GEN_INT (exact_log2 (GET_MODE_SIZE (mode).to_constant ())));
       destexp = gen_rtx_PLUS (Pmode, destexp, destptr);
     }
   else
@@ -8160,7 +8160,7 @@ expand_set_or_cpymem_via_rep (rtx destmem, rtx srcmem,
   if ((!issetmem || orig_value == const0_rtx) && CONST_INT_P (count))
     {
       rounded_count
-	= ROUND_DOWN (INTVAL (count), (HOST_WIDE_INT) GET_MODE_SIZE (mode));
+	= ROUND_DOWN (INTVAL (count), (HOST_WIDE_INT) GET_MODE_SIZE (mode).to_constant ());
       destmem = shallow_copy_rtx (destmem);
       set_mem_size (destmem, rounded_count);
     }
@@ -8179,7 +8179,7 @@ expand_set_or_cpymem_via_rep (rtx destmem, rtx srcmem,
       if (mode != QImode)
 	{
 	  srcexp = gen_rtx_ASHIFT (Pmode, countreg,
-				   GEN_INT (exact_log2 (GET_MODE_SIZE (mode))));
+				   GEN_INT (exact_log2 (GET_MODE_SIZE (mode).to_constant ())));
 	  srcexp = gen_rtx_PLUS (Pmode, srcexp, srcptr);
 	}
       else
@@ -8187,7 +8187,7 @@ expand_set_or_cpymem_via_rep (rtx destmem, rtx srcmem,
       if (CONST_INT_P (count))
 	{
 	  rounded_count
-	    = ROUND_DOWN (INTVAL (count), (HOST_WIDE_INT) GET_MODE_SIZE (mode));
+	    = ROUND_DOWN (INTVAL (count), (HOST_WIDE_INT) GET_MODE_SIZE (mode).to_constant ());
 	  srcmem = shallow_copy_rtx (srcmem);
 	  set_mem_size (srcmem, rounded_count);
 	}
@@ -8229,12 +8229,12 @@ emit_memmov (rtx destmem, rtx *srcmem, rtx destptr, rtx srcptr,
      MOVE_MODE is an integer mode at the moment (SI, DI, TI, etc.).  */
   if (known_gt (GET_MODE_SIZE (move_mode), GET_MODE_SIZE (word_mode)))
     {
-      int nunits = GET_MODE_SIZE (move_mode) / GET_MODE_SIZE (word_mode);
+      int nunits = GET_MODE_SIZE (move_mode).to_constant () / GET_MODE_SIZE (word_mode);
       if (!mode_for_vector (word_mode, nunits).exists (&move_mode)
 	  || (code = optab_handler (mov_optab, move_mode)) == CODE_FOR_nothing)
 	{
 	  move_mode = word_mode;
-	  piece_size = GET_MODE_SIZE (move_mode);
+	  piece_size = GET_MODE_SIZE (move_mode).to_constant ();
 	  code = optab_handler (mov_optab, move_mode);
 	}
     }
@@ -8425,7 +8425,7 @@ emit_memset (rtx destmem, rtx destptr, rtx promoted_val,
       move_mode = int_mode_for_size (move_bits, 0).require ();
       promoted_val = gen_lowpart (move_mode, promoted_val);
     }
-  piece_size = GET_MODE_SIZE (move_mode);
+  piece_size = GET_MODE_SIZE (move_mode).to_constant ();
   code = optab_handler (mov_optab, move_mode);
   gcc_assert (code != CODE_FOR_nothing && promoted_val != NULL_RTX);
 
@@ -8504,7 +8504,7 @@ setmem_epilogue_gen_val (void *op_p, void *prev_p, HOST_WIDE_INT,
     {
       gcc_assert (GET_MODE_INNER (mode) == QImode);
 
-      unsigned int op_size = GET_MODE_SIZE (op_mode);
+      unsigned int op_size = GET_MODE_SIZE (op_mode).to_constant ();
       unsigned int size = GET_MODE_SIZE (mode);
       unsigned int nunits;
       machine_mode vec_mode;
@@ -8758,7 +8758,7 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
 	 size, first try the narrower vector, otherwise, use the
 	 original value. */
       machine_mode inner_mode = GET_MODE_INNER (mode);
-      unsigned int nunits = size / GET_MODE_SIZE (inner_mode);
+      unsigned int nunits = size / GET_MODE_SIZE (inner_mode).to_constant ();
       if (nunits > 1)
 	{
 	  mode = mode_for_vector (GET_MODE_INNER (mode),
@@ -8769,8 +8769,8 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
 	{
 	  scalar_int_mode smode
 	    = smallest_int_mode_for_size (size * BITS_PER_UNIT).require ();
-	  gcc_assert (GET_MODE_SIZE (GET_MODE (scalar_value))
-		      >= GET_MODE_SIZE (smode));
+	  gcc_assert (known_ge (GET_MODE_SIZE (GET_MODE (scalar_value)),
+				GET_MODE_SIZE (smode)));
 	  mode = smode;
 	  if (GET_MODE (scalar_value) == mode)
 	    value = scalar_value;
@@ -8779,7 +8779,7 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
 	}
     }
   destmem = change_address (destmem, mode, destptr);
-  modesize = GEN_INT (GET_MODE_SIZE (mode));
+  modesize = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
   gcc_assert (known_le (GET_MODE_SIZE (mode), size));
   for (n = 0; known_lt (n * GET_MODE_SIZE (mode), size); n++)
     {
@@ -8788,19 +8788,19 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
       else
 	{
           emit_move_insn (destmem, srcmem);
-          srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode));
+          srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode).to_constant ());
 	}
-      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode));
+      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode).to_constant ());
     }
 
   destmem = offset_address (destmem, count, 1);
   destmem = offset_address (destmem, GEN_INT (-2 * size),
-			    GET_MODE_SIZE (mode));
+			    GET_MODE_SIZE (mode).to_constant ());
   if (!issetmem)
     {
       srcmem = offset_address (srcmem, count, 1);
       srcmem = offset_address (srcmem, GEN_INT (-2 * size),
-			       GET_MODE_SIZE (mode));
+			       GET_MODE_SIZE (mode).to_constant ());
     }
   for (n = 0; known_lt (n * GET_MODE_SIZE (mode), size); n++)
     {
@@ -8809,9 +8809,9 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
       else
 	{
 	  emit_move_insn (destmem, srcmem);
-	  srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode));
+	  srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode).to_constant ());
 	}
-      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode));
+      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode).to_constant ());
     }
   emit_jump_insn (gen_jump (done_label));
   emit_barrier ();
@@ -8966,7 +8966,7 @@ expand_set_or_cpymem_prologue_epilogue_by_misaligned_moves (rtx destmem, rtx src
   if (!issetmem)
     srcmem = change_address (srcmem, mode, *srcptr);
   destmem = change_address (destmem, mode, *destptr);
-  modesize = GEN_INT (GET_MODE_SIZE (mode));
+  modesize = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
   for (n = 0; prolog_size < desired_align - align; n++)
     {
       if (issetmem)
@@ -8974,10 +8974,10 @@ expand_set_or_cpymem_prologue_epilogue_by_misaligned_moves (rtx destmem, rtx src
       else
 	{
           emit_move_insn (destmem, srcmem);
-          srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode));
+          srcmem = offset_address (srcmem, modesize, GET_MODE_SIZE (mode).to_constant ());
 	}
-      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode));
-      prolog_size += GET_MODE_SIZE (mode);
+      destmem = offset_address (destmem, modesize, GET_MODE_SIZE (mode).to_constant ());
+      prolog_size += GET_MODE_SIZE (mode).to_constant ();
     }
 
 
@@ -9355,7 +9355,7 @@ decide_alignment (int align,
   if (move_mode == VOIDmode)
     return 0;
 
-  desired_align = GET_MODE_SIZE (move_mode);
+  desired_align = GET_MODE_SIZE (move_mode).to_constant ();
   /* PentiumPro has special logic triggering for 8 byte aligned blocks.
      copying whole cacheline at once.  */
   if (TARGET_CPU_P (PENTIUMPRO)
@@ -9715,7 +9715,7 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
       move_mode = QImode;
       break;
     }
-  size_needed = GET_MODE_SIZE (move_mode) * unroll_factor;
+  size_needed = GET_MODE_SIZE (move_mode).to_constant () * unroll_factor;
   epilogue_size_needed = size_needed;
 
   /* If we are going to call any library calls conditionally, make sure any
@@ -10090,7 +10090,7 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
   /* If 8 registers registers can cover all memory, load them into
      registers and store them together to avoid possible address
      overlap between source and destination.  */
-  unsigned HOST_WIDE_INT moves = count / GET_MODE_SIZE (mode);
+  unsigned HOST_WIDE_INT moves = count / GET_MODE_SIZE (mode).to_constant ();
   if (moves == 0)
     {
       mode = smallest_int_mode_for_size
@@ -10101,8 +10101,8 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
 	{
 	  /* Reduce the smallest move size by half so that MOVES == 1.  */
 	  mode = smallest_int_mode_for_size
-	    (GET_MODE_BITSIZE (mode) / 2).require ();
-	  moves = count / GET_MODE_SIZE (mode);
+	    (GET_MODE_BITSIZE (mode).to_constant () / 2).require ();
+	  moves = count / GET_MODE_SIZE (mode).to_constant ();
 	  gcc_assert (moves == 1);
 	}
     }
@@ -10120,11 +10120,11 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
     {
       emit_move_insn (tmp[i], srcmem);
       srcmem = offset_address (srcmem,
-			       GEN_INT (GET_MODE_SIZE (mode)),
-			       GET_MODE_SIZE (mode));
+			       GEN_INT (GET_MODE_SIZE (mode).to_constant ()),
+			       GET_MODE_SIZE (mode).to_constant ());
     }
 
-  unsigned int epilogue_size = count & (GET_MODE_SIZE (mode) - 1);
+  unsigned int epilogue_size = count & (GET_MODE_SIZE (mode).to_constant () - 1);
   machine_mode epilogue_mode = VOIDmode;
   if (epilogue_size)
     {
@@ -10135,8 +10135,8 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
       srcmem = adjust_address (srcmem, epilogue_mode, 0);
       srcmem = offset_address (srcmem, GEN_INT (epilogue_size), 1);
       srcmem = offset_address (srcmem,
-			       GEN_INT (-GET_MODE_SIZE (epilogue_mode)),
-			       GET_MODE_SIZE (epilogue_mode));
+			       GEN_INT (-GET_MODE_SIZE (epilogue_mode).to_constant ()),
+			       GET_MODE_SIZE (epilogue_mode).to_constant ());
       emit_move_insn (tmp[8], srcmem);
     }
 
@@ -10145,8 +10145,8 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
     {
       emit_move_insn (destmem, tmp[i]);
       destmem = offset_address (destmem,
-				GEN_INT (GET_MODE_SIZE (mode)),
-				GET_MODE_SIZE (mode));
+				GEN_INT (GET_MODE_SIZE (mode).to_constant ()),
+				GET_MODE_SIZE (mode).to_constant ());
     }
 
   if (epilogue_size)
@@ -10155,8 +10155,8 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
       destmem = adjust_address (destmem, epilogue_mode, 0);
       destmem = offset_address (destmem, GEN_INT (epilogue_size), 1);
       destmem = offset_address (destmem,
-				GEN_INT (-GET_MODE_SIZE (epilogue_mode)),
-				GET_MODE_SIZE (epilogue_mode));
+				GEN_INT (-GET_MODE_SIZE (epilogue_mode).to_constant ()),
+				GET_MODE_SIZE (epilogue_mode).to_constant ());
       emit_move_insn (destmem, tmp[8]);
     }
 
@@ -10223,9 +10223,9 @@ ix86_expand_n_move_set_or_movmem (rtx destmem, rtx srcmem,
 
   rtx step;
   if (forward)
-    step = GEN_INT (GET_MODE_SIZE (mode));
+    step = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
   else
-    step = GEN_INT (-GET_MODE_SIZE (mode));
+    step = GEN_INT (-GET_MODE_SIZE (mode).to_constant ());
 
   if (memset_vals)
     {
@@ -10244,7 +10244,7 @@ ix86_expand_n_move_set_or_movmem (rtx destmem, rtx srcmem,
       for (i = 0; i < moves - 1; i++)
 	{
 	  emit_move_insn (tmp[i], srcmem);
-	  srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode));
+	  srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode).to_constant ());
 	}
       emit_move_insn (tmp[i], srcmem);
     }
@@ -10253,7 +10253,7 @@ ix86_expand_n_move_set_or_movmem (rtx destmem, rtx srcmem,
   for (i = 0; i < moves - 1; i++)
     {
       emit_move_insn (destmem, tmp[i]);
-      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode));
+      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode).to_constant ());
     }
   emit_move_insn (destmem, tmp[i]);
 }
@@ -10276,16 +10276,16 @@ ix86_expand_load_movmem (rtx src, rtx srcreg, rtx count_exp,
   if (last)
     {
       srcmem = offset_address (srcmem, count_exp, 1);
-      step = GEN_INT (-GET_MODE_SIZE (mode));
-      srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode));
+      step = GEN_INT (-GET_MODE_SIZE (mode).to_constant ());
+      srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode).to_constant ());
     }
   else
-    step = GEN_INT (GET_MODE_SIZE (mode));
+    step = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
 
   for (i = 0; i < moves - 1; i++)
     {
       emit_move_insn (regs[i], srcmem);
-      srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode));
+      srcmem = offset_address (srcmem, step, GET_MODE_SIZE (mode).to_constant ());
     }
   emit_move_insn (regs[i], srcmem);
 }
@@ -10305,16 +10305,16 @@ ix86_expand_store_movmem (rtx dst, rtx destreg, rtx count_exp,
   if (last)
     {
       destmem = offset_address (destmem, count_exp, 1);
-      step = GEN_INT (-GET_MODE_SIZE (mode));
-      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode));
+      step = GEN_INT (-GET_MODE_SIZE (mode).to_constant ());
+      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode).to_constant ());
     }
   else
-    step = GEN_INT (GET_MODE_SIZE (mode));
+    step = GEN_INT (GET_MODE_SIZE (mode).to_constant ());
 
   for (i = 0; i < moves - 1; i++)
     {
       emit_move_insn (destmem, regs[i]);
-      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode));
+      destmem = offset_address (destmem, step, GET_MODE_SIZE (mode).to_constant ());
     }
   emit_move_insn (destmem, regs[i]);
 }
@@ -10358,22 +10358,22 @@ ix86_expand_n_overlapping_move_set_or_movmem (rtx dst, rtx src,
 	{
 	  emit_move_insn (tmp[i], srcmem);
 	  srcmem = offset_address (srcmem,
-				   GEN_INT (GET_MODE_SIZE (mode)),
-				   GET_MODE_SIZE (mode));
+				   GEN_INT (GET_MODE_SIZE (mode).to_constant ()),
+				   GET_MODE_SIZE (mode).to_constant ());
 	}
       emit_move_insn (tmp[i], srcmem);
 
       /* Load the second half.  */
       srcmem = offset_address (base_srcmem, count_exp, 1);
       srcmem = offset_address (srcmem,
-			       GEN_INT (-GET_MODE_SIZE (mode)),
-			       GET_MODE_SIZE (mode));
+			       GEN_INT (-GET_MODE_SIZE (mode).to_constant ()),
+			       GET_MODE_SIZE (mode).to_constant ());
       for (j = half_moves, i = 0; i < half_moves - 1; i++, j++)
 	{
 	  emit_move_insn (tmp[j], srcmem);
 	  srcmem = offset_address (srcmem,
-				   GEN_INT (-GET_MODE_SIZE (mode)),
-				   GET_MODE_SIZE (mode));
+				   GEN_INT (-GET_MODE_SIZE (mode).to_constant ()),
+				   GET_MODE_SIZE (mode).to_constant ());
 	}
       emit_move_insn (tmp[j], srcmem);
     }
@@ -10386,20 +10386,20 @@ ix86_expand_n_overlapping_move_set_or_movmem (rtx dst, rtx src,
     {
       emit_move_insn (destmem, tmp[i]);
       destmem = offset_address (destmem,
-				GEN_INT (GET_MODE_SIZE (mode)),
-				GET_MODE_SIZE (mode));
+				GEN_INT (GET_MODE_SIZE (mode).to_constant ()),
+				GET_MODE_SIZE (mode).to_constant ());
     }
   emit_move_insn (destmem, tmp[i]);
 
   /* Store the second half.  */
   destmem = offset_address (base_destmem, count_exp, 1);
-  destmem = offset_address (destmem, GEN_INT (-GET_MODE_SIZE (mode)),
-			    GET_MODE_SIZE (mode));
+  destmem = offset_address (destmem, GEN_INT (-GET_MODE_SIZE (mode).to_constant ()),
+			    GET_MODE_SIZE (mode).to_constant ());
   for (j = half_moves, i = 0; i < half_moves - 1; i++, j++)
     {
       emit_move_insn (destmem, tmp[j]);
-      destmem = offset_address (destmem, GEN_INT (-GET_MODE_SIZE (mode)),
-				GET_MODE_SIZE (mode));
+      destmem = offset_address (destmem, GEN_INT (-GET_MODE_SIZE (mode).to_constant ()),
+				GET_MODE_SIZE (mode).to_constant ());
     }
   emit_move_insn (destmem, tmp[j]);
 }
@@ -10688,8 +10688,8 @@ ix86_expand_set_or_movmem (rtx operands[], bool iscpymem, bool issetmem)
       /* Reduce MOVE_MAX by half so that MOVE_MAX can be used.  */
       if (known_gt (GET_MODE_SIZE (mode), probable_max_size))
 	mode = smallest_int_mode_for_size
-	  (GET_MODE_BITSIZE (mode) / 2).require ();
-      move_max = GET_MODE_SIZE (mode);
+	  (GET_MODE_BITSIZE (mode).to_constant () / 2).require ();
+      move_max = GET_MODE_SIZE (mode).to_constant ();
     }
 
   /* Try to fully unroll memmove of known size first.  */
@@ -10703,7 +10703,7 @@ ix86_expand_set_or_movmem (rtx operands[], bool iscpymem, bool issetmem)
   if (issetmem)
     {
       /* Use vector mode if MODE size > word size.  */
-      unsigned int size = GET_MODE_SIZE (mode);
+      unsigned int size = GET_MODE_SIZE (mode).to_constant ();
       poly_uint64 nunits;
       if (size > UNITS_PER_WORD)
 	{
@@ -10719,7 +10719,7 @@ ix86_expand_set_or_movmem (rtx operands[], bool iscpymem, bool issetmem)
       else
 	val_word = promote_duplicated_reg (word_mode, memset_val_exp);
       memset_vals[memset_val_word] = val_word;
-      if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	{
 	  if (memset_val_exp == const0_rtx)
 	    memset_vals[memset_val_vector] = CONST0_RTX (mode);
@@ -10973,11 +10973,11 @@ ix86_expand_set_or_movmem (rtx operands[], bool iscpymem, bool issetmem)
 
 	      srcmem = change_address (src, mode, srcreg);
 	      destmem = change_address (dst, mode, destreg);
-	      rtx step = GEN_INT (-GET_MODE_SIZE (mode));
+	      rtx step = GEN_INT (-GET_MODE_SIZE (mode).to_constant ());
 	      srcmem = offset_address (srcmem, step,
-				       GET_MODE_SIZE (mode));
+				       GET_MODE_SIZE (mode).to_constant ());
 	      destmem = offset_address (destmem, step,
-					GET_MODE_SIZE (mode));
+					GET_MODE_SIZE (mode).to_constant ());
 
 	      rtx_code_label *loop_4x_vec_backward_label
 		= gen_label_rtx ();
@@ -14693,7 +14693,7 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
 static int
 get_element_number (tree vec_type, tree arg)
 {
-  unsigned HOST_WIDE_INT elt, max = TYPE_VECTOR_SUBPARTS (vec_type) - 1;
+  unsigned HOST_WIDE_INT elt, max = TYPE_VECTOR_SUBPARTS (vec_type).to_constant () - 1;
 
   if (!tree_fits_uhwi_p (arg)
       || (elt = tree_to_uhwi (arg), elt > max))
@@ -14720,7 +14720,7 @@ ix86_expand_vec_init_builtin (tree type, tree exp, rtx target)
 {
   machine_mode tmode = TYPE_MODE (type);
   machine_mode inner_mode = GET_MODE_INNER (tmode);
-  int i, n_elt = GET_MODE_NUNITS (tmode);
+  int i, n_elt = GET_MODE_NUNITS (tmode).to_constant ();
   rtvec v = rtvec_alloc (n_elt);
 
   gcc_assert (VECTOR_MODE_P (tmode));
@@ -16119,7 +16119,7 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 	  unsigned char lsb_index = UINTVAL (op1);
 	  unsigned char length = UINTVAL (op1) >> 8;
 
-	  unsigned char bitsize = GET_MODE_BITSIZE (mode);
+	  unsigned char bitsize = GET_MODE_BITSIZE (mode).to_constant ();
 
 	  icode = code_for_tbm_bextri (mode);
 
@@ -16867,7 +16867,7 @@ rdseed_step:
 	  else if (TREE_CODE (arg3) == VECTOR_CST)
 	    {
 	      unsigned int negative = 0;
-	      for (i = 0; i < VECTOR_CST_NELTS (arg3); ++i)
+	      for (i = 0; known_lt (i, VECTOR_CST_NELTS (arg3)); ++i)
 		{
 		  tree cst = VECTOR_CST_ELT (arg3, i);
 		  if (TREE_CODE (cst) == INTEGER_CST
@@ -17622,7 +17622,7 @@ ix86_vector_duplicate_value (machine_mode mode, rtx target, rtx val)
       start_sequence ();
 
       if (!TARGET_PREFER_BCST_FROM_INTEGER && CONST_INT_P (val)
-	  && GET_MODE_BITSIZE (innermode) <= HOST_BITS_PER_WIDE_INT
+	  && known_le (GET_MODE_BITSIZE (innermode), HOST_BITS_PER_WIDE_INT)
 	  && known_ge (GET_MODE_BITSIZE(mode), 128))
 	reg = validize_mem (force_const_mem (innermode, val));
       else
@@ -17821,7 +17821,7 @@ ix86_expand_vector_init_duplicate (bool mmx_ok, machine_mode mode,
 	  memset (&dperm, 0, sizeof (dperm));
 	  dperm.target = target;
 	  dperm.vmode = mode;
-	  dperm.nelt = GET_MODE_NUNITS (mode);
+	  dperm.nelt = GET_MODE_NUNITS (mode).to_constant ();
 	  dperm.op0 = dperm.op1 = gen_reg_rtx (mode);
 	  dperm.one_operand_p = true;
 
@@ -17878,7 +17878,7 @@ ix86_expand_vector_init_duplicate (bool mmx_ok, machine_mode mode,
 	if (CONST_INT_P (val))
 	  {
 	    x = simplify_binary_operation (ASHIFT, wsmode, val,
-					   GEN_INT (GET_MODE_BITSIZE (smode)));
+					   GEN_INT (GET_MODE_BITSIZE (smode).to_constant ()));
 	    val = simplify_binary_operation (IOR, wsmode, val, x);
 	  }
 	else if (smode == QImode && !TARGET_PARTIAL_REG_STALL)
@@ -17886,7 +17886,7 @@ ix86_expand_vector_init_duplicate (bool mmx_ok, machine_mode mode,
 	else
 	  {
 	    x = expand_simple_binop (wsmode, ASHIFT, val,
-				     GEN_INT (GET_MODE_BITSIZE (smode)),
+				     GEN_INT (GET_MODE_BITSIZE (smode).to_constant ()),
 				     NULL_RTX, 1, OPTAB_LIB_WIDEN);
 	    val = expand_simple_binop (wsmode, IOR, val, x, x, 1,
 				       OPTAB_LIB_WIDEN);
@@ -19971,7 +19971,7 @@ ix86_expand_vector_init_general (bool mmx_ok, machine_mode mode,
     case E_V16SFmode:
     case E_V8DFmode:
     case E_V8DImode:
-      n = GET_MODE_NUNITS (mode);
+      n = GET_MODE_NUNITS (mode).to_constant ();
       for (i = 0; i < n; i++)
 	ops[i] = XVECEXP (vals, 0, i);
       ix86_expand_vector_init_concat (mode, target, ops, n);
@@ -20014,7 +20014,7 @@ ix86_expand_vector_init_general (bool mmx_ok, machine_mode mode,
       goto half;
 
 half:
-      n = GET_MODE_NUNITS (mode);
+      n = GET_MODE_NUNITS (mode).to_constant ();
       for (i = 0; i < n; i++)
 	ops[i] = XVECEXP (vals, 0, i);
       op0 = gen_reg_rtx (half_mode);
@@ -20047,7 +20047,7 @@ half:
       goto quarter;
 
 quarter:
-      n = GET_MODE_NUNITS (mode);
+      n = GET_MODE_NUNITS (mode).to_constant ();
       for (i = 0; i < n; i++)
 	ops[i] = XVECEXP (vals, 0, i);
       op0 = gen_reg_rtx (quarter_mode);
@@ -20071,7 +20071,7 @@ quarter:
 
     case E_V8HFmode:
     case E_V8BFmode:
-      n = GET_MODE_NUNITS (mode);
+      n = GET_MODE_NUNITS (mode).to_constant ();
       for (i = 0; i < n; i++)
 	ops[i] = XVECEXP (vals, 0, i);
       ix86_expand_vector_init_interleave (mode, target, ops, n >> 1);
@@ -20100,13 +20100,15 @@ quarter:
       machine_mode tmp_mode, inner_mode;
       rtx words[4], shift;
 
-      tmp_mode = (GET_MODE_SIZE (mode) < UNITS_PER_WORD) ? SImode : word_mode;
+      tmp_mode = (known_lt (GET_MODE_SIZE (mode), UNITS_PER_WORD)
+		  ? SImode : word_mode);
 
       inner_mode = GET_MODE_INNER (mode);
-      n_elts = GET_MODE_NUNITS (mode);
-      n_words = GET_MODE_SIZE (mode) / GET_MODE_SIZE (tmp_mode);
+      n_elts = GET_MODE_NUNITS (mode).to_constant ();
+      n_words = (GET_MODE_SIZE (mode).to_constant ()
+		 / GET_MODE_SIZE (tmp_mode).to_constant ());
       n_elt_per_word = n_elts / n_words;
-      shift = GEN_INT (GET_MODE_BITSIZE (inner_mode));
+      shift = GEN_INT (GET_MODE_BITSIZE (inner_mode).to_constant ());
 
       for (i = 0; i < n_words; ++i)
 	{
@@ -20173,7 +20175,7 @@ ix86_expand_vector_init (bool mmx_ok, rtx target, rtx vals)
 {
   machine_mode mode = GET_MODE (target);
   machine_mode inner_mode = GET_MODE_INNER (mode);
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int n_var = 0, one_var = -1;
   bool all_same = true, all_const_zero = true;
   int i;
@@ -20194,7 +20196,7 @@ ix86_expand_vector_init (bool mmx_ok, rtx target, rtx vals)
 	      || inner_mode == HFmode
 	      || inner_mode == BFmode)
 	    {
-	      unsigned int n_bits = n_elts * GET_MODE_SIZE (inner_mode);
+	      unsigned int n_bits = n_elts * GET_MODE_SIZE (inner_mode).to_constant ();
 	      scalar_mode elt_mode = inner_mode == TImode ? DImode : SImode;
 	      n_bits /= GET_MODE_SIZE (elt_mode);
 	      mode = mode_for_vector (elt_mode, n_bits).require ();
@@ -20276,7 +20278,7 @@ ix86_expand_vector_set_var (rtx target, rtx val, rtx idx)
   rtx vec[64];
   machine_mode mode = GET_MODE (target);
   machine_mode cmp_mode = mode;
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   rtx valv,idxv,constv,idx_tmp;
   bool ok = false;
 
@@ -20449,7 +20451,7 @@ ix86_expand_vector_set (bool mmx_ok, rtx target, rtx val, int elt)
   machine_mode mmode = VOIDmode;
   rtx (*gen_blendm) (rtx, rtx, rtx, rtx);
 
-  if (!IN_RANGE (elt, 0, GET_MODE_NUNITS (mode)))
+  if (!IN_RANGE (elt, 0, GET_MODE_NUNITS (mode).to_constant ()))
     {
       emit_move_insn (target, target);
       return;
@@ -21410,7 +21412,7 @@ ix86_expand_reduc (rtx (*fn) (rtx, rtx, rtx), rtx dest, rtx in)
       return;
     }
 
-  for (i = GET_MODE_BITSIZE (mode);
+  for (i = GET_MODE_BITSIZE (mode).to_constant ();
        i > GET_MODE_UNIT_BITSIZE (mode);
        i >>= 1)
     {
@@ -21895,7 +21897,7 @@ ix86_emit_swdivsf (rtx res, rtx a, rtx b, machine_mode mode)
     emit_insn (gen_rtx_SET (x0, gen_rtx_UNSPEC (mode, gen_rtvec (1, b),
 						UNSPEC_RCP)));
 
-  unsigned vector_size = GET_MODE_SIZE (mode);
+  unsigned vector_size = GET_MODE_SIZE (mode).to_constant ();
 
   /* (a - (rcp(b) * a * b)) * rcp(b) + rcp(b) * a
      N-R step with 2 fma implementation.  */
@@ -22001,7 +22003,7 @@ ix86_emit_swsqrtsf (rtx res, rtx a, machine_mode mode, bool recip)
   /* e0 = x0 * a */
   emit_insn (gen_rtx_SET (e0, gen_rtx_MULT (mode, x0, a)));
 
-  unsigned vector_size = GET_MODE_SIZE (mode);
+  unsigned vector_size = GET_MODE_SIZE (mode).to_constant ();
   if (TARGET_FMA
       || (TARGET_AVX512F && vector_size == 64)
       || (TARGET_AVX512VL && (vector_size == 32 || vector_size == 16)))
@@ -23162,7 +23164,7 @@ expand_vec_perm_blend (struct expand_vec_perm_d *d)
       || (!swap_commutative_operands_p (op0, op1)
 	  && !(mask & 1)))
     {
-      unsigned n_elts = GET_MODE_NUNITS (vmode);
+      unsigned n_elts = GET_MODE_NUNITS (vmode).to_constant ();
       std::swap (op0, op1);
       unsigned HOST_WIDE_INT mask_all = HOST_WIDE_INT_1U;
       if (n_elts == HOST_BITS_PER_WIDE_INT)
@@ -23313,7 +23315,7 @@ valid_perm_using_mode_p (machine_mode vmode, struct expand_vec_perm_d *d)
   if (known_ge (GET_MODE_NUNITS (vmode), d->nelt))
     return true;
 
-  chunk = d->nelt / GET_MODE_NUNITS (vmode);
+  chunk = d->nelt / GET_MODE_NUNITS (vmode).to_constant ();
   for (i = 0; i < d->nelt; i += chunk)
     if (d->perm[i] & (chunk - 1))
       return false;
@@ -23340,7 +23342,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
   nelt = d->nelt;
 
   if (!d->one_operand_p)
-    switch (GET_MODE_SIZE (d->vmode))
+    switch (GET_MODE_SIZE (d->vmode).to_constant ())
       {
       case 4:
 	if (!TARGET_XOP)
@@ -23390,7 +23392,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
 	return false;
       }
   else
-    switch (GET_MODE_SIZE (d->vmode))
+    switch (GET_MODE_SIZE (d->vmode).to_constant ())
       {
       case 4:
 	if (!TARGET_SSSE3)
@@ -23552,7 +23554,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
 
   machine_mode vpmode = vmode;
 
-  nelt = GET_MODE_SIZE (vmode);
+  nelt = GET_MODE_SIZE (vmode).to_constant ();
 
   /* Emulate narrow modes with V16QI instructions.  */
   if (nelt < 16)
@@ -23579,7 +23581,7 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
     }
 
   vperm = gen_rtx_CONST_VECTOR (vpmode,
-				gen_rtvec_v (GET_MODE_NUNITS (vpmode), rperm));
+				gen_rtvec_v (GET_MODE_NUNITS (vpmode).to_constant (), rperm));
   vperm = force_reg (vpmode, vperm);
 
   if (vmode == d->vmode)
@@ -24138,7 +24140,7 @@ expand_vec_perm_punpckldq_pshuf (struct expand_vec_perm_d *d)
   dperm.op0 = op0;
   dperm.op1 = op0;
   dperm.vmode = widen_vmode;
-  unsigned nelt = GET_MODE_NUNITS (widen_vmode);
+  unsigned nelt = GET_MODE_NUNITS (widen_vmode).to_constant ();
   dperm.nelt = nelt;
   dperm.one_operand_p = true;
   dperm.testing_p = false;
@@ -25502,7 +25504,7 @@ expand_vec_perm_pshufb2 (struct expand_vec_perm_d *d)
   if (d->testing_p)
     return true;
 
-  switch (GET_MODE_SIZE (d->vmode))
+  switch (GET_MODE_SIZE (d->vmode).to_constant ())
     {
     case 4:
       mode = V4QImode;
@@ -25814,7 +25816,7 @@ expand_vec_perm_pslldq_psrldq_por (struct expand_vec_perm_d *d, bool pandn)
   gen_vec_shr = vmode == E_V16QImode ? gen_vec_shr_v16qi : gen_vec_shr_v8hi;
   gen_vec_shl = vmode == E_V16QImode ? gen_vec_shl_v16qi : gen_vec_shl_v8hi;
   imode = GET_MODE_INNER (vmode);
-  inner_size = GET_MODE_BITSIZE (imode);
+  inner_size = GET_MODE_BITSIZE (imode).to_constant ();
   op0 = gen_reg_rtx (vmode);
   op1 = gen_reg_rtx (vmode);
 
@@ -26958,7 +26960,7 @@ ix86_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   d.vmode = vmode;
   gcc_assert (VECTOR_MODE_P (d.vmode));
-  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
+  d.nelt = nelt = GET_MODE_NUNITS (d.vmode).to_constant ();
   d.testing_p = !target;
 
   gcc_assert (known_eq (sel.length (), nelt));
@@ -27064,7 +27066,7 @@ ix86_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   for (i = which = 0; i < nelt; ++i)
     {
-      unsigned char e = sel[i];
+      unsigned char e = sel[i].to_constant ();
       gcc_assert (e < 2 * nelt);
       d.perm[i] = e;
       perm[i] = e;
@@ -27157,7 +27159,7 @@ ix86_expand_vec_extract_even_odd (rtx targ, rtx op0, rtx op1, unsigned odd)
   d.op0 = op0;
   d.op1 = op1;
   d.vmode = GET_MODE (targ);
-  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
+  d.nelt = nelt = GET_MODE_NUNITS (d.vmode).to_constant ();
   d.one_operand_p = false;
   d.testing_p = false;
 
@@ -27183,7 +27185,7 @@ ix86_expand_vec_interleave (rtx targ, rtx op0, rtx op1, bool high_p)
   d.op0 = op0;
   d.op1 = op1;
   d.vmode = GET_MODE (targ);
-  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
+  d.nelt = nelt = GET_MODE_NUNITS (d.vmode).to_constant ();
   d.one_operand_p = false;
   d.testing_p = false;
 
@@ -27671,7 +27673,7 @@ ix86_expand_vecop_qihi (enum rtx_code code, rtx dest, rtx op1, rtx op2)
   d.op0 = gen_lowpart (qimode, res_l);
   d.op1 = gen_lowpart (qimode, res_h);
   d.vmode = qimode;
-  d.nelt = GET_MODE_NUNITS (qimode);
+  d.nelt = GET_MODE_NUNITS (qimode).to_constant ();
   d.one_operand_p = false;
   d.testing_p = false;
 
@@ -27711,9 +27713,9 @@ static bool
 const_vector_equal_evenodd_p (rtx op)
 {
   machine_mode mode = GET_MODE (op);
-  int i, nunits = GET_MODE_NUNITS (mode);
+  int i, nunits = GET_MODE_NUNITS (mode).to_constant ();
   if (!CONST_VECTOR_P (op)
-      || nunits != CONST_VECTOR_NUNITS (op))
+      || maybe_ne (nunits, CONST_VECTOR_NUNITS (op)))
     return false;
   for (i = 0; i < nunits; i += 2)
     if (CONST_VECTOR_ELT (op, i) != CONST_VECTOR_ELT (op, i + 1))
@@ -28173,14 +28175,14 @@ ix86_expand_pextr (rtx *operands)
   if (SUBREG_P (dst))
     {
       /* Reject non-lowpart subregs.  */
-      if (SUBREG_BYTE (dst) > 0)
+      if (known_gt (SUBREG_BYTE (dst), 0))
 	return false;
       dst = SUBREG_REG (dst);
     }
 
   if (SUBREG_P (src))
     {
-      pos += SUBREG_BYTE (src) * BITS_PER_UNIT;
+      pos += SUBREG_BYTE (src).to_constant () * BITS_PER_UNIT;
       src = SUBREG_REG (src);
     }
 
@@ -28275,7 +28277,7 @@ ix86_expand_pinsr (rtx *operands)
 
   if (SUBREG_P (dst))
     {
-      pos += SUBREG_BYTE (dst) * BITS_PER_UNIT;
+      pos += SUBREG_BYTE (dst).to_constant () * BITS_PER_UNIT;
       dst = SUBREG_REG (dst);
     }
 
@@ -28335,7 +28337,7 @@ ix86_expand_pinsr (rtx *operands)
 
 	if (SUBREG_P (src))
 	  {
-	    unsigned int srcpos = SUBREG_BYTE (src);
+	    unsigned int srcpos = SUBREG_BYTE (src).to_constant ();
 
 	    if (srcpos > 0)
 	      {
@@ -28789,8 +28791,8 @@ ix86_gen_bcst_mem (machine_mode mode, rtx x)
       && !CONST_FIXED_P (cst))
     return NULL_RTX;
 
-  int n_elts = GET_MODE_NUNITS (mode);
-  if (CONST_VECTOR_NUNITS (x) != n_elts)
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
+  if (maybe_ne (CONST_VECTOR_NUNITS (x), n_elts))
     return NULL_RTX;
 
   for (int i = 1; i < n_elts; i++)
@@ -29513,7 +29515,7 @@ ix86_vgf2p8affine_shift_matrix (rtx src, rtx count, enum rtx_code code)
       gcc_unreachable ();
     }
 
-  int nelts = GET_MODE_NUNITS (mode);
+  int nelts = GET_MODE_NUNITS (mode).to_constant ();
   rtvec vec = rtvec_alloc (nelts);
   uint64_t ma = matrix[shift];
   for (int i = 0; i < nelts; i++)
@@ -29529,7 +29531,7 @@ ix86_expand_trunc_with_avx2_noavx512f (rtx output, rtx input, machine_mode cvt_m
 {
   machine_mode out_mode = GET_MODE (output);
   machine_mode in_mode = GET_MODE (input);
-  int len = GET_MODE_SIZE (in_mode);
+  int len = GET_MODE_SIZE (in_mode).to_constant ();
   gcc_assert (known_eq (len, GET_MODE_SIZE (cvt_mode))
 	      && GET_MODE_INNER (out_mode) == GET_MODE_INNER (cvt_mode)
 	      && (REG_P (input) || SUBREG_P (input)));
@@ -29542,7 +29544,7 @@ ix86_expand_trunc_with_avx2_noavx512f (rtx output, rtx input, machine_mode cvt_m
   d.op0 = lowpart_subreg (cvt_mode, force_reg(in_mode, input), in_mode);
   d.op1 = d.op0;
   d.vmode = cvt_mode;
-  d.nelt = GET_MODE_NUNITS (cvt_mode);
+  d.nelt = GET_MODE_NUNITS (cvt_mode).to_constant ();
   d.testing_p = false;
   d.one_operand_p = true;
 
@@ -29580,7 +29582,7 @@ ix86_expand_vector_sf2bf_with_vec_perm (rtx dest, rtx src)
       gcc_unreachable ();
     }
 
-  int nelt = GET_MODE_NUNITS (vperm_mode);
+  int nelt = GET_MODE_NUNITS (vperm_mode).to_constant ();
   vec_perm_builder sel (nelt, nelt, 1);
   sel.quick_grow (nelt);
   for (int i = 0; i != nelt; i++)
@@ -29617,7 +29619,7 @@ ix86_expand_vector_bf2sf_with_vec_perm (rtx dest, rtx src)
       gcc_unreachable ();
     }
 
-  int nelt = GET_MODE_NUNITS (vperm_mode);
+  int nelt = GET_MODE_NUNITS (vperm_mode).to_constant ();
   vec_perm_builder sel (nelt, nelt, 1);
   sel.quick_grow (nelt);
   for (int i = 0, k = 0, j = nelt; i != nelt; i++)
@@ -29643,7 +29645,7 @@ ix86_expand_gfni_bitreverse (rtx dest, rtx src)
 {
   machine_mode mode = GET_MODE (dest);
   rtx temp;
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     {
       rtx temp1 = gen_reg_rtx (mode == TImode ? V2DImode : V4SImode);
       rtx temp2 = gen_reg_rtx (mode == TImode ? V2DImode : V4SImode);
@@ -29711,7 +29713,7 @@ ix86_expand_gfni_bitreverse (rtx dest, rtx src)
   rtx target = gen_reg_rtx ((known_lt (GET_MODE_SIZE (mode), 4) || !TARGET_64BIT)
 			    ? SImode : mode == TImode ? DImode : mode);
   emit_move_insn (target, lowpart_subreg (GET_MODE (target), temp, V16QImode));
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     {
       rtx temp1 = gen_reg_rtx (GET_MODE (target));
       if (mode == TImode || TARGET_SSE4_1)
@@ -29741,7 +29743,7 @@ ix86_expand_gfni_bitreverse (rtx dest, rtx src)
       emit_insn (gen_bswap (temp5, temp1));
       temp4 = gen_rtx_ZERO_EXTEND (mode, temp4);
       temp5 = gen_rtx_ZERO_EXTEND (mode, temp5);
-      rtx shift = GEN_INT (GET_MODE_PRECISION (GET_MODE (target)));
+      rtx shift = GEN_INT (GET_MODE_PRECISION (GET_MODE (target)).to_constant ());
       temp4 = gen_rtx_ASHIFT (mode, temp4, shift);
       emit_insn (gen_rtx_SET (dest, gen_rtx_IOR (mode, temp4, temp5)));
       return;
@@ -29809,8 +29811,8 @@ ix86_expand_lcp_stall_peephole (rtx_insn *insn, rtx *operands,
 		  /* Reject DEST if a register is not wide enough to
 		     supply MODE or invalid for QImode.  */
 		  if (!GENERAL_REG_P (dest)
-		      || (GET_MODE_SIZE (GET_MODE (dest))
-			  < GET_MODE_SIZE (mode))
+		      || known_lt (GET_MODE_SIZE (GET_MODE (dest)),
+				   GET_MODE_SIZE (mode))
 		      || (mode == QImode
 			  && !ANY_QI_REGNO_P (REGNO (dest))))
 		    continue;

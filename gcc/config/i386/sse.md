@@ -3684,7 +3684,8 @@
   /* Negate mask bits to compensate for swapped PLUS and MINUS RTXes.  */
   operands[5]
     = GEN_INT (~INTVAL (operands[5])
-	       & ((HOST_WIDE_INT_1U << GET_MODE_NUNITS (<MODE>mode)) - 1));
+	       & ((HOST_WIDE_INT_1U
+		   << GET_MODE_NUNITS (<MODE>mode).to_constant ()) - 1));
 })
 
 (define_split
@@ -3715,7 +3716,8 @@
   HOST_WIDE_INT ival = 0;
 
   for (i = 0; i < nelt; i++)
-    if (INTVAL (XVECEXP (operands[5], 0, i)) < GET_MODE_NUNITS (<MODE>mode))
+    if (known_lt (INTVAL (XVECEXP (operands[5], 0, i)),
+		 GET_MODE_NUNITS (<MODE>mode)))
       ival |= HOST_WIDE_INT_1 << i;
 
   operands[5] = GEN_INT (ival);
@@ -3749,7 +3751,8 @@
   HOST_WIDE_INT ival = 0;
 
   for (i = 0; i < nelt; i++)
-    if (INTVAL (XVECEXP (operands[5], 0, i)) >= GET_MODE_NUNITS (<MODE>mode))
+    if (known_ge (INTVAL (XVECEXP (operands[5], 0, i)),
+		 GET_MODE_NUNITS (<MODE>mode)))
       ival |= HOST_WIDE_INT_1 << i;
 
   operands[5] = GEN_INT (ival);
@@ -4714,8 +4717,8 @@
 	    UNSPEC_PCMP)))]
   "TARGET_AVX512F
    && (!VALID_MASK_AVX512BW_MODE (<SWI248x:MODE>mode) || TARGET_AVX512BW)
-   && (GET_MODE_NUNITS (<V48H_AVX512VL:MODE>mode)
-      < GET_MODE_PRECISION (<SWI248x:MODE>mode))"
+   && known_lt (GET_MODE_NUNITS (<V48H_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))"
   "v<ssecmpintprefix>cmp<ssemodesuffix>\t{%3, %2, %1, %0|%0, %1, %2, %3}"
   [(set_attr "type" "ssecmp")
    (set_attr "length_immediate" "1")
@@ -4738,8 +4741,8 @@
 	    UNSPEC_PCMP))]
   "TARGET_AVX512F
    && (!VALID_MASK_AVX512BW_MODE (<SWI248x:MODE>mode) || TARGET_AVX512BW)
-   && (GET_MODE_NUNITS (<V48H_AVX512VL:MODE>mode)
-       < GET_MODE_PRECISION (<SWI248x:MODE>mode))
+   && known_lt (GET_MODE_NUNITS (<V48H_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -4769,7 +4772,7 @@
 	     (match_operand:V48H_AVX512VL 2 "nonimmediate_operand")
 	     (match_operand:SI 3 "<cmp_imm_predicate>" "n")]
 	    UNSPEC_PCMP)))]
-  "TARGET_AVX512F && GET_MODE_NUNITS (<MODE>mode) >= 8
+  "TARGET_AVX512F && known_ge (GET_MODE_NUNITS (<MODE>mode), 8)
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -4906,8 +4909,8 @@
 	     (match_operand:SI 3 "const_0_to_7_operand" "n")]
 	    UNSPEC_PCMP)))]
   "TARGET_AVX512BW
-   && (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode)
-       < GET_MODE_PRECISION (<SWI248x:MODE>mode))"
+   && known_lt (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))"
   "vpcmp<ssemodesuffix>\t{%3, %2, %1, %0|%0, %1, %2, %3}"
   [(set_attr "type" "ssecmp")
    (set_attr "length_immediate" "1")
@@ -4929,8 +4932,8 @@
 	     (match_dup 3)]
 	    UNSPEC_PCMP))]
   "TARGET_AVX512BW
-  && (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode)
-      < GET_MODE_PRECISION (<SWI248x:MODE>mode))
+  && known_lt (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))
   && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -4994,7 +4997,7 @@
   /* EQ/LE/NLT/TRUE.  */
   if (cmp_imm == 0 || cmp_imm == 2 || cmp_imm == 5 || cmp_imm == 7)
   {
-    int nelts = GET_MODE_NUNITS (<MODE>mode);
+    int nelts = GET_MODE_NUNITS (<MODE>mode).to_constant ();
     if (nelts >= 8)
       res = CONSTM1_RTX (<avx512fmaskmode>mode);
     else
@@ -5028,8 +5031,8 @@
 	     (match_operand:SI 3 "const_0_to_7_operand" "n")]
 	    UNSPEC_UNSIGNED_PCMP)))]
   "TARGET_AVX512BW
-  && (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode)
-      < GET_MODE_PRECISION (<SWI248x:MODE>mode))"
+  && known_lt (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))"
   "vpcmpu<ssemodesuffix>\t{%3, %2, %1, %0|%0, %1, %2, %3}"
   [(set_attr "type" "ssecmp")
    (set_attr "length_immediate" "1")
@@ -5052,8 +5055,8 @@
 	    UNSPEC_UNSIGNED_PCMP))]
   "TARGET_AVX512BW
    && ix86_pre_reload_split ()
-   && (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode)
-      < GET_MODE_PRECISION (<SWI248x:MODE>mode))
+   && known_lt (GET_MODE_NUNITS (<VI12_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -5120,8 +5123,8 @@
 	    UNSPEC_UNSIGNED_PCMP)))]
   "TARGET_AVX512F
    && (!VALID_MASK_AVX512BW_MODE (<SWI248x:MODE>mode) || TARGET_AVX512BW)
-   && (GET_MODE_NUNITS (<VI48_AVX512VL:MODE>mode)
-      < GET_MODE_PRECISION (<SWI248x:MODE>mode))"
+   && known_lt (GET_MODE_NUNITS (<VI48_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))"
   "vpcmpu<ssemodesuffix>\t{%3, %2, %1, %0|%0, %1, %2, %3}"
   [(set_attr "type" "ssecmp")
    (set_attr "length_immediate" "1")
@@ -5144,8 +5147,8 @@
 	    UNSPEC_UNSIGNED_PCMP))]
   "TARGET_AVX512F
    && (!VALID_MASK_AVX512BW_MODE (<SWI248x:MODE>mode) || TARGET_AVX512BW)
-   && (GET_MODE_NUNITS (<VI48_AVX512VL:MODE>mode)
-       < GET_MODE_PRECISION (<SWI248x:MODE>mode))
+   && known_lt (GET_MODE_NUNITS (<VI48_AVX512VL:MODE>mode),
+		 GET_MODE_PRECISION (<SWI248x:MODE>mode))
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -5180,7 +5183,7 @@
 	     (match_operand:SI 3 "const_0_to_7_operand")]
 	    UNSPEC_UNSIGNED_PCMP)))]
   "TARGET_AVX512F && ix86_pre_reload_split ()
-   && GET_MODE_NUNITS (<MODE>mode) >= 8"
+   && known_ge (GET_MODE_NUNITS (<MODE>mode), 8)"
   "#"
   "&& 1"
   [(set (match_dup 0)
@@ -12836,8 +12839,8 @@
 	  (match_operand:V4SF 1 "register_operand" "0,0,v")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE4_1
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (V4SFmode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (V4SFmode))"
 {
   operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])) << 4);
   switch (which_alternative)
@@ -18858,7 +18861,7 @@
 	     UNSPEC_PCMP)))]
   "TARGET_AVX512VL && ix86_pre_reload_split ()
   && GET_MODE_CLASS (GET_MODE (operands[3])) == MODE_VECTOR_INT
-  && GET_MODE_SIZE (GET_MODE (operands[3])) == <MODE_SIZE>
+  && known_eq (GET_MODE_SIZE (GET_MODE (operands[3])), <MODE_SIZE>)
   /* LT or GE 0 */
   && ((INTVAL (operands[5]) == 1 && !MEM_P (operands[1]))
       || (INTVAL (operands[5]) == 5 && !MEM_P (operands[2])))"
@@ -20697,8 +20700,8 @@
 	  (match_operand:PINSR_MODE 1 "register_operand" "0,0,x,x,v,v,x")
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_SSE2
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (<MODE>mode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (<MODE>mode))"
 {
   HOST_WIDE_INT items = INTVAL (operands[3]);
 
@@ -20738,20 +20741,20 @@
    (set (attr "prefix_rex")
      (if_then_else
        (and (not (match_test "TARGET_AVX"))
-	    (match_test "GET_MODE_NUNITS (<MODE>mode) == 2"))
+	    (match_test "known_eq (GET_MODE_NUNITS (<MODE>mode), 2)"))
        (const_string "1")
        (const_string "*")))
    (set (attr "prefix_extra")
      (if_then_else
        (ior (eq_attr "prefix" "evex")
-	    (match_test "GET_MODE_NUNITS (<MODE>mode) == 8"))
+	    (match_test "known_eq (GET_MODE_NUNITS (<MODE>mode), 8)"))
        (const_string "*")
        (const_string "1")))
    (set_attr "length_immediate" "1")
    (set_attr "prefix" "orig,orig,vex,vex,evex,evex,vex")
    (set_attr "mode" "TI")
    (set (attr "enabled")
-     (cond [(and (not (match_test "GET_MODE_NUNITS (<MODE>mode) == 8"))
+     (cond [(and (not (match_test "known_eq (GET_MODE_NUNITS (<MODE>mode), 8)"))
 		 (eq_attr "alternative" "6"))
 	      (symbol_ref "false")
 	   ]
@@ -20767,8 +20770,8 @@
 	  (match_operand:SI 3 "const_int_operand")))]
   "TARGET_AVX2 && reload_completed
    && INTVAL (operands[3]) > 1
-   && ((unsigned) exact_log2 (INTVAL (operands[3]))
-       < GET_MODE_NUNITS (<MODE>mode))"
+   && known_lt ((unsigned) exact_log2 (INTVAL (operands[3])),
+		 GET_MODE_NUNITS (<MODE>mode))"
   [(set (match_dup 0)
 	(vec_duplicate:V8_128 (match_dup 2)))
    (set (match_dup 0)
@@ -22316,17 +22319,19 @@
   "can_create_pseudo_p ()
    && REG_P (operands[1])
    && VECTOR_MODE_P (GET_MODE (operands[1]))
-   && ((TARGET_SSE && GET_MODE_SIZE (GET_MODE (operands[1])) == 16)
-       || (TARGET_AVX && GET_MODE_SIZE (GET_MODE (operands[1])) == 32)
+   && ((TARGET_SSE
+	&& known_eq (GET_MODE_SIZE (GET_MODE (operands[1])), 16))
+       || (TARGET_AVX
+	   && known_eq (GET_MODE_SIZE (GET_MODE (operands[1])), 32))
        || (TARGET_AVX512F
-	   && GET_MODE_SIZE (GET_MODE (operands[1])) == 64))
+	   && known_eq (GET_MODE_SIZE (GET_MODE (operands[1])), 64)))
    && (<MODE>mode == SImode || TARGET_64BIT || MEM_P (operands[0]))"
   [(set (match_dup 0) (vec_select:SWI48x (match_dup 1)
 					 (parallel [(const_int 0)])))]
 {
   rtx tmp;
 
-  switch (GET_MODE_SIZE (GET_MODE (operands[1])))
+  switch (GET_MODE_SIZE (GET_MODE (operands[1])).to_constant ())
     {
     case 64:
       if (<MODE>mode == SImode)
@@ -23090,12 +23095,13 @@
    (set (match_dup 0) (match_dup 3))]
 {
   operands[2] = gen_reg_rtx (SImode);
-  if (GET_MODE_NUNITS (<MODE>mode) == 32)
+  if (known_eq (GET_MODE_NUNITS (<MODE>mode), 32))
     operands[3] = gen_rtx_NOT (SImode, operands[2]);
   else
     {
       operands[3]
-	= gen_int_mode ((HOST_WIDE_INT_1 << GET_MODE_NUNITS (<MODE>mode)) - 1,
+	= gen_int_mode ((HOST_WIDE_INT_1
+			 << GET_MODE_NUNITS (<MODE>mode).to_constant ()) - 1,
 			SImode);
       operands[3] = gen_rtx_XOR (SImode, operands[2], operands[3]);
     }
@@ -23108,19 +23114,20 @@
           UNSPEC_MOVMSK))]
   "TARGET_SSE2
    && GET_MODE_CLASS (GET_MODE (operands[1])) == MODE_VECTOR_INT
-   && GET_MODE_SIZE (GET_MODE (operands[1])) == <MODE_SIZE>"
+   && known_eq (GET_MODE_SIZE (GET_MODE (operands[1])), <MODE_SIZE>)"
   [(set (match_dup 2)
 	(unspec:SI [(match_dup 1)] UNSPEC_MOVMSK))
    (set (match_dup 0) (match_dup 3))]
 {
   operands[2] = gen_reg_rtx (SImode);
   operands[1] = gen_lowpart (<MODE>mode, operands[1]);
-  if (GET_MODE_NUNITS (<MODE>mode) == 32)
+  if (known_eq (GET_MODE_NUNITS (<MODE>mode), 32))
     operands[3] = gen_rtx_NOT (SImode, operands[2]);
   else
     {
       operands[3]
-	= gen_int_mode ((HOST_WIDE_INT_1 << GET_MODE_NUNITS (<MODE>mode)) - 1,
+	= gen_int_mode ((HOST_WIDE_INT_1
+			 << GET_MODE_NUNITS (<MODE>mode).to_constant ()) - 1,
 			SImode);
       operands[3] = gen_rtx_XOR (SImode, operands[2], operands[3]);
     }
@@ -24837,7 +24844,7 @@
 	  UNSPEC_BLENDV))]
   "TARGET_SSE4_1
    && GET_MODE_CLASS (GET_MODE (operands[3])) == MODE_VECTOR_INT
-   && GET_MODE_SIZE (GET_MODE (operands[3])) == <MODE_SIZE>"
+   && known_eq (GET_MODE_SIZE (GET_MODE (operands[3])), <MODE_SIZE>)"
   [(set (match_dup 0)
 	(unspec:VI1_AVX2
 	  [(match_dup 2) (match_dup 1) (match_dup 4)]
@@ -24904,7 +24911,7 @@
 	  UNSPEC_BLENDV))]
   "TARGET_SSE4_1
    && GET_MODE_CLASS (GET_MODE (operands[3])) == MODE_VECTOR_INT
-   && GET_MODE_SIZE (GET_MODE (operands[3])) == <MODE_SIZE>
+   && known_eq (GET_MODE_SIZE (GET_MODE (operands[3])), <MODE_SIZE>)
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -24926,7 +24933,7 @@
 	  UNSPEC_BLENDV))]
   "TARGET_SSE4_1
    && GET_MODE_CLASS (GET_MODE (operands[3])) == MODE_VECTOR_INT
-   && GET_MODE_SIZE (GET_MODE (operands[3])) == <MODE_SIZE>
+   && known_eq (GET_MODE_SIZE (GET_MODE (operands[3])), <MODE_SIZE>)
    && ix86_pre_reload_split ()"
   "#"
   "&& 1"
@@ -31208,7 +31215,7 @@
 {
   unsigned HOST_WIDE_INT mask = INTVAL (operands[3]);
   bool has_zero = false;
-  unsigned n = GET_MODE_NUNITS (<MODE>mode), i;
+  unsigned n = GET_MODE_NUNITS (<MODE>mode).to_constant (), i;
   unsigned ones = 0;
 
   /* If all ones bits is in mask's lower part,

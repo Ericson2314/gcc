@@ -938,7 +938,7 @@ scalar_chain::emit_conversion_insns (rtx insns, rtx_insn *after)
 static rtx
 gen_gpr_to_xmm_move_src (enum machine_mode vmode, rtx gpr)
 {
-  switch (GET_MODE_NUNITS (vmode))
+  switch (GET_MODE_NUNITS (vmode).to_constant ())
     {
     case 1:
       return gen_rtx_SUBREG (vmode, gpr, 0);
@@ -1089,7 +1089,7 @@ smode_convert_cst (rtx x, enum machine_mode vmode)
   if (constm1_operand (x, GET_MODE (x)))
     return CONSTM1_RTX (vmode);
 
-  unsigned n = GET_MODE_NUNITS (vmode);
+  unsigned n = GET_MODE_NUNITS (vmode).to_constant ();
   rtx *v = XALLOCAVEC (rtx, n);
   v[0] = x;
   for (unsigned i = 1; i < n; ++i)
@@ -1218,7 +1218,7 @@ scalar_chain::convert_compare (rtx op1, rtx op2, rtx_insn *insn)
 		*op = CONSTM1_RTX (vmode);
 	      else
 		{
-		  unsigned n = GET_MODE_NUNITS (vmode);
+		  unsigned n = GET_MODE_NUNITS (vmode).to_constant ();
 		  rtx *v = XALLOCAVEC (rtx, n);
 		  v[0] = *op;
 		  for (unsigned i = 1; i < n; ++i)
@@ -2438,7 +2438,8 @@ general_scalar_to_vector_candidate_p (rtx_insn *insn, enum machine_mode mode)
     case ROTATE:
     case ROTATERT:
       if (!CONST_INT_P (XEXP (src, 1))
-	  || !IN_RANGE (INTVAL (XEXP (src, 1)), 0, GET_MODE_BITSIZE (mode)-1))
+	  || !IN_RANGE (INTVAL (XEXP (src, 1)), 0,
+			GET_MODE_BITSIZE (mode).to_constant () - 1))
 	return false;
 
       /* Check for extend highpart case.  */
@@ -3505,7 +3506,7 @@ ix86_place_single_vector_set (rtx dest, rtx src, bitmap bbs,
 
 	       */
 	      gcc_assert (CONST_INT_P (inner_scalar));
-	      unsigned int bits = GET_MODE_BITSIZE (reg_mode);
+	      unsigned int bits = GET_MODE_BITSIZE (reg_mode).to_constant ();
 	      machine_mode mode = int_mode_for_size (bits, 0).require ();
 	      reg = gen_rtx_SUBREG (mode, reg, 0);
 	    }
@@ -3767,7 +3768,7 @@ ix86_get_vector_cse_mode (unsigned int size, machine_mode smode)
   if (VECTOR_MODE_P (smode))
     smode = GET_MODE_INNER (smode);
   scalar_mode s_mode = as_a <scalar_mode> (smode);
-  poly_uint64 nunits = size / GET_MODE_SIZE (smode);
+  poly_uint64 nunits = size / GET_MODE_SIZE (smode).to_constant ();
   machine_mode mode = mode_for_vector (s_mode, nunits).require ();
   return mode;
 }
@@ -3801,7 +3802,7 @@ replace_vector_const (machine_mode vector_mode, rtx vector_const,
 	replace = vector_const;
       else
 	{
-	  unsigned int size = GET_MODE_SIZE (mode);
+	  unsigned int size = GET_MODE_SIZE (mode).to_constant ();
 	  if (size < ix86_regmode_natural_size (mode))
 	    {
 	      /* If the mode size is smaller than its natural size,
@@ -3882,7 +3883,7 @@ ix86_broadcast_inner (rtx op, machine_mode mode,
     }
 
   mode = GET_MODE (op);
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   if (nunits < 2)
     return nullptr;
 
@@ -3922,7 +3923,7 @@ ix86_broadcast_inner (rtx op, machine_mode mode,
 
   if (const_vector_p)
     {
-      bool int_load_p = GET_MODE_SIZE (mode) <= UNITS_PER_WORD;
+      bool int_load_p = known_le (GET_MODE_SIZE (mode), UNITS_PER_WORD);
       *kind_p = X86_CSE_CONST_VECTOR;
       if (int_load_p)
 	{
@@ -4038,7 +4039,7 @@ ix86_broadcast_inner (rtx op, machine_mode mode,
   op = XEXP (op, 0);
   rtx reg = op;
   if (SUBREG_P (op)
-      && SUBREG_BYTE (op) == 0
+      && known_eq (SUBREG_BYTE (op), 0)
       && !paradoxical_subreg_p (op))
     reg = SUBREG_REG (op);
   if (!REG_P (reg))
@@ -4137,7 +4138,7 @@ ix86_broadcast_inner (rtx op, machine_mode mode,
 		(reg:V2SI 517)) 2066 {*movv2si_internal} (nil))
 
        */
-      if (GET_MODE_SIZE (orig_mode) <= UNITS_PER_WORD)
+      if (known_le (GET_MODE_SIZE (orig_mode), UNITS_PER_WORD))
 	*kind_p = X86_CSE_CONST_VECTOR;
 
       *insn_p = nullptr;
@@ -5002,7 +5003,7 @@ pass_x86_cse::x86_cse (void)
 		/* Record the maximum vector size.  */
 		if (kind <= X86_CSE_VEC_DUP
 		    && known_lt (load->size, GET_MODE_SIZE (mode)))
-		  load->size = GET_MODE_SIZE (mode);
+		  load->size = GET_MODE_SIZE (mode).to_constant ();
 
 		/* Record the basic block.  */
 		bitmap_set_bit (load->bbs, bb->index);
@@ -5036,7 +5037,7 @@ pass_x86_cse::x86_cse (void)
 	    load->tlsdesc_val = nullptr;
 	  load->mode = scalar_mode;
 	  load->dest_mode = mode;
-	  load->size = GET_MODE_SIZE (mode);
+	  load->size = GET_MODE_SIZE (mode).to_constant ();
 	  load->def_insn = def_insn;
 	  load->count = 1;
 	  load->threshold = threshold;
@@ -5089,7 +5090,7 @@ pass_x86_cse::x86_cse (void)
 		  broadcast_source = CONSTM1_RTX (mode);
 		else
 		  {
-		    int nunits = GET_MODE_NUNITS (mode);
+		    int nunits = GET_MODE_NUNITS (mode).to_constant ();
 		    rtvec v = rtvec_alloc (nunits);
 		    for (int j = 0; j < nunits ; j++)
 		      RTVEC_ELT (v, j) = load->val;

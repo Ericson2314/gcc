@@ -1150,7 +1150,7 @@
   if (!CONST_VECTOR_P (op))
     return false;
 
-  n_elts = CONST_VECTOR_NUNITS (op);
+  n_elts = CONST_VECTOR_NUNITS (op).to_constant ();
 
   for (n_elts--; n_elts > 0; n_elts--)
     {
@@ -1185,7 +1185,7 @@
     }
 
   rtx first = XVECEXP (op, 0, 0);
-  for (int i = 1; i != GET_MODE_NUNITS (GET_MODE (op)); i++)
+  for (int i = 1; maybe_ne (i, GET_MODE_NUNITS (GET_MODE (op))); i++)
     {
       rtx tmp = XVECEXP (op, 0, i);
       if (!rtx_equal_p (tmp, first))
@@ -1227,11 +1227,11 @@
 {
   mode = GET_MODE (op);
   if (GET_MODE_CLASS (mode) != MODE_VECTOR_INT
-      || (GET_MODE_SIZE (mode) != 32
-	  && GET_MODE_SIZE (mode) != 64))
+      || (maybe_ne (GET_MODE_SIZE (mode), 32)
+	  && maybe_ne (GET_MODE_SIZE (mode), 64)))
     return false;
 
-  int nelts = CONST_VECTOR_NUNITS (op);
+  int nelts = CONST_VECTOR_NUNITS (op).to_constant ();
   for (int i = 0; i != nelts; i++)
     {
       rtx elt = CONST_VECTOR_ELT (op, i);
@@ -1252,10 +1252,10 @@
 {
   mode = GET_MODE (op);
   if (GET_MODE_CLASS (mode) != MODE_VECTOR_INT
-      || GET_MODE_SIZE (mode) != 64)
+      || maybe_ne (GET_MODE_SIZE (mode), 64))
     return false;
 
-  int nelts = CONST_VECTOR_NUNITS (op);
+  int nelts = CONST_VECTOR_NUNITS (op).to_constant ();
   for (int i = 0; i != nelts; i++)
     {
       rtx elt = CONST_VECTOR_ELT (op, i);
@@ -1292,7 +1292,7 @@
   (and (match_code "vec_duplicate")
        (and (match_test "TARGET_AVX512F")
 	    (ior (match_test "TARGET_AVX512VL")
-		 (match_test "GET_MODE_SIZE (GET_MODE (op)) == 64")))
+		 (match_test "known_eq (GET_MODE_SIZE (GET_MODE (op)), 64)")))
        (match_test "VALID_BCST_MODE_P (GET_MODE_INNER (GET_MODE (op)))")
        (match_test "GET_MODE (XEXP (op, 0))
 		    == GET_MODE_INNER (GET_MODE (op))")
@@ -1328,7 +1328,7 @@
     mode = GET_MODE (op);
   else if (GET_MODE (op) != mode)
     return false;
-  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+  if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     return false;
   HOST_WIDE_INT val = ix86_convert_const_vector_to_integer (op, mode);
   return trunc_int_for_mode (val, SImode) == val;
@@ -1752,7 +1752,7 @@
 ;; less than its natural alignment.
 (define_predicate "misaligned_operand"
   (and (match_code "mem")
-       (match_test "MEM_ALIGN (op) < GET_MODE_BITSIZE (mode)")))
+       (match_test "known_lt (MEM_ALIGN (op), GET_MODE_BITSIZE (mode))")))
 
 ;; Return true if OP is a parallel for an mov{d,q,dqa,ps,pd} vec_select,
 ;; where one of the two operands of the vec_concat is const0_operand.
@@ -1843,7 +1843,7 @@
     gcc_unreachable ();
 
   mask = INTVAL (XEXP (op, 2));
-  nunits = GET_MODE_NUNITS (mode);
+  nunits = GET_MODE_NUNITS (mode).to_constant ();
 
   for (elt = 0; elt < nunits; elt++)
     {
@@ -1877,7 +1877,7 @@
   else
     gcc_unreachable ();
 
-  nunits = GET_MODE_NUNITS (mode);
+  nunits = GET_MODE_NUNITS (mode).to_constant ();
   if (XVECLEN (XEXP (op, 1), 0) != nunits)
     return false;
 
@@ -1925,7 +1925,7 @@
 (define_predicate "permvar_truncate_operand"
  (match_code "mem")
 {
-  int nelt = GET_MODE_NUNITS (mode);
+  int nelt = GET_MODE_NUNITS (mode).to_constant ();
   int perm[128];
   int id;
 
@@ -2334,7 +2334,7 @@
   (match_operand 0 "memory_operand")
 {
   /* OK if immediate operand size < 4 bytes.  */
-  if (GET_MODE_SIZE (mode) < 4)
+  if (known_lt (GET_MODE_SIZE (mode), 4))
     return true;
 
   bool default_addr = ADDR_SPACE_GENERIC_P (MEM_ADDR_SPACE (op));
