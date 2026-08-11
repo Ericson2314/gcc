@@ -67,8 +67,10 @@ host_os=@host_os@
 # of them.  Consumed by the target-specs rule below.
 libatomic_target=@libatomic_target@
 
-# Normally identical to target_noncanonical, except for compilers built
-# as accelerator targets.
+# Empty, except for compilers built as accelerator targets, where it names
+# the accelerator.  (Upstream this was documented as "normally identical to
+# target_noncanonical"; there is no target_noncanonical here to be identical
+# to, and the variable is empty in the normal case either way.)
 accel_dir_suffix = @accel_dir_suffix@
 
 # Sed command to transform gcc to installed name.
@@ -845,7 +847,16 @@ dollar = @dollar@
 # Used in install-cross.
 gcc_tooldir = @gcc_tooldir@
 # Since gcc_tooldir does not exist at build-time, use -B$(build_tooldir)/bin/
-build_tooldir = $(exec_prefix)/$(target_noncanonical)
+#
+# $(build_target_triple), not a compiler-wide target: this directory is only
+# ever reached through $(GCC_FOR_TARGET), which is $(BUILD_DRIVER_NAME) --
+# i.e. it is the tool directory for the one triple whose target libraries this
+# build tree builds, exactly the scope BUILD_DRIVER_NAME already has.  It was
+# $(target_noncanonical), which is unsubstituted and therefore empty, so every
+# such command got -B$(exec_prefix)//bin/ and -isystem $(exec_prefix)//include:
+# paths that name the exec prefix itself and silently find nothing target-
+# specific, rather than failing.
+build_tooldir = $(exec_prefix)/$(build_target_triple)
 # Directory in which the compiler finds target-independent g++ includes.
 gcc_gxx_include_dir = @gcc_gxx_include_dir@
 gcc_gxx_include_dir_add_sysroot = @gcc_gxx_include_dir_add_sysroot@
@@ -989,8 +1000,14 @@ BUILD_CPPFLAGS= -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 		-I$(srcdir)/../include $(INCINTL) $(CPPINC) $(CPPFLAGS)
 
 # Actual name to use when installing a native compiler.
+#
+# GCC_TARGET_INSTALL_NAME (upstream: $(target_noncanonical)-gcc) is gone.  This
+# compiler has no target, so there is no triple to name a second copy of the
+# driver after; with target_noncanonical unsubstituted the name was literally
+# "-gcc", and installing it meant `ln gcc -gcc', which ln reads as an option.
+# Per-target <triple>-gcc spellings are install aliases and belong with the
+# per-target manifest, not with a driver that is built once.
 GCC_INSTALL_NAME := $(shell echo gcc|sed '$(program_transform_name)')
-GCC_TARGET_INSTALL_NAME := $(target_noncanonical)-$(shell echo gcc|sed '$(program_transform_name)')
 CPP_INSTALL_NAME := $(shell echo cpp|sed '$(program_transform_name)')
 GCOV_INSTALL_NAME := $(shell echo gcov|sed '$(program_transform_name)')
 GCOV_TOOL_INSTALL_NAME := $(shell echo gcov-tool|sed '$(program_transform_name)')
@@ -2139,8 +2156,17 @@ BACKEND = $(EXTRA_BACKEND_OBJS) libbackend.a main.o libcommon-target.a \
 # front-end checking.
 TREECHECKING = @TREECHECKING@
 
-# The full name of the driver on installation
-FULL_DRIVER_NAME=$(target_noncanonical)-gcc-$(version)$(exeext)
+# The full name of the driver on installation.
+#
+# THIS MUST STAY IDENTICAL TO GCC_DRIVER_NAME in gcc-driver-name.h, which
+# configure.ac writes and which libgccjit execs; the build-directory symlink
+# below is how jit's testsuite finds it before installation.  Upstream both
+# were "$(target_noncanonical)-gcc-$(version)", and both became "-gcc-<ver>"
+# when ACX_NONCANONICAL_TARGET went away -- a name starting with a dash.
+# configure.ac has already dropped the prefix (see the comment there); this is
+# the other half.  The driver serves every target in the build, so there is no
+# triple to name it after.
+FULL_DRIVER_NAME=gcc-$(version)$(exeext)
 
 MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  insn-output.cc $(INSNRECOG_SEQ_SRC) insn-recog.h \
@@ -2840,6 +2866,19 @@ collect2$(exeext): $(COLLECT2_OBJS) $(LIBDEPS)
 # extension warning is turned off here rather than the safety given up.
 CFLAGS-target-caps.o += -Wno-c++20-extensions
 
+# UNRESOLVED, AND KNOWN EMPTY.  $(target_noncanonical) is unsubstituted, so
+# TARGET_MACHINE is "" and collect2 builds its tool names as concat
+# (target_machine, "-", "nm") = "-nm", "-ld", "-strip", "-gcc" (collect2.cc
+# :812-:875, :1161, :3055).  Those lookups simply never match and collect2
+# falls back to the unprefixed names, so it is not currently mis-executing --
+# but it is searching for filenames that begin with a dash.
+#
+# This is NOT fixable by picking a value here: unlike build_tooldir, collect2
+# is compiled once and serves every target, so a single triple baked into it
+# would be exactly the privileged target this branch removed.  The real fix is
+# in collect2.cc -- either drop the prefixed lookups (the resolution taken for
+# GCC_DRIVER_NAME in configure.ac) or have collect2 learn its target the way
+# cc1 does, from the driver.  Left as-is deliberately; see the report.
 CFLAGS-collect2.o += -DTARGET_MACHINE=\"$(target_noncanonical)\" \
 
 LTO_WRAPPER_OBJS = lto-wrapper.o collect-utils.o ggc-none.o lockfile.o \
@@ -3131,6 +3170,11 @@ check-target-caps:
 	rc=$$?; rm -f tmp-cfgfiles; exit $$rc
 
 REFERENCE_SPECS =
+# The probe below is configured for $(build_target_triple): the reference it
+# compares against is this build tree's own driver, and the as/ld it probes are
+# the ones that driver reports, so the triple must be the one this build tree
+# builds for.  It was $(target_noncanonical), i.e. `--with-target=' with an
+# empty value.
 .PHONY: check-target-specs
 check-target-specs: xgcc$(exeext)
 	@set -e; \
@@ -3143,7 +3187,7 @@ check-target-specs: xgcc$(exeext)
 	probe_ld=`./xgcc$(exeext) -print-prog-name=ld`; \
 	rm -rf tmp-target-specs; mkdir tmp-target-specs; \
 	(cd tmp-target-specs && \
-	   $$tsdir/configure --with-target=$(target_noncanonical) \
+	   $$tsdir/configure --with-target=$(build_target_triple) \
 	     --with-as="$$probe_as" --with-ld="$$probe_ld" \
 	     --with-specs-file=probed.specs > probe.log 2>&1) || \
 	  { echo "check-target-specs: probe configure failed" >&2; \
@@ -4056,6 +4100,15 @@ CFLAGS-intl.o += -DLOCALEDIR=\"$(localedir)\"
 #
 # Remake cpp.
 
+# GPLUSPLUS_TOOL_INCLUDE_DIR below is UNRESOLVED, AND KNOWN EMPTY.
+# $(target_noncanonical) is unsubstituted, so it expands to
+# $(gcc_gxx_include_dir) with a trailing slash -- i.e. a duplicate of
+# GPLUSPLUS_INCLUDE_DIR, entered twice into cpp's include chain, instead of
+# naming the per-target C++ header directory it exists for.  Not fixable here:
+# cppdefault.cc is compiled once for all targets and this directory is
+# per-target by construction, so any single value would reinstate exactly the
+# privileged target this branch removed.  Same for TOOL_INCLUDE_DIR, whose
+# $(gcc_tooldir) is set in configure.ac and has the same hole in it.
 PREPROCESSOR_DEFINES = \
   -DGCC_INCLUDE_DIR=\"$(libsubdir)/include\" \
   -DFIXED_INCLUDE_DIR=\"$(libsubdir)/include-fixed\" \
@@ -4872,24 +4925,25 @@ install-common: native lang.install-common installdirs
 	  fi; \
 	fi
 
-# Install the driver program as $(target_noncanonical)-gcc,
-# $(target_noncanonical)-gcc-$(version), and also as gcc if native.
+# Install the driver program as gcc, and as gcc-$(version).
+#
+# Upstream also installed it as $(target_noncanonical)-gcc, via a link-then-
+# rename dance (the temp name existed so the rename could be atomic over an
+# in-use binary).  That copy is gone: the driver serves every target in the
+# build, so there is no triple to name it after, and with
+# $(target_noncanonical) unsubstituted the names were "-gcc" and "-gcc-tmp".
+# The whole recipe line is prefixed with `-', so `ln gcc -gcc-tmp' failed with
+# "ln: invalid option -- 'g'" and install carried on -- which is also why the
+# $(FULL_DRIVER_NAME) alias, "-gcc-17.0.0" and equally unlinkable, was never
+# noticed as missing from any installation.
 install-driver: installdirs xgcc$(exeext)
 	-rm -f $(DESTDIR)$(bindir)/$(GCC_INSTALL_NAME)$(exeext)
 	-$(INSTALL_PROGRAM) xgcc$(exeext) $(DESTDIR)$(bindir)/$(GCC_INSTALL_NAME)$(exeext)
 	-if test "$(enable_as_accelerator)" != "yes" ; then \
-	  if [ "$(GCC_INSTALL_NAME)" != "$(target_noncanonical)-gcc-$(version)" ]; then \
+	  if [ "$(GCC_INSTALL_NAME)$(exeext)" != "$(FULL_DRIVER_NAME)" ]; then \
 	    rm -f $(DESTDIR)$(bindir)/$(FULL_DRIVER_NAME); \
 	    ( cd $(DESTDIR)$(bindir) && \
 	      $(LN) $(GCC_INSTALL_NAME)$(exeext) $(FULL_DRIVER_NAME) ); \
-	  fi; \
-	  if [ ! -f gcc-cross$(exeext) ] \
-	      && [ "$(GCC_INSTALL_NAME)" != "$(GCC_TARGET_INSTALL_NAME)" ] \
-	      && [ "$(GCC_TARGET_INSTALL_NAME)$(exeext)" != "$(FULL_DRIVER_NAME)" ] ; then \
-	    rm -f $(DESTDIR)$(bindir)/$(target_noncanonical)-gcc-tmp$(exeext); \
-	    ( cd $(DESTDIR)$(bindir) && \
-	      $(LN) $(GCC_INSTALL_NAME)$(exeext) $(target_noncanonical)-gcc-tmp$(exeext) && \
-	      mv -f $(target_noncanonical)-gcc-tmp$(exeext) $(GCC_TARGET_INSTALL_NAME)$(exeext) ); \
 	  fi; \
 	fi
 
@@ -5155,20 +5209,19 @@ install-collect2: collect2 installdirs
 install-lto-wrapper: lto-wrapper$(exeext)
 	$(INSTALL_PROGRAM) lto-wrapper$(exeext) $(DESTDIR)$(libexecsubdir)/lto-wrapper$(exeext)
 
+# Upstream also linked each of these to $(target_noncanonical)-gcc-ar etc.
+# Those aliases are gone for the same reason as $(target_noncanonical)-gcc: the
+# wrappers are built once and drive a driver that has no target.  This was not
+# merely cosmetic -- with $(target_noncanonical) empty the link target was
+# "-gcc-ar", so the recipe ran `ln gcc-ar -gcc-ar', ln parsed it as options,
+# and `make install' FAILED here.  Unlike install-driver this recipe has no
+# leading `-', so it aborted the install rather than skipping the alias.
 install-gcc-ar: installdirs gcc-ar$(exeext) gcc-nm$(exeext) gcc-ranlib$(exeext)
 	if test "$(enable_as_accelerator)" != "yes" ; then \
 	  for i in gcc-ar gcc-nm gcc-ranlib; do \
 	    install_name=`echo $$i|sed '$(program_transform_name)'` ;\
-	    target_install_name=$(target_noncanonical)-`echo $$i|sed '$(program_transform_name)'` ; \
 	    rm -f $(DESTDIR)$(bindir)/$$install_name$(exeext) ; \
 	    $(INSTALL_PROGRAM) $$i$(exeext) $(DESTDIR)$(bindir)/$$install_name$(exeext) ;\
-	    if test -f gcc-cross$(exeext); then \
-	      :; \
-	    else \
-	      rm -f $(DESTDIR)$(bindir)/$$target_install_name$(exeext); \
-	      ( cd $(DESTDIR)$(bindir) && \
-		$(LN) $$install_name$(exeext) $$target_install_name$(exeext) ) ; \
-	    fi ; \
 	  done; \
 	fi
 
@@ -5192,11 +5245,10 @@ uninstall: lang.uninstall
 	-rm -rf $(DESTDIR)$(man1dir)/cpp$(man1ext)
 	-rm -f $(DESTDIR)$(infodir)/cpp.info* $(DESTDIR)$(infodir)/gcc.info*
 	-rm -f $(DESTDIR)$(infodir)/cppinternals.info* $(DESTDIR)$(infodir)/gccint.info*
+	-rm -f $(DESTDIR)$(bindir)/$(FULL_DRIVER_NAME)
 	for i in ar nm ranlib ; do \
 	  install_name=`echo gcc-$$i|sed '$(program_transform_name)'`$(exeext) ;\
-	  target_install_name=$(target_noncanonical)-`echo gcc-$$i|sed '$(program_transform_name)'`$(exeext) ; \
 	  rm -f $(DESTDIR)$(bindir)/$$install_name ; \
-	  rm -f $(DESTDIR)$(bindir)/$$target_install_name ; \
 	done
 #
 # These targets are for the dejagnu testsuites. The file site.exp
