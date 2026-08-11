@@ -25,6 +25,7 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "target-caps.h"
 #include "xregex.h"
 #include "obstack.h"
 #include "intl.h"
@@ -682,22 +683,24 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
 	case OPT_static_libstdc__:
 	  library = library >= 0 ? 2 : library;
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  /* Remove -static-libstdc++ from the command only if target supports
-	     LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
-	     back-end target can use outfile substitution.  */
-	  args[i] |= SKIPOPT;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    /* Remove -static-libstdc++ from the command only if target supports
+	       LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
+	       back-end target can use outfile substitution.  */
+	    args[i] |= SKIPOPT;
+	    }
 	  break;
 
 	case OPT_static_libgm2:
 	  shared_libgm2 = false;
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  /* Remove -static-libgm2 from the command only if target supports
-	     LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
-	     back-end target can use outfile substitution.  */
-	  args[i] |= SKIPOPT;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    /* Remove -static-libgm2 from the command only if target supports
+	       LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
+	       back-end target can use outfile substitution.  */
+	    args[i] |= SKIPOPT;
+	    }
 	  break;
 
 	case OPT_stdlib_:
@@ -882,22 +885,25 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
     {
       if (allow_libraries)
 	{
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  if (!shared_libgm2)
-	    append_option (OPT_Wl_, LD_STATIC_OPTION, 1);
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    if (!shared_libgm2)
+	      append_option (OPT_Wl_, targ_caps.ld_static_option, 1);
+	    }
 	  added_libraries += add_default_libs (libraries);
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  if (!shared_libgm2)
-	    append_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1);
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    if (!shared_libgm2)
+	      append_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1);
+	    }
 	}
 
       /* Add `-lstdc++' if we haven't already done so.  */
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
-	append_option (OPT_Wl_, LD_STATIC_OPTION, 1);
-#endif
+      if (targ_ld_static_dynamic ())
+	{
+	if (library > 1 && !static_link)
+	  append_option (OPT_Wl_, targ_caps.ld_static_option, 1);
+	}
       if (which_library == USE_LIBCXX)
 	{
 	  append_option (OPT_l, saw_profile_flag ? LIBCXX_PROFILE : LIBCXX, 1);
@@ -921,10 +927,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	  append_option (OPT_l, LIBSTDCXX_STATIC, 1);
 	  added_libraries++;
 	}
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
-	append_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1);
-#endif
+      if (targ_ld_static_dynamic ())
+	{
+	if (library > 1 && !static_link)
+	  append_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1);
+	}
     }
   if (need_math)
     {

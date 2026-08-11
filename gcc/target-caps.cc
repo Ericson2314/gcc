@@ -110,7 +110,13 @@ struct target_caps targ_caps =
   .as_riscv_march_zifencei = true,
   .as_riscv_march_zaamo_zalrsc = true,
   .as_riscv_march_b = true,
-  .solaris_ld = false
+  .solaris_ld = false,
+
+  /* String capabilities.  Today's behaviour: every consumer of these had the
+     GNU spellings compiled into it, and HAVE_LD_STATIC_DYNAMIC defaulted to 1,
+     so a compiler told nothing about its linker keeps doing exactly that.  */
+  .ld_static_option = "-Bstatic",
+  .ld_dynamic_option = "-Bdynamic"
 };
 
 /* No built-in default: see target-caps.h.  A compiler that has not been told
@@ -138,16 +144,54 @@ read_target_caps (const char *file)
       if (line[0] == '#' || line[0] == '\n')
 	continue;
 
-      /* `target <triple>' names the configuration, not a capability, so it is
-	 the one line whose value is not an integer.  Matched before the
-	 integer parse because that parse would silently drop it.  */
+      /* STRING-VALUED LINES, matched before the integer parse because that
+	 parse would silently drop them: `%d' fails on `-Bstatic' and the line
+	 would be skipped with no diagnostic, which is how a capability comes to
+	 be written and never read.
+
+	 One table for all of them, including `target', which used to have a
+	 sscanf of its own.  Two string paths is two places to get the empty
+	 case wrong, and the empty case is the one that matters -- a name with
+	 no value must yield "" and never NULL, because every consumer indexes
+	 or dereferences the result.  See the rules in target-caps.h.  */
       {
-	char triple[128];
-	if (sscanf (line, "target %127s", triple) == 1)
+	static const struct { const char *name; const char **slot; } strs[] = {
+	  { "target", &targ_caps_target_name },
+	  { "ld_static_option", &targ_caps.ld_static_option },
+	  { "ld_dynamic_option", &targ_caps.ld_dynamic_option }
+	};
+	bool matched = false;
+	for (unsigned i = 0; i < ARRAY_SIZE (strs); i++)
 	  {
-	    targ_caps_target_name = xstrdup (triple);
-	    continue;
+	    size_t nlen = strlen (strs[i].name);
+	    if (strncmp (line, strs[i].name, nlen) != 0)
+	      continue;
+	    /* The name must be a whole field: `ld_static_option_extra' must not
+	       match `ld_static_option'.  */
+	    if (line[nlen] != ' ' && line[nlen] != '\t'
+		&& line[nlen] != '\n' && line[nlen] != '\0')
+	      continue;
+
+	    const char *p = line + nlen;
+	    while (*p == ' ' || *p == '\t')
+	      p++;
+	    const char *end = p;
+	    while (*end != '\0' && *end != '\n' && *end != ' ' && *end != '\t')
+	      end++;
+
+	    /* `target' is the one whose absence is meaningful: no target line
+	       means no target, and the compiler must fail loudly rather than
+	       pretend to one.  A capability with an empty value means the
+	       feature is absent, which is a normal answer.  */
+	    if (end == p && strs[i].slot == &targ_caps_target_name)
+	      ;
+	    else
+	      *strs[i].slot = xstrndup (p, end - p);
+	    matched = true;
+	    break;
 	  }
+	if (matched)
+	  continue;
       }
 
       if (sscanf (line, "%63s %d", name, &value) != 2)

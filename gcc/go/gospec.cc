@@ -378,28 +378,30 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
       added_libraries++;
       j++;
 
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
+      if (targ_ld_static_dynamic ())
 	{
-	  generate_option (OPT_Wl_, LD_STATIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+	if (library > 1 && !static_link)
+	  {
+	    generate_option (OPT_Wl_, targ_caps.ld_static_option, 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	  }
 	}
-#endif
 
       generate_option (OPT_l, saw_profile_flag ? LIBGO_PROFILE : LIBGO, 1,
 		       CL_DRIVER, &new_decoded_options[j]);
       added_libraries++;
       j++;
 
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
+      if (targ_ld_static_dynamic ())
 	{
-	  generate_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+	if (library > 1 && !static_link)
+	  {
+	    generate_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	  }
 	}
-#endif
 
       /* When linking libgo statically we also need to link with the
 	 pthread library.  */

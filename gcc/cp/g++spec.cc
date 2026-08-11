@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "target-caps.h"
 #include "opts.h"
 
 /* This bit is set if we saw a `-xfoo' language specification.  */
@@ -237,12 +238,13 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
 	case OPT_static_libstdc__:
 	  library = library >= 0 ? 2 : library;
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  /* Remove -static-libstdc++ from the command only if target supports
-	     LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
-	     back-end target can use outfile substitution.  */
-	  args[i] |= SKIPOPT;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    /* Remove -static-libstdc++ from the command only if target supports
+	       LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
+	       back-end target can use outfile substitution.  */
+	    args[i] |= SKIPOPT;
+	    }
 	  break;
 
 	case OPT_stdlib_:
@@ -418,14 +420,15 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 			   &new_decoded_options[j++]);
 	  ++added_libraries;
 	}
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
+      if (targ_ld_static_dynamic ())
 	{
-	  generate_option (OPT_Wl_, LD_STATIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+	if (library > 1 && !static_link)
+	  {
+	    generate_option (OPT_Wl_, targ_caps.ld_static_option, 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	  }
 	}
-#endif
       if (which_library == USE_LIBCXX)
 	{
 	  generate_option (OPT_l,
@@ -455,14 +458,15 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	  added_libraries++;
 	  j++;
 	}
-#ifdef HAVE_LD_STATIC_DYNAMIC
-      if (library > 1 && !static_link)
+      if (targ_ld_static_dynamic ())
 	{
-	  generate_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+	if (library > 1 && !static_link)
+	  {
+	    generate_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	  }
 	}
-#endif
     }
   if (saw_math)
     new_decoded_options[j++] = *saw_math;

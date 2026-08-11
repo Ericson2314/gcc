@@ -52,6 +52,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "opts.h"
 
 #include "tm.h"
+#include "target-caps.h"
 #include "intl.h"
 
 #ifndef MATH_LIBRARY
@@ -168,17 +169,19 @@ append_option (size_t opt_index, const char *arg, int value)
    FORCE_STATIC, ensure the library is linked statically.  */
 
 static void
-add_arg_libgfortran (bool force_static ATTRIBUTE_UNUSED)
+add_arg_libgfortran (bool force_static)
 {
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if (force_static)
-    append_option (OPT_Wl_, LD_STATIC_OPTION, 1);
-#endif
+  if (targ_ld_static_dynamic ())
+    {
+    if (force_static)
+      append_option (OPT_Wl_, targ_caps.ld_static_option, 1);
+    }
   append_option (OPT_l, FORTRAN_LIBRARY, 1);
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if (force_static)
-    append_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1);
-#endif
+  if (targ_ld_static_dynamic ())
+    {
+    if (force_static)
+      append_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1);
+    }
 }
 
 void
@@ -260,15 +263,17 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	  break;
 
 	case OPT_static_libgfortran:
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  static_lib = 1;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    static_lib = 1;
+	    }
 	  break;
 
 	case OPT_static:
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  static_linking = 1;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    static_linking = 1;
+	    }
 	  break;
 
 	case OPT_l:

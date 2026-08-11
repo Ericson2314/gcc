@@ -76,21 +76,25 @@ along with GCC; see the file COPYING3.  If not see
    in that case, and for executable link with --{,no-}whole-archive around
    it to force everything into the executable.  And similarly for -ltsan
    and -llsan.  */
-#if defined(HAVE_LD_STATIC_DYNAMIC)
+/* No #if defined(HAVE_LD_STATIC_DYNAMIC) around these three any more.  That
+   guard was VACUOUS, not protective: mkconfig.sh put `#define
+   HAVE_LD_STATIC_DYNAMIC 1' into the tm.h preamble, so it was always taken --
+   but it was the ENCLOSING guard, three specs wide, and reading only the
+   nearest one would have missed it.  The spellings are now %(link_static) and
+   %(link_dynamic), empty on a linker that has no such pair.  */
 #undef LIBASAN_EARLY_SPEC
 #define LIBASAN_EARLY_SPEC "%{!shared:libasan_preinit%O%s} " \
   "%{static-libasan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -lasan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-libasan:-lasan -lpthread}"
+  "%(link_static) --whole-archive -lasan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-libasan:-lasan -lpthread}"
 #undef LIBTSAN_EARLY_SPEC
 #define LIBTSAN_EARLY_SPEC "%{static-libtsan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -ltsan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-libtsan:-ltsan -lpthread}"
+  "%(link_static) --whole-archive -ltsan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-libtsan:-ltsan -lpthread}"
 #undef LIBLSAN_EARLY_SPEC
 #define LIBLSAN_EARLY_SPEC "%{static-liblsan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -llsan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-liblsan:-llsan -lpthread}"
-#endif
+  "%(link_static) --whole-archive -llsan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-liblsan:-llsan -lpthread}"
 
 /************************[  Target stuff  ]***********************************/
 

@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gcc.h"
 #include "opts.h"
 #include "tm.h"
+#include "target-caps.h"
 #include "intl.h"
 
 int lang_specific_extra_outfiles = 0;
@@ -117,23 +118,25 @@ append_option (size_t opt_index, const char *arg, int value)
   }
 
 static void
-add_arg_lib(const char *library, bool force_static ATTRIBUTE_UNUSED)
+add_arg_lib(const char *library, bool force_static)
   {
   /* Append a libgcobol argument to the list being built.  If
      FORCE_STATIC, ensure the library is linked statically.  */
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if( force_static )
+  if (targ_ld_static_dynamic ())
     {
-    append_option (OPT_Wl_, LD_STATIC_OPTION, 1);
+    if( force_static )
+      {
+      append_option (OPT_Wl_, targ_caps.ld_static_option, 1);
+      }
     }
-#endif
   append_option (OPT_l, library, 1);
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if( force_static )
+  if (targ_ld_static_dynamic ())
     {
-    append_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1);
+    if( force_static )
+      {
+      append_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1);
+      }
     }
-#endif
   }
 
 void
@@ -508,10 +511,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
         break;
 
       case OPT_static_libgcobol:
-#if !defined (HAVE_LD_STATIC_DYNAMIC)
-        // Allow the target to use spec substitution.
-        append_arg(decoded_options[i]);
-#endif
+	if (!targ_ld_static_dynamic ())
+	  {
+	  // Allow the target to use spec substitution.
+	  append_arg(decoded_options[i]);
+	  }
         // Else don't pass this one on to cobol1
         break;
 
@@ -522,10 +526,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 ////        break;
 ////#endif
       case OPT_static:
-#if defined (HAVE_LD_STATIC_DYNAMIC)
-        append_arg(decoded_options[i]);
-        static_in_general = true;
-#endif        
+	if (targ_ld_static_dynamic ())
+	  {
+	  append_arg(decoded_options[i]);
+	  static_in_general = true;
+	  }
         break;
 
       default:

@@ -2482,6 +2482,22 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_lto_plugin" >&5
 $as_echo "$gcc_cv_lto_plugin" >&6; }
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker spelling for -Bstatic/-Bdynamic" >&5
+$as_echo_n "checking linker spelling for -Bstatic/-Bdynamic... " >&6; }
+gcc_cv_ld_static_option=
+gcc_cv_ld_dynamic_option=
+if "" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
+  gcc_cv_ld_static_option='-Bstatic'
+  gcc_cv_ld_dynamic_option='-Bdynamic'
+elif "" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+  gcc_cv_ld_static_option='-bstatic'
+  gcc_cv_ld_dynamic_option='-bdynamic'
+elif "" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+  gcc_cv_ld_static_option='-aarchive_shared'
+  gcc_cv_ld_dynamic_option='-adefault'
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: /" >&5
+$as_echo "/" >&6; }
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for .hidden" >&5
@@ -3278,6 +3294,12 @@ ld_now `ts_bool "$gcc_cv_ld_now"`
 ld_relro `ts_bool "$gcc_cv_ld_relro"`
 lto_plugin `if test "$gcc_cv_lto_plugin" -gt 0; then echo 1; else echo 0; fi`
 ld_demangle `ts_bool "$gcc_cv_ld_demangle"`
+# The linker's -Bstatic/-Bdynamic spellings, empty when it has no such pair.
+# These are STRINGS, not booleans; see the rules at the end of target-caps.h.
+# The %(link_static)/%(link_dynamic) specs below carry the same two answers to
+# the spec half of the driver -- write both or neither.
+ld_static_option ${gcc_cv_ld_static_option}
+ld_dynamic_option ${gcc_cv_ld_dynamic_option}
 EOF
 
 if test x"$gcc_cv_ld_as_needed" = xyes; then
@@ -3325,6 +3347,15 @@ ${link_as_needed}
 *link_no_as_needed:
 ${link_no_as_needed}
 
+# The C half of these two is ld_static_option/ld_dynamic_option in the target
+# config file above.  One probe, two carriers; changing one alone puts two
+# different spellings on one target.
+*link_static:
+${gcc_cv_ld_static_option}
+
+*link_dynamic:
+${gcc_cv_ld_dynamic_option}
+
 *link_libatomic:
 ${link_libatomic}
 
@@ -3343,6 +3374,8 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&5
 $as_echo "$as_me:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -Bstatic spelling ..... ${gcc_cv_ld_static_option:-none}" >&5
+$as_echo "$as_me:   ld -Bstatic spelling ..... ${gcc_cv_ld_static_option:-none}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   libatomic on link line ... ${spec_libatomic}" >&5
 $as_echo "$as_me:   libatomic on link line ... ${spec_libatomic}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --demangle ............ ${gcc_cv_ld_demangle}" >&5

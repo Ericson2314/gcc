@@ -19,6 +19,7 @@
 #include "opt-suggestions.h"
 #include "gcc.h"
 #include "tm.h"
+#include "target-caps.h"
 #include "opts.h"
 
 /* satisfy intellisense  */
@@ -124,12 +125,13 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
 	case OPT_static_libga68:
 	  libga68_link = LIBGA68_STATIC;
-#ifdef HAVE_LD_STATIC_DYNAMIC
-	  /* Remove -static-libga68 from the command only if target supports
-	     LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
-	     back-end target can use outfile substitution.  */
-	  args[i] |= SKIPOPT;
-#endif
+	  if (targ_ld_static_dynamic ())
+	    {
+	    /* Remove -static-libga68 from the command only if target supports
+	       LD_STATIC_DYNAMIC.  When not supported, it is left in so that a
+	       back-end target can use outfile substitution.  */
+	    args[i] |= SKIPOPT;
+	    }
 	  break;
 
 	case OPT_shared_libga68:
@@ -184,26 +186,28 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 		     &new_decoded_options[j++]);
 
   /* Add `-lga68 -lm' if we haven't already done so.  */
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if (libga68_link == LIBGA68_STATIC && !static_link)
+  if (targ_ld_static_dynamic ())
     {
-      generate_option (OPT_Wl_, LD_STATIC_OPTION, 1, CL_DRIVER,
-		       &new_decoded_options[j++]);
-      added_libraries++; /* The driver calls add_infile while handling -Wl */
+    if (libga68_link == LIBGA68_STATIC && !static_link)
+      {
+	generate_option (OPT_Wl_, targ_caps.ld_static_option, 1, CL_DRIVER,
+			 &new_decoded_options[j++]);
+	added_libraries++; /* The driver calls add_infile while handling -Wl */
+      }
     }
-#endif
   generate_option (OPT_l,
 		   "ga68", 1,
 		   CL_DRIVER, &new_decoded_options[j++]);
   added_libraries++;
-#ifdef HAVE_LD_STATIC_DYNAMIC
-  if (libga68_link == LIBGA68_STATIC && !static_link)
+  if (targ_ld_static_dynamic ())
     {
-      generate_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1, CL_DRIVER,
-		       &new_decoded_options[j++]);
-      added_libraries++; /* The driver calls add_infile while handling -Wl */
+    if (libga68_link == LIBGA68_STATIC && !static_link)
+      {
+	generate_option (OPT_Wl_, targ_caps.ld_dynamic_option, 1, CL_DRIVER,
+			 &new_decoded_options[j++]);
+	added_libraries++; /* The driver calls add_infile while handling -Wl */
+      }
     }
-#endif
   *in_decoded_options_count = j;
   *in_decoded_options = new_decoded_options;
   *in_added_libraries = added_libraries;

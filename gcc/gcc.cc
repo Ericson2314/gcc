@@ -815,36 +815,32 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
 #endif
 
 /* How this linker spells "link the following statically" and "back to
-   dynamic".  These were AC_SUBST'd from a configure probe of one linker
-   (gcc_cv_ld_static_option), which a multi-target driver cannot have.  The GNU
-   spellings are the default; AIX (-bstatic/-bdynamic) and HP-UX
-   (-aarchive_shared/-adefault) are reported through the target config, which
-   probes the real linker.
+   dynamic".  These used to be LD_STATIC_OPTION/LD_DYNAMIC_OPTION, AC_SUBST'd
+   from a configure probe of one linker, and the note that stood here described
+   the fix rather than making it: it said AIX and HP-UX "are reported through
+   the target config", and nothing reported them.  The GNU spellings were
+   compiled in on every target.
 
-   HAVE_LD_STATIC_DYNAMIC likewise: with the probe gone the guards below were
-   silently false, which dropped -Bstatic/-Bdynamic from the sanitizer link
-   specs on every target rather than choosing a different spelling.  */
-#ifndef LD_STATIC_OPTION
-#define LD_STATIC_OPTION "-Bstatic"
-#endif
-#ifndef LD_DYNAMIC_OPTION
-#define LD_DYNAMIC_OPTION "-Bdynamic"
-#endif
-#ifndef HAVE_LD_STATIC_DYNAMIC
-#define HAVE_LD_STATIC_DYNAMIC 1
-#endif
+   They are now the `link_static' and `link_dynamic' named specs, written by
+   target-specs from a probe of the real linker, with the GNU spellings as the
+   driver's defaults so an unprobed driver behaves exactly as before.
+
+   HAVE_LD_STATIC_DYNAMIC is GONE rather than converted, and that is not a
+   shortcut.  Its `#else' arms dropped the two bracket groups, which is what an
+   EMPTY link_static/link_dynamic already does -- `%{static-libasan:}' expands
+   to nothing.  A separate "has the pair" flag could only ever disagree with the
+   pair itself.  The C-code consumers derive the same answer from the same two
+   strings; see targ_ld_static_dynamic () in target-caps.h.  */
 
 #ifndef LIBASAN_SPEC
 #define STATIC_LIBASAN_LIBS \
   " %{static-libasan|static:%:include(libsanitizer.spec)%(link_libasan)}"
 #ifdef LIBASAN_EARLY_SPEC
 #define LIBASAN_SPEC STATIC_LIBASAN_LIBS
-#elif defined(HAVE_LD_STATIC_DYNAMIC)
-#define LIBASAN_SPEC "%{static-libasan:" LD_STATIC_OPTION \
-		     "} -lasan %{static-libasan:" LD_DYNAMIC_OPTION "}" \
-		     STATIC_LIBASAN_LIBS
 #else
-#define LIBASAN_SPEC "-lasan" STATIC_LIBASAN_LIBS
+#define LIBASAN_SPEC "%{static-libasan:%(link_static)}"		\
+		     " -lasan %{static-libasan:%(link_dynamic)}"	\
+		     STATIC_LIBASAN_LIBS
 #endif
 #endif
 
@@ -857,12 +853,10 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
   " %{static-libhwasan|static:%:include(libsanitizer.spec)%(link_libhwasan)}"
 #ifdef LIBHWASAN_EARLY_SPEC
 #define LIBHWASAN_SPEC STATIC_LIBHWASAN_LIBS
-#elif defined(HAVE_LD_STATIC_DYNAMIC)
-#define LIBHWASAN_SPEC "%{static-libhwasan:" LD_STATIC_OPTION \
-		     "} -lhwasan %{static-libhwasan:" LD_DYNAMIC_OPTION "}" \
-		     STATIC_LIBHWASAN_LIBS
 #else
-#define LIBHWASAN_SPEC "-lhwasan" STATIC_LIBHWASAN_LIBS
+#define LIBHWASAN_SPEC "%{static-libhwasan:%(link_static)}"		\
+		     " -lhwasan %{static-libhwasan:%(link_dynamic)}"	\
+		     STATIC_LIBHWASAN_LIBS
 #endif
 #endif
 
@@ -875,12 +869,10 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
   " %{static-libtsan|static:%:include(libsanitizer.spec)%(link_libtsan)}"
 #ifdef LIBTSAN_EARLY_SPEC
 #define LIBTSAN_SPEC STATIC_LIBTSAN_LIBS
-#elif defined(HAVE_LD_STATIC_DYNAMIC)
-#define LIBTSAN_SPEC "%{static-libtsan:" LD_STATIC_OPTION \
-		     "} -ltsan %{static-libtsan:" LD_DYNAMIC_OPTION "}" \
-		     STATIC_LIBTSAN_LIBS
 #else
-#define LIBTSAN_SPEC "-ltsan" STATIC_LIBTSAN_LIBS
+#define LIBTSAN_SPEC "%{static-libtsan:%(link_static)}"		\
+		     " -ltsan %{static-libtsan:%(link_dynamic)}"	\
+		     STATIC_LIBTSAN_LIBS
 #endif
 #endif
 
@@ -893,12 +885,10 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
   " %{static-liblsan|static:%:include(libsanitizer.spec)%(link_liblsan)}"
 #ifdef LIBLSAN_EARLY_SPEC
 #define LIBLSAN_SPEC STATIC_LIBLSAN_LIBS
-#elif defined(HAVE_LD_STATIC_DYNAMIC)
-#define LIBLSAN_SPEC "%{static-liblsan:" LD_STATIC_OPTION \
-		     "} -llsan %{static-liblsan:" LD_DYNAMIC_OPTION "}" \
-		     STATIC_LIBLSAN_LIBS
 #else
-#define LIBLSAN_SPEC "-llsan" STATIC_LIBLSAN_LIBS
+#define LIBLSAN_SPEC "%{static-liblsan:%(link_static)}"		\
+		     " -llsan %{static-liblsan:%(link_dynamic)}"	\
+		     STATIC_LIBLSAN_LIBS
 #endif
 #endif
 
@@ -909,13 +899,14 @@ static const char *asm_v = "%{v} %{w:-W} %{I*}";
 #ifndef LIBUBSAN_SPEC
 #define STATIC_LIBUBSAN_LIBS \
   " %{static-libubsan|static:%:include(libsanitizer.spec)%(link_libubsan)}"
-#ifdef HAVE_LD_STATIC_DYNAMIC
-#define LIBUBSAN_SPEC "%{static-libubsan:" LD_STATIC_OPTION \
-		     "} -lubsan %{static-libubsan:" LD_DYNAMIC_OPTION "}" \
-		     STATIC_LIBUBSAN_LIBS
-#else
-#define LIBUBSAN_SPEC "-lubsan" STATIC_LIBUBSAN_LIBS
-#endif
+/* ubsan's ladder is TWO-way, not three: there is no LIBUBSAN_EARLY_SPEC, so
+   unlike its four siblings it never had an early-spec arm.  Worth saying out
+   loud because the five look interchangeable and are not; a rewrite that
+   treated them alike would have produced a LIBUBSAN_SPEC guarded on a macro
+   that does not exist.  */
+#define LIBUBSAN_SPEC "%{static-libubsan:%(link_static)}"		\
+		      " -lubsan %{static-libubsan:%(link_dynamic)}"	\
+		      STATIC_LIBUBSAN_LIBS
 #endif
 
 /* Linker options for compressed debug sections.  What the linker supports is a
@@ -1284,6 +1275,21 @@ static const char *link_libatomic = "";
    nothing.  Registering them is what connects the probe to a consumer.  */
 static const char *link_as_needed = "";
 static const char *link_no_as_needed = "";
+
+/* How this linker spells "statically from here" and "back to dynamic": GNU
+   -Bstatic/-Bdynamic, AIX -bstatic/-bdynamic, HP-UX -aarchive_shared/-adefault.
+   Referenced from the sanitizer link specs above and from the ones the target
+   headers define; target-specs writes both from one probe.
+
+   The GNU spellings are the defaults because that is what was compiled in
+   before, on every target, so an unprobed driver is unchanged.  A linker with
+   no such pair gets EMPTY strings, and then `%{static-libasan:%(link_static)}'
+   contributes nothing -- which is exactly what the old
+   `#else' arm of the HAVE_LD_STATIC_DYNAMIC ladder produced.  The same two
+   values reach the language driver programs as targ_caps.ld_static_option and
+   .ld_dynamic_option, because those call append_option and cannot read a spec.  */
+static const char *link_static = "-Bstatic";
+static const char *link_dynamic = "-Bdynamic";
 
 /* How to hand the LTO plugin to the linker.  Written by target-specs, which
    asks the linker whether it takes -plugin at all and, if so, whether to use
@@ -1786,6 +1792,8 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_libatomic",		&link_libatomic),
   INIT_STATIC_SPEC ("link_as_needed",		&link_as_needed),
   INIT_STATIC_SPEC ("link_no_as_needed",	&link_no_as_needed),
+  INIT_STATIC_SPEC ("link_static",		&link_static),
+  INIT_STATIC_SPEC ("link_dynamic",		&link_dynamic),
   INIT_STATIC_SPEC ("link_plugin",		&link_plugin),
   INIT_STATIC_SPEC ("lto_plugin",		&lto_plugin_spec),
   INIT_STATIC_SPEC ("cplusplus_cpp",		&cplusplus_cpp),

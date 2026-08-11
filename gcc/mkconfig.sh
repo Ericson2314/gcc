@@ -88,20 +88,11 @@ case $output in
 #ifndef HAVE_LD_AS_NEEDED
 # define HAVE_LD_AS_NEEDED 1
 #endif
-#ifndef HAVE_LD_STATIC_DYNAMIC
-# define HAVE_LD_STATIC_DYNAMIC 1
-#endif
 #ifndef HAVE_LD_PIE
 # define HAVE_LD_PIE 1
 #endif
 #ifndef HAVE_LD_PUSHPOPSTATE_SUPPORT
 # define HAVE_LD_PUSHPOPSTATE_SUPPORT 1
-#endif
-#ifndef LD_STATIC_OPTION
-# define LD_STATIC_OPTION "-Bstatic"
-#endif
-#ifndef LD_DYNAMIC_OPTION
-# define LD_DYNAMIC_OPTION "-Bdynamic"
 #endif
 EOF
     ;;

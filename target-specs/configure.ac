@@ -662,25 +662,45 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-plugin' > /dev/null; then
 fi
 AC_MSG_RESULT([$gcc_cv_lto_plugin])
 
-dnl -Bstatic/-Bdynamic is probed above.  The option SPELLING (AIX -bstatic,
-dnl HP-UX -aarchive_shared) used to be probed here too and written out as the
-dnl *link_static and *link_dynamic specs.  Both are gone, and this is a DELETE
-dnl rather than a wire-up on purpose:
+dnl How this linker spells "statically from here" and "back to dynamic".  GNU
+dnl ld says -Bstatic/-Bdynamic, AIX ld -bstatic/-bdynamic, HP-UX ld
+dnl -aarchive_shared/-adefault -- so it is a property of the linker, and a
+dnl compiler serving many toolchains cannot have it compiled in.
 dnl
-dnl   LD_STATIC_OPTION and LD_DYNAMIC_OPTION are not stranded.  They are live
-dnl   compile-time macros (gcc.cc, defaults.h, defaulting to the GNU spellings)
-dnl   that target headers override -- and, decisively, that EIGHT language
-dnl   driver programs use from C: g++spec.cc, gfortranspec.cc, gospec.cc,
-dnl   d-spec.cc, gm2spec.cc, a68spec.cc, gcobolspec.cc and the freebsd/gnu-user
-dnl   sanitizer specs.  `append_option (OPT_Wl_, LD_STATIC_OPTION, 1)' cannot
-dnl   read a spec string, so a named spec could never have carried this to all
-dnl   of its consumers; the honest carrier is a targ_caps STRING field, and
-dnl   targ_caps has no string fields yet.  Emitting a spec that reaches at most
-dnl   half the consumers would have looked connected and left the other half on
-dnl   the GNU default -- the shape this project keeps paying for.
+dnl ONE PROBE, TWO CARRIERS, and both are written below from these two
+dnl variables.  The duplication is forced, not chosen:
 dnl
-dnl   Re-add when targ_caps grows strings, and convert all eight callers at
-dnl   once.  Until then the GNU spellings are what every consumer already uses.
+dnl   spec text  -- the sanitizer link specs in gcc.cc and in gnu-user.h /
+dnl                 freebsd.h, via the %(link_static) / %(link_dynamic) named
+dnl                 specs.  Spec text cannot read a variable.
+dnl   C code     -- targ_caps.ld_static_option / .ld_dynamic_option, read by the
+dnl                 seven language driver programs, which call
+dnl                 `append_option (OPT_Wl_, ..., 1)'.  append_option cannot read
+dnl                 a spec.
+dnl
+dnl Emitting only one of them is the failure this is guarding against: half the
+dnl consumers would get the probed AIX spelling and the other half the GNU one,
+dnl on the same target, with nothing to notice.  Keep the two emissions
+dnl together and fed from these variables, never from two probes.
+dnl
+dnl EMPTY means the linker has no such pair at all, and every consumer must then
+dnl omit the option rather than pass an empty one.  That replaces the old
+dnl HAVE_LD_STATIC_DYNAMIC: a separate flag could say "yes" beside an empty
+dnl spelling, and each consumer would emit a bare `-Wl,'.
+AC_MSG_CHECKING([linker spelling for -Bstatic/-Bdynamic])
+gcc_cv_ld_static_option=
+gcc_cv_ld_dynamic_option=
+if "" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
+  gcc_cv_ld_static_option='-Bstatic'
+  gcc_cv_ld_dynamic_option='-Bdynamic'
+elif "" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+  gcc_cv_ld_static_option='-bstatic'
+  gcc_cv_ld_dynamic_option='-bdynamic'
+elif "" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+  gcc_cv_ld_static_option='-aarchive_shared'
+  gcc_cv_ld_dynamic_option='-adefault'
+fi
+AC_MSG_RESULT([/])
 
 dnl --- Consulted by cc1: these go in the target config file. ----------------
 
@@ -1520,6 +1540,12 @@ ld_now `ts_bool "$gcc_cv_ld_now"`
 ld_relro `ts_bool "$gcc_cv_ld_relro"`
 lto_plugin `if test "$gcc_cv_lto_plugin" -gt 0; then echo 1; else echo 0; fi`
 ld_demangle `ts_bool "$gcc_cv_ld_demangle"`
+# The linker's -Bstatic/-Bdynamic spellings, empty when it has no such pair.
+# These are STRINGS, not booleans; see the rules at the end of target-caps.h.
+# The %(link_static)/%(link_dynamic) specs below carry the same two answers to
+# the spec half of the driver -- write both or neither.
+ld_static_option ${gcc_cv_ld_static_option}
+ld_dynamic_option ${gcc_cv_ld_dynamic_option}
 EOF
 
 dnl The driver-side ones are spec fragments.  They are appended as their own
@@ -1625,6 +1651,15 @@ ${link_as_needed}
 *link_no_as_needed:
 ${link_no_as_needed}
 
+# The C half of these two is ld_static_option/ld_dynamic_option in the target
+# config file above.  One probe, two carriers; changing one alone puts two
+# different spellings on one target.
+*link_static:
+${gcc_cv_ld_static_option}
+
+*link_dynamic:
+${gcc_cv_ld_dynamic_option}
+
 *link_libatomic:
 ${link_libatomic}
 
@@ -1656,6 +1691,7 @@ EOF
 fi
 
 AC_MSG_NOTICE([  ld --as-needed ........... ${gcc_cv_ld_as_needed}])
+AC_MSG_NOTICE([  ld -Bstatic spelling ..... ${gcc_cv_ld_static_option:-none}])
 AC_MSG_NOTICE([  libatomic on link line ... ${spec_libatomic}])
 AC_MSG_NOTICE([  ld --demangle ............ ${gcc_cv_ld_demangle}])
 AC_MSG_NOTICE([  ld --sysroot ............. ${gcc_cv_ld_sysroot}])

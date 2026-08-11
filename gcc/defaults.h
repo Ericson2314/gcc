@@ -1581,28 +1581,16 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 
 /* How this linker spells "link the following statically" and "back to
-   dynamic", and whether it can do so at all.  These came from a configure
-   probe of one linker (gcc_cv_ld_static_option, AC_SUBST'ed into auto-host.h),
-   which a compiler serving many toolchains cannot have.
+   dynamic", and whether it can do so at all, used to be defaulted here as
+   LD_STATIC_OPTION / LD_DYNAMIC_OPTION / HAVE_LD_STATIC_DYNAMIC.  All three are
+   gone: they are `targ_caps.ld_static_option' and `.ld_dynamic_option' now, with
+   targ_ld_static_dynamic () derived from the pair rather than stored beside it,
+   so the spelling and the "has it at all" answer cannot disagree.
 
-   Defaulting them here matters more than it looks: the guards are `#ifdef', so
-   with the macro simply gone the sanitizer link specs in every lang_specific
-   driver -- g++, gfortran, gdc, go, gm2, cobol, algol68 -- quietly lost
-   -Bstatic/-Bdynamic rather than choosing a different spelling, and nothing
-   diagnosed it.  A linker that spells them differently (AIX, HP-UX) is
-   answered by target-specs/configure probing the real linker.
-
-   gcc.cc carries its own copy of these: it deliberately includes no tm.h and
-   so never reaches this header.  */
-#ifndef LD_STATIC_OPTION
-#define LD_STATIC_OPTION "-Bstatic"
-#endif
-#ifndef LD_DYNAMIC_OPTION
-#define LD_DYNAMIC_OPTION "-Bdynamic"
-#endif
-#ifndef HAVE_LD_STATIC_DYNAMIC
-#define HAVE_LD_STATIC_DYNAMIC 1
-#endif
+   A macro was the wrong shape for a second reason.  These reach the driver
+   through TWO consumers -- spec text and the C code of the seven language
+   driver programs -- and gcc.cc includes no tm.h, so this header had to keep a
+   duplicate set for it.  Two defaults for one value is how they drift.  */
 
 /* Nonzero if the target object format has COMDAT groups (ELF section groups,
    or the Sun as `.group' spelling of them).  ELF targets define this to 1 in

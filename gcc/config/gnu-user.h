@@ -136,30 +136,32 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    in that case, and for executable link with --{,no-}whole-archive around
    it to force everything into the executable.  And similarly for -ltsan,
    -lhwasan, and -llsan.  */
-/* Was #if defined(HAVE_LD_STATIC_DYNAMIC); see the note on LINK_EH_SPEC.
-   LD_STATIC_OPTION and LD_DYNAMIC_OPTION default to the GNU spellings in
-   gcc.cc, and a linker that spells them differently -- AIX, HP-UX -- says so
-   through the target config rather than by losing the specs entirely.  */
+/* Was #if defined(HAVE_LD_STATIC_DYNAMIC); see the note on LINK_EH_SPEC.  The
+   spellings are now the %(link_static) and %(link_dynamic) named specs, which
+   default to GNU -Bstatic/-Bdynamic in gcc.cc and are overwritten per target by
+   target-specs from a probe of the real linker.  A linker with no such pair
+   makes both specs empty, which drops the brackets and leaves plain -lasan --
+   what the old #else arm did.  */
 #undef LIBASAN_EARLY_SPEC
 #define LIBASAN_EARLY_SPEC "%{!shared:libasan_preinit%O%s} " \
   "%{static-libasan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -lasan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-libasan:-lasan}"
+  "%(link_static) --whole-archive -lasan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-libasan:-lasan}"
 #undef LIBHWASAN_EARLY_SPEC
 #define LIBHWASAN_EARLY_SPEC "%{!shared:libhwasan_preinit%O%s} " \
   "%{static-libhwasan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -lhwasan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-libhwasan:-lhwasan}"
+  "%(link_static) --whole-archive -lhwasan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-libhwasan:-lhwasan}"
 #undef LIBTSAN_EARLY_SPEC
 #define LIBTSAN_EARLY_SPEC "%{!shared:libtsan_preinit%O%s} " \
   "%{static-libtsan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -ltsan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-libtsan:-ltsan}"
+  "%(link_static) --whole-archive -ltsan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-libtsan:-ltsan}"
 #undef LIBLSAN_EARLY_SPEC
 #define LIBLSAN_EARLY_SPEC "%{!shared:liblsan_preinit%O%s} " \
   "%{static-liblsan:%{!shared:" \
-  LD_STATIC_OPTION " --whole-archive -llsan --no-whole-archive " \
-  LD_DYNAMIC_OPTION "}}%{!static-liblsan:-llsan}"
+  "%(link_static) --whole-archive -llsan --no-whole-archive " \
+  "%(link_dynamic)" "}}%{!static-liblsan:-llsan}"
 
 #undef TARGET_F951_OPTIONS
 #define TARGET_F951_OPTIONS "%{!nostdinc:\

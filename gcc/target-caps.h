@@ -416,6 +416,54 @@ struct target_caps
      than changing it, and a compiler told nothing about its linker keeps the
      priority sections that are correct for the linker most people use.  */
   bool solaris_ld;
+
+  /* --- STRING-VALUED CAPABILITIES ------------------------------------------
+     These are the first non-bool fields in this struct, so read this before
+     adding another.  Three rules, each of which has a reason:
+
+     1. NEVER NULL.  A string capability is always a valid C string; "not
+	supported" is spelled "".  Every consumer either indexes [0] or hands
+	the pointer to something that will dereference it, and a NULL that only
+	appears on an unusual target is the kind of thing that is found by a
+	segfault on someone else's machine.  read_target_caps enforces this:
+	a line with no value sets "", never NULL.
+     2. THE DEFAULT IS A STRING LITERAL, the replacement is xstrdup'd, and the
+	old value is never freed.  There is exactly one config file per run and
+	the strings live as long as the process, so a free would have to
+	distinguish literal from heap for no benefit.  Same discipline as
+	targ_caps_target_name below.
+     3. DERIVE PREDICATES, DO NOT STORE THEM.  targ_ld_static_dynamic () below
+	is computed from these two rather than being a third field, because a
+	stored `has the pair' bit is a value that can disagree with the pair --
+	which is this project's signature bug.  If you find yourself adding a
+	bool that answers a question about a string, derive it instead.  */
+
+  /* The linker's spellings of "link the libraries from here on statically"
+     and "go back to preferring shared".  GNU ld spells them -Bstatic and
+     -Bdynamic; AIX ld uses -bstatic/-bdynamic and HP-UX ld
+     -aarchive_shared/-adefault, which is the whole reason these cannot be a
+     compile-time constant in a driver that serves many targets.
+
+     Both are used from BOTH kinds of consumer, and that is why they are here
+     as well as in the spec file:
+
+       spec TEXT  -- the sanitizer link specs in gcc.cc and in the target
+		     headers, through the %(link_static)/%(link_dynamic) named
+		     specs that target-specs writes from the same probe;
+       C CODE     -- the seven language driver programs (g++spec.cc,
+		     gfortranspec.cc, gospec.cc, d-spec.cc, gm2spec.cc,
+		     a68spec.cc, gcobolspec.cc), which call
+		     `append_option (OPT_Wl_, ..., 1)' and cannot read a spec.
+
+     One probe, two carriers.  The carriers are unavoidable -- a spec cannot
+     read a variable and append_option cannot read a spec -- but they must not
+     be two answers, so target-specs writes both from one probe of one linker.
+
+     Empty means the linker has no such pair at all, and every consumer must
+     then omit the option rather than pass an empty one; see
+     targ_ld_static_dynamic ().  */
+  const char *ld_static_option;
+  const char *ld_dynamic_option;
 };
 
 extern struct target_caps targ_caps;
@@ -429,6 +477,27 @@ targ_glibc_at_least (int major, int minor)
   return (targ_caps.glibc_major > major
 	  || (targ_caps.glibc_major == major
 	      && targ_caps.glibc_minor >= minor));
+}
+
+/* True if this linker has a -Bstatic/-Bdynamic pair at all, whatever it spells
+   them.  This is the old HAVE_LD_STATIC_DYNAMIC, and it is a FUNCTION OF THE
+   TWO STRINGS rather than a capability of its own on purpose: as a separate
+   field it could say "yes" while the spellings were empty, and every consumer
+   would then emit a bare `-Wl,' with no argument.  That is exactly how the
+   restored `-plugin' spec nearly shipped without its file name -- connected,
+   and failing worse than when it was missing.
+
+   BOTH halves of a consumer's decision must be gated on this, not just the
+   emission.  A language driver that swallows -static-libfoo (`args[i] |=
+   SKIPOPT') because it intends to bracket the library, and then does not
+   bracket it because the linker cannot, has silently ignored the user's
+   option.  The two used to be one `#ifdef' and they must stay one test.  */
+
+inline bool
+targ_ld_static_dynamic (void)
+{
+  return (targ_caps.ld_static_option[0] != '\0'
+	  && targ_caps.ld_dynamic_option[0] != '\0');
 }
 
 /* The target triple this configuration is for, as named by the `target' line
