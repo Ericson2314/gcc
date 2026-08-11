@@ -1,0 +1,124 @@
+# Per-target testsuite support for a multi-target compiler.
+#   Copyright (C) 2026 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# One binary now serves many targets, selected per compilation by
+# -ftarget-config=.  That makes it possible to run the testsuite once per
+# TARGET rather than once per compiler, which is what the mtnix board and
+# mtcheck.sh do.  Two things are needed from inside runtest, and this file is
+# both of them.  It is INERT unless MT_TARGET_NAME is set in the environment,
+# so an ordinary `make check' behaves exactly as before.
+
+# 1. ATTRIBUTION.
+#
+# A .sum file records no target of its own.  Every per-target run writes the
+# same `gcc.sum', with the same test names, and nothing inside it says which
+# -ftarget-config= produced it.  Mixing two up is not a visible error; it is a
+# clean-looking result about the wrong target.  So stamp the log, and let
+# mtcheck.sh do the same to the file NAME.
+
+if { [info exists env(MT_TARGET_NAME)] && $env(MT_TARGET_NAME) ne "" } {
+    verbose -log "=== MULTI-TARGET RUN: target = $env(MT_TARGET_NAME) ==="
+    if { [info exists env(MT_TARGET_CONFIG)] } {
+	verbose -log "=== MULTI-TARGET RUN: config = $env(MT_TARGET_CONFIG) ==="
+    }
+}
+
+# 2. COMPILE-ONLY MODE.
+#
+# For most of the 188 targets there is no assembler, no target libgcc and no
+# way to run the result, so only the compile half is observable.  The naive
+# way to get that -- let the run tests link, and let the links fail -- turns
+# every one of them into a FAIL that means "no libraries here", which is a
+# floor, and floors have a way of being read as results.  The other naive way
+# -- suppress execution at the board's _load proc -- still LINKS, so it has
+# the same problem one step later.
+#
+# So downgrade the request itself, at the point dg.exp records it.
+#
+# `dg-do' is called from inside `dg-test' and reaches dg-test's frame with
+# `upvar dg-do-what'.  A wrapper must therefore hand the original the SAME
+# caller frame, which is what `uplevel 1' does: the renamed proc runs as a new
+# frame whose caller is still dg-test, so its upvar resolves as before, and the
+# wrapper's own `upvar 1' names the very same variable.  Intercepting further
+# in -- at gcc-dg-test, the obvious place -- does NOT work: dg.exp consults
+# dg-do-what a second time after that proc returns (dg.exp:797) and would run
+# the test anyway.
+#
+# What this costs, stated because it is the whole limitation of compile-only
+# coverage: a `dg-do run' test downgraded to `compile' no longer checks its
+# own output.  It passes if it compiles.  Such a test is evidence about the
+# front end, the middle end and the target's asm output, and is NOT evidence
+# that the program computes the right answer.  Do not add compile-only and
+# execution numbers together.
+
+if { [info exists env(MT_COMPILE_ONLY)] && $env(MT_COMPILE_ONLY) ne ""
+     && [info procs dg-do] ne "" && [info procs mt_orig_dg-do] eq "" } {
+
+    rename dg-do mt_orig_dg-do
+
+    proc dg-do { args } {
+	uplevel 1 [linsert $args 0 mt_orig_dg-do]
+	upvar 1 dg-do-what dw
+	if { ![info exists dw] } {
+	    return
+	}
+	switch -- [lindex $dw 0] {
+	    "run" - "link" - "assemble" {
+		set dw [lreplace $dw 0 0 compile]
+	    }
+	}
+    }
+
+    verbose -log "=== MULTI-TARGET RUN: compile-only\
+		  (run/link/assemble downgraded to compile) ==="
+}
+
+# 3. THE VERSION BANNER.
+#
+# default_gcc_version does `lindex $GCC_UNDER_TEST 0' -- it deliberately drops
+# every argument -- and then runs that bare driver with -v.  With no target
+# selected that is a fatal error, so the banner reads "Couldn't determine
+# version of xgcc", and the log grows two `option_init_struct' lines that have
+# nothing to do with any test.  Left alone it forces the harness's post-run
+# guard for that string to tolerate a nonzero count, and a guard with a
+# tolerance is a guard that will one day absorb the real thing.  gcc.exp
+# defines gcc_version as a one-line forwarder expressly so it can be
+# overridden; that is the seam used here.  Same for g++.
+
+if { [info exists env(MT_TARGET_NAME)] && $env(MT_TARGET_NAME) ne "" } {
+    proc mt_report_version { what under_test } {
+	set status [remote_exec host "$under_test -v"]
+	foreach line [split [lindex $status 1] "\n"] {
+	    if { [regexp {^(gcc|g\+\+) version } $line] } {
+		clone_output "$what version $line"
+		return
+	    }
+	}
+	clone_output "$what version UNKNOWN from: $under_test"
+    }
+    proc gcc_version { } {
+	global GCC_UNDER_TEST
+	gcc_init
+	mt_report_version "gcc" $GCC_UNDER_TEST
+    }
+    # NOT done for g++_version: g++.exp defines it AFTER it load_lib's its way
+    # here, so an override written now is simply overwritten, and an
+    # [info procs] guard evaluated now is simply false.  Rather than pretend
+    # otherwise, mtcheck.sh's G4 guard subtracts the version probe's two lines
+    # explicitly and prints the count it subtracted, so the tolerance is
+    # visible instead of built in.
+}

@@ -36,6 +36,10 @@ load_lib torture-options.exp
 load_lib fortran-modules.exp
 load_lib multiline.exp
 load_lib dg-test-cleanup.exp
+# Per-target (-ftarget-config=) run support.  Inert unless MT_TARGET_NAME /
+# MT_COMPILE_ONLY are set in the environment; must come after dg.exp, whose
+# `dg-do' it wraps.
+load_lib multi-target.exp
 
 # We set LC_ALL and LANG to C so that we get the same error messages as expected.
 setenv LC_ALL C
