@@ -2097,12 +2097,16 @@ ix86_option_override_internal (bool main_args_p,
   SUBSUBTARGET_OVERRIDE_OPTIONS;
 #endif
 
-#ifdef HAVE_LD_BROKEN_PE_DWARF5
   /* If the PE linker has broken DWARF 5 support, make
-     DWARF 4 the default.  */
-  if (TARGET_PECOFF)
+     DWARF 4 the default.
+
+     Was `#ifdef HAVE_LD_BROKEN_PE_DWARF5'.  defaults.h defines that macro
+     unconditionally now, as `(targ_caps.ld_broken_pe_dwarf5)', so the guard was
+     vacuously true and EVERY PECOFF build was silently downgraded to DWARF 4
+     regardless of what the linker could do.  Demonstrated by injecting an
+     `#error' inside the block and watching the build fail.  */
+  if (HAVE_LD_BROKEN_PE_DWARF5 && TARGET_PECOFF)
     SET_OPTION_IF_UNSET (opts, opts_set, dwarf_version, 4);
-#endif
 
   /* -fPIC is the default for x86_64.  */
   if (TARGET_MACHO && TARGET_64BIT_P (opts->x_ix86_isa_flags))
