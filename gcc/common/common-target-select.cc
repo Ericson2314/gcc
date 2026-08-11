@@ -84,12 +84,27 @@ const struct targetm_common_entry targetm_common_registry[] = {
    consulted after option decoding, by which time selection has happened or a
    function hook has already fired.  */
 
+/* Reported with fprintf rather than internal_error, and that is not laziness.
+   The driver reaches its first common hook inside driver::decode_argv, which
+   runs BEFORE driver::global_initializations calls diagnostic_initialize --
+   so internal_error there segfaults inside diagnostic_impl and prints no
+   message at all, only a backtrace.  A control that dies silently is not a
+   loud failure; this one says the same thing in every binary at every stage,
+   which is worth more than the backtrace it gives up.  */
+
 static ATTRIBUTE_NORETURN void
 no_common_target_selected (const char *hook)
 {
-  internal_error ("common target hook %qs used before a target was selected; "
-		  "no target has been installed by %<targetm_common_select%>",
-		  hook);
+  fprintf (stderr,
+	   "%s: fatal error: common target hook `%s' was used before a target "
+	   "was selected\n"
+	   "no target has been installed: nothing called "
+	   "targetm_common_select, so the table in force is the empty back "
+	   "end.  A target is named by the `target' line of the file passed "
+	   "as -ftarget-config=; a compiler given none has no target and "
+	   "deliberately has no default.\n",
+	   progname != NULL ? progname : "gcc", hook);
+  exit (FATAL_EXIT_CODE);
 }
 
 #undef HOOKSTRUCT
