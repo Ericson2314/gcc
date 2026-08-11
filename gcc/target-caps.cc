@@ -102,6 +102,7 @@ struct target_caps targ_caps =
   .as_aarch64_aeabi_build_attributes = true,
   .as_mips_nan = true,
   .as_mips_micromips = true,
+  .as_mips_dspr1_mult = true,
   .as_riscv_attribute = true,
   .as_riscv_misa_spec = true,
   .as_riscv_march_zifencei = true,
@@ -258,6 +259,8 @@ read_target_caps (const char *file)
 	targ_caps.as_mips_nan = value != 0;
       else if (strcmp (name, "as_mips_micromips") == 0)
 	targ_caps.as_mips_micromips = value != 0;
+      else if (strcmp (name, "as_mips_dspr1_mult") == 0)
+	targ_caps.as_mips_dspr1_mult = value != 0;
       else if (strcmp (name, "as_riscv_attribute") == 0)
 	targ_caps.as_riscv_attribute = value != 0;
       else if (strcmp (name, "as_riscv_misa_spec") == 0)

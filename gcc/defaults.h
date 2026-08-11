@@ -154,6 +154,45 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_ASM_GLOBAL_OP GLOBAL_ASM_OP
 #endif
 
+/* Likewise for the section-switching directives.  Same reasoning: both
+   consumers (init_varasm_once, and the __LIBGCC_* predefines in
+   c-family/c-cppbuiltin.cc) are compiled once, so they must read targetm
+   rather than these macros.
+
+   The macros themselves are deliberately KEPT.  Target libraries compile
+   against tconfig.h/tm.h and cannot see targetm at all, and some of these
+   feed derived macros inside the compiler -- cfgexpand.cc tests
+   !defined(INIT_SECTION_ASM_OP).  Converting to a hook and dropping the
+   macro would silently change both.  */
+#if defined TEXT_SECTION_ASM_OP && !defined TARGET_ASM_TEXT_SECTION_ASM_OP
+#define TARGET_ASM_TEXT_SECTION_ASM_OP TEXT_SECTION_ASM_OP
+#endif
+#if defined DATA_SECTION_ASM_OP && !defined TARGET_ASM_DATA_SECTION_ASM_OP
+#define TARGET_ASM_DATA_SECTION_ASM_OP DATA_SECTION_ASM_OP
+#endif
+#if defined SDATA_SECTION_ASM_OP && !defined TARGET_ASM_SDATA_SECTION_ASM_OP
+#define TARGET_ASM_SDATA_SECTION_ASM_OP SDATA_SECTION_ASM_OP
+#endif
+#if defined READONLY_DATA_SECTION_ASM_OP \
+    && !defined TARGET_ASM_READONLY_DATA_SECTION_ASM_OP
+#define TARGET_ASM_READONLY_DATA_SECTION_ASM_OP READONLY_DATA_SECTION_ASM_OP
+#endif
+#if defined BSS_SECTION_ASM_OP && !defined TARGET_ASM_BSS_SECTION_ASM_OP
+#define TARGET_ASM_BSS_SECTION_ASM_OP BSS_SECTION_ASM_OP
+#endif
+#if defined SBSS_SECTION_ASM_OP && !defined TARGET_ASM_SBSS_SECTION_ASM_OP
+#define TARGET_ASM_SBSS_SECTION_ASM_OP SBSS_SECTION_ASM_OP
+#endif
+#if defined CTORS_SECTION_ASM_OP && !defined TARGET_ASM_CTORS_SECTION_ASM_OP
+#define TARGET_ASM_CTORS_SECTION_ASM_OP CTORS_SECTION_ASM_OP
+#endif
+#if defined DTORS_SECTION_ASM_OP && !defined TARGET_ASM_DTORS_SECTION_ASM_OP
+#define TARGET_ASM_DTORS_SECTION_ASM_OP DTORS_SECTION_ASM_OP
+#endif
+#if defined INIT_SECTION_ASM_OP && !defined TARGET_ASM_INIT_SECTION_ASM_OP
+#define TARGET_ASM_INIT_SECTION_ASM_OP INIT_SECTION_ASM_OP
+#endif
+
 /* This is how to output the definition of a user-level label named
    NAME, such as the label on variable NAME.  */
 
@@ -1472,6 +1511,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_AS_IX86_TLSLDM (targ_caps.as_ix86_tlsldm)
 #undef HAVE_AS_GNU_ATTRIBUTE
 #define HAVE_AS_GNU_ATTRIBUTE (targ_caps.as_gnu_attribute)
+#undef HAVE_AS_DSPR1_MULT
+#define HAVE_AS_DSPR1_MULT (targ_caps.as_mips_dspr1_mult)
 #undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
 #define HAVE_GAS_CFI_PERSONALITY_DIRECTIVE (targ_caps.cfi_personality)
 #undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE

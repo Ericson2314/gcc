@@ -235,12 +235,18 @@ struct mips_cpu_info {
 #define TARGET_WRITABLE_EH_FRAME (flag_pic && TARGET_SHARED)
 #endif
 
-/* Test the assembler to set ISA_HAS_DSP_MULT to DSP Rev 1 or 2.  */
-#ifdef HAVE_AS_DSPR1_MULT
-#define ISA_HAS_DSP_MULT ISA_HAS_DSP
-#else
-#define ISA_HAS_DSP_MULT ISA_HAS_DSPR2
+/* DSP Rev 1 or 2, depending on whether the assembler takes DSPR1 mult with
+   four accumulators.  defaults.h redefines HAVE_AS_DSPR1_MULT to read targ_caps,
+   so this is a runtime test in the compiler; generators and target-library
+   builds have that redefinition guarded out, hence the fallback below.  Both
+   arms were already runtime expressions, so only the choice between them moved.
+
+   Safe in the machine description: the three mips.md uses are C bodies and the
+   constraints.md use reaches only tm-constrs.h, which no generator includes.  */
+#ifndef HAVE_AS_DSPR1_MULT
+#define HAVE_AS_DSPR1_MULT 0
 #endif
+#define ISA_HAS_DSP_MULT (HAVE_AS_DSPR1_MULT ? ISA_HAS_DSP : ISA_HAS_DSPR2)
 
 /* ISA has LSA available.  */
 #define ISA_HAS_LSA		(mips_isa_rev >= 6 || ISA_HAS_MSA)

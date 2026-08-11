@@ -1969,18 +1969,37 @@ for gcc_mt in ${gcc_manifest_targets}; do
          # rather than whichever target happened to generate insn-constants.h.
          printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
            "${gcc_mt_base}" "${gcc_mt_md}" "${gcc_mt_md}" >> ${gcc_common_mk}
-         # The build-directory headers this target's tm.h includes.  What they
-         # hold is multilib-derived spec macros -- SYSROOT_SUFFIX_SPEC,
-         # MLIB_SELF_SPECS -- and a multi-target build includes no single
-         # target's tmake_file, so MULTILIB_OPTIONS and friends are empty.
-         # That is the degenerate case the fragments themselves handle by
-         # producing an empty file (`loongarch-multilib.h: ; @touch $@', and
-         # print-sysroot-suffix.sh emits nothing when given no multilibs), so
-         # an empty file is the right content here, not a placeholder for one.
-         # Giving each a name of its own is what matters: it is why sh and
-         # m68k and c6x can now be built into the same compiler.
+         # The build-directory headers this target's tm.h includes, holding
+         # multilib-derived spec macros -- SYSROOT_SUFFIX_SPEC and friends.
+         #
+         # These were empty placeholders while the multilib data did not exist:
+         # a multi-target build includes no single target's tmake_file, so
+         # MULTILIB_OPTIONS and friends were unset and the generators had
+         # nothing to work from.  That data is now extracted per target into
+         # multi-target.multilib, so the real content can be produced.
+         # gen-sysroot-suffix.sh does it, and documents which targets still
+         # cannot be answered on this side of the build, and why.
+         # Two kinds end up in this list and they need different treatment.
          for gcc_mt_h in ${gcc_mt_genh_files}; do
-           printf '%s:\n\t: > $@\n\n' "${gcc_mt_h}" >> ${gcc_common_mk}
+           case ${gcc_mt_h} in
+             *sysroot-suffix*)
+               printf '%s: multi-target.manifest multi-target.multilib $(srcdir)/gen-sysroot-suffix.sh\n\t$(SHELL) $(srcdir)/gen-sysroot-suffix.sh %s multi-target.manifest multi-target.multilib $(srcdir) > $@\n\n' \
+                 "${gcc_mt_h}" "${gcc_mt}" >> ${gcc_common_mk}
+               ;;
+             *)
+               # The rest are headers a config/<cpu>/t-<cpu>-headers fragment
+               # already generates under its plain name, which we then renamed
+               # per back end so that two back ends generating the same name do
+               # not collide.  The renamed copy has to be the fragment's output;
+               # generating it empty meant tm-gcn.h included a
+               # gcn-device-macros-gcn.h with nothing in it while the real
+               # 158-line gcn-device-macros.h sat unused beside it.  That was
+               # true before this rule existed and would have kept being true.
+               gcc_mt_horig=`echo "${gcc_mt_h}" | sed "s/-${gcc_mt_base}\\.h\$/.h/"`
+               printf '%s: %s\n\tcp $< $@\n\n' \
+                 "${gcc_mt_h}" "${gcc_mt_horig}" >> ${gcc_common_mk}
+               ;;
+           esac
          done
          printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
            "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" >> ${gcc_common_mk}
@@ -3956,19 +3975,9 @@ LCF0:
     dnl .dtprelword settled as a build-time constant: it guards hook-table
     dnl registration, which cannot be a runtime test.  See config/mips/mips.cc.
 
-    gcc_GAS_CHECK_FEATURE([DSPR1 mult with four accumulators support],
-      gcc_cv_as_mips_dspr1_mult,,
-[	.set	mips32r2
-	.set	nodspr2
-	.set	dsp
-	madd	$ac3,$4,$5
-	maddu	$ac3,$4,$5
-	msub	$ac3,$4,$5
-	msubu	$ac3,$4,$5
-	mult	$ac3,$4,$5
-	multu	$ac3,$4,$5],,
-      [AC_DEFINE(HAVE_AS_DSPR1_MULT, 1,
-	  [Define if your assembler supports DSPR1 mult.])])
+    dnl DSPR1 mult moved to target-specs; targ_caps.as_mips_dspr1_mult, bridged
+    dnl through HAVE_AS_DSPR1_MULT in defaults.h so ISA_HAS_DSP_MULT keeps working
+    dnl in mips.md C bodies and in the constraints.md register constraint.
 
     AC_MSG_CHECKING(assembler and linker for explicit JALR relocation)
     gcc_cv_as_ld_jalr_reloc=no

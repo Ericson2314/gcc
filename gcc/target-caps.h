@@ -357,6 +357,7 @@ struct target_caps
      needed no field at all, just a sensible default in the spec text.  */
   bool as_mips_nan;
   bool as_mips_micromips;
+  bool as_mips_dspr1_mult;
 
   /* riscv back-end assembler capabilities.  True by default, as above.
      Every one of these gates a "skip this extension because older binutils

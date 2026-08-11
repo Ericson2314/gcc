@@ -1174,6 +1174,7 @@ dnl ---------------------------------------------------------------------------
 
 gcc_cv_as_mips_nan=no
 gcc_cv_as_micromips_support=no
+gcc_cv_as_mips_dspr1_mult=no
 case ${target} in
   mips*-*-*)
     AC_MSG_CHECKING([assembler for -mnan= support])
@@ -1188,7 +1189,18 @@ case ${target} in
     if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
       gcc_cv_as_micromips_support=yes
     fi
-    AC_MSG_RESULT([$gcc_cv_as_micromips_support])
+    AC_MSG_RESULT([])
+
+    AC_MSG_CHECKING([assembler for DSPR1 mult with four accumulators])
+    cat > conftest.s <<'TSEOF'
+	.set	mips32r2
+	.set	nodspr2
+	multu	,,
+TSEOF
+    if "" -32 -mdspr2 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_dspr1_mult=yes
+    fi
+    AC_MSG_RESULT([])
 
     rm -f conftest.s conftest.o
     ;;
@@ -1382,7 +1394,8 @@ as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 
 # mips back-end assembler capabilities.
 as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
-as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
+as_mips_micromips `ts_bool ""`
+as_mips_dspr1_mult `ts_bool "$gcc_cv_as_mips_dspr1_mult"`
 
 # riscv back-end assembler capabilities.
 as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`
