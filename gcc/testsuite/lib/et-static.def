@@ -56,9 +56,10 @@ shf_link_order
 HAVE_GAS_SECTION_LINK_ORDER
 this target supports SHF_LINK_ORDER
 
-sht_init_array
-HAVE_INITFINI_ARRAY_SUPPORT
-this target supports SHT_INIT_ARRAY
+# sht_init_array used to live here, reading HAVE_INITFINI_ARRAY_SUPPORT.  That
+# macro is a tm.h macro now (config/elfos.h raises it for ELF), and this file
+# can only see auto-host.h, so it silently answered 0 and took 21 tests with it.
+# It is a compile probe in target-supports.exp instead.
 
 solaris_as
 HAVE_SOLARIS_AS

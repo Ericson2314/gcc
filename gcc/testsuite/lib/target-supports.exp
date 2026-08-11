@@ -14316,6 +14316,24 @@ proc check_effective_target_no_fsanitize_address {} {
     return 0;
 }
 
+# Return 1 if the target puts constructors in .init_array, 0 otherwise.
+#
+# This was a static effective target in et-static.def, read out of auto-host.h
+# as HAVE_INITFINI_ARRAY_SUPPORT.  That macro moved into config/elfos.h, where
+# et-static.def cannot see it, so the generated proc quietly became
+# `return 0' and 11 attr-retain-* plus 10 attr-used*/pr99113 tests stopped
+# running -- 69 gcc and 174 g++ subtests -- while the compiler went on emitting
+# exactly the same code.  Ask the compiler, not a build artefact.
+#
+# Two-sided by construction: a target using .ctors/.dtors fails the pattern.
+
+proc check_effective_target_sht_init_array { } {
+    return [check_no_messages_and_pattern sht_init_array {\.init_array} assembly {
+	static void ctor (void) __attribute__((constructor));
+	static void ctor (void) { }
+    }]
+}
+
 # Return 1 if the target supports GNU Retain, 0 otherwise.
 # This means both SHF_GNU_RETAIN and SHT_INIT_ARRAY to simplify uses.
 
