@@ -2309,6 +2309,11 @@ void
 assemble_string (const char *p, int size)
 {
   int pos = 0;
+  /* The encoding tests below are genuine compile-time facts about the host
+     character set and stay in the preprocessor.  Whether the assembler
+     accepts `.base64' is not; it is targ_caps.gas_base64, so the larger chunk
+     size it permits is chosen at run time.  BASE64_ASM_OP's mere existence
+     used to stand in for the capability.  */
 #if defined(BASE64_ASM_OP) \
     && BITS_PER_UNIT == 8 \
     && CHAR_BIT == 8 \
@@ -2318,7 +2323,7 @@ assemble_string (const char *p, int size)
     && '+' == 43 \
     && '/' == 47 \
     && '=' == 61
-  int maximum = 16384;
+  int maximum = targ_caps.gas_base64 ? 16384 : 2000;
 #else
   int maximum = 2000;
 #endif
@@ -8787,7 +8792,9 @@ default_elf_asm_output_ascii (FILE *f, const char *s, unsigned int len)
     && '+' == 43 \
     && '/' == 47 \
     && '=' == 61
-      if (s >= last_base64)
+      /* targ_caps.gas_base64 was the `#ifdef HAVE_GAS_BASE64' that used to
+	 decide whether BASE64_ASM_OP existed at all.  */
+      if (targ_caps.gas_base64 && s >= last_base64)
 	{
 	  unsigned cnt = 0;
 	  unsigned char prev_c = ' ';

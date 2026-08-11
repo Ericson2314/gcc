@@ -455,9 +455,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define STRING_ASM_OP	"\t.string\t"
 
-#ifdef HAVE_GAS_BASE64
+/* Defined unconditionally: whether the assembler accepts `.base64' is a
+   runtime value now (targ_caps.gas_base64), and varasm.cc tests that before
+   emitting one.  The spelling itself does not vary.  Was `#ifdef
+   HAVE_GAS_BASE64'.  */
 #define BASE64_ASM_OP	"\t.base64\t"
-#endif
 
 /* The routine used to output NUL terminated strings.  We use a special
    version of this for most svr4 targets because doing so makes the

@@ -260,6 +260,13 @@ struct target_caps
      on which target is primary.  */
   bool gas_cv_ucomp;
 
+  /* Assembler supports the `.base64' directive, which lets long strings be
+     emitted far more compactly.  Was HAVE_GAS_BASE64, whose only role was to
+     decide whether elfos.h defined BASE64_ASM_OP; varasm.cc then tested that
+     macro's existence.  BASE64_ASM_OP is unconditional now and this field is
+     the real question.  */
+  bool gas_base64;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives
