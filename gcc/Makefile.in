@@ -2116,7 +2116,11 @@ $(FULL_DRIVER_NAME): ./xgcc$(exeext)
 #
 # SELFTEST_DEPS need to be set before including language makefile fragments.
 # Otherwise $(SELFTEST_DEPS) is empty when used from <LANG>/Make-lang.in.
-SELFTEST_DEPS = $(GCC_PASSES) stmp-int-hdrs $(srcdir)/testsuite/selftests
+# $(SPECS) is here for its ORDER, not its contents: it is the file target that
+# forces `target-specs' to have run, and therefore that the per-target config
+# file SELFTEST_FLAGS looks for exists before the recipe expands.
+SELFTEST_DEPS = $(GCC_PASSES) stmp-int-hdrs $(SPECS) \
+	$(srcdir)/testsuite/selftests
 
 DO_LINK_SERIALIZATION = @DO_LINK_SERIALIZATION@
 
@@ -2416,7 +2420,18 @@ rest.cross: specs
 # Specify the path to gcc/testsuite/selftests within the srcdir
 # as an argument to -fself-test.
 DEVNULL=$(if $(findstring mingw,$(build)),nul,/dev/null)
+# The selftest driver must name a target like any other invocation: with the
+# empty back end a compiler that has not been told which target it is for exits
+# at the first common hook rather than picking a default.  `$(wildcard)' is
+# evaluated when this recursively-expanded variable is USED, i.e. in the recipe,
+# by which time $(SPECS) has forced target-specs to run and the file exists.
+#
+# This step is newly REACHABLE, not newly broken: it depends on stmp-int-hdrs,
+# which the target-specs failure used to prevent ever being made, so the
+# selftests have not run in this tree for as long as that check has been red.
+SELFTEST_TARGET_CONFIG = $(wildcard specs-$(TEST_TARGET)-config)
 SELFTEST_FLAGS = -nostdinc $(DEVNULL) -S -o $(DEVNULL) \
+	$(if $(SELFTEST_TARGET_CONFIG),-ftarget-config=$(SELFTEST_TARGET_CONFIG)) \
 	-fself-test=$(srcdir)/testsuite/selftests
 
 # Run the selftests during the build once we have a driver and the frontend,
