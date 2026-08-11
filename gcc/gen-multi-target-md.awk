@@ -552,6 +552,41 @@ function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
   printf "\t  insn-conditions-%s.md\n", key;
   printf "\t$(STAMP) s-condmd-%s\n\n", key;
 
+  # This triple's source-derived spec file: the spec macros its own tm.h chain
+  # defines, printed in read_specs() format.  Per TRIPLE and not per back end,
+  # which is the whole reason it is emitted here: LINK_SPEC, STARTFILE_SPEC and
+  # the rest are exactly the macros that differ between x86_64-linux-gnu and
+  # x86_64-elf while both are the i386 back end.
+  #
+  # gen-target-specs.cc is a generator in the ordinary sense -- BUILD_CXXFLAGS
+  # carries -DGENERATOR_FILE, which is what lets tm-<key>.h skip the
+  # insn-flags-<key>.h and insn-modes-<key>.h it would otherwise include and
+  # which are not built for a non-primary target.  Nothing about a spec string
+  # needs them.
+  #
+  # It links against nothing but libiberty: no errors.o, no read-md, because it
+  # only expands macros and prints them.
+  printf "build/gen-target-specs-%s.o : $(srcdir)/gen-target-specs.cc \\\n", key;
+  printf "  tm-%s.h $(srcdir)/spec-names.h \\\n", key;
+  printf "  $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
+  printf "build/gen-target-specs-%s.o : BUILD_CPPFLAGS += \\\n", key;
+  printf "  -DTM_HEADER='\"tm-%s.h\"' -DTARGET_TRIPLE='\"%s\"'\n", key, trg;
+  printf "build/gen-target-specs-%s.o : $(srcdir)/gen-target-specs.cc\n", key;
+  printf "\t$(COMPILER_FOR_BUILD) -c $(BUILD_COMPILERFLAGS) $(BUILD_CPPFLAGS) \\\n";
+  printf "\t  -o $@ $<\n\n";
+  printf "build/gen-target-specs-%s$(build_exeext): \\\n", key;
+  printf "  build/gen-target-specs-%s.o $(BUILD_LIBDEPS)\n", key;
+  printf "\t+$(LINKER_FOR_BUILD) $(BUILD_LINKERFLAGS) $(BUILD_LDFLAGS) -o $@ \\\n";
+  printf "\t    $(filter-out $(BUILD_LIBDEPS), $^) $(BUILD_LIBS)\n\n";
+
+  # Named for the triple as the manifest spells it, because that is the name
+  # the target-specs rule in Makefile.in looks for.
+  printf "specs-src-%s: build/gen-target-specs-%s$(build_exeext)\n", trg, key;
+  printf "\t$(RUN_GEN) build/gen-target-specs-%s$(build_exeext) > tmp-specs-src-%s\n", key, key;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-specs-src-%s specs-src-%s\n\n", key, trg;
+
+  srcspecs = srcspecs " specs-src-" trg;
+
   condfiles[cpu] = condfiles[cpu] " insn-conditions-" key ".md";
   ntriples[cpu]++;
 }
@@ -625,4 +660,12 @@ $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
-		    emit_asm_ops_registry() }
+		    emit_asm_ops_registry(); emit_source_specs() }
+
+# The list every source-derived spec file is reachable from, so that one make
+# target builds them all and the target-specs rule can depend on it.
+function emit_source_specs() {
+  printf "MULTI_TARGET_SOURCE_SPECS =%s\n\n", srcspecs;
+  printf ".PHONY: source-specs\n";
+  printf "source-specs: $(MULTI_TARGET_SOURCE_SPECS)\n\n";
+}

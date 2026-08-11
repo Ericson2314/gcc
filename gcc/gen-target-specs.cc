@@ -61,7 +61,56 @@ along with GCC; see the file COPYING3.  If not see
    boundary this program exists to keep.  */
 #define LINK_LIBATOMIC_SPEC "%(link_libatomic)"
 
+/* config/darwin.h builds its LINK_COMMAND_SPEC out of this one.  target-specs
+   already writes *link_plugin, gated on whether an LTO plugin was found.  */
+#define LINK_PLUGIN_SPEC "%(link_plugin)"
+
+/* Likewise, and also from darwin.h's LINK_COMMAND_SPEC.  target-specs writes
+   *link_compress_debug from what it found the linker able to do.  */
+#define LINK_COMPRESS_DEBUG_SPEC "%(link_compress_debug)"
+
+/* config/i386/cygming.h declares a `mingw_include_path' extra spec whose value
+   is this.  It used to come from gcc/Makefile.in's PREPROCESSOR_DEFINES and was
+   dropped when the compiler stopped being configured for one target, so nothing
+   has defined it since -- another macro left referenced with no definer, found
+   by compiling this file for i686-pc-cygwin.  The triple is what it always
+   held, and here it is this target's triple rather than the build's one, which
+   is more nearly right than what it replaced.  */
+#define DEFAULT_TARGET_MACHINE TARGET_TRIPLE
+
 #include TM_HEADER
+
+/* gcc.cc does not build its `cpp', `cc1' and `link' specs from one macro
+   each.  It builds them from two:
+
+       cpp_spec  = CPP_SPEC  LIBC_CPP_SPEC       (gcc.cc:1167)
+       cc1_spec  = CC1_SPEC  OS_CC1_SPEC         (gcc.cc:1168)
+       link_spec = LINK_SPEC LIBC_LINK_SPEC      (gcc.cc:1174)
+
+   The second of each is how a C library or an OS layer adds to what the CPU
+   back end asked for, and five targets in the tree use them.  Emitting only
+   the first would drop those silently -- the spec file would look complete and
+   be missing an arm of the value on exactly the targets that needed it.  So
+   the composition is mirrored here, with the same "" fallbacks gcc.cc uses,
+   and these three are emitted unconditionally rather than under #ifdef.  */
+#ifndef CPP_SPEC
+#define CPP_SPEC ""
+#endif
+#ifndef LIBC_CPP_SPEC
+#define LIBC_CPP_SPEC ""
+#endif
+#ifndef CC1_SPEC
+#define CC1_SPEC ""
+#endif
+#ifndef OS_CC1_SPEC
+#define OS_CC1_SPEC ""
+#endif
+#ifndef LINK_SPEC
+#define LINK_SPEC ""
+#endif
+#ifndef LIBC_LINK_SPEC
+#define LIBC_LINK_SPEC ""
+#endif
 
 /* Emit one spec.  A target may legitimately define a spec macro as the empty
    string; that is different from not defining it at all, and read_specs
@@ -85,23 +134,20 @@ main (void)
 #ifdef ASM_SPEC
   emit ("asm", ASM_SPEC);
 #endif
+#ifdef ASM_V_SPEC
+  emit ("asm_v", ASM_V_SPEC);
+#endif
 #ifdef ASM_FINAL_SPEC
   emit ("asm_final", ASM_FINAL_SPEC);
 #endif
-#ifdef CPP_SPEC
-  emit ("cpp", CPP_SPEC);
-#endif
-#ifdef CC1_SPEC
-  emit ("cc1", CC1_SPEC);
-#endif
+  emit ("cpp", CPP_SPEC LIBC_CPP_SPEC);
+  emit ("cc1", CC1_SPEC OS_CC1_SPEC);
 #ifdef CC1PLUS_SPEC
   emit ("cc1plus", CC1PLUS_SPEC);
 #endif
 
   /* Linking.  */
-#ifdef LINK_SPEC
-  emit ("link", LINK_SPEC);
-#endif
+  emit ("link", LINK_SPEC LIBC_LINK_SPEC);
 #ifdef LIB_SPEC
   emit ("lib", LIB_SPEC);
 #endif

@@ -728,11 +728,16 @@ proper position among the other output files.  */
 #define ASM_SPEC ""
 #endif
 
-/* config.h can define ASM_V_SPEC to pass equivalents of -v, -w (no warnings),
-   and -I to the assembler.  */
-#ifndef ASM_V_SPEC
-#define ASM_V_SPEC "%{v} %{w:-W} %{I*}"
-#endif
+/* How -v, -w and -I are passed on to the assembler.  Four targets spell this
+   differently, and they used to do it by defining ASM_V_SPEC in their tm.h,
+   which this file no longer includes -- so the generic form below was being
+   used on all four.  It is the `asm_v' named spec now, referenced from
+   asm_options, and gen-target-specs writes the target's own form into its spec
+   file.  The default is the generic string rather than the empty one that
+   suits a probe-derived spec: this is not a question about the toolchain, it
+   is what 179 of 183 targets actually want, and blanking it would stop passing
+   -v to the assembler everywhere.  */
+static const char *asm_v = "%{v} %{w:-W} %{I*}";
 
 /* config.h can define ASM_FINAL_SPEC to run a post processor after
    the assembler has run.  */
@@ -1309,7 +1314,7 @@ static const char *cc1_options =
 
 static const char *asm_options =
 "%{-target-help:%:print-asm-header()} "
-ASM_V_SPEC
+"%(asm_v)"
 " %(asm_debug_option)"
 " %(asm_compress_debug) "
 "%a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %d%w%u%O}";
@@ -1717,6 +1722,7 @@ struct spec_list
 static struct spec_list static_specs[] =
 {
   INIT_STATIC_SPEC ("asm",			&asm_spec),
+  INIT_STATIC_SPEC ("asm_v",			&asm_v),
   INIT_STATIC_SPEC ("asm_debug",		&asm_debug),
   INIT_STATIC_SPEC ("asm_debug_option",		&asm_debug_option),
   INIT_STATIC_SPEC ("asm_compress_debug",	&asm_compress_debug),

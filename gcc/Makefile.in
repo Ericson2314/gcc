@@ -2814,14 +2814,41 @@ multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
 	  $(srcdir) "$(MAKE)" "$(AWK)" > tmp-multilib-data
 	$(SHELL) $(srcdir)/../move-if-change tmp-multilib-data $@
 
-target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext)
+# The source-derived half of each target's spec file, built by rules in
+# multi-target-md.mk.  The split is the same one target-specs/ documents from
+# the other side: LINK_SPEC, STARTFILE_SPEC, ENDFILE_SPEC, LIB_SPEC, ASM_SPEC,
+# CPP_SPEC and CC1_SPEC are strings in the target's own tm.h chain, known here
+# at build time and unaffected by which assembler or linker is installed, so
+# probing for them post-build would be asking a question that has no probe.
+# The driver could not see them at all -- it includes no tm.h -- so it linked
+# with its generic defaults on every target, looking for crt0.o where glibc
+# targets want crt1.o and passing no -dynamic-linker.
+#
+# Both halves land in the one specs-<target> file, so the driver still reads a
+# single file per target and nothing downstream has to know there were two
+# producers.  The names are disjoint today: this half writes the tm.h-derived
+# specs, target-specs/ writes the probe-derived ones.  The source-derived half
+# is written FIRST so that if they ever do collide, read_specs applies the
+# probed value last and it wins -- the probe asked the actual toolchain, and a
+# source-derived guess should not override an answer.
+#
+# Each finished file is then handed to the driver's own read_specs, which is
+# the only checker that can fail the way a bad spec file fails.  Measured on
+# --enable-targets=all: 170 of 183 accepted, and all 13 rejections are one
+# cause -- EXTRA_SPEC_FUNCTIONS.  arm's `target_mode_check', loongarch's
+# `driver_init' and avr's `double-lib' live in config/<cpu>/driver-<cpu>.cc,
+# which a single-target driver linked in through extra_gcc_objs and a
+# multi-target one cannot.  That is the registry problem, not this one, and it
+# is named here rather than left to surface at someone's first compile.
+target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
+  $(MULTI_TARGET_SOURCE_SPECS)
 	@set -e; \
 	tsdir=$(srcdir)/../target-specs; \
 	if test ! -x $$tsdir/configure; then \
 	  echo "target-specs: $$tsdir/configure not generated; run autoconf there" >&2; \
 	  exit 1; \
 	fi; \
-	made=0; skipped=0; \
+	made=0; skipped=0; srcmade=0; unusable=0; \
 	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
 	  tas=$$t-as; tld=$$t-ld; \
 	  if ! command -v "$$tas" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
@@ -2848,11 +2875,24 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext)
 	      exit 1; \
 	    fi; \
 	  else \
-	    echo "target-specs: SKIP $$t -- $$tas or $$tld not found"; \
+	    echo "target-specs: SKIP probes for $$t -- $$tas or $$tld not found"; \
+	    rm -f specs-$$t; \
 	    skipped=`expr $$skipped + 1`; \
 	  fi; \
+	  if test -f specs-src-$$t; then \
+	    cat specs-src-$$t > tmp-specs-$$t; \
+	    if test -f specs-$$t; then cat specs-$$t >> tmp-specs-$$t; fi; \
+	    mv tmp-specs-$$t specs-$$t; \
+	    srcmade=`expr $$srcmade + 1`; \
+	  fi; \
+	  if test -f specs-$$t; then \
+	    why=`./xgcc$(exeext) -specs=specs-$$t --version 2>&1 >/dev/null` || { \
+	      echo "target-specs: $$t NOT USABLE -- $$why"; \
+	      unusable=`expr $$unusable + 1`; }; \
+	  fi; \
 	done; \
-	echo "target-specs: $$made generated, $$skipped skipped"
+	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
+	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"
 
 REFERENCE_SPECS =
 .PHONY: check-target-specs
