@@ -232,16 +232,42 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # That is a POLICY, not an oversight, and it has to be the same policy for
   # every generator or the results disagree with each other.  See the
   # insn-flags note above for why folding against tm-<base>.h is the wrong
-  # trade here: tm-<base>.h is whichever triple came first in the manifest, so
-  # a condition that turns on an OS or ABI choice gets that arbitrary triple's
-  # answer.  For a header of macros that only cost a wrong constant; for
-  # genemit and genrecog, which actually ELIDE patterns whose condition is
-  # provably false (gensupport.cc's insn_elision, which gencodes and genflags
-  # alone turn off), it would mean a pattern that is unreachable for every
-  # triple of the back end because one triple could not use it.  Passing the
-  # conditions file to none of them keeps every condition deferred to run time,
-  # which is what a multi-target compiler wants, and is exactly how GCC behaved
-  # before gencondmd existed.
+  # trade: tm-<base>.h is whichever triple came first in the manifest, so a
+  # condition that turns on an OS or ABI choice gets that arbitrary triple's
+  # answer.  For a header of macros that costs a wrong constant.  For genemit
+  # and genrecog it costs the pattern: gensupport.cc ELIDES patterns whose
+  # condition is provably false, and only gencodes and genflags turn that off
+  # (insn_elision = 0), so one triple's inability to use a pattern would delete
+  # it for every triple of the back end.  That is wrong code, not a missed
+  # optimisation.
+  #
+  # UNIFORMITY IS MANDATORY, and measurably so: gencodes consults the truth
+  # value even with elision off, emitting `= CODE_FOR_nothing' for a pattern it
+  # can prove dead.  Feeding it the conditions file moves NUM_INSN_CODES for
+  # i386 from 15874 to 15429 and renumbers 8555 lines of CODE_FOR_.  A build
+  # where some generators saw the file and others did not would disagree about
+  # what every insn code means.
+  #
+  # Passing it to none keeps every condition deferred to run time, which is
+  # what a multi-target compiler wants, and is how GCC behaved before gencondmd
+  # existed.  Elision is then inert by construction rather than by our
+  # restraint: condition_table is populated only by add_c_test, called only
+  # from read-rtl.cc's define_conditions handler, which only an
+  # insn-conditions.md contains.  With no such file every non-empty condition
+  # is -1 (unknown) and nothing is ever elided.
+  #
+  # AUDITED, because "these generators are per back end" is only safe if their
+  # output depends on the .md and not on which tm.h they were compiled with.
+  # Intersecting each generator's identifiers with the 689 macros tm-i386.h
+  # defines: gencodes, genconfig, genattr, genattr-common, genattrtab, genemit,
+  # genopinit, genextract, genpeep, genautomata, gentarget-def, genflags and
+  # genconditions reference NONE of them.  Only genpreds (SWITCHABLE_TARGET,
+  # TARGET_MEM_CONSTRAINT, TARGET_SUPPORTS_WIDE_INT) and genoutput
+  # (TARGET_MEM_CONSTRAINT) do, and those two are exactly the ones whose rules
+  # already say they want this back end's tm.h.  (genrecog matches only
+  # GENERATOR_FILE, a build-system define, which is the method's one false
+  # positive.)  They all still need *a* tm.h -- rtl.h wants
+  # FIRST_PSEUDO_REGISTER -- but that reaches a structure size, not the output.
   n = split("codes config attr attr-common", parts, " ");
   for (i = 1; i <= n; i++) {
     printf "insn-%s-%s.h: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
