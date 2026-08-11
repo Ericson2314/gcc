@@ -182,10 +182,46 @@ new_mode (enum mode_class cl, const char *name,
   m = find_mode (name);
   if (m)
     {
+#ifdef GENMODES_UNION
+      /* Union run: one enum for every back end at once, so the same mode
+	 name arriving from several `*-modes.def' files is the normal case
+	 -- `TFmode' and `V2SImode' are each defined by a dozen of them.
+	 They agree on the only thing the enum records, which is the name
+	 and the class, and they are one entry in the vocabulary.
+
+	 Size, precision and format do NOT have to agree, and often do not
+	 (`XFmode' is 12 bytes on i386 and 16 on ia64, `SFmode' is VAX F
+	 format on vax and IEEE elsewhere).  Those live in the per-back-end
+	 tables, so the first definition's numbers are simply discarded
+	 along with the rest of the duplicate record.
+
+	 The class is different: it decides which contiguous run of the
+	 enum the mode lands in, and `MIN_MODE_<CLASS>'/`MAX_MODE_<CLASS>'
+	 are that run's endpoints.  A name that is two classes cannot be
+	 one entry, so that is the one disagreement worth a diagnostic.  */
+      if (m->cl != cl)
+	{
+	  error ("%s:%d: mode \"%s\" is %s here but %s at %s:%d",
+		 trim_filename (file), line, name, mode_class_names[cl],
+		 mode_class_names[m->cl], m->file, m->line);
+	  return m;
+	}
+
+      /* Hand back a throwaway copy.  The caller is about to fill in the
+	 duplicate's precision, component and so on; letting it write
+	 through to the retained record would make the last back end read
+	 win, silently.  */
+      {
+	struct mode_data *scratch = XNEW (struct mode_data);
+	memcpy (scratch, m, sizeof (struct mode_data));
+	return scratch;
+      }
+#else
       error ("%s:%d: duplicate definition of mode \"%s\"",
 	     trim_filename (file), line, name);
       error ("%s:%d: previous definition here", m->file, m->line);
       return m;
+#endif
     }
 
   m = XNEW (struct mode_data);
@@ -257,6 +293,12 @@ new_adjust (const char *name,
   for (a = *category; a; a = a->next)
     if (a->mode == mode)
       {
+#ifdef GENMODES_UNION
+	/* Two back ends adjusting the same mode differently is expected --
+	   the adjustment is per-back-end data and the union run emits no
+	   data, only the enum.  Keep the first and say nothing.  */
+	return;
+#endif
 	error ("%s:%d: mode \"%s\" already has a %s adjustment",
 	       file, line, name, catname);
 	error ("%s:%d: previous adjustment here", a->file, a->line);
