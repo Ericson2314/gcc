@@ -282,6 +282,21 @@ struct target_caps
      to this field alone, and no longer has to include auto-host.h to do it.  */
   bool gas_shf_gnu_retain;
 
+  /* Assembler has `.balign' and `.p2align' (and `.balignw').  Was
+     HAVE_GAS_BALIGN_AND_P2ALIGN.  i386/gas.h picks the mnemonic with it;
+     m68k.h emits a nop-filled `.balignw' or falls back to ASM_OUTPUT_ALIGN,
+     which is what final.cc's macro-existence cascade used to reach.  */
+  bool gas_balign_and_p2align;
+
+  /* Assembler takes the max-skip form `.p2align LOG,,MAX', so -falign-*
+     padding can be bounded.  Was HAVE_GAS_MAX_SKIP_P2ALIGN, which five target
+     headers used to gate the DEFINITION of ASM_OUTPUT_MAX_SKIP_ALIGN; final.cc
+     chose between that, ASM_OUTPUT_ALIGN_WITH_NOP and ASM_OUTPUT_ALIGN purely
+     by which macros existed.  The macros are unconditional now and final.cc
+     makes the choice, which keeps the fallback exact -- the max-skip arm emits
+     two directives where the others emit one.  */
+  bool gas_max_skip_p2align;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

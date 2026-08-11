@@ -339,7 +339,8 @@
         fprintf (FILE, "\t.align32 %d,0x60000000\n", (LOG));  \
     } while (0)
 
-#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
+/* Defined unconditionally; final.cc consults targ_caps.gas_max_skip_p2align
+   before using it.  Was `#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN'.  */
 /* This is supported in cctools 465 and later.  The macro test
    above prevents using it in earlier build environments.  */
 #define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE,LOG,MAX_SKIP)          \
@@ -350,7 +351,6 @@
       else                                                    \
         fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP)); \
     }
-#endif
 
 /* Generate insns to call the profiler.  */
 

@@ -2252,7 +2252,8 @@ extern unsigned int const svr4_debugger_register_map[FIRST_PSEUDO_REGISTER];
    command to pad the location counter to a multiple of 1<<LOG
    bytes if it is within MAX_SKIP bytes.  */
 
-#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
+/* Defined unconditionally; final.cc consults targ_caps.gas_max_skip_p2align
+   before using it.  Was `#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN'.  */
 # define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE,LOG,MAX_SKIP)			\
   do {									\
     if ((LOG) != 0) {							\
@@ -2262,7 +2263,6 @@ extern unsigned int const svr4_debugger_register_map[FIRST_PSEUDO_REGISTER];
 	fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP));	\
     }									\
   } while (0)
-#endif
 
 /* Write the extra assembler code needed to declare a function
    properly.  */

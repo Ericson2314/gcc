@@ -2300,7 +2300,8 @@ extern int making_const_table;
     }								\
   while (0)
 
-#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
+/* Defined unconditionally; final.cc consults targ_caps.gas_max_skip_p2align
+   before using it.  Was `#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN'.  */
 /* To support -falign-* switches we need to use .p2align so
    that alignment directives in code sections will be padded
    with no-op instructions, rather than zeroes.  */
@@ -2313,7 +2314,6 @@ extern int making_const_table;
         fprintf ((FILE), "\t.p2align %d,,%d\n",			\
                  (int) (LOG), (int) (MAX_SKIP));		\
     }
-#endif
 
 /* Add two bytes to the length of conditionally executed Thumb-2
    instructions for the IT instruction.  */

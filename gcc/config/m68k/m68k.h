@@ -817,12 +817,24 @@ __transfer_from_trampoline ()					\
   if ((LOG) >= 1)			\
     fprintf (FILE, "\t.even\n");
 
-#ifdef HAVE_GAS_BALIGN_AND_P2ALIGN
-/* Use "move.l %a4,%a4" to advance within code.  */
+/* Use "move.l %a4,%a4" to advance within code.
+   Was `#ifdef HAVE_GAS_BALIGN_AND_P2ALIGN' around the definition.  final.cc
+   picks between ASM_OUTPUT_MAX_SKIP_ALIGN, this, and ASM_OUTPUT_ALIGN by which
+   macros EXIST, so defining this unconditionally would take the .balignw arm on
+   assemblers that cannot assemble it.  The fallback therefore moves inside:
+   without the capability this is exactly what the cascade used to reach.  */
 #define ASM_OUTPUT_ALIGN_WITH_NOP(FILE,LOG)			\
-  if ((LOG) > 0)						\
-    fprintf ((FILE), "\t.balignw %u,0x284c\n", 1 << (LOG));
-#endif
+  do								\
+    {								\
+      if (targ_caps.gas_balign_and_p2align)			\
+	{							\
+	  if ((LOG) > 0)					\
+	    fprintf ((FILE), "\t.balignw %u,0x284c\n", 1 << (LOG)); \
+	}							\
+      else							\
+	ASM_OUTPUT_ALIGN ((FILE), (LOG));			\
+    }								\
+  while (0)
 
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
   fprintf (FILE, "\t.skip %u\n", (int)(SIZE))

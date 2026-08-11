@@ -50,7 +50,8 @@
 #undef TARGET_ASM_DESTRUCTOR
 #define TARGET_ASM_DESTRUCTOR aarch64_elf_asm_destructor
 
-#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
+/* Defined unconditionally; final.cc consults targ_caps.gas_max_skip_p2align
+   before using it.  Was `#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN'.  */
 /* Support for -falign-* switches.  Use .p2align to ensure that code
    sections are padded with NOP instructions, rather than zeros.  */
 #define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE, LOG, MAX_SKIP)		\
@@ -65,8 +66,6 @@
 		     (int) (LOG), (int) (MAX_SKIP));		\
 	}							\
     } while (0)
-
-#endif /* HAVE_GAS_MAX_SKIP_P2ALIGN */
 
 #define JUMP_TABLES_IN_TEXT_SECTION 0
 

@@ -50,11 +50,16 @@ along with GCC; see the file COPYING3.  If not see
    doubt or guess work, and since this file is used for both a.out and other
    file formats, we use one of them.  */
 
-#ifdef HAVE_GAS_BALIGN_AND_P2ALIGN
+/* Was `#ifdef HAVE_GAS_BALIGN_AND_P2ALIGN' around this override.  Only the
+   mnemonic differs -- att.h's fallback is `.align' with the same 1 << LOG
+   operand -- so the choice is a runtime read rather than whether the macro
+   exists.  */
 #undef ASM_OUTPUT_ALIGN
-#define ASM_OUTPUT_ALIGN(FILE,LOG) \
-  if ((LOG)!=0) fprintf ((FILE), "\t.balign %d\n", 1 << (LOG))
-#endif
+#define ASM_OUTPUT_ALIGN(FILE,LOG)					\
+  if ((LOG)!=0) fprintf ((FILE),					\
+			 (targ_caps.gas_balign_and_p2align		\
+			  ? "\t.balign %d\n" : "\t.align %d\n"),		\
+			 1 << (LOG))
 
 /* A C statement or statements which output an assembler instruction
    opcode to the stdio stream STREAM.  The macro-operand PTR is a

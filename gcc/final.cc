@@ -2406,19 +2406,33 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	  align_flags alignment = LABEL_TO_ALIGNMENT (insn);
 	  if (alignment.levels[0].log && NEXT_INSN (insn))
 	    {
+	      /* This cascade used to be chosen entirely by which macros EXIST,
+		 with ASM_OUTPUT_MAX_SKIP_ALIGN defined only under `#ifdef
+		 HAVE_GAS_MAX_SKIP_P2ALIGN'.  Whether the assembler takes
+		 `.p2align LOG,,MAX' is a property of that assembler, so the
+		 first arm is now chosen at run time and the others remain the
+		 fallback they always were -- putting the test here rather than
+		 inside five targets' macros keeps that fallback exact, since
+		 the arm below emits ONE directive where the arm above emits
+		 two.  */
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
-	      /* Output both primary and secondary alignment.  */
-	      ASM_OUTPUT_MAX_SKIP_ALIGN (file, alignment.levels[0].log,
-					 alignment.levels[0].maxskip);
-	      ASM_OUTPUT_MAX_SKIP_ALIGN (file, alignment.levels[1].log,
-					 alignment.levels[1].maxskip);
-#else
+	      if (targ_caps.gas_max_skip_p2align)
+		{
+		  /* Output both primary and secondary alignment.  */
+		  ASM_OUTPUT_MAX_SKIP_ALIGN (file, alignment.levels[0].log,
+					     alignment.levels[0].maxskip);
+		  ASM_OUTPUT_MAX_SKIP_ALIGN (file, alignment.levels[1].log,
+					     alignment.levels[1].maxskip);
+		}
+	      else
+#endif
+		{
 #ifdef ASM_OUTPUT_ALIGN_WITH_NOP
-              ASM_OUTPUT_ALIGN_WITH_NOP (file, alignment.levels[0].log);
+		  ASM_OUTPUT_ALIGN_WITH_NOP (file, alignment.levels[0].log);
 #else
-	      ASM_OUTPUT_ALIGN (file, alignment.levels[0].log);
+		  ASM_OUTPUT_ALIGN (file, alignment.levels[0].log);
 #endif
-#endif
+		}
 	    }
 	}
       CC_STATUS_INIT;
