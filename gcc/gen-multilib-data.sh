@@ -1,0 +1,114 @@
+#! /bin/sh
+
+# Copyright (C) 2026 Free Software Foundation, Inc.
+# This file is part of GCC.
+#
+# GCC is free software; you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 3, or (at your option) any later version.
+#
+# GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along
+# with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# Extract each target's multilib set into a sibling of multi-target.manifest.
+#
+# Why this is a shell script driving make, rather than more shell in
+# configure: MULTILIB_OPTIONS, MULTILIB_MATCHES, MULTILIB_REUSE and
+# MULTILIB_OSDIRNAMES are *make* variables.  Nothing in config.gcc assigns
+# them; they are set by the config/*/t-* fragments named in each target's
+# tmake_file, and a fragment can compute one from another or from
+# TM_MULTILIB_CONFIG.  The only way to learn what a target's multilib set
+# actually is, is to let make evaluate that target's fragments.
+#
+# It runs at configure/make time and not in target-specs/ on purpose: this
+# data is derived from the source tree, not probed from an installed
+# assembler or linker, so it is knowable without the target toolchain and
+# belongs on this side of the split.
+#
+# The fragments are not self-contained: they use variables that gcc/Makefile.in
+# supplies.  m68k/t-mlibs computes its multilib set by shelling out to $(AWK)
+# over m68k-devices.def and then checks the answer against
+# $(target_cpu_default), so a stub that omits either gets `make: BEGIN { FS=...
+# }: No such file or directory' -- make trying to run the awk *program* as a
+# command -- or a spurious "default cpu '' is not in multilib set ''".  Anything
+# else a fragment turns out to need has to be passed in the same way.
+#
+# Usage: gen-multilib-data.sh MANIFEST SRCDIR MAKE AWK
+
+set -e
+
+manifest=$1
+srcdir=$2
+make=${3-make}
+awk_prog=${4-awk}
+
+if test ! -f "$manifest"; then
+  echo "$0: no such manifest: $manifest" >&2
+  exit 1
+fi
+
+tmp=tmp-multilib-stub.mk
+
+echo "# Generated from $manifest; do not edit."
+echo "# One stanza per target: the multilib set its tmake_file fragments define."
+
+# Read the manifest one stanza at a time.  Blank line ends a stanza.
+target= tmake= tmconf= tcd=
+emit () {
+  test -n "$target" || return 0
+
+  # The build only includes fragments that exist -- see the tmake_file loop in
+  # configure.ac -- and tmake_file does name some that do not (sh-unknown-elf
+  # asks for sh/t-elf, which is not in the tree).  Applying the same filter
+  # matters: `include' of a missing file is a hard error in make, so without
+  # it this stops on the first such target instead of reporting it.
+  {
+    echo "srcdir = $srcdir"
+    echo "AWK = $awk_prog"
+    echo "target_cpu_default = $tcd"
+    echo "TM_MULTILIB_CONFIG = $tmconf"
+    for f in $tmake; do
+      if test -f "$srcdir/config/$f"; then
+	echo "include \$(srcdir)/config/$f"
+      fi
+    done
+    # Tab-indented recipe lines.
+    echo 'multilib-show:'
+    printf '\t@echo "multilib_options $(MULTILIB_OPTIONS)"\n'
+    printf '\t@echo "multilib_matches $(MULTILIB_MATCHES)"\n'
+    printf '\t@echo "multilib_reuse $(MULTILIB_REUSE)"\n'
+    printf '\t@echo "multilib_osdirnames $(MULTILIB_OSDIRNAMES)"\n'
+  } > $tmp
+
+  echo ""
+  echo "target $target"
+  # A fragment that cannot be evaluated is reported rather than silently
+  # yielding an empty multilib set, which would look like "this target has no
+  # multilibs" -- the confidently-wrong answer this whole exercise keeps
+  # running into.
+  if ! "$make" -s -f $tmp multilib-show 2>/dev/null; then
+    echo "multilib_error 1"
+    echo "$0: could not evaluate multilib fragments for $target" >&2
+  fi
+
+  target= tmake= tmconf= tcd=
+}
+
+while IFS= read -r line; do
+  case $line in
+    "target "*)             target=${line#target } ;;
+    "tmake_file "*)         tmake=${line#tmake_file } ;;
+    "tm_multilib_config "*) tmconf=${line#tm_multilib_config } ;;
+    "target_cpu_default "*) tcd=${line#target_cpu_default } ;;
+    "")                     emit ;;
+  esac
+done < "$manifest"
+emit
+
+rm -f $tmp

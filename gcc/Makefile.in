@@ -2747,7 +2747,20 @@ gcc.o: $(BASEVER)
 # toolchain, not this build.  A target whose tools are not installed is skipped
 # with a notice rather than silently omitted.
 .PHONY: target-specs
-target-specs: multi-target.manifest
+# Each target's multilib set.  A sibling of the manifest rather than more
+# stanzas inside it: m68k alone contributes a 100-entry multilib_matches line,
+# and 188 of those would swamp the file people actually read.
+#
+# This is source-derived data, not probed: it comes from t-* fragments in the
+# tree and does not depend on which assembler or linker is installed, so it is
+# produced here at build time rather than by target-specs/ after the build.
+# See gen-multilib-data.sh for why it takes make to read it at all.
+multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
+	$(SHELL) $(srcdir)/gen-multilib-data.sh multi-target.manifest \
+	  $(srcdir) "$(MAKE)" "$(AWK)" > tmp-multilib-data
+	$(SHELL) $(srcdir)/../move-if-change tmp-multilib-data $@
+
+target-specs: multi-target.manifest multi-target.multilib
 	@set -e; \
 	tsdir=$(srcdir)/../target-specs; \
 	if test ! -x $$tsdir/configure; then \
