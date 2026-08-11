@@ -51,14 +51,27 @@
 # The script uses temporary subscripts in order to permit a recursive
 # algorithm without the use of functions.
 
+# Those subscripts go in a directory of this process's own.  They used to be
+# written into the current directory under fixed names, which is fine for the
+# one invocation a single-target build makes, but a multi-target build makes
+# one per configured target and runs them in parallel: two copies then
+# overwrite each other's helper mid-execution and the build dies with
+# `$tmpdir/print-sysroot-suffix3.sh: Text file busy' and status 126.  A fixed name in
+# a shared directory is the bug; $$ is unique per process and needs no mktemp.
+
 set -e
+
+tmpdir=./pss-tmp-$$
+rm -rf "$tmpdir"
+mkdir "$tmpdir"
+trap 'rm -rf "$tmpdir"' 0
 
 dirnames="$1"
 options="$2"
 matches="$3"
 reuse="$4"
 
-cat > print-sysroot-suffix3.sh <<\EOF
+cat > $tmpdir/print-sysroot-suffix3.sh <<\EOF
 #! /bin/sh
 # Print all the multilib matches for this option
 result="$1"
@@ -66,12 +79,12 @@ EOF
 for x in $matches; do
   l=`echo $x | sed -e 's/=.*$//' -e 's/?/=/g'`
   r=`echo $x | sed -e 's/^.*=//' -e 's/?/=/g'`
-  echo "[ \"\$1\" = \"$l\" ] && result=\"\$result|$r\"" >> print-sysroot-suffix3.sh
+  echo "[ \"\$1\" = \"$l\" ] && result=\"\$result|$r\"" >> $tmpdir/print-sysroot-suffix3.sh
 done
-echo 'echo $result' >> print-sysroot-suffix3.sh
-chmod +x print-sysroot-suffix3.sh
+echo 'echo $result' >> $tmpdir/print-sysroot-suffix3.sh
+chmod +x $tmpdir/print-sysroot-suffix3.sh
 
-cat > print-sysroot-suffix2.sh <<\EOF
+cat > $tmpdir/print-sysroot-suffix2.sh <<\EOF
 #! /bin/sh
 # Recursive script to enumerate all multilib combinations, match against
 # multilib directories and output a spec string of the result.
@@ -88,17 +101,17 @@ EOF
 for x in $reuse; do
   l=`echo $x | sed -e 's/=.*$//' -e 's/\./=/g'`
   r=`echo $x | sed -e 's/^.*=//' -e 's/\./=/g'`
-  echo "/$r/) optstring=\"/$l/\" ;;" >> print-sysroot-suffix2.sh
+  echo "/$r/) optstring=\"/$l/\" ;;" >> $tmpdir/print-sysroot-suffix2.sh
 done
-echo "  esac" >> print-sysroot-suffix2.sh
+echo "  esac" >> $tmpdir/print-sysroot-suffix2.sh
 
 pat=
 for x in $dirnames; do
   p=`echo $x | sed -e 's,=!,/$=/,'`
   pat="$pat -e 's=^//$p='"
 done
-echo '  optstring=`echo "/$optstring" | sed '"$pat\`" >> print-sysroot-suffix2.sh
-cat >> print-sysroot-suffix2.sh <<\EOF
+echo '  optstring=`echo "/$optstring" | sed '"$pat\`" >> $tmpdir/print-sysroot-suffix2.sh
+cat >> $tmpdir/print-sysroot-suffix2.sh <<\EOF
   case $optstring in
   //*)
     ;;
@@ -116,10 +129,10 @@ else
     case $x in
 EOF
 for x in `echo "$options" | sed -e 's,/, ,g'`; do
-  match=`./print-sysroot-suffix3.sh "$x"`
-  echo "$x) optmatch=\"$match\" ;;" >> print-sysroot-suffix2.sh
+  match=`$tmpdir/print-sysroot-suffix3.sh "$x"`
+  echo "$x) optmatch=\"$match\" ;;" >> $tmpdir/print-sysroot-suffix2.sh
 done
-cat >> print-sysroot-suffix2.sh <<\EOF
+cat >> $tmpdir/print-sysroot-suffix2.sh <<\EOF
     esac
     bit=`"$0" "$padding  " "$optstring$x/" "$@"`
     if [ -z "$lastopt" ]; then
@@ -147,9 +160,7 @@ cat >> print-sysroot-suffix2.sh <<\EOF
 fi
 EOF
 
-chmod +x ./print-sysroot-suffix2.sh
-result=`./print-sysroot-suffix2.sh "" "/" $options`
+chmod +x $tmpdir/print-sysroot-suffix2.sh
+result=`$tmpdir/print-sysroot-suffix2.sh "" "/" $options`
 echo "#undef SYSROOT_SUFFIX_SPEC"
 echo "#define SYSROOT_SUFFIX_SPEC \"$result\""
-rm print-sysroot-suffix2.sh
-rm print-sysroot-suffix3.sh

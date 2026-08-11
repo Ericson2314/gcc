@@ -66,14 +66,13 @@ function reset() {
 # triples all four do, of m68k's fourteen only two.  So the header follows tm.h
 # down to the triple like everything else here.
 #
-# RUN IN A SCRATCH DIRECTORY, and this is not tidiness.
-# config/print-sysroot-suffix.sh writes a helper called
-# ./print-sysroot-suffix3.sh in the CURRENT directory, under that fixed name.
-# Two of these running at once in the same directory overwrite each other's
-# helper mid-execution: with -j12 the first attempt died on
-# `./print-sysroot-suffix3.sh: Text file busy' and exit 126.  Per-base there was
-# at most one such rule so it never showed; going per-triple makes eight, and
-# the race becomes the common case.
+# These rules run in parallel with each other, which
+# config/print-sysroot-suffix.sh could not survive until recently: it wrote its
+# helper scripts into the CURRENT directory under fixed names, so two copies
+# clobbered each other mid-execution (`Text file busy', status 126, under
+# -j12).  That is fixed in the script itself now -- it works in a directory of
+# its own -- so nothing is needed here.  Recorded because the caller-side
+# workaround that used to be here looked like tidiness and was not.
 function emit_sysroot_suffix(key,	hdr) {
   if (inc ~ /(^| )linux-sysroot-suffix\.h( |$)/)
     hdr = "linux-sysroot-suffix.h";
@@ -84,11 +83,9 @@ function emit_sysroot_suffix(key,	hdr) {
 
   printf "sysroot-suffix-%s.h: multi-target.manifest multi-target.multilib \\\n", key;
   printf "  $(srcdir)/gen-sysroot-suffix.sh\n";
-  printf "\trm -rf tmp-ssdir-%s && mkdir tmp-ssdir-%s\n", key, key;
-  printf "\tcd tmp-ssdir-%s && $(SHELL) $(srcdir)/gen-sysroot-suffix.sh \\\n", key;
-  printf "\t  %s ../multi-target.manifest ../multi-target.multilib $(srcdir) \\\n", trg;
-  printf "\t  > ../tmp-sysroot-suffix-%s.h\n", key;
-  printf "\trm -rf tmp-ssdir-%s\n", key;
+  printf "\t$(SHELL) $(srcdir)/gen-sysroot-suffix.sh %s \\\n", trg;
+  printf "\t  multi-target.manifest multi-target.multilib $(srcdir) \\\n";
+  printf "\t  > tmp-sysroot-suffix-%s.h\n", key;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-sysroot-suffix-%s.h $@\n\n", key;
   return hdr;
 }
