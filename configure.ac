@@ -3825,10 +3825,16 @@ if test x${is_cross_compiler} = xyes ; then
   target_configargs="--with-cross-host=${host_noncanonical} ${target_configargs}"
 fi
 
-# Special user-friendly check for native x86_64-linux build, if
-# multilib is not explicitly enabled.
-case "$target:$have_compiler:$host:$target:$enable_multilib" in
-  x86_64-*linux*:yes:$build:$build:)
+# Special user-friendly check for native x86_64-linux build.
+#
+# The discriminant used to carry a fifth field, ${enable_multilib}, matched
+# against an empty pattern field -- "the user picked neither multilib flag".
+# Neither flag exists any more, so nothing sets that variable, the field was
+# always empty and the arm always matched on a native x86_64 host.  Dropping
+# the dead field from both the word and the pattern is what the check already
+# does; see the demotion to a warning below for why it is only a warning.
+case "$target:$have_compiler:$host:$target" in
+  x86_64-*linux*:yes:$build:$build)
     # Make sure we have a development environment that handles 32-bit
     dev64=no
     echo "int main () { return 0; }" > conftest.c
@@ -3858,10 +3864,17 @@ case "$target:$have_compiler:$host:$target:$enable_multilib" in
     ;;
 esac
 
-# Default to --enable-multilib.
-if test x${enable_multilib} = x ; then
-  target_configargs="--enable-multilib ${target_configargs}"
-fi
+# Multilib is mandatory, and the target libraries still have to be TOLD so:
+# config-ml.in does nothing at all unless ${enable_multilib} = yes, and it gets
+# that from each target library's own AC_ARG_ENABLE(multilib) in
+# config/multi.m4.  So this pass-through is load-bearing and stays.
+#
+# What is gone is the condition.  This used to be guarded by
+# "if test x${enable_multilib} = x", i.e. "unless the user chose", and this
+# script no longer declares either multilib flag -- so the guard tested a
+# variable nothing sets, was therefore always true, and the pass-through was
+# already unconditional in fact.  Saying so is not a behaviour change.
+target_configargs="--enable-multilib ${target_configargs}"
 
 # Pass through with_multi_buildlist to host and target.  'gcc' needs it for the
 # fixed includes which are multilib'd and target libraries need it as they use

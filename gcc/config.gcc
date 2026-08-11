@@ -3844,309 +3844,48 @@ case ${target} in
   i586-*-*)
     arch_without_sse2=yes
     arch_without_64bit=yes
-    case ${target_noncanonical} in
-      k6_2-*)
-	arch=k6-2
-	cpu=k6-2
-	;;
-      k6_3-*)
-	arch=k6-3
-	cpu=k6-3
-	;;
-      k6-*)
-	arch=k6
-	cpu=k6
-	;;
-      pentium_mmx-*|winchip_c6-*|winchip2-*|c3-*)
-	arch=pentium-mmx
-	cpu=pentium-mmx
-	;;
-      *)
-	arch=pentium
-	cpu=pentium
-	;;
-    esac
+    # The pre-canonicalisation target name is gone, so this dispatch is dead.
+    # It used to read ${target_noncanonical} -- the name the user actually
+    # wrote -- to recover a specific CPU that config.sub had already folded
+    # into i586, matching the CPU spellings this replaces.
+    #
+    # ACX_NONCANONICAL_TARGET went with AC_CANONICAL_TARGET, and config.gcc is
+    # now handed a target that gcc/configure.ac has already run through
+    # config.sub, so no pre-canonical spelling survives to match on.  With the
+    # variable unset every arm but the default was unreachable, silently, and
+    # the default is what is kept below.
+    arch=pentium
+    cpu=pentium
     ;;
   i686-*-* | i786-*-*)
-    case ${target_noncanonical} in
-      znver1-*)
-	arch=znver1
-	cpu=znver1
-	;;
-      znver2-*)
-	arch=znver2
-	cpu=znver2
-	;;
-      znver3-*)
-	arch=znver3
-	cpu=znver3
-	;;
-      znver4-*)
-	arch=znver4
-	cpu=znver4
-	;;
-      znver5-*)
-	arch=znver5
-	cpu=znver5
-	;;
-      znver6-*)
-	arch=znver6
-	cpu=znver6
-	;;
-      bdver4-*)
-        arch=bdver4
-        cpu=bdver4
-        ;;
-      bdver3-*)
-        arch=bdver3
-        cpu=bdver3
-        ;;
-      bdver2-*)
-        arch=bdver2
-        cpu=bdver2
-        ;;
-      bdver1-*)
-	arch=bdver1
-	cpu=bdver1
-	;;
-      btver1-*)
-	arch=btver1
-	cpu=btver1
-	;;
-      btver2-*)
-	arch=btver2
-	cpu=btver2
-	;;
-      amdfam10-*|barcelona-*)
-	arch=amdfam10
-	cpu=amdfam10
-	;;
-      k8_sse3-*|opteron_sse3-*|athlon64_sse3-*)
-	arch=k8-sse3
-	cpu=k8-sse3
-	;;
-      k8-*|opteron-*|athlon64-*|athlon_fx-*)
-	arch=k8
-	cpu=k8
-	;;
-      athlon_xp-*|athlon_mp-*|athlon_4-*)
-	arch=athlon-4
-	cpu=athlon-4
-	arch_without_sse2=yes
-	arch_without_64bit=yes
-	;;
-      athlon_tbird-*|athlon-*)
-	arch=athlon
-	cpu=athlon
-	arch_without_sse2=yes
-	;;
-      geode-*)
-	arch=geode
-	cpu=geode
-	arch_without_sse2=yes
-	;;
-      lujiazui-*)
-	arch=lujiazui
-	cpu=lujiazui
-	;;
-      yongfeng-*)
-	arch=yongfeng
-	cpu=yongfeng
-	;;
-      shijidadao-*)
-	arch=shijidadao
-	cpu=shijidadao
-	;;
-      pentium2-*)
-	arch=pentium2
-	cpu=pentium2
-	arch_without_sse2=yes
-	;;
-      pentium3-*|pentium3m-*)
-	arch=pentium3
-	cpu=pentium3
-	arch_without_sse2=yes
-	;;
-      pentium4-*|pentium4m-*)
-	arch=pentium4
-	cpu=pentium4
-	;;
-      prescott-*)
-	arch=prescott
-	cpu=prescott
-	;;
-      nocona-*)
-	arch=nocona
-	cpu=nocona
-	;;
-      atom-*)
-	arch=atom
-	cpu=atom
-	;;
-      slm-*)
-	arch=slm
-	cpu=slm
-	;;
-      core2-*)
-	arch=core2
-	cpu=core2
-	;;
-      corei7-*)
-	arch=corei7
-	cpu=corei7
-	;;
-      corei7_avx-*)
-	arch=corei7-avx
-	cpu=corei7-avx
-	;;
-      pentium_m-*)
-	arch=pentium-m
-	cpu=pentium-m
-	;;
-      pentiumpro-*)
-	arch=pentiumpro
-	cpu=pentiumpro
-	arch_without_sse2=yes
-	;;
-      c86_4g_m4-*)
-	arch=c86-4g-m4
-	cpu=c86-4g-m4
-	;;
-      c86_4g_m6-*)
-	arch=c86-4g-m6
-	cpu=c86-4g-m6
-	;;
-      c86_4g_m7-*)
-	arch=c86-4g-m7
-	cpu=c86-4g-m7
-	;;
-      c86_4g_m8-*)
-	arch=c86-4g-m8
-	cpu=c86-4g-m8
-	;;
-      *)
-	arch=pentiumpro
-	cpu=generic
-	arch_without_sse2=yes
-	arch_without_64bit=yes
-	;;
-    esac
+    # The pre-canonicalisation target name is gone, so this dispatch is dead.
+    # It used to read ${target_noncanonical} -- the name the user actually
+    # wrote -- to recover a specific CPU that config.sub had already folded
+    # into i686, matching the CPU spellings this replaces.
+    #
+    # ACX_NONCANONICAL_TARGET went with AC_CANONICAL_TARGET, and config.gcc is
+    # now handed a target that gcc/configure.ac has already run through
+    # config.sub, so no pre-canonical spelling survives to match on.  With the
+    # variable unset every arm but the default was unreachable, silently, and
+    # the default is what is kept below.
+    arch=pentiumpro
+    cpu=generic
+    arch_without_sse2=yes
+    arch_without_64bit=yes
     ;;
   x86_64-*-*)
-    case ${target_noncanonical} in
-      znver1-*)
-	arch=znver1
-	cpu=znver1
-	;;
-      znver2-*)
-	arch=znver2
-	cpu=znver2
-	;;
-      znver3-*)
-	arch=znver3
-	cpu=znver3
-	;;
-	  znver4-*)
-	arch=znver4
-	cpu=znver4
-	;;
-      znver5-*)
-	arch=znver5
-	cpu=znver5
-	;;
-      znver6-*)
-	arch=znver6
-	cpu=znver6
-	;;
-      bdver4-*)
-        arch=bdver4
-        cpu=bdver4
-        ;;
-      bdver3-*)
-        arch=bdver3
-        cpu=bdver3
-        ;;
-      bdver2-*)
-        arch=bdver2
-        cpu=bdver2
-        ;;
-      bdver1-*)
-	arch=bdver1
-	cpu=bdver1
-	;;
-      btver1-*)
-	arch=btver1
-	cpu=btver1
-	;;
-      btver2-*)
-	arch=btver2
-	cpu=btver2
-	;;
-      amdfam10-*|barcelona-*)
-	arch=amdfam10
-	cpu=amdfam10
-	;;
-      k8_sse3-*|opteron_sse3-*|athlon64_sse3-*)
-	arch=k8-sse3
-	cpu=k8-sse3
-	;;
-      k8-*|opteron-*|athlon_64-*)
-	arch=k8
-	cpu=k8
-	;;
-      lujiazui-*)
-	arch=lujiazui
-	cpu=lujiazui
-	;;
-      yongfeng-*)
-	arch=yongfeng
-	cpu=yongfeng
-	;;
-      shijidadao-*)
-	arch=shijidadao
-	cpu=shijidadao
-	;;
-      nocona-*)
-	arch=nocona
-	cpu=nocona
-	;;
-      atom-*)
-	arch=atom
-	cpu=atom
-	;;
-      slm-*)
-	arch=slm
-	cpu=slm
-	;;
-      core2-*)
-	arch=core2
-	cpu=core2
-	;;
-      corei7-*)
-	arch=corei7
-	cpu=corei7
-	;;
-      c86_4g_m4-*)
-	arch=c86-4g-m4
-	cpu=c86-4g-m4
-	;;
-      c86_4g_m6-*)
-	arch=c86-4g-m6
-	cpu=c86-4g-m6
-	;;
-      c86_4g_m7-*)
-	arch=c86-4g-m7
-	cpu=c86-4g-m7
-	;;
-      c86_4g_m8-*)
-	arch=c86-4g-m8
-	cpu=c86-4g-m8
-	;;
-      *)
-	arch=x86-64
-	cpu=generic
-	;;
-    esac
+    # The pre-canonicalisation target name is gone, so this dispatch is dead.
+    # It used to read ${target_noncanonical} -- the name the user actually
+    # wrote -- to recover a specific CPU that config.sub had already folded
+    # into x86_64, matching the CPU spellings this replaces.
+    #
+    # ACX_NONCANONICAL_TARGET went with AC_CANONICAL_TARGET, and config.gcc is
+    # now handed a target that gcc/configure.ac has already run through
+    # config.sub, so no pre-canonical spelling survives to match on.  With the
+    # variable unset every arm but the default was unreachable, silently, and
+    # the default is what is kept below.
+    arch=x86-64
+    cpu=generic
     ;;
 esac
 
