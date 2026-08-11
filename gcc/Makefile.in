@@ -697,6 +697,24 @@ lang_checks += check-libgdiagnostics check-sarif-replay
 endif
 lang_opt_files=@lang_opt_files@ $(srcdir)/c-family/c.opt $(srcdir)/common.opt $(srcdir)/params.opt $(srcdir)/analyzer/analyzer.opt
 lang_specs_files=@lang_specs_files@
+
+# Every language's lang-specs.h in the SOURCE TREE, which is deliberately not
+# $(lang_specs_files) -- that follows --enable-languages, and the spec-file
+# checks must not.
+#
+# A target's generated spec file carries `*cplusplus_cpp' whenever that target's
+# headers define CPLUSPLUS_CPP_SPEC, which is a property of the TARGET and has
+# nothing to do with whether C++ was configured in this build.  The only
+# consumer of that spec is cp/lang-specs.h.  Build the reference corpus from
+# the configured languages and a C-only build cannot see the consumer, so
+# check-spec-refs calls a live carrier dead -- on exactly the configuration
+# most people build.  It did, and it blocked a build tonight.
+#
+# The rule this encodes: a check's corpus has to match what the GENERATOR can
+# emit, not what this build happens to enable.  Anything narrower produces
+# configuration-dependent verdicts, and a check that fails on a legitimate
+# configuration is a check that gets turned off.
+ALL_LANG_SPECS_FILES = $(wildcard $(srcdir)/*/lang-specs.h)
 lang_tree_files=@lang_tree_files@
 target_cpu_default=@target_cpu_default@
 extra_modes_file=@extra_modes_file@
@@ -2988,7 +3006,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
 	rc=0; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac $(lang_specs_files) \
+	  $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
 	  -- `cat tmp-specfiles` || rc=1; \
 	if test -s tmp-cfgfiles; then \
 	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles` \
@@ -3015,7 +3033,7 @@ check-spec-refs:
 	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print \
 	  > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac $(lang_specs_files) \
+	  $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
 	  -- `cat tmp-specfiles`; \
 	rc=$$?; rm -f tmp-specfiles; exit $$rc
 
