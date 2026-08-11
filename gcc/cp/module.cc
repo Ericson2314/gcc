@@ -233,6 +233,7 @@ Classes used:
 #include "intl.h"
 #include "langhooks.h"
 #include "contracts.h"
+#include "target-caps.h"
 /* This TU doesn't need or want to see the networking.  */
 #define CODY_NETWORKING 0
 #include "mapper-client.h"
@@ -20760,11 +20761,31 @@ module_state::write_config (elf_out *to, module_state_config &config,
 
   cfg.u (to->name (is_header () ? "" : get_flatname ()));
 
-  /* Configuration. */
+  /* Configuration.
+
+     The target is the one SELECTED for this compilation, not a macro.  It
+     used to be TARGET_MACHINE, and that had stopped being a triple at all:
+     ACX_NONCANONICAL_TARGET went out of gcc/configure.ac with
+     --enable-as-accelerator-for, so nothing substituted $(target) and
+     cp/module.o was compiled with -DTARGET_MACHINE="".  Every CMI therefore
+     recorded the empty string, and read_config below compared "" with "" and
+     accepted it -- so a CMI built by a compiler for one target was accepted
+     by a compiler for another, silently, and the wrong declarations were
+     imported.  Keying a compatibility check on a constant is worse than
+     keying it on the wrong value, because the check still looks present.
+
+     targ_caps_target_name cannot be NULL here: reaching C++ parsing means a
+     target was selected, since the empty back end fatals at the first common
+     hook.  Asserted rather than defaulted, because the whole bug was a
+     default that compared equal to itself.
+
+     HOST_MACHINE stays a macro.  $(host) really is substituted, and the host
+     really is fixed when the compiler is built.  */
+  gcc_assert (targ_caps_target_name != NULL);
   dump () && dump ("Writing target='%s', host='%s'",
-		   TARGET_MACHINE, HOST_MACHINE);
-  unsigned target = to->name (TARGET_MACHINE);
-  unsigned host = (!strcmp (TARGET_MACHINE, HOST_MACHINE)
+		   targ_caps_target_name, HOST_MACHINE);
+  unsigned target = to->name (targ_caps_target_name);
+  unsigned host = (!strcmp (targ_caps_target_name, HOST_MACHINE)
 		   ? target : to->name (HOST_MACHINE));
   cfg.u (target);
   cfg.u (host);
@@ -20918,11 +20939,20 @@ module_state::read_config (module_state_config &config, bool complain)
     const char *their_target = from ()->name (cfg.u ());
     const char *their_host = from ()->name (cfg.u ());
     dump () && dump ("Read target='%s', host='%s'", their_target, their_host);
-    if (strcmp (their_target, TARGET_MACHINE)
+    gcc_assert (targ_caps_target_name != NULL);
+    if (strcmp (their_target, targ_caps_target_name)
 	|| strcmp (their_host, HOST_MACHINE))
       {
+	/* their_target:their_host, then ours -- NOT interleaved.  The
+	   original argument order paired each of their values with one of
+	   ours ("is <their target>:<our target>, expected <their host>:<our
+	   host>"), which no reader would guess.  It was unreadable rather
+	   than wrong-headed while every one of the four values was "" or the
+	   same host string; the moment the target became a real triple the
+	   message started actively misleading.  */
 	error_at (loc, "target & host is %qs:%qs, expected %qs:%qs",
-		  their_target, TARGET_MACHINE, their_host, HOST_MACHINE);
+		  their_target, their_host,
+		  targ_caps_target_name, HOST_MACHINE);
 	cfg.set_overrun ();
 	goto done;
       }

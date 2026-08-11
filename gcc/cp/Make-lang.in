@@ -54,8 +54,11 @@ c++.serial = cc1plus$(exeext)
 
 CFLAGS-cp/g++spec.o += $(DRIVER_DEFINES)
 
-CFLAGS-cp/module.o += -DHOST_MACHINE=\"$(host)\" \
-	-DTARGET_MACHINE=\"$(target)\" $(ZLIBINC)
+# No -DTARGET_MACHINE: module.cc takes the SELECTED target at run time.  The
+# macro was $(target), which gcc/Makefile.in does not define -- it expanded
+# to "" and every CMI recorded the empty string.  HOST_MACHINE stays: $(host)
+# is substituted, and the host is fixed when the compiler is built.
+CFLAGS-cp/module.o += -DHOST_MACHINE=\"$(host)\" $(ZLIBINC)
 
 # In non-release builds, use a date-related module version.
 ifneq ($(DEVPHASE_c),)
