@@ -310,9 +310,16 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* This determines whether or not we support marking sections with
    SHF_GNU_RETAIN flag.  Also require .init_array/.fini_array section
    for constructors and destructors.  */
+/* Was `#if HAVE_GAS_SHF_GNU_RETAIN && HAVE_INITFINI_ARRAY_SUPPORT'.  The
+   .init_array/.fini_array half is a target property and stays in the
+   preprocessor; the assembler's support for the `R' flag is not, so it is a
+   runtime read.  The only consumer (c-family/c-attribs.cc) tests this in value
+   position, so a macro expanding to an expression works.  targ_caps is
+   declared further down this file, which is fine: a macro body is not
+   evaluated where it is written.  */
 #ifndef SUPPORTS_SHF_GNU_RETAIN
-#if HAVE_GAS_SHF_GNU_RETAIN && HAVE_INITFINI_ARRAY_SUPPORT
-#define SUPPORTS_SHF_GNU_RETAIN 1
+#if HAVE_INITFINI_ARRAY_SUPPORT
+#define SUPPORTS_SHF_GNU_RETAIN (targ_caps.gas_shf_gnu_retain)
 #else
 #define SUPPORTS_SHF_GNU_RETAIN 0
 #endif

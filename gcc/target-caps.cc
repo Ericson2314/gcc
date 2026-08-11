@@ -80,6 +80,7 @@ struct target_caps targ_caps =
   .gas_cv_ucomp = true,
   .gas_base64 = true,
   .gas_section_exclude = true,
+  .gas_shf_gnu_retain = true,
   .dwarf2_debug_line = true,
   .dwarf2_debug_view = true,
   .gas_shf_merge = true,
@@ -302,6 +303,8 @@ read_target_caps (const char *file)
 	targ_caps.gas_base64 = value != 0;
       else if (strcmp (name, "gas_section_exclude") == 0)
 	targ_caps.gas_section_exclude = value != 0;
+      else if (strcmp (name, "gas_shf_gnu_retain") == 0)
+	targ_caps.gas_shf_gnu_retain = value != 0;
       else if (strcmp (name, "dwarf2_debug_line") == 0)
 	targ_caps.dwarf2_debug_line = value != 0;
       else if (strcmp (name, "dwarf2_debug_view") == 0)

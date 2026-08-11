@@ -275,6 +275,13 @@ struct target_caps
      of one runtime test, so they cannot disagree.  */
   bool gas_section_exclude;
 
+  /* Assembler supports the SHF_GNU_RETAIN section flag (`R' in the flag
+     string), which keeps a section from being garbage-collected.  Was
+     HAVE_GAS_SHF_GNU_RETAIN.  defaults.h folds this with the target's
+     .init_array support into SUPPORTS_SHF_GNU_RETAIN; avr/elf.h overrides that
+     to this field alone, and no longer has to include auto-host.h to do it.  */
+  bool gas_shf_gnu_retain;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives
