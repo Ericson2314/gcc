@@ -1274,6 +1274,31 @@ struct union_slot
 static struct union_slot *union_slots;
 static unsigned int n_union_slots;
 
+/* NUM_POLY_INT_COEFFS AS THE SHARED NUMBERING SAYS IT IS, or 0 before the
+   list has been read.
+
+   This is not a mode, but it belongs in the same file and for the same
+   reason.  A back end sets it in its own <cpu>-modes.def (aarch64 and riscv
+   say 2; everyone else takes genmodes' default of 1), genmodes emits it into
+   insn-modes.h, and poly-int-types.h builds poly_int64, poly_uint64 and the
+   rest on top of it.  So on a multi-target build the middle end is compiled
+   with poly_int<1,...> -- the primary's answer -- while aarch64's objects use
+   poly_int<2,...>, and every function passing one across that line has a
+   DIFFERENT MANGLED NAME on the two sides.  It shows up as 37 undefined
+   references with names like
+
+     undefined reference to `gen_int_mode(poly_int<2u, long>, machine_mode)'
+
+   which read as missing middle-end objects and are nothing of the kind.
+
+   The union answer is the maximum, and taking it is safe rather than merely
+   convenient: a back end that needs only one coefficient works correctly with
+   two, carrying a second that is always zero -- which is exactly what aarch64
+   itself does for every non-SVE computation.  The maximum is what the union
+   run already computes, because it includes every configured back end's modes
+   file and the last `#define NUM_POLY_INT_COEFFS 2' wins over the default.  */
+static int union_poly_int_coeffs;
+
 /* Write the shared numbering: one line per ordinal, in enum order.  This
    is the union run's output; `read_union_list' is its reader.  */
 static void
@@ -1281,6 +1306,11 @@ emit_union_list (void)
 {
   int c;
   struct mode_data *m;
+
+  /* Settings first, one per `#'-introduced line.  A per-back-end run reads
+     these back instead of computing its own answer; see
+     union_poly_int_coeffs.  */
+  printf ("#poly_int_coeffs %d\n", NUM_POLY_INT_COEFFS);
 
   for_all_modes (c, m)
     if (strcmp (m->name, m->bare))
@@ -1307,6 +1337,16 @@ read_union_list (void)
   while (fgets (line, sizeof line, f))
     {
       int c, nf;
+
+      if (line[0] == '#')
+	{
+	  int v;
+	  if (sscanf (line, "#poly_int_coeffs %d", &v) == 1)
+	    union_poly_int_coeffs = v;
+	  else
+	    error ("%s: unknown setting \"%s\"", union_list_file, line);
+	  continue;
+	}
 
       nf = sscanf (line, "%255s %63s %63s %255s", name, cl, arch, bare);
       if (nf != 2 && nf != 4)
@@ -1344,6 +1384,17 @@ read_union_list (void)
      not have, every table would come out empty, and the build would go on.  */
   if (n_union_slots == 0)
     error ("%s: no modes in the shared numbering", union_list_file);
+
+  /* Zero would silently mean poly_int<0>, which does not compile, but only in
+     whatever translation unit happens to instantiate it first -- far from
+     here.  Refuse instead: an old list that predates the setting is exactly
+     the case that has to be caught, and it cannot be told from a corrupt one.
+     No fallback to this run's own NUM_POLY_INT_COEFFS: that is precisely the
+     per-back-end answer the shared one exists to replace, so silently using
+     it would restore the bug and report success.  */
+  if (union_poly_int_coeffs <= 0)
+    error ("%s: no #poly_int_coeffs line; regenerate the shared numbering",
+	   union_list_file);
 }
 
 /* Rebuild the per-class lists so that walking them in class order walks
@@ -1853,7 +1904,14 @@ enum machine_mode\n{");
 
   printf ("#define NUM_INT_N_ENTS %d\n", n_int_n_ents);
 
-  printf ("#define NUM_POLY_INT_COEFFS %d\n", NUM_POLY_INT_COEFFS);
+  /* The shared answer when there is one; see union_poly_int_coeffs.  This is
+     the ONE value in insn-modes-<base>.h that is deliberately not this back
+     end's own -- it decides a TYPE that crosses between back ends, so it is
+     vocabulary and not data.  A run given no shared numbering at all (no -U)
+     has no back end but its own to agree with, and answers as it always
+     did.  */
+  printf ("#define NUM_POLY_INT_COEFFS %d\n",
+	  union_list_file ? union_poly_int_coeffs : NUM_POLY_INT_COEFFS);
 
   puts ("\
 \n\
