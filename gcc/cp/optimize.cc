@@ -212,7 +212,7 @@ static bool
 can_alias_cdtor (tree fn)
 {
   /* If aliases aren't supported by the assembler, fail.  */
-  if (!TARGET_SUPPORTS_ALIASES)
+  if (!targetm.asm_out.supports_aliases ())
     return false;
 
   /* We can't use an alias if there are virtual bases.  */

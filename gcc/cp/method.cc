@@ -297,7 +297,7 @@ use_thunk (tree thunk_fndecl, bool emit_p)
   if (!emit_p)
     return;
 
-  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function))
+  if (targetm.asm_out.use_local_thunk_alias_p (function))
    alias = make_alias_for_thunk (function);
   else
    alias = function;
@@ -337,7 +337,7 @@ use_thunk (tree thunk_fndecl, bool emit_p)
 
   push_to_top_level ();
 
-  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function)
+  if (targetm.asm_out.use_local_thunk_alias_p (function)
       && targetm_common->have_named_sections)
     {
       tree fn = function;

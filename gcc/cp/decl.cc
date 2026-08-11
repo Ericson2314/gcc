@@ -21394,7 +21394,7 @@ cxx_comdat_group (tree decl)
 	     into the same section as the target function.  In that case
 	     we must return target's name.  */
 	  tree target = THUNK_TARGET (decl);
-	  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (target)
+	  if (targetm.asm_out.use_local_thunk_alias_p (target)
 	      && DECL_SECTION_NAME (target) != NULL
 	      && DECL_ONE_ONLY (target))
 	    decl = target;

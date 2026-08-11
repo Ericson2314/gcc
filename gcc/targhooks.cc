@@ -123,6 +123,26 @@ default_external_libcall (rtx fun ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* The default for TARGET_ASM_SUPPORTS_ALIASES.  Deliberately derived from the
+   emission hook rather than from a separate flag: making the two independent
+   is what lets a target claim alias support it cannot deliver, or lose alias
+   support silently while still claiming it.  */
+
+bool
+default_supports_aliases (void)
+{
+  return targetm.asm_out.output_def != NULL;
+}
+
+/* The default for TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P.  A local alias for a
+   thunk target is exactly an alias, so the answer is the same question.  */
+
+bool
+default_use_local_thunk_alias_p (tree decl ATTRIBUTE_UNUSED)
+{
+  return targetm.asm_out.supports_aliases ();
+}
+
 int
 default_unspec_may_trap_p (const_rtx x, unsigned flags)
 {

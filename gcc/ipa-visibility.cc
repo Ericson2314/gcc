@@ -83,6 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "calls.h"
 #include "varasm.h"
+#include "target.h"
 #include "ipa-utils.h"
 #include "stringpool.h"
 #include "attribs.h"
@@ -348,7 +349,7 @@ static bool
 can_replace_by_local_alias (symtab_node *node)
 {
   /* If aliases aren't supported, we can't do replacement.  */
-  if (!TARGET_SUPPORTS_ALIASES)
+  if (!targetm.asm_out.supports_aliases ())
     return false;
 
   /* Weakrefs have a reason to be non-local.  Be sure we do not replace
@@ -489,7 +490,7 @@ optimize_weakref (symtab_node *node)
 
   /* If we have definition of weakref's target and we know it binds locally,
      we can turn weakref to static alias.  */
-  if (TARGET_SUPPORTS_ALIASES
+  if (targetm.asm_out.supports_aliases ()
       && target->definition && decl_binds_to_current_def_p (target->decl))
     strip_weakref = static_alias = true;
   /* Otherwise we can turn weakref into transparent alias.  This transformation
@@ -627,7 +628,7 @@ function_and_variable_visibility (bool whole_program)
   /* All aliases should be processed at this point.  */
   gcc_checking_assert (!alias_pairs || !alias_pairs->length ());
 
-  if (TARGET_SUPPORTS_ALIASES)
+  if (targetm.asm_out.supports_aliases ())
     {
       FOR_EACH_DEFINED_FUNCTION (node)
 	{

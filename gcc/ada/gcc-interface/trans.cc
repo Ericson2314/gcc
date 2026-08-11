@@ -11343,7 +11343,7 @@ use_alias_for_thunk_p (tree target)
   if (TREE_CODE (DECL_CONTEXT (target)) == FUNCTION_DECL)
     return false;
 
-  return TARGET_USE_LOCAL_THUNK_ALIAS_P (target);
+  return targetm.asm_out.use_local_thunk_alias_p (target);
 }
 
 static GTY(()) unsigned long thunk_labelno = 0;

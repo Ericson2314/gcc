@@ -746,7 +746,7 @@ cgraph_node::create_same_body_alias (tree alias, tree decl)
   cgraph_node *n;
 
   /* If aliases aren't supported by the assembler, fail.  */
-  if (!TARGET_SUPPORTS_ALIASES)
+  if (!targetm.asm_out.supports_aliases ())
     return NULL;
 
   /* Langhooks can create same body aliases of symbols not defined.

@@ -115,9 +115,9 @@ terminate an initialized variable declaration.",
  hook_void_void)
 
 /* The assembler directive that makes a label global.  */
-DEFHOOKPOD
+DEFHOOK
 (global_op,
- "A C string constant, the assembler directive that makes a label global;\n\
+ "Return the assembler directive that makes a label global;\n\
 for example @code{\"\\t.globl\\t\"}.  It is emitted by the default\n\
 @code{TARGET_ASM_GLOBALIZE_LABEL} immediately before the label name.\n\
 \n\
@@ -130,7 +130,7 @@ once for the whole compiler, so a macro read there would bake a single\n\
 target's directive into every target.  The directive genuinely varies\n\
 (@code{\"\\t.globl\\t\"}, @code{\"\\t.global\\t\"}, @code{\"\\t.export\\t\"},\n\
 and spellings with no leading tab all occur in tree).",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
 /* The assembler directives that switch to each of the standard sections.
    These mirror the TEXT_SECTION_ASM_OP family of target macros, which are
@@ -144,63 +144,71 @@ and spellings with no leading tab all occur in tree).",
    that exactly as the old "#ifdef" did: varasm.cc leaves the section pointer
    null, and c-cppbuiltin.cc omits the predefine entirely, which preserves
    libgcc's #elif/#ifndef fallbacks.  */
-DEFHOOKPOD
+DEFHOOK
 (text_section_asm_op,
- "A C string constant, the assembler directive to switch to the text section,\n\
-or @code{NULL} if the target has none.  Defaults to the target macro\n\
-@code{TEXT_SECTION_ASM_OP}.",
- const char *, NULL)
+ "Return the assembler directive to switch to the text section, or\n\
+@code{NULL} if the target has none.  Defaults to returning the target macro\n\
+@code{TEXT_SECTION_ASM_OP}.\n\
+\n\
+This is a function rather than a string constant because on some targets the\n\
+directive depends on command-line options rather than on the target alone:\n\
+rx selects between two syntaxes on @option{-mas100-syntax}, pdp11 on\n\
+@code{TARGET_DEC_ASM} and arm on @code{TARGET_AAPCS_BASED}.  Such a value\n\
+cannot be held in a per-target table, because it varies per compilation\n\
+rather than per target.  A function is evaluated at the point of use and so\n\
+sees the options in force.",
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (data_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the data section.  Defaults to\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the data section.  Defaults to\n\
 @code{DATA_SECTION_ASM_OP}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (sdata_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small data section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the small data section.\n\
 Defaults to @code{SDATA_SECTION_ASM_OP}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (readonly_data_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the read-only data section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the read-only data section.\n\
 Defaults to @code{READONLY_DATA_SECTION_ASM_OP}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (bss_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the BSS section.  Defaults to\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the BSS section.  Defaults to\n\
 @code{BSS_SECTION_ASM_OP}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (sbss_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small BSS section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the small BSS section.\n\
 Defaults to @code{SBSS_SECTION_ASM_OP}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (ctors_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the constructors section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the constructors section.\n\
 Defaults to @code{CTORS_SECTION_ASM_OP}.  Targets using @code{.init_array}\n\
 leave this @code{NULL}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (dtors_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the destructors section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the destructors section.\n\
 Defaults to @code{DTORS_SECTION_ASM_OP}.  Targets using @code{.fini_array}\n\
 leave this @code{NULL}.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
-DEFHOOKPOD
+DEFHOOK
 (init_section_asm_op,
- "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the @code{.init} section.\n\
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, returning the directive for the @code{.init} section.\n\
 Defaults to @code{INIT_SECTION_ASM_OP}.  Used only to emit\n\
 @code{__LIBGCC_INIT_SECTION_ASM_OP__} for libgcc.",
- const char *, NULL)
+ const char *, (void), hook_constcharptr_void_null)
 
 /* Output code that will globalize a label.  */
 DEFHOOK
@@ -248,6 +256,109 @@ macro; a back end that still defines that macro gets it bridged into this\n\
 hook automatically.",
  void, (FILE *stream, tree decl, const char *name),
  hook_void_FILEptr_tree_constcharptr)
+
+/* Equate two symbols.  NULL if the target cannot.  */
+DEFHOOK
+(output_def,
+ "Write to @var{stream} the assembler code that equates the symbol\n\
+@var{name} to the value @var{value}, both given as strings.\n\
+\n\
+This hook is the replacement for the old @code{ASM_OUTPUT_DEF} target macro,\n\
+and a back end that defines that macro -- directly, or indirectly by defining\n\
+@code{SET_ASM_OP} -- gets it bridged into this hook automatically.  A target\n\
+whose assembler cannot equate two symbols leaves the hook @code{NULL}; that,\n\
+and not a separate flag, is what @code{TARGET_ASM_SUPPORTS_ALIASES} reports,\n\
+so the ability to emit an alias and the claim to support one can never\n\
+disagree.",
+ void, (FILE *stream, const char *name, const char *value),
+ NULL)
+
+/* Equate two symbols, given their decls rather than their names.  */
+DEFHOOK
+(output_def_from_decls,
+ "Write to @var{stream} the assembler code that equates the symbol of\n\
+@var{decl} to the symbol of @var{target}.  Used in preference to\n\
+@code{TARGET_ASM_OUTPUT_DEF} when it is non-@code{NULL}, because the decls\n\
+carry type and visibility information the bare names do not.\n\
+\n\
+This hook is the replacement for the old @code{ASM_OUTPUT_DEF_FROM_DECLS}\n\
+target macro; a back end that still defines that macro gets it bridged into\n\
+this hook automatically.",
+ void, (FILE *stream, tree decl, tree target),
+ NULL)
+
+/* Declare a symbol weak, given its decl.  */
+DEFHOOK
+(weaken_decl,
+ "Write to @var{stream} the assembler code that declares the symbol\n\
+@var{name} of @var{decl} weak, optionally as an alias for @var{value}.\n\
+@var{value} is null when no alias is wanted.\n\
+\n\
+This hook is the replacement for the old @code{ASM_WEAKEN_DECL} target macro;\n\
+a back end that still defines that macro gets it bridged into this hook\n\
+automatically.  Note that @code{SUPPORTS_WEAK} still derives from the macros,\n\
+not from these hooks, so the value seen by the target libraries is unchanged.",
+ void, (FILE *stream, tree decl, const char *name, const char *value),
+ NULL)
+
+/* Declare a symbol weak, given only its name.  */
+DEFHOOK
+(weaken_label,
+ "Write to @var{stream} the assembler code that declares the symbol\n\
+@var{name} weak.  Used when @code{TARGET_ASM_WEAKEN_DECL} is @code{NULL}.\n\
+\n\
+This hook is the replacement for the old @code{ASM_WEAKEN_LABEL} target\n\
+macro; a back end that still defines that macro gets it bridged into this\n\
+hook automatically.",
+ void, (FILE *stream, const char *name),
+ NULL)
+
+/* Declare a symbol to be a weak alias for another.  */
+DEFHOOK
+(output_weak_alias,
+ "Write to @var{stream} the assembler code that makes @var{name} a weak\n\
+alias for @var{value}.  Used only when neither @code{TARGET_ASM_WEAKEN_DECL}\n\
+nor @code{TARGET_ASM_WEAKEN_LABEL} is available.\n\
+\n\
+This hook is the replacement for the old @code{ASM_OUTPUT_WEAK_ALIAS} target\n\
+macro; a back end that still defines that macro gets it bridged into this\n\
+hook automatically.",
+ void, (FILE *stream, const char *name, const char *value),
+ NULL)
+
+/* Whether this target can define one symbol to be an alias of another.  */
+DEFHOOK
+(supports_aliases,
+ "Return @code{true} if this target can define one symbol to be an alias of\n\
+another.\n\
+\n\
+The default returns @code{targetm.asm_out.output_def != NULL}, i.e.@: it\n\
+derives the answer from the very hook that would have to do the work, so a\n\
+target cannot claim support it has no way to deliver.  Override it only when\n\
+alias support is a run-time property rather than a property of the back end:\n\
+@code{nvptx} does, because its assembler grew aliases late and the answer\n\
+depends on @option{-malias}.\n\
+\n\
+This hook replaces the old @code{TARGET_SUPPORTS_ALIASES} target macro, which\n\
+was derived from @code{ASM_OUTPUT_DEF}; a back end that still defines that\n\
+macro gets it bridged into this hook automatically.",
+ bool, (void),
+ default_supports_aliases)
+
+/* Whether a local alias may be used for a thunk to DECL.  */
+DEFHOOK
+(use_local_thunk_alias_p,
+ "Return @code{true} if it is safe to use a local alias for the virtual\n\
+function @var{decl} when constructing a thunk to it.\n\
+\n\
+The default is @code{TARGET_ASM_SUPPORTS_ALIASES}.  @code{i386} Cygwin and\n\
+MinGW override it to refuse for @code{DECL_ONE_ONLY} functions.\n\
+\n\
+This hook replaces the old @code{TARGET_USE_LOCAL_THUNK_ALIAS_P} target\n\
+macro; a back end that still defines that macro gets it bridged into this\n\
+hook automatically.",
+ bool, (tree decl),
+ default_use_local_thunk_alias_p)
 
 /* Output code that will emit a label for unwind info, if this
    target requires such labels.  Second argument is the decl the

@@ -1912,7 +1912,7 @@ finish_thunk (tree thunk, tree function)
   bool this_adjusting = true;
   tree alias;
 
-  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function))
+  if (targetm.asm_out.use_local_thunk_alias_p (function))
     alias = make_alias_for_thunk (function);
   else
     alias = function;
@@ -1927,7 +1927,7 @@ finish_thunk (tree thunk, tree function)
       return;
     }
 
-  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (function)
+  if (targetm.asm_out.use_local_thunk_alias_p (function)
       && targetm_common->have_named_sections)
     {
       tree fn = function;

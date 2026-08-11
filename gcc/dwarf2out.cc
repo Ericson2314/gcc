@@ -11326,13 +11326,12 @@ output_comp_unit (dw_die_ref die, int output_if_empty,
       DECL_VISIBILITY (decl) = VISIBILITY_HIDDEN;
       DECL_VISIBILITY_SPECIFIED (decl) = true;
       targetm.asm_out.assemble_visibility (decl, VISIBILITY_HIDDEN);
-#ifdef ASM_WEAKEN_LABEL
       /* We prefer a .weak because that handles duplicates from duplicate
          archive members in a graceful way.  */
-      ASM_WEAKEN_LABEL (asm_out_file, oldsym);
-#else
-      targetm.asm_out.globalize_label (asm_out_file, oldsym);
-#endif
+      if (targetm.asm_out.weaken_label)
+	targetm.asm_out.weaken_label (asm_out_file, oldsym);
+      else
+	targetm.asm_out.globalize_label (asm_out_file, oldsym);
       ASM_OUTPUT_LABEL (asm_out_file, oldsym);
     }
 

@@ -798,7 +798,7 @@ varpool_node::create_extra_name_alias (tree alias, tree decl)
   varpool_node *alias_node;
 
   /* If aliases aren't supported by the assembler, fail.  */
-  if (!TARGET_SUPPORTS_ALIASES)
+  if (!targetm.asm_out.supports_aliases ())
     return NULL;
 
   alias_node = varpool_node::create_alias (alias, decl);

@@ -23,6 +23,8 @@ along with GCC; see the file COPYING3.  If not see
 extern bool default_legitimate_address_p (machine_mode, rtx, bool, code_helper);
 
 extern void default_external_libcall (rtx);
+extern bool default_supports_aliases (void);
+extern bool default_use_local_thunk_alias_p (tree);
 extern rtx default_legitimize_address (rtx, rtx, machine_mode);
 extern bool default_legitimize_address_displacement (rtx *, rtx *,
 						     poly_int64, machine_mode);

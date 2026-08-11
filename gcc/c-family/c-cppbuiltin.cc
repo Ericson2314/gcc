@@ -1586,18 +1586,18 @@ c_cpp_builtins (cpp_reader *pfile)
 	 EVERY target's libgcc; targetm is per back end.  A null hook omits
 	 the predefine entirely, which is what the absent #ifdef did, and is
 	 what preserves crtstuff.c's #elif/#ifndef fallbacks.  */
-      if (targetm.asm_out.ctors_section_asm_op)
+      if (targetm.asm_out.ctors_section_asm_op ())
 	builtin_define_with_value ("__LIBGCC_CTORS_SECTION_ASM_OP__",
-				   targetm.asm_out.ctors_section_asm_op, 1);
-      if (targetm.asm_out.dtors_section_asm_op)
+				   targetm.asm_out.ctors_section_asm_op (), 1);
+      if (targetm.asm_out.dtors_section_asm_op ())
 	builtin_define_with_value ("__LIBGCC_DTORS_SECTION_ASM_OP__",
-				   targetm.asm_out.dtors_section_asm_op, 1);
-      if (targetm.asm_out.text_section_asm_op)
+				   targetm.asm_out.dtors_section_asm_op (), 1);
+      if (targetm.asm_out.text_section_asm_op ())
 	builtin_define_with_value ("__LIBGCC_TEXT_SECTION_ASM_OP__",
-				   targetm.asm_out.text_section_asm_op, 1);
-      if (targetm.asm_out.init_section_asm_op)
+				   targetm.asm_out.text_section_asm_op (), 1);
+      if (targetm.asm_out.init_section_asm_op ())
 	builtin_define_with_value ("__LIBGCC_INIT_SECTION_ASM_OP__",
-				   targetm.asm_out.init_section_asm_op, 1);
+				   targetm.asm_out.init_section_asm_op (), 1);
 #ifdef INIT_ARRAY_SECTION_ASM_OP
       /* Despite the name of this target macro, the expansion is not
 	 actually used, and may be empty rather than a string

@@ -136,6 +136,90 @@ target_def_output_external (FILE *stream ATTRIBUTE_UNUSED,
 #define TARGET_ASM_OUTPUT_EXTERNAL target_def_output_external
 #endif
 
+/* Same bridge, for the alias/weak family.  These six travel together on
+   purpose: ASM_OUTPUT_DEF and ASM_WEAKEN_DECL select mutually exclusive
+   branches of do_assemble_alias, so converting one without the other would
+   leave the middle end dispatching at run time into a branch that had been
+   compiled out.  Leaving a hook NULL is the signal that the target has no such
+   directive, which is how TARGET_ASM_OUTPUT_ANCHOR already works below.  */
+
+#if defined (ASM_OUTPUT_DEF) && !defined (TARGET_ASM_OUTPUT_DEF)
+static void
+target_def_output_def (FILE *stream ATTRIBUTE_UNUSED,
+		       const char *name ATTRIBUTE_UNUSED,
+		       const char *value ATTRIBUTE_UNUSED)
+{
+  ASM_OUTPUT_DEF (stream, name, value);
+}
+#define TARGET_ASM_OUTPUT_DEF target_def_output_def
+#endif
+
+#if defined (ASM_OUTPUT_DEF_FROM_DECLS) && !defined (TARGET_ASM_OUTPUT_DEF_FROM_DECLS)
+static void
+target_def_output_def_from_decls (FILE *stream ATTRIBUTE_UNUSED,
+				  tree decl ATTRIBUTE_UNUSED,
+				  tree target ATTRIBUTE_UNUSED)
+{
+  ASM_OUTPUT_DEF_FROM_DECLS (stream, decl, target);
+}
+#define TARGET_ASM_OUTPUT_DEF_FROM_DECLS target_def_output_def_from_decls
+#endif
+
+#if defined (ASM_WEAKEN_DECL) && !defined (TARGET_ASM_WEAKEN_DECL)
+static void
+target_def_weaken_decl (FILE *stream ATTRIBUTE_UNUSED,
+			tree decl ATTRIBUTE_UNUSED,
+			const char *name ATTRIBUTE_UNUSED,
+			const char *value ATTRIBUTE_UNUSED)
+{
+  ASM_WEAKEN_DECL (stream, decl, name, value);
+}
+#define TARGET_ASM_WEAKEN_DECL target_def_weaken_decl
+#endif
+
+#if defined (ASM_WEAKEN_LABEL) && !defined (TARGET_ASM_WEAKEN_LABEL)
+static void
+target_def_weaken_label (FILE *stream ATTRIBUTE_UNUSED,
+			 const char *name ATTRIBUTE_UNUSED)
+{
+  ASM_WEAKEN_LABEL (stream, name);
+}
+#define TARGET_ASM_WEAKEN_LABEL target_def_weaken_label
+#endif
+
+#if defined (ASM_OUTPUT_WEAK_ALIAS) && !defined (TARGET_ASM_OUTPUT_WEAK_ALIAS)
+static void
+target_def_output_weak_alias (FILE *stream ATTRIBUTE_UNUSED,
+			      const char *name ATTRIBUTE_UNUSED,
+			      const char *value ATTRIBUTE_UNUSED)
+{
+  ASM_OUTPUT_WEAK_ALIAS (stream, name, value);
+}
+#define TARGET_ASM_OUTPUT_WEAK_ALIAS target_def_output_weak_alias
+#endif
+
+/* Only nvptx defines TARGET_SUPPORTS_ALIASES (a run-time test on -malias);
+   every other target leaves it to the default, which asks output_def.  */
+#if defined (TARGET_SUPPORTS_ALIASES) && !defined (TARGET_ASM_SUPPORTS_ALIASES)
+static bool
+target_def_supports_aliases (void)
+{
+  return TARGET_SUPPORTS_ALIASES;
+}
+#define TARGET_ASM_SUPPORTS_ALIASES target_def_supports_aliases
+#endif
+
+/* nvptx and i386 Cygwin/MinGW define TARGET_USE_LOCAL_THUNK_ALIAS_P.  */
+#if defined (TARGET_USE_LOCAL_THUNK_ALIAS_P) \
+    && !defined (TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P)
+static bool
+target_def_use_local_thunk_alias_p (tree decl ATTRIBUTE_UNUSED)
+{
+  return TARGET_USE_LOCAL_THUNK_ALIAS_P (decl);
+}
+#define TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P target_def_use_local_thunk_alias_p
+#endif
+
 /* Declare a target attribute table called NAME that only has GNU attributes.
    There should be no null trailing element.  E.g.:
 
@@ -149,6 +233,12 @@ target_def_output_external (FILE *stream ATTRIBUTE_UNUSED,
   static const attribute_spec NAME##_2[] = __VA_ARGS__; \
   static const scoped_attribute_specs NAME##_1 = { "gnu", { NAME##_2 } }; \
   static const scoped_attribute_specs *const NAME[] = { &NAME##_1 }
+
+/* Must precede target-hooks-def.h: it supplies TARGET_ASM_GLOBAL_OP and the
+   TARGET_ASM_*_SECTION_ASM_OP family by wrapping each tm.h macro in a
+   function, and target-hooks-def.h only fills in a default where the hook is
+   not already defined.  */
+#include "target-asm-ops.h"
 
 #include "target-hooks-def.h"
 

@@ -37,19 +37,128 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TARGET_ASM_OPS_H
 #define GCC_TARGET_ASM_OPS_H
 
+/* Function pointers, not strings.  On some targets these directives depend on
+   command-line options rather than on the target alone -- rx switches all of
+   them plus GLOBAL_ASM_OP on -mas100-syntax, pdp11 on TARGET_DEC_ASM, arm's
+   CTORS/DTORS on TARGET_AAPCS_BASED -- and mmix's DATA_SECTION_ASM_OP is a
+   call into the back end.  None of those is a constant expression, so none can
+   be stored in a table.  More importantly the value varies per COMPILATION,
+   not per target, so a table keyed by target identity is the wrong shape for
+   it however it is typed.  Evaluating a function at the point of use sees the
+   options in force.  */
 struct target_asm_ops
 {
-  const char *global_op;
-  const char *text_section_asm_op;
-  const char *data_section_asm_op;
-  const char *sdata_section_asm_op;
-  const char *readonly_data_section_asm_op;
-  const char *bss_section_asm_op;
-  const char *sbss_section_asm_op;
-  const char *ctors_section_asm_op;
-  const char *dtors_section_asm_op;
-  const char *init_section_asm_op;
+  const char *(*global_op) (void);
+  const char *(*text_section_asm_op) (void);
+  const char *(*data_section_asm_op) (void);
+  const char *(*sdata_section_asm_op) (void);
+  const char *(*readonly_data_section_asm_op) (void);
+  const char *(*bss_section_asm_op) (void);
+  const char *(*sbss_section_asm_op) (void);
+  const char *(*ctors_section_asm_op) (void);
+  const char *(*dtors_section_asm_op) (void);
+  const char *(*init_section_asm_op) (void);
 };
+
+/* Wrap each target macro in a function of the right shape.  Defined
+   unconditionally, with the #ifdef inside the body, so that a back end
+   lacking the macro yields a function returning NULL rather than needing a
+   separate fallback -- "no such section" then has exactly one spelling.
+
+   Included both by target-def.h, so each back end's targetm starts out
+   correct, and by target-asm-ops.cc, which is compiled once per back end
+   against that back end's tm-<base>.h to build its table.  These are
+   `static inline', so each translation unit gets its own copy and the
+   addresses stored in a table are still constant expressions.  */
+#define GCC_TARGET_ASM_OP_WRAPPER(FN, MACRO)		\
+  static inline const char *				\
+  FN (void)						\
+  {							\
+    return MACRO;					\
+  }
+
+#ifdef GLOBAL_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_global_op, GLOBAL_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_global_op, NULL)
+#endif
+#ifdef TEXT_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_text, TEXT_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_text, NULL)
+#endif
+#ifdef DATA_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_data, DATA_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_data, NULL)
+#endif
+#ifdef SDATA_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_sdata, SDATA_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_sdata, NULL)
+#endif
+#ifdef READONLY_DATA_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_rodata, READONLY_DATA_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_rodata, NULL)
+#endif
+#ifdef BSS_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_bss, BSS_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_bss, NULL)
+#endif
+#ifdef SBSS_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_sbss, SBSS_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_sbss, NULL)
+#endif
+#ifdef CTORS_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_ctors, CTORS_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_ctors, NULL)
+#endif
+#ifdef DTORS_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_dtors, DTORS_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_dtors, NULL)
+#endif
+#ifdef INIT_SECTION_ASM_OP
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_init, INIT_SECTION_ASM_OP)
+#else
+GCC_TARGET_ASM_OP_WRAPPER (gcc_taop_init, NULL)
+#endif
+
+/* #ifndef so a back end that supplies its own hook still wins.  */
+#ifndef TARGET_ASM_GLOBAL_OP
+#define TARGET_ASM_GLOBAL_OP gcc_taop_global_op
+#endif
+#ifndef TARGET_ASM_TEXT_SECTION_ASM_OP
+#define TARGET_ASM_TEXT_SECTION_ASM_OP gcc_taop_text
+#endif
+#ifndef TARGET_ASM_DATA_SECTION_ASM_OP
+#define TARGET_ASM_DATA_SECTION_ASM_OP gcc_taop_data
+#endif
+#ifndef TARGET_ASM_SDATA_SECTION_ASM_OP
+#define TARGET_ASM_SDATA_SECTION_ASM_OP gcc_taop_sdata
+#endif
+#ifndef TARGET_ASM_READONLY_DATA_SECTION_ASM_OP
+#define TARGET_ASM_READONLY_DATA_SECTION_ASM_OP gcc_taop_rodata
+#endif
+#ifndef TARGET_ASM_BSS_SECTION_ASM_OP
+#define TARGET_ASM_BSS_SECTION_ASM_OP gcc_taop_bss
+#endif
+#ifndef TARGET_ASM_SBSS_SECTION_ASM_OP
+#define TARGET_ASM_SBSS_SECTION_ASM_OP gcc_taop_sbss
+#endif
+#ifndef TARGET_ASM_CTORS_SECTION_ASM_OP
+#define TARGET_ASM_CTORS_SECTION_ASM_OP gcc_taop_ctors
+#endif
+#ifndef TARGET_ASM_DTORS_SECTION_ASM_OP
+#define TARGET_ASM_DTORS_SECTION_ASM_OP gcc_taop_dtors
+#endif
+#ifndef TARGET_ASM_INIT_SECTION_ASM_OP
+#define TARGET_ASM_INIT_SECTION_ASM_OP gcc_taop_init
+#endif
 
 /* One entry per configured back end, so a table can be found by name.  */
 struct target_asm_ops_entry

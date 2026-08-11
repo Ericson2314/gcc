@@ -2497,7 +2497,7 @@ asan_protect_global (tree decl, bool ignore_decl_rtl_set_p)
   if (lookup_attribute ("weakref", DECL_ATTRIBUTES (decl)))
     return false;
 
-  if (!TARGET_SUPPORTS_ALIASES && asan_needs_local_alias (decl))
+  if (!targetm.asm_out.supports_aliases () && asan_needs_local_alias (decl))
     return false;
 
   return true;

@@ -217,12 +217,16 @@ sem_item::dump (void)
 bool
 sem_item::target_supports_symbol_aliases_p (void)
 {
-#if !defined (ASM_OUTPUT_DEF) || (!defined(ASM_OUTPUT_WEAK_ALIAS) && !defined (ASM_WEAKEN_DECL))
-  return false;
-#else
-  gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+  /* Both a plain alias and a weak alias must be expressible: ICF may need
+     either.  Historically this was a compile-time test on ASM_OUTPUT_DEF and
+     ASM_OUTPUT_WEAK_ALIAS/ASM_WEAKEN_DECL, which baked one target's answer
+     into every target.  */
+  if (!targetm.asm_out.output_def
+      || (!targetm.asm_out.output_weak_alias && !targetm.asm_out.weaken_decl))
+    return false;
+
+  gcc_checking_assert (targetm.asm_out.supports_aliases ());
   return true;
-#endif
 }
 
 void sem_item::set_hash (hashval_t hash)

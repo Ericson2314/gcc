@@ -142,56 +142,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_DEFERRED_OUTPUT_DEFS(DECL,TARGET) false
 #endif
 
-/* Carry the target's GLOBAL_ASM_OP into the targetm.asm_out.global_op hook.
-   varasm.cc is compiled once for the whole compiler, so it cannot read
-   GLOBAL_ASM_OP directly without baking one target's directive into every
-   target; targetm, by contrast, is instantiated per back end.  Placed here
-   because defaults.h is included at the END of tm.h, after every CPU and OS
-   header, so GLOBAL_ASM_OP already has its final value (several OS headers,
-   e.g. config/openbsd.h, #undef and redefine it).  A back end that supplies
-   its own TARGET_ASM_GLOBALIZE_LABEL need not define GLOBAL_ASM_OP at all.  */
-#if defined GLOBAL_ASM_OP && !defined TARGET_ASM_GLOBAL_OP
-#define TARGET_ASM_GLOBAL_OP GLOBAL_ASM_OP
-#endif
-
-/* Likewise for the section-switching directives.  Same reasoning: both
-   consumers (init_varasm_once, and the __LIBGCC_* predefines in
-   c-family/c-cppbuiltin.cc) are compiled once, so they must read targetm
-   rather than these macros.
-
-   The macros themselves are deliberately KEPT.  Target libraries compile
-   against tconfig.h/tm.h and cannot see targetm at all, and some of these
-   feed derived macros inside the compiler -- cfgexpand.cc tests
-   !defined(INIT_SECTION_ASM_OP).  Converting to a hook and dropping the
-   macro would silently change both.  */
-#if defined TEXT_SECTION_ASM_OP && !defined TARGET_ASM_TEXT_SECTION_ASM_OP
-#define TARGET_ASM_TEXT_SECTION_ASM_OP TEXT_SECTION_ASM_OP
-#endif
-#if defined DATA_SECTION_ASM_OP && !defined TARGET_ASM_DATA_SECTION_ASM_OP
-#define TARGET_ASM_DATA_SECTION_ASM_OP DATA_SECTION_ASM_OP
-#endif
-#if defined SDATA_SECTION_ASM_OP && !defined TARGET_ASM_SDATA_SECTION_ASM_OP
-#define TARGET_ASM_SDATA_SECTION_ASM_OP SDATA_SECTION_ASM_OP
-#endif
-#if defined READONLY_DATA_SECTION_ASM_OP \
-    && !defined TARGET_ASM_READONLY_DATA_SECTION_ASM_OP
-#define TARGET_ASM_READONLY_DATA_SECTION_ASM_OP READONLY_DATA_SECTION_ASM_OP
-#endif
-#if defined BSS_SECTION_ASM_OP && !defined TARGET_ASM_BSS_SECTION_ASM_OP
-#define TARGET_ASM_BSS_SECTION_ASM_OP BSS_SECTION_ASM_OP
-#endif
-#if defined SBSS_SECTION_ASM_OP && !defined TARGET_ASM_SBSS_SECTION_ASM_OP
-#define TARGET_ASM_SBSS_SECTION_ASM_OP SBSS_SECTION_ASM_OP
-#endif
-#if defined CTORS_SECTION_ASM_OP && !defined TARGET_ASM_CTORS_SECTION_ASM_OP
-#define TARGET_ASM_CTORS_SECTION_ASM_OP CTORS_SECTION_ASM_OP
-#endif
-#if defined DTORS_SECTION_ASM_OP && !defined TARGET_ASM_DTORS_SECTION_ASM_OP
-#define TARGET_ASM_DTORS_SECTION_ASM_OP DTORS_SECTION_ASM_OP
-#endif
-#if defined INIT_SECTION_ASM_OP && !defined TARGET_ASM_INIT_SECTION_ASM_OP
-#define TARGET_ASM_INIT_SECTION_ASM_OP INIT_SECTION_ASM_OP
-#endif
+/* The POD bridge that used to sit here -- TARGET_ASM_GLOBAL_OP and the nine
+   section-op hooks defined straight to their tm.h macros -- is gone.  Those
+   hooks are function pointers now (see target-asm-ops.h), and defaults.h is
+   included at the END of tm.h, i.e. BEFORE target-def.h, so a definition here
+   wins the `#ifndef` in target-asm-ops.h and hands a string literal to a
+   `const char *(*)(void)` slot.  The bridge lives in target-asm-ops.h alone.  */
 
 /* This is how to output the definition of a user-level label named
    NAME, such as the label on variable NAME.  */
@@ -981,24 +937,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_VTABLE_DATA_ENTRY_DISTANCE 1
 #endif
 
-/* Decide whether it is safe to use a local alias for a virtual function
-   when constructing thunks.  */
-#ifndef TARGET_USE_LOCAL_THUNK_ALIAS_P
-#ifdef ASM_OUTPUT_DEF
-#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 1
-#else
-#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 0
-#endif
-#endif
-
-/* Decide whether target supports aliases.  */
-#ifndef TARGET_SUPPORTS_ALIASES
-#ifdef ASM_OUTPUT_DEF
-#define TARGET_SUPPORTS_ALIASES 1
-#else
-#define TARGET_SUPPORTS_ALIASES 0
-#endif
-#endif
+/* Whether it is safe to use a local alias for a virtual function when
+   constructing thunks, and whether the target supports aliases at all, are now
+   the target hooks TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P and
+   TARGET_ASM_SUPPORTS_ALIASES.  They used to be defined here, derived from
+   ASM_OUTPUT_DEF, which baked one target's answer into every target: the files
+   that ask (symtab.cc, ipa-visibility.cc, cp/*.cc, d/decl.cc, ...) are compiled
+   once for the whole compiler.  A back end that still defines the old macro
+   gets it bridged into the hook by target-def.h; nvptx and i386 Cygwin/MinGW
+   are the two that do.  There is deliberately no fallback definition here, so
+   that a stale use of the old macro name fails to compile rather than silently
+   reading whichever tm.h happened to win.  */
 
 /* Indicate whether the target uses "target" attributes for function
    multiversioning.  This is used to choose between the "target" and
@@ -1611,6 +1560,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_LD_AVR_AVRXMEGA2_FLMAP (targ_caps.ld_avr_avrxmega2_flmap)
 #undef HAVE_LD_AVR_AVRXMEGA4_FLMAP
 #define HAVE_LD_AVR_AVRXMEGA4_FLMAP (targ_caps.ld_avr_avrxmega4_flmap)
+#undef HAVE_LD_PIE
+#define HAVE_LD_PIE (targ_caps.ld_pie)
 #undef HAVE_LD_NOW_SUPPORT
 #define HAVE_LD_NOW_SUPPORT (targ_caps.ld_now)
 #undef HAVE_LD_RELRO_SUPPORT

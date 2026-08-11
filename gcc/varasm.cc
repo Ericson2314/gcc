@@ -4575,8 +4575,8 @@ output_constant_pool_contents (struct rtx_constant_pool *pool)
   for (desc = pool->first; desc ; desc = desc->next)
     if (desc->mark < 0)
       {
-#ifdef ASM_OUTPUT_DEF
-	gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+	gcc_checking_assert (targetm.asm_out.supports_aliases ());
+	gcc_assert (targetm.asm_out.output_def);
 
 	const char *name = XSTR (desc->sym, 0);
 	char label[256];
@@ -4590,10 +4590,7 @@ output_constant_pool_contents (struct rtx_constant_pool *pool)
 	    sprintf (buffer, "%s+" HOST_WIDE_INT_PRINT_DEC, p, desc->offset);
 	    p = buffer;
 	  }
-	ASM_OUTPUT_DEF (asm_out_file, name, p);
-#else
-	gcc_unreachable ();
-#endif
+	targetm.asm_out.output_def (asm_out_file, name, p);
       }
     else if (desc->mark)
       {
@@ -4803,7 +4800,7 @@ void
 output_shared_constant_pool (void)
 {
   if (optimize
-      && TARGET_SUPPORTS_ALIASES)
+      && targetm.asm_out.supports_aliases ())
     optimize_constant_pool (shared_constant_pool);
 
   output_constant_pool_contents (shared_constant_pool);
@@ -6326,32 +6323,25 @@ declare_weak (tree decl)
 static void
 weak_finish_1 (tree decl)
 {
-#if defined (ASM_WEAKEN_DECL) || defined (ASM_WEAKEN_LABEL)
   const char *const name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-#endif
 
   if (! TREE_USED (decl))
     return;
 
-#ifdef ASM_WEAKEN_DECL
-  ASM_WEAKEN_DECL (asm_out_file, decl, name, NULL);
-#else
-#ifdef ASM_WEAKEN_LABEL
-  ASM_WEAKEN_LABEL (asm_out_file, name);
-#else
-#ifdef ASM_OUTPUT_WEAK_ALIAS
-  {
-    static bool warn_once = 0;
-    if (! warn_once)
-      {
-	warning (0, "only weak aliases are supported in this configuration");
-	warn_once = 1;
-      }
-    return;
-  }
-#endif
-#endif
-#endif
+  if (targetm.asm_out.weaken_decl)
+    targetm.asm_out.weaken_decl (asm_out_file, decl, name, NULL);
+  else if (targetm.asm_out.weaken_label)
+    targetm.asm_out.weaken_label (asm_out_file, name);
+  else if (targetm.asm_out.output_weak_alias)
+    {
+      static bool warn_once = 0;
+      if (! warn_once)
+	{
+	  warning (0, "only weak aliases are supported in this configuration");
+	  warn_once = 1;
+	}
+      return;
+    }
 }
 
 /* Fiven an assembly name, find the decl it is associated with.  */
@@ -6388,12 +6378,14 @@ weak_finish (void)
 #ifndef ASM_OUTPUT_WEAKREF
       else if (! TREE_SYMBOL_REFERENCED (target))
 	{
-	  /* Use ASM_WEAKEN_LABEL only if ASM_WEAKEN_DECL is not
-	     defined, otherwise we and weak_finish_1 would use
-	     different macros.  */
-# if defined ASM_WEAKEN_LABEL && ! defined ASM_WEAKEN_DECL
-	  ASM_WEAKEN_LABEL (asm_out_file, IDENTIFIER_POINTER (target));
-# else
+	  /* Use weaken_label only if weaken_decl is not available,
+	     otherwise we and weak_finish_1 would use different
+	     directives.  */
+	  if (targetm.asm_out.weaken_label && !targetm.asm_out.weaken_decl)
+	    targetm.asm_out.weaken_label (asm_out_file,
+					  IDENTIFIER_POINTER (target));
+	  else
+	    {
 	  tree decl = find_decl (target);
 
 	  if (! decl)
@@ -6410,7 +6402,7 @@ weak_finish (void)
 	    }
 
 	  weak_finish_1 (decl);
-# endif
+	    }
 	}
 #endif
 
@@ -6455,17 +6447,16 @@ static void
 globalize_decl (tree decl)
 {
 
-#if defined (ASM_WEAKEN_LABEL) || defined (ASM_WEAKEN_DECL)
-  if (DECL_WEAK (decl))
+  if (DECL_WEAK (decl)
+      && (targetm.asm_out.weaken_decl || targetm.asm_out.weaken_label))
     {
       const char *name = XSTR (XEXP (DECL_RTL (decl), 0), 0);
       tree *p, t;
 
-#ifdef ASM_WEAKEN_DECL
-      ASM_WEAKEN_DECL (asm_out_file, decl, name, 0);
-#else
-      ASM_WEAKEN_LABEL (asm_out_file, name);
-#endif
+      if (targetm.asm_out.weaken_decl)
+	targetm.asm_out.weaken_decl (asm_out_file, decl, name, 0);
+      else
+	targetm.asm_out.weaken_label (asm_out_file, name);
 
       /* Remove this function from the pending weak list so that
 	 we do not emit multiple .weak directives for it.  */
@@ -6490,7 +6481,6 @@ globalize_decl (tree decl)
 
       return;
     }
-#endif
 
   targetm.asm_out.globalize_decl_name (asm_out_file, decl);
 }
@@ -6546,7 +6536,8 @@ do_assemble_alias (tree decl, tree target)
       return;
     }
 
-#ifdef ASM_OUTPUT_DEF
+  if (targetm.asm_out.output_def || targetm.asm_out.output_def_from_decls)
+    {
   tree orig_decl = decl;
 
   /* Make name accessible from other files, if appropriate.  */
@@ -6570,33 +6561,34 @@ do_assemble_alias (tree decl, tree target)
 		  "%qs is not supported on this target", "ifunc");
     }
 
-# ifdef ASM_OUTPUT_DEF_FROM_DECLS
-  ASM_OUTPUT_DEF_FROM_DECLS (asm_out_file, decl, target);
-# else
-  ASM_OUTPUT_DEF (asm_out_file,
-		  IDENTIFIER_POINTER (id),
-		  IDENTIFIER_POINTER (target));
-# endif
+  if (targetm.asm_out.output_def_from_decls)
+    targetm.asm_out.output_def_from_decls (asm_out_file, decl, target);
+  else
+    targetm.asm_out.output_def (asm_out_file,
+				IDENTIFIER_POINTER (id),
+				IDENTIFIER_POINTER (target));
   /* If symbol aliases aren't actually supported...  */
-  if (!TARGET_SUPPORTS_ALIASES
+  if (!targetm.asm_out.supports_aliases ()
 # ifdef ACCEL_COMPILER
       /* ..., and unless special-cased...  */
       && !lookup_attribute ("symbol alias handled", DECL_ATTRIBUTES (decl))
 # endif
       )
-    /* ..., 'ASM_OUTPUT_DEF{,_FROM_DECLS}' better have raised an error.  */
+    /* ..., the output_def hook better have raised an error.  */
     gcc_checking_assert (seen_error ());
-#elif defined (ASM_OUTPUT_WEAK_ALIAS) || defined (ASM_WEAKEN_DECL)
+    }
+  else if (targetm.asm_out.output_weak_alias || targetm.asm_out.weaken_decl)
   {
     const char *name;
     tree *p, t;
 
     name = IDENTIFIER_POINTER (id);
-# ifdef ASM_WEAKEN_DECL
-    ASM_WEAKEN_DECL (asm_out_file, decl, name, IDENTIFIER_POINTER (target));
-# else
-    ASM_OUTPUT_WEAK_ALIAS (asm_out_file, name, IDENTIFIER_POINTER (target));
-# endif
+    if (targetm.asm_out.weaken_decl)
+      targetm.asm_out.weaken_decl (asm_out_file, decl, name,
+				   IDENTIFIER_POINTER (target));
+    else
+      targetm.asm_out.output_weak_alias (asm_out_file, name,
+					 IDENTIFIER_POINTER (target));
     /* Remove this function from the pending weak list so that
        we do not emit multiple .weak directives for it.  */
     for (p = &weak_decls; (t = *p) ; )
@@ -6616,7 +6608,6 @@ do_assemble_alias (tree decl, tree target)
 	  p = &TREE_CHAIN (t);
       }
   }
-#endif
 }
 
 /* Output .symver directive.  */
@@ -6655,14 +6646,15 @@ assemble_alias (tree decl, tree target)
       if (TREE_PUBLIC (decl))
 	error ("%qs symbol %q+D must have static linkage", "weakref", decl);
     }
-  else if (!TARGET_SUPPORTS_ALIASES)
+  else if (!targetm.asm_out.supports_aliases ())
     {
-# if !defined(ASM_OUTPUT_WEAK_ALIAS) && !defined (ASM_WEAKEN_DECL)
-      error_at (DECL_SOURCE_LOCATION (decl),
-		"alias definitions not supported in this configuration");
-      TREE_ASM_WRITTEN (decl) = 1;
-      return;
-# else
+      if (!targetm.asm_out.output_weak_alias && !targetm.asm_out.weaken_decl)
+	{
+	  error_at (DECL_SOURCE_LOCATION (decl),
+		    "alias definitions not supported in this configuration");
+	  TREE_ASM_WRITTEN (decl) = 1;
+	  return;
+	}
       if (!DECL_WEAK (decl))
 	{
 	  /* NB: ifunc_resolver isn't set when an error is detected.  */
@@ -6676,8 +6668,6 @@ assemble_alias (tree decl, tree target)
 	  TREE_ASM_WRITTEN (decl) = 1;
 	  return;
 	}
-# endif
-      gcc_unreachable ();
     }
   TREE_USED (decl) = 1;
 
@@ -6973,40 +6963,40 @@ init_varasm_once (void)
      instantiated per back end.  A null hook means "this target has no such
      section" and leaves the section pointer null, exactly as the absent
      #ifdef did.  */
-  if (targetm.asm_out.text_section_asm_op)
+  if (targetm.asm_out.text_section_asm_op ())
     text_section = get_unnamed_section (SECTION_CODE, output_section_asm_op,
-					targetm.asm_out.text_section_asm_op);
+					targetm.asm_out.text_section_asm_op ());
 
-  if (targetm.asm_out.data_section_asm_op)
+  if (targetm.asm_out.data_section_asm_op ())
     data_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-					targetm.asm_out.data_section_asm_op);
+					targetm.asm_out.data_section_asm_op ());
 
-  if (targetm.asm_out.sdata_section_asm_op)
+  if (targetm.asm_out.sdata_section_asm_op ())
     sdata_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-					 targetm.asm_out.sdata_section_asm_op);
+					 targetm.asm_out.sdata_section_asm_op ());
 
-  if (targetm.asm_out.readonly_data_section_asm_op)
+  if (targetm.asm_out.readonly_data_section_asm_op ())
     readonly_data_section
       = get_unnamed_section (0, output_section_asm_op,
-			     targetm.asm_out.readonly_data_section_asm_op);
+			     targetm.asm_out.readonly_data_section_asm_op ());
 
-  if (targetm.asm_out.ctors_section_asm_op)
+  if (targetm.asm_out.ctors_section_asm_op ())
     ctors_section = get_unnamed_section (0, output_section_asm_op,
-					 targetm.asm_out.ctors_section_asm_op);
+					 targetm.asm_out.ctors_section_asm_op ());
 
-  if (targetm.asm_out.dtors_section_asm_op)
+  if (targetm.asm_out.dtors_section_asm_op ())
     dtors_section = get_unnamed_section (0, output_section_asm_op,
-					 targetm.asm_out.dtors_section_asm_op);
+					 targetm.asm_out.dtors_section_asm_op ());
 
-  if (targetm.asm_out.bss_section_asm_op)
+  if (targetm.asm_out.bss_section_asm_op ())
     bss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
 				       output_section_asm_op,
-				       targetm.asm_out.bss_section_asm_op);
+				       targetm.asm_out.bss_section_asm_op ());
 
-  if (targetm.asm_out.sbss_section_asm_op)
+  if (targetm.asm_out.sbss_section_asm_op ())
     sbss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
 					output_section_asm_op,
-					targetm.asm_out.sbss_section_asm_op);
+					targetm.asm_out.sbss_section_asm_op ());
 
   tls_comm_section = get_noswitch_section (SECTION_WRITE | SECTION_BSS
 					   | SECTION_COMMON, emit_tls_common);
@@ -7802,22 +7792,24 @@ default_strip_name_encoding (const char *str)
   return str + (*str == '*');
 }
 
-#ifdef ASM_OUTPUT_DEF
 /* The default implementation of TARGET_ASM_OUTPUT_ANCHOR.  Define the
-   anchor relative to ".", the current section position.  */
+   anchor relative to ".", the current section position.  Only reachable on a
+   target that has an output_def hook: target-def.h NULLs
+   TARGET_ASM_OUTPUT_ANCHOR when the target has no ASM_OUTPUT_DEF, and a NULL
+   output_anchor disables section anchors altogether.  */
 
 void
 default_asm_output_anchor (rtx symbol)
 {
-  gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+  gcc_checking_assert (targetm.asm_out.supports_aliases ());
+  gcc_assert (targetm.asm_out.output_def);
 
   char buffer[100];
 
   sprintf (buffer, "*. + " HOST_WIDE_INT_PRINT_DEC,
 	   SYMBOL_REF_BLOCK_OFFSET (symbol));
-  ASM_OUTPUT_DEF (asm_out_file, XSTR (symbol, 0), buffer);
+  targetm.asm_out.output_def (asm_out_file, XSTR (symbol, 0), buffer);
 }
-#endif
 
 /* The default implementation of TARGET_USE_ANCHORS_FOR_SYMBOL_P.  */
 
@@ -8101,8 +8093,8 @@ decl_replaceable_p (tree decl, bool semantic_interposition_p)
 void
 default_globalize_label (FILE * stream, const char *name)
 {
-  gcc_assert (targetm.asm_out.global_op != NULL);
-  fputs (targetm.asm_out.global_op, stream);
+  gcc_assert (targetm.asm_out.global_op () != NULL);
+  fputs (targetm.asm_out.global_op (), stream);
   assemble_name (stream, name);
   putc ('\n', stream);
 }

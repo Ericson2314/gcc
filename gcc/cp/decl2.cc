@@ -4311,7 +4311,7 @@ get_tls_init_fn (tree var)
 
   /* If the variable is internal, or if we can't generate aliases,
      call the local init function directly.  */
-  if (!TREE_PUBLIC (var) || !TARGET_SUPPORTS_ALIASES)
+  if (!TREE_PUBLIC (var) || !targetm.asm_out.supports_aliases ())
     return get_local_tls_init_fn (DECL_SOURCE_LOCATION (var));
 
   tree sname = mangle_tls_init_fn (var);
@@ -5563,7 +5563,7 @@ handle_tls_init (void)
 						false);
 
       /* Output init aliases even with -fno-extern-tls-init.  */
-      if (TARGET_SUPPORTS_ALIASES && TREE_PUBLIC (var))
+      if (targetm.asm_out.supports_aliases () && TREE_PUBLIC (var))
 	{
           tree single_init_fn = get_tls_init_fn (var);
 	  if (single_init_fn == NULL_TREE)
@@ -5630,7 +5630,7 @@ generate_mangling_alias (tree decl, tree id2)
 void
 note_mangling_alias (tree decl, tree id2)
 {
-  if (TARGET_SUPPORTS_ALIASES)
+  if (targetm.asm_out.supports_aliases ())
     {
       if (!defer_mangling_aliases)
 	generate_mangling_alias (decl, id2);
