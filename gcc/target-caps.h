@@ -122,6 +122,36 @@ struct target_caps
      and dwarf2out.cc already supplied 0 for everyone else.  */
   bool xcoff_dwarf_extras;
 
+  /* Assembler resolves  in a data section, so jump tables need not be
+     forced into .text.  Was HAVE_AS_GOTOFF_IN_DATA.  Both channels are
+     runtime expressions -- i386.cc and JUMP_TABLES_IN_TEXT_SECTION in
+     i386.h -- so this is the cleanest conversion in the i386 set.  */
+  bool as_gotoff_in_data;
+
+  /* Assembler encodes movq between an integer and an MMX/SSE register
+     the way GCC expects.  Was HAVE_AS_IX86_INTERUNIT_MOVQ.  */
+  bool as_ix86_interunit_movq;
+
+  /* Assembler emits R_386_GOT32X relocations.  Was HAVE_AS_IX86_GOT32X.  */
+  bool as_ix86_got32x;
+
+  /* Assembler can call __tls_get_addr through the GOT, so -fno-plt TLS
+     works.  Was HAVE_AS_IX86_TLS_GET_ADDR_GOT.  */
+  bool as_ix86_tls_get_addr_got;
+
+  /* Assembler emits R_X86_64_CODE_6_GOTTPOFF.  Was
+     HAVE_AS_R_X86_64_CODE_6_GOTTPOFF.  */
+  bool as_r_x86_64_code_6_gottpoff;
+
+  /* Assembler accepts the Sun TLS local-dynamic PLT syntax.  Was
+     HAVE_AS_IX86_TLSLDMPLT.  Defaults false: this is Solaris-as syntax,
+     and auto-host.h answered 0 for GNU as.  */
+  bool as_ix86_tlsldmplt;
+
+  /* Assembler accepts the Sun TLS local-dynamic syntax.  Was
+     HAVE_AS_IX86_TLSLDM.  Defaults false for the same reason.  */
+  bool as_ix86_tlsldm;
+
   /* Assembler takes `-relax', and the linker relaxes tail calls into branch-
      always.  Was HAVE_AS_RELAX_OPTION.  Only the codegen half is a runtime
      value: the spec half (ASM_RELAX_SPEC) is a string baked into the driver's

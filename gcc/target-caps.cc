@@ -50,6 +50,13 @@ struct target_caps targ_caps =
   .ld_broken_secrel32 = false,
   .as_ref = false,
   .xcoff_dwarf_extras = false,
+  .as_gotoff_in_data = true,
+  .as_ix86_interunit_movq = true,
+  .as_ix86_got32x = true,
+  .as_ix86_tls_get_addr_got = true,
+  .as_r_x86_64_code_6_gottpoff = true,
+  .as_ix86_tlsldmplt = false,
+  .as_ix86_tlsldm = false,
   .as_relax_option = true,
   .as_offsetable_lo10 = true,
   .as_gnu_attribute = true,
@@ -138,6 +145,20 @@ read_target_caps (const char *file)
 	targ_caps.as_ref = value != 0;
       else if (strcmp (name, "xcoff_dwarf_extras") == 0)
 	targ_caps.xcoff_dwarf_extras = value != 0;
+      else if (strcmp (name, "as_gotoff_in_data") == 0)
+	targ_caps.as_gotoff_in_data = value != 0;
+      else if (strcmp (name, "as_ix86_interunit_movq") == 0)
+	targ_caps.as_ix86_interunit_movq = value != 0;
+      else if (strcmp (name, "as_ix86_got32x") == 0)
+	targ_caps.as_ix86_got32x = value != 0;
+      else if (strcmp (name, "as_ix86_tls_get_addr_got") == 0)
+	targ_caps.as_ix86_tls_get_addr_got = value != 0;
+      else if (strcmp (name, "as_r_x86_64_code_6_gottpoff") == 0)
+	targ_caps.as_r_x86_64_code_6_gottpoff = value != 0;
+      else if (strcmp (name, "as_ix86_tlsldmplt") == 0)
+	targ_caps.as_ix86_tlsldmplt = value != 0;
+      else if (strcmp (name, "as_ix86_tlsldm") == 0)
+	targ_caps.as_ix86_tlsldm = value != 0;
       else if (strcmp (name, "as_relax_option") == 0)
 	targ_caps.as_relax_option = value != 0;
       else if (strcmp (name, "as_offsetable_lo10") == 0)

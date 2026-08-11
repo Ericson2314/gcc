@@ -1438,6 +1438,20 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_AS_REF (targ_caps.as_ref)
 #undef HAVE_XCOFF_DWARF_EXTRAS
 #define HAVE_XCOFF_DWARF_EXTRAS (targ_caps.xcoff_dwarf_extras)
+#undef HAVE_AS_GOTOFF_IN_DATA
+#define HAVE_AS_GOTOFF_IN_DATA (targ_caps.as_gotoff_in_data)
+#undef HAVE_AS_IX86_INTERUNIT_MOVQ
+#define HAVE_AS_IX86_INTERUNIT_MOVQ (targ_caps.as_ix86_interunit_movq)
+#undef HAVE_AS_IX86_GOT32X
+#define HAVE_AS_IX86_GOT32X (targ_caps.as_ix86_got32x)
+#undef HAVE_AS_IX86_TLS_GET_ADDR_GOT
+#define HAVE_AS_IX86_TLS_GET_ADDR_GOT (targ_caps.as_ix86_tls_get_addr_got)
+#undef HAVE_AS_R_X86_64_CODE_6_GOTTPOFF
+#define HAVE_AS_R_X86_64_CODE_6_GOTTPOFF (targ_caps.as_r_x86_64_code_6_gottpoff)
+#undef HAVE_AS_IX86_TLSLDMPLT
+#define HAVE_AS_IX86_TLSLDMPLT (targ_caps.as_ix86_tlsldmplt)
+#undef HAVE_AS_IX86_TLSLDM
+#define HAVE_AS_IX86_TLSLDM (targ_caps.as_ix86_tlsldm)
 #undef HAVE_AS_GNU_ATTRIBUTE
 #define HAVE_AS_GNU_ATTRIBUTE (targ_caps.as_gnu_attribute)
 #undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
