@@ -141,6 +141,11 @@ extern int alpha_this_gpdisp_sequence_number;
    As of Jan 2002, only glibc 2.2.4 can actually make use of this, but
    I imagine that other systems will catch up.  In the meantime, it
    doesn't harm to make sure that the data exists to be used later.  */
-#if defined(HAVE_LD_EH_FRAME_HDR)
+/* Was #if defined(HAVE_LD_EH_FRAME_HDR).  That macro came from a configure
+   probe of one linker, and a multi-target compiler has no such linker to
+   probe; with the probe gone the guard was silently false, which dropped
+   --eh-frame-hdr from this target's link line.  config/gnu-user.h and
+   config/sol2.h already made it unconditional for the same reason; these were
+   missed.  A linker that lacks it is handled by overriding the spec, not by
+   the compiler quietly omitting the option.  */
 #define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
-#endif

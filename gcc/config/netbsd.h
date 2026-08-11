@@ -124,9 +124,14 @@ along with GCC; see the file COPYING3.  If not see
 #undef LIBGCC_SPEC
 #define LIBGCC_SPEC NETBSD_LIBGCC_SPEC
 
-#if defined(HAVE_LD_EH_FRAME_HDR)
+/* Was #if defined(HAVE_LD_EH_FRAME_HDR).  That macro came from a configure
+   probe of one linker, and a multi-target compiler has no such linker to
+   probe; with the probe gone the guard was silently false, which dropped
+   --eh-frame-hdr from this target's link line.  config/gnu-user.h and
+   config/sol2.h already made it unconditional for the same reason; these were
+   missed.  A linker that lacks it is handled by overriding the spec, not by
+   the compiler quietly omitting the option.  */
 #define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
-#endif
 
 #undef TARGET_LIBC_HAS_FUNCTION
 #define TARGET_LIBC_HAS_FUNCTION no_c99_libc_has_function

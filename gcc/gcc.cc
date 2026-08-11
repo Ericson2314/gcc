@@ -1128,7 +1128,7 @@ proper position among the other output files.  */
 #ifndef LINK_COMMAND_SPEC
 #define LINK_COMMAND_SPEC "\
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
-    %(linker) %(link_target_config) %(link_buildid) " \
+    %(linker) %(link_target_config) %(link_buildid) %(link_eh) " \
     LINK_PLUGIN_SPEC \
    "%{flto|flto=*:%<fcompare-debug*} \
     %{flto} %{fno-lto} %{flto=*} %l " LINK_PIE_SPEC \
@@ -1275,6 +1275,17 @@ static const char *link_target_config = "";
    Written by target-specs/configure; it was previously emitted into the spec
    file but never referenced, so it had no effect at all.  */
 static const char *link_buildid = "";
+
+/* --eh-frame-hdr, when the linker has it.  Written by target-specs/configure.
+
+   This is the replacement for LINK_EH_SPEC, which config/gnu-user.h,
+   config/sol2.h and the four BSD headers still define.  The driver no longer
+   includes tm.h, so `#ifdef LINK_EH_SPEC' in init_spec is unconditionally
+   false and NO target header can reach it any more -- the option had quietly
+   stopped being passed on every target, not just the ones whose header still
+   had the old HAVE_LD_EH_FRAME_HDR guard.  Empty by default, because a linker
+   we have not asked is not a linker we may assume; target-specs asks.  */
+static const char *link_eh = "";
 
 /* Linker options -fhardened adds, if this linker has them.  Not referenced
    from any spec string: the driver reads it directly, because whether to
@@ -1732,6 +1743,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("cc1_target_config",		&cc1_target_config),
   INIT_STATIC_SPEC ("link_target_config",	&link_target_config),
   INIT_STATIC_SPEC ("link_buildid",		&link_buildid),
+  INIT_STATIC_SPEC ("link_eh",			&link_eh),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),

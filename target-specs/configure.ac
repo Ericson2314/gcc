@@ -287,12 +287,28 @@ else
   link_buildid=
 fi
 
+dnl This probe ran and its answer was thrown away -- it reached nothing but an
+dnl AC_MSG_NOTICE at the end of the script.  Meanwhile the driver had lost
+dnl LINK_EH_SPEC along with tm.h, so --eh-frame-hdr was being passed on no
+dnl target at all.  config/gnu-user.h's comment already promised this channel
+dnl ("the answer for a linker that does not is delivered by overriding the
+dnl spec, see target-specs/configure.ac"); it just was not built.
+dnl
+dnl `%{!static|static-pie:...}' is the spelling every LINK_EH_SPEC used, except
+dnl DragonFly's, which passed it unconditionally.  Static links have no
+dnl PT_GNU_EH_FRAME consumer, so the guarded form is the correct one.
 AC_MSG_CHECKING([linker for --eh-frame-hdr])
 gcc_cv_ld_eh_frame_hdr=no
 if "$gcc_cv_ld" --help 2>&1 | grep -- '--eh-frame-hdr' > /dev/null; then
   gcc_cv_ld_eh_frame_hdr=yes
 fi
 AC_MSG_RESULT([$gcc_cv_ld_eh_frame_hdr])
+
+if test x"$gcc_cv_ld_eh_frame_hdr" = xyes; then
+  link_eh='%{!static|static-pie:--eh-frame-hdr} '
+else
+  link_eh=
+fi
 
 AC_MSG_CHECKING([linker for -pie])
 gcc_cv_ld_pie=no
@@ -508,6 +524,9 @@ ${option_defaults}
 
 *link_buildid:
 ${link_buildid}
+
+*link_eh:
+${link_eh}
 
 *link_hardening:
 ${link_hardening}

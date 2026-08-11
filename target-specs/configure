@@ -2172,6 +2172,12 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_eh_frame_hdr" >&5
 $as_echo "$gcc_cv_ld_eh_frame_hdr" >&6; }
 
+if test x"$gcc_cv_ld_eh_frame_hdr" = xyes; then
+  link_eh='%{!static|static-pie:--eh-frame-hdr} '
+else
+  link_eh=
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -pie" >&5
 $as_echo_n "checking linker for -pie... " >&6; }
 gcc_cv_ld_pie=no
@@ -2351,6 +2357,9 @@ ${option_defaults}
 
 *link_buildid:
 ${link_buildid}
+
+*link_eh:
+${link_eh}
 
 *link_hardening:
 ${link_hardening}
