@@ -1255,6 +1255,7 @@ gcc_cv_as_mips_dspr1_mult=no
 gcc_cv_as_mips_explicit_relocs=no
 gcc_cv_as_mips_explicit_relocs_pcrel=no
 gcc_cv_as_ld_mips_jalr_reloc=no
+gcc_cv_as_mips_dot_module=no
 case ${target} in
   mips*-*-*)
     AC_MSG_CHECKING([assembler for -mnan= support])
@@ -1341,6 +1342,22 @@ TSEOF
       fi
     fi
     AC_MSG_RESULT([$gcc_cv_as_ld_mips_jalr_reloc])
+
+    dnl .module.  This one was still in gcc/configure.ac's mips arm.  Two
+    dnl consumers, and they disagree about nothing: mips.cc emits `.module'
+    dnl directives when the assembler takes them and `.gnu_attribute 4, N'
+    dnl when it does not, and mips.h's FP_ASM_SPEC hands -mhard-float and
+    dnl friends to the assembler only in the first case.  Both now read this
+    dnl one answer.
+    AC_MSG_CHECKING([assembler for .module support])
+    cat > conftest.s <<'TSEOF'
+	.module mips2
+	.module fp=xx
+TSEOF
+    if "$gcc_cv_as" -32 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_dot_module=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_mips_dot_module])
 
     rm -f conftest.s conftest.o
     ;;
@@ -1621,6 +1638,9 @@ as_mips_dspr1_mult `ts_bool "$gcc_cv_as_mips_dspr1_mult"`
 as_mips_explicit_relocs `ts_bool "$gcc_cv_as_mips_explicit_relocs"`
 as_mips_explicit_relocs_pcrel `ts_bool "$gcc_cv_as_mips_explicit_relocs_pcrel"`
 as_ld_mips_jalr_reloc `ts_bool "$gcc_cv_as_ld_mips_jalr_reloc"`
+# The *asm_fp_module spec below is written from this same answer -- write
+# both or neither.
+as_mips_dot_module `ts_bool "$gcc_cv_as_mips_dot_module"`
 
 # loongarch back-end assembler capabilities.  A PAIR: linker relaxation needs
 # both.  The *asm_mrelax spec below is written from these same two variables --
@@ -1767,8 +1787,19 @@ else
   asm_mrelax="%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
 fi
 
-dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.
-  Emitted as a
+dnl mips FP_ASM_SPEC, from the .module probe.  These four options tell the
+dnl assembler which FP ABI the code uses, and gas only accepts them once it
+dnl understands `.module'; passing -msoft-float to an older assembler makes it
+dnl reject every hard-float instruction, which is why the original was gated at
+dnl all.  Written whole for the same reason as asm_mrelax: it is one answer, and
+dnl a fragment would invite a consumer to pass some of the four.
+if test x"$gcc_cv_as_mips_dot_module" = xyes; then
+  asm_fp_module='%{mhard-float} %{msoft-float} %{msingle-float} %{mdouble-float}'
+else
+  asm_fp_module=''
+fi
+
+dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.  Emitted as a
 dnl reference to the named spec the target header already registers, so the spec
 dnl TEXT stays in config/sol2.h where the target knowledge belongs and only the
 dnl CHOICE lives here.
@@ -1810,6 +1841,15 @@ ${link_plugin}
 # conservative opt-in form, so an unprobed driver is unchanged.
 *asm_mrelax:
 ${asm_mrelax}
+
+# The FP ABI options mips hands to its assembler, empty when the assembler is
+# too old for the .module directive.  mips's ASM_SPEC refers to this and no
+# other target's does; the driver's own default is empty, so an unprobed driver
+# is unchanged.  No backticks in this text: the heredoc is unquoted so that
+# \${asm_fp_module} expands, which means it is also a command-substitution
+# context.
+*asm_fp_module:
+${asm_fp_module}
 
 EOF
 

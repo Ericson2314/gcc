@@ -301,18 +301,6 @@
 #endif
 
 
-/* Define if your assembler supports conditional branch relaxation. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_COND_BRANCH_RELAXATION
-#endif
-
-
-/* Define if your assembler supports .module. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DOT_MODULE
-#endif
-
-
 /* Define if your assembler supports DTPREL relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_DTPREL_RELOC
@@ -370,12 +358,6 @@
 /* Define if your macOS assembler supports the -mmacos-version-min option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
-#endif
-
-
-/* Define if your assembler supports -mrelax option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MRELAX_OPTION
 #endif
 
 

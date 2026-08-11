@@ -1459,13 +1459,13 @@ struct mips_cpu_info {
    all hard-float instructions which may require some user code to be
    updated.  */
 
-#ifdef HAVE_AS_DOT_MODULE
-#define FP_ASM_SPEC "\
-%{mhard-float} %{msoft-float} \
-%{msingle-float} %{mdouble-float}"
-#else
-#define FP_ASM_SPEC
-#endif
+/* Whether the assembler is new enough for these is a property of the
+   assembler this compiler is pointed at, not of the machine it was built on,
+   so the answer arrives in the target config as the *asm_fp_module spec.  It
+   used to be `#ifdef HAVE_AS_DOT_MODULE', probed inside `case $target in
+   mips*-*-*)' -- which meant that in any build whose configured target was not
+   mips these four options were silently dropped.  */
+#define FP_ASM_SPEC "%(asm_fp_module)"
 
 /* SUBTARGET_ASM_SPEC is always passed to the assembler.  It may be
    overridden by subtargets.  */

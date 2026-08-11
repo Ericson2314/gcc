@@ -4003,17 +4003,18 @@ LCF0:
     dnl the driver before any target config is read, so it cannot be a runtime
     dnl test.  An unusual assembler overrides that spec in its spec file.
 
-    gcc_GAS_CHECK_FEATURE([.module support],
-      gcc_cv_as_mips_dot_module,[-32],
-      [.module mips2
-       .module fp=xx],,
-      [AC_DEFINE(HAVE_AS_DOT_MODULE, 1,
-	  [Define if your assembler supports .module.])])
-    if test x$gcc_cv_as_mips_dot_module = xno \
-       && test x$with_fp_32 != x; then
-      AC_MSG_ERROR(
-	[Requesting --with-fp-32= requires assembler support for .module.])
-    fi
+    dnl .module support: as_mips_dot_module moved to target-specs.  The probe
+    dnl was here, inside `case $target in mips*-*-*)', so it ran only when mips
+    dnl was the target GCC itself was configured for; in every other build
+    dnl HAVE_AS_DOT_MODULE was undefined and mips silently emitted the
+    dnl `.gnu_attribute 4, N' fallback instead of `.module' directives, and
+    dnl dropped FP_ASM_SPEC from its ASM_SPEC.  Now targ_caps.as_mips_dot_module
+    dnl and the *asm_fp_module spec.
+    dnl
+    dnl The --with-fp-32 consistency check went with it.  It compared a
+    dnl configure-time probe against a configure-time --with option, and neither
+    dnl side of that comparison exists at this point any more: --with-fp-32 is
+    dnl config.gcc's, per target, and the probe answer is now per target too.
 
     dnl .micromips moved to target-specs; targ_caps.as_mips_micromips.
 

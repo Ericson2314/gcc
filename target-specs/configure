@@ -3004,6 +3004,7 @@ gcc_cv_as_mips_dspr1_mult=no
 gcc_cv_as_mips_explicit_relocs=no
 gcc_cv_as_mips_explicit_relocs_pcrel=no
 gcc_cv_as_ld_mips_jalr_reloc=no
+gcc_cv_as_mips_dot_module=no
 case ${target} in
   mips*-*-*)
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mnan= support" >&5
@@ -3088,6 +3089,18 @@ TSEOF
     fi
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_ld_mips_jalr_reloc" >&5
 $as_echo "$gcc_cv_as_ld_mips_jalr_reloc" >&6; }
+
+                            { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .module support" >&5
+$as_echo_n "checking assembler for .module support... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.module mips2
+	.module fp=xx
+TSEOF
+    if "$gcc_cv_as" -32 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_dot_module=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_mips_dot_module" >&5
+$as_echo "$gcc_cv_as_mips_dot_module" >&6; }
 
     rm -f conftest.s conftest.o
     ;;
@@ -3354,6 +3367,9 @@ as_mips_dspr1_mult `ts_bool "$gcc_cv_as_mips_dspr1_mult"`
 as_mips_explicit_relocs `ts_bool "$gcc_cv_as_mips_explicit_relocs"`
 as_mips_explicit_relocs_pcrel `ts_bool "$gcc_cv_as_mips_explicit_relocs_pcrel"`
 as_ld_mips_jalr_reloc `ts_bool "$gcc_cv_as_ld_mips_jalr_reloc"`
+# The *asm_fp_module spec below is written from this same answer -- write
+# both or neither.
+as_mips_dot_module `ts_bool "$gcc_cv_as_mips_dot_module"`
 
 # loongarch back-end assembler capabilities.  A PAIR: linker relaxation needs
 # both.  The *asm_mrelax spec below is written from these same two variables --
@@ -3440,7 +3456,12 @@ else
   asm_mrelax="%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
 fi
 
-  Emitted as a
+if test x"$gcc_cv_as_mips_dot_module" = xyes; then
+  asm_fp_module='%{mhard-float} %{msoft-float} %{msingle-float} %{mdouble-float}'
+else
+  asm_fp_module=''
+fi
+
 if test x"$gcc_cv_solaris_ld" = xyes; then
   cat >> "$specs_file" <<EOF
 *link_arch:
@@ -3479,6 +3500,15 @@ ${link_plugin}
 # conservative opt-in form, so an unprobed driver is unchanged.
 *asm_mrelax:
 ${asm_mrelax}
+
+# The FP ABI options mips hands to its assembler, empty when the assembler is
+# too old for the .module directive.  mips's ASM_SPEC refers to this and no
+# other target's does; the driver's own default is empty, so an unprobed driver
+# is unchanged.  No backticks in this text: the heredoc is unquoted so that
+# \${asm_fp_module} expands, which means it is also a command-substitution
+# context.
+*asm_fp_module:
+${asm_fp_module}
 
 EOF
 

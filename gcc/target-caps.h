@@ -384,6 +384,16 @@ struct target_caps
   bool as_mips_micromips;
   bool as_mips_dspr1_mult;
 
+  /* Assembler takes `.module'.  TWO consumers of one answer, and they are not
+     alternatives: mips.cc emits `.module' directives when it is true and the
+     older `.gnu_attribute 4, N' encoding when it is false, and mips.h's
+     FP_ASM_SPEC hands -mhard-float and its three companions to the assembler
+     only when it is true.  Passing -msoft-float to an assembler too old for
+     `.module' makes it reject every hard-float instruction, which is why the
+     spec was gated at all.  Both halves are written from this one field; the
+     spec half is the *asm_fp_module spec.  */
+  bool as_mips_dot_module;
+
   /* Assembler takes the `%gp_rel(sym)' explicit relocation operators, and the
      newer `%pcrel_hi'/`%pcrel_lo' pair.  These two decide the DEFAULT of
      -mexplicit-relocs=, which used to be MIPS_EXPLICIT_RELOCS, an AC_DEFINE

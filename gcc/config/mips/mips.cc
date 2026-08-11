@@ -10337,105 +10337,113 @@ mips_file_start (void)
     fprintf (asm_out_file, "\t.nan\t%s\n",
 	     mips_nan == MIPS_IEEE_754_2008 ? "2008" : "legacy");
 
-#ifdef HAVE_AS_DOT_MODULE
-  /* Record the FP ABI.  See below for comments.  */
-  if (TARGET_NO_FLOAT)
+  /* Whether the assembler understands `.module' is a property of the
+     assembler this compiler is pointed at.  It used to be
+     HAVE_AS_DOT_MODULE, probed inside `case $target in mips*-*-*)', so
+     any build not configured for mips took the .gnu_attribute arm
+     unconditionally and said nothing about it.  */
+  if (targ_caps.as_mips_dot_module)
     {
-      if (HAVE_AS_GNU_ATTRIBUTE)
-	fputs ("\t.gnu_attribute 4, 0\n", asm_out_file);
-    }
-  else if (!TARGET_HARD_FLOAT_ABI)
-    fputs ("\t.module\tsoftfloat\n", asm_out_file);
-  else if (!TARGET_DOUBLE_FLOAT)
-    fputs ("\t.module\tsinglefloat\n", asm_out_file);
-  else if (TARGET_FLOATXX)
-    fputs ("\t.module\tfp=xx\n", asm_out_file);
-  else if (TARGET_FLOAT64)
-    fputs ("\t.module\tfp=64\n", asm_out_file);
-  else
-    fputs ("\t.module\tfp=32\n", asm_out_file);
-
-  if (TARGET_ODD_SPREG)
-    fputs ("\t.module\toddspreg\n", asm_out_file);
-  else
-    fputs ("\t.module\tnooddspreg\n", asm_out_file);
-
-  fprintf (asm_out_file, "\t.module\tarch=%s\n", mips_arch_info->name);
-  /* FIXME: DSPR3 is not supported by GCC? gas does support it */
-  if (TARGET_DSPR2)
-    fputs ("\t.module\tdspr2\n", asm_out_file);
-  else if (TARGET_DSP)
-    fputs ("\t.module\tdsp\n", asm_out_file);
-  if (TARGET_EVA)
-    fputs ("\t.module\teva\n", asm_out_file);
-  if (TARGET_MCU)
-    fputs ("\t.module\tmcu\n", asm_out_file);
-  if (TARGET_MDMX)
-    fputs ("\t.module\tmdmx\n", asm_out_file);
-  if (TARGET_MIPS3D)
-    fputs ("\t.module\tmips3d\n", asm_out_file);
-  if (TARGET_MT)
-    fputs ("\t.module\tmt\n", asm_out_file);
-  if (TARGET_SMARTMIPS)
-    fputs ("\t.module\tsmartmips\n", asm_out_file);
-  if (TARGET_VIRT)
-    fputs ("\t.module\tvirt\n", asm_out_file);
-  if (TARGET_MSA)
-    fputs ("\t.module\tmsa\n", asm_out_file);
-  if (TARGET_XPA)
-    fputs ("\t.module\txpa\n", asm_out_file);
-  if (TARGET_MIPS16E2)
-    fputs ("\t.module\tmips16e2\n", asm_out_file);
-  if (TARGET_CRC)
-    fputs ("\t.module\tcrc\n", asm_out_file);
-  if (TARGET_GINV)
-    fputs ("\t.module\tginv\n", asm_out_file);
-  if (TARGET_LOONGSON_MMI)
-    fputs ("\t.module\tloongson-mmi\n", asm_out_file);
-  /* FIXME: LOONGSON-CAM is not supported by GCC? gas does support it */
-  if (TARGET_LOONGSON_EXT2)
-    fputs ("\t.module\tloongson-ext2\n", asm_out_file);
-  else if (TARGET_LOONGSON_EXT)
-    fputs ("\t.module\tloongson-ext\n", asm_out_file);
-
-#else
-  if (HAVE_AS_GNU_ATTRIBUTE)
-  {
-    int attr;
-
-    /* No floating-point operations, -mno-float.  */
+    /* Record the FP ABI.  See below for comments.  */
     if (TARGET_NO_FLOAT)
-      attr = 0;
-    /* Soft-float code, -msoft-float.  */
+      {
+        if (HAVE_AS_GNU_ATTRIBUTE)
+  	fputs ("\t.gnu_attribute 4, 0\n", asm_out_file);
+      }
     else if (!TARGET_HARD_FLOAT_ABI)
-      attr = 3;
-    /* Single-float code, -msingle-float.  */
+      fputs ("\t.module\tsoftfloat\n", asm_out_file);
     else if (!TARGET_DOUBLE_FLOAT)
-      attr = 2;
-    /* 64-bit FP registers on a 32-bit target, -mips32r2 -mfp64.
-       Reserved attr=4.
-       This case used 12 callee-saved double-precision registers
-       and is deprecated.  */
-    /* 64-bit or 32-bit FP registers on a 32-bit target, -mfpxx.  */
+      fputs ("\t.module\tsinglefloat\n", asm_out_file);
     else if (TARGET_FLOATXX)
-      attr = 5;
-    /* 64-bit FP registers on a 32-bit target, -mfp64 -modd-spreg.  */
-    else if (mips_abi == ABI_32 && TARGET_FLOAT64 && TARGET_ODD_SPREG)
-      attr = 6;
-    /* 64-bit FP registers on a 32-bit target, -mfp64 -mno-odd-spreg.  */
-    else if (mips_abi == ABI_32 && TARGET_FLOAT64)
-      attr = 7;
-    /* Regular FP code, FP regs same size as GP regs, -mdouble-float.  */
+      fputs ("\t.module\tfp=xx\n", asm_out_file);
+    else if (TARGET_FLOAT64)
+      fputs ("\t.module\tfp=64\n", asm_out_file);
     else
-      attr = 1;
+      fputs ("\t.module\tfp=32\n", asm_out_file);
 
-    fprintf (asm_out_file, "\t.gnu_attribute 4, %d\n", attr);
+    if (TARGET_ODD_SPREG)
+      fputs ("\t.module\toddspreg\n", asm_out_file);
+    else
+      fputs ("\t.module\tnooddspreg\n", asm_out_file);
 
-    /* 128-bit MSA.  */
-    if (ISA_HAS_MSA)
-      fprintf (asm_out_file, "\t.gnu_attribute 8, 1\n");
-  }
-#endif
+    fprintf (asm_out_file, "\t.module\tarch=%s\n", mips_arch_info->name);
+    /* FIXME: DSPR3 is not supported by GCC? gas does support it */
+    if (TARGET_DSPR2)
+      fputs ("\t.module\tdspr2\n", asm_out_file);
+    else if (TARGET_DSP)
+      fputs ("\t.module\tdsp\n", asm_out_file);
+    if (TARGET_EVA)
+      fputs ("\t.module\teva\n", asm_out_file);
+    if (TARGET_MCU)
+      fputs ("\t.module\tmcu\n", asm_out_file);
+    if (TARGET_MDMX)
+      fputs ("\t.module\tmdmx\n", asm_out_file);
+    if (TARGET_MIPS3D)
+      fputs ("\t.module\tmips3d\n", asm_out_file);
+    if (TARGET_MT)
+      fputs ("\t.module\tmt\n", asm_out_file);
+    if (TARGET_SMARTMIPS)
+      fputs ("\t.module\tsmartmips\n", asm_out_file);
+    if (TARGET_VIRT)
+      fputs ("\t.module\tvirt\n", asm_out_file);
+    if (TARGET_MSA)
+      fputs ("\t.module\tmsa\n", asm_out_file);
+    if (TARGET_XPA)
+      fputs ("\t.module\txpa\n", asm_out_file);
+    if (TARGET_MIPS16E2)
+      fputs ("\t.module\tmips16e2\n", asm_out_file);
+    if (TARGET_CRC)
+      fputs ("\t.module\tcrc\n", asm_out_file);
+    if (TARGET_GINV)
+      fputs ("\t.module\tginv\n", asm_out_file);
+    if (TARGET_LOONGSON_MMI)
+      fputs ("\t.module\tloongson-mmi\n", asm_out_file);
+    /* FIXME: LOONGSON-CAM is not supported by GCC? gas does support it */
+    if (TARGET_LOONGSON_EXT2)
+      fputs ("\t.module\tloongson-ext2\n", asm_out_file);
+    else if (TARGET_LOONGSON_EXT)
+      fputs ("\t.module\tloongson-ext\n", asm_out_file);
+
+    }
+  else
+    {
+    if (HAVE_AS_GNU_ATTRIBUTE)
+    {
+      int attr;
+
+      /* No floating-point operations, -mno-float.  */
+      if (TARGET_NO_FLOAT)
+        attr = 0;
+      /* Soft-float code, -msoft-float.  */
+      else if (!TARGET_HARD_FLOAT_ABI)
+        attr = 3;
+      /* Single-float code, -msingle-float.  */
+      else if (!TARGET_DOUBLE_FLOAT)
+        attr = 2;
+      /* 64-bit FP registers on a 32-bit target, -mips32r2 -mfp64.
+         Reserved attr=4.
+         This case used 12 callee-saved double-precision registers
+         and is deprecated.  */
+      /* 64-bit or 32-bit FP registers on a 32-bit target, -mfpxx.  */
+      else if (TARGET_FLOATXX)
+        attr = 5;
+      /* 64-bit FP registers on a 32-bit target, -mfp64 -modd-spreg.  */
+      else if (mips_abi == ABI_32 && TARGET_FLOAT64 && TARGET_ODD_SPREG)
+        attr = 6;
+      /* 64-bit FP registers on a 32-bit target, -mfp64 -mno-odd-spreg.  */
+      else if (mips_abi == ABI_32 && TARGET_FLOAT64)
+        attr = 7;
+      /* Regular FP code, FP regs same size as GP regs, -mdouble-float.  */
+      else
+        attr = 1;
+
+      fprintf (asm_out_file, "\t.gnu_attribute 4, %d\n", attr);
+
+      /* 128-bit MSA.  */
+      if (ISA_HAS_MSA)
+        fprintf (asm_out_file, "\t.gnu_attribute 8, 1\n");
+    }
+    }
 
   /* If TARGET_ABICALLS, tell GAS to generate -KPIC code.  */
   if (TARGET_ABICALLS)
