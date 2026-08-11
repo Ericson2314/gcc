@@ -2878,10 +2878,10 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
 	  tas=$$t-as; tld=$$t-ld; \
 	  if ! command -v "$$tas" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
-	    tas=`./xgcc$(exeext) -print-prog-name=as 2>/dev/null || echo $$t-as`; \
+	    tas=as; \
 	  fi; \
 	  if ! command -v "$$tld" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
-	    tld=`./xgcc$(exeext) -print-prog-name=ld 2>/dev/null || echo $$t-ld`; \
+	    tld=ld; \
 	  fi; \
 	  if command -v "$$tas" > /dev/null 2>&1 && command -v "$$tld" > /dev/null 2>&1; then \
 	    rm -rf tmp-ts-$$t; mkdir tmp-ts-$$t; \
@@ -2901,7 +2901,8 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	      exit 1; \
 	    fi; \
 	  else \
-	    echo "target-specs: SKIP probes for $$t -- $$tas or $$tld not found"; \
+	    echo "target-specs: SKIP probes for $$t -- $$tas or $$tld not found;" \
+	         "no target-config file, so no driver can select $$t"; \
 	    rm -f specs-$$t; \
 	    skipped=`expr $$skipped + 1`; \
 	  fi; \
@@ -2912,7 +2913,9 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    srcmade=`expr $$srcmade + 1`; \
 	  fi; \
 	  if test -f specs-$$t; then \
-	    why=`./xgcc$(exeext) -specs=specs-$$t --version 2>&1 >/dev/null` || { \
+	    tcfg=; \
+	    if test -f specs-$$t-config; then tcfg=-ftarget-config=specs-$$t-config; fi; \
+	    why=`./xgcc$(exeext) $$tcfg -specs=specs-$$t --version 2>&1 >/dev/null` || { \
 	      echo "target-specs: $$t NOT USABLE -- $$why"; \
 	      unusable=`expr $$unusable + 1`; }; \
 	  fi; \
