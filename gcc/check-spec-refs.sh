@@ -71,17 +71,40 @@
 #
 # Usage: check-spec-refs.sh GCC_CC TARGET_SPECS_AC SPECFILE...
 #
-# TARGET_SPECS_AC is target-specs/configure.ac, which is a reference source and
-# not a checked file: it emits spec TEXT of its own (`*link_arch:' is written as
-# %(link_arch_sun)), so a name can be live purely because target-specs refers to
-# it.  Leaving it out of the corpus made sol2.h's link_arch_sun look dead.
+# Usage: check-spec-refs.sh GCC_CC REFSRC... -- SPECFILE...
+#
+# The REFSRC files are reference sources and not checked files.  Two kinds are
+# passed today:
+#
+#   target-specs/configure.ac -- it emits spec TEXT of its own (`*link_arch:'
+#     is written as %(link_arch_sun)), so a name can be live purely because
+#     target-specs refers to it.  Leaving it out made sol2.h's link_arch_sun
+#     look dead.
+#
+#   the enabled languages' `<lang>/lang-specs.h' -- THE DRIVER IS NOT ONE FILE.
+#     gcc.cc's `compilers' array is assembled from those fragments through the
+#     generated `specs.h', so a %(name) written in cp/lang-specs.h is a
+#     reference from the driver in every sense that matters at run time and in
+#     no sense that greping gcc.cc alone can see.  `cplusplus_cpp' -- the spec
+#     that carries -D_GNU_SOURCE, without which C++ cannot include <string> --
+#     is referred to from exactly there and from nowhere else, and this check
+#     called it dead the day it landed.  A file being #included is not the same
+#     as its text being in the corpus (method rule 5: wrong corpus), and the
+#     failure mode is the WORST one available here -- a false positive on a
+#     spec that is not merely live but load-bearing, which is precisely the
+#     kind of report that gets a checker demoted to advisory.
 
 set -e
 
 gcc_cc=$1
 shift
-ts_ac=$1
-shift
+refsrcs=
+while test $# -gt 0; do
+  case $1 in
+    --) shift; break ;;
+    *)  refsrcs="$refsrcs $1"; shift ;;
+  esac
+done
 
 if test ! -f "$gcc_cc"; then
   echo "check-spec-refs: $gcc_cc not found" >&2
@@ -176,11 +199,15 @@ reachable () {
 
 # Two reference sets, because the two kinds of name are judged against
 # different corpora (see the loop below).
-#   driverrefs -- the driver and target-specs' own emitted spec text.  Both are
-#                 target-independent: a reference in either covers every target.
+#   driverrefs -- the driver (gcc.cc plus the lang-specs fragments its
+#                 `compilers' array is assembled from) and target-specs' own
+#                 emitted spec text.  All are target-independent: a reference
+#                 in any of them covers every target.
 #   refs       -- driverrefs plus every spec file, i.e. tree-wide.
 refs_from "$gcc_cc" > "$work"/driverrefs
-test -f "$ts_ac" && refs_from "$ts_ac" >> "$work"/driverrefs
+for _rs in $refsrcs; do
+  test -f "$_rs" && refs_from "$_rs" >> "$work"/driverrefs
+done
 sort -u "$work"/driverrefs -o "$work"/driverrefs
 
 cat "$work"/driverrefs > "$work"/refs
@@ -221,6 +248,33 @@ fi
 if reachable zzz_calib_dead; then
   echo "check-spec-refs: CALIBRATION FAILED -- a spec referred to from nowhere" \
        "is called reachable.  Refusing to report." >&2
+  exit 1
+fi
+
+# A FOURTH PATH, and it needs its own arm for the same reason path 3 did: the
+# lang-specs fragments are `.h', so they go through the C comment stripper and
+# not the spec-file one, and they arrive as REFSRC arguments rather than as
+# checked files.  Every part of that is a place the wiring can come undone
+# without anything else here noticing -- which is exactly what happened to
+# `cplusplus_cpp'.  The stimulus is synthetic (method rule 3: a control drawn
+# from the corpus cannot question it) and shaped like a real fragment,
+# including the comment, so that a stripper that swallowed the file would show
+# up as a must-hit failure rather than as a quiet extra name on the dead list.
+printf '/* A fragment comment mentioning %%(zzz_calib_h_dead).  */\n{".zzz", "@zzz", 0, 0, 0},\n{"@zzz", "cc1zzz %%(zzz_calib_h_live)", 0, 0, 0},\n' \
+  > "$work"/calib-lang-specs.h
+refs_from "$work"/calib-lang-specs.h >> "$work"/driverrefs
+sort -u "$work"/driverrefs -o "$work"/driverrefs
+refs_from "$work"/calib-lang-specs.h >> "$work"/refs
+sort -u "$work"/refs -o "$work"/refs
+if ! reachable zzz_calib_h_live; then
+  echo "check-spec-refs: CALIBRATION FAILED -- a spec referred to from a" \
+       "lang-specs.h fragment is called dead, so the driver's own specs" \
+       "cannot be judged." >&2
+  exit 1
+fi
+if reachable zzz_calib_h_dead; then
+  echo "check-spec-refs: CALIBRATION FAILED -- a spec named only in a COMMENT" \
+       "in a lang-specs.h fragment is called reachable.  Refusing to report." >&2
   exit 1
 fi
 

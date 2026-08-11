@@ -2977,7 +2977,8 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
 	rc=0; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles` || rc=1; \
+	  $(srcdir)/../target-specs/configure.ac $(lang_specs_files) \
+	  -- `cat tmp-specfiles` || rc=1; \
 	if test -s tmp-cfgfiles; then \
 	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles` \
 	    || rc=1; \
@@ -2985,9 +2986,11 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	rm -f tmp-specfiles tmp-cfgfiles; \
 	if test $$rc -ne 0; then \
 	  echo "target-specs: the checks above found specs nothing consults." >&2; \
-	  echo "target-specs: ADVISORY here -- \`make check-spec-refs' and" \
-	       "\`make check-target-caps' are the gates." >&2; \
-	fi
+	  echo "target-specs: this is FATAL here.  A spec file the driver cannot" \
+	       "consult is a value thrown away, and the only moment anyone will" \
+	       "look is the moment it is written." >&2; \
+	fi; \
+	exit $$rc
 
 # Fail the build if a spec file names a spec nothing ever asks for.  Three
 # separate times a spec has been written into every per-target spec file with
@@ -3001,7 +3004,8 @@ check-spec-refs:
 	@find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print \
 	  > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
+	  $(srcdir)/../target-specs/configure.ac $(lang_specs_files) \
+	  -- `cat tmp-specfiles`; \
 	rc=$$?; rm -f tmp-specfiles; exit $$rc
 
 # The same failure, on the other half of what target-specs writes.  A spec file
@@ -3019,14 +3023,21 @@ check-spec-refs:
 # a check appended after it never executed in any build, while looking wired up
 # because the build was already red for another reason.
 #
-# AND THAT IS WHY THE CHECKS ARE ADVISORY IN THAT RULE AND FATAL ONLY HERE.
-# Wiring a new check to fail the build gates everyone on a backlog they did not
-# create: those four dead specs predate the check, and failing on them stopped
-# `target-specs', which stops `gcc/specs', which stops `libgcc.a', which put the
-# whole testsuite in an environmental floor -- the exact condition that hid 1447
-# C++ regressions in the first place.  A check that blocks the work needed to
-# fix what it found is worse than no check.  Report in the build, fail in the
-# gate, and let the gate go green when the backlog is cleared.
+# BOTH CHECKS ARE FATAL IN THAT RULE AGAIN.  They were made advisory while four
+# specs nothing consults were blocking `target-specs', which stops `gcc/specs',
+# which stops `libgcc.a', which put the whole testsuite into an environmental
+# floor -- a check that blocks the work needed to fix what it found is worse
+# than no check, and that reasoning was right at the time.  It expired: the four
+# were disposed of in `88ef1f18136'.  Leaving the recipe advisory after that
+# bought nothing and cost the enforcement on the ONE path that always runs,
+# since almost nobody types `make check-spec-refs'.
+#
+# The standing lesson from the episode is not "advisory is safer".  It is that a
+# check's REPORT and a check's TIMING are separate decisions: the backlog that
+# justified the demotion was a backlog of real bugs, so the fix was to clear
+# them, and a false positive -- `cplusplus_cpp', reported dead because the
+# corpus was gcc.cc alone and the reference lives in cp/lang-specs.h -- is a bug
+# in the check to be fixed in the check, never a reason to stop failing.
 .PHONY: check-target-caps
 check-target-caps:
 	@find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
