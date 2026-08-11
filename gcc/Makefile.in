@@ -3592,24 +3592,66 @@ insn-modes.h: s-modes-h; @true
 insn-modes-inline.h: s-modes-inline-h; @true
 min-insn-modes.cc: s-modes-m; @true
 
-s-modes: build/genmodes$(build_exeext)
-	$(RUN_GEN) build/genmodes$(build_exeext) > tmp-modes.cc
+# The SHARED MODE NUMBERING.  `modes-union.list' is written by the union
+# genmodes run whose rules multi-target-md.mk emits; every genmodes run in the
+# build, this one included, places its tables against it.
+#
+# This is not optional and it is not merely tidy.  Without it each back end's
+# enum is dense over the modes that back end happens to define, so `SImode' is
+# a different integer for each of them: measured in a two-target build dir,
+# ordinal 18 for i386 and 17 for aarch64, with NUM_MACHINE_MODES 124 against
+# 192.  A middle-end object compiled against one numbering and a back-end
+# object compiled against another pass modes to each other with no link error
+# and no diagnostic.  genmodes.cc has carried the union machinery (`-l', `-U',
+# `-A', -DGENMODES_UNION) since f7c4d1aed68; nothing invoked it, which is why
+# the numbering was still per back end.  Grep the generated multi-target-md.mk
+# for `-U', not this comment, to check that it is still wired up.
+#
+# The singular run is the PRIMARY's, so it announces itself as
+# $(multi_target_base) -- the same base key the tm-<base>.h files and the
+# common_out_symbol use.
+MODES_UNION_FLAGS = -U modes-union.list -A $(multi_target_base)
+
+# An empty $(multi_target_base) would expand to a bare `-A' whose argument is
+# then the NEXT flag: `-A -m' leaves genmodes with no -m, so it writes the full
+# tables where min-insn-modes.cc was expected and says nothing.  That is a
+# silent wrong answer, not a stopped build, so check it once here.  The same
+# variable is checked the same way for target-asm-ops-select.o above, and for
+# the same reason -- it has already been empty once.
+check_modes_union_base = \
+  test -n "$(multi_target_base)" || { \
+    echo "s-modes*: multi_target_base is empty; genmodes would be given" >&2; \
+    echo "  a bare -A and would silently consume the next flag." >&2; \
+    echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+    echo "  targetm_common_<base>_common" >&2; \
+    exit 1; }
+
+s-modes: build/genmodes$(build_exeext) modes-union.list
+	@$(check_modes_union_base)
+	$(RUN_GEN) build/genmodes$(build_exeext) $(MODES_UNION_FLAGS) \
+	  > tmp-modes.cc
 	$(SHELL) $(srcdir)/../move-if-change tmp-modes.cc insn-modes.cc
 	$(STAMP) s-modes
 
-s-modes-h: build/genmodes$(build_exeext)
-	$(RUN_GEN) build/genmodes$(build_exeext) -h > tmp-modes.h
+s-modes-h: build/genmodes$(build_exeext) modes-union.list
+	@$(check_modes_union_base)
+	$(RUN_GEN) build/genmodes$(build_exeext) $(MODES_UNION_FLAGS) -h \
+	  > tmp-modes.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-modes.h insn-modes.h
 	$(STAMP) s-modes-h
 
-s-modes-inline-h: build/genmodes$(build_exeext)
-	$(RUN_GEN) build/genmodes$(build_exeext) -i > tmp-modes-inline.h
+s-modes-inline-h: build/genmodes$(build_exeext) modes-union.list
+	@$(check_modes_union_base)
+	$(RUN_GEN) build/genmodes$(build_exeext) $(MODES_UNION_FLAGS) -i \
+	  > tmp-modes-inline.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-modes-inline.h \
 	  insn-modes-inline.h
 	$(STAMP) s-modes-inline-h
 
-s-modes-m: build/genmodes$(build_exeext)
-	$(RUN_GEN) build/genmodes$(build_exeext) -m > tmp-min-modes.cc
+s-modes-m: build/genmodes$(build_exeext) modes-union.list
+	@$(check_modes_union_base)
+	$(RUN_GEN) build/genmodes$(build_exeext) $(MODES_UNION_FLAGS) -m \
+	  > tmp-min-modes.cc
 	$(SHELL) $(srcdir)/../move-if-change tmp-min-modes.cc min-insn-modes.cc
 	$(STAMP) s-modes-m
 

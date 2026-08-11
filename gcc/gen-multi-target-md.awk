@@ -302,18 +302,31 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     modesdep = "";
     printf "build/genmodes-%s.o : BUILD_CPPFLAGS += -DTARGET_NO_EXTRA_MODES\n", cpu;
   }
+  # Remember this back end for the union run emitted at END.  The order is
+  # the manifest's, which is configure's, so the shared numbering is stable
+  # between runs of this script for one configuration.
+  union_cpu[++n_union_cpu] = cpu;
+  union_modes[cpu] = xmodes;
+
+  # Every run places its tables against the SHARED numbering, and announces
+  # which back end it is so that a name two back ends define and disagree
+  # about is attributed correctly.  Without `-U' each back end's enum is dense
+  # over its own modes and `SImode' is a different integer in each -- silently,
+  # with no link error.  See MODES_UNION_FLAGS in Makefile.in.
+  ufl = sprintf("-U modes-union.list -A %s", cpu);
+
   printf "genprogerr += modes-%s\n", cpu;
   printf "build/genmodes-%s.o : genmodes.cc $(BCONFIG_H) $(SYSTEM_H) errors.h \\\n", cpu;
   printf "  $(HASHTAB_H) machmode.def%s\n", modesdep;
   printf "\n";
-  printf "insn-modes-%s.h: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
-  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) -h > tmp-modes-%s.h\n", cpu, cpu;
+  printf "insn-modes-%s.h: build/genmodes-%s$(build_exeext) modes-union.list\n", cpu, cpu;
+  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) %s -h > tmp-modes-%s.h\n", cpu, ufl, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-%s.h $@\n", cpu;
-  printf "insn-modes-inline-%s.h: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
-  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) -i > tmp-modes-inline-%s.h\n", cpu, cpu;
+  printf "insn-modes-inline-%s.h: build/genmodes-%s$(build_exeext) modes-union.list\n", cpu, cpu;
+  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) %s -i > tmp-modes-inline-%s.h\n", cpu, ufl, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-inline-%s.h $@\n", cpu;
-  printf "min-insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
-  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) -m > tmp-min-modes-%s.cc\n", cpu, cpu;
+  printf "min-insn-modes-%s.cc: build/genmodes-%s$(build_exeext) modes-union.list\n", cpu, cpu;
+  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) %s -m > tmp-min-modes-%s.cc\n", cpu, ufl, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-min-modes-%s.cc $@\n\n", cpu;
   # The full mode tables, as opposed to the -m subset the generators link
   # against.  This is a cc1 object, not a build/ one: it carries mode_size,
@@ -325,9 +338,9 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # file that exposed the reason: `#include "tm.h"' from a source sitting in
   # the build root finds the build root's OWN tm.h, which is the PRIMARY
   # target's, before any -I is consulted at all.
-  printf "mt-%s/insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu, cpu;
+  printf "mt-%s/insn-modes-%s.cc: build/genmodes-%s$(build_exeext) modes-union.list\n", cpu, cpu, cpu;
   printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
-  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) > tmp-modes-%s.cc\n", cpu, cpu;
+  printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) %s > tmp-modes-%s.cc\n", cpu, ufl, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-%s.cc $@\n\n", cpu;
 
   # Everything the generators link against sees the mode enum through
@@ -1003,7 +1016,95 @@ $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_source_specs();
-		    emit_inc_dirs() }
+		    emit_modes_union(); emit_inc_dirs() }
+
+# THE SHARED MODE NUMBERING.
+#
+# genmodes.cc has carried this machinery since f7c4d1aed68 and nothing invoked
+# it: there was no `-l' and no `-U' anywhere in the build, so every back end's
+# mode enum stayed dense over its own modes.  Measured in a two-target build
+# dir before this function existed: `E_SImode' was ordinal 18 for i386 and 17
+# for aarch64, NUM_MACHINE_MODES 124 against 192.  Two objects that disagree
+# about which integer `SImode' is link cleanly and miscompile silently, which
+# is the exact bug class this branch exists to remove -- and it sat upstream
+# of every symbol the selector was being sized for.
+#
+# `absence of an artefact is not absence of a mechanism' has bitten this
+# project repeatedly; this is the mirror of it.  The mechanism was present in
+# genmodes.cc and its comments described a wiring that did not exist.  The
+# check that settles it is one command against the GENERATED fragment, not
+# against genmodes.cc:
+#
+#	grep -c ' -U modes-union.list ' multi-target-md.mk
+#
+# and the check that it WORKS is that two back ends' insn-modes-<base>.h agree
+# on the ordinal of every mode they both define.
+function emit_modes_union(   i, c, m, deps, seen_modes) {
+  if (n_union_cpu == 0)
+    return;
+
+  # The union input: one #include per back end, each announced so that a name
+  # it defines can be attributed to it, and each reporting the bitsize maxima
+  # before they are #undef'd.  Reading all the files and then looking at
+  # MAX_BITSIZE_MODE_ANY_INT once would give whichever file came last, not the
+  # largest -- genmodes.cc:1000 records that trap; this is the code it asks
+  # for.
+  deps = "";
+  for (i = 1; i <= n_union_cpu; i++) {
+    c = union_cpu[i];
+    if (union_modes[c] != "" && !(union_modes[c] in seen_modes)) {
+      seen_modes[union_modes[c]] = 1;
+      deps = deps " $(srcdir)/config/" union_modes[c];
+    }
+  }
+
+  printf "# The union genmodes input.  Generated; see emit_modes_union in\n";
+  printf "# gen-multi-target-md.awk.\n";
+  printf "modes-union.def:%s\n", deps;
+  printf "\t@rm -f tmp-modes-union.def\n";
+  printf "\t@printf '/* Generated by gen-multi-target-md.awk.  Do not edit.  */\\n' > tmp-modes-union.def\n";
+  for (i = 1; i <= n_union_cpu; i++) {
+    c = union_cpu[i];
+    m = union_modes[c];
+    if (m == "")
+      continue;
+    # One printf per back end.  `%' never appears in what is written, so
+    # nothing here needs escaping for printf(1) beyond the newlines.
+    printf "\t@printf 'union_note_arch (\"%s\");\\n", c;
+    printf "#include \"config/%s\"\\n", m;
+    printf "#ifdef MAX_BITSIZE_MODE_ANY_INT\\n";
+    printf "union_note_max_bitsize (MAX_BITSIZE_MODE_ANY_INT, 0);\\n";
+    printf "#undef MAX_BITSIZE_MODE_ANY_INT\\n";
+    printf "#endif\\n";
+    printf "#ifdef MAX_BITSIZE_MODE_ANY_MODE\\n";
+    printf "union_note_max_bitsize (0, MAX_BITSIZE_MODE_ANY_MODE);\\n";
+    printf "#undef MAX_BITSIZE_MODE_ANY_MODE\\n";
+    printf "#endif\\n";
+    # Back to null before the next file, and before the rest of machmode.def:
+    # a name defined by COMPLEX_MODES/VECTOR_MODES after the include belongs to
+    # nobody and must not be qualified with the last back end read.
+    printf "union_note_arch (0);\\n' >> tmp-modes-union.def\n";
+  }
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-union.def $@\n\n";
+
+  # The union genmodes.  -DGENMODES_UNION turns on the announcement hooks and
+  # the running bitsize maxima; the extra-modes file is the generated union
+  # input, which lives in the BUILD directory -- `config/<cpu>/...' inside it
+  # is then resolved through -I$(srcdir), because the build directory has no
+  # config/ of its own.
+  printf "genprogerr += modes-union\n";
+  printf "build/genmodes-union.o : BUILD_CPPFLAGS += -DGENMODES_UNION -DTARGET_EXTRA_MODES_FILE='\"modes-union.def\"'\n";
+  printf "build/genmodes-union.o : genmodes.cc $(BCONFIG_H) $(SYSTEM_H) errors.h \\\n";
+  printf "  $(HASHTAB_H) machmode.def modes-union.def\n\n";
+
+  printf "modes-union.list: build/genmodes-union$(build_exeext)\n";
+  printf "\t$(RUN_GEN) build/genmodes-union$(build_exeext) -l > tmp-modes-union.list\n";
+  printf "\t@test -s tmp-modes-union.list || { \\\n";
+  printf "\t  echo 'modes-union.list: the union run emitted no modes;' >&2; \\\n";
+  printf "\t  echo '  every genmodes run would then be numbered against nothing.' >&2; \\\n";
+  printf "\t  exit 1; }\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-union.list $@\n\n";
+}
 
 # One .o rule per back-end object, for every configured back end.
 #
