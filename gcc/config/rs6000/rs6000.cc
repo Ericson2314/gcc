@@ -22361,15 +22361,15 @@ rs6000_asm_weaken_decl (FILE *stream, tree decl,
   if (decl && TREE_CODE (decl) == FUNCTION_DECL
       && DEFAULT_ABI == ABI_AIX && DOT_SYMBOLS)
     {
-#if TARGET_XCOFF && HAVE_GAS_HIDDEN
-      if (TARGET_XCOFF)
+#if TARGET_XCOFF
+      if (HAVE_GAS_HIDDEN)
 	fputs (rs6000_xcoff_visibility (decl), stream);
 #endif
       fputs ("\n\t.weak\t.", stream);
       RS6000_OUTPUT_BASENAME (stream, name);
     }
-#if TARGET_XCOFF && HAVE_GAS_HIDDEN
-  if (TARGET_XCOFF)
+#if TARGET_XCOFF
+  if (HAVE_GAS_HIDDEN)
     fputs (rs6000_xcoff_visibility (decl), stream);
 #endif
   fputc ('\n', stream);
