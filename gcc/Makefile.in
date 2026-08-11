@@ -590,6 +590,12 @@ SYSTEM_HEADER_DIR = `echo @SYSTEM_HEADER_DIR@ | sed -e :a -e 's,[^/]*/\.\.\/,,' 
 # Path to the system headers on the build machine.
 BUILD_SYSTEM_HEADER_DIR = `echo @BUILD_SYSTEM_HEADER_DIR@ | sed -e :a -e 's,[^/]*/\.\.\/,,' -e ta`
 
+# The machine whose headers live in BUILD_SYSTEM_HEADER_DIR, and therefore the
+# machine whose fixincludes fixes apply to them.  Not the compiler's target:
+# gcc/ has none, and this was never a question about the compiler.  See
+# configure.ac.  Empty is a hard error, never a default -- see stmp-fixinc.
+FIXINCLUDES_MACHINE = @fixincludes_machine@
+
 # Control whether to run fixincludes.
 STMP_FIXINC = @STMP_FIXINC@
 
@@ -3951,7 +3957,16 @@ stmp-fixinc: gsyslimits.h macro_list fixinc_list \
 	    fi; \
 	    $(mkinstalldirs) $${fix_dir}; \
 	    chmod a+rx $${fix_dir} || true; \
-	    (TARGET_MACHINE='$(target)'; srcdir=`cd $(srcdir); ${PWD_COMMAND}`; \
+	    if test -z '$(FIXINCLUDES_MACHINE)'; then \
+	      echo "fixincludes: refusing to run without a machine name." >&2; \
+	      echo "  An empty TARGET_MACHINE puts fixincl in its self-test mode:" >&2; \
+	      echo "  per-machine gating is switched off and EVERY machine's fixes" >&2; \
+	      echo "  are applied to ${BUILD_SYSTEM_HEADER_DIR}, which is how the" >&2; \
+	      echo "  VxWorks unistd.h wrapper once made libgcc unbuildable." >&2; \
+	      echo "  Pass --with-fixincludes-machine=MACHINE." >&2; \
+	      exit 1; \
+	    fi; \
+	    (TARGET_MACHINE='$(FIXINCLUDES_MACHINE)'; srcdir=`cd $(srcdir); ${PWD_COMMAND}`; \
 	      SHELL='$(SHELL)'; MACRO_LIST=`${PWD_COMMAND}`/macro_list ; \
 	      gcc_dir=`${PWD_COMMAND}` ; \
 	      export TARGET_MACHINE srcdir SHELL MACRO_LIST && \

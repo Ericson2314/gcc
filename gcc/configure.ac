@@ -2596,6 +2596,34 @@ else
   target_header_dir=${native_system_header_dir}
 fi
 
+dnl The machine whose system headers fixincludes is fixing.
+dnl
+dnl This is NOT the compiler's target -- gcc/ no longer has one -- it is a
+dnl property of BUILD_SYSTEM_HEADER_DIR, i.e. of the header tree being fixed.
+dnl With no --with-build-sysroot that tree is the NATIVE one, so the machine it
+dnl belongs to is the host.  With a build sysroot the headers are some other
+dnl machine's and nothing here can name it; say so rather than guess.
+dnl
+dnl It must never be empty.  fixincl.c:403 turns an empty TARGET_MACHINE into
+dnl `pz_machine = NULL', which is its self-test mode: per-machine gating is
+dnl switched off entirely and EVERY machine's fixes are applied to whatever
+dnl headers it is handed.  A vacuous filter is permissive, not empty.  That is
+dnl how config/vxworks' unistd.h wrapper (`#include <ioLib.h>') was written into
+dnl a glibc include-fixed and made libgcc unbuildable.  Makefile.in refuses to
+dnl run fixincludes when this is empty.
+AC_ARG_WITH(fixincludes-machine,
+[AS_HELP_STRING([--with-fixincludes-machine=MACHINE],
+                [machine name whose system headers fixincludes should fix;
+                 needed only with --with-build-sysroot, where the headers are
+                 not the host's])],
+[fixincludes_machine="$withval"],
+[if test "x$with_build_sysroot" != x; then
+   fixincludes_machine=
+ else
+   fixincludes_machine=$host
+ fi])
+AC_SUBST(fixincludes_machine)
+
 # If this is a cross-compiler that does not
 # have its own set of headers then define
 # inhibit_libc
