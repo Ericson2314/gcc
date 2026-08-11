@@ -131,6 +131,31 @@ struct target_caps targ_caps =
   .as_riscv_march_zifencei = true,
   .as_riscv_march_zaamo_zalrsc = true,
   .as_riscv_march_b = true,
+
+  /* The 2026-08-11 sweep.  false, not true -- see the note in target-caps.h.
+     These have been off for every build that was not configured for their own
+     back end, and turning them on for an unprobed toolchain would emit
+     directives its assembler has never accepted.  */
+  .as_entry_markers = false,
+  .as_mfcrf = false,
+  .as_power10_htm = false,
+  .as_rel16 = false,
+  .as_pltseq = false,
+  .as_mspabi_attribute = false,
+  .as_mmacosx_version_min = false,
+  .as_macos_build_version = false,
+  .gas_literal16 = false,
+  .gas_nsubspa_comdat = false,
+  .gas_arm_extended_arch = false,
+  .as_loongarch_support_call36 = false,
+  .as_loongarch_tls_le_relaxation = false,
+  .as_loongarch_16b_atomic = false,
+  .as_loongarch_eh_frame_pcrel_encoding = false,
+  .as_s390_architecture_modifiers = false,
+  .as_s390_vector_loadstore_alignment_hints = false,
+  .as_s390_vector_loadstore_alignment_hints_on_z13 = false,
+  .use_as_traditional_format = false,
+
   .solaris_ld = false,
 
   /* String capabilities.  Today's behaviour: every consumer of these had the
@@ -436,6 +461,45 @@ read_target_caps (const char *file)
 	targ_caps.as_riscv_march_zaamo_zalrsc = value != 0;
       else if (strcmp (name, "as_riscv_march_b") == 0)
 	targ_caps.as_riscv_march_b = value != 0;
+      else if (strcmp (name, "as_entry_markers") == 0)
+	targ_caps.as_entry_markers = value != 0;
+      else if (strcmp (name, "as_mfcrf") == 0)
+	targ_caps.as_mfcrf = value != 0;
+      else if (strcmp (name, "as_power10_htm") == 0)
+	targ_caps.as_power10_htm = value != 0;
+      else if (strcmp (name, "as_rel16") == 0)
+	targ_caps.as_rel16 = value != 0;
+      else if (strcmp (name, "as_pltseq") == 0)
+	targ_caps.as_pltseq = value != 0;
+      else if (strcmp (name, "as_mspabi_attribute") == 0)
+	targ_caps.as_mspabi_attribute = value != 0;
+      else if (strcmp (name, "as_mmacosx_version_min") == 0)
+	targ_caps.as_mmacosx_version_min = value != 0;
+      else if (strcmp (name, "as_macos_build_version") == 0)
+	targ_caps.as_macos_build_version = value != 0;
+      else if (strcmp (name, "gas_literal16") == 0)
+	targ_caps.gas_literal16 = value != 0;
+      else if (strcmp (name, "gas_nsubspa_comdat") == 0)
+	targ_caps.gas_nsubspa_comdat = value != 0;
+      else if (strcmp (name, "gas_arm_extended_arch") == 0)
+	targ_caps.gas_arm_extended_arch = value != 0;
+      else if (strcmp (name, "as_loongarch_support_call36") == 0)
+	targ_caps.as_loongarch_support_call36 = value != 0;
+      else if (strcmp (name, "as_loongarch_tls_le_relaxation") == 0)
+	targ_caps.as_loongarch_tls_le_relaxation = value != 0;
+      else if (strcmp (name, "as_loongarch_16b_atomic") == 0)
+	targ_caps.as_loongarch_16b_atomic = value != 0;
+      else if (strcmp (name, "as_loongarch_eh_frame_pcrel_encoding") == 0)
+	targ_caps.as_loongarch_eh_frame_pcrel_encoding = value != 0;
+      else if (strcmp (name, "as_s390_architecture_modifiers") == 0)
+	targ_caps.as_s390_architecture_modifiers = value != 0;
+      else if (strcmp (name, "as_s390_vector_loadstore_alignment_hints") == 0)
+	targ_caps.as_s390_vector_loadstore_alignment_hints = value != 0;
+      else if (strcmp (name,
+		       "as_s390_vector_loadstore_alignment_hints_on_z13") == 0)
+	targ_caps.as_s390_vector_loadstore_alignment_hints_on_z13 = value != 0;
+      else if (strcmp (name, "use_as_traditional_format") == 0)
+	targ_caps.use_as_traditional_format = value != 0;
       else if (strcmp (name, "solaris_ld") == 0)
 	targ_caps.solaris_ld = value != 0;
     }

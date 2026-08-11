@@ -263,6 +263,93 @@ AC_ARG_WITH([specs-file],
   [AS_HELP_STRING([--with-specs-file=PATH], [where to write the spec file])],
   [specs_file=$withval], [specs_file=specs-${target}])
 
+dnl Where this target's C++ headers live.  These were --with-gxx-include-dir
+dnl and --with-gxx-libcxx-include-dir in gcc/configure.ac, i.e. ONE answer for
+dnl the whole compiler; they are per target and they belong here.  They are not
+dnl probes: nothing about an assembler or a linker is being asked.  They are
+dnl the location of an installation, which is why they are options and not
+dnl gcc_cv_ tests.
+dnl
+dnl THREE STATES, AND THE MIDDLE ONE IS THE TRAP.
+dnl
+dnl   unset       emit no key.  targ_caps keeps its built-in default, which is
+dnl               the installation-relative path gcc/Makefile.in computes and
+dnl               passes as -DGPLUSPLUS_INCLUDE_DIR.  This is today behaviour,
+dnl               unchanged, and it is the right answer for a target installed
+dnl               under our own prefix.
+dnl   =DIR        emit DIR.  The tool and backward directories are derived from
+dnl               it unless given separately.
+dnl   =no         emit the key with an EMPTY value.  "This target has no such
+dnl               directory": cppdefault.cc drops the entry from the include
+dnl               search path rather than searching "".
+dnl
+dnl OMITTING THE KEY IS NOT THE SAME AS EMITTING IT EMPTY, and it is silently
+dnl the opposite: an omitted key leaves the built-in default in place, so
+dnl --with-gxx-libcxx-include-dir=no would go on searching the libc++ headers.
+dnl That is why =no writes a key with nothing after the name rather than
+dnl skipping the line.
+ts_emit_gxx=no
+ts_emit_gxx_libcxx=no
+ts_gxx_include_dir=
+ts_gxx_tool_include_dir=
+ts_gxx_backward_include_dir=
+ts_gxx_libcxx_include_dir=
+
+AC_ARG_WITH([gxx-include-dir],
+  [AS_HELP_STRING([--with-gxx-include-dir=DIR],
+     [where this target's g++ header files are; "no" for none at all])],
+  [ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-gxx-include-dir needs a directory or "no"]) ;;
+     *)     ts_gxx_include_dir=$withval ;;
+   esac], [])
+
+AC_ARG_WITH([gxx-tool-include-dir],
+  [AS_HELP_STRING([--with-gxx-tool-include-dir=DIR],
+     [where this target's target-specific g++ headers are])],
+  [ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_tool_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-gxx-tool-include-dir needs a directory or "no"]) ;;
+     *)     ts_gxx_tool_include_dir=$withval ;;
+   esac],
+  [dnl Derived, and this derivation is the reason the key exists.  gcc's
+   dnl Makefile.in builds GPLUSPLUS_TOOL_INCLUDE_DIR as
+   dnl $(gcc_gxx_include_dir)/$(target_noncanonical) with target_noncanonical
+   dnl UNSUBSTITUTED, so the built-in default has been a duplicate of
+   dnl gxx_include_dir with a trailing slash, entered into the search path
+   dnl twice.  Here ${target} is known, so this is the first place the entry
+   dnl can be right.  Only derived when a base was given: with no base there is
+   dnl nothing to append to, and emitting a bare "/${target}" would be worse
+   dnl than the duplicate.
+   if test x"$ts_emit_gxx" = xyes && test -n "$ts_gxx_include_dir"; then
+     ts_gxx_tool_include_dir=$ts_gxx_include_dir/$target
+   fi])
+
+AC_ARG_WITH([gxx-backward-include-dir],
+  [AS_HELP_STRING([--with-gxx-backward-include-dir=DIR],
+     [where this target's backward-compatibility g++ headers are])],
+  [ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_backward_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-gxx-backward-include-dir needs a directory or "no"]) ;;
+     *)     ts_gxx_backward_include_dir=$withval ;;
+   esac],
+  [if test x"$ts_emit_gxx" = xyes && test -n "$ts_gxx_include_dir"; then
+     ts_gxx_backward_include_dir=$ts_gxx_include_dir/backward
+   fi])
+
+AC_ARG_WITH([gxx-libcxx-include-dir],
+  [AS_HELP_STRING([--with-gxx-libcxx-include-dir=DIR],
+     [where this target's libc++ header files are; "no" for none at all])],
+  [ts_emit_gxx_libcxx=yes
+   case $withval in
+     no|"") ts_gxx_libcxx_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-gxx-libcxx-include-dir needs a directory or "no"]) ;;
+     *)     ts_gxx_libcxx_include_dir=$withval ;;
+   esac], [])
+
 dnl Missing tools are not an error.  When this runs as part of the tree the
 dnl target's binutils may legitimately not be installed yet, and failing the
 dnl whole build for that would be wrong -- the specs for that target simply
@@ -2267,8 +2354,14 @@ gas_nsubspa_comdat `ts_bool "$gcc_cv_as_nsubspa_comdat"`
 gas_base64 `ts_bool "$gcc_cv_as_base64"`
 gas_cv_ucomp `ts_bool "$gcc_cv_as_cv_ucomp"`
 gas_lcomm_with_alignment `ts_bool "$gcc_cv_as_lcomm_with_alignment"`
-# Section flags.  gas_section_exclude folds the `e' and `#exclude' spellings,
+# Section flags.  gas_section_exclude folds the "e" and "#exclude" spellings,
 # exactly as HAVE_GAS_SECTION_EXCLUDE did.
+#
+# NO BACKTICKS IN THE PROSE OF THIS HEREDOC.  It is unquoted, because every
+# value in it is a command substitution -- so a backtick in a comment opens one
+# too, and the shell swallows every line up to the next stray backtick.  When
+# that last happened the whole "cat" died with a parse error and NOT ONE key
+# reached the file, silently.  Use "..." in comments here, never GNU quoting.
 gas_section_exclude `ts_bool "$gcc_cv_as_section_exclude"`
 gas_shf_gnu_retain `ts_bool "$gcc_cv_as_shf_gnu_retain"`
 gas_section_link_order `ts_bool "$gcc_cv_as_section_link_order"`
@@ -2277,14 +2370,31 @@ use_as_traditional_format `ts_bool "$gcc_cv_as_eh_frame_traditional"`
 # darwin.
 as_mmacosx_version_min `ts_bool "$gcc_cv_as_mmacosx_version_min"`
 as_macos_build_version `ts_bool "$gcc_cv_as_darwin_build_version"`
-# avr.
-as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
-as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
-as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
-# cris.
-as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
-# ia64.
-as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
+# avr.  THE THREE avr KEYS ARE PROBED AND DELIBERATELY NOT WRITTEN.  Their
+# only consumer is gen-avr-mmcu-specs.cc, which is a BUILD-MACHINE program: it
+# writes device-specs/ at build time and reads HAVE_AS_AVR_MLINK_RELAX_OPTION,
+# _MRMW_OPTION and _MGCCISR_OPTION from auto-host.h.  A build-time generator
+# cannot read targ_caps, so there is nowhere for these answers to land yet, and
+# check-target-caps is right to refuse a key nothing reads.  Writing them is
+# one uncommented line each once avr's device specs are generated per target
+# the way this directory generates the rest.
+#   as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
+#   as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
+#   as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
+# cris.  PROBED, NOT WRITTEN, same reason in a different shape: the consumer is
+# MAYBE_AS_NO_MUL_BUG_ABORT in cris.h, which is SPEC TEXT.  Spec text comes
+# down the gen-target-specs channel, not through targ_caps, so this belongs
+# beside asm_mrelax below rather than here -- as a spec, when someone writes
+# the cris side of it.
+#   as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
+# ia64.  PROBED, NOT WRITTEN, AND THIS ONE IS A CHECKER LIMIT, NOT A DESIGN
+# GAP.  The reader exists and is correct -- defaults.h defines
+# HAVE_AS_LTOFFX_LDXMOV_RELOCS from this key and ia64.md reads it at
+# ia64.md:774 and :787 -- but check-target-caps.sh builds its reader corpus
+# from *.cc, *.h, *.c and *.def only, so an .md file is invisible to it and the
+# key reads as dead.  Uncomment this line together with adding "*.md" to that
+# find; doing it alone turns "make target-specs" red for everyone.
+#   as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
 # powerpc.
 as_mfcrf `ts_bool "$gcc_cv_as_powerpc_mfcrf"`
 as_power10_htm `ts_bool "$gcc_cv_as_power10_htm"`
@@ -2300,14 +2410,56 @@ as_loongarch_support_call36 `ts_bool "$gcc_cv_as_loongarch_call36"`
 as_loongarch_eh_frame_pcrel_encoding `ts_bool "$gcc_cv_as_loongarch_eh_frame_pcrel"`
 as_loongarch_tls_le_relaxation `ts_bool "$gcc_cv_as_loongarch_tls_le_relaxation"`
 as_loongarch_16b_atomic `ts_bool "$gcc_cv_as_loongarch_16b_atomic"`
-# s390.  The two alignment-hint answers are one `#if/#elif' ladder in s390.h.
-as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
+# s390.  The two alignment-hint answers are one "#if/#elif" ladder in s390.h.
+# as_s390_machine_machinemode is PROBED AND NOT WRITTEN.  Its consumer is
+# S390_USE_TARGET_ATTRIBUTE, which is tested with "#if" in nine places, one of
+# them selecting SWITCHABLE_TARGET -- that one changes data layout and cannot
+# become a run-time answer.  Making it a capability needs s390 to stop deciding
+# SWITCHABLE_TARGET from an assembler probe, which is its own change.
+#   as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
 as_s390_architecture_modifiers `ts_bool "$gcc_cv_as_s390_architecture_modifiers"`
 as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"`
 as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
 # arm.
 gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
 EOF
+
+dnl Where this target's C++ headers live.  STRINGS, and the empty string is a
+dnl real answer -- cppdefault.cc drops the entry from the include search path
+dnl rather than searching "".
+dnl
+dnl TWO CONDITIONAL HEREDOCS, not printf, and that is not a style choice.
+dnl check-target-caps.sh learns which keys this script writes by reading the
+dnl heredocs, and it treats any OTHER redirection onto $target_config_file as a
+dnl hard error rather than as a key it failed to see -- because a hole there
+dnl reads as "never written", which is a false positive on a live key.  A
+dnl printf emission is exactly such a hole.  Anything added here must stay in
+dnl this shape or teach that extractor first.
+dnl
+dnl The heredocs are UNQUOTED, like the big one above, so ${} expands.  KEEP
+dnl BACKTICKS OUT OF THE COMMENTS IN THEM.
+dnl
+dnl An empty variable gives "name" followed by a space and nothing else, which
+dnl is a key WITH an empty value: target-caps.cc takes the rest of the line
+dnl after the name, so the slot becomes "" rather than keeping its default.
+dnl Same shape ld_static_option uses for the same reason.
+if test x"$ts_emit_gxx" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# C++ header directories for this target.  STRINGS, and empty is a real answer:
+# cppdefault.cc drops the entry from the include search path rather than
+# searching "".  A key that is absent is NOT the same thing -- that leaves the
+# built-in installation-relative default in place.
+gxx_include_dir ${ts_gxx_include_dir}
+gxx_tool_include_dir ${ts_gxx_tool_include_dir}
+gxx_backward_include_dir ${ts_gxx_backward_include_dir}
+EOF
+fi
+if test x"$ts_emit_gxx_libcxx" = xyes; then
+cat >> "$target_config_file" <<EOF
+gxx_libcxx_include_dir ${ts_gxx_libcxx_include_dir}
+EOF
+fi
 
 dnl The driver-side ones are spec fragments.  They are appended as their own
 dnl spec entries rather than folded into the ones written above.

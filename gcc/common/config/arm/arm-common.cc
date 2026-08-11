@@ -115,11 +115,13 @@ arm_rewrite_mcpu (int argc, const char **argv)
 {
   gcc_assert (argc);
 
-#ifdef HAVE_GAS_ARM_EXTENDED_ARCH
-  return argv[argc - 1];
-#else
+  /* Was `#ifdef HAVE_GAS_ARM_EXTENDED_ARCH'.  That macro is
+     targ_caps.gas_arm_extended_arch now, always defined, so the question is
+     asked at run time: an assembler that understands the extended -mcpu
+     spelling gets the string through unchanged.  */
+  if (HAVE_GAS_ARM_EXTENDED_ARCH)
+    return argv[argc - 1];
   return arm_rewrite_selected_cpu (argv[argc - 1]);
-#endif
 }
 
 /* Comparator for arm_rewrite_selected_arch.  Compare the two arch extension
@@ -228,11 +230,11 @@ arm_rewrite_march (int argc, const char **argv)
 {
   gcc_assert (argc);
 
-#ifdef HAVE_GAS_ARM_EXTENDED_ARCH
-  return argv[argc - 1];
-#else
+  /* See arm_rewrite_mcpu: a run-time capability, not a preprocessor
+     question.  */
+  if (HAVE_GAS_ARM_EXTENDED_ARCH)
+    return argv[argc - 1];
   return arm_rewrite_selected_arch (argv[argc - 1]);
-#endif
 }
 
 #include "arm-cpu-cdata.h"

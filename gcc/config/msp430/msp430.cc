@@ -2620,7 +2620,13 @@ msp430_output_aligned_decl_common (FILE *		  stream,
 static void
 msp430_file_end (void)
 {
-#ifdef HAVE_AS_MSPABI_ATTRIBUTE
+  /* Was `#ifdef HAVE_AS_MSPABI_ATTRIBUTE'.  That macro is
+     targ_caps.as_mspabi_attribute now and is always defined, so the whole body
+     is compiled and the question is asked at run time.  */
+  if (!HAVE_AS_MSPABI_ATTRIBUTE)
+    return;
+
+  {
   /* Enum for tag names.  */
   enum
     {
@@ -2665,7 +2671,7 @@ msp430_file_end (void)
 	     msp430_data_region == MSP430_REGION_LOWER
 	     ? Tag_GNU_MSP430_Data_Region_Lower
 	     : Tag_GNU_MSP430_Data_Region_Any);
-#endif
+  }
 }
 
 enum msp430_builtin

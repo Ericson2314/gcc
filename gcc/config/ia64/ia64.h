@@ -81,7 +81,15 @@ extern unsigned int ia64_section_threshold;
 #define TARGET_ILP32 0
 #endif
 
-#ifndef HAVE_AS_LTOFFX_LDXMOV_RELOCS
+/* HAVE_AS_LTOFFX_LDXMOV_RELOCS had a floor here, and the floor is what made
+   the loss silent: the probe only ran when ia64 was the configured target, so
+   every other build took the 0 from here.  It is
+   targ_caps.as_ltoffx_ldxmov_relocs now (defaults.h), always defined, and the
+   two consumers in ia64.md already read it as a run-time value.
+
+   Generators are the exception: the generated tm.h includes defaults.h only
+   under `!GENERATOR_FILE', so they need a definition of their own.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
 #define HAVE_AS_LTOFFX_LDXMOV_RELOCS 0
 #endif
 

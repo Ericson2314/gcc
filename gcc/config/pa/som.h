@@ -273,12 +273,17 @@ do {						\
 
 /* CVS GAS as of 4/28/04 supports a comdat parameter for the .nsubspa
    directive.  This provides one-only linkage semantics even though we
-   don't have weak support.  */
-#ifdef HAVE_GAS_NSUBSPA_COMDAT
-#define SUPPORTS_SOM_COMDAT (TARGET_GAS)
-#else
-#define SUPPORTS_SOM_COMDAT 0
+   don't have weak support.
+
+   Was `#ifdef HAVE_GAS_NSUBSPA_COMDAT'; that macro is
+   targ_caps.gas_nsubspa_comdat now (defaults.h) and is always defined, so the
+   assembler's answer is ANDed in rather than deciding at preprocessing time,
+   exactly like targ_caps.gas_weak in TARGET_SUPPORTS_WEAK above.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
+/* Generators do not include defaults.h; see the same block in rs6000.h.  */
+#define HAVE_GAS_NSUBSPA_COMDAT 0
 #endif
+#define SUPPORTS_SOM_COMDAT (HAVE_GAS_NSUBSPA_COMDAT && TARGET_GAS)
 
 /* We can support one only if we support weak or comdat.  */
 #define SUPPORTS_ONE_ONLY (TARGET_SUPPORTS_WEAK || SUPPORTS_SOM_COMDAT)

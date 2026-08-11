@@ -592,6 +592,54 @@ struct target_caps
   bool as_riscv_march_zaamo_zalrsc;
   bool as_riscv_march_b;
 
+  /* The 2026-08-11 sweep out of gcc/configure.ac.  Each was an AC_DEFINE that
+     only existed when its own back end happened to be the configured target,
+     so on every other build the macro was undefined and the back end compiled
+     its "assembler cannot do this" arm -- silently, and for reasons that had
+     nothing to do with the assembler in front of it.
+
+     DEFAULTS ARE false HERE, unlike the optimistic assembler defaults above,
+     and the difference is deliberate: those describe features every modern gas
+     has, so `true' is the better guess for a compiler told nothing.  These
+     have been OFF for essentially every build, because the floors in the
+     target headers supplied 0.  Defaulting them true would turn features on
+     for an unprobed toolchain that has never had them, which is a worse
+     failure than leaving a capable assembler underused.  */
+  bool as_entry_markers;		/* HAVE_AS_ENTRY_MARKERS  */
+  bool as_mfcrf;			/* HAVE_AS_MFCRF  */
+  bool as_power10_htm;			/* HAVE_AS_POWER10_HTM  */
+  bool as_rel16;			/* HAVE_AS_REL16  */
+  bool as_pltseq;			/* HAVE_AS_PLTSEQ  */
+  bool as_mspabi_attribute;		/* HAVE_AS_MSPABI_ATTRIBUTE  */
+  bool as_mmacosx_version_min;	  /* HAVE_AS_MMACOSX_VERSION_MIN_OPTION  */
+  bool as_macos_build_version;		/* HAVE_AS_MACOS_BUILD_VERSION  */
+  bool gas_literal16;			/* HAVE_GAS_LITERAL16  */
+  bool gas_nsubspa_comdat;		/* HAVE_GAS_NSUBSPA_COMDAT  */
+  bool gas_arm_extended_arch;		/* HAVE_GAS_ARM_EXTENDED_ARCH  */
+
+  /* loongarch.  Upstream spelled these HAVE_AS_SUPPORT_CALL36,
+     HAVE_AS_TLS_LE_RELAXATION, HAVE_AS_16B_ATOMIC and
+     HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT -- names with no back end in them,
+     which is how loongarch came to read alpha's answer for the neighbouring
+     explicit-relocs probe.  The names here say whose question it is.  */
+  bool as_loongarch_support_call36;
+  bool as_loongarch_tls_le_relaxation;
+  bool as_loongarch_16b_atomic;
+  bool as_loongarch_eh_frame_pcrel_encoding;
+
+  /* s390.  as_s390_machine_machinemode is deliberately absent: its consumer
+     S390_USE_TARGET_ATTRIBUTE selects SWITCHABLE_TARGET with `#if', which
+     cannot be a run-time answer.  See target-specs/configure.ac.  */
+  bool as_s390_architecture_modifiers;
+  bool as_s390_vector_loadstore_alignment_hints;
+  bool as_s390_vector_loadstore_alignment_hints_on_z13;
+
+  /* Assembler needs --traditional-format.  Was USE_AS_TRADITIONAL_FORMAT, read
+     by gcc.cc's init_spec, which is to say by the DRIVER: a driver built for
+     any other target could never prepend the flag, whatever it was asked to
+     compile for.  */
+  bool use_as_traditional_format;
+
   /* The linker for this target is Sun ld rather than GNU ld.  Was
      HAVE_SOLARIS_LD, which has been silently 0 everywhere since the probe was
      removed, so every Solaris configuration has been behaving as if it linked

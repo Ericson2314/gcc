@@ -15306,8 +15306,13 @@ rs6000_indirect_sibcall_template (rtx *operands, unsigned int funop)
   return rs6000_indirect_call_template_1 (operands, funop, true);
 }
 
-#if HAVE_AS_PLTSEQ
-/* Output indirect call insns.  WHICH identifies the type of sequence.  */
+/* Output indirect call insns.  WHICH identifies the type of sequence.
+
+   This body used to sit inside `#if HAVE_AS_PLTSEQ'.  That macro is
+   targ_caps.as_pltseq now, which is not a preprocessor constant -- an `#if'
+   over it evaluates the identifier as 0 and would silently compile the
+   function out of every build.  It is compiled unconditionally; the insns that
+   call it are guarded by TARGET_PLTSEQ, which reads the capability.  */
 const char *
 rs6000_pltseq_template (rtx *operands, int which)
 {
@@ -15376,7 +15381,6 @@ rs6000_pltseq_template (rtx *operands, int which)
     }
   return str;
 }
-#endif
 
 #if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
 /* Emit an assembler directive to set symbol visibility for DECL to
@@ -25905,9 +25909,10 @@ rs6000_need_ipa_fn_target_info (const_tree decl,
 static bool
 rs6000_update_ipa_fn_target_info (unsigned int &info, const gimple *stmt)
 {
-#ifndef HAVE_AS_POWER10_HTM
-  /* Assume inline asm can use any instruction features.  */
-  if (gimple_code (stmt) == GIMPLE_ASM)
+  /* Assume inline asm can use any instruction features.  Was `#ifndef
+     HAVE_AS_POWER10_HTM'; that macro is targ_caps.as_power10_htm now and is
+     always defined, so the question is asked at run time.  */
+  if (!HAVE_AS_POWER10_HTM && gimple_code (stmt) == GIMPLE_ASM)
     {
       const char *asm_str = gimple_asm_string (as_a<const gasm *> (stmt));
       /* Ignore empty inline asm string.  */
@@ -25917,7 +25922,6 @@ rs6000_update_ipa_fn_target_info (unsigned int &info, const gimple *stmt)
 	info |= RS6000_FN_TARGET_INFO_HTM;
       return false;
     }
-#endif
 
   if (gimple_code (stmt) == GIMPLE_CALL)
     {

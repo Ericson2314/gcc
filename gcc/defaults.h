@@ -1624,6 +1624,99 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    between 8 and 4, so the flag selects between them.  */
 #undef POWERPC64_TOC_POINTER_ALIGNMENT
 #define POWERPC64_TOC_POINTER_ALIGNMENT (targ_caps.ld_toc_align ? 8 : 4)
+
+/* Back-end assembler capabilities from the same sweep.  Each of these was an
+   AC_DEFINE that only existed when its back end happened to be the configured
+   target; every other build silently compiled the "assembler cannot do it"
+   arm.  They are per-target answers now.
+
+   NOTE FOR EVERY ONE OF THESE: the macro is now ALWAYS DEFINED, so a consumer
+   written as `#ifdef' would take the true arm unconditionally, which is the
+   exact opposite of the old silent-false.  Every consumer reached from here
+   was converted to a run-time `if' or to a macro body; do not add an `#ifdef'
+   consumer back.  */
+#undef HAVE_AS_ENTRY_MARKERS
+#define HAVE_AS_ENTRY_MARKERS (targ_caps.as_entry_markers)
+#undef HAVE_AS_LTOFFX_LDXMOV_RELOCS
+#define HAVE_AS_LTOFFX_LDXMOV_RELOCS (targ_caps.as_ltoffx_ldxmov_relocs)
+#undef HAVE_AS_MFCRF
+#define HAVE_AS_MFCRF (targ_caps.as_mfcrf)
+#undef HAVE_AS_POWER10_HTM
+#define HAVE_AS_POWER10_HTM (targ_caps.as_power10_htm)
+#undef HAVE_AS_REL16
+#define HAVE_AS_REL16 (targ_caps.as_rel16)
+#undef HAVE_AS_PLTSEQ
+#define HAVE_AS_PLTSEQ (targ_caps.as_pltseq)
+#undef HAVE_AS_MSPABI_ATTRIBUTE
+#define HAVE_AS_MSPABI_ATTRIBUTE (targ_caps.as_mspabi_attribute)
+#undef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
+#define HAVE_AS_MMACOSX_VERSION_MIN_OPTION (targ_caps.as_mmacosx_version_min)
+#undef HAVE_AS_MACOS_BUILD_VERSION
+#define HAVE_AS_MACOS_BUILD_VERSION (targ_caps.as_macos_build_version)
+#undef HAVE_GAS_LITERAL16
+#define HAVE_GAS_LITERAL16 (targ_caps.gas_literal16)
+#undef HAVE_GAS_NSUBSPA_COMDAT
+#define HAVE_GAS_NSUBSPA_COMDAT (targ_caps.gas_nsubspa_comdat)
+#undef HAVE_GAS_ARM_EXTENDED_ARCH
+#define HAVE_GAS_ARM_EXTENDED_ARCH (targ_caps.gas_arm_extended_arch)
+#undef HAVE_AS_SUPPORT_CALL36
+#define HAVE_AS_SUPPORT_CALL36 (targ_caps.as_loongarch_support_call36)
+#undef HAVE_AS_TLS_LE_RELAXATION
+#define HAVE_AS_TLS_LE_RELAXATION (targ_caps.as_loongarch_tls_le_relaxation)
+#undef HAVE_AS_16B_ATOMIC
+#define HAVE_AS_16B_ATOMIC (targ_caps.as_loongarch_16b_atomic)
+#undef HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT
+#define HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT \
+  (targ_caps.as_loongarch_eh_frame_pcrel_encoding)
+#undef HAVE_AS_ARCHITECTURE_MODIFIERS
+#define HAVE_AS_ARCHITECTURE_MODIFIERS (targ_caps.as_s390_architecture_modifiers)
+#undef HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS \
+  (targ_caps.as_s390_vector_loadstore_alignment_hints)
+#undef HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13 \
+  (targ_caps.as_s390_vector_loadstore_alignment_hints_on_z13)
+#else
+/* Target-library builds (USED_FOR_TARGET) have no targ_caps.
+
+   THIS BRANCH DOES NOT SERVE GENERATORS, and it is worth saying so because it
+   looks as though it should: the generated tm.h includes defaults.h only under
+   `!GENERATOR_FILE', so a generator never reaches this file at all.  Whatever
+   a generator needs has to be defined in the target header it does include --
+   there are `#if defined (GENERATOR_FILE)' blocks to that effect in rs6000.h,
+   ia64.h, s390.h, pa/som.h and loongarch/loongarch-opts.h, each naming this
+   one.  Adding a name here and expecting build/gencondmd*.o to pick it up is
+   the mistake this paragraph exists to stop; the build failure it produces
+   names the .md line, not this file.
+
+   THE VALUE IS 0, AND FOR THE GENERATOR COPIES THAT IS A KNOWN GAP, NOT A FIX.
+   gencondmd pre-evaluates any insn condition it can fold to a constant, so an
+   insn whose condition is `HAVE_AS_PLTSEQ && TARGET_ELF' is deleted at BUILD
+   time and the run-time capability never reaches it.  That is exactly what the
+   old floors did, so nothing regresses -- but as_pltseq, as_rel16 and
+   as_loongarch_tls_le_relaxation are per-target only in the C++ that reads
+   them, and still build-time constants in the insn conditions.  Closing that
+   needs gencondmd to see a NON-constant, which the target-caps carrier does
+   not offer a generator today.  */
+#define HAVE_AS_ENTRY_MARKERS 0
+#define HAVE_AS_LTOFFX_LDXMOV_RELOCS 0
+#define HAVE_AS_MFCRF 0
+#define HAVE_AS_POWER10_HTM 0
+#define HAVE_AS_REL16 0
+#define HAVE_AS_PLTSEQ 0
+#define HAVE_AS_MSPABI_ATTRIBUTE 0
+#define HAVE_AS_MMACOSX_VERSION_MIN_OPTION 0
+#define HAVE_AS_MACOS_BUILD_VERSION 0
+#define HAVE_GAS_LITERAL16 0
+#define HAVE_GAS_NSUBSPA_COMDAT 0
+#define HAVE_GAS_ARM_EXTENDED_ARCH 0
+#define HAVE_AS_SUPPORT_CALL36 0
+#define HAVE_AS_TLS_LE_RELAXATION 0
+#define HAVE_AS_16B_ATOMIC 0
+#define HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT 0
+#define HAVE_AS_ARCHITECTURE_MODIFIERS 0
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS 0
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13 0
 #endif
 
 /* How this linker spells "link the following statically" and "back to

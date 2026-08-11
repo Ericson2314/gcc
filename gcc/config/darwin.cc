@@ -1430,9 +1430,9 @@ darwin_mergeable_string_section (tree exp,
   return readonly_data_section;
 }
 
-#ifndef HAVE_GAS_LITERAL16
-#define HAVE_GAS_LITERAL16 0
-#endif
+/* HAVE_GAS_LITERAL16 had a floor here.  It is targ_caps.gas_literal16 now
+   (defaults.h): always defined, and the two consumers below already read it as
+   a run-time value.  */
 
 static section *
 darwin_mergeable_constant_section (tree exp,
@@ -3138,7 +3138,11 @@ darwin_asm_output_dwarf_offset (FILE *file, int size, const char * lab,
 void
 darwin_file_start (void)
 {
-#ifdef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
+  /* Was `#ifdef HAVE_AS_MMACOSX_VERSION_MIN_OPTION'.  That macro is
+     targ_caps.as_mmacosx_version_min now and is always defined, so the whole
+     body is compiled and the question is asked at run time.  */
+  if (!HAVE_AS_MMACOSX_VERSION_MIN_OPTION)
+    return;
   /* This should not happen with a well-formed command line, but the user could
      invoke cc1* directly without it.  */
   if (!darwin_macosx_version_min)
@@ -3153,12 +3157,12 @@ darwin_file_start (void)
   if (count < 2)
     min = 0;
   const char *directive;
-#ifdef HAVE_AS_MACOS_BUILD_VERSION
-  /* We only handle macos, so far.  */
-  if (generating_for_darwin_version >= 18)
+  /* We only handle macos, so far.  Was `#ifdef HAVE_AS_MACOS_BUILD_VERSION';
+     that macro is targ_caps.as_macos_build_version now and is always defined,
+     so the assembler's ability is asked at run time.  */
+  if (HAVE_AS_MACOS_BUILD_VERSION && generating_for_darwin_version >= 18)
     directive = "build_version macos, ";
   else
-#endif
     directive = "macosx_version_min ";
   if (count > 2 && tiny != 0)
     fprintf (asm_out_file, "\t.%s %u, %u, %u\n", directive, maj, min, tiny);
@@ -3166,7 +3170,6 @@ darwin_file_start (void)
     fprintf (asm_out_file, "\t.%s %u, %u\n", directive, maj, min);
   else
      fprintf (asm_out_file, "\t.%s %u, 0\n", directive, maj);
-#endif
 }
 
 /* Called for the TARGET_ASM_FILE_END hook.

@@ -3985,14 +3985,15 @@ rs6000_output_function_prologue (FILE *file)
 	     entry point in rs6000_elf_declare_function_name.  */
 	  char buf[256];
 
-#ifdef HAVE_AS_ENTRY_MARKERS
-	  /* If supported by the linker, emit a marker relocation.  If the
-	     total code size of the final executable or shared library
-	     happens to fit into 2 GB after all, the linker will replace
-	     this code sequence with the sequence for the small or medium
-	     code model.  */
-	  fprintf (file, "\t.reloc .,R_PPC64_ENTRY\n");
-#endif
+	  /* If supported by the assembler and linker, emit a marker
+	     relocation.  If the total code size of the final executable or
+	     shared library happens to fit into 2 GB after all, the linker will
+	     replace this code sequence with the sequence for the small or
+	     medium code model.  Was `#ifdef HAVE_AS_ENTRY_MARKERS'; that macro
+	     is targ_caps.as_entry_markers now, always defined, so the question
+	     is asked at run time.  */
+	  if (HAVE_AS_ENTRY_MARKERS)
+	    fprintf (file, "\t.reloc .,R_PPC64_ENTRY\n");
 	  fprintf (file, "\tld 2,");
 	  ASM_GENERATE_INTERNAL_LABEL (buf, "LCL", rs6000_pic_labelno);
 	  assemble_name (file, buf);

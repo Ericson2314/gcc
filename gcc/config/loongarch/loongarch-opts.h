@@ -140,9 +140,9 @@ struct loongarch_flags {
    alpha's assembler answer.  Now targ_caps.as_loongarch_explicit_relocs, which
    cannot be written by another back end.  */
 
-#ifndef HAVE_AS_SUPPORT_CALL36
-#define HAVE_AS_SUPPORT_CALL36 0
-#endif
+/* HAVE_AS_SUPPORT_CALL36 had a floor here too; it is
+   targ_caps.as_loongarch_support_call36 now (defaults.h) and always defined.
+   Its three consumers in loongarch.cc already read it as a run-time value.  */
 
 /* HAVE_AS_MRELAX_OPTION and HAVE_AS_COND_BRANCH_RELAXATION had floors here.
    Both are gone: targ_caps.as_loongarch_relax and .as_loongarch_cond_branch_relax.
@@ -154,12 +154,20 @@ struct loongarch_flags {
 #define HAVE_AS_TLS 0
 #endif
 
-#ifndef HAVE_AS_TLS_LE_RELAXATION
-#define HAVE_AS_TLS_LE_RELAXATION 0
-#endif
+/* HAVE_AS_TLS_LE_RELAXATION and HAVE_AS_16B_ATOMIC had floors here.  They are
+   targ_caps.as_loongarch_tls_le_relaxation and .as_loongarch_16b_atomic now
+   (defaults.h), always defined, and every consumer -- loongarch.cc,
+   loongarch.md's insn condition, linux.h's HAVE_IFUNC_FOR_LIBATOMIC_16B --
+   already reads them as run-time values.
 
-#ifndef HAVE_AS_16B_ATOMIC
+   Generators are the exception: the generated tm.h includes defaults.h only
+   under `!GENERATOR_FILE', and loongarch.md has an insn condition that is
+   nothing but HAVE_AS_TLS_LE_RELAXATION, so gencondmd needs these.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
+#define HAVE_AS_SUPPORT_CALL36 0
+#define HAVE_AS_TLS_LE_RELAXATION 0
 #define HAVE_AS_16B_ATOMIC 0
+#define HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT 0
 #endif
 
 #endif /* LOONGARCH_OPTS_H */

@@ -2091,15 +2091,18 @@ init_spec (void)
     obstack_1grow (&obstack, '\0');
     libgcc_spec = XOBFINISH (&obstack, const char *);
   }
-#ifdef USE_AS_TRADITIONAL_FORMAT
-  /* Prepend "--traditional-format" to whatever asm_spec we had before.  */
-  {
-    static const char tf[] = "--traditional-format ";
-    obstack_grow (&obstack, tf, sizeof (tf) - 1);
-    obstack_grow0 (&obstack, asm_spec, strlen (asm_spec));
-    asm_spec = XOBFINISH (&obstack, const char *);
-  }
-#endif
+  /* Prepend "--traditional-format" to whatever asm_spec we had before.  Was
+     `#ifdef USE_AS_TRADITIONAL_FORMAT', an AC_DEFINE that only existed when
+     the configured target needed it -- so on a driver built for anything else
+     the flag was compiled out and could never come back.  It is
+     targ_caps.use_as_traditional_format now, read per target.  */
+  if (targ_caps.use_as_traditional_format)
+    {
+      static const char tf[] = "--traditional-format ";
+      obstack_grow (&obstack, tf, sizeof (tf) - 1);
+      obstack_grow0 (&obstack, asm_spec, strlen (asm_spec));
+      asm_spec = XOBFINISH (&obstack, const char *);
+    }
 
 /* --with-linker-hash-style is gone.  It prepended --hash-style= to link_spec
    here, which made one linker's hash format a property of the compiler binary.

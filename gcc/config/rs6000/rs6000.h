@@ -221,10 +221,16 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 /* Define TARGET_MFCRF if the target assembler does not support the
    optional field operand for mfcr.  */
 
-#ifndef HAVE_AS_MFCRF
+/* HAVE_AS_MFCRF was an AC_DEFINE, so this used to be a preprocessor decision:
+   an assembler without the field operand made TARGET_MFCRF the constant 0.  It
+   is targ_caps.as_mfcrf now (defaults.h) -- always defined, answered per
+   target -- so the assembler's ability is ANDed into the option instead.  The
+   mask test is spelled out because options.h's own definition has just been
+   #undef'd.  rs6000-c.cc's _ARCH_ predefine reads OPTION_MASK_MFCRF directly
+   and is deliberately left alone: the old code did not touch it either.  */
 #undef  TARGET_MFCRF
-#define TARGET_MFCRF 0
-#endif
+#define TARGET_MFCRF \
+  (HAVE_AS_MFCRF && (rs6000_isa_flags & OPTION_MASK_MFCRF) != 0)
 
 #ifndef TARGET_SECURE_PLT
 #define TARGET_SECURE_PLT 0
@@ -240,8 +246,23 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define HAVE_AS_TLS 0
 #endif
 
-#ifndef HAVE_AS_PLTSEQ
+/* GENERATORS ONLY.  The generated tm.h includes defaults.h only under
+   `!GENERATOR_FILE', so build/gencondmd*.o -- which compiles every .md insn
+   condition, and rs6000.md has three mentioning these -- never sees the
+   targ_caps definitions and fails to compile without something here.  This is
+   not a fallback for the compiler: for the compiler defaults.h #undef's these
+   and redefines them from targ_caps a few hundred lines later.
+
+   The value is 0, which is what the old unconditional floors gave gencondmd,
+   so nothing changes for it -- but it does mean an insn condition that folds
+   to a constant through one of these is still decided at BUILD time.  See the
+   note beside the same names in defaults.h.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
+#define HAVE_AS_MFCRF 0
+#define HAVE_AS_REL16 0
 #define HAVE_AS_PLTSEQ 0
+#define HAVE_AS_POWER10_HTM 0
+#define HAVE_AS_ENTRY_MARKERS 0
 #endif
 
 #ifndef TARGET_PLTSEQ

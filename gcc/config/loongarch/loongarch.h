@@ -1262,13 +1262,13 @@ struct GTY (()) machine_function
 };
 #endif
 
-#ifdef HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT
-#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
-  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4)
-#else
-#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
-  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_absptr)
-#endif
+/* Was an `#ifdef HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT' pair.  That macro is
+   targ_caps.as_loongarch_eh_frame_pcrel_encoding now (defaults.h) and is
+   always defined, so the choice is made at run time.  */
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)			\
+  (((GLOBAL) ? DW_EH_PE_indirect : 0)					\
+   | (HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT				\
+      ? (DW_EH_PE_pcrel | DW_EH_PE_sdata4) : DW_EH_PE_absptr))
 
 /* Do emit .note.GNU-stack by default.  */
 #ifndef NEED_INDICATE_EXEC_STACK

@@ -175,13 +175,22 @@ enum processor_flags
 #define TARGET_Z17 TARGET_CPU_Z17
 #define TARGET_Z17_P(opts) (TARGET_CPU_Z17_P (opts))
 
-#if defined(HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13)
-#define TARGET_VECTOR_LOADSTORE_ALIGNMENT_HINTS TARGET_Z13
-#elif defined(HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS)
-#define TARGET_VECTOR_LOADSTORE_ALIGNMENT_HINTS TARGET_Z14
-#else
-#define TARGET_VECTOR_LOADSTORE_ALIGNMENT_HINTS 0
+/* Generators only; the generated tm.h includes defaults.h only under
+   `!GENERATOR_FILE'.  See the same block in rs6000.h.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
+#define HAVE_AS_ARCHITECTURE_MODIFIERS 0
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS 0
+#define HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13 0
 #endif
+
+/* Was an `#if defined / #elif defined' ladder over two AC_DEFINEs.  Both are
+   targ_caps values now (defaults.h) and both are ALWAYS defined, so `defined'
+   no longer distinguishes them -- the ladder has to test their VALUES, in the
+   same order, or the z13 arm would win on every target.  */
+#define TARGET_VECTOR_LOADSTORE_ALIGNMENT_HINTS				\
+  (HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13			\
+   ? TARGET_Z13								\
+   : (HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS ? TARGET_Z14 : 0))
 
 /* Evaluate to true if it is ok to emit a non-signaling vector
    comparison.  */
@@ -194,11 +203,15 @@ enum processor_flags
 #define S390_USE_TARGET_ATTRIBUTE 0
 #endif
 
-#ifdef HAVE_AS_ARCHITECTURE_MODIFIERS
-#define S390_USE_ARCHITECTURE_MODIFIERS 1
-#else
-#define S390_USE_ARCHITECTURE_MODIFIERS 0
-#endif
+/* Was `#ifdef HAVE_AS_ARCHITECTURE_MODIFIERS'.  That macro is
+   targ_caps.as_s390_architecture_modifiers now and is always defined; its one
+   consumer (s390.cc) reads this in value position, so it becomes the value.
+
+   S390_USE_TARGET_ATTRIBUTE above is deliberately NOT converted: it is tested
+   with `#if' in nine places, one of which selects SWITCHABLE_TARGET, and that
+   one cannot be a run-time answer.  targ_caps.as_s390_machine_machinemode is
+   therefore probed and not yet written; see target-specs/configure.ac.  */
+#define S390_USE_ARCHITECTURE_MODIFIERS HAVE_AS_ARCHITECTURE_MODIFIERS
 
 #if S390_USE_TARGET_ATTRIBUTE
 /* For switching between functions with different target attributes.  */

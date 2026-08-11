@@ -53,15 +53,19 @@
 #define	TARGET_NO_EABI		(! TARGET_EABI)
 #define	TARGET_REGNAMES		rs6000_regnames
 
-#ifdef HAVE_AS_REL16
+/* Both of these used to be preprocessor decisions over an AC_DEFINE: when the
+   assembler could not do it the option variable was never consulted, and
+   rs6000.h's floor made the target macro the constant 0.  HAVE_AS_REL16 and
+   HAVE_AS_PLTSEQ are targ_caps values now (defaults.h) and always defined, so
+   the assembler's answer is ANDed with the option instead.  Defining these
+   unconditionally also stops rs6000.h's `#ifndef' floors from firing, which is
+   deliberate: a floor and a capability answering the same question is how the
+   original went wrong.  */
 #undef TARGET_SECURE_PLT
-#define TARGET_SECURE_PLT	secure_plt
-#endif
+#define TARGET_SECURE_PLT	(HAVE_AS_REL16 && secure_plt)
 
-#if HAVE_AS_PLTSEQ
 #undef TARGET_PLTSEQ
-#define TARGET_PLTSEQ rs6000_pltseq
-#endif
+#define TARGET_PLTSEQ		(HAVE_AS_PLTSEQ && rs6000_pltseq)
 
 #define SDATA_DEFAULT_SIZE 8
 

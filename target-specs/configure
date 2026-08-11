@@ -653,6 +653,10 @@ with_shared_libgcc
 with_glibc_version
 with_s390_excess_float_precision
 with_specs_file
+with_gxx_include_dir
+with_gxx_tool_include_dir
+with_gxx_backward_include_dir
+with_gxx_libcxx_include_dir
 enable_linker_build_id
 '
       ac_precious_vars='build_alias
@@ -1307,6 +1311,17 @@ Optional Packages:
   --with-s390-excess-float-precision=0|1
                           s390 target C library typedefs float_t to double
   --with-specs-file=PATH  where to write the spec file
+  --with-gxx-include-dir=DIR
+                          where this target's g++ header files are; "no" for
+                          none at all
+  --with-gxx-tool-include-dir=DIR
+                          where this target's target-specific g++ headers are
+  --with-gxx-backward-include-dir=DIR
+                          where this target's backward-compatibility g++
+                          headers are
+  --with-gxx-libcxx-include-dir=DIR
+                          where this target's libc++ header files are; "no"
+                          for none at all
 
 Report bugs to the package provider.
 _ACEOF
@@ -2103,6 +2118,69 @@ if test "${with_specs_file+set}" = set; then :
   withval=$with_specs_file; specs_file=$withval
 else
   specs_file=specs-${target}
+fi
+
+
+ts_emit_gxx=no
+ts_emit_gxx_libcxx=no
+ts_gxx_include_dir=
+ts_gxx_tool_include_dir=
+ts_gxx_backward_include_dir=
+ts_gxx_libcxx_include_dir=
+
+
+# Check whether --with-gxx-include-dir was given.
+if test "${with_gxx_include_dir+set}" = set; then :
+  withval=$with_gxx_include_dir; ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_include_dir= ;;
+     yes)   as_fn_error $? "--with-gxx-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_gxx_include_dir=$withval ;;
+   esac
+fi
+
+
+
+# Check whether --with-gxx-tool-include-dir was given.
+if test "${with_gxx_tool_include_dir+set}" = set; then :
+  withval=$with_gxx_tool_include_dir; ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_tool_include_dir= ;;
+     yes)   as_fn_error $? "--with-gxx-tool-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_gxx_tool_include_dir=$withval ;;
+   esac
+else
+                             if test x"$ts_emit_gxx" = xyes && test -n "$ts_gxx_include_dir"; then
+     ts_gxx_tool_include_dir=$ts_gxx_include_dir/$target
+   fi
+fi
+
+
+
+# Check whether --with-gxx-backward-include-dir was given.
+if test "${with_gxx_backward_include_dir+set}" = set; then :
+  withval=$with_gxx_backward_include_dir; ts_emit_gxx=yes
+   case $withval in
+     no|"") ts_gxx_backward_include_dir= ;;
+     yes)   as_fn_error $? "--with-gxx-backward-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_gxx_backward_include_dir=$withval ;;
+   esac
+else
+  if test x"$ts_emit_gxx" = xyes && test -n "$ts_gxx_include_dir"; then
+     ts_gxx_backward_include_dir=$ts_gxx_include_dir/backward
+   fi
+fi
+
+
+
+# Check whether --with-gxx-libcxx-include-dir was given.
+if test "${with_gxx_libcxx_include_dir+set}" = set; then :
+  withval=$with_gxx_libcxx_include_dir; ts_emit_gxx_libcxx=yes
+   case $withval in
+     no|"") ts_gxx_libcxx_include_dir= ;;
+     yes)   as_fn_error $? "--with-gxx-libcxx-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_gxx_libcxx_include_dir=$withval ;;
+   esac
 fi
 
 
@@ -4350,8 +4428,14 @@ gas_nsubspa_comdat `ts_bool "$gcc_cv_as_nsubspa_comdat"`
 gas_base64 `ts_bool "$gcc_cv_as_base64"`
 gas_cv_ucomp `ts_bool "$gcc_cv_as_cv_ucomp"`
 gas_lcomm_with_alignment `ts_bool "$gcc_cv_as_lcomm_with_alignment"`
-# Section flags.  gas_section_exclude folds the `e' and `#exclude' spellings,
+# Section flags.  gas_section_exclude folds the "e" and "#exclude" spellings,
 # exactly as HAVE_GAS_SECTION_EXCLUDE did.
+#
+# NO BACKTICKS IN THE PROSE OF THIS HEREDOC.  It is unquoted, because every
+# value in it is a command substitution -- so a backtick in a comment opens one
+# too, and the shell swallows every line up to the next stray backtick.  When
+# that last happened the whole "cat" died with a parse error and NOT ONE key
+# reached the file, silently.  Use "..." in comments here, never GNU quoting.
 gas_section_exclude `ts_bool "$gcc_cv_as_section_exclude"`
 gas_shf_gnu_retain `ts_bool "$gcc_cv_as_shf_gnu_retain"`
 gas_section_link_order `ts_bool "$gcc_cv_as_section_link_order"`
@@ -4360,14 +4444,31 @@ use_as_traditional_format `ts_bool "$gcc_cv_as_eh_frame_traditional"`
 # darwin.
 as_mmacosx_version_min `ts_bool "$gcc_cv_as_mmacosx_version_min"`
 as_macos_build_version `ts_bool "$gcc_cv_as_darwin_build_version"`
-# avr.
-as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
-as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
-as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
-# cris.
-as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
-# ia64.
-as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
+# avr.  THE THREE avr KEYS ARE PROBED AND DELIBERATELY NOT WRITTEN.  Their
+# only consumer is gen-avr-mmcu-specs.cc, which is a BUILD-MACHINE program: it
+# writes device-specs/ at build time and reads HAVE_AS_AVR_MLINK_RELAX_OPTION,
+# _MRMW_OPTION and _MGCCISR_OPTION from auto-host.h.  A build-time generator
+# cannot read targ_caps, so there is nowhere for these answers to land yet, and
+# check-target-caps is right to refuse a key nothing reads.  Writing them is
+# one uncommented line each once avr's device specs are generated per target
+# the way this directory generates the rest.
+#   as_avr_mlink_relax `ts_bool "$gcc_cv_as_avr_mlink_relax"`
+#   as_avr_mrmw `ts_bool "$gcc_cv_as_avr_mrmw"`
+#   as_avr_mgccisr `ts_bool "$gcc_cv_as_avr_mgccisr"`
+# cris.  PROBED, NOT WRITTEN, same reason in a different shape: the consumer is
+# MAYBE_AS_NO_MUL_BUG_ABORT in cris.h, which is SPEC TEXT.  Spec text comes
+# down the gen-target-specs channel, not through targ_caps, so this belongs
+# beside asm_mrelax below rather than here -- as a spec, when someone writes
+# the cris side of it.
+#   as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
+# ia64.  PROBED, NOT WRITTEN, AND THIS ONE IS A CHECKER LIMIT, NOT A DESIGN
+# GAP.  The reader exists and is correct -- defaults.h defines
+# HAVE_AS_LTOFFX_LDXMOV_RELOCS from this key and ia64.md reads it at
+# ia64.md:774 and :787 -- but check-target-caps.sh builds its reader corpus
+# from *.cc, *.h, *.c and *.def only, so an .md file is invisible to it and the
+# key reads as dead.  Uncomment this line together with adding "*.md" to that
+# find; doing it alone turns "make target-specs" red for everyone.
+#   as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
 # powerpc.
 as_mfcrf `ts_bool "$gcc_cv_as_powerpc_mfcrf"`
 as_power10_htm `ts_bool "$gcc_cv_as_power10_htm"`
@@ -4383,14 +4484,37 @@ as_loongarch_support_call36 `ts_bool "$gcc_cv_as_loongarch_call36"`
 as_loongarch_eh_frame_pcrel_encoding `ts_bool "$gcc_cv_as_loongarch_eh_frame_pcrel"`
 as_loongarch_tls_le_relaxation `ts_bool "$gcc_cv_as_loongarch_tls_le_relaxation"`
 as_loongarch_16b_atomic `ts_bool "$gcc_cv_as_loongarch_16b_atomic"`
-# s390.  The two alignment-hint answers are one `#if/#elif' ladder in s390.h.
-as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
+# s390.  The two alignment-hint answers are one "#if/#elif" ladder in s390.h.
+# as_s390_machine_machinemode is PROBED AND NOT WRITTEN.  Its consumer is
+# S390_USE_TARGET_ATTRIBUTE, which is tested with "#if" in nine places, one of
+# them selecting SWITCHABLE_TARGET -- that one changes data layout and cannot
+# become a run-time answer.  Making it a capability needs s390 to stop deciding
+# SWITCHABLE_TARGET from an assembler probe, which is its own change.
+#   as_s390_machine_machinemode `ts_bool "$gcc_cv_as_s390_machine_machinemode"`
 as_s390_architecture_modifiers `ts_bool "$gcc_cv_as_s390_architecture_modifiers"`
 as_s390_vector_loadstore_alignment_hints `ts_bool "$gcc_cv_as_s390_vector_hints"`
 as_s390_vector_loadstore_alignment_hints_on_z13 `ts_bool "$gcc_cv_as_s390_vector_hints_z13"`
 # arm.
 gas_arm_extended_arch `ts_bool "$gcc_cv_as_arm_option_extensions"`
 EOF
+
+if test x"$ts_emit_gxx" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# C++ header directories for this target.  STRINGS, and empty is a real answer:
+# cppdefault.cc drops the entry from the include search path rather than
+# searching "".  A key that is absent is NOT the same thing -- that leaves the
+# built-in installation-relative default in place.
+gxx_include_dir ${ts_gxx_include_dir}
+gxx_tool_include_dir ${ts_gxx_tool_include_dir}
+gxx_backward_include_dir ${ts_gxx_backward_include_dir}
+EOF
+fi
+if test x"$ts_emit_gxx_libcxx" = xyes; then
+cat >> "$target_config_file" <<EOF
+gxx_libcxx_include_dir ${ts_gxx_libcxx_include_dir}
+EOF
+fi
 
 if test x"$gcc_cv_ld_as_needed" = xyes; then
   link_as_needed="%{!static:%{!static-pie:${gcc_cv_ld_as_needed_option}}}"
