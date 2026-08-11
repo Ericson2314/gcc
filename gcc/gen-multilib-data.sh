@@ -73,6 +73,16 @@ emit () {
     echo "AWK = $awk_prog"
     echo "target_cpu_default = $tcd"
     echo "TM_MULTILIB_CONFIG = $tmconf"
+    # Expand `$(call if_multiarch,:<triplet>)' to its argument, which is the
+    # opposite of what gcc/Makefile.in does.  There it is neutered, because
+    # whether to *use* multiarch paths was decided by wildcard-probing the
+    # build machine's sysroot and a multi-target compiler has no single answer.
+    # But the arguments at those call sites are the multilib -> multiarch
+    # osdirname mapping itself -- real per-target data -- and that is precisely
+    # what is being extracted here.  Neutered, MULTILIB_OSDIRNAMES comes out
+    # stripped of every triplet and the mapping is lost; expanded, the data is
+    # complete and whether to use it stays a decision for later.
+    echo 'if_multiarch = $(1)'
     for f in $tmake; do
       if test -f "$srcdir/config/$f"; then
 	echo "include \$(srcdir)/config/$f"
@@ -84,6 +94,7 @@ emit () {
     printf '\t@echo "multilib_matches $(MULTILIB_MATCHES)"\n'
     printf '\t@echo "multilib_reuse $(MULTILIB_REUSE)"\n'
     printf '\t@echo "multilib_osdirnames $(MULTILIB_OSDIRNAMES)"\n'
+    printf '\t@echo "multiarch_dirname $(MULTIARCH_DIRNAME)"\n'
   } > $tmp
 
   echo ""
