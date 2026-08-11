@@ -306,6 +306,12 @@ struct target_caps
      unconditionally.  */
   bool gas_weak;
 
+  /* Assembler accepts `.weakref'.  Was HAVE_GAS_WEAKREF.  Kept distinct from
+     the new TARGET_USE_WEAKREF policy macro: pa/som.h does not want .weakref
+     even though gas there accepts it, and it used to say so by pretending the
+     capability was missing.  */
+  bool gas_weakref;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

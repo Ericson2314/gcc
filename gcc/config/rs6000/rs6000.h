@@ -1884,7 +1884,8 @@ extern int toc_initialized;
   rs6000_asm_weaken_decl ((FILE), (DECL), (NAME), (VAL))
 #endif
 
-#if HAVE_GAS_WEAKREF
+/* Defined unconditionally; varasm.cc consults targ_caps.gas_weakref before
+   emitting one, and TARGET_USE_WEAKREF is the policy knob.  */
 #define ASM_OUTPUT_WEAKREF(FILE, DECL, NAME, VALUE)			\
   do									\
     {									\
@@ -1902,7 +1903,6 @@ extern int toc_initialized;
 	}								\
       fputc ('\n', (FILE));						\
     } while (0)
-#endif
 
 /* This implements the `alias' attribute.  */
 #undef	ASM_OUTPUT_DEF_FROM_DECLS

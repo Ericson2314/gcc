@@ -216,8 +216,18 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    uses that, in case the latter is undefined, will not cause errors,
    and will add it to the symbol table as weak undefined.  However, if
    the latter is referenced directly, a strong reference prevails.  */
+/* Whether this target WANTS `.weakref' at all.  A policy decision, and a
+   separate question from whether the assembler accepts the directive
+   (targ_caps.gas_weakref): pa/som.h sets this to 0 precisely because gas DOES
+   accept `.weakref' there but gives the wrong symbol type for function
+   references.  It used to express that by `#undef HAVE_GAS_WEAKREF', i.e. by
+   claiming a capability was absent when it was present.  */
+#ifndef TARGET_USE_WEAKREF
+#define TARGET_USE_WEAKREF 1
+#endif
+
 #ifndef ASM_OUTPUT_WEAKREF
-#if defined HAVE_GAS_WEAKREF
+#if TARGET_USE_WEAKREF
 #define ASM_OUTPUT_WEAKREF(FILE, DECL, NAME, VALUE)			\
   do									\
     {									\

@@ -349,9 +349,12 @@ do {						\
 
 /* Although gas accepts .weakref, it doesn't provide the correct symbol
    type for function references.  For now, we use ASM_WEAKEN_DECL instead.
-   We have to undefine HAVE_GAS_WEAKREF to prevent default.h from defining
-   ASM_OUTPUT_WEAKREF.  */
-#undef HAVE_GAS_WEAKREF
+
+   This used to `#undef HAVE_GAS_WEAKREF' to stop defaults.h defining
+   ASM_OUTPUT_WEAKREF -- saying "the assembler cannot do this" to express "we
+   would rather it did not".  The capability and the policy are separate now,
+   and this is the policy.  */
+#define TARGET_USE_WEAKREF 0
 
 /* We can't handle weak aliases, and therefore can't support pragma weak.
    Suppress the use of pragma weak in gthr-dce.h and gthr-posix.h.  */

@@ -6538,18 +6538,26 @@ do_assemble_alias (tree decl, tree target)
       if (!TREE_SYMBOL_REFERENCED (target))
 	weakref_targets = tree_cons (decl, target, weakref_targets);
 
+      /* The macro's existence says the target has a `.weakref' spelling and
+	 wants to use it; targ_caps.gas_weakref says the assembler accepts it.
+	 Was chosen entirely by `#ifdef', so an assembler without the directive
+	 got one emitted anyway.  The fallback below is the arm the `#else'
+	 used to be.  */
 #ifdef ASM_OUTPUT_WEAKREF
-      ASM_OUTPUT_WEAKREF (asm_out_file, decl,
-			  IDENTIFIER_POINTER (id),
-			  IDENTIFIER_POINTER (target));
-#else
+      if (targ_caps.gas_weakref)
+	{
+	  ASM_OUTPUT_WEAKREF (asm_out_file, decl,
+			      IDENTIFIER_POINTER (id),
+			      IDENTIFIER_POINTER (target));
+	  return;
+	}
+#endif
       if (!TARGET_SUPPORTS_WEAK)
 	{
 	  error_at (DECL_SOURCE_LOCATION (decl),
 		    "%qs is not supported in this configuration", "weakref ");
 	  return;
 	}
-#endif
       return;
     }
 
