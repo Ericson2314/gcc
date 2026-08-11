@@ -93,6 +93,12 @@ struct mode_data
 				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
   bool boolean;
+  bool numbered;		/* Shared numbering: this mode was given an
+				   ordinal by the shared numbering.  */
+  bool is_hole;			/* Union numbering: no back end reachable from
+				   this run defines this mode.  The record
+				   exists only to occupy the ordinal that the
+				   shared enum gave it.  */
 };
 
 static struct mode_data *modes[MAX_MODE_CLASS];
@@ -104,7 +110,7 @@ static const struct mode_data blank_mode = {
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
   "<unknown>", 0, 0, 0, 0, false, false, 0,
-  false
+  false, false, false
 };
 
 static htab_t modes_by_name;
@@ -1092,6 +1098,193 @@ calc_wider_mode (void)
 #error "Unknown value of NUM_POLY_INT_COEFFS"
 #endif
 
+/* The shared mode numbering.
+
+   `E_SImode' has to be the same number in every translation unit of a
+   compiler that holds more than one back end, and today it is not: it is
+   ordinal 122 for i386, 115 for aarch64, 51 for riscv, because each back
+   end's enum is dense over the modes that back end happens to define.  A
+   back-end object compiled against its own numbering, linked with shared
+   code compiled against another's, passes `SImode' and the other side
+   reads a different mode -- with no link error and no diagnostic.
+
+   The fix is the project's standing rule: union the vocabulary, keep the
+   data per configuration.  A `-DGENMODES_UNION' run reads every back end's
+   modes file at once and emits the enum -- that is the vocabulary, and it
+   is the same for everybody.  The tables (`mode_size', `mode_next',
+   `real_format_for_mode', ...) stay per back end, because a mode's size,
+   precision and format legitimately differ between back ends and are not
+   vocabulary.
+
+   Those tables are emitted as positional initialisers in enum order, so a
+   per-back-end run has to place its values at the SHARED ordinals and put
+   something inert at the ordinals belonging to back ends it knows nothing
+   about.  `-U' passes it the shared numbering to place them against: the
+   union run writes the list with `-l', and each per-back-end run reads it.
+
+   The per-back-end run still reads only its own modes file and computes
+   every value exactly as it does today; `-U' changes WHERE a value is
+   written, never what it is.  That is deliberate.  Deriving which modes
+   belong to a back end from the union run instead -- by tracking which
+   file defined what -- gets the modes that `machmode.def' DERIVES from a
+   back end's own (`COMPLEX_MODES', `VECTOR_MODES') wrong in ways that are
+   hard to see, and the ground truth for "does this back end have this
+   mode" is simply what its own run produces.
+
+   A mode no back end defines is a HOLE: class from the shared numbering so
+   that it lands in the right run of the enum, and everything else zero.
+   Its size and precision are 0 and its format is a null pointer, so shared
+   code asking a foreign mode about itself gets an answer that is wrong in
+   a way that shows, rather than another back end's answer.  Nothing should
+   ask: `mode_next'/`mode_wider' and `class_narrowest_mode' stay dense over
+   the back end's own modes, so `FOR_EACH_MODE*' never walks into a hole.  */
+
+static const char *union_list_file;
+static bool gen_union_list;
+
+struct union_slot
+{
+  const char *name;
+  enum mode_class cl;
+};
+
+static struct union_slot *union_slots;
+static unsigned int n_union_slots;
+
+/* Write the shared numbering: one line per ordinal, in enum order.  This
+   is the union run's output; `read_union_list' is its reader.  */
+static void
+emit_union_list (void)
+{
+  int c;
+  struct mode_data *m;
+
+  for_all_modes (c, m)
+    printf ("%s %s\n", m->name, mode_class_names[m->cl]);
+}
+
+static void
+read_union_list (void)
+{
+  FILE *f = fopen (union_list_file, "r");
+  char name[256], cl[64];
+  unsigned int alloc = 64;
+
+  if (!f)
+    {
+      error ("cannot read shared mode numbering %s", union_list_file);
+      return;
+    }
+
+  union_slots = XNEWVEC (struct union_slot, alloc);
+  while (fscanf (f, "%255s %63s", name, cl) == 2)
+    {
+      int c;
+
+      if (n_union_slots == alloc)
+	{
+	  alloc *= 2;
+	  union_slots = XRESIZEVEC (struct union_slot, union_slots, alloc);
+	}
+      for (c = 0; c < MAX_MODE_CLASS; c++)
+	if (!strcmp (cl, mode_class_names[c]))
+	  break;
+      if (c == MAX_MODE_CLASS)
+	{
+	  error ("%s: unknown mode class \"%s\" for mode \"%s\"",
+		 union_list_file, cl, name);
+	  break;
+	}
+      union_slots[n_union_slots].name = xstrdup (name);
+      union_slots[n_union_slots].cl = (enum mode_class) c;
+      n_union_slots++;
+    }
+  fclose (f);
+
+  /* A numbering that could not be read must not be silently treated as an
+     empty one: every mode would then look like a mode this back end does
+     not have, every table would come out empty, and the build would go on.  */
+  if (n_union_slots == 0)
+    error ("%s: no modes in the shared numbering", union_list_file);
+}
+
+/* Rebuild the per-class lists so that walking them in class order walks
+   the shared numbering, with a hole wherever this back end has no mode.  */
+static void
+apply_union_order (void)
+{
+  struct mode_data *tail[MAX_MODE_CLASS];
+  struct mode_data **all;
+  unsigned int n_all = 0, i;
+  int c;
+  struct mode_data *m;
+
+  for_all_modes (c, m)
+    n_all++;
+  all = XNEWVEC (struct mode_data *, n_all);
+  n_all = 0;
+  for_all_modes (c, m)
+    all[n_all++] = m;
+
+  for (c = 0; c < MAX_MODE_CLASS; c++)
+    {
+      modes[c] = 0;
+      n_modes[c] = 0;
+      tail[c] = 0;
+    }
+
+  for (i = 0; i < n_union_slots; i++)
+    {
+      c = union_slots[i].cl;
+      m = find_mode (union_slots[i].name);
+
+      /* The class is the one thing the shared numbering fixes, because it
+	 decides which run of the enum a mode lands in and
+	 `MIN_MODE_<CLASS>'/`MAX_MODE_<CLASS>' are that run's endpoints.  */
+      if (m && m->cl != (enum mode_class) c)
+	{
+	  error ("mode \"%s\" is %s here but %s in the shared numbering",
+		 m->name, mode_class_names[m->cl], mode_class_names[c]);
+	  m = 0;
+	}
+
+      if (m)
+	m->numbered = true;
+      else
+	{
+	  m = XNEW (struct mode_data);
+	  *m = blank_mode;
+	  m->name = union_slots[i].name;
+	  m->cl = (enum mode_class) c;
+	  m->precision = 0;
+	  m->bytesize = 0;
+	  m->ncomponents = 0;
+	  m->alignment = 0;
+	  m->format = "0";
+	  m->is_hole = true;
+	}
+
+      m->next = 0;
+      if (tail[c])
+	tail[c]->next = m;
+      else
+	modes[c] = m;
+      tail[c] = m;
+      n_modes[c]++;
+    }
+
+  /* A mode of this back end's that the shared numbering does not contain
+     has no ordinal to be written at, and would simply vanish from every
+     table -- which is the silent-wrong-answer this step exists to remove.
+     It means the numbering is stale, so say which mode and stop.  */
+  for (i = 0; i < n_all; i++)
+    if (!all[i]->numbered)
+      error ("%s:%d: mode \"%s\" is missing from the shared numbering %s",
+	     all[i]->file, all[i]->line, all[i]->name, union_list_file);
+
+  free (all);
+}
+
 /* Output routines.  */
 
 #define tagged_printf(FMT, ARG, TAG) do {		\
@@ -1683,6 +1876,16 @@ emit_mode_wider (void)
     {
       struct mode_data * m2;
 
+      /* A hole has size and precision 0, so the search below would match
+	 the hole itself (0 == 2 * 0) and hand out a mode that is its own
+	 2x-wider.  Nothing should ask a foreign mode for its 2x-wider;
+	 answer VOIDmode, which every caller already treats as "none".  */
+      if (m->is_hole)
+	{
+	  tagged_printf ("E_%smode", void_mode->name, m->name);
+	  continue;
+	}
+
       for (m2 = m;
 	   m2 && m2 != void_mode;
 	   m2 = m2->wider)
@@ -1853,11 +2056,20 @@ emit_class_narrowest_mode (void)
     {
       /* Bleah, all this to get the comment right for MIN_MODE_INT.  */
       struct mode_data *m = modes[c];
-      while (m && m->boolean)
+      while (m && (m->boolean || m->is_hole))
 	m = m->next;
       const char *comment_name = (m ? m : void_mode)->name;
 
-      tagged_printf ("MIN_%s", mode_class_names[c], comment_name);
+      /* This is where `FOR_EACH_MODE_IN_CLASS' starts walking, so under a
+	 shared numbering it must be this back end's own narrowest mode of
+	 the class and not the numbering's, which may well belong to a back
+	 end that is not this one.  `MIN_MODE_<CLASS>' is the numbering's,
+	 so name the mode instead -- and say VOIDmode when this back end has
+	 no mode of the class at all, which ends the walk immediately.  */
+      if (union_list_file)
+	tagged_printf ("E_%smode", (m ? m : void_mode)->name, comment_name);
+      else
+	tagged_printf ("MIN_%s", mode_class_names[c], comment_name);
     }
 
   print_closer ();
@@ -2220,19 +2432,31 @@ int
 main (int argc, char **argv)
 {
   bool gen_header = false, gen_inlines = false, gen_min = false;
+  int i;
   progname = argv[0];
 
-  if (argc == 1)
-    ;
-  else if (argc == 2 && !strcmp (argv[1], "-h"))
-    gen_header = true;
-  else if (argc == 2 && !strcmp (argv[1], "-i"))
-    gen_inlines = true;
-  else if (argc == 2 && !strcmp (argv[1], "-m"))
-    gen_min = true;
-  else
+  for (i = 1; i < argc; i++)
     {
-      error ("usage: %s [-h|-i|-m] > file", progname);
+      if (!strcmp (argv[i], "-h"))
+	gen_header = true;
+      else if (!strcmp (argv[i], "-i"))
+	gen_inlines = true;
+      else if (!strcmp (argv[i], "-m"))
+	gen_min = true;
+      else if (!strcmp (argv[i], "-l"))
+	gen_union_list = true;
+      else if (!strcmp (argv[i], "-U") && i + 1 < argc)
+	union_list_file = argv[++i];
+      else
+	{
+	  error ("usage: %s [-h|-i|-m|-l] [-U numbering] > file", progname);
+	  return FATAL_EXIT_CODE;
+	}
+    }
+
+  if (gen_header + gen_inlines + gen_min + gen_union_list > 1)
+    {
+      error ("%s: -h, -i, -m and -l are mutually exclusive", progname);
       return FATAL_EXIT_CODE;
     }
 
@@ -2246,7 +2470,22 @@ main (int argc, char **argv)
 
   calc_wider_mode ();
 
-  if (gen_header)
+  /* After `calc_wider_mode', which is what puts each class's list in width
+     order, and before anything is emitted: the shared numbering only moves
+     values to other ordinals, it does not compute them.  */
+  if (union_list_file)
+    {
+      read_union_list ();
+      if (have_error)
+	return FATAL_EXIT_CODE;
+      apply_union_order ();
+      if (have_error)
+	return FATAL_EXIT_CODE;
+    }
+
+  if (gen_union_list)
+    emit_union_list ();
+  else if (gen_header)
     emit_insn_modes_h ();
   else if (gen_inlines)
     emit_insn_modes_inline_h ();
