@@ -2486,18 +2486,18 @@ $as_echo "$gcc_cv_lto_plugin" >&6; }
 $as_echo_n "checking linker spelling for -Bstatic/-Bdynamic... " >&6; }
 gcc_cv_ld_static_option=
 gcc_cv_ld_dynamic_option=
-if "" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
   gcc_cv_ld_static_option='-Bstatic'
   gcc_cv_ld_dynamic_option='-Bdynamic'
-elif "" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+elif "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
   gcc_cv_ld_static_option='-bstatic'
   gcc_cv_ld_dynamic_option='-bdynamic'
-elif "" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
   gcc_cv_ld_static_option='-aarchive_shared'
   gcc_cv_ld_dynamic_option='-adefault'
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: /" >&5
-$as_echo "/" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${gcc_cv_ld_static_option:-none}/${gcc_cv_ld_dynamic_option:-none}" >&5
+$as_echo "${gcc_cv_ld_static_option:-none}/${gcc_cv_ld_dynamic_option:-none}" >&6; }
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for .hidden" >&5

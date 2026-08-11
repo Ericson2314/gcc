@@ -690,17 +690,17 @@ dnl spelling, and each consumer would emit a bare `-Wl,'.
 AC_MSG_CHECKING([linker spelling for -Bstatic/-Bdynamic])
 gcc_cv_ld_static_option=
 gcc_cv_ld_dynamic_option=
-if "" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
+if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bstatic' > /dev/null; then
   gcc_cv_ld_static_option='-Bstatic'
   gcc_cv_ld_dynamic_option='-Bdynamic'
-elif "" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
+elif "$gcc_cv_ld" --help 2>&1 | grep -- '-bstatic' > /dev/null; then
   gcc_cv_ld_static_option='-bstatic'
   gcc_cv_ld_dynamic_option='-bdynamic'
-elif "" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
+elif "$gcc_cv_ld" --help 2>&1 | grep -- '-aarchive_shared' > /dev/null; then
   gcc_cv_ld_static_option='-aarchive_shared'
   gcc_cv_ld_dynamic_option='-adefault'
 fi
-AC_MSG_RESULT([/])
+AC_MSG_RESULT([${gcc_cv_ld_static_option:-none}/${gcc_cv_ld_dynamic_option:-none}])
 
 dnl --- Consulted by cc1: these go in the target config file. ----------------
 
