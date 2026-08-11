@@ -64,6 +64,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "hosthooks.h"
 #include "opts.h"
 #include "target-caps.h"
+#include "target-asm-ops.h"
 #include "opts-diagnostic.h"
 #include "stringpool.h"
 #include "attribs.h"
@@ -1841,6 +1842,14 @@ backend_init (void)
 
   init_rtlanal ();
   init_inline_once ();
+  /* Put the selected back end's assembler directives into targetm.asm_out
+     before init_varasm_once caches them into section objects.  Selected by
+     target identity, not by anything probed: read_target_caps runs much later
+     than this (see below in toplev_main), so a directive that depended on a
+     probed capability would be read here before the probe result existed, and
+     the symptom would be a silently wrong section directive rather than a
+     crash.  */
+  init_targetm_asm_ops ();
   init_varasm_once ();
   save_register_info ();
 
@@ -2363,7 +2372,12 @@ toplev::main (int argc, char **argv)
   /* Target assembler/linker capabilities.  The driver passes this out of the
      target's spec file; without one the built-in defaults apply.  Must run
      after option decoding (it is what sets target_config_file) and before any
-     pass consults targ_caps.  */
+     pass consults targ_caps.
+
+     Note this is much later than general_init, and in particular later than
+     init_varasm_once and init_targetm_asm_ops.  Nothing those two read may
+     depend on targ_caps: at that point the file has not been read and every
+     capability still holds its built-in default.  */
   if (target_config_file != NULL)
     read_target_caps (target_config_file);
 

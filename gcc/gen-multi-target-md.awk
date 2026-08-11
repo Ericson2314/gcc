@@ -35,7 +35,7 @@
 
 function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   if (cpu == "" || seen[cpu])
-    { cpu = ""; md = ""; tmp = ""; xmodes = ""; return }
+    { cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; return }
   seen[cpu] = 1;
 
   # Reading a back end's .md means knowing its machine modes: the md files
@@ -185,12 +185,71 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # builds it lives in multi-target-common.mk, so add the prerequisite here.
   printf "%s-common.o: tm_p-%s.h tm-constrs-%s.h\n\n", cpu, cpu, cpu;
 
-  cpu = ""; md = ""; tmp = ""; xmodes = "";
+  # This back end's assembler directives, compiled from its own tm-<base>.h.
+  # See target-asm-ops.h: targetm holds one target's directives because only
+  # the configured target's config/<cpu>/<cpu>.cc is linked, and this is the
+  # cheap part of fixing that -- the values that are plain strings.
+  #
+  # mmix is excluded because on mmix they are not.  DATA_SECTION_ASM_OP there
+  # is `mmix_data_section_asm_op ()', a call into the back end, so the table
+  # cannot be statically initialised for it.  That is not a limitation of this
+  # file: targetm.asm_out.data_section_asm_op is a POD `const char *' hook, so
+  # mmix cannot be represented in it at all, and TARGET_INITIALIZER would
+  # reject the same expression the moment config/mmix/mmix.cc were compiled.
+  # Excluded loudly here rather than silently producing a wrong directive;
+  # making that hook a function on mmix's behalf is the owner's call.
+  #
+  # Back ends that share default-common.cc are skipped as well, and for a
+  # duller reason: tm-<base>.h is generated per *common file* base, not per
+  # cpu_type, so ft32 and the four others in that group have no tm-ft32.h to
+  # compile against.  Every other rule in this file happens to be safe because
+  # cpu_type and the common-file base coincide for the 45 back ends that have
+  # their own; these five are where the two keys come apart.
+  if (cpu == "mmix")
+    printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP is a function call.\n\n";
+  else if (cof == "default-common.cc")
+    printf "# target-asm-ops-%s.o omitted: no tm-%s.h (shares default-common.cc).\n\n",
+	   cpu, cpu;
+  else {
+  printf "target-asm-ops-%s.o: $(srcdir)/target-asm-ops.cc tm-%s.h \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-asm-ops.h\n";
+  printf "\t$(COMPILE) -DTM_H_FILE='\"tm-%s.h\"' \\\n", cpu;
+  printf "\t  -DTARGETM_ASM_OPS_SYMBOL=targetm_asm_ops_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-asm-ops.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+    asm_ops_objs = asm_ops_objs " target-asm-ops-" cpu ".o";
+    asm_ops_bases = asm_ops_bases " " cpu;
+  }
+
+  cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = "";
+}
+
+# The registry the selector includes: one declaration per back end plus a list
+# naming them all.  Generated here rather than by configure because this file
+# already walks the manifest and knows every cpu_type.
+function emit_asm_ops_registry(	i, n, parts) {
+  n = split(asm_ops_bases, parts, " ");
+
+  printf "MULTI_TARGET_ASM_OPS_OBJS =%s\n", asm_ops_objs;
+  printf "multi-target-asm-ops.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_asm_ops targetm_asm_ops_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_ASM_OPS_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_ASM_OPS_ENTRY (\"%s\", targetm_asm_ops_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-asm-ops.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-asm-ops.h $@\n\n";
+  printf "target-asm-ops-select.o: multi-target-asm-ops.h\n\n";
 }
 
 $1 == "cpu_type"  { cpu = $2 }
+$1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 NF == 0		  { flush() }
-END		  { flush() }
+END		  { flush(); emit_asm_ops_registry() }

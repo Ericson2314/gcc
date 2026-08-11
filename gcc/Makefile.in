@@ -1448,6 +1448,8 @@ ANALYZER_OBJS = \
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
 OBJS = \
+	target-asm-ops-select.o \
+	$(MULTI_TARGET_ASM_OPS_OBJS) \
 	$(GIMPLE_MATCH_PD_SEQ_O) \
 	gimple-match-exports.o \
 	$(GENERIC_MATCH_PD_SEQ_O) \
@@ -2936,6 +2938,31 @@ $(out_object_file): $(out_file)
 # Names which of those tables is in force; needs the same -D.
 common/common-target-select.o: $(srcdir)/common/common-target-select.cc
 	$(COMPILE) -DTARGETM_COMMON_SYMBOL=$(common_out_symbol) $<
+	$(POSTCOMPILE)
+
+# The same shape for the assembler-directive tables: one per back end, built
+# from that back end's tm-<base>.h by rules in multi-target-md.mk, and this
+# file naming the one in force.  The -D has to match the symbol the configured
+# target's table was compiled under.
+# The base name is recovered from common_out_symbol rather than from a
+# cpu_type variable, which this Makefile no longer has: configure substitutes
+# targetm_common_<base>_common, and <base> is the same key the tables and the
+# tm-<base>.h files use.
+multi_target_base = \
+  $(patsubst targetm_common_%_common,%,$(common_out_symbol))
+
+# Fail here rather than compile `targetm_asm_ops_' with nothing after it: an
+# empty symbol name produces a header and an object that are individually valid
+# and inscrutable together, which is dearer for everyone than a stopped build.
+# This has already happened once, when the name was taken from a cpu_type
+# variable this Makefile does not have.
+target-asm-ops-select.o: $(srcdir)/target-asm-ops-select.cc
+	@test -n "$(multi_target_base)" || { \
+	  echo "target-asm-ops-select.o: multi_target_base is empty;" >&2; \
+	  echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+	  echo "  targetm_common_<base>_common" >&2; \
+	  exit 1; }
+	$(COMPILE) -DTARGETM_ASM_OPS_SYMBOL=targetm_asm_ops_$(multi_target_base) $<
 	$(POSTCOMPILE)
 #
 # Generate header and source files from the machine description,
