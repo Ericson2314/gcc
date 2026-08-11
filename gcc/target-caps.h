@@ -67,6 +67,24 @@ struct target_caps
      is the default.  Only meaningful when decimal_float is true.  */
   bool decimal_bid_format;
 
+  /* This configuration emits VMS Debug information alongside DWARF: it changes
+     the DWARF 5 line-table file-entry format (adding DW_LNCT_timestamp and
+     DW_LNCT_size), adds DW_AT_VMS_rtnbeg_pd_address to subprogram DIEs, and
+     emits the VMS debug main pointer DIE.  Was VMS_DEBUGGING_INFO in tm.h,
+     defined only by config/alpha/vms.h and config/ia64/vms.h.
+
+     PER CONFIGURATION, NOT PER BACK END, and that is why it lives here rather
+     than in targetm.  config/alpha serves five triple families and only
+     alpha*-dec-*vms* includes vms.h, so one alpha back end needs both answers;
+     a per-back-end hook table cannot express that.  It is one of at least 905
+     macros measured to vary between triples of a single back end.
+
+     Default false: a compiler that has not been told it is targeting VMS must
+     emit ordinary DWARF.  Guessing true would corrupt the line table for every
+     other target, and the failure would be silent -- consumers would read the
+     two extra format pairs as file entries.  */
+  bool vms_debug;
+
   /* Version of the GNU C Library on the target, or 0.0 for "not glibc, or not
      known".  Was --with-glibc-version, and failing that a grep for __GLIBC__ in
      $target_header_dir/features.h -- gcc/configure reaching into the target's

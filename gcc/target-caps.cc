@@ -43,6 +43,7 @@ struct target_caps targ_caps =
   .s390_excess_float_precision = false,
   .decimal_float = false,
   .decimal_bid_format = false,
+  .vms_debug = false,
   .glibc_major = 0,
   .glibc_minor = 0,
   .libc_hwcap_in_tcb = false,
@@ -143,6 +144,8 @@ read_target_caps (const char *file)
 	targ_caps.decimal_float = value != 0;
       else if (strcmp (name, "decimal_bid_format") == 0)
 	targ_caps.decimal_bid_format = value != 0;
+      else if (strcmp (name, "vms_debug") == 0)
+	targ_caps.vms_debug = value != 0;
       else if (strcmp (name, "glibc_major") == 0)
 	targ_caps.glibc_major = value;
       else if (strcmp (name, "glibc_minor") == 0)
