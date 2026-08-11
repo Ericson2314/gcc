@@ -5044,6 +5044,11 @@ print_decision (FILE *f, output_state *os, decision *d, unsigned int indent,
       /* Output the decision as a switch statement.  */
       printf_indent (f, indent, "switch (");
       print_nonbool_test (f, os, d->test);
+      /* SUBREG_BYTE is a poly_int, which cannot control a switch.  The
+	 case labels are the constant byte offsets written in the .md
+	 file, so the value has to be constant to reach any of them.  */
+      if (d->test.kind == rtx_test::SUBREG_FIELD)
+	fprintf (f, ".to_constant ()");
       fprintf (f, ")\n");
 
       /* Each case statement starts with the same set of valid variables.
