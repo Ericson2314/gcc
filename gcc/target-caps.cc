@@ -28,9 +28,19 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "target-caps.h"
 
-/* Target assembler/linker capabilities.  Initialised to what a modern GNU
-   toolchain supports, so a compiler invoked without a target-config file
-   behaves like a normally-configured one.
+/* Target assembler/linker capabilities.
+
+   These used to be initialised, as a block, to "what a modern GNU toolchain
+   supports", on the stated grounds that a compiler invoked without a
+   target-config file should behave like a normally-configured one.  Both
+   halves of that were wrong.  A compiler invoked without a config file selects
+   no target and cannot compile at all, so the premise never applied; and where
+   the defaults ARE reachable -- a config file that names a target but omits
+   keys, which a real build here has already produced -- "modern GNU" is a
+   guess about an assembler nobody described.  Each default is now decided on
+   its own evidence; see the block comment at the assembler directives below
+   for the two questions that decide it, and the per-field notes for the
+   answers.
 
    Designated rather than positional, and deliberately so: several people add
    fields to this struct, and with a positional list an insertion silently
@@ -73,23 +83,119 @@ struct target_caps targ_caps =
   .cfi_directive = true,
   .cfi_personality = true,
   .cfi_sections = true,
+  /* ASSEMBLER-DIRECTIVE DEFAULTS: TWO QUESTIONS PER FIELD, NOT ONE.
+     ----------------------------------------------------------------
+     These defaults are in force only when cc1 is handed a target-config file
+     that NAMES A TARGET but omits the key.  That is not hypothetical: a
+     truncated config file with nothing but the `target' line has already been
+     produced by a real build here, and every field below sat at its built-in
+     value for that build's whole life.  (A compiler given NO config file at all
+     cannot compile anything -- it has no target and dies at the first target
+     hook -- so these values can never be reached that way.)
+
+     Two independent questions decide each default, and the old blanket `true'
+     answered only the second:
+
+       (1) HAZARD OF true.  If the assembler in front of us lacks the feature,
+	   `true' makes cc1 emit a directive it will reject.  That hazard is
+	   real for a recent or GNU-specific directive and negligible for one
+	   every assembler has had for decades.
+       (2) SAFETY OF false.  `false' is only an option when the fallback arm is
+	   SEMANTICALLY EQUIVALENT -- worse code, never different meaning.  For
+	   three fields below it is not, and there `true' has to stay whatever
+	   the answer to (1).
+
+     A field flips to `false' only when (1) is real AND (2) holds.  Flipping the
+     rest as well would cost every unprobed build real code quality and buy no
+     safety, which is the same targeted-not-blanket trade the mode-union work
+     had to make.  */
+
+  /* KEPT true: hazard of `true' is negligible.  `.loc ... is_stmt' and
+     `.loc ... discriminator' are DWARF line-table sub-directives that gas and
+     the LLVM integrated assembler have both had for well over a decade, and
+     the only thing at stake either way is debug-line quality.  */
   .gas_loc_stmt = true,
   .gas_discriminator = true,
   .as_line_zero = true,
+
+  /* KEPT true, and here `false' is UNSAFE, which decides it on its own.  The
+     fallback emits `.lcomm NAME,ROUNDED' with no alignment operand at all
+     (i386/bsd.h), so an over-aligned static silently comes out UNDER-aligned --
+     a correctness bug, not a quality loss.  Only i386/bsd.h consults this;
+     every other target takes `ASM_OUTPUT_ALIGNED_LOCAL_P true' from
+     defaults.h.  */
   .gas_lcomm_with_alignment = true,
-  .gas_cv_ucomp = true,
-  .gas_base64 = true,
-  .gas_section_exclude = true,
-  .gas_shf_gnu_retain = true,
+
+  /* FLIPPED to false: recent directives whose fallback arms are equivalent.
+     `.cv_ucomp'/`.cv_scomp' and `.base64' are both new enough that an
+     assembler nobody has described to us is more likely to lack them than to
+     have them, and emitting either at such an assembler is a hard failure.
+     dwarf2codeview.cc has a fallback encoding; varasm.cc merely drops to
+     2000-byte string chunks from 16384.  Both cost size and nothing else.  */
+  .gas_cv_ucomp = false,
+  .gas_base64 = false,
+
+  /* FLIPPED to false: section flags, all post-2020 in gas, all quality-only
+     when absent.  `e' (exclude) is the sharpest case -- its probe in
+     target-specs/configure.ac has a second arm for Solaris `as' syntax
+     (`.section "foo1", #exclude'), so the feature is NOT gas-only and the
+     spelling is not even uniform; varasm.cc and sparc.cc just skip the flag
+     without it, and mingw/winnt.cc emits `n' instead.  `R' (SHF_GNU_RETAIN)
+     and `o' (link order) both fall back to an ordinary section.  Note the same
+     probe deliberately answers `no' for all of these on Solaris already, so
+     `false' is a state these consumers are known to handle.  */
+  .gas_section_exclude = false,
+  .gas_shf_gnu_retain = false,
+
+  /* KEPT true: hazard negligible.  `.balign'/`.p2align' are universal, and
+     both readers were checked -- i386/gas.h's fallback is `.align' with the
+     SAME `1 << LOG' operand (so no unit ambiguity), and m68k.h falls back to
+     plain ASM_OUTPUT_ALIGN.  Nothing is gained by assuming their absence.  */
   .gas_balign_and_p2align = true,
-  .gas_max_skip_p2align = true,
+
+  /* FLIPPED to false: the max-skip form `.p2align LOG,,MAX' is a GNU spelling,
+     not the plain directive.  Measured, not assumed: with it, final.cc emits
+     `.p2align 4,,10'; without it, `.align 16'.  Both assemble; the second just
+     pads unconditionally.  Density only.  */
+  .gas_max_skip_p2align = false,
+
+  /* KEPT true, and `false' is UNSAFE.  A missing `.weak' does not make cc1
+     emit less -- it makes varasm.cc warn (`weak declaration of %q+D not
+     supported') and emit a STRONG symbol where a weak one was asked for, which
+     surfaces as a duplicate-definition link failure or a wrong resolution far
+     from here.  `.weak' is also not a gas feature: every ELF, COFF and Mach-O
+     assembler has a spelling for it, so `true' rests on universality rather
+     than on the "modern gas" guess that used to justify this whole block.  */
   .gas_weak = true,
-  .gas_weakref = true,
-  .gas_subsection_ordering = true,
+
+  /* FLIPPED to false.  This is the one field in the group that really IS
+     GNU-specific -- `.weakref' is a gas invention with no counterpart
+     elsewhere -- so it is exactly the field the old blanket default was
+     guessing about.  varasm.cc's `#else' arm (the weakref_targets list,
+     resolved through do_assemble_alias) is a complete alternative path.  */
+  .gas_weakref = false,
+
+  /* FLIPPED to false: `.subsection -1'/`.previous' is a gas-specific way to
+     park a jump table, and sparc is the only consumer.  Without it sparc picks
+     DImode case vectors instead of SImode -- correct, merely larger.  */
+  .gas_subsection_ordering = false,
+
   .dwarf2_debug_line = true,
   .dwarf2_debug_view = true,
+
+  /* KEPT true: SHF_MERGE is ELF gABI, not a GNU extension, and is read in
+     value position by varasm.cc and dwarf2out.cc.  */
   .gas_shf_merge = true,
-  .gas_section_link_order = true,
+
+  /* FLIPPED to false: the `o' section flag is binutils-2.35-era and only
+     enables a linker-GC refinement.  */
+  .gas_section_link_order = false,
+
+  /* KEPT true, and `false' is UNSAFE.  Without `.hidden', varasm.cc warns and
+     DROPS the visibility attribute, USE_HIDDEN_LINKONCE goes off on i386, s390
+     and sparc, and `__dso_handle' handling changes in ipa.cc and cp/decl.cc --
+     C++ static destructor registration, not code quality.  `.hidden' is also
+     universal on ELF.  */
   .gas_hidden = true,
   .ld_ro_rw_section_mixing = true,
   .ld_eh_gc_sections = true,
