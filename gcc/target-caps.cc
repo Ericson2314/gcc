@@ -81,7 +81,12 @@ struct target_caps targ_caps =
   .as_aarch64_small_pic_relocs = true,
   .as_aarch64_aeabi_build_attributes = true,
   .as_mips_nan = true,
-  .as_mips_micromips = true
+  .as_mips_micromips = true,
+  .as_riscv_attribute = true,
+  .as_riscv_misa_spec = true,
+  .as_riscv_march_zifencei = true,
+  .as_riscv_march_zaamo_zalrsc = true,
+  .as_riscv_march_b = true
 };
 
 /* Read capability settings from FILE.  Format is one `name value' pair per
@@ -193,6 +198,16 @@ read_target_caps (const char *file)
 	targ_caps.as_mips_nan = value != 0;
       else if (strcmp (name, "as_mips_micromips") == 0)
 	targ_caps.as_mips_micromips = value != 0;
+      else if (strcmp (name, "as_riscv_attribute") == 0)
+	targ_caps.as_riscv_attribute = value != 0;
+      else if (strcmp (name, "as_riscv_misa_spec") == 0)
+	targ_caps.as_riscv_misa_spec = value != 0;
+      else if (strcmp (name, "as_riscv_march_zifencei") == 0)
+	targ_caps.as_riscv_march_zifencei = value != 0;
+      else if (strcmp (name, "as_riscv_march_zaamo_zalrsc") == 0)
+	targ_caps.as_riscv_march_zaamo_zalrsc = value != 0;
+      else if (strcmp (name, "as_riscv_march_b") == 0)
+	targ_caps.as_riscv_march_b = value != 0;
     }
 
   fclose (f);

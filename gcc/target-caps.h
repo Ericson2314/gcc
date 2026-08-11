@@ -279,6 +279,20 @@ struct target_caps
      needed no field at all, just a sensible default in the spec text.  */
   bool as_mips_nan;
   bool as_mips_micromips;
+
+  /* riscv back-end assembler capabilities.  True by default, as above.
+     Every one of these gates a "skip this extension because older binutils
+     does not know it" flag in common/config/riscv/riscv-common.cc, so true
+     means "assembler is current, emit the extension normally" -- which is what
+     the probe produced against any assembler new enough to matter.
+
+     as_riscv_misa_spec has a spec half as well; see ASM_MISA_SPEC in
+     config/riscv/riscv.h.  */
+  bool as_riscv_attribute;
+  bool as_riscv_misa_spec;
+  bool as_riscv_march_zifencei;
+  bool as_riscv_march_zaamo_zalrsc;
+  bool as_riscv_march_b;
 };
 
 extern struct target_caps targ_caps;

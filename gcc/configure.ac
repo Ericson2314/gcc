@@ -784,11 +784,9 @@ dnl thread model each target gets is unchanged.
 enable_threads=''
 
 dnl --enable-tls is gone.  It was not a feature switch: it OVERRODE the
-dnl assembler TLS probe, forcing a yes or no answer about a specific as.  A
-dnl compiler that is handed a different assembler at run time cannot carry an
-dnl override for one.  Empty is what a build that did not pass it had, so the
-dnl probe decides, as it always did by default.
-enable_tls=''
+dnl assembler TLS probe, forcing a yes or no answer about a specific as.  The
+dnl probe it overrode is gone too (HAVE_AS_TLS is a build-time constant now),
+dnl so the variable had no remaining consumer and is removed with it.
 
 dnl --enable-vtable-verify selected whether libvtv is available to link against.
 dnl That is a target runtime library question, so ENABLE_VTABLE_VERIFY is now a
@@ -3349,406 +3347,28 @@ dnl libc property, so HAVE_NEWLIB_NANO_FORMATTED_IO is now a target-header
 dnl macro with a 0 default in defaults.h, matching the stock default (the
 dnl option was off unless explicitly given).
 
-# Thread-local storage - the check is heavily parameterized.
-conftest_s=
-tls_as_opt=
-case "$target" in
-changequote(,)dnl
-  alpha*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	ldq	$27,__tls_get_addr($29)		!literal!1
-	lda	$16,foo($29)			!tlsgd!1
-	jsr	$26,($27),__tls_get_addr	!lituse_tlsgd!1
-	ldq	$27,__tls_get_addr($29)		!literal!2
-	lda	$16,foo($29)			!tlsldm!2
-	jsr	$26,($27),__tls_get_addr	!lituse_tlsldm!2
-	ldq	$1,foo($29)			!gotdtprel
-	ldah	$2,foo($29)			!dtprelhi
-	lda	$3,foo($2)			!dtprello
-	lda	$4,foo($29)			!dtprel
-	ldq	$1,foo($29)			!gottprel
-	ldah	$2,foo($29)			!tprelhi
-	lda	$3,foo($2)			!tprello
-	lda	$4,foo($29)			!tprel'
-	;;
-  arc*-*-*)
-    conftest_s='
-	add_s r0,r0, @foo@tpoff'
-	;;
-  cris-*-*|crisv32-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-x:      .long   25
-        .text
-	move.d x:IE,$r10
-	nop'
-	;;
-  frv*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-x:      .long   25
-        .text
-        call    #gettlsoff(x)'
-	;;
-  hppa*-*-linux*)
-    conftest_s='
-t1:	.reg	%r20
-t2:	.reg	%r21
-gp:	.reg	%r19
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	.align	4
-	addil LT%foo-$tls_gdidx$,gp
-	ldo RT%foo-$tls_gdidx$(%r1),%arg0
-	b __tls_get_addr
-	nop 		
-	addil LT%foo-$tls_ldidx$,gp
-	b __tls_get_addr
-	ldo RT%foo-$tls_ldidx$(%r1),%arg0
-	addil LR%foo-$tls_dtpoff$,%ret0
-	ldo RR%foo-$tls_dtpoff$(%r1),%t1
-	mfctl %cr27,%t1 		
-	addil LT%foo-$tls_ieoff$,gp
-	ldw RT%foo-$tls_ieoff$(%r1),%t2
-	add %t1,%t2,%t3 		
-	mfctl %cr27,%t1 		
-	addil LR%foo-$tls_leoff$,%t1
-	ldo RR%foo-$tls_leoff$(%r1),%t2'
-	;;
-  arm*-*-*)
-    conftest_s='
-	.section ".tdata","awT",%progbits
-foo:	.long	25
-	.text
-.word foo(gottpoff)
-.word foo(tpoff)
-.word foo(tlsgd)
-.word foo(tlsldm)
-.word foo(tlsldo)'
-	;;
-  i?86-*-* | x86_64-*-*)
-    if test x$as_flavor = xsolaris; then
-      tls_section_flag=t
-changequote([,])dnl
-      AC_DEFINE(TLS_SECTION_ASM_FLAG, 't',
-[Define to the flag used to mark TLS sections if the default (`T') doesn't work.])
-changequote(,)dnl
-    else
-      tls_section_flag=T
-    fi
-    conftest_s='
-      .section .tdata,"aw'$tls_section_flag'",@progbits'
-    case "$target" in
-      i?86-*-* | x86_64-*-linux-gnuabi32 | x86_64-*-mingw32abi32)
-	tls_as_opt="$tls_as_opt $as_32_opt"
-	conftest_s="$conftest_s
-foo:	.long	25
-	.text
-	movl	%gs:0, %eax
-	leal	foo@tlsgd(,%ebx,1), %eax
-	leal	foo@tlsldm(%ebx), %eax
-	leal	foo@dtpoff(%eax), %edx
-	movl	foo@gottpoff(%ebx), %eax
-	subl	foo@gottpoff(%ebx), %eax
-	addl	foo@gotntpoff(%ebx), %eax
-	movl	foo@indntpoff, %eax
-	movl	\$foo@tpoff, %eax
-	subl	\$foo@tpoff, %eax
-	leal	foo@ntpoff(%ecx), %eax"
-	;;
-      x86_64-*-*)
-	tls_as_opt="$as_64_opt"
-	conftest_s="$conftest_s
-foo:	.long	25
-	.text
-	movq	%fs:0, %rax
-	leaq	foo@tlsgd(%rip), %rdi
-	leaq	foo@tlsld(%rip), %rdi
-	leaq	foo@dtpoff(%rax), %rdx
-	movq	foo@gottpoff(%rip), %rax
-	movq	\$foo@tpoff, %rax"
-	;;
-    esac
-    ;;
-  ia64-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	data8	25
-	.text
-	addl	r16 = @ltoff(@dtpmod(foo#)), gp
-	addl	r17 = @ltoff(@dtprel(foo#)), gp
-	addl	r18 = @ltoff(@tprel(foo#)), gp
-	addl	r19 = @dtprel(foo#), gp
-	adds	r21 = @dtprel(foo#), r13
-	movl	r23 = @dtprel(foo#)
-	addl	r20 = @tprel(foo#), gp
-	adds	r22 = @tprel(foo#), r13
-	movl	r24 = @tprel(foo#)'
-	;;
-  loongarch*-*-*)
-    conftest_s='
-	.section .tdata,"awT",@progbits
-x:	.word 2
-	.text
-	la.tls.gd $a0,x
-	bl __tls_get_addr'
-	tls_first_major=0
-	tls_first_minor=0
-	;;
-  microblaze*-*-*)
-    conftest_s='
-	.section .tdata,"awT",@progbits
-x:
-	.word 2
-	.text
-	addik r5,r20,x@TLSGD
-	addik r5,r20,x@TLSLDM'
-	;;
-  mips*-*-*)
-    conftest_s='
-	.section .tdata,"awT",@progbits
-x:
-	.word 2
-	.text
-	addiu $4, $28, %tlsgd(x)
-	addiu $4, $28, %tlsldm(x)
-	lui $4, %dtprel_hi(x)
-	addiu $4, $4, %dtprel_lo(x)
-	lw $4, %gottprel(x)($28)
-	lui $4, %tprel_hi(x)
-	addiu $4, $4, %tprel_lo(x)'
-	tls_as_opt='-32'
-	;;
-  m68k-*-*)
-    conftest_s='
-	.section .tdata,"awT",@progbits
-x:
-	.word 2
-	.text
-foo:
-	move.l x@TLSGD(%a5),%a0
-	move.l x@TLSLDM(%a5),%a0
-	move.l x@TLSLDO(%a5),%a0
-	move.l x@TLSIE(%a5),%a0
-	move.l x@TLSLE(%a5),%a0'
-	;;
-  aarch64*-*-*)
-    conftest_s='
-	.section ".tdata","awT",%progbits
-foo:	.long	25
-	.text
-	adrp  x0, :tlsgd:x
-	add   x0, x0, #:tlsgd_lo12:x
-        bl    __tls_get_addr
-	nop'
-	;;
-  or1k*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	l.movhi	r3, tpoffha(foo)
-	l.add	r3, r3, r10
-	l.lwz	r4, tpofflo(foo)(r3)'
-    ;;
-  powerpc-ibm-aix*)
-    conftest_s='
-	.extern __get_tpointer
-	.toc
-LC..1:
-	.tc a[TC],a[TL]@le
-	.csect .text[PR]
-.tlstest:
-	lwz 9,LC..1(2)
-	bla __get_tpointer
-	lwzx 3,9,3
-	.globl a
-	.csect a[TL],4
-a:
-	.space 4'
-	;;
-  powerpc64*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-	.align 3
-ld0:	.space 8
-ld1:	.space 8
-x1:	.space 8
-x2:	.space 8
-x3:	.space 8
-	.text
-	addi 3,2,ld0@got@tlsgd
-	bl .__tls_get_addr
-	nop
-	addi 3,2,ld1@toc
-	bl .__tls_get_addr
-	nop
-	addi 3,2,x1@got@tlsld
-	bl .__tls_get_addr
-	nop
-	addi 9,3,x1@dtprel
-	bl .__tls_get_addr
-	nop
-	addis 9,3,x2@dtprel@ha
-	addi 9,9,x2@dtprel@l
-	bl .__tls_get_addr
-	nop
-	ld 9,x3@got@dtprel(2)
-	add 9,9,3
-	bl .__tls_get_addr
-	nop'
-	tls_as_opt="-a64"
-	;;
-  powerpc*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-	.align 2
-ld0:	.space 4
-ld1:	.space 4
-x1:	.space 4
-x2:	.space 4
-x3:	.space 4
-	.text
-	addi 3,31,ld0@got@tlsgd
-	bl __tls_get_addr
-	addi 3,31,x1@got@tlsld
-	bl __tls_get_addr
-	addi 9,3,x1@dtprel
-	addis 9,3,x2@dtprel@ha
-	addi 9,9,x2@dtprel@l
-	lwz 9,x3@got@tprel(31)
-	add 9,9,x@tls
-	addi 9,2,x1@tprel
-	addis 9,2,x2@tprel@ha
-	addi 9,9,x2@tprel@l'
-	tls_as_opt="-a32"
-	;;
-  riscv*-*-*)
-    conftest_s='
-	.section .tdata,"awT",@progbits
-x:	.word 2
-	.text
-	la.tls.gd a0,x
-        call __tls_get_addr'
-	;;
-  s390x-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	.quad	foo@TLSGD
-	.quad	foo@TLSLDM
-	.quad	foo@DTPOFF
-	.quad	foo@NTPOFF
-	.quad	foo@GOTNTPOFF
-	lg	%r1,foo@GOTNTPOFF(%r12)
-	larl	%r1,foo@INDNTPOFF
-	brasl	%r14,__tls_get_offset@PLT:tls_gdcall:foo
-	brasl	%r14,__tls_get_offset@PLT:tls_ldcall:foo'
-	tls_as_opt="-m64 -Aesame"
-	;;
-  sh-*-* | sh[123456789lbe]*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	.long	foo@TLSGD
-	.long	foo@TLSLDM
-	.long	foo@DTPOFF
-	.long	foo@GOTTPOFF
-	.long	foo@TPOFF'
-	;;
-  sparc*-*-*)
-    if test x$as_flavor = xsolaris; then
-      conftest_s='
-      .section ".tdata",#alloc,#write,#tls'
-    else
-      conftest_s='
-      .section ".tdata","awT",@progbits'
-    fi
-    tls_as_opt=$as_32_opt
-    conftest_s="$conftest_s
-foo:	.long	25
-	.text
-	sethi	%tgd_hi22(foo), %o0
-	add	%o0, %tgd_lo10(foo), %o1
-	add	%l7, %o1, %o0, %tgd_add(foo)
-	call	__tls_get_addr, %tgd_call(foo)
-	sethi	%tldm_hi22(foo), %l1
-	add	%l1, %tldm_lo10(foo), %l2
-	add	%l7, %l2, %o0, %tldm_add(foo)
-	call	__tls_get_addr, %tldm_call(foo)
-	sethi	%tldo_hix22(foo), %l3
-	xor	%l3, %tldo_lox10(foo), %l4
-	add	%o0, %l4, %l5, %tldo_add(foo)
-	sethi	%tie_hi22(foo), %o3
-	add	%o3, %tie_lo10(foo), %o3
-	ld	[%l7 + %o3], %o2, %tie_ld(foo)
-	add	%g7, %o2, %o4, %tie_add(foo)
-	sethi	%tle_hix22(foo), %l1
-	xor	%l1, %tle_lox10(foo), %o5
-	ld	[%g7 + %o5], %o1"
-	;;
-  xtensa*-*-*)
-    conftest_s='
-	.section ".tdata","awT",@progbits
-foo:	.long	25
-	.text
-	movi	a8, foo@TLSFUNC
-	movi	a10, foo@TLSARG
-	callx8.tls a8, foo@TLSCALL'
-	;;
-changequote([,])dnl
-esac
-set_have_as_tls=no
-if test "x$enable_tls" = xno ; then
-  : # TLS explicitly disabled.
-elif test "x$enable_tls" = xyes ; then
-  set_have_as_tls=yes # TLS explicitly enabled.
-elif test -z "$conftest_s"; then
-  : # If we don't have a check, assume no support.
-else
-  gcc_GAS_CHECK_FEATURE(thread-local storage support, gcc_cv_as_tls,
-  [$tls_as_opt $fw_as_opt], [$conftest_s],,
-  [set_have_as_tls=yes])
-fi
-case $target_os in
-  win32 | pe | cygwin* | mingw32*)
-    if test $set_have_as_tls = yes; then
-      # Hack to check whether ld breaks on @secrel32 for Windows
-      if test $in_tree_ld = yes; then
-        if gcc_fn_gld_min_version 2 44; then
-	  : # ld support for @secrel32 was fixed in this version
-	else
-	  AC_MSG_ERROR([ld version is known to have broken secrel32 relocations, configure without --enable-tls or with --disable-tls to remove this error. See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881 for more information.])
-	fi
-      elif test x"$gcc_cv_as" != x -a x"$gcc_cv_ld" != x -a x"$gcc_cv_objdump" != x; then
-	echo '.text'          > conftest.s
-	echo 'foo: nop'      >> conftest.s
-	echo '.data'         >> conftest.s
-	echo '.secrel32 foo' >> conftest.s
-	if $gcc_cv_as -o conftest.o conftest.s > /dev/null 2>&1 && $gcc_cv_ld -o conftest.exe conftest.o > /dev/null; then
-	  if $gcc_cv_objdump -h conftest.exe | grep '\.reloc\>' > /dev/null; then
-	    AC_MSG_ERROR([ld has broken secrel32 relocations, configure without --enable-tls or with --disable-tls to remove this error. See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881 for more information.])
-	  fi
-	else
-	  AC_MSG_ERROR([Error occurred while checking for broken secrel32 relocations. See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881 for more information.])
-	fi
-	rm -f conftest.s conftest.o conftest.exe
-      else
-	AC_MSG_ERROR([Cannot check for broken secrel32 relocations to determine --enable-tls support. See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80881 for more information.])
-      fi
-    fi
-    ;;
-esac
-if test $set_have_as_tls = yes ; then
-  AC_DEFINE(HAVE_AS_TLS, 1,
-	    [Define if your assembler and linker support thread-local storage.])
-fi
+dnl Thread-local storage.  gcc/configure.ac used to answer HAVE_AS_TLS with a
+dnl ~400-line parameterized probe: a `case "$target"' supplying a different
+dnl conftest_s and tls_as_opt for each of ~20 architectures, then one
+dnl gcc_GAS_CHECK_FEATURE over the result, plus a Windows-only linker check for
+dnl broken @secrel32 relocations.
+dnl
+dnl HAVE_AS_TLS does NOT become a targ_caps capability, for two reasons:
+dnl
+dnl   - It is read from ~55 insn conditions in config/*/*.md (rs6000, alpha,
+dnl     mips, frv, xtensa, loongarch).  Those compile into generated TUs that
+dnl     see tm.h but not target-caps.h, so `targ_caps' is not in scope there.
+dnl   - It is already a target-header macro.  Eight target headers supply an
+dnl     `#ifndef HAVE_AS_TLS / #define HAVE_AS_TLS 0' fallback and the Lynx
+dnl     headers #undef it, so simply dropping the define here would silently
+dnl     turn TLS off on rs6000, sparc, alpha, mips, frv, xtensa and loongarch.
+dnl
+dnl So it stays a build-time constant, defined unconditionally: every assembler
+dnl any supported binutils ships has had TLS for close to two decades.  A target
+dnl whose assembler lacks it still says so in its own header, exactly as the
+dnl Lynx ports already do.
+AC_DEFINE(HAVE_AS_TLS, 1,
+	  [Define if your assembler and linker support thread-local storage.])
 
 # Target OS-specific assembler checks.
 
@@ -3785,15 +3405,14 @@ case "$target" in
     dnl concern and --with-multilib-list is gone, so that goes with it; the
     dnl ILP32 diagnostic survives as a runtime check in aarch64.cc.
     dnl
-    dnl HAVE_AS_DTPREL_RELOC is deliberately NOT moved yet: its consumers are
-    dnl guarded by `#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)'
-    dnl and HAVE_AS_TLS belongs to the generic assembler cluster.  Converting
-    dnl half of that condition would leave the other half frozen.
-    gcc_GAS_CHECK_FEATURE([support of DTPREL relocation], gcc_cv_as_aarch64_dtprel_relocation,,
-    [
-	.xword %dtprel(expr)
-    ],,[AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
-	[Define if your assembler supports DTPREL relocation.])])
+    dnl HAVE_AS_DTPREL_RELOC takes the same resolution as HAVE_AS_TLS, which it
+    dnl is paired with: both consumers are
+    dnl `#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)' in
+    dnl aarch64.cc, a compile-time existence test that cannot read targ_caps.
+    dnl So it stays a build-time constant, defined unconditionally -- every
+    dnl aarch64 assembler binutils has ever shipped emits %dtprel.
+    AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
+	[Define if your assembler supports DTPREL relocation.])
     dnl --enable-standard-branch-protection, --enable-fix-cortex-a53-835769 and
     dnl --enable-fix-cortex-a53-843419 used to append to tm_defines from inside
     dnl this aarch64 arm of `case $target'.  Every macro they set
@@ -4386,31 +4005,17 @@ x:
 	  [Define if your assembler supports .mspabi_attribute.])])
     ;;
     riscv*-*-*)
-    gcc_GAS_CHECK_FEATURE([.attribute support],
-      gcc_cv_as_riscv_attribute,,
-      [.attribute stack_align,4],,
-      [AC_DEFINE(HAVE_AS_RISCV_ATTRIBUTE, 1,
-	  [Define if your assembler supports .attribute.])])
-    gcc_GAS_CHECK_FEATURE([-misa-spec= support],
-      gcc_cv_as_riscv_isa_spec,
-      [-misa-spec=2.2],,,
-      [AC_DEFINE(HAVE_AS_MISA_SPEC, 1,
-		 [Define if the assembler understands -misa-spec=.])])
-    gcc_GAS_CHECK_FEATURE([-march=rv32i_zifencei support],
-      gcc_cv_as_riscv_march_zifencei,
-      [-march=rv32i_zifencei2p0],,,
-      [AC_DEFINE(HAVE_AS_MARCH_ZIFENCEI, 1,
-		 [Define if the assembler understands -march=rv*_zifencei.])])
-    gcc_GAS_CHECK_FEATURE([-march=rv32i_zaamo_zalrsc support],
-      gcc_cv_as_riscv_march_zaamo_zalrsc,
-      [-march=rv32i_zaamo_zalrsc],,,
-      [AC_DEFINE(HAVE_AS_MARCH_ZAAMO_ZALRSC, 1,
-		 [Define if the assembler understands -march=rv*_zaamo_zalrsc.])])
-    gcc_GAS_CHECK_FEATURE([-march=rv32i_b support],
-      gcc_cv_as_riscv_march_b,
-      [-march=rv32i_b],,,
-      [AC_DEFINE(HAVE_AS_MARCH_B, 1,
-		 [Define if the assembler understands -march=rv*_b.])])
+    dnl The riscv assembler probes -- .attribute, -misa-spec=, and the
+    dnl -march=rv*_zifencei / _zaamo_zalrsc / _b extension tests -- have moved to
+    dnl target-specs, which asks the assembler that will actually be used.  They
+    dnl arrive as targ_caps.as_riscv_attribute, .as_riscv_misa_spec,
+    dnl .as_riscv_march_zifencei, .as_riscv_march_zaamo_zalrsc and
+    dnl .as_riscv_march_b, and gate the corresponding "skip this extension,
+    dnl binutils is too old" flags in common/config/riscv/riscv-common.cc.
+    dnl
+    dnl -misa-spec= also has a spec half, ASM_MISA_SPEC in config/riscv/riscv.h;
+    dnl a spec cannot be a runtime test, so that one settles on the spelling
+    dnl every supported assembler takes.
     ;;
     loongarch*-*-*)
     gcc_GAS_CHECK_FEATURE([.dtprelword support],

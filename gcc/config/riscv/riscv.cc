@@ -62,6 +62,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "tree-pass.h"
 #include "opts.h"
+#include "target-caps.h"
 #include "tm-constrs.h"
 #include "rtl-iter.h"
 #include "gimple.h"
@@ -12308,16 +12309,22 @@ riscv_option_override (void)
       riscv_stack_boundary = 8 << riscv_preferred_stack_boundary_arg;
     }
 
-  if (riscv_emit_attribute_p < 0)
-#ifdef HAVE_AS_RISCV_ATTRIBUTE
-    riscv_emit_attribute_p = TARGET_RISCV_ATTRIBUTE;
-#else
-    riscv_emit_attribute_p = 0;
+  /* Emitting ELF attributes needs GNU as 2.32.  Whether the assembler in hand
+     has it is asked of that assembler now, not of the one configure found.  */
+  if (targ_caps.as_riscv_attribute)
+    {
+      if (riscv_emit_attribute_p < 0)
+	riscv_emit_attribute_p = TARGET_RISCV_ATTRIBUTE;
+    }
+  else
+    {
+      if (riscv_emit_attribute_p < 0)
+	riscv_emit_attribute_p = 0;
 
-  if (riscv_emit_attribute_p)
-    error ("%<-mriscv-attribute%> RISC-V ELF attribute requires GNU as 2.32"
-	   " [%<-mriscv-attribute%>]");
-#endif
+      if (riscv_emit_attribute_p)
+	error ("%<-mriscv-attribute%> RISC-V ELF attribute requires GNU as 2.32"
+	       " [%<-mriscv-attribute%>]");
+    }
 
   if (riscv_stack_protector_guard == SSP_GLOBAL
       && OPTION_SET_P (riscv_stack_protector_guard_offset_str))

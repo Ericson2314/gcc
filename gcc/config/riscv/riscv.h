@@ -88,11 +88,12 @@ extern const char *riscv_arch_help (int argc, const char **argv);
 #define TARGET_64BIT           (__riscv_xlen == 64)
 #endif /* IN_LIBGCC2 */
 
-#ifdef HAVE_AS_MISA_SPEC
+/* Was guarded by HAVE_AS_MISA_SPEC.  A spec is baked into the driver before any
+   target config file is read, so it cannot be a runtime test; every assembler
+   GCC still builds against takes -misa-spec=, and one that does not is handled
+   by overriding this spec in that target's spec file.  The runtime half of the
+   same probe -- whether to skip zicsr -- is targ_caps.as_riscv_misa_spec.  */
 #define ASM_MISA_SPEC "%{misa-spec=*}"
-#else
-#define ASM_MISA_SPEC ""
-#endif
 
 /* Reference:
      https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html#Stringizing  */

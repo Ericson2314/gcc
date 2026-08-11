@@ -1154,6 +1154,58 @@ case ${target} in
     ;;
 esac
 
+dnl ---------------------------------------------------------------------------
+dnl BACK-END ASSEMBLER SECTION: riscv
+dnl
+dnl From the riscv arm of the same `case "$target"'.  Each gates a "skip this
+dnl extension, binutils is too old" flag in common/config/riscv/riscv-common.cc.
+dnl ---------------------------------------------------------------------------
+
+gcc_cv_as_riscv_attribute=no
+gcc_cv_as_riscv_isa_spec=no
+gcc_cv_as_riscv_march_zifencei=no
+gcc_cv_as_riscv_march_zaamo_zalrsc=no
+gcc_cv_as_riscv_march_b=no
+case ${target} in
+  riscv*-*-*)
+    AC_MSG_CHECKING([assembler for .attribute support])
+    echo '	.attribute stack_align,4' > conftest.s
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_riscv_attribute=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_riscv_attribute])
+
+    dnl The -march= probes take no input, only the option.
+    echo '	.text' > conftest.s
+
+    AC_MSG_CHECKING([assembler for -misa-spec= support])
+    if "$gcc_cv_as" -misa-spec=2.2 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_riscv_isa_spec=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_riscv_isa_spec])
+
+    AC_MSG_CHECKING([assembler for -march=rv32i_zifencei support])
+    if "$gcc_cv_as" -march=rv32i_zifencei2p0 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_riscv_march_zifencei=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_riscv_march_zifencei])
+
+    AC_MSG_CHECKING([assembler for -march=rv32i_zaamo_zalrsc support])
+    if "$gcc_cv_as" -march=rv32i_zaamo_zalrsc -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_riscv_march_zaamo_zalrsc=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_riscv_march_zaamo_zalrsc])
+
+    AC_MSG_CHECKING([assembler for -march=rv32i_b support])
+    if "$gcc_cv_as" -march=rv32i_b -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_riscv_march_b=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_riscv_march_b])
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1182,6 +1234,13 @@ as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 # mips back-end assembler capabilities.
 as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
 as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
+
+# riscv back-end assembler capabilities.
+as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`
+as_riscv_misa_spec `ts_bool "$gcc_cv_as_riscv_isa_spec"`
+as_riscv_march_zifencei `ts_bool "$gcc_cv_as_riscv_march_zifencei"`
+as_riscv_march_zaamo_zalrsc `ts_bool "$gcc_cv_as_riscv_march_zaamo_zalrsc"`
+as_riscv_march_b `ts_bool "$gcc_cv_as_riscv_march_b"`
 
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`

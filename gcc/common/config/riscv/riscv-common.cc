@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"
+#include "target-caps.h"
 #include "flags.h"
 #include "diagnostic-core.h"
 #include "config/riscv/riscv-protos.h"
@@ -720,25 +721,24 @@ riscv_subset_list::to_string (bool version_p) const
 	break;
       }
 
-#ifndef HAVE_AS_MISA_SPEC
-  /* Skip since older binutils doesn't recognize zicsr.  */
-  skip_zicsr = true;
-#endif
-#ifndef HAVE_AS_MARCH_ZIFENCEI
-  /* Skip since older binutils doesn't recognize zifencei, we made
-     a mistake in that binutils 2.35 supports zicsr but not zifencei.  */
-  skip_zifencei = true;
-#endif
-#ifndef HAVE_AS_MARCH_ZAAMO_ZALRSC
-  /* Skip since binutils 2.42 and earlier don't recognize zaamo/zalrsc.
-     Expanding 'a' to zaamo/zalrsc would otherwise break compilations
-     for users with an older version of binutils.  */
-  skip_zaamo_zalrsc = true;
-#endif
-#ifndef HAVE_AS_MARCH_B
-  /* Skip since binutils 2.42 and earlier don't recognize b.  */
-  skip_b = true;
-#endif
+  /* Each of these skips an extension the assembler is too old to know.  What
+     the assembler in hand knows is asked of it after the build, so these are
+     runtime tests rather than tests of whichever assembler configure found.  */
+  if (!targ_caps.as_riscv_misa_spec)
+    /* Skip since older binutils does not recognize zicsr.  */
+    skip_zicsr = true;
+  if (!targ_caps.as_riscv_march_zifencei)
+    /* Skip since older binutils does not recognize zifencei; binutils 2.35
+       supports zicsr but not zifencei.  */
+    skip_zifencei = true;
+  if (!targ_caps.as_riscv_march_zaamo_zalrsc)
+    /* Skip since binutils 2.42 and earlier do not recognize zaamo/zalrsc.
+       Expanding 'a' to zaamo/zalrsc would otherwise break compilations for
+       users with an older version of binutils.  */
+    skip_zaamo_zalrsc = true;
+  if (!targ_caps.as_riscv_march_b)
+    /* Skip since binutils 2.42 and earlier do not recognize b.  */
+    skip_b = true;
 
   for (subset = m_head; subset != NULL; subset = subset->next)
     {
