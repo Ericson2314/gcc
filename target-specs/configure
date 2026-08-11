@@ -2569,27 +2569,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_ctf" >&5
 $as_echo "$gcc_cv_ld_ctf" >&6; }
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --version-script" >&5
-$as_echo_n "checking linker for --version-script... " >&6; }
-gcc_cv_ld_version_script=no
-ld_version_script_option=
-if "$gcc_cv_ld" --help 2>&1 | grep -- '--version-script' > /dev/null; then
-  gcc_cv_ld_version_script=yes
-  ld_version_script_option='--version-script='
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_version_script" >&5
-$as_echo "$gcc_cv_ld_version_script" >&6; }
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for -soname" >&5
-$as_echo_n "checking linker for -soname... " >&6; }
-gcc_cv_ld_soname=no
-ld_soname_option=
-if "$gcc_cv_ld" --help 2>&1 | grep -- '-soname' > /dev/null; then
-  gcc_cv_ld_soname=yes
-  ld_soname_option='-soname'
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_soname" >&5
-$as_echo "$gcc_cv_ld_soname" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for non-broken PE dwarf5" >&5
 $as_echo_n "checking linker for non-broken PE dwarf5... " >&6; }
@@ -3409,10 +3388,6 @@ $as_echo "$as_me:   ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}" >&6;}
 $as_echo "$as_me:   ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&5
 $as_echo "$as_me:   ld -z ctf ................ ${gcc_cv_ld_ctf}" >&6;}
-{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld --version-script ...... ${gcc_cv_ld_version_script}" >&5
-$as_echo "$as_me:   ld --version-script ...... ${gcc_cv_ld_version_script}" >&6;}
-{ $as_echo "$as_me:${as_lineno-$LINENO}:   ld -soname ............... ${gcc_cv_ld_soname}" >&5
-$as_echo "$as_me:   ld -soname ............... ${gcc_cv_ld_soname}" >&6;}
 
 fi
 

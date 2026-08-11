@@ -733,23 +733,14 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-z ctf' > /dev/null; then
 fi
 AC_MSG_RESULT([$gcc_cv_ld_ctf])
 
-AC_MSG_CHECKING([linker for --version-script])
-gcc_cv_ld_version_script=no
-ld_version_script_option=
-if "$gcc_cv_ld" --help 2>&1 | grep -- '--version-script' > /dev/null; then
-  gcc_cv_ld_version_script=yes
-  ld_version_script_option='--version-script='
-fi
-AC_MSG_RESULT([$gcc_cv_ld_version_script])
-
-AC_MSG_CHECKING([linker for -soname])
-gcc_cv_ld_soname=no
-ld_soname_option=
-if "$gcc_cv_ld" --help 2>&1 | grep -- '-soname' > /dev/null; then
-  gcc_cv_ld_soname=yes
-  ld_soname_option='-soname'
-fi
-AC_MSG_RESULT([$gcc_cv_ld_soname])
+dnl The --version-script and -soname probes that used to sit here have gone back
+dnl to gcc/configure.ac.  They were never target questions: they answer how to
+dnl give libgccjit.so and libgdiagnostics.so -- HOST libraries, linked during the
+dnl build by $(LLINKER) -- a version script and an soname.  This script runs
+dnl AFTER the build, so an answer computed here can never reach the Makefile
+dnl variable that needs it; both probes ran on every target and were discarded,
+dnl while Makefile.in went on expanding @ld_version_script_option@ literally onto
+dnl a link line.  CHECK C in scratchpad/sweep.sh is what named them.
 
 dnl PE-only.  The original grepped the in-tree ld's own linker scripts for
 dnl NOLOAD on .debug_loclists/.debug_rnglists, which cannot be done against an
@@ -1653,8 +1644,6 @@ AC_MSG_NOTICE([  ld .hidden ............... ${gcc_cv_ld_hidden}])
 AC_MSG_NOTICE([  ld ro/rw mixing .......... ${gcc_cv_ld_ro_rw_mix}])
 AC_MSG_NOTICE([  ld --gc-sections ......... ${gcc_cv_ld_eh_gc_sections}])
 AC_MSG_NOTICE([  ld -z ctf ................ ${gcc_cv_ld_ctf}])
-AC_MSG_NOTICE([  ld --version-script ...... ${gcc_cv_ld_version_script}])
-AC_MSG_NOTICE([  ld -soname ............... ${gcc_cv_ld_soname}])
 
 fi
 

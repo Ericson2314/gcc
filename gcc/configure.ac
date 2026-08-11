@@ -3112,6 +3112,76 @@ if test x$ld_is_gold = xno && which ${gcc_cv_ld}.gold >/dev/null 2>&1; then
 fi
 AC_MSG_RESULT($gold_non_default)
 
+dnl How to give a HOST shared library a version script and an soname.  These
+dnl two belong here and not in target-specs/, and the distinction is the whole
+dnl reason they are back:
+dnl
+dnl   the library being linked is libgccjit.so / libgdiagnostics.so -- HOST
+dnl   objects, linked by $(LLINKER) during this build.  Nothing about a target
+dnl   enters into it.  target-specs/ runs AFTER the build and writes spec files,
+dnl   so a probe placed there is structurally incapable of reaching a Makefile
+dnl   variable the build already needed -- and Makefile.in:1306-1307 still said
+dnl   `LD_VERSION_SCRIPT_OPTION = @ld_version_script_option@'.  With nothing
+dnl   AC_SUBSTing it, that is not empty, it is LEFT UNSUBSTITUTED, so
+dnl   `$(if $(LD_VERSION_SCRIPT_OPTION),...)' tested true and the link line for
+dnl   libgdiagnostics.so read
+dnl       -Wl,@ld_version_script_option@,.../libgdiagnostics.map
+dnl   Measured on a configured Makefile, not inferred.  It has not bitten only
+dnl   because --enable-languages=c builds neither library.
+dnl
+dnl Keyed on $host, not $target as upstream had it: it is the host's linker
+dnl linking a host library.  That upstream used $target here was already wrong;
+dnl it happened to work because the two agree in a native build.
+AC_MSG_CHECKING(linker version script option)
+gcc_cv_ld_version_script=no
+ld_version_script_option=''
+if test $in_tree_ld = yes; then
+  gcc_cv_ld_version_script=yes
+  ld_version_script_option='--version-script'
+elif test x$gcc_cv_ld != x; then
+  if $gcc_cv_ld --help 2>&1 | grep -- --version-script > /dev/null; then
+    gcc_cv_ld_version_script=yes
+    ld_version_script_option='--version-script'
+  fi
+fi
+case "$host" in
+  dnl Solaris 2 ld always supports -M.  It supports a subset of
+  dnl --version-script since Solaris 11.4, but only under
+  dnl -z gnu-version-script-compat, so -M stays the one to use.
+  *-*-solaris2*)
+    gcc_cv_ld_version_script=yes
+    ld_version_script_option='-M'
+    ;;
+esac
+AC_MSG_RESULT($gcc_cv_ld_version_script)
+AC_SUBST(ld_version_script_option)
+
+AC_MSG_CHECKING(linker soname option)
+gcc_cv_ld_soname=no
+ld_soname_option=''
+if test $in_tree_ld = yes; then
+  gcc_cv_ld_soname=yes
+  ld_soname_option='-soname'
+elif test x$gcc_cv_ld != x; then
+  if $gcc_cv_ld --help 2>&1 | grep -- -soname > /dev/null; then
+    gcc_cv_ld_soname=yes
+    ld_soname_option='-soname'
+  fi
+fi
+case "$host" in
+  *-*-darwin*)
+    gcc_cv_ld_soname=yes
+    ld_soname_option='-install_name'
+    ;;
+  dnl Solaris 2 ld always supports -h, and --soname since a Solaris 10 update.
+  *-*-solaris2*)
+    gcc_cv_ld_soname=yes
+    ld_soname_option='-h'
+    ;;
+esac
+AC_MSG_RESULT($gcc_cv_ld_soname)
+AC_SUBST(ld_soname_option)
+
 ORIGINAL_LD_FOR_TARGET=$gcc_cv_ld
 AC_SUBST(ORIGINAL_LD_FOR_TARGET)
 case "$ORIGINAL_LD_FOR_TARGET" in
