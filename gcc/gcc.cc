@@ -8417,6 +8417,98 @@ target_from_progname (void)
   return found;
 }
 
+/* A fatal error raised BEFORE driver::global_initializations has run.
+
+   fatal_error cannot be used there.  diagnostic_initialize has not been
+   called yet, so the message is dropped and the user sees only
+   "compilation terminated." -- which is how EVERY target diagnostic in
+   driver::main came to be silent, including the one stage 4's acceptance
+   reported as working.  Measured on an unmodified build: `xgcc
+   -ftarget-config=<file naming an unconfigured triple>' printed the triple's
+   name nowhere.
+
+   This is the same lesson the empty back end already learned -- it reports
+   through fprintf for exactly this reason (common/common-target-select.cc)
+   -- applied to the calls that were left behind.  A compiler that refuses to
+   act and will not say why is worse than one that guesses, because there is
+   nothing to search for.  */
+
+static ATTRIBUTE_NORETURN void
+early_fatal_error (const char *fmt, ...)
+{
+  va_list ap;
+
+  fprintf (stderr, "%s: fatal error: ", progname != NULL ? progname : "gcc");
+  va_start (ap, fmt);
+  vfprintf (stderr, fmt, ap);
+  va_end (ap);
+  fprintf (stderr, "\n");
+  exit (FATAL_EXIT_CODE);
+}
+
+/* The installation's preferred target, from a `default-target' file beside
+   this binary, or NULL.
+
+   THIS IS A PREFERENCE, NOT A PRIVILEGE, and the distinction is the whole
+   reason it is a file and not a configure option.  No target is built
+   differently because of it; nothing in the build writes it; deleting it
+   returns the compiler to having no default at all.  It exists so that an
+   installer -- a distribution, or a user with one toolchain -- can say "when
+   nobody says otherwise, mean this one", which is a statement about a machine
+   someone installed, not about how GCC was compiled.  Compare the thing this
+   project removed: a default baked in at configure time made one target's
+   back end the one that shared code silently agreed with.
+
+   The file is one line, a triple, `#' comments and blank lines ignored.  It is
+   validated against the registry by the caller exactly as the program name is,
+   so a default naming an unconfigured target is a diagnostic and never a
+   fallback to whatever is first.
+
+   Read only when nothing else answered, and its ABSENCE is not a failure here
+   -- it returns NULL and the empty back end reports having no target, which is
+   what every installation without the file already gets.  */
+
+static const char *
+target_from_default_file (const char *argv0)
+{
+  /* Beside the driver itself, found the way the driver finds everything else
+     relative to its own location, so a relocated or unpacked-anywhere
+     installation reads its own file and not another's.  Mapping bindir onto
+     bindir asks make_relative_prefix for exactly "the directory I was run
+     from", including the PATH search when argv0 has no separator in it.  */
+  char *dir = make_relative_prefix (argv0, standard_bindir_prefix,
+				    standard_bindir_prefix);
+  if (dir == NULL)
+    return NULL;
+
+  char *path = concat (dir, "default-target", NULL);
+  free (dir);
+
+  FILE *f = fopen (path, "r");
+  if (f == NULL)
+    return NULL;
+
+  char line[256];
+  const char *result = NULL;
+
+  while (fgets (line, sizeof (line), f) != NULL)
+    {
+      char triple[128];
+
+      if (line[0] == '#')
+	continue;
+      if (sscanf (line, "%127s", triple) != 1)
+	continue;
+
+      result = xstrdup (triple);
+      break;
+    }
+
+  fclose (f);
+  free (path);
+  return result;
+}
+
 int
 driver::main (int argc, char **argv)
 {
@@ -8466,12 +8558,24 @@ driver::main (int argc, char **argv)
   if (selected_target != NULL
       && name_target != NULL
       && strcmp (selected_target, name_target) != 0)
-    fatal_error (input_location,
-		 "%qs says the target is %qs, but %<-ftarget-config=%> names "
-		 "%qs", progname, name_target, selected_target);
+    early_fatal_error ("%s says the target is `%s', but -ftarget-config= "
+		       "names `%s'", progname, name_target, selected_target);
 
   if (selected_target == NULL)
     selected_target = name_target;
+
+  /* Last, the installation's preference.  Deliberately last and deliberately
+     not consulted when either of the two above answered: a `default-target'
+     file must not be able to override the target someone named, whether they
+     named it with a flag or by which program they ran.  A file that could
+     silently redirect `aarch64-linux-gnu-gcc' would be the privileged target
+     all over again, just written from a different place.  */
+  const char *default_target = NULL;
+  if (selected_target == NULL)
+    {
+      default_target = target_from_default_file (argv[0]);
+      selected_target = default_target;
+    }
 
   /* The common hook table, scanned here for the same reason: the driver reads
      targetm_common (compute_multilib, among others) from build_multilib_strings
@@ -8484,9 +8588,28 @@ driver::main (int argc, char **argv)
      can fail here.  */
   if (selected_target != NULL
       && !targetm_common_select (selected_target))
-    fatal_error (input_location,
-		 "target %qs is not one of the targets this compiler was "
-		 "configured for", selected_target);
+    {
+      if (default_target != NULL)
+	early_fatal_error ("the installed `default-target' file names `%s', "
+			   "which is not one of the targets this compiler "
+			   "was configured for", selected_target);
+      else
+	early_fatal_error ("target `%s' is not one of the targets this "
+			   "compiler was configured for", selected_target);
+    }
+
+  /* Everything that asks this driver what machine it is for is asking about
+     the target SELECTED, not about the compiler, which serves several.  That
+     is exactly what spec_machine's own comment says it is -- but nothing ever
+     assigned it, so `-dumpmachine' printed an empty line, the `Target:' line
+     of `-v' was blank, and the tool search built its directory prefix out of
+     nothing.  Assigned here, right after selection, because process_command
+     and set_up_specs both read it and both run later.
+
+     Left empty when no target was selected: that is the honest answer, and it
+     is what the initialiser already meant.  */
+  if (selected_target != NULL)
+    spec_machine = selected_target;
 
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
