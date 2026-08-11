@@ -38,7 +38,88 @@
 
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
-  tmk = ""; tmkp = "";
+  tmk = ""; tmkp = ""; outf = ""; xobjs = "";
+}
+
+# Record the build-directory headers a t-<...>-headers fragment generates, so
+# that <cpu>-inc/s-inc can depend on them.
+#
+# This is not tidiness.  The rules ARE included (just above) and the headers ARE
+# generatable, but a rule nothing depends on is never run: aarch64-builtins.cc
+# failed on a missing aarch64-builtin-iterators.h for exactly that reason, and
+# the failure reads as a missing rule rather than a missing dependency.  Absence
+# of an artefact is not absence of a rule -- this file's own history has three
+# instances of that confusion -- so the cure is to name the artefact.
+#
+# The fragment states what it generates in `generated_files +=', which is the
+# form gcc/Makefile.in already reads and therefore the only claim in the tree
+# about these names.  It is read rather than a list kept here, so the two
+# cannot drift.  Note `generated_files' itself cannot be used at make time:
+# Makefile.in assigns it with `=' at a line AFTER multi-target-md.mk is
+# included, so every `+=' a fragment did is silently discarded.
+function scan_hdr_frag(path,	line, i, n, parts) {
+  while ((getline line < path) > 0) {
+    if (line !~ /^[ \t]*generated_files[ \t]*\+=/)
+      continue;
+    sub(/^[ \t]*generated_files[ \t]*\+=[ \t]*/, "", line);
+    n = split(line, parts, "[ \t]+");
+    for (i = 1; i <= n; i++)
+      if (parts[i] != "" && parts[i] != "\\" &&
+	  !((cpu SUBSEP parts[i]) in seen_hdrgen)) {
+	seen_hdrgen[cpu SUBSEP parts[i]] = 1;
+	hdrgen[cpu] = hdrgen[cpu] " " parts[i];
+      }
+  }
+  close(path);
+}
+
+# The source that builds <obj>.o, as claimed by this target's tmake_file
+# fragments.
+#
+# `extra_objs' names OBJECTS, never sources, and the mapping is not derivable
+# from the name: aarch-common.o is built from config/arm/aarch-common.cc by a
+# rule in config/aarch64/t-aarch64, and linux.o from config/linux.cc by
+# config/t-linux.  Guessing config/<cpu>/<obj>.cc gets both wrong -- and gets
+# them wrong SILENTLY if some file happens to exist under the guessed name.
+#
+# So read the fragments, which is where the tree actually states it.  Two
+# details the first version of this scan got wrong, both measured:
+#
+#   * Rules are written `foo.o: \' with the source on a continuation line, so
+#     matching only the target's own physical line under-read by 12% (18 of 153
+#     objects) and reported "no rule found" for the wrong reason.  Follow `\'.
+#   * The RECIPES are not reusable and are deliberately ignored.  The 195 `.o'
+#     rules across config/**/t-* reduce to two families, `$(COMPILE) $<' and an
+#     older `$(COMPILER) -c ... <src>' with no `-o' at all, and the second
+#     cannot name mt-<cpu>/<obj>.o even if we wanted it to.  Only the source is
+#     taken from the fragment; the recipe is generated uniform.
+#
+# Returns "" when nothing claims the object, and the caller refuses rather than
+# guesses.
+function frag_source_for(obj, frags,	i, n, parts, path, line, cont, tok, j, m, toks) {
+  n = split(frags, parts, " ");
+  for (i = 2; i <= n; i++) {
+    path = srcdir "/config/" parts[i];
+    cont = 0;
+    while ((getline line < path) > 0) {
+      if (!cont) {
+	if (line !~ ("^" obj "\\.o[ \t]*:"))
+	  continue;
+	cont = 1;
+      }
+      m = split(line, toks, "[ \t]+");
+      for (j = 1; j <= m; j++)
+	if (toks[j] ~ /^\$\(srcdir\)\/config\/.*\.(cc|c)$/) {
+	  close(path);
+	  return toks[j];
+	}
+      cont = (line ~ /\\$/);
+      if (!cont)
+	break;
+    }
+    close(path);
+  }
+  return "";
 }
 
 # Has this back end been converted to the 2-coefficient poly_int discipline?
@@ -187,6 +268,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
       seen_hdr_frag[cpu "/t-" cpu "-headers"] = 1;
       printf "include $(srcdir)/config/%s/t-%s-headers\n", cpu, cpu;
     }
+    scan_hdr_frag(srcdir "/config/" cpu "/t-" cpu "-headers");
   }
 
   # ... and the same for any OTHER fragment this target uses.  Keying only on
@@ -208,6 +290,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 	seen_hdr_frag[parts[i] "-headers"] = 1;
 	printf "include $(srcdir)/config/%s-headers\n", parts[i];
       }
+      scan_hdr_frag(srcdir "/config/" parts[i] "-headers");
     }
   }
 
@@ -236,7 +319,14 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # against.  This is a cc1 object, not a build/ one: it carries mode_size,
   # mode_precision and the rest for THIS back end's numbering, so it has to
   # exist once per back end for the same reason insn-modes-<base>.h does.
-  printf "insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu;
+  #
+  # It is written into mt-<cpu>/ rather than the build root, and that is not a
+  # tidying choice -- see the MT_SRC comment at emit_base_objects.  This is the
+  # file that exposed the reason: `#include "tm.h"' from a source sitting in
+  # the build root finds the build root's OWN tm.h, which is the PRIMARY
+  # target's, before any -I is consulted at all.
+  printf "mt-%s/insn-modes-%s.cc: build/genmodes-%s$(build_exeext)\n", cpu, cpu, cpu;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genmodes-%s$(build_exeext) > tmp-modes-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-modes-%s.cc $@\n\n", cpu;
 
@@ -389,9 +479,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # links them yet.
   n = split("output extract peep automata enums", parts, " ");
   for (i = 1; i <= n; i++) {
-    printf "insn-%s-%s.cc: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
-	   parts[i], cpu, parts[i], cpu;
+    printf "mt-%s/insn-%s-%s.cc: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	   cpu, parts[i], cpu, parts[i], cpu;
     printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+    printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
     printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu;
     printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
@@ -407,28 +498,30 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-target-def-%s.h $@\n\n", cpu;
 
   # genattrtab writes three files, genopinit two; neither uses stdout.
-  printf "insn-attrtab-%s.cc insn-dfatab-%s.cc insn-latencytab-%s.cc: \\\n",
-	 cpu, cpu, cpu;
+  printf "mt-%s/insn-attrtab-%s.cc mt-%s/insn-dfatab-%s.cc mt-%s/insn-latencytab-%s.cc: \\\n",
+	 cpu, cpu, cpu, cpu, cpu, cpu;
   printf "  s-attrtab-%s; @true\n", cpu;
   printf "s-attrtab-%s: build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
   printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
   printf "\t  -Atmp-attrtab-%s.cc -Dtmp-dfatab-%s.cc \\\n", cpu, cpu;
   printf "\t  -Ltmp-latencytab-%s.cc\n", cpu;
-  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-attrtab-%s.cc insn-attrtab-%s.cc\n", cpu, cpu;
-  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-dfatab-%s.cc insn-dfatab-%s.cc\n", cpu, cpu;
-  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-latencytab-%s.cc insn-latencytab-%s.cc\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-attrtab-%s.cc mt-%s/insn-attrtab-%s.cc\n", cpu, cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-dfatab-%s.cc mt-%s/insn-dfatab-%s.cc\n", cpu, cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-latencytab-%s.cc mt-%s/insn-latencytab-%s.cc\n", cpu, cpu, cpu;
   printf "\t$(STAMP) s-attrtab-%s\n\n", cpu;
 
-  printf "insn-opinit-%s.cc insn-opinit-%s.h: s-opinit-%s; @true\n", cpu, cpu, cpu;
+  printf "mt-%s/insn-opinit-%s.cc insn-opinit-%s.h: s-opinit-%s; @true\n", cpu, cpu, cpu, cpu;
   printf "s-opinit-%s: build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
   printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
   printf "\t  -htmp-opinit-%s.h -ctmp-opinit-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.h insn-opinit-%s.h\n", cpu, cpu;
-  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.cc insn-opinit-%s.cc\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.cc mt-%s/insn-opinit-%s.cc\n", cpu, cpu, cpu;
   printf "\t$(STAMP) s-opinit-%s\n\n", cpu;
 
   # genemit and genrecog do not write to stdout: they split their output over
@@ -436,32 +529,34 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # by -H as well.  The split count is a build-parallelism knob
   # (@DEFAULT_INSNEMIT_PARTITIONS@), not target data, so every back end reuses
   # the one make already computed rather than getting a sequence of its own.
-  printf "INSNEMIT_SEQ_SRC_%s = $(patsubst %%, insn-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu;
+  printf "INSNEMIT_SEQ_SRC_%s = $(patsubst %%, mt-%s/insn-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu, cpu;
   printf "INSNEMIT_SEQ_TMP_%s = $(patsubst %%, tmp-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu;
   printf "$(INSNEMIT_SEQ_SRC_%s): s-tmp-emit-%s; @true\n", cpu, cpu;
   printf "s-tmp-emit-%s: build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
   printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
   printf "\t  $(addprefix -O,$(INSNEMIT_SEQ_TMP_%s))\n", cpu;
   printf "\t$(foreach id, $(INSNEMIT_SPLITS_SEQ), \\\n";
   printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-emit-%s-$(id).cc \\\n", cpu;
-  printf "\t  insn-emit-%s-$(id).cc;)\n", cpu;
+  printf "\t  mt-%s/insn-emit-%s-$(id).cc;)\n", cpu, cpu;
   printf "\t$(STAMP) s-tmp-emit-%s\n\n", cpu;
 
-  printf "INSNRECOG_SEQ_SRC_%s = $(patsubst %%, insn-recog-%s-%%.cc, $(INSNRECOG_SPLITS_SEQ))\n", cpu, cpu;
+  printf "INSNRECOG_SEQ_SRC_%s = $(patsubst %%, mt-%s/insn-recog-%s-%%.cc, $(INSNRECOG_SPLITS_SEQ))\n", cpu, cpu, cpu;
   printf "INSNRECOG_SEQ_TMP_%s = $(patsubst %%, tmp-recog-%s-%%.cc, $(INSNRECOG_SPLITS_SEQ))\n", cpu, cpu;
   printf "$(INSNRECOG_SEQ_SRC_%s): s-tmp-recog-%s; @true\n", cpu, cpu;
   printf "insn-recog-%s.h: s-tmp-recog-%s; @true\n", cpu, cpu;
   printf "s-tmp-recog-%s: build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
   printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
   printf "\t  -Hinsn-recog-%s.h \\\n", cpu;
   printf "\t  $(addprefix -O,$(INSNRECOG_SEQ_TMP_%s))\n", cpu;
   printf "\t$(foreach id, $(INSNRECOG_SPLITS_SEQ), \\\n";
   printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-recog-%s-$(id).cc \\\n", cpu;
-  printf "\t  insn-recog-%s-$(id).cc;)\n", cpu;
+  printf "\t  mt-%s/insn-recog-%s-$(id).cc;)\n", cpu, cpu;
   printf "\t$(STAMP) s-tmp-recog-%s\n\n", cpu;
 
   printf "tm-preds-%s.h: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
@@ -479,7 +574,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # both the two rules above it and upstream's s-preds: genpreds -h/-c/<none>
   # must all see one input set, or the bodies compiled here would not be the
   # ones the prototypes above declare.
-  printf "insn-preds-%s.cc: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
+  printf "mt-%s/insn-preds-%s.cc: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, cpu, md;
+  printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
   printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s > tmp-preds-%s.cc\n", md, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-preds-%s.cc $@\n\n", cpu;
@@ -568,7 +664,12 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     # does not restamp 16 forwarders and recompile the whole back end: the
     # forwarders' CONTENT never changes once written, only their timestamps
     # would.  The stamp is what the rest of the build depends on.
-    printf "%s-inc/s-inc: $(MULTI_TARGET_INC_HDRS_%s) Makefile\n", cpu, cpu;
+    # ...plus whatever this back end's t-<...>-headers fragments generate; see
+    # scan_hdr_frag.  They are prerequisites of the stamp rather than of each
+    # object because they are needed by the same sources for the same reason
+    # the forwarders are, and one stamp is what the object rules depend on.
+    printf "%s-inc/s-inc: $(MULTI_TARGET_INC_HDRS_%s)%s Makefile\n",
+	   cpu, cpu, hdrgen[cpu];
     printf "\t$(mkinstalldirs) %s-inc\n", cpu;
     printf "\tfor stem in $(MULTI_TARGET_INC_STEMS); do \\\n";
     printf "\t  echo \"#include \\\"$${stem}-%s.h\\\"\" > tmp-inc-%s.h; \\\n", cpu, cpu;
@@ -613,6 +714,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
     printf "\tdone\n";
     printf "\t$(STAMP) %s-inc/s-inc\n\n", cpu;
+
+    emit_base_objects();
   }
 
   emit_triple();
@@ -891,6 +994,8 @@ $1 == "tmake_file_present" { tmkp = $0 }
 $1 == "cpu_type"  { cpu = $2 }
 $1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }
+$1 == "out_file"  { outf = $2 }
+$1 == "extra_objs" { xobjs = ""; for (i = 2; i <= NF; i++) xobjs = xobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
@@ -900,6 +1005,163 @@ END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_source_specs();
 		    emit_inc_dirs() }
 
+# One .o rule per back-end object, for every configured back end.
+#
+# This is what the per-base generated sources and the per-base include
+# directory were for.  The mechanism is not new here: it was spiked three times
+# in the build directory (spike4/5/6.mk) over aarch64's 20 config sources and
+# its 30 generated ones, 50/50 clean with NO source edits, and this function
+# only writes down what those spikes ran.
+#
+# Three things make one uniform recipe enough, and all three were measured
+# rather than assumed:
+#
+#   * `-I<cpu>-inc' supplies every generated header under the plain name the
+#     sources actually write, transitively.  That is MULTI_TARGET_INC, and it
+#     must be reached through a target-specific variable inside a RECURSIVE
+#     assignment -- an `INCLUDES := $(MULTI_TARGET_INC) ...' expands before the
+#     target-specific value exists and both arms of the test then fail
+#     identically, which reads as "the mechanism does not work".
+#   * `$(COMPILE) $<' is the whole recipe.  See frag_source_for for why the
+#     fragments' own recipes are ignored.
+#   * `<cpu>-inc/s-inc' is a sufficient single prerequisite: it already names
+#     all 16 forwarders and, since scan_hdr_frag, the t-<...>-headers outputs
+#     too.
+#
+# The config objects go in `mt-<cpu>/' rather than being renamed.  Measured
+# over all 188 targets: 153 distinct object names, and the number with more
+# than one distinct source is ZERO -- there is no rename problem in this space.
+# 123 names are wanted by more than one target and 9 by more than one back end,
+# so what the directory buys is that `linux.o' wanted by 37 targets needs no
+# scheme at all.  Compiling it per back end rather than once is a cost, not a
+# correctness question: its `.text' was byte-identical across x86_64-linux,
+# s390x-linux and arm-linux-androideabi, so a later dedupe is available and is
+# deliberately not taken here, where it would be a second mechanism to get
+# wrong.
+#
+# NOT YET IN `OBJS'.  These objects compile but cannot all be linked into one
+# compiler yet: `targetm' alone has 47 definitions under that one name, and the
+# selector that chooses between them is a separate piece of work.  Emitting the
+# rules first is deliberate -- it is the half that can be verified on its own,
+# by `make multi-target-objs'.
+function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
+  objs = "";
+
+  # The ONE flag a fragment's recipe carries that the uniform recipe cannot do
+  # without.  `-DTARGET_POLY_AWARE' says this back end's sources are written to
+  # the 2-coefficient poly_int discipline, and it is per back end by
+  # construction, so dropping it produces 223 errors of the form `request for
+  # member to_constant in ... poly_int<1, short unsigned int>' -- in the back
+  # end's own sources, which reads as a source bug and is not one.
+  #
+  # It is read out of config/<cpu>/t-<cpu> rather than listed here for the
+  # reason poly_aware() gives: the fragment is where a back end DECLARES the
+  # conversion, and a second list would drift from it exactly once.  Note that
+  # this is not a reversal of "ignore the fragments' recipes": the recipes are
+  # still ignored, and this is the one FLAG lifted out of them, deliberately
+  # and by name.
+  poly = poly_aware(cpu) ? " -DTARGET_POLY_AWARE" : "";
+
+  # *** MT_SRC: WHY EVERY PER-BASE SOURCE LIVES IN mt-<cpu>/ ***
+  #
+  # `-I<cpu>-inc' is NOT enough on its own, and the reason is a rule of the
+  # preprocessor rather than anything about this build.  `#include "tm.h"'
+  # searches the directory OF THE FILE CONTAINING THE DIRECTIVE first, before
+  # any -I at all.  A generated source sitting in the build root therefore
+  # finds the build root's own tm.h -- the PRIMARY target's -- and no -I can
+  # outrank it.
+  #
+  # This was live and it was nearly silent.  Only insn-modes-aarch64.cc failed,
+  # with `aarch64_sve_vg was not declared', because its ADJUST_NUNITS text
+  # happens to name an aarch64 symbol that i386's tm.h does not have.  Every
+  # other per-base generated source compiled CLEAN against i386's tm.h.  That
+  # is the branch's own bug class -- right on the build's triple, wrong
+  # everywhere else -- reproduced inside the machinery meant to remove it.
+  #
+  # It also explains why the earlier spikes read as proof and were not: they
+  # compiled sources from $(srcdir)/config/<cpu>/, where the same rule works
+  # FOR us (no tm.h next to them), and generated sources whose first tm.h comes
+  # transitively through a $(srcdir) header, which likewise resolves by -I.
+  # The failing case is exactly a build-root source whose own `#include "tm.h"'
+  # is the first one reached.
+  #
+  # Three arms, all run, with -H to name the file actually opened:
+  #   ./insn-modes-aarch64.cc      + -Iaarch64-inc   -> 57 errors
+  #   mt-aarch64/insn-modes-...cc  + -Iaarch64-inc   -> 0, via aarch64-inc/tm.h
+  #   mt-aarch64/insn-modes-...cc  withOUT it        -> 499 errors
+  # The third arm matters: without it a pass is consistent with the directory
+  # doing nothing.
+  n = split("attrtab automata dfatab extract latencytab modes opinit output " \
+	    "peep preds enums", parts, " ");
+  for (i = 1; i <= n; i++) {
+    printf "insn-%s-%s.o: mt-%s/insn-%s-%s.cc %s-inc/s-inc\n",
+	   parts[i], cpu, cpu, parts[i], cpu, cpu;
+    printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+    objs = objs " insn-" parts[i] "-" cpu ".o";
+  }
+
+  # insn-emit and insn-recog are the two that are SPLIT, so their names are
+  # two-axis.  The split count is a build-parallelism knob shared by every back
+  # end (INSNEMIT_SPLITS_SEQ), not target data, so the rule list and the
+  # generator's own -O list are the same list and cannot disagree.
+  printf "insn-emit-%s-%%.o: mt-%s/insn-emit-%s-%%.cc %s-inc/s-inc\n", cpu, cpu, cpu, cpu;
+  printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+  printf "insn-recog-%s-%%.o: mt-%s/insn-recog-%s-%%.cc %s-inc/s-inc\n", cpu, cpu, cpu, cpu;
+  printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+  objs = objs " $(patsubst %,insn-emit-" cpu "-%.o,$(INSNEMIT_SPLITS_SEQ))";
+  objs = objs " $(patsubst %,insn-recog-" cpu "-%.o,$(INSNRECOG_SPLITS_SEQ))";
+
+  # The hand-written back-end sources: this back end's main file plus its
+  # extra_objs.
+  #
+  # Written as one whole rule per object rather than a pattern rule plus a
+  # prerequisite-only rule.  The pattern-rule form is shorter and wrong: with
+  # both rules matching, `$<' is whichever prerequisite make happens to put
+  # first, so the recipe can compile the STAMP instead of the source -- and it
+  # does so for some objects and not others, which reads as a broken source
+  # file.
+  n = split(outf " " xobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    if (i == 1) {
+      # out_file is a PATH under config/, not an object name.
+      src = "$(srcdir)/config/" parts[i];
+      obj = parts[i];
+      sub(/.*\//, "", obj);
+      sub(/\.cc$/, "", obj);
+    } else {
+      obj = parts[i];
+      sub(/\.o$/, "", obj);
+      src = frag_source_for(obj, tmkp);
+      if (src == "") {
+	# Refuse rather than guess.  A guessed config/<cpu>/<obj>.cc that
+	# happens to exist would compile the wrong file without a word; a
+	# guessed one that does not exist would fail three steps away, at a
+	# missing prerequisite whose name nothing in the tree explains.
+	printf "$(error multi-target: nothing in %s's tmake_file claims a rule for %s.o,\n",
+	       cpu, obj;
+	printf "  so gen-multi-target-md.awk cannot tell which source builds it.\n";
+	printf "  Add the rule to the fragment that puts %s.o in extra_objs.)\n\n",
+	       obj;
+	continue;
+      }
+    }
+    printf "mt-%s/%s.o: %s %s-inc/s-inc\n", cpu, obj, src, cpu;
+    printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
+    printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+    objs = objs " mt-" cpu "/" obj ".o";
+  }
+
+  printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
+  printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  printf "MULTI_TARGET_OBJS += $(MULTI_TARGET_OBJS_%s)\n", cpu;
+  # One back end at a time, by name.  Needed for more than convenience: the
+  # control that shows these objects read THEIR OWN headers rather than the
+  # primary's poisons one base's tm.h and requires the other base still to
+  # build, and that arm cannot be expressed without building one base alone.
+  printf ".PHONY: multi-target-objs-%s\n", cpu;
+  printf "multi-target-objs-%s: $(MULTI_TARGET_OBJS_%s)\n\n", cpu, cpu;
+}
+
 # One target that materialises every back end's forwarding-header directory, so
 # that anything wanting per-back-end compilation can depend on it by name
 # rather than on 48 stamps.  MULTI_TARGET_INC_DIRS is accumulated with `+=' as
@@ -907,6 +1169,14 @@ END		  { flush(); emit_condition_intersections();
 function emit_inc_dirs() {
   printf ".PHONY: multi-target-incdirs\n";
   printf "multi-target-incdirs: $(patsubst %%,%%/s-inc,$(MULTI_TARGET_INC_DIRS))\n\n";
+
+  # Every configured back end's objects, by name.  This is the handle the
+  # OBJS work is verified through while MULTI_TARGET_OBJS is not yet in OBJS:
+  # `make multi-target-objs' compiles every back end there is, and a back end
+  # whose sources do not survive per-base compilation says so here rather than
+  # inside a link of 24k symbols.
+  printf ".PHONY: multi-target-objs\n";
+  printf "multi-target-objs: $(MULTI_TARGET_OBJS)\n\n";
 }
 
 # The list every source-derived spec file is reachable from, so that one make

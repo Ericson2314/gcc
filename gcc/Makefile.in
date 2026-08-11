@@ -1358,6 +1358,25 @@ multi-target-md.mk: multi-target.manifest multi-target.multilib \
 	  -f $(srcdir)/gen-multi-target-md.awk \
 	  multi-target.manifest > tmp-multi-target-md.mk
 	$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-md.mk $@
+
+# Every configured back end's objects: its generated insn-* sources and its
+# hand-written config/ ones, each compiled against its OWN headers.  Accumulated
+# with `+=' by multi-target-md.mk, one block per back end, and declared here so
+# that a single-target build -- which has no such file -- still has the name.
+#
+# It MUST be declared before the include, not after.  `+=' on a name with no
+# previous assignment simply creates it, so a `MULTI_TARGET_OBJS =' below would
+# silently discard everything the fragment accumulated.  That is not
+# hypothetical: it is exactly what happens to `generated_files', which the
+# t-<cpu>-headers fragments append to and Makefile.in assigns with `=' some
+# 2500 lines further down, and the reason scan_hdr_frag in
+# gen-multi-target-md.awk reads those fragments itself instead.
+#
+# Deliberately NOT in OBJS yet.  These objects compile, but linking all of them
+# into one compiler needs a selector first: `targetm' alone has 47 definitions
+# under that one name.  `make multi-target-objs' is what verifies them until
+# then.
+MULTI_TARGET_OBJS =
 -include multi-target-md.mk
 
 # Specify the directories to be searched for header files.
@@ -4775,6 +4794,9 @@ mostlyclean: lang.mostlyclean
 # multi-target-md.mk does not exist, and `rm -rf' with no operand is an error
 # rather than a no-op.
 	$(if $(MULTI_TARGET_INC_DIRS),-rm -rf $(MULTI_TARGET_INC_DIRS))
+# And the per-back-end object directories, for the same two reasons: whole
+# directories, and absent from a single-target build.
+	$(if $(MULTI_TARGET_INC_DIRS),-rm -rf $(patsubst %-inc,mt-%,$(MULTI_TARGET_INC_DIRS)))
 # Delete debugging dump files.
 	-rm -f *.[0-9][0-9].* */*.[0-9][0-9].*
 # Delete some files made during installation.
