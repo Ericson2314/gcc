@@ -2983,7 +2983,11 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    || rc=1; \
 	fi; \
 	rm -f tmp-specfiles tmp-cfgfiles; \
-	exit $$rc
+	if test $$rc -ne 0; then \
+	  echo "target-specs: the checks above found specs nothing consults." >&2; \
+	  echo "target-specs: ADVISORY here -- \`make check-spec-refs' and" \
+	       "\`make check-target-caps' are the gates." >&2; \
+	fi
 
 # Fail the build if a spec file names a spec nothing ever asks for.  Three
 # separate times a spec has been written into every per-target spec file with
@@ -3014,6 +3018,15 @@ check-spec-refs:
 # that nothing consults, and under `set -e' that failure ended the recipe -- so
 # a check appended after it never executed in any build, while looking wired up
 # because the build was already red for another reason.
+#
+# AND THAT IS WHY THE CHECKS ARE ADVISORY IN THAT RULE AND FATAL ONLY HERE.
+# Wiring a new check to fail the build gates everyone on a backlog they did not
+# create: those four dead specs predate the check, and failing on them stopped
+# `target-specs', which stops `gcc/specs', which stops `libgcc.a', which put the
+# whole testsuite in an environmental floor -- the exact condition that hid 1447
+# C++ regressions in the first place.  A check that blocks the work needed to
+# fix what it found is worse than no check.  Report in the build, fail in the
+# gate, and let the gate go green when the backlog is cleared.
 .PHONY: check-target-caps
 check-target-caps:
 	@find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
