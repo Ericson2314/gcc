@@ -4292,6 +4292,14 @@ write_header (FILE *f, const char *header_filename)
   fprintf (f, "#include \"%s\"\n", header_filename);
   fprintf (f, "%s", "\n");
 
+  /* pattern42/recog_7/split_3/peephole2_9 are per-back-end counters, so two
+     back ends' insn-recog objects define the same names for unrelated code.
+     Put them in the back end's namespace.  The three top-level entry points
+     recog/split_insns/peephole2_insns stay at global scope -- see
+     print_subroutine -- because recog.h declares them.  */
+  print_ns_using (f);
+  print_ns_open (f);
+
   fprintf (f, "%s", "\n\
 /* `recog' contains a decision tree that recognizes whether the rtx\n\
    X0 is a valid instruction.\n\
@@ -5232,6 +5240,13 @@ static void
 print_subroutine (FILE *f, output_state *os, state *s, int proc_id,
 		  bool in_header = false)
 {
+  /* The main routines are the four names the middle end calls by hand, so
+     they must NOT be namespaced: recog.h declares them at global scope.
+     Step out of the namespace for the definition and step back in.  */
+  bool global_p = (proc_id == 0 && !in_header);
+  if (global_p)
+    print_ns_close (f);
+
   fprintf (f, "\n");
   const char *specifier_ext = "extern";
   const char *specifier_default = "";
@@ -5294,6 +5309,9 @@ print_subroutine (FILE *f, output_state *os, state *s, int proc_id,
     }
   print_state (f, os, s, 2, true);
   fprintf (f, "}\n");
+
+  if (global_p)
+    print_ns_open (f);
 }
 
 /* Print out a routine of type TYPE that performs ROOT.  */
@@ -5438,6 +5456,12 @@ main (int argc, const char **argv)
   for (auto f : output_files)
     write_header (f, header_name);
 
+  if (header)
+    {
+      print_ns_using (header);
+      print_ns_open (header);
+    }
+
   FILE *file = NULL;
   unsigned file_idx;
 
@@ -5544,9 +5568,13 @@ main (int argc, const char **argv)
   print_subroutine_group (output_files, header, &os, SPLIT, &split_root);
   print_subroutine_group (output_files, header, &os, PEEPHOLE2, &peephole2_root);
 
+  if (header)
+    print_ns_close (header);
   fclose (header);
 
   int ret = SUCCESS_EXIT_CODE;
+  for (FILE *f : output_files)
+    print_ns_close (f);
   for (FILE *f : output_files)
     if (fclose (f) != 0)
       ret = FATAL_EXIT_CODE;

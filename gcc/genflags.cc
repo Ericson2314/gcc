@@ -243,13 +243,28 @@ main (int argc, const char **argv)
 	break;
       }
 
-  /* Print out the prototypes now.  */
+  /* Print out the prototypes now.  In a multi-target build they go into the
+     back end's namespace, matching the definitions genemit writes; the
+     using-directive is what lets every existing `gen_addsi3 (...)' call site
+     stay unqualified.  See gensupport.h.  */
   dummy = (rtx) 0;
   obstack_grow (&obstack, &dummy, sizeof (rtx));
   insns = XOBFINISH (&obstack, rtx *);
 
+  print_ns_using (stdout);
+  print_ns_open (stdout);
+
   for (insn_ptr = insns; *insn_ptr; insn_ptr++)
-    gen_proto (*insn_ptr);
+    {
+      bool global_p = gen_name_is_global_p (XSTR (*insn_ptr, 0));
+      if (global_p)
+	print_ns_close (stdout);
+      gen_proto (*insn_ptr);
+      if (global_p)
+	print_ns_open (stdout);
+    }
+
+  print_ns_close (stdout);
 
   puts ("\n#endif /* GCC_INSN_FLAGS_H */");
 

@@ -3975,3 +3975,97 @@ print_gen_include (FILE *outf, const char *name)
 {
   fprintf (outf, "#include \"%s%s.h\"\n", name, GEN_HDR_SUFFIX);
 }
+
+/* The per-back-end namespace, or NULL in a single-target build.
+   See gensupport.h.  */
+
+const char *
+gen_target_ns (void)
+{
+  static char *ns;
+  static bool computed;
+
+  if (!computed)
+    {
+      const char *suffix = GEN_HDR_SUFFIX;
+
+      computed = true;
+      if (suffix[0] == '-' && suffix[1] != '\0')
+	{
+	  ns = concat ("insn_", suffix + 1, NULL);
+	  /* cpu_type directory names are already identifier-safe, but do not
+	     rely on it: one bad character here is a syntax error in every
+	     generated file at once, which is a confusing way to learn it.  */
+	  for (char *p = ns; *p; p++)
+	    if (!ISALNUM (*p) && *p != '_')
+	      *p = '_';
+	}
+    }
+  return ns;
+}
+
+/* True if the md pattern NAME's gen_NAME must stay at GLOBAL scope.
+
+   `blockage' is the case that exists: emit-rtl.h declares `gen_blockage'
+   unconditionally and emit-rtl.cc DEFINES it under `#if !HAVE_blockage', so
+   the middle end (builtins.cc, explow.cc, function.cc) calls one name that
+   is supplied either by the middle end or by the back end's insn-emit.  Put
+   the back end's copy in a namespace and every one of those calls becomes
+   `call of overloaded gen_blockage() is ambiguous' -- two entities where the
+   tree intends one.
+
+   So it stays global, which means it JOINS the small set that the target
+   selector has to arbitrate (recog, split_insns, peephole2_insns,
+   add_clobbers, added_clobbers_hard_reg_p).  That is the right place for it:
+   it is a name the middle end calls directly and therefore needs SELECTING,
+   not merely disambiguating.
+
+   The failure mode if this list is ever short is a compile error at the call
+   site naming the function, not silent misbehaviour.  */
+
+bool
+gen_name_is_global_p (const char *name)
+{
+  static const char *const globals[] = { "blockage" };
+
+  if (!gen_target_ns ())
+    return false;
+  for (unsigned i = 0; i < ARRAY_SIZE (globals); i++)
+    if (strcmp (name, globals[i]) == 0)
+      return true;
+  return false;
+}
+
+/* Open the per-back-end namespace on OUTF.  No-op when singular.  */
+
+void
+print_ns_open (FILE *outf)
+{
+  const char *ns = gen_target_ns ();
+  if (ns)
+    fprintf (outf, "\nnamespace %s {\n", ns);
+}
+
+/* Close it again.  */
+
+void
+print_ns_close (FILE *outf)
+{
+  const char *ns = gen_target_ns ();
+  if (ns)
+    fprintf (outf, "\n} /* namespace %s */\n", ns);
+}
+
+/* Declare the namespace and pull it into the global scope, so that the
+   thousands of hand-written call sites that say gen_addsi3 (...) keep
+   working unqualified while the DEFINITIONS get distinct mangled names.
+   A using-directive also covers members declared after it, which is what
+   makes this usable at the top of a generated file.  */
+
+void
+print_ns_using (FILE *outf)
+{
+  const char *ns = gen_target_ns ();
+  if (ns)
+    fprintf (outf, "\nnamespace %s { }\nusing namespace %s;\n", ns, ns);
+}

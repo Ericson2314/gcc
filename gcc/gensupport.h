@@ -45,6 +45,30 @@ along with GCC; see the file COPYING3.  If not see
    end's file.  */
 extern void print_gen_include (FILE *outf, const char *name);
 
+/* Multi-target, part two: the generated SOURCES define the same identifiers
+   for every back end -- gen_addsi3, pattern42, recog_7 -- because they are
+   the standard optab vocabulary plus per-file counters.  Measured on aarch64
+   against the x86_64 libbackend.a: 6005 strong-symbol collisions, of which
+   5058 are gen_*.  That overlap is structural, so there is nothing to dedupe;
+   the names have to become distinct.
+
+   They are made distinct by NAMESPACE rather than by renaming, because
+   gen_addsi3 is called by that spelling from thousands of hand-written
+   back-end sources and from the middle end.  A namespace plus a
+   using-directive in the header that declares them changes the mangled
+   symbol and changes no call site.  (The same reasoning as the machine-mode
+   fix f7c4d1aed68: qualify what collides, leave the spelling alone.)
+
+   Deliberately NOT namespaced, because the middle end declares them in the
+   hand-written recog.h and calls them by name across the whole compiler:
+   recog, split_insns, peephole2_insns, add_clobbers,
+   added_clobbers_hard_reg_p.  Those are for the selector.  */
+extern const char *gen_target_ns (void);
+extern bool gen_name_is_global_p (const char *name);
+extern void print_ns_open (FILE *outf);
+extern void print_ns_close (FILE *outf);
+extern void print_ns_using (FILE *outf);
+
 struct obstack;
 extern struct obstack *rtl_obstack;
 
