@@ -129,6 +129,28 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # one target and is not per-back-end yet.  Without it genflags emits the
   # condition as the body of the HAVE_* macro, which is what GCC did before
   # gencondmd existed -- correct, just not pre-evaluated.
+  #
+  # KNOWN GAP: gencondmd is the last generator in the insn-* pipeline that is
+  # not per-back-end (genmodes, genpreds, genflags and tm_p all are), so
+  # build/gencondmd.cc contains i386 content only.  Deferred deliberately, not
+  # forgotten.  Estimated at half a day for the mechanism -- every input
+  # already exists, and genconditions.cc's write_header hardcodes exactly the
+  # four headers that are already generated per base (tm, insn-constants, tm_p,
+  # tm-constrs), so it is the same -DTM_H_FILE shape used by genpreds.cc and
+  # genflags.cc -- against a day or more for the fallout, with real
+  # uncertainty.  gencondmd.cc is a 35-include TU pulling rtl.h, function.h,
+  # emit-rtl.h, df.h, resource.h, reload.h and recog.h, and making it
+  # per-back-end means compiling that whole stack against all 45 tm-<base>.h
+  # for the first time.  The modes/preds precedent was 23 back-end failures and
+  # most of a session; genflags was cheap only because genpreds had already
+  # paid for the much smaller header set.
+  #
+  # Note this is a correctness/optimality gap, not a verification one.  Do not
+  # grep build/gencondmd.cc to decide whether an .md use is a condition string
+  # or a C body: that file describes one back end, so a zero hit cannot
+  # distinguish "no condition uses this" from "that .md was never read".  Read
+  # the .md structurally instead -- inside `{ ... }' after the condition is a C
+  # body, in the bare condition string is not.
   printf "insn-flags-%s.h: build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
   printf "  $(srcdir)/config/%s\n", md;
   printf "\t$(RUN_GEN) build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
