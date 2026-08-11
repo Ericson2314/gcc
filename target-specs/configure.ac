@@ -1379,6 +1379,7 @@ dnl consumers read them as one `&&' condition, so an answer for one without the
 dnl other describes a configuration neither probe measured.
 gcc_cv_as_loongarch_relax=no
 gcc_cv_as_loongarch_cond_branch_relax=no
+gcc_cv_as_loongarch_explicit_relocs=no
 case ${target} in
   loongarch*-*-*)
     AC_MSG_CHECKING([assembler for -mrelax])
@@ -1403,6 +1404,67 @@ TSEOF
       gcc_cv_as_loongarch_cond_branch_relax=yes
     fi
     AC_MSG_RESULT([$gcc_cv_as_loongarch_cond_branch_relax])
+
+    dnl Explicit relocation operators.  This is the half of the old shared
+    dnl HAVE_AS_EXPLICIT_RELOCS that loongarch owned; alpha owned the other.
+    AC_MSG_CHECKING([assembler for explicit relocation support])
+    echo 'a:pcalau12i $t0,%pc_hi20(a)' > conftest.s
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_loongarch_explicit_relocs=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_loongarch_explicit_relocs])
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
+dnl ---------------------------------------------------------------------------
+dnl BACK-END ASSEMBLER SECTION: alpha
+dnl
+dnl From `case $target in alpha*-*-linux* | alpha*-*-*bsd*)' in
+dnl gcc/configure.ac.  The first of these used to AC_DEFINE a macro name the
+dnl LOONGARCH arm also defined, so whichever arm ran owned the name for both
+dnl back ends and loongarch read alpha's answer through its own `#ifndef' floor.
+dnl Per-back-end capability names cannot collide that way; that is the point of
+dnl the prefix.
+dnl ---------------------------------------------------------------------------
+
+gcc_cv_as_alpha_explicit_relocs=no
+gcc_cv_as_alpha_jsrdirect_relocs=no
+case ${target} in
+  alpha*-*-linux* | alpha*-*-*bsd*)
+    AC_MSG_CHECKING([assembler for explicit relocation support])
+    cat > conftest.s <<'TSEOF'
+	.set nomacro
+	.text
+	extbl	$3, $2, $3	!lituse_bytoff!1
+	ldq	$2, a($29)	!literal!1
+	ldq	$4, b($29)	!literal!2
+	ldq_u	$3, 0($2)	!lituse_base!1
+	ldq	$27, f($29)	!literal!5
+	jsr	$26, ($27), f	!lituse_jsr!5
+	ldah	$29, 0($26)	!gpdisp!3
+	lda	$0, c($29)	!gprel
+	ldah	$1, d($29)	!gprelhigh
+	lda	$1, d($1)	!gprellow
+	lda	$29, 0($29)	!gpdisp!3
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_alpha_explicit_relocs=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_alpha_explicit_relocs])
+
+    AC_MSG_CHECKING([assembler for jsrdirect relocation support])
+    cat > conftest.s <<'TSEOF'
+	.set nomacro
+	.text
+	ldq	$27, a($29)	!literal!1
+	jsr	$26, ($27), a	!lituse_jsrdirect!1
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_alpha_jsrdirect_relocs=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_alpha_jsrdirect_relocs])
 
     rm -f conftest.s conftest.o
     ;;
@@ -1626,6 +1688,12 @@ as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
 dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
 dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
 
+# alpha back-end assembler capabilities.  as_alpha_explicit_relocs and
+# loongarch's as_loongarch_explicit_relocs below were ONE macro name in
+# gcc/configure.ac; they are two questions with two answers.
+as_alpha_explicit_relocs `ts_bool "$gcc_cv_as_alpha_explicit_relocs"`
+as_alpha_jsrdirect_relocs `ts_bool "$gcc_cv_as_alpha_jsrdirect_relocs"`
+
 # aarch64 back-end assembler capabilities.
 as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
 as_aarch64_small_pic_relocs `ts_bool "$gcc_cv_as_aarch64_picreloc"`
@@ -1647,6 +1715,7 @@ as_mips_dot_module `ts_bool "$gcc_cv_as_mips_dot_module"`
 # write both or neither.
 as_loongarch_relax `ts_bool "$gcc_cv_as_loongarch_relax"`
 as_loongarch_cond_branch_relax `ts_bool "$gcc_cv_as_loongarch_cond_branch_relax"`
+as_loongarch_explicit_relocs `ts_bool "$gcc_cv_as_loongarch_explicit_relocs"`
 
 # riscv back-end assembler capabilities.
 as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`

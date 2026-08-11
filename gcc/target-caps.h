@@ -374,6 +374,25 @@ struct target_caps
   bool as_aarch64_small_pic_relocs;
   bool as_aarch64_aeabi_build_attributes;
 
+  /* alpha back-end assembler capabilities.
+
+     as_alpha_explicit_relocs and as_loongarch_explicit_relocs below were ONE
+     MACRO, `HAVE_AS_EXPLICIT_RELOCS', AC_DEFINEd from two different arms of
+     gcc/configure.ac by two different probes.  Only one arm could run, and
+     loongarch-opts.h floored the name with `#ifndef' -- so an alpha-primary
+     build gave loongarch alpha's assembler answer, silently and with no link
+     error, which is this project's failure mode in one macro.  Two names, two
+     answers; the prefix is what makes the collision impossible rather than
+     merely absent.
+
+     as_alpha_explicit_relocs carries what TARGET_DEFAULT_EXPLICIT_RELOCS and
+     TARGET_SUPPORT_ARCH used to: it sets MASK_EXPLICIT_RELOCS as a default in
+     alpha_option_init_struct, and it decides whether alpha_file_start emits a
+     `.arch' directive.  TARGET_DEFAULT_TARGET_FLAGS could not carry it -- that
+     is a static initializer, the same wall the mips `Init (...)' case hit.  */
+  bool as_alpha_explicit_relocs;
+  bool as_alpha_jsrdirect_relocs;
+
   /* mips back-end assembler capabilities, from the mips arm of the same
      `case $target'.  True by default for the same reason as the aarch64 group:
      the probes answered "no" when there was no assembler to ask.
@@ -465,6 +484,7 @@ struct target_caps
      True by default, as with the other back-end assembler groups: a current GNU
      assembler has both, and the probes answered "no" only when there was
      nothing to ask.  */
+  bool as_loongarch_explicit_relocs;
   bool as_loongarch_relax;
   bool as_loongarch_cond_branch_relax;
 

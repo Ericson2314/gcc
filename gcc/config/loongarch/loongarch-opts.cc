@@ -1127,7 +1127,7 @@ loongarch_init_misc_options (struct gcc_options *opts,
 
   /* Set mexplicit-relocs default.  */
   if (opts->x_la_opt_explicit_relocs == M_OPT_UNSET)
-    opts->x_la_opt_explicit_relocs = (HAVE_AS_EXPLICIT_RELOCS
+    opts->x_la_opt_explicit_relocs = (targ_caps.as_loongarch_explicit_relocs
 				      ? (TARGET_LINKER_RELAXATION
 					 ? EXPLICIT_RELOCS_AUTO
 					 : EXPLICIT_RELOCS_ALWAYS)

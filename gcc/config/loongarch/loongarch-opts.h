@@ -134,9 +134,11 @@ struct loongarch_flags {
    while -m[no]-memcpy imposes a global constraint.  */
 #define TARGET_DO_OPTIMIZE_BLOCK_MOVE_P  loongarch_do_optimize_block_move_p()
 
-#ifndef HAVE_AS_EXPLICIT_RELOCS
-#define HAVE_AS_EXPLICIT_RELOCS 0
-#endif
+/* HAVE_AS_EXPLICIT_RELOCS had a floor here, and the floor was the bug: the
+   macro was AC_DEFINEd by loongarch's arm of `case $target' AND by alpha's, so
+   in an alpha-primary build this `#ifndef' did not fire and loongarch read
+   alpha's assembler answer.  Now targ_caps.as_loongarch_explicit_relocs, which
+   cannot be written by another back end.  */
 
 #ifndef HAVE_AS_SUPPORT_CALL36
 #define HAVE_AS_SUPPORT_CALL36 0

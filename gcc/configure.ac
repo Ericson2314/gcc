@@ -3805,34 +3805,18 @@ case "$target" in
     dnl already has a default in config/aarch64/aarch64.h, so the options are
     dnl simply gone.
     ;;
-  # All TARGET_ABI_OSF targets.
-  alpha*-*-linux* | alpha*-*-*bsd*)
-    gcc_GAS_CHECK_FEATURE([explicit relocation support],
-	gcc_cv_as_alpha_explicit_relocs,,
-[	.set nomacro
-	.text
-	extbl	$3, $2, $3	!lituse_bytoff!1
-	ldq	$2, a($29)	!literal!1
-	ldq	$4, b($29)	!literal!2
-	ldq_u	$3, 0($2)	!lituse_base!1
-	ldq	$27, f($29)	!literal!5
-	jsr	$26, ($27), f	!lituse_jsr!5
-	ldah	$29, 0($26)	!gpdisp!3
-	lda	$0, c($29)	!gprel
-	ldah	$1, d($29)	!gprelhigh
-	lda	$1, d($1)	!gprellow
-	lda	$29, 0($29)	!gpdisp!3],,
-    [AC_DEFINE(HAVE_AS_EXPLICIT_RELOCS, 1,
-  [Define if your assembler supports explicit relocations.])])
-    gcc_GAS_CHECK_FEATURE([jsrdirect relocation support],
-	gcc_cv_as_alpha_jsrdirect_relocs,,
-[	.set nomacro
-	.text
-	ldq	$27, a($29)	!literal!1
-	jsr	$26, ($27), a	!lituse_jsrdirect!1],,
-    [AC_DEFINE(HAVE_AS_JSRDIRECT_RELOCS, 1,
-  [Define if your assembler supports the lituse_jsrdirect relocation.])])
-    ;;
+  dnl alpha: as_alpha_explicit_relocs moved to target-specs, and
+  dnl HAVE_AS_JSRDIRECT_RELOCS with it -- they were probed here, inside
+  dnl `case $target in alpha*-*-linux* | alpha*-*-*bsd*)'.
+  dnl
+  dnl THE MACRO NAME HAD TWO AUTHORITIES.  `HAVE_AS_EXPLICIT_RELOCS' was
+  dnl AC_DEFINEd by this arm AND by the loongarch arm below, from different
+  dnl probes, meaning different things -- and loongarch-opts.h floored it with
+  dnl `#ifndef'.  So in an alpha-primary build the floor did not apply and
+  dnl loongarch set la_opt_explicit_relocs from ALPHA'S assembler answer.  Not a
+  dnl missing value, a wrong one imported from another back end, and it links
+  dnl cleanly.  The two halves had to move together: converting either one left
+  dnl the name owned by the other.
 
   avr-*-*)
     gcc_GAS_CHECK_FEATURE([--mlink-relax option], gcc_cv_as_avr_mlink_relax,
@@ -4074,11 +4058,9 @@ dnl loud failure at a distance and one silent wrong answer.
     ;;
     loongarch*-*-*)
     dnl .dtprelword settled as a build-time constant; see the mips arm above.
-    gcc_GAS_CHECK_FEATURE([explicit relocation support],
-      gcc_cv_as_loongarch_explicit_relocs,,
-      [a:pcalau12i $t0,%pc_hi20(a)],,
-      [AC_DEFINE(HAVE_AS_EXPLICIT_RELOCS, 1,
-	  [Define if your assembler supports explicit relocation.])])
+    dnl explicit relocation support moved to target-specs as
+    dnl as_loongarch_explicit_relocs.  It shared the macro name
+    dnl HAVE_AS_EXPLICIT_RELOCS with the alpha arm above; see the note there.
     gcc_GAS_CHECK_FEATURE([call36 relocation support],
       gcc_cv_as_loongarch_call36,,
       [pcaddu18i $r1, %call36(a)

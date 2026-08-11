@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic-core.h"
+#include "target-caps.h"
 #include "tm-alpha.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
@@ -44,6 +45,14 @@ alpha_option_init_struct (struct gcc_options *opts ATTRIBUTE_UNUSED)
   /* Enable section anchors by default.  */
   opts->x_flag_section_anchors = 1;
 #endif
+
+  /* -mexplicit-relocs by default when the assembler takes them.  This was
+     TARGET_DEFAULT_EXPLICIT_RELOCS, folded into TARGET_DEFAULT_TARGET_FLAGS --
+     a STATIC INITIALIZER, which cannot read targ_caps.  Setting it here instead
+     keeps the same precedence: this hook runs before the command line is
+     decoded, so an explicit -mno-explicit-relocs still wins.  */
+  if (targ_caps.as_alpha_explicit_relocs)
+    opts->x_target_flags |= MASK_EXPLICIT_RELOCS;
 }
 
 /* Implement TARGET_HANDLE_OPTION.  */
@@ -81,7 +90,7 @@ alpha_handle_option (struct gcc_options *opts,
 
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS \
-  (TARGET_DEFAULT | TARGET_CPU_DEFAULT | TARGET_DEFAULT_EXPLICIT_RELOCS)
+  (TARGET_DEFAULT | TARGET_CPU_DEFAULT)
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION alpha_handle_option
 

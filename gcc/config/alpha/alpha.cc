@@ -5853,11 +5853,8 @@ alpha_print_operand (FILE *file, rtx x, int code)
       {
 	const char *lituse;
 
-#ifdef HAVE_AS_JSRDIRECT_RELOCS
-	lituse = "lituse_jsrdirect";
-#else
-	lituse = "lituse_jsr";
-#endif
+	lituse = (targ_caps.as_alpha_jsrdirect_relocs
+		  ? "lituse_jsrdirect" : "lituse_jsr");
 
 	gcc_assert (INTVAL (x) != 0);
 	fprintf (file, "\t\t!%s!%d", lituse, (int) INTVAL (x));
@@ -10185,7 +10182,8 @@ alpha_file_start (void)
     fputs ("\t.set noat\n", asm_out_file);
   if (TARGET_EXPLICIT_RELOCS)
     fputs ("\t.set nomacro\n", asm_out_file);
-  if (TARGET_SUPPORT_ARCH | TARGET_BWX | TARGET_MAX | TARGET_FIX | TARGET_CIX)
+  if (targ_caps.as_alpha_explicit_relocs
+      | TARGET_BWX | TARGET_MAX | TARGET_FIX | TARGET_CIX)
     {
       const char *arch;
 

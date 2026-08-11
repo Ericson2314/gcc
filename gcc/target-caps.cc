@@ -102,6 +102,8 @@ struct target_caps targ_caps =
   .as_aarch64_mabi = true,
   .as_aarch64_small_pic_relocs = true,
   .as_aarch64_aeabi_build_attributes = true,
+  .as_alpha_explicit_relocs = true,
+  .as_alpha_jsrdirect_relocs = true,
   .as_mips_nan = true,
   .as_mips_micromips = true,
   .as_mips_dspr1_mult = true,
@@ -109,6 +111,7 @@ struct target_caps targ_caps =
   .as_mips_explicit_relocs = true,
   .as_mips_explicit_relocs_pcrel = true,
   .as_ld_mips_jalr_reloc = true,
+  .as_loongarch_explicit_relocs = true,
   .as_loongarch_relax = true,
   .as_loongarch_cond_branch_relax = true,
   .as_riscv_attribute = true,
@@ -337,6 +340,10 @@ read_target_caps (const char *file)
 	targ_caps.as_aarch64_small_pic_relocs = value != 0;
       else if (strcmp (name, "as_aarch64_aeabi_build_attributes") == 0)
 	targ_caps.as_aarch64_aeabi_build_attributes = value != 0;
+      else if (strcmp (name, "as_alpha_explicit_relocs") == 0)
+	targ_caps.as_alpha_explicit_relocs = value != 0;
+      else if (strcmp (name, "as_alpha_jsrdirect_relocs") == 0)
+	targ_caps.as_alpha_jsrdirect_relocs = value != 0;
       else if (strcmp (name, "as_mips_nan") == 0)
 	targ_caps.as_mips_nan = value != 0;
       else if (strcmp (name, "as_mips_micromips") == 0)
@@ -351,6 +358,8 @@ read_target_caps (const char *file)
 	targ_caps.as_mips_explicit_relocs_pcrel = value != 0;
       else if (strcmp (name, "as_ld_mips_jalr_reloc") == 0)
 	targ_caps.as_ld_mips_jalr_reloc = value != 0;
+      else if (strcmp (name, "as_loongarch_explicit_relocs") == 0)
+	targ_caps.as_loongarch_explicit_relocs = value != 0;
       else if (strcmp (name, "as_loongarch_relax") == 0)
 	targ_caps.as_loongarch_relax = value != 0;
       else if (strcmp (name, "as_loongarch_cond_branch_relax") == 0)

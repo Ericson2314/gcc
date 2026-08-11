@@ -26691,86 +26691,6 @@ case "$target" in
 $as_echo "#define HAVE_AS_DTPREL_RELOC 1" >>confdefs.h
 
                                 ;;
-  # All TARGET_ABI_OSF targets.
-  alpha*-*-linux* | alpha*-*-*bsd*)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for explicit relocation support" >&5
-$as_echo_n "checking assembler for explicit relocation support... " >&6; }
-if ${gcc_cv_as_alpha_explicit_relocs+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_alpha_explicit_relocs=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '	.set nomacro
-	.text
-	extbl	$3, $2, $3	!lituse_bytoff!1
-	ldq	$2, a($29)	!literal!1
-	ldq	$4, b($29)	!literal!2
-	ldq_u	$3, 0($2)	!lituse_base!1
-	ldq	$27, f($29)	!literal!5
-	jsr	$26, ($27), f	!lituse_jsr!5
-	ldah	$29, 0($26)	!gpdisp!3
-	lda	$0, c($29)	!gprel
-	ldah	$1, d($29)	!gprelhigh
-	lda	$1, d($1)	!gprellow
-	lda	$29, 0($29)	!gpdisp!3' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_alpha_explicit_relocs=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_alpha_explicit_relocs" >&5
-$as_echo "$gcc_cv_as_alpha_explicit_relocs" >&6; }
-if test $gcc_cv_as_alpha_explicit_relocs = yes; then
-
-$as_echo "#define HAVE_AS_EXPLICIT_RELOCS 1" >>confdefs.h
-
-fi
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for jsrdirect relocation support" >&5
-$as_echo_n "checking assembler for jsrdirect relocation support... " >&6; }
-if ${gcc_cv_as_alpha_jsrdirect_relocs+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_alpha_jsrdirect_relocs=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '	.set nomacro
-	.text
-	ldq	$27, a($29)	!literal!1
-	jsr	$26, ($27), a	!lituse_jsrdirect!1' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_alpha_jsrdirect_relocs=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_alpha_jsrdirect_relocs" >&5
-$as_echo "$gcc_cv_as_alpha_jsrdirect_relocs" >&6; }
-if test $gcc_cv_as_alpha_jsrdirect_relocs = yes; then
-
-$as_echo "#define HAVE_AS_JSRDIRECT_RELOCS 1" >>confdefs.h
-
-fi
-
-    ;;
 
   avr-*-*)
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for --mlink-relax option" >&5
@@ -27248,38 +27168,7 @@ fi
     riscv*-*-*)
                                                 ;;
     loongarch*-*-*)
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for explicit relocation support" >&5
-$as_echo_n "checking assembler for explicit relocation support... " >&6; }
-if ${gcc_cv_as_loongarch_explicit_relocs+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_loongarch_explicit_relocs=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo 'a:pcalau12i $t0,%pc_hi20(a)' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_loongarch_explicit_relocs=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_explicit_relocs" >&5
-$as_echo "$gcc_cv_as_loongarch_explicit_relocs" >&6; }
-if test $gcc_cv_as_loongarch_explicit_relocs = yes; then
-
-$as_echo "#define HAVE_AS_EXPLICIT_RELOCS 1" >>confdefs.h
-
-fi
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for call36 relocation support" >&5
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for call36 relocation support" >&5
 $as_echo_n "checking assembler for call36 relocation support... " >&6; }
 if ${gcc_cv_as_loongarch_call36+:} false; then :
   $as_echo_n "(cached) " >&6

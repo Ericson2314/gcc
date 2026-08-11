@@ -166,18 +166,14 @@ extern enum alpha_fp_trap_mode alpha_fptm;
 #define TARGET_CPU_DEFAULT 0
 #endif
 
-#ifndef TARGET_DEFAULT_EXPLICIT_RELOCS
-#ifdef HAVE_AS_EXPLICIT_RELOCS
-#define TARGET_DEFAULT_EXPLICIT_RELOCS MASK_EXPLICIT_RELOCS
-#define TARGET_SUPPORT_ARCH 1
-#else
-#define TARGET_DEFAULT_EXPLICIT_RELOCS 0
-#endif
-#endif
-
-#ifndef TARGET_SUPPORT_ARCH
-#define TARGET_SUPPORT_ARCH 0
-#endif
+/* TARGET_DEFAULT_EXPLICIT_RELOCS and TARGET_SUPPORT_ARCH are gone.  Both were
+   `#ifdef HAVE_AS_EXPLICIT_RELOCS', probed inside
+   `case $target in alpha*-*-linux* | alpha*-*-*bsd*)', and that macro name was
+   also AC_DEFINEd by the loongarch arm -- so the answer alpha got, or gave, was
+   whichever arm the build happened to run.  Both now read
+   targ_caps.as_alpha_explicit_relocs: the default flag in
+   alpha_option_init_struct, the `.arch' directive in alpha_file_start.
+   No subtarget header ever overrode either macro.  */
 
 /* Support for a compile-time default CPU, et cetera.  The rules are:
    --with-cpu is ignored if -mcpu is specified.
