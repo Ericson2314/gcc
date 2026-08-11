@@ -3447,6 +3447,21 @@ reg_to_stack (void)
   return true;
 }
 #endif /* STACK_REGS */
+
+#ifndef STACK_REGS
+/* A target with no register stack has no insn that mentions one.  Defined
+   outside the STACK_REGS body above for the same reason as
+   regstack_completed: rtl.h declares it unconditionally, and cfgcleanup.cc
+   now calls it on every target, having replaced its `#ifdef STACK_REGS'
+   with a run-time question.  A run-time test cannot elide a link-time
+   reference, so the symbol has to exist wherever its caller does.  */
+
+bool
+stack_regs_mentioned (const_rtx insn ATTRIBUTE_UNUSED)
+{
+  return false;
+}
+#endif
 
 namespace {
 
