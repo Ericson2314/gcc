@@ -3093,6 +3093,38 @@ $as_echo "$gcc_cv_as_ld_mips_jalr_reloc" >&6; }
     ;;
 esac
 
+gcc_cv_as_loongarch_relax=no
+gcc_cv_as_loongarch_cond_branch_relax=no
+case ${target} in
+  loongarch*-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mrelax" >&5
+$as_echo_n "checking assembler for -mrelax... " >&6; }
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mrelax -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_loongarch_relax=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_relax" >&5
+$as_echo "$gcc_cv_as_loongarch_relax" >&6; }
+
+                { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for conditional branch relaxation" >&5
+$as_echo_n "checking assembler for conditional branch relaxation... " >&6; }
+    cat > conftest.s <<'TSEOF'
+a:
+	.rept 32769
+	nop
+	.endr
+	beq $a0,$a1,a
+TSEOF
+    if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_loongarch_cond_branch_relax=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_loongarch_cond_branch_relax" >&5
+$as_echo "$gcc_cv_as_loongarch_cond_branch_relax" >&6; }
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
 
 gcc_cv_as_riscv_attribute=no
 gcc_cv_as_riscv_isa_spec=no
@@ -3323,6 +3355,12 @@ as_mips_explicit_relocs `ts_bool "$gcc_cv_as_mips_explicit_relocs"`
 as_mips_explicit_relocs_pcrel `ts_bool "$gcc_cv_as_mips_explicit_relocs_pcrel"`
 as_ld_mips_jalr_reloc `ts_bool "$gcc_cv_as_ld_mips_jalr_reloc"`
 
+# loongarch back-end assembler capabilities.  A PAIR: linker relaxation needs
+# both.  The *asm_mrelax spec below is written from these same two variables --
+# write both or neither.
+as_loongarch_relax `ts_bool "$gcc_cv_as_loongarch_relax"`
+as_loongarch_cond_branch_relax `ts_bool "$gcc_cv_as_loongarch_cond_branch_relax"`
+
 # riscv back-end assembler capabilities.
 as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`
 as_riscv_misa_spec `ts_bool "$gcc_cv_as_riscv_isa_spec"`
@@ -3390,6 +3428,19 @@ case $gcc_cv_lto_plugin in
   *) link_plugin='%{fuse-linker-plugin:%e-fuse-linker-plugin is not supported in this configuration}' ;;
 esac
 
+if test x"$gcc_cv_as_loongarch_relax" = xyes; then
+  if test x"$gcc_cv_as_loongarch_cond_branch_relax" = xyes; then
+    asm_mrelax_default='%{!mrelax:%{!mno-relax:-mrelax}}'
+  else
+    asm_mrelax_default='%{!mrelax:%{!mno-relax:-mno-relax}}'
+  fi
+  asm_mrelax="%{!mno-pass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
+else
+  asm_mrelax_default='%{!mrelax:%{!mno-relax:-mno-relax}}'
+  asm_mrelax="%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
+fi
+
+  Emitted as a
 if test x"$gcc_cv_solaris_ld" = xyes; then
   cat >> "$specs_file" <<EOF
 *link_arch:
@@ -3419,6 +3470,15 @@ ${link_libatomic}
 
 *link_plugin:
 ${link_plugin}
+
+# How to hand -mrelax to the assembler.  Written whole rather than as a
+# fragment: the DEFAULT arm needs BOTH probe answers and the enclosing
+# %{...} needs one, so a fragment would let a consumer assemble a combination
+# neither probe describes.  loongarch's ASM_SPEC refers to this; every other
+# target's ASM_SPEC does not mention it, and the driver's own default is the
+# conservative opt-in form, so an unprobed driver is unchanged.
+*asm_mrelax:
+${asm_mrelax}
 
 EOF
 

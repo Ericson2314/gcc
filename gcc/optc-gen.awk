@@ -224,6 +224,13 @@ print "};"
 print "const unsigned int cl_enums_count = " n_enums ";"
 print ""
 
+# Everything below goes into a STATIC INITIALIZER, so every Init() argument has
+# to be a constant expression -- and, in a compiler that serves many targets, a
+# constant correct for all of them.  An answer probed from one assembler or
+# chosen by a `case $target' is not one; it is a per-target value compiled in as
+# everybody's, and nothing here can diagnose that.  Put the floor in Init() and
+# set the real default from TARGET_OPTION_INIT_STRUCT.  See "Init(value)" in
+# doc/options.texi, and mips_option_init_struct for the worked example.
 print "const struct gcc_options global_options_init =\n{"
 for (i = 0; i < n_extra_vars; i++) {
 	var = extra_vars[i]

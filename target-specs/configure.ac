@@ -1347,6 +1347,51 @@ TSEOF
 esac
 
 dnl ---------------------------------------------------------------------------
+dnl loongarch.  Both of these were probed in gcc/configure.ac INSIDE
+dnl `case $target in loongarch*-*-*)', which is a shape that cannot work in a
+dnl compiler with no privileged target: the probe ran only when loongarch was
+dnl the target GCC itself was configured for, and every other build fell to
+dnl loongarch-opts.h's `#ifndef' floors of 0.  Loongarch then stopped passing
+dnl -mrelax to its assembler and stopped defaulting linker relaxation on, with
+dnl nothing to say so, because a floor turns a missing definition into a wrong
+dnl answer rather than a build failure.
+dnl
+dnl THEY ARE A PAIR AND ARE PROBED AND EMITTED TOGETHER.  Linker relaxation
+dnl needs both; the assembler spec needs the first.  Two of the three original
+dnl consumers read them as one `&&' condition, so an answer for one without the
+dnl other describes a configuration neither probe measured.
+gcc_cv_as_loongarch_relax=no
+gcc_cv_as_loongarch_cond_branch_relax=no
+case ${target} in
+  loongarch*-*-*)
+    AC_MSG_CHECKING([assembler for -mrelax])
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mrelax -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_loongarch_relax=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_loongarch_relax])
+
+    dnl 32769 nops puts the following branch out of the +/-32KiB range a
+    dnl conditional branch can encode, so this assembles only if the assembler
+    dnl relaxes it into a longer sequence.
+    AC_MSG_CHECKING([assembler for conditional branch relaxation])
+    cat > conftest.s <<'TSEOF'
+a:
+	.rept 32769
+	nop
+	.endr
+	beq $a0,$a1,a
+TSEOF
+    if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_loongarch_cond_branch_relax=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_loongarch_cond_branch_relax])
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
+dnl ---------------------------------------------------------------------------
 dnl BACK-END ASSEMBLER SECTION: riscv
 dnl
 dnl From the riscv arm of the same `case "$target"'.  Each gates a "skip this
@@ -1577,6 +1622,12 @@ as_mips_explicit_relocs `ts_bool "$gcc_cv_as_mips_explicit_relocs"`
 as_mips_explicit_relocs_pcrel `ts_bool "$gcc_cv_as_mips_explicit_relocs_pcrel"`
 as_ld_mips_jalr_reloc `ts_bool "$gcc_cv_as_ld_mips_jalr_reloc"`
 
+# loongarch back-end assembler capabilities.  A PAIR: linker relaxation needs
+# both.  The *asm_mrelax spec below is written from these same two variables --
+# write both or neither.
+as_loongarch_relax `ts_bool "$gcc_cv_as_loongarch_relax"`
+as_loongarch_cond_branch_relax `ts_bool "$gcc_cv_as_loongarch_cond_branch_relax"`
+
 # riscv back-end assembler capabilities.
 as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`
 as_riscv_misa_spec `ts_bool "$gcc_cv_as_riscv_isa_spec"`
@@ -1698,7 +1749,26 @@ case $gcc_cv_lto_plugin in
   *) link_plugin='%{fuse-linker-plugin:%e-fuse-linker-plugin is not supported in this configuration}' ;;
 esac
 
-dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.  Emitted as a
+dnl The asm_mrelax spec, from the two loongarch probes.  Three shapes, not four:
+dnl when the assembler will not take -mrelax at all the DEFAULT arm is
+dnl -mno-relax whatever the conditional-branch answer was, because the original
+dnl `#if' read the two with `&&'.  Keeping that here rather than in the spec
+dnl text is what stops a later reader from "simplifying" it into two
+dnl independent choices.
+if test x"$gcc_cv_as_loongarch_relax" = xyes; then
+  if test x"$gcc_cv_as_loongarch_cond_branch_relax" = xyes; then
+    asm_mrelax_default='%{!mrelax:%{!mno-relax:-mrelax}}'
+  else
+    asm_mrelax_default='%{!mrelax:%{!mno-relax:-mno-relax}}'
+  fi
+  asm_mrelax="%{!mno-pass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
+else
+  asm_mrelax_default='%{!mrelax:%{!mno-relax:-mno-relax}}'
+  asm_mrelax="%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} ${asm_mrelax_default}}"
+fi
+
+dnl Solaris link_arch: pick the Sun-ld form when we found Sun ld.
+  Emitted as a
 dnl reference to the named spec the target header already registers, so the spec
 dnl TEXT stays in config/sol2.h where the target knowledge belongs and only the
 dnl CHOICE lives here.
@@ -1731,6 +1801,15 @@ ${link_libatomic}
 
 *link_plugin:
 ${link_plugin}
+
+# How to hand -mrelax to the assembler.  Written whole rather than as a
+# fragment: the DEFAULT arm needs BOTH probe answers and the enclosing
+# %{...} needs one, so a fragment would let a consumer assemble a combination
+# neither probe describes.  loongarch's ASM_SPEC refers to this; every other
+# target's ASM_SPEC does not mention it, and the driver's own default is the
+# conservative opt-in form, so an unprobed driver is unchanged.
+*asm_mrelax:
+${asm_mrelax}
 
 EOF
 

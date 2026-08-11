@@ -298,8 +298,13 @@ Target Mask(LINKER_RELAXATION)
 Take advantage of linker relaxations to reduce the number of instructions
 required to materialize symbol addresses.
 
+; Floor, not the default: Init() is a static initializer (see doc/options.texi).
+; Nothing reads this variable -- the spec tests for the OPTION
+; (%{!mno-pass-mrelax-to-as:...}), not for the Var -- so there is deliberately
+; no TARGET_OPTION_INIT_STRUCT setting it.  Adding one would be a channel to a
+; consumer that does not exist.
 mpass-mrelax-to-as
-Driver Var(la_pass_mrelax_to_as) Init(HAVE_AS_MRELAX_OPTION)
+Driver Var(la_pass_mrelax_to_as) Init(0)
 Pass -mrelax or -mno-relax option to the assembler.
 
 Enum

@@ -437,6 +437,27 @@ struct target_caps
      attention, and the two came from removing one probe.  */
   bool as_ld_mips_jalr_reloc;
 
+  /* loongarch back-end assembler capabilities.  The assembler takes -mrelax at
+     all, and it relaxes CONDITIONAL BRANCHES.  Read as a PAIR: linker
+     relaxation needs both, and the driver spec that hands -mrelax to the
+     assembler needs the first.
+
+     These were HAVE_AS_MRELAX_OPTION and HAVE_AS_COND_BRANCH_RELAXATION, probed
+     in gcc/configure.ac INSIDE `case $target in loongarch*-*-*)' -- so the
+     probes ran only when loongarch was the target GCC itself was configured
+     for.  A probe scoped by `case $target' is structurally incompatible with a
+     compiler that has no privileged target: for every other build the macros
+     were undefined, loongarch-opts.h's `#ifndef' floors made them 0, and
+     loongarch silently stopped passing -mrelax to its assembler and stopped
+     defaulting linker relaxation on.  Nothing failed, because the floors are
+     what turn a missing definition into a wrong answer.
+
+     True by default, as with the other back-end assembler groups: a current GNU
+     assembler has both, and the probes answered "no" only when there was
+     nothing to ask.  */
+  bool as_loongarch_relax;
+  bool as_loongarch_cond_branch_relax;
+
   /* riscv back-end assembler capabilities.  True by default, as above.
      Every one of these gates a "skip this extension because older binutils
      does not know it" flag in common/config/riscv/riscv-common.cc, so true

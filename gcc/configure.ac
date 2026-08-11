@@ -4087,20 +4087,16 @@ dnl loud failure at a distance and one silent wrong answer.
        .cfi_endproc],,
       [AC_DEFINE(HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT, 1,
 	  [Define if your assembler supports eh_frame pcrel encoding.])])
-    gcc_GAS_CHECK_FEATURE([-mrelax option], gcc_cv_as_loongarch_relax,
-      [-mrelax], [.text],,
-      [AC_DEFINE(HAVE_AS_MRELAX_OPTION, 1,
-		[Define if your assembler supports -mrelax option.])])
-    gcc_GAS_CHECK_FEATURE([conditional branch relaxation support],
-      gcc_cv_as_loongarch_cond_branch_relax,
-      [$fw_as_opt],
-      [a:
-       .rept 32769
-       nop
-       .endr
-       beq $a0,$a1,a],,
-      [AC_DEFINE(HAVE_AS_COND_BRANCH_RELAXATION, 1,
-		[Define if your assembler supports conditional branch relaxation.])])
+dnl The -mrelax and conditional-branch-relaxation probes have moved to
+dnl target-specs; targ_caps.as_loongarch_relax and .as_loongarch_cond_branch_relax.
+dnl
+dnl A FIFTH SHAPE, worth naming: a probe scoped by `case $target'.  These two sat
+dnl inside `loongarch*-*-*)' below, so they ran only when loongarch was the
+dnl target GCC itself was configured for.  A compiler with no privileged target
+dnl cannot get an answer that way, and the failure is not a build error -- the
+dnl `#ifndef' floors in loongarch-opts.h supplied 0, loongarch quietly stopped
+dnl passing -mrelax to its assembler and stopped defaulting linker relaxation
+dnl on, and every other probe in this `case' has the same problem waiting.
     gcc_GAS_CHECK_FEATURE([tls le relaxation support],
       gcc_cv_as_loongarch_tls_le_relaxation_support,,
       [lu12i.w $t0,%le_hi20_r(a)],,

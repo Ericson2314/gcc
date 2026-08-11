@@ -272,29 +272,29 @@ Generate approximate reciprocal divide and square root for better throughput.
 
 ; The code model option names for -mcmodel.
 Enum
-Name(cmodel) Type(int)
+Name(loongarch_cmodel) Type(int)
 The code model option names for -mcmodel:
 
 EnumValue
-Enum(cmodel) String(normal) Value(CMODEL_NORMAL)
+Enum(loongarch_cmodel) String(normal) Value(CMODEL_NORMAL)
 
 EnumValue
-Enum(cmodel) String(tiny) Value(CMODEL_TINY)
+Enum(loongarch_cmodel) String(tiny) Value(CMODEL_TINY)
 
 EnumValue
-Enum(cmodel) String(tiny-static) Value(CMODEL_TINY_STATIC)
+Enum(loongarch_cmodel) String(tiny-static) Value(CMODEL_TINY_STATIC)
 
 EnumValue
-Enum(cmodel) String(medium) Value(CMODEL_MEDIUM)
+Enum(loongarch_cmodel) String(medium) Value(CMODEL_MEDIUM)
 
 EnumValue
-Enum(cmodel) String(large) Value(CMODEL_LARGE)
+Enum(loongarch_cmodel) String(large) Value(CMODEL_LARGE)
 
 EnumValue
-Enum(cmodel) String(extreme) Value(CMODEL_EXTREME)
+Enum(loongarch_cmodel) String(extreme) Value(CMODEL_EXTREME)
 
 mcmodel=
-Target RejectNegative Joined Enum(cmodel) Var(la_opt_cmodel) Init(M_OPT_UNSET) Save
+Target RejectNegative Joined Enum(loongarch_cmodel) Var(la_opt_cmodel) Init(M_OPT_UNSET) Save
 Specify the code model.
 
 mdirect-extern-access
@@ -306,22 +306,27 @@ Target Mask(LINKER_RELAXATION)
 Take advantage of linker relaxations to reduce the number of instructions
 required to materialize symbol addresses.
 
+; Floor, not the default: Init() is a static initializer (see doc/options.texi).
+; Nothing reads this variable -- the spec tests for the OPTION
+; (%{!mno-pass-mrelax-to-as:...}), not for the Var -- so there is deliberately
+; no TARGET_OPTION_INIT_STRUCT setting it.  Adding one would be a channel to a
+; consumer that does not exist.
 mpass-mrelax-to-as
-Driver Var(la_pass_mrelax_to_as) Init(HAVE_AS_MRELAX_OPTION)
+Driver Var(la_pass_mrelax_to_as) Init(0)
 Pass -mrelax or -mno-relax option to the assembler.
 
 Enum
-Name(tls_type) Type(int)
+Name(loongarch_tls_type) Type(int)
 The possible TLS dialects:
 
 EnumValue
-Enum(tls_type) String(trad) Value(TLS_TRADITIONAL)
+Enum(loongarch_tls_type) String(trad) Value(TLS_TRADITIONAL)
 
 EnumValue
-Enum(tls_type) String(desc) Value(TLS_DESCRIPTORS)
+Enum(loongarch_tls_type) String(desc) Value(TLS_DESCRIPTORS)
 
 mtls-dialect=
-Target RejectNegative Joined Enum(tls_type) Var(la_opt_tls_dialect) Init(M_OPT_UNSET) Save
+Target RejectNegative Joined Enum(loongarch_tls_type) Var(la_opt_tls_dialect) Init(M_OPT_UNSET) Save
 Specify TLS dialect.
 
 -param=loongarch-vect-unroll-limit=

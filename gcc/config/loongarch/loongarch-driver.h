@@ -51,19 +51,27 @@ along with GCC; see the file COPYING3.  If not see
   "%{G*} %{,ada:-gnatea %{mabi=*} -gnatez} " \
   "%(subtarget_cc1_spec)"
 
-#if HAVE_AS_MRELAX_OPTION && HAVE_AS_COND_BRANCH_RELAXATION
-#define ASM_MRELAX_DEFAULT "%{!mrelax:%{!mno-relax:-mrelax}}"
-#else
-#define ASM_MRELAX_DEFAULT "%{!mrelax:%{!mno-relax:-mno-relax}}"
-#endif
+/* Whether to hand -mrelax to the assembler, and which way round the default
+   goes, used to be two `#if' ladders over HAVE_AS_MRELAX_OPTION and
+   HAVE_AS_COND_BRANCH_RELAXATION.  Both came from probes in gcc/configure.ac
+   that sat inside `case $target in loongarch*-*-*)', so they ran only when
+   loongarch was the target GCC itself was configured for.  In any other build
+   neither macro was defined, loongarch-opts.h's `#ifndef' floors made both 0,
+   and this spec quietly became the opt-in -mno-relax form -- loongarch never
+   passing -mrelax to its assembler, on every such compiler, with nothing said.
 
-#if HAVE_AS_MRELAX_OPTION
-#define ASM_MRELAX_SPEC \
-  "%{!mno-pass-mrelax-to-as:%{mrelax} %{mno-relax} " ASM_MRELAX_DEFAULT "}"
-#else
-#define ASM_MRELAX_SPEC \
-  "%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} " ASM_MRELAX_DEFAULT "}"
-#endif
+   It is now the `asm_mrelax' named spec, written by target-specs from a probe
+   of the real assembler.  The whole spec is written there rather than a
+   fragment, because the two probes do not decompose into two independent
+   pieces of text: the DEFAULT arm needs both answers and the enclosing
+   `%{!mno-pass-mrelax-to-as:...}' vs `%{mpass-mrelax-to-as:...}' needs one, so
+   splitting them would let a caller assemble a combination neither probe
+   describes.
+
+   The driver's built-in default is the conservative form -- ask the assembler
+   for nothing unless the user says so -- which is what the dead `#else' arms
+   produced, so an unprobed driver is unchanged.  */
+#define ASM_MRELAX_SPEC "%(asm_mrelax)"
 
 #undef ASM_SPEC
 #define ASM_SPEC \

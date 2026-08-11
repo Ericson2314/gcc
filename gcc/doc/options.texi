@@ -393,6 +393,29 @@ The variable specified by the @code{Var} property should be statically
 initialized to @var{value}.  If more than one option using the same
 variable specifies @code{Init}, all must specify the same initializer.
 
+@var{value} lands in the initializer of @code{global_options_init} in the
+generated @file{options.cc}, so it must be a constant expression, and one
+@emph{correct for every target this compiler serves}.  A driver serves many
+targets, so an answer that came from probing one assembler or one linker, or
+from a @code{case $target} in @file{config.gcc}, is not such a constant: it is
+one target's answer compiled in as everybody's.
+
+If the real default depends on the target, put the @emph{floor} in @code{Init} ---
+the value that is correct against every target, which is usually the one that
+asks least of the tools --- and set the actual default at run time from the back
+end's @code{TARGET_OPTION_INIT_STRUCT} hook, which runs after the @code{Init}
+values are installed and before the command line is decoded, so an explicit
+option still overrides it.  @code{mips_option_init_struct} in
+@file{common/config/mips/mips-common.cc} is the worked example.
+
+Two failure modes to know about, because they look nothing alike.  If the macro
+named here is left undefined, the error appears in @emph{generated} code
+(@samp{options.cc: error: @var{value} was not declared in this scope}), names a
+macro no source file mentions, and only in a build where that back end's options
+reach @file{options.cc}.  If instead a header supplies an @code{#ifndef} floor
+for it, the build succeeds and the wrong value is used silently --- the floor
+buys a compile at the price of a wrong answer.
+
 @item WarnRemoved
 The option is removed and every usage of such option will
 result in a warning.  We use it option backward compatibility.

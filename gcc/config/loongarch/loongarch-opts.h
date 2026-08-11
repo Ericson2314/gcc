@@ -142,13 +142,11 @@ struct loongarch_flags {
 #define HAVE_AS_SUPPORT_CALL36 0
 #endif
 
-#ifndef HAVE_AS_MRELAX_OPTION
-#define HAVE_AS_MRELAX_OPTION 0
-#endif
-
-#ifndef HAVE_AS_COND_BRANCH_RELAXATION
-#define HAVE_AS_COND_BRANCH_RELAXATION 0
-#endif
+/* HAVE_AS_MRELAX_OPTION and HAVE_AS_COND_BRANCH_RELAXATION had floors here.
+   Both are gone: targ_caps.as_loongarch_relax and .as_loongarch_cond_branch_relax.
+   The floors were the reason the loss went unnoticed -- with the probes only
+   running when loongarch was the configured target, every other build got 0
+   from here and compiled cleanly with linker relaxation silently off.  */
 
 #ifndef HAVE_AS_TLS
 #define HAVE_AS_TLS 0

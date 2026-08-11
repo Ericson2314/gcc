@@ -27,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "obstack.h"
 #include "opts.h"
 #include "diagnostic-core.h"
+#include "target-caps.h"
 
 #include "loongarch-cpu.h"
 #include "loongarch-opts.h"
@@ -1112,9 +1113,15 @@ loongarch_init_misc_options (struct gcc_options *opts,
   INIT_TARGET_FLAG (COND_MOVE_INT, 1)
   INIT_TARGET_FLAG (COND_MOVE_FLOAT, 1)
 
-  /* Set mrelax default.  */
+  /* Set mrelax default.  Linker relaxation needs BOTH answers -- the assembler
+     has to take -mrelax at all, and it has to relax conditional branches -- and
+     they are asked of the real assembler through the target config rather than
+     of whichever one GCC was built against.  Read together, as one condition,
+     because that is what they were: converting half of a coupled pair is how
+     the last one of these went wrong.  */
   INIT_TARGET_FLAG (LINKER_RELAXATION,
-		    HAVE_AS_MRELAX_OPTION && HAVE_AS_COND_BRANCH_RELAXATION)
+		    targ_caps.as_loongarch_relax
+		    && targ_caps.as_loongarch_cond_branch_relax)
 
 #undef INIT_TARGET_FLAG
 
