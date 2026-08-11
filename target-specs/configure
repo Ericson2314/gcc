@@ -3256,7 +3256,7 @@ gas_loc_stmt `ts_bool "$gcc_cv_as_is_stmt"`
 gas_discriminator `ts_bool "$gcc_cv_as_discriminator"`
 as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
 dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
-dwarf2_debug_view `ts_bool ""`
+dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
 
 # aarch64 back-end assembler capabilities.
 as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
@@ -3265,7 +3265,7 @@ as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 
 # mips back-end assembler capabilities.
 as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
-as_mips_micromips `ts_bool ""`
+as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
 as_mips_dspr1_mult `ts_bool "$gcc_cv_as_mips_dspr1_mult"`
 
 # riscv back-end assembler capabilities.
