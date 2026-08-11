@@ -88,8 +88,13 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # Everything the generators link against sees the mode enum through
   # coretypes.h, so it all has to be compiled against this back end's modes,
   # not just the one file that tabulates them.
+  # inchash is here rather than only on genrecog's link line, which is where
+  # Makefile.in puts it for the single-target build: make allows one recipe per
+  # target, so a per-back-end program cannot take an extra object without a
+  # rule of its own.  Linking it into every generator costs an unused object
+  # and keeps one list.
   n = split("rtl read-rtl ggc-none vec gensupport print-rtl " \
-	    "hash-table sort read-md errors", parts, " ");
+	    "hash-table inchash sort read-md errors", parts, " ");
   objs = "build/min-insn-modes-" cpu ".o";
   for (i = 1; i <= n; i++)
     objs = objs " build/" parts[i] "-" cpu ".o";
@@ -111,7 +116,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # genconditions.cc wants it for the same reason and for one more: the file
   # it *writes* names four back-end headers, and which four is settled when
   # genconditions itself is compiled (see the GENCONDMD_* defines below).
-  n = split("preds flags conditions codes config attr attr-common", parts, " ");
+  n = split("preds flags conditions codes config attr attr-common emit recog",
+	    parts, " ");
   for (i = 1; i <= n; i++) {
     printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
 	   parts[i], cpu, parts[i], cpu, cpu;
@@ -279,6 +285,37 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.h $@\n\n",
 	   parts[i], cpu;
   }
+
+  # genemit and genrecog do not write to stdout: they split their output over
+  # NUM_INSNEMIT_SPLITS files named by -O, and genrecog writes a header named
+  # by -H as well.  The split count is a build-parallelism knob
+  # (@DEFAULT_INSNEMIT_PARTITIONS@), not target data, so every back end reuses
+  # the one make already computed rather than getting a sequence of its own.
+  printf "INSNEMIT_SEQ_SRC_%s = $(patsubst %%, insn-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu;
+  printf "INSNEMIT_SEQ_TMP_%s = $(patsubst %%, tmp-emit-%s-%%.cc, $(INSNEMIT_SPLITS_SEQ))\n", cpu, cpu;
+  printf "$(INSNEMIT_SEQ_SRC_%s): s-tmp-emit-%s; @true\n", cpu, cpu;
+  printf "s-tmp-emit-%s: build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
+  printf "  $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genemit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s $(addprefix -O,$(INSNEMIT_SEQ_TMP_%s))\n", md, cpu;
+  printf "\t$(foreach id, $(INSNEMIT_SPLITS_SEQ), \\\n";
+  printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-emit-%s-$(id).cc \\\n", cpu;
+  printf "\t  insn-emit-%s-$(id).cc;)\n", cpu;
+  printf "\t$(STAMP) s-tmp-emit-%s\n\n", cpu;
+
+  printf "INSNRECOG_SEQ_SRC_%s = $(patsubst %%, insn-recog-%s-%%.cc, $(INSNRECOG_SPLITS_SEQ))\n", cpu, cpu;
+  printf "INSNRECOG_SEQ_TMP_%s = $(patsubst %%, tmp-recog-%s-%%.cc, $(INSNRECOG_SPLITS_SEQ))\n", cpu, cpu;
+  printf "$(INSNRECOG_SEQ_SRC_%s): s-tmp-recog-%s; @true\n", cpu, cpu;
+  printf "insn-recog-%s.h: s-tmp-recog-%s; @true\n", cpu, cpu;
+  printf "s-tmp-recog-%s: build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
+  printf "  $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genrecog-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s -Hinsn-recog-%s.h \\\n", md, cpu;
+  printf "\t  $(addprefix -O,$(INSNRECOG_SEQ_TMP_%s))\n", cpu;
+  printf "\t$(foreach id, $(INSNRECOG_SPLITS_SEQ), \\\n";
+  printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-recog-%s-$(id).cc \\\n", cpu;
+  printf "\t  insn-recog-%s-$(id).cc;)\n", cpu;
+  printf "\t$(STAMP) s-tmp-recog-%s\n\n", cpu;
 
   printf "tm-preds-%s.h: build/genpreds-%s$(build_exeext) $(srcdir)/common.md $(srcdir)/config/%s\n", cpu, cpu, md;
   printf "\t$(RUN_GEN) build/genpreds-%s$(build_exeext) -h $(srcdir)/common.md \\\n", cpu;

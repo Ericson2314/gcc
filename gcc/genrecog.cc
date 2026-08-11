@@ -108,7 +108,11 @@
 #define INCLUDE_ALGORITHM
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* Which back end this generator is built for.  Same knob as genpreds.cc.  */
+#ifndef TM_H_FILE
+#define TM_H_FILE "tm.h"
+#endif
+#include TM_H_FILE
 #include "rtl.h"
 #include "errors.h"
 #include "read-md.h"
