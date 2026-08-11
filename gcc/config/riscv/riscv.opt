@@ -38,7 +38,7 @@ Target Alias(fplt) Undocumented
 This option is deprecated; use -fplt or -fno-plt instead.
 
 mabi=
-Target RejectNegative Joined Enum(abi_type) Var(riscv_abi) Init(ABI_ILP32) Negative(mabi=)
+Target RejectNegative Joined Enum(riscv_abi_type) Var(riscv_abi) Init(ABI_ILP32) Negative(mabi=)
 Specify integer and floating-point calling convention.
 
 mpreferred-stack-boundary=
@@ -46,32 +46,32 @@ Target RejectNegative Joined UInteger Var(riscv_preferred_stack_boundary_arg)
 Attempt to keep stack aligned to this power of 2.
 
 Enum
-Name(abi_type) Type(enum riscv_abi_type)
+Name(riscv_abi_type) Type(enum riscv_abi_type)
 Supported ABIs (for use with the -mabi= option):
 
 EnumValue
-Enum(abi_type) String(ilp32) Value(ABI_ILP32)
+Enum(riscv_abi_type) String(ilp32) Value(ABI_ILP32)
 
 EnumValue
-Enum(abi_type) String(ilp32e) Value(ABI_ILP32E)
+Enum(riscv_abi_type) String(ilp32e) Value(ABI_ILP32E)
 
 EnumValue
-Enum(abi_type) String(ilp32f) Value(ABI_ILP32F)
+Enum(riscv_abi_type) String(ilp32f) Value(ABI_ILP32F)
 
 EnumValue
-Enum(abi_type) String(ilp32d) Value(ABI_ILP32D)
+Enum(riscv_abi_type) String(ilp32d) Value(ABI_ILP32D)
 
 EnumValue
-Enum(abi_type) String(lp64) Value(ABI_LP64)
+Enum(riscv_abi_type) String(lp64) Value(ABI_LP64)
 
 EnumValue
-Enum(abi_type) String(lp64e) Value(ABI_LP64E)
+Enum(riscv_abi_type) String(lp64e) Value(ABI_LP64E)
 
 EnumValue
-Enum(abi_type) String(lp64f) Value(ABI_LP64F)
+Enum(riscv_abi_type) String(lp64f) Value(ABI_LP64F)
 
 EnumValue
-Enum(abi_type) String(lp64d) Value(ABI_LP64D)
+Enum(riscv_abi_type) String(lp64d) Value(ABI_LP64D)
 
 mfdiv
 Target Mask(FDIV)
@@ -417,17 +417,17 @@ Target RejectNegative Joined Enum(rvv_vector_bits) Var(rvv_vector_bits) Init(RVV
 -mrvv-vector-bits=<string>	Set the kind of bits for an RVV vector register.
 
 Enum
-Name(tls_type) Type(enum riscv_tls_type)
+Name(riscv_tls_type) Type(enum riscv_tls_type)
 The possible TLS dialects:
 
 EnumValue
-Enum(tls_type) String(trad) Value(TLS_TRADITIONAL)
+Enum(riscv_tls_type) String(trad) Value(TLS_TRADITIONAL)
 
 EnumValue
-Enum(tls_type) String(desc) Value(TLS_DESCRIPTORS)
+Enum(riscv_tls_type) String(desc) Value(TLS_DESCRIPTORS)
 
 mtls-dialect=
-Target RejectNegative Joined Enum(tls_type) Var(riscv_tls_dialect) Init(TLS_TRADITIONAL) Save
+Target RejectNegative Joined Enum(riscv_tls_type) Var(riscv_tls_dialect) Init(TLS_TRADITIONAL) Save
 Specify TLS dialect.
 
 mfence-tso
