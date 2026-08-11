@@ -647,6 +647,7 @@ with_option_defaults
 with_cpu_type
 with_decimal_float
 with_decimal_bid_format
+with_libatomic
 with_glibc_version
 with_s390_excess_float_precision
 with_specs_file
@@ -1294,6 +1295,7 @@ Optional Packages:
   --with-decimal-bid-format=0|1
                           target ABI encodes decimal float as BID rather than
                           DPD
+  --with-libatomic=yes|no this build provides a libatomic for the target
   --with-glibc-version=M.N
                           target runs glibc version M.N or later
   --with-s390-excess-float-precision=0|1
@@ -1995,6 +1997,14 @@ if test "${with_decimal_bid_format+set}" = set; then :
   withval=$with_decimal_bid_format; spec_decimal_bid_format=$withval
 else
   spec_decimal_bid_format=0
+fi
+
+
+# Check whether --with-libatomic was given.
+if test "${with_libatomic+set}" = set; then :
+  withval=$with_libatomic; spec_libatomic=$withval
+else
+  spec_libatomic=no
 fi
 
 
@@ -3321,6 +3331,16 @@ else
   link_no_as_needed=
 fi
 
+if test x"$spec_libatomic" != xyes; then
+  link_libatomic=
+elif test x"$gcc_cv_ld_as_needed" = xyes; then
+  link_libatomic="%{!fno-link-libatomic:${gcc_cv_ld_as_needed_option} -latomic ${gcc_cv_ld_no_as_needed_option}} "
+elif test x"$gcc_cv_ld_use_as_needed_ldscript" = xyes; then
+        link_libatomic='%{!fno-link-libatomic:-latomic_asneeded} '
+else
+          link_libatomic=
+fi
+
 ts_plugin_body='-plugin %(linker_plugin_file) \
     -plugin-opt=%(lto_wrapper) \
     -plugin-opt=-fresolution=%u.res \
@@ -3348,6 +3368,9 @@ ${link_as_needed}
 *link_no_as_needed:
 ${link_no_as_needed}
 
+*link_libatomic:
+${link_libatomic}
+
 *link_static:
 ${gcc_cv_ld_static_option}
 
@@ -3367,6 +3390,8 @@ EOF
 
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&5
 $as_echo "$as_me:   ld --as-needed ........... ${gcc_cv_ld_as_needed}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:   libatomic on link line ... ${spec_libatomic}" >&5
+$as_echo "$as_me:   libatomic on link line ... ${spec_libatomic}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --demangle ............ ${gcc_cv_ld_demangle}" >&5
 $as_echo "$as_me:   ld --demangle ............ ${gcc_cv_ld_demangle}" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}:   ld --sysroot ............. ${gcc_cv_ld_sysroot}" >&5

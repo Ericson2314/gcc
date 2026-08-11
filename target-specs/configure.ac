@@ -132,6 +132,15 @@ AC_ARG_WITH([decimal-bid-format],
   [AS_HELP_STRING([--with-decimal-bid-format=0|1],
      [target ABI encodes decimal float as BID rather than DPD])],
   [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=0])
+dnl Whether this build has a libatomic for this target.  Not probed: the
+dnl question is "did the top level build one", and when these probes run it has
+dnl not been installed yet, so asking the linker for -latomic would answer no on
+dnl a build that is about to have one.  gcc/configure knows (TARGET_CONFIGDIRS)
+dnl and gcc/Makefile.in passes it to exactly the one target it holds for.
+AC_ARG_WITH([libatomic],
+  [AS_HELP_STRING([--with-libatomic=yes|no],
+     [this build provides a libatomic for the target])],
+  [spec_libatomic=$withval], [spec_libatomic=no])
 dnl The target's GNU C Library version.  gcc/configure used to grep __GLIBC__
 dnl out of the target sysroot's features.h; this step is the right place to ask,
 dnl because it runs per target after the build and whoever runs it knows what
@@ -1520,6 +1529,47 @@ else
   link_no_as_needed=
 fi
 
+dnl What to link for libatomic.  This is LINK_LIBATOMIC_SPEC, which gcc.cc used
+dnl to build behind `#if defined(TARGET_PROVIDES_LIBATOMIC) &&
+dnl defined(USE_LD_AS_NEEDED)'.  Both macros came from tm.h, gcc.cc no longer
+dnl includes tm.h, so the guard was unconditionally false and the macro was
+dnl always "" -- while a dozen target headers under config/ still built their
+dnl LINK_GCC_C_SEQUENCE_SPEC out of it.  gen-target-specs writes
+dnl %(link_libatomic) where the header wrote the macro; this fills it in.
+dnl
+dnl The two questions the old guard asked are answered from two different
+dnl places, and that split is the point.  "Is there a libatomic" is a fact about
+dnl the build, passed in above.  "Can this linker take it as-needed" is a fact
+dnl about the installed linker, and is asked here.
+dnl
+dnl THE OPTION SPELLINGS ARE USED RAW, not through %(link_as_needed).  Those
+dnl named specs carry `%{!static:%{!static-pie:...}}' because the libgcc_s
+dnl sequence needs it; LINK_LIBATOMIC_SPEC never had those guards and going
+dnl through them would silently change what a -static link gets.  Same reason
+dnl the ldscript form below is a separate string rather than a wrapper.
+dnl
+dnl gcc_cv_ld_as_needed_option and gcc_cv_ld_no_as_needed_option are set
+dnl unconditionally at the top of the --as-needed probe, NOT inside its `yes'
+dnl arm -- checked, because the last stranded macro restored here referenced
+dnl data that had been stranded by the same guard, and emitting the spec would
+dnl have produced a worse failure than leaving it out.
+if test x"$spec_libatomic" != xyes; then
+  link_libatomic=
+elif test x"$gcc_cv_ld_as_needed" = xyes; then
+  link_libatomic="%{!fno-link-libatomic:${gcc_cv_ld_as_needed_option} -latomic ${gcc_cv_ld_no_as_needed_option}} "
+elif test x"$gcc_cv_ld_use_as_needed_ldscript" = xyes; then
+  dnl Solaris ld: the as-needed decision is made by a linker script that comes
+  dnl with the library, so the driver names that library instead of bracketing
+  dnl the ordinary one.  This was USE_LD_AS_NEEDED_LDSCRIPT.
+  link_libatomic='%{!fno-link-libatomic:-latomic_asneeded} '
+else
+  dnl A linker that cannot do as-needed at all gets nothing, which is what the
+  dnl `#else' arm produced.  Linking -latomic unconditionally is not the
+  dnl conservative choice: it is a hard dependency on a library the program may
+  dnl not need.
+  link_libatomic=
+fi
+
 dnl How to hand the LTO plugin to the linker.  This is the whole spec, not just
 dnl the -plugin option: without -plugin-opt=-fresolution= the linker calls
 dnl lto-wrapper without a resolution file and the link still fails, so emitting
@@ -1572,6 +1622,9 @@ ${link_as_needed}
 *link_no_as_needed:
 ${link_no_as_needed}
 
+*link_libatomic:
+${link_libatomic}
+
 *link_static:
 ${gcc_cv_ld_static_option}
 
@@ -1590,6 +1643,7 @@ ${link_plugin}
 EOF
 
 AC_MSG_NOTICE([  ld --as-needed ........... ${gcc_cv_ld_as_needed}])
+AC_MSG_NOTICE([  libatomic on link line ... ${spec_libatomic}])
 AC_MSG_NOTICE([  ld --demangle ............ ${gcc_cv_ld_demangle}])
 AC_MSG_NOTICE([  ld --sysroot ............. ${gcc_cv_ld_sysroot}])
 AC_MSG_NOTICE([  ld @file ................. ${gcc_cv_ld_at_file}])

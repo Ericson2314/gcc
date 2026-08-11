@@ -4592,10 +4592,27 @@ dnl `case "$target"' that excluded ia64.  ENABLE_DEFAULT_SSP is now purely a
 dnl target-header knob; defaults.h supplies DEFAULT_FLAG_SSP 0 when no target
 dnl header defines it.
 
+dnl libatomic_target names the ONE triple this build will have a libatomic for,
+dnl and is empty when there is none.  LINK_LIBATOMIC_SPEC needs it: -latomic is
+dnl put on the link line only where the library exists, and `is libatomic in
+dnl TARGET_CONFIGDIRS' is the only place that is known.  It cannot be probed by
+dnl target-specs/ the way the linker questions are, because at the time those
+dnl probes run the library has not been built yet, let alone installed.
+dnl
+dnl It is deliberately a TRIPLE and not a yes/no.  The top level builds target
+dnl libraries for ${target} alone, so in a compiler serving 183 targets the
+dnl answer is yes for at most one of them; a boolean would have been handed to
+dnl every target's spec file and put -latomic on 182 link lines that have no
+dnl such library.  ${target} is already canonicalised here (see the top of this
+dnl file), so it compares equal to the manifest entry Makefile.in matches it
+dnl against.
+libatomic_target=
 if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
+  libatomic_target=${target}
   AC_DEFINE(TARGET_PROVIDES_LIBATOMIC, 1,
 	    [Define if libatomic is built for the target.])
 fi
+AC_SUBST(libatomic_target)
 
 dnl The <sys/sdt.h> probe is gone.  Nothing in gcc/ ever read HAVE_SYS_SDT_H:
 dnl its only consumers are libgcc/unwind-dw2.c and unwind-arm-common.inc, which

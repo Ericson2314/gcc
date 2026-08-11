@@ -732,6 +732,7 @@ MAINT
 zlibinc
 zlibdir
 HOST_LIBS
+libatomic_target
 thin_archive_support
 ORIGINAL_DSYMUTIL_FOR_TARGET
 gcc_cv_dsymutil
@@ -21522,7 +21523,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21525 "configure"
+#line 21526 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21628,7 +21629,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21631 "configure"
+#line 21632 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -28291,11 +28292,14 @@ fi
 
 
 
+libatomic_target=
 if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
+  libatomic_target=${target}
 
 $as_echo "#define TARGET_PROVIDES_LIBATOMIC 1" >>confdefs.h
 
 fi
+
 
 
 
