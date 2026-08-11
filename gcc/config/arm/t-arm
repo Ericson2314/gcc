@@ -169,3 +169,44 @@ aarch-bti-insert.o: $(srcdir)/config/arm/aarch-bti-insert.cc \
     $(CONTEXT_H) $(TREE_PASS_H) regrename.h
 	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
 		$(srcdir)/config/arm/aarch-bti-insert.cc
+
+# arm's sources have been converted to the 2-coefficient poly_int discipline:
+# they say known_lt/maybe_ne/to_constant () rather than relying on the
+# fixed-size shorthand that target code gets while NUM_POLY_INT_COEFFS is 1.
+# Ask for the discipline now, so that the eventual flip to 2 coefficients is a
+# no-op here.  See coretypes.h.
+#
+# PER OBJECT, not T_CFLAGS -- T_CFLAGS is one variable for the whole gcc/
+# directory and would hand arm's opt-in to every other back end.  See the same
+# comment in config/i386/t-i386 for the full reasoning.
+arm_poly_objs = arm.o arm-builtins.o arm-mve-builtins.o \
+  arm-mve-builtins-shapes.o arm-mve-builtins-base.o \
+  aarch-common.o aarch-bti-insert.o arm-c.o arm-d.o driver-arm.o
+
+$(foreach o,$(arm_poly_objs),$(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+
+# The machine description's conditions are arm target code too, and they are
+# compiled inside the generated insn-* files, whose names differ between a
+# single-target build (insn-recog.o) and a multi-target one
+# (insn-recog-arm.o).  Match both shapes.
+arm_poly_gen = insn-attrtab.o insn-automata.o insn-dfatab.o insn-emit.o \
+  insn-enums.o insn-extract.o insn-latencytab.o insn-modes.o insn-opinit.o \
+  insn-output.o insn-peep.o insn-preds.o insn-recog.o
+
+$(foreach o,$(arm_poly_gen),$(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+$(foreach o,$(arm_poly_gen),$(eval CFLAGS-$(o:.o=)-arm.o += -DTARGET_POLY_AWARE))
+
+# insn-emit and insn-recog are split into a configured number of files.  Use
+# the Makefile's own lists rather than a pattern: a pattern-specific variable
+# propagates to the target's PREREQUISITES and would reach build/genemit.o and
+# build/genrecog.o, generators shared by every back end.
+$(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
+  $(eval CFLAGS-$(o) += -DTARGET_POLY_AWARE))
+$(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
+  $(eval CFLAGS-$(o:.o=)-arm.o += -DTARGET_POLY_AWARE))
+
+# gencondmd is compiled once per configured triple and the triple cannot be
+# spelled here, so this one does need a pattern.  Its prerequisites are
+# generated .cc files rather than objects, so nothing shared inherits the flag.
+build/gencondmd.o : T_CFLAGS += -DTARGET_POLY_AWARE
+build/gencondmd-arm%.o : T_CFLAGS += -DTARGET_POLY_AWARE

@@ -331,8 +331,8 @@
 	}
       machine_mode new_mode
 	= mode_for_vector (new_smode,
-			   GET_MODE_SIZE (<MODE>mode)
-			   / GET_MODE_SIZE (new_smode)).require ();
+			   exact_div (GET_MODE_SIZE (<MODE>mode),
+			     GET_MODE_SIZE (new_smode))).require ();
       rtx new_mem = adjust_address (*memloc, new_mode, 0);
 
       if (!for_store)

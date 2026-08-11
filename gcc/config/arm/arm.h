@@ -371,7 +371,7 @@ emission of floating point pcs attributes.  */
    endianness difference between NEON architectural lane numbers and those
    used in RTL */
 #define NEON_ENDIAN_LANE_N(mode, n)  \
-  (BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode) - 1 - n : n)
+  (BYTES_BIG_ENDIAN ? GET_MODE_NUNITS ((machine_mode) (mode)).to_constant () - 1 - n : n)
 
 /* Support for a compile-time default CPU, et cetera.  The rules are:
    --with-arch is ignored if -march or -mcpu are specified.
@@ -899,12 +899,12 @@ extern const int arm_arch_cde_coproc_bits[];
 /* The number of (integer) registers required to hold a quantity of type MODE.
    Also used for VFP registers.  */
 #define ARM_NUM_REGS(MODE)				\
-  ARM_NUM_INTS (GET_MODE_SIZE (MODE))
+  ARM_NUM_INTS (GET_MODE_SIZE ((machine_mode) (MODE)).to_constant ())
 
 /* The number of (integer) registers required to hold a quantity of TYPE MODE.  */
 #define ARM_NUM_REGS2(MODE, TYPE)                   \
   ARM_NUM_INTS ((MODE) == BLKmode ? 		\
-  int_size_in_bytes (TYPE) : GET_MODE_SIZE (MODE))
+  int_size_in_bytes (TYPE) : GET_MODE_SIZE ((machine_mode) (MODE)).to_constant ())
 
 /* The number of (integer) argument register available.  */
 #define NUM_ARG_REGS		4
@@ -1846,7 +1846,7 @@ enum arm_auto_incmodes
 
 #define THUMB1_REGNO_MODE_OK_FOR_BASE_P(REGNO, MODE)		\
   (TEST_REGNO (REGNO, <=, LAST_LO_REGNUM)			\
-   || (GET_MODE_SIZE (MODE) >= 4				\
+   || (known_ge (GET_MODE_SIZE (MODE), 4)				\
        && TEST_REGNO (REGNO, ==, STACK_POINTER_REGNUM)))
 
 #define REGNO_MODE_OK_FOR_BASE_P(REGNO, MODE)		\
@@ -1988,7 +1988,7 @@ enum arm_auto_incmodes
 #define THUMB1_REG_MODE_OK_FOR_BASE_P(X, MODE)	\
   (REGNO (X) <= LAST_LO_REGNUM			\
    || REGNO (X) >= FIRST_PSEUDO_REGISTER	\
-   || (GET_MODE_SIZE (MODE) >= 4		\
+   || (known_ge (GET_MODE_SIZE (MODE), 4)		\
        && (REGNO (X) == STACK_POINTER_REGNUM	\
 	   || (X) == hard_frame_pointer_rtx	\
 	   || (X) == arg_pointer_rtx)))

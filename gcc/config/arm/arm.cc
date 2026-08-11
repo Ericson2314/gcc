@@ -5738,10 +5738,10 @@ arm_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
 
   /* Everything below assumes an integer mode.  */
   if (GET_MODE_CLASS (mode) != MODE_INT
-      || GET_MODE_BITSIZE (mode) > HOST_BITS_PER_WIDE_INT)
+      || known_gt (GET_MODE_BITSIZE (mode), HOST_BITS_PER_WIDE_INT))
     return;
 
-  maxval = (HOST_WIDE_INT_1U << (GET_MODE_BITSIZE (mode) - 1)) - 1;
+  maxval = (HOST_WIDE_INT_1U << (GET_MODE_BITSIZE (mode).to_constant () - 1)) - 1;
 
   /* For DImode, we have GE/LT/GEU/LTU comparisons (with cmp/sbc).  In
      ARM mode we can also use cmp/cmpeq for GTU/LEU.  GT/LE must be
@@ -6509,7 +6509,7 @@ aapcs_vfp_sub_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -6585,7 +6585,7 @@ aapcs_vfp_sub_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -6619,7 +6619,7 @@ aapcs_vfp_sub_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -6776,7 +6776,7 @@ aapcs_vfp_allocate (CUMULATIVE_ARGS *pcum, machine_mode mode,
 		    const_tree type  ATTRIBUTE_UNUSED)
 {
   int rmode_size
-    = MAX (GET_MODE_SIZE (pcum->aapcs_vfp_rmode), GET_MODE_SIZE (SFmode));
+    = MAX (GET_MODE_SIZE (pcum->aapcs_vfp_rmode).to_constant (), GET_MODE_SIZE (SFmode));
   int shift = rmode_size / GET_MODE_SIZE (SFmode);
   unsigned mask = (1 << (shift * pcum->aapcs_vfp_rcount)) - 1;
   int regno;
@@ -6813,7 +6813,7 @@ aapcs_vfp_allocate (CUMULATIVE_ARGS *pcum, machine_mode mode,
 				       FIRST_VFP_REGNUM + regno + i * rshift);
 		tmp = gen_rtx_EXPR_LIST
 		  (VOIDmode, tmp,
-		   GEN_INT (i * GET_MODE_SIZE (rmode)));
+		   GEN_INT (i * GET_MODE_SIZE (rmode).to_constant ()));
 		XVECEXP (par, 0, i) = tmp;
 	      }
 
@@ -6839,7 +6839,7 @@ aapcs_vfp_allocate_return_reg (enum arm_pcs pcs_variant ATTRIBUTE_UNUSED,
 
   if (mode == BLKmode
       || (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) >= GET_MODE_SIZE (TImode)
+	  && known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (TImode))
 	  && !(TARGET_NEON || TARGET_HAVE_MVE)))
     {
       int count;
@@ -6861,13 +6861,13 @@ aapcs_vfp_allocate_return_reg (enum arm_pcs pcs_variant ATTRIBUTE_UNUSED,
 	      count *= 2;
 	    }
 	}
-      shift = GET_MODE_SIZE(ag_mode) / GET_MODE_SIZE(SFmode);
+      shift = GET_MODE_SIZE(ag_mode).to_constant () / GET_MODE_SIZE(SFmode);
       par = gen_rtx_PARALLEL (mode, rtvec_alloc (count));
       for (i = 0; i < count; i++)
 	{
 	  rtx tmp = gen_rtx_REG (ag_mode, FIRST_VFP_REGNUM + i * shift);
 	  tmp = gen_rtx_EXPR_LIST (VOIDmode, tmp,
-				   GEN_INT (i * GET_MODE_SIZE (ag_mode)));
+				   GEN_INT (i * GET_MODE_SIZE (ag_mode).to_constant ()));
 	  XVECEXP (par, 0, i) = tmp;
 	}
 
@@ -7046,7 +7046,7 @@ static rtx
 aapcs_libcall_value (machine_mode mode)
 {
   if (BYTES_BIG_ENDIAN && ALL_FIXED_POINT_MODE_P (mode)
-      && GET_MODE_SIZE (mode) <= 4)
+      && known_le (GET_MODE_SIZE (mode), 4))
     mode = SImode;
 
   return aapcs_allocate_return_reg (mode, NULL_TREE, NULL_TREE);
@@ -8288,7 +8288,7 @@ legitimize_pic_address (rtx orig, machine_mode mode, rtx reg, rtx pic_reg,
 	    return plus_constant (Pmode, base, INTVAL (offset));
 	}
 
-      if (GET_MODE_SIZE (mode) > 4
+      if (known_gt (GET_MODE_SIZE (mode), 4)
 	  && (GET_MODE_CLASS (mode) == MODE_INT
 	      || TARGET_SOFT_FLOAT))
 	{
@@ -8652,7 +8652,7 @@ arm_legitimate_address_outer_p (machine_mode mode, rtx x, RTX_CODE outer,
 
   if (code == POST_INC || code == PRE_DEC
       || ((code == PRE_INC || code == POST_DEC)
-	  && (use_ldrd || GET_MODE_SIZE (mode) <= 4)))
+	  && (use_ldrd || known_le (GET_MODE_SIZE (mode), 4))))
     return arm_address_register_rtx_p (XEXP (x, 0), strict_p);
 
   else if ((code == POST_MODIFY || code == PRE_MODIFY)
@@ -8669,7 +8669,7 @@ arm_legitimate_address_outer_p (machine_mode mode, rtx x, RTX_CODE outer,
 	  && REG_P (addend))
 	return 0;
 
-      return ((use_ldrd || GET_MODE_SIZE (mode) <= 4)
+      return ((use_ldrd || known_le (GET_MODE_SIZE (mode), 4))
 	      && arm_legitimate_index_p (mode, addend, outer, strict_p));
     }
 
@@ -8771,7 +8771,7 @@ thumb2_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
 
   if (code == POST_INC || code == PRE_DEC
       || ((code == PRE_INC || code == POST_DEC)
-	  && (use_ldrd || GET_MODE_SIZE (mode) <= 4)))
+	  && (use_ldrd || known_le (GET_MODE_SIZE (mode), 4))))
     return arm_address_register_rtx_p (XEXP (x, 0), strict_p);
 
   else if ((code == POST_MODIFY || code == PRE_MODIFY)
@@ -8787,7 +8787,7 @@ thumb2_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
 	return 0;
 
       offset = INTVAL(addend);
-      if (GET_MODE_SIZE (mode) <= 4)
+      if (known_le (GET_MODE_SIZE (mode), 4))
 	return (offset > -256 && offset < 256);
 
       return (use_ldrd && offset > -1024 && offset < 1024
@@ -8852,7 +8852,7 @@ arm_legitimate_index_p (machine_mode mode, rtx index, RTX_CODE outer,
 	    && (INTVAL (index) & 3) == 0);
 
   if (arm_address_register_rtx_p (index, strict_p)
-      && (GET_MODE_SIZE (mode) <= 4))
+      && (known_le (GET_MODE_SIZE (mode), 4)))
     return 1;
 
   /* This handles DFmode only if !TARGET_HARD_FLOAT.  */
@@ -8892,7 +8892,7 @@ arm_legitimate_index_p (machine_mode mode, rtx index, RTX_CODE outer,
 	    && INTVAL (index) > -1024
 	    && (INTVAL (index) & 3) == 0);
 
-  if (GET_MODE_SIZE (mode) <= 4
+  if (known_le (GET_MODE_SIZE (mode), 4)
       && ! (arm_arch4
 	    && (mode == HImode
 		|| mode == HFmode
@@ -8991,7 +8991,7 @@ thumb2_legitimate_index_p (machine_mode mode, rtx index, int strict_p)
 	    && (INTVAL (index) & 3) == 0);
 
   if (arm_address_register_rtx_p (index, strict_p)
-      && (GET_MODE_SIZE (mode) <= 4))
+      && (known_le (GET_MODE_SIZE (mode), 4)))
     return 1;
 
   /* This handles DImode if !TARGET_NEON, and DFmode if !TARGET_VFP_BASE.  */
@@ -9054,7 +9054,7 @@ thumb1_base_register_rtx_p (rtx x, machine_mode mode, int strict_p)
   return (regno <= LAST_LO_REGNUM
 	  || regno > LAST_VIRTUAL_REGISTER
 	  || regno == FRAME_POINTER_REGNUM
-	  || (GET_MODE_SIZE (mode) >= 4
+	  || (known_ge (GET_MODE_SIZE (mode), 4)
 	      && (regno == STACK_POINTER_REGNUM
 		  || regno >= FIRST_PSEUDO_REGISTER
 		  || x == hard_frame_pointer_rtx
@@ -9093,7 +9093,7 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
     return 0;
 
   /* ??? Not clear if this is right.  Experiment.  */
-  if (GET_MODE_SIZE (mode) < 4
+  if (known_lt (GET_MODE_SIZE (mode), 4)
       && !(reload_in_progress || reload_completed)
       && (reg_mentioned_p (frame_pointer_rtx, x)
 	  || reg_mentioned_p (arg_pointer_rtx, x)
@@ -9108,14 +9108,14 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
     return 1;
 
   /* This is PC relative data before arm_reorg runs.  */
-  else if (GET_MODE_SIZE (mode) >= 4 && CONSTANT_P (x)
+  else if (known_ge (GET_MODE_SIZE (mode), 4) && CONSTANT_P (x)
 	   && SYMBOL_REF_P (x)
 	   && CONSTANT_POOL_ADDRESS_P (x) && !flag_pic
 	   && !arm_disable_literal_pool)
     return 1;
 
   /* This is PC relative data after arm_reorg runs.  */
-  else if ((GET_MODE_SIZE (mode) >= 4 || mode == HFmode)
+  else if ((known_ge (GET_MODE_SIZE (mode), 4) || mode == HFmode)
 	   && reload_completed
 	   && (LABEL_REF_P (x)
 	       || (GET_CODE (x) == CONST
@@ -9125,7 +9125,7 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
     return 1;
 
   /* Post-inc indexing only supported for SImode and larger.  */
-  else if (GET_CODE (x) == POST_INC && GET_MODE_SIZE (mode) >= 4
+  else if (GET_CODE (x) == POST_INC && known_ge (GET_MODE_SIZE (mode), 4)
 	   && thumb1_index_register_rtx_p (XEXP (x, 0), strict_p))
     return 1;
 
@@ -9135,7 +9135,7 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
       /* We disallow FRAME+REG addressing since we know that FRAME
 	 will be replaced with STACK, and SP relative addressing only
 	 permits SP+OFFSET.  */
-      if (GET_MODE_SIZE (mode) <= 4
+      if (known_le (GET_MODE_SIZE (mode), 4)
 	  && XEXP (x, 0) != frame_pointer_rtx
 	  && XEXP (x, 1) != frame_pointer_rtx
 	  && thumb1_index_register_rtx_p (XEXP (x, 0), strict_p)
@@ -9156,10 +9156,10 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
 	 just like GO_IF_LEGITIMATE_OFFSET does.  */
       else if (REG_P (XEXP (x, 0))
 	       && REGNO (XEXP (x, 0)) == STACK_POINTER_REGNUM
-	       && GET_MODE_SIZE (mode) >= 4
+	       && known_ge (GET_MODE_SIZE (mode), 4)
 	       && CONST_INT_P (XEXP (x, 1))
 	       && INTVAL (XEXP (x, 1)) >= 0
-	       && INTVAL (XEXP (x, 1)) + GET_MODE_SIZE (mode) <= 1024
+	       && known_le (INTVAL (XEXP (x, 1)) + GET_MODE_SIZE (mode), 1024)
 	       && (INTVAL (XEXP (x, 1)) & 3) == 0)
 	return 1;
 
@@ -9167,14 +9167,14 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
 	       && (REGNO (XEXP (x, 0)) == FRAME_POINTER_REGNUM
 		   || REGNO (XEXP (x, 0)) == ARG_POINTER_REGNUM
 		   || VIRTUAL_REGISTER_P (XEXP (x, 0)))
-	       && GET_MODE_SIZE (mode) >= 4
+	       && known_ge (GET_MODE_SIZE (mode), 4)
 	       && CONST_INT_P (XEXP (x, 1))
 	       && (INTVAL (XEXP (x, 1)) & 3) == 0)
 	return 1;
     }
 
   else if (GET_MODE_CLASS (mode) != MODE_FLOAT
-	   && GET_MODE_SIZE (mode) == 4
+	   && known_eq (GET_MODE_SIZE (mode), 4)
 	   && SYMBOL_REF_P (x)
 	   && CONSTANT_POOL_ADDRESS_P (x)
 	   && !arm_disable_literal_pool
@@ -9191,7 +9191,7 @@ thumb1_legitimate_address_p (machine_mode mode, rtx x, int strict_p)
 int
 thumb_legitimate_offset_p (machine_mode mode, HOST_WIDE_INT val)
 {
-  switch (GET_MODE_SIZE (mode))
+  switch (GET_MODE_SIZE (mode).to_constant ())
     {
     case 1:
       return val >= 0 && val < 32;
@@ -9201,7 +9201,7 @@ thumb_legitimate_offset_p (machine_mode mode, HOST_WIDE_INT val)
 
     default:
       return (val >= 0
-	      && (val + GET_MODE_SIZE (mode)) <= 128
+	      && known_le ((val + GET_MODE_SIZE (mode)), 128)
 	      && (val & 3) == 0);
     }
 }
@@ -9636,7 +9636,7 @@ thumb_legitimize_address (rtx x, rtx orig_x, machine_mode mode)
 {
   if (GET_CODE (x) == PLUS
       && CONST_INT_P (XEXP (x, 1))
-      && (INTVAL (XEXP (x, 1)) >= 32 * GET_MODE_SIZE (mode)
+      && (known_ge (INTVAL (XEXP (x, 1)), 32 * GET_MODE_SIZE (mode))
 	  || INTVAL (XEXP (x, 1)) < 0))
     {
       rtx xop0 = XEXP (x, 0);
@@ -9647,16 +9647,16 @@ thumb_legitimize_address (rtx x, rtx orig_x, machine_mode mode)
 	 then offsetting that.  Don't do this when optimizing for space
 	 since it can cause too many CSEs.  */
       if (optimize_size && offset >= 0
-	  && offset < 256 + 31 * GET_MODE_SIZE (mode))
+	  && known_lt (offset, 256 + 31 * GET_MODE_SIZE (mode)))
 	{
 	  HOST_WIDE_INT delta;
 
 	  if (offset >= 256)
-	    delta = offset - (256 - GET_MODE_SIZE (mode));
-	  else if (offset < 32 * GET_MODE_SIZE (mode) + 8)
-	    delta = 31 * GET_MODE_SIZE (mode);
+	    delta = offset - (256 - GET_MODE_SIZE (mode).to_constant ());
+	  else if (known_lt (offset, 32 * GET_MODE_SIZE (mode) + 8))
+	    delta = 31 * GET_MODE_SIZE (mode).to_constant ();
 	  else
-	    delta = offset & (~31 * GET_MODE_SIZE (mode));
+	    delta = offset & (~31 * GET_MODE_SIZE (mode).to_constant ());
 
 	  xop0 = force_operand (plus_constant (Pmode, xop0, offset - delta),
 				NULL_RTX);
@@ -9970,7 +9970,7 @@ thumb1_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer)
     case SET:
       /* A SET doesn't have a mode, so let's look at the SET_DEST to get
 	 the mode.  */
-      words = ARM_NUM_INTS (GET_MODE_SIZE (GET_MODE (SET_DEST (x))));
+      words = ARM_NUM_INTS (GET_MODE_SIZE (GET_MODE (SET_DEST (x))).to_constant ());
       return (COSTS_N_INSNS (words)
 	      + 4 * ((MEM_P (SET_SRC (x)))
 		     + MEM_P (SET_DEST (x))));
@@ -10027,7 +10027,7 @@ thumb1_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer)
       /* XXX another guess.  */
       /* Memory costs quite a lot for the first word, but subsequent words
 	 load at the equivalent of a single insn each.  */
-      return (10 + 4 * ((GET_MODE_SIZE (mode) - 1) / UNITS_PER_WORD)
+      return (10 + 4 * ((GET_MODE_SIZE (mode).to_constant () - 1) / UNITS_PER_WORD)
 	      + ((SYMBOL_REF_P (x) && CONSTANT_POOL_ADDRESS_P (x))
 		 ? 4 : 0));
 
@@ -10221,7 +10221,7 @@ thumb1_size_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer)
     case SET:
       /* A SET doesn't have a mode, so let's look at the SET_DEST to get
 	 the mode.  */
-      words = ARM_NUM_INTS (GET_MODE_SIZE (GET_MODE (SET_DEST (x))));
+      words = ARM_NUM_INTS (GET_MODE_SIZE (GET_MODE (SET_DEST (x))).to_constant ());
       cost = COSTS_N_INSNS (words);
       if (satisfies_constraint_J (SET_SRC (x))
 	  || satisfies_constraint_K (SET_SRC (x))
@@ -10291,7 +10291,7 @@ thumb1_size_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer)
     case MEM:
       return (COSTS_N_INSNS (1)
 	      + COSTS_N_INSNS (1)
-		* ((GET_MODE_SIZE (mode) - 1) / UNITS_PER_WORD)
+		* ((GET_MODE_SIZE (mode).to_constant () - 1) / UNITS_PER_WORD)
               + ((SYMBOL_REF_P (x) && CONSTANT_POOL_ADDRESS_P (x))
                  ? COSTS_N_INSNS (1) : 0));
 
@@ -10507,7 +10507,7 @@ arm_mem_costs (rtx x, const struct cpu_cost_table *extra_cost,
     {
       if (FLOAT_MODE_P (mode))
 	{
-	  if (GET_MODE_SIZE (mode) == 8)
+	  if (known_eq (GET_MODE_SIZE (mode), 8))
 	    *cost += extra_cost->ldst.loadd;
 	  else
 	    *cost += extra_cost->ldst.loadf;
@@ -10517,7 +10517,7 @@ arm_mem_costs (rtx x, const struct cpu_cost_table *extra_cost,
       else
 	{
 	  /* Integer modes */
-	  if (GET_MODE_SIZE (mode) == 8)
+	  if (known_eq (GET_MODE_SIZE (mode), 8))
 	    *cost += extra_cost->ldst.ldrd;
 	  else
 	    *cost += extra_cost->ldst.load;
@@ -10551,7 +10551,7 @@ arm_bfi_1_p (rtx op0, rtx op1, rtx *sub0, rtx *sub1)
   else
     *sub0 = XEXP (op0, 0);
 
-  if (const2 >= GET_MODE_BITSIZE (GET_MODE (op0)))
+  if (known_ge (const2, GET_MODE_BITSIZE (GET_MODE (op0))))
     return false;
 
   *sub1 = XEXP (op1, 0);
@@ -10627,7 +10627,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	     unless we don't have HW FP, in which case everything
 	     larger than word mode will require two insns.  */
 	  *cost = COSTS_N_INSNS (((!TARGET_VFP_BASE
-				   && GET_MODE_SIZE (mode) > 4)
+				   && known_gt (GET_MODE_SIZE (mode), 4))
 				  || mode == DImode)
 				 ? 2 : 1);
 	  /* Conditional register moves can be encoded
@@ -10780,7 +10780,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	  return true;
 	}
       else if (GET_MODE_CLASS (mode) == MODE_INT
-	       && GET_MODE_SIZE (mode) < 4)
+	       && known_lt (GET_MODE_SIZE (mode), 4))
 	{
 	  if (code == ASHIFT)
 	    {
@@ -11023,7 +11023,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	}
 
       if (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) < 4)
+	  && known_lt (GET_MODE_SIZE (mode), 4))
 	{
 	  rtx shift_op, shift_reg;
 	  shift_reg = NULL;
@@ -11138,7 +11138,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	   on one of the operands.  Only left shifts can be used in the
 	   narrow modes.  */
       if (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) < 4)
+	  && known_lt (GET_MODE_SIZE (mode), 4))
 	{
 	  rtx shift_op, shift_reg;
 	  shift_reg = NULL;
@@ -11596,7 +11596,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	}
 
       if (GET_MODE_CLASS (mode) == MODE_INT
-	  && GET_MODE_SIZE (mode) < 4)
+	  && known_lt (GET_MODE_SIZE (mode), 4))
 	{
 	  /* Slightly disparage, as we might need an extend operation.  */
 	  *cost += 1;
@@ -12673,10 +12673,10 @@ arm_memory_move_cost (machine_mode mode, reg_class_t rclass,
     return 10;
   else
     {
-      if (GET_MODE_SIZE (mode) < 4)
+      if (known_lt (GET_MODE_SIZE (mode), 4))
 	return 8;
       else
-	return ((2 * GET_MODE_SIZE (mode)) * (rclass == LO_REGS ? 1 : 2));
+	return ((2 * GET_MODE_SIZE (mode).to_constant ()) * (rclass == LO_REGS ? 1 : 2));
     }
 }
 
@@ -12736,7 +12736,7 @@ arm_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 
       case vec_construct:
       case vec_deconstruct:
-	elements = TYPE_VECTOR_SUBPARTS (vectype);
+	elements = TYPE_VECTOR_SUBPARTS (vectype).to_constant ();
 	return elements / 2 + 1;
 
       default:
@@ -13205,7 +13205,7 @@ simd_valid_immediate (rtx op, machine_mode mode, int inverse,
   bool vector = GET_CODE (op) == CONST_VECTOR;
 
   if (vector)
-    n_elts = CONST_VECTOR_NUNITS (op);
+    n_elts = CONST_VECTOR_NUNITS (op).to_constant ();
   else
     {
       n_elts = 1;
@@ -13276,7 +13276,7 @@ simd_valid_immediate (rtx op, machine_mode mode, int inverse,
     }
 
   /* Sanity check.  */
-  gcc_assert (idx == GET_MODE_SIZE (mode));
+  gcc_assert (known_eq (idx, GET_MODE_SIZE (mode)));
 
   do
     {
@@ -13435,7 +13435,7 @@ neon_immediate_valid_for_shift (rtx op, machine_mode mode,
 				bool isleftshift)
 {
   unsigned int innersize = GET_MODE_UNIT_SIZE (mode);
-  unsigned int n_elts = CONST_VECTOR_NUNITS (op), i;
+  unsigned int n_elts = CONST_VECTOR_NUNITS (op).to_constant (), i;
   unsigned HOST_WIDE_INT last_elt = 0;
   unsigned HOST_WIDE_INT maxshift;
 
@@ -13541,7 +13541,7 @@ void
 neon_pairwise_reduce (rtx op0, rtx op1, machine_mode mode,
 		      rtx (*reduc) (rtx, rtx, rtx))
 {
-  unsigned int i, parts = GET_MODE_SIZE (mode) / GET_MODE_UNIT_SIZE (mode);
+  unsigned int i, parts = GET_MODE_SIZE (mode).to_constant () / GET_MODE_UNIT_SIZE (mode);
   rtx tmpsum = op1;
 
   for (i = parts / 2; i >= 1; i /= 2)
@@ -13565,7 +13565,7 @@ neon_vdup_constant (rtx vals, bool generate)
   machine_mode inner_mode = GET_MODE_INNER (mode);
   rtx x;
 
-  if (GET_CODE (vals) != CONST_VECTOR || GET_MODE_SIZE (inner_mode) > 4)
+  if (GET_CODE (vals) != CONST_VECTOR || known_gt (GET_MODE_SIZE (inner_mode), 4))
     return NULL_RTX;
 
   if (!const_vec_duplicate_p (vals, &x))
@@ -13595,7 +13595,7 @@ mve_bool_vec_to_const (rtx const_vec)
   if (!VECTOR_MODE_P (mode))
     return const_vec;
 
-  unsigned n_elts = GET_MODE_NUNITS (mode);
+  unsigned n_elts = GET_MODE_NUNITS (mode).to_constant ();
   unsigned el_prec = GET_MODE_PRECISION (GET_MODE_INNER (mode));
   unsigned shift_c = 16 / n_elts;
   unsigned i;
@@ -13632,7 +13632,7 @@ neon_make_constant (rtx vals, bool generate)
   machine_mode mode = GET_MODE (vals);
   rtx target;
   rtx const_vec = NULL_RTX;
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int n_const = 0;
   int i;
 
@@ -13685,7 +13685,7 @@ neon_expand_vector_init (rtx target, rtx vals)
 {
   machine_mode mode = GET_MODE (target);
   machine_mode inner_mode = GET_MODE_INNER (mode);
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int n_var = 0, one_var = -1;
   bool all_same = true;
   rtx x, mem;
@@ -13712,7 +13712,7 @@ neon_expand_vector_init (rtx target, rtx vals)
     }
 
   /* Splat a single non-constant element if we can.  */
-  if (all_same && GET_MODE_SIZE (inner_mode) <= 4)
+  if (all_same && known_le (GET_MODE_SIZE (inner_mode), 4))
     {
       x = copy_to_mode_reg (inner_mode, XVECEXP (vals, 0, 0));
       emit_insn (gen_rtx_SET (target, gen_vec_duplicate (mode, x)));
@@ -13863,7 +13863,7 @@ arm_coproc_mem_operand_wb (rtx op, int wb_level)
      The encoded immediate for 16-bit modes is multiplied by 2,
      while the encoded immediate for 32-bit and 64-bit modes is
      multiplied by 4.  */
-  int factor = MIN (GET_MODE_SIZE (GET_MODE (op)), 4);
+  int factor = MIN (GET_MODE_SIZE (GET_MODE (op)).to_constant (), 4);
   if (GET_CODE (ind) == PLUS
       && REG_P (XEXP (ind, 0))
       && REG_MODE_OK_FOR_BASE_P (XEXP (ind, 0), VOIDmode)
@@ -14142,11 +14142,11 @@ neon_vcmla_lane_prepare_operands (rtx *operands)
   machine_mode mode = GET_MODE (operands[3]);
   int regno = REGNO (operands[3]);
   regno = ((regno - FIRST_VFP_REGNUM) >> 1);
-  if (lane > 0 && lane >= GET_MODE_NUNITS (mode) / 4)
+  if (lane > 0 && lane >= GET_MODE_NUNITS (mode).to_constant () / 4)
     {
       operands[3] = gen_int_mode (regno + 1, constmode);
       operands[4]
-	= gen_int_mode (lane - GET_MODE_NUNITS (mode) / 4, constmode);
+	= gen_int_mode (lane - GET_MODE_NUNITS (mode).to_constant () / 4, constmode);
     }
   else
     {
@@ -14521,7 +14521,7 @@ ldm_stm_operation_p (rtx op, bool load, machine_mode mode,
   gcc_assert (!return_pc || load);
 
   /* Set up the increments and sizes for the mode.  */
-  reg_bytes = GET_MODE_SIZE (mode);
+  reg_bytes = GET_MODE_SIZE (mode).to_constant ();
   words_per_reg = ARM_NUM_REGS (mode);
 
   /* If this is a return, then the first element in the par must be
@@ -16043,7 +16043,7 @@ inline static rtx
 next_consecutive_mem (rtx mem)
 {
   machine_mode mode = GET_MODE (mem);
-  HOST_WIDE_INT offset = GET_MODE_SIZE (mode);
+  HOST_WIDE_INT offset = GET_MODE_SIZE (mode).to_constant ();
   rtx addr = plus_constant (Pmode, XEXP (mem, 0), offset);
 
   return adjust_automodify_address (mem, mode, addr, offset);
@@ -16829,7 +16829,7 @@ arm_reload_in_hi (rtx *operands)
 
   if (SUBREG_P (ref))
     {
-      offset = SUBREG_BYTE (ref);
+      offset = SUBREG_BYTE (ref).to_constant ();
       ref = SUBREG_REG (ref);
     }
 
@@ -16957,7 +16957,7 @@ arm_reload_out_hi (rtx *operands)
 
   if (SUBREG_P (ref))
     {
-      offset = SUBREG_BYTE (ref);
+      offset = SUBREG_BYTE (ref).to_constant ();
       ref = SUBREG_REG (ref);
     }
 
@@ -17179,7 +17179,7 @@ arm_pad_reg_upward (machine_mode mode,
       else
 	{
 	  if ((COMPLEX_MODE_P (mode) || ALL_FIXED_POINT_MODE_P (mode))
-	      && GET_MODE_SIZE (mode) <= 4)
+	      && known_le (GET_MODE_SIZE (mode), 4))
 	    return true;
 	}
     }
@@ -17627,10 +17627,10 @@ arm_print_value (FILE *f, rtx x)
 	int i;
 
 	fprintf (f, "<");
-	for (i = 0; i < CONST_VECTOR_NUNITS (x); i++)
+	for (i = 0; known_lt (i, CONST_VECTOR_NUNITS (x)); i++)
 	  {
 	    fprintf (f, HOST_WIDE_INT_PRINT_HEX, INTVAL (CONST_VECTOR_ELT (x, i)));
-	    if (i < (CONST_VECTOR_NUNITS (x) - 1))
+	    if (known_lt (i, (CONST_VECTOR_NUNITS (x) - 1)))
 	      fputc (',', f);
 	  }
 	fprintf (f, ">");
@@ -17777,7 +17777,7 @@ struct minipool_fixup
 
 /* Fixes less than a word need padding out to a word boundary.  */
 #define MINIPOOL_FIX_SIZE(mode) \
-  (GET_MODE_SIZE ((mode)) >= 4 ? GET_MODE_SIZE ((mode)) : 4)
+  (known_ge (GET_MODE_SIZE ((mode)), 4) ? GET_MODE_SIZE ((mode)).to_constant () : 4)
 
 static Mnode *	minipool_vector_head;
 static Mnode *	minipool_vector_tail;
@@ -17806,7 +17806,7 @@ get_jump_table_size (rtx_jump_table_data *insn)
       HOST_WIDE_INT size;
       HOST_WIDE_INT modesize;
 
-      modesize = GET_MODE_SIZE (GET_MODE (body));
+      modesize = GET_MODE_SIZE (GET_MODE (body)).to_constant ();
       size = modesize * XVECLEN (body, elt);
       switch (modesize)
 	{
@@ -18306,7 +18306,7 @@ dump_minipool (rtx_insn *scan)
 
 	  rtx val = copy_rtx (mp->value);
 
-	  switch (GET_MODE_SIZE (mp->mode))
+	  switch (GET_MODE_SIZE (mp->mode).to_constant ())
 	    {
 #ifdef HAVE_consttable_1
 	    case 1:
@@ -18574,7 +18574,7 @@ arm_const_double_inline_cost (rtx val)
   if (mode == VOIDmode)
     mode = DImode;
 
-  gcc_assert (GET_MODE_SIZE (mode) == 8);
+  gcc_assert (known_eq (GET_MODE_SIZE (mode), 8));
 
   lowpart = gen_lowpart (SImode, val);
   highpart = gen_highpart_mode (SImode, mode, val);
@@ -20878,9 +20878,9 @@ output_move_vfp (rtx *operands)
 {
   rtx reg, mem, addr, ops[2];
   int load = REG_P (operands[0]);
-  int dp = GET_MODE_SIZE (GET_MODE (operands[0])) == 8;
+  int dp = known_eq (GET_MODE_SIZE (GET_MODE (operands[0])), 8);
   int sp = (!TARGET_VFP_FP16INST
-	    || GET_MODE_SIZE (GET_MODE (operands[0])) == 4);
+	    || known_eq (GET_MODE_SIZE (GET_MODE (operands[0])), 4));
   int integer_p = GET_MODE_CLASS (GET_MODE (operands[0])) == MODE_INT;
   const char *templ;
   char buff[50];
@@ -21712,9 +21712,9 @@ thumb1_compute_save_core_reg_mask (void)
   /* The 504 below is 8 bytes less than 512 because there are two possible
      alignment words.  We can't tell here if they will be present or not so we
      have to play it safe and assume that they are. */
-  if ((CALLER_INTERWORKING_SLOT_SIZE +
-       ROUND_UP_WORD (get_frame_size ()) +
-       crtl->outgoing_args_size) >= 504)
+  if (known_ge (CALLER_INTERWORKING_SLOT_SIZE +
+       ROUND_UP_WORD (get_frame_size ().to_constant ()) +
+       crtl->outgoing_args_size, 504))
     {
       /* This is the same as the code in thumb1_expand_prologue() which
 	 determines which register to use for stack decrement. */
@@ -22154,9 +22154,9 @@ arm_output_function_prologue (FILE *f)
     asm_fprintf (f, "\t%@ Non-secure entry function: called from non-secure code.\n");
 
   asm_fprintf (f, "\t%@ args = %wd, pretend = %d, frame = %wd\n",
-	       (HOST_WIDE_INT) crtl->args.size,
+	       (HOST_WIDE_INT) crtl->args.size.to_constant (),
 	       crtl->args.pretend_args_size,
-	       (HOST_WIDE_INT) get_frame_size ());
+	       get_frame_size ().to_constant ());
 
   asm_fprintf (f, "\t%@ frame_needed = %d, uses_anonymous_args = %d\n",
 	       frame_pointer_needed,
@@ -23157,7 +23157,7 @@ arm_size_return_regs (void)
   else
     mode = DECL_MODE (DECL_RESULT (current_function_decl));
 
-  return GET_MODE_SIZE (mode);
+  return GET_MODE_SIZE (mode).to_constant ();
 }
 
 /* Return true if the current function needs to save/restore LR.  */
@@ -23292,7 +23292,7 @@ arm_compute_frame_layout (void)
 
   /* Initially this is the size of the local variables.  It will translated
      into an offset once we have determined the size of preceding data.  */
-  frame_size = ROUND_UP_WORD (get_frame_size ());
+  frame_size = ROUND_UP_WORD (get_frame_size ().to_constant ());
 
   /* Space for variadic functions.  */
   offsets->saved_args = crtl->args.pretend_args_size;
@@ -23358,7 +23358,7 @@ arm_compute_frame_layout (void)
       /* Try to align stack by pushing an extra reg.  Don't bother doing this
          when there is a stack frame as the alignment will be rolled into
 	 the normal stack adjustment.  */
-      if (frame_size + crtl->outgoing_args_size == 0)
+      if (known_eq (frame_size + crtl->outgoing_args_size, 0))
 	{
 	  int reg = -1;
 
@@ -23414,7 +23414,7 @@ arm_compute_frame_layout (void)
 
   offsets->locals_base = offsets->soft_frame + frame_size;
   offsets->outgoing_args = (offsets->locals_base
-			    + crtl->outgoing_args_size);
+			    + crtl->outgoing_args_size.to_constant ());
 
   if (ARM_DOUBLEWORD_ALIGN)
     {
@@ -24703,7 +24703,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
         machine_mode mode = GET_MODE (x);
         int regno;
 
-        if (GET_MODE_SIZE (mode) != 8 || !REG_P (x))
+        if (maybe_ne (GET_MODE_SIZE (mode), 8) || !REG_P (x))
           {
 	    output_operand_lossage ("invalid operand for code '%c'", code);
 	    return;
@@ -24728,7 +24728,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	int is_quad = (code == 'q');
 	int regno;
 
-	if (GET_MODE_SIZE (mode) != (is_quad ? 16 : 8))
+	if (maybe_ne (GET_MODE_SIZE (mode), (is_quad ? 16 : 8)))
 	  {
 	    output_operand_lossage ("invalid operand for code '%c'", code);
 	    return;
@@ -24763,8 +24763,8 @@ arm_print_operand (FILE *stream, rtx x, int code)
         machine_mode mode = GET_MODE (x);
         int regno;
 
-        if ((GET_MODE_SIZE (mode) != 16
-	     && GET_MODE_SIZE (mode) != 32) || !REG_P (x))
+        if ((maybe_ne (GET_MODE_SIZE (mode), 16)
+	     && maybe_ne (GET_MODE_SIZE (mode), 32)) || !REG_P (x))
           {
 	    output_operand_lossage ("invalid operand for code '%c'", code);
 	    return;
@@ -24777,7 +24777,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	    return;
           }
 
-        if (GET_MODE_SIZE (mode) == 16)
+        if (known_eq (GET_MODE_SIZE (mode), 16))
           fprintf (stream, "d%d", ((regno - FIRST_VFP_REGNUM) >> 1)
 				  + (code == 'f' ? 1 : 0));
         else
@@ -24863,7 +24863,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	   instruction (for some alignments) as an aid to the memory subsystem
 	   of the target.  */
 	align = MEM_ALIGN (x) >> 3;
-	memsize = MEM_SIZE (x);
+	memsize = MEM_SIZE (x).to_constant ();
 
 	/* Only certain alignment specifiers are supported by the hardware.  */
 	if (memsize == 32 && (align % 32) == 0)
@@ -24907,7 +24907,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	    || code  == PRE_DEC)
 	  {
 	    asm_fprintf (stream, "[%r", REGNO (XEXP (addr, 0)));
-	    inc_val = GET_MODE_SIZE (GET_MODE (x));
+	    inc_val = GET_MODE_SIZE (GET_MODE (x)).to_constant ();
 	    if (code == POST_INC || code == POST_DEC)
 	      asm_fprintf (stream, "], #%s%d", (code == POST_INC)
 					       ? "" : "-", inc_val);
@@ -24962,7 +24962,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
         machine_mode mode = GET_MODE (x);
         int regno;
 
-        if (GET_MODE_SIZE (mode) != 4 || !REG_P (x))
+        if (maybe_ne (GET_MODE_SIZE (mode), 4) || !REG_P (x))
           {
 	    output_operand_lossage ("invalid operand for code '%c'", code);
 	    return;
@@ -24996,7 +24996,7 @@ arm_print_operand (FILE *stream, rtx x, int code)
         machine_mode mode = GET_MODE (x);
         int regno;
 
-        if (GET_MODE_SIZE (mode) != 2 || !REG_P (x))
+        if (maybe_ne (GET_MODE_SIZE (mode), 2) || !REG_P (x))
           {
 	    output_operand_lossage ("invalid operand for code '%c'", code);
 	    return;
@@ -25121,7 +25121,7 @@ arm_print_operand_address (FILE *stream, machine_mode mode, rtx x)
 	    asm_fprintf (stream, "[%r, #%s%d]!",
 			 REGNO (XEXP (x, 0)),
 			 GET_CODE (x) == PRE_DEC ? "-" : "",
-			 GET_MODE_SIZE (mode));
+			 GET_MODE_SIZE (mode).to_constant ());
 	  else if (TARGET_HAVE_MVE
 		   && VALID_MVE_STRUCT_MODE (mode))
 	    asm_fprintf (stream, "[%r]!", REGNO (XEXP (x,0)));
@@ -25258,7 +25258,7 @@ arm_assemble_integer (rtx x, unsigned int size, int aligned_p)
 
       gcc_assert (GET_CODE (x) == CONST_VECTOR);
 
-      units = CONST_VECTOR_NUNITS (x);
+      units = CONST_VECTOR_NUNITS (x).to_constant ();
       size = GET_MODE_UNIT_SIZE (mode);
 
       if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
@@ -25957,7 +25957,7 @@ static unsigned int
 arm_hard_regno_nregs (unsigned int regno, machine_mode mode)
 {
   if (IS_VPR_REGNUM (regno))
-    return CEIL (GET_MODE_SIZE (mode), 2);
+    return CEIL (GET_MODE_SIZE (mode).to_constant (), 2);
 
   if (TARGET_32BIT
       && regno > PC_REGNUM
@@ -26043,7 +26043,7 @@ arm_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 	return true;
 
       return !((TARGET_LDRD || TARGET_CDE)
-	       && GET_MODE_SIZE (mode) > 4 && (regno & 1) != 0);
+	       && known_gt (GET_MODE_SIZE (mode), 4) && (regno & 1) != 0);
     }
 
   if (regno == FRAME_POINTER_REGNUM
@@ -26614,7 +26614,7 @@ thumb_exit (FILE *f, int reg_containing_return_addr)
       else
 	mode = DECL_MODE (DECL_RESULT (current_function_decl));
 
-      size = GET_MODE_SIZE (mode);
+      size = GET_MODE_SIZE (mode).to_constant ();
 
       if (size == 0)
 	{
@@ -29555,7 +29555,7 @@ arm_emit_vector_const (FILE *file, rtx x)
     }
 
   fprintf (file, "0x");
-  for (i = CONST_VECTOR_NUNITS (x); i--;)
+  for (i = CONST_VECTOR_NUNITS (x).to_constant (); i--;)
     {
       rtx element;
 
@@ -29671,7 +29671,7 @@ arm_promote_function_mode (const_tree type ATTRIBUTE_UNUSED,
                            int for_return ATTRIBUTE_UNUSED)
 {
   if (GET_MODE_CLASS (mode) == MODE_INT
-      && GET_MODE_SIZE (mode) < 4)
+      && known_lt (GET_MODE_SIZE (mode), 4))
     return SImode;
 
   return mode;
@@ -30102,12 +30102,12 @@ arm_dwarf_register_span (rtx rtl)
      legacy encodings.  We also use these encodings for D0-D15 for
      compatibility with older debuggers.  */
   mode = GET_MODE (rtl);
-  if (GET_MODE_SIZE (mode) < 8)
+  if (known_lt (GET_MODE_SIZE (mode), 8))
     return NULL_RTX;
 
   if (VFP_REGNO_OK_FOR_SINGLE (regno))
     {
-      nregs = GET_MODE_SIZE (mode) / 4;
+      nregs = GET_MODE_SIZE (mode).to_constant () / 4;
       for (i = 0; i < nregs; i += 2)
 	if (TARGET_BIG_END)
 	  {
@@ -30122,7 +30122,7 @@ arm_dwarf_register_span (rtx rtl)
     }
   else
     {
-      nregs = GET_MODE_SIZE (mode) / 8;
+      nregs = GET_MODE_SIZE (mode).to_constant () / 8;
       for (i = 0; i < nregs; i++)
 	parts[i] = gen_rtx_REG (DImode, regno + i);
     }
@@ -30892,7 +30892,7 @@ arm_frame_pointer_required (void)
       && arm_except_unwind_info (&global_options) == UI_TARGET
       && cfun->can_throw_non_call_exceptions)
     {
-      HOST_WIDE_INT size = get_frame_size ();
+      HOST_WIDE_INT size = get_frame_size ().to_constant ();
 
       /* That's irrelevant if there is no stack adjustment.  */
       if (size <= 0)
@@ -31684,7 +31684,7 @@ arm_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
 opt_machine_mode
 arm_mode_to_pred_mode (machine_mode mode)
 {
-  switch (GET_MODE_NUNITS (mode))
+  switch (GET_MODE_NUNITS (mode).to_constant ())
     {
     case 16: return V16BImode;
     case 8: return V8BImode;
@@ -31894,7 +31894,7 @@ void
 arm_expand_vec_perm (rtx target, rtx op0, rtx op1, rtx sel)
 {
   machine_mode vmode = GET_MODE (target);
-  unsigned int nelt = GET_MODE_NUNITS (vmode);
+  unsigned int nelt = GET_MODE_NUNITS (vmode).to_constant ();
   bool one_vector_p = rtx_equal_p (op0, op1);
   rtx mask;
 
@@ -31919,11 +31919,11 @@ neon_endian_lane_map (machine_mode mode, int lane)
 {
   if (BYTES_BIG_ENDIAN)
   {
-    int nelems = GET_MODE_NUNITS (mode);
+    int nelems = GET_MODE_NUNITS (mode).to_constant ();
     /* Reverse lane order.  */
     lane = (nelems - 1 - lane);
     /* Reverse D register order, to match ABI.  */
-    if (GET_MODE_SIZE (mode) == 16)
+    if (known_eq (GET_MODE_SIZE (mode), 16))
       lane = lane ^ (nelems / 2);
   }
   return lane;
@@ -31935,7 +31935,7 @@ neon_endian_lane_map (machine_mode mode, int lane)
 static int
 neon_pair_endian_lane_map (machine_mode mode, int lane)
 {
-  int nelem = GET_MODE_NUNITS (mode);
+  int nelem = GET_MODE_NUNITS (mode).to_constant ();
   if (BYTES_BIG_ENDIAN)
     lane =
       neon_endian_lane_map (mode, lane & (nelem - 1)) + (lane & nelem);
@@ -31949,7 +31949,7 @@ neon_pair_endian_lane_map (machine_mode mode, int lane)
 static bool
 arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
 {
-  unsigned int i, odd, mask, nelt = d->perm.length ();
+  unsigned int i, odd, mask, nelt = d->perm.length ().to_constant ();
   rtx out0, out1, in0, in1;
   int first_elem;
   int swap_nelt;
@@ -31960,9 +31960,9 @@ arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
   /* arm_expand_vec_perm_const_1 () helpfully swaps the operands for the
      big endian pattern on 64 bit vectors, so we correct for that.  */
   swap_nelt = BYTES_BIG_ENDIAN && !d->one_vector_p
-    && GET_MODE_SIZE (d->vmode) == 8 ? nelt : 0;
+    && known_eq (GET_MODE_SIZE (d->vmode), 8) ? nelt : 0;
 
-  first_elem = d->perm[neon_endian_lane_map (d->vmode, 0)] ^ swap_nelt;
+  first_elem = d->perm[neon_endian_lane_map (d->vmode, 0)].to_constant () ^ swap_nelt;
 
   if (first_elem == neon_endian_lane_map (d->vmode, 0))
     odd = 0;
@@ -31976,7 +31976,7 @@ arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
     {
       unsigned elt =
 	(neon_pair_endian_lane_map (d->vmode, i) * 2 + odd) & mask;
-      if ((d->perm[i] ^ swap_nelt) != neon_pair_endian_lane_map (d->vmode, elt))
+      if ((d->perm[i].to_constant () ^ swap_nelt) != neon_pair_endian_lane_map (d->vmode, elt))
 	return false;
     }
 
@@ -32003,7 +32003,7 @@ arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
 {
-  unsigned int i, high, mask, nelt = d->perm.length ();
+  unsigned int i, high, mask, nelt = d->perm.length ().to_constant ();
   rtx out0, out1, in0, in1;
   int first_elem;
   bool is_swapped;
@@ -32013,7 +32013,7 @@ arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
 
   is_swapped = BYTES_BIG_ENDIAN;
 
-  first_elem = d->perm[neon_endian_lane_map (d->vmode, 0) ^ is_swapped];
+  first_elem = d->perm[neon_endian_lane_map (d->vmode, 0) ^ is_swapped].to_constant ();
 
   high = nelt / 2;
   if (first_elem == neon_endian_lane_map (d->vmode, high))
@@ -32028,12 +32028,12 @@ arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
     {
       unsigned elt =
 	neon_pair_endian_lane_map (d->vmode, i + high) & mask;
-      if (d->perm[neon_pair_endian_lane_map (d->vmode, 2 * i + is_swapped)]
+      if (d->perm[neon_pair_endian_lane_map (d->vmode, 2 * i + is_swapped)].to_constant ()
 	  != elt)
 	return false;
       elt =
 	neon_pair_endian_lane_map (d->vmode, i + nelt + high) & mask;
-      if (d->perm[neon_pair_endian_lane_map (d->vmode, 2 * i + !is_swapped)]
+      if (d->perm[neon_pair_endian_lane_map (d->vmode, 2 * i + !is_swapped)].to_constant ()
 	  != elt)
 	return false;
     }
@@ -32060,13 +32060,13 @@ arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vrev (struct expand_vec_perm_d *d)
 {
-  unsigned int i, j, diff, nelt = d->perm.length ();
+  unsigned int i, j, diff, nelt = d->perm.length ().to_constant ();
   rtx (*gen) (machine_mode, rtx, rtx);
 
   if (!d->one_vector_p)
     return false;
 
-  diff = d->perm[0];
+  diff = d->perm[0].to_constant ();
   switch (diff)
     {
     case 7:
@@ -32131,7 +32131,7 @@ arm_evpc_neon_vrev (struct expand_vec_perm_d *d)
 	   value of diff other than these values implies that
 	   something is wrong by the time we get here.  */
 	gcc_assert (i + j < nelt);
-	if (d->perm[i + j] != i + diff - j)
+	if (maybe_ne (d->perm[i + j], i + diff - j))
 	  return false;
       }
 
@@ -32148,16 +32148,16 @@ arm_evpc_neon_vrev (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vtrn (struct expand_vec_perm_d *d)
 {
-  unsigned int i, odd, mask, nelt = d->perm.length ();
+  unsigned int i, odd, mask, nelt = d->perm.length ().to_constant ();
   rtx out0, out1, in0, in1;
 
   if (GET_MODE_UNIT_SIZE (d->vmode) >= 8)
     return false;
 
   /* Note that these are little-endian tests.  Adjust for big-endian later.  */
-  if (d->perm[0] == 0)
+  if (known_eq (d->perm[0], 0))
     odd = 0;
-  else if (d->perm[0] == 1)
+  else if (known_eq (d->perm[0], 1))
     odd = 1;
   else
     return false;
@@ -32165,9 +32165,9 @@ arm_evpc_neon_vtrn (struct expand_vec_perm_d *d)
 
   for (i = 0; i < nelt; i += 2)
     {
-      if (d->perm[i] != i + odd)
+      if (maybe_ne (d->perm[i], i + odd))
 	return false;
-      if (d->perm[i + 1] != ((i + nelt + odd) & mask))
+      if (maybe_ne (d->perm[i + 1], ((i + nelt + odd) & mask)))
 	return false;
     }
 
@@ -32197,12 +32197,12 @@ arm_evpc_neon_vtrn (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vext (struct expand_vec_perm_d *d)
 {
-  unsigned int i, nelt = d->perm.length ();
+  unsigned int i, nelt = d->perm.length ().to_constant ();
   rtx offset;
 
   unsigned int location;
 
-  unsigned int next  = d->perm[0] + 1;
+  unsigned int next  = d->perm[0].to_constant () + 1;
 
   /* TODO: Handle GCC's numbering of elements for big-endian.  */
   if (BYTES_BIG_ENDIAN)
@@ -32227,11 +32227,11 @@ arm_evpc_neon_vext (struct expand_vec_perm_d *d)
 	    next = 0;
 	}
 
-      if (d->perm[i] != next)
+      if (maybe_ne (d->perm[i], next))
 	return false;
     }
 
-  location = d->perm[0];
+  location = d->perm[0].to_constant ();
 
   /* Success! */
   if (d->testing_p)
@@ -32257,7 +32257,7 @@ arm_evpc_neon_vtbl (struct expand_vec_perm_d *d)
 {
   rtx rperm[MAX_VECT_LEN], sel;
   machine_mode vmode = d->vmode;
-  unsigned int i, nelt = d->perm.length ();
+  unsigned int i, nelt = d->perm.length ().to_constant ();
 
   /* TODO: ARM's VTBL indexing is little-endian.  In order to handle GCC's
      numbering of elements for big-endian, we must reverse the order.  */
@@ -32274,7 +32274,7 @@ arm_evpc_neon_vtbl (struct expand_vec_perm_d *d)
     return false;
 
   for (i = 0; i < nelt; ++i)
-    rperm[i] = GEN_INT (d->perm[i]);
+    rperm[i] = GEN_INT (d->perm[i].to_constant ());
   sel = gen_rtx_CONST_VECTOR (vmode, gen_rtvec_v (nelt, rperm));
   sel = force_reg (vmode, sel);
 
@@ -32294,8 +32294,8 @@ arm_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
   /* The pattern matching functions above are written to look for a small
      number to begin the sequence (0, 1, N/2).  If we begin with an index
      from the second operand, we can swap the operands.  */
-  unsigned int nelt = d->perm.length ();
-  if (d->perm[0] >= nelt)
+  unsigned int nelt = d->perm.length ().to_constant ();
+  if (known_ge (d->perm[0], nelt))
     {
       d->perm.rotate_inputs (1);
       std::swap (d->op0, d->op1);
@@ -32349,10 +32349,10 @@ arm_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
   gcc_assert (VECTOR_MODE_P (d.vmode));
   d.testing_p = !target;
 
-  nelt = GET_MODE_NUNITS (d.vmode);
+  nelt = GET_MODE_NUNITS (d.vmode).to_constant ();
   for (i = which = 0; i < nelt; ++i)
     {
-      int ei = sel[i] & (2 * nelt - 1);
+      int ei = sel[i].to_constant () & (2 * nelt - 1);
       which |= (ei < nelt ? 1 : 2);
     }
 
@@ -32404,7 +32404,7 @@ arm_autoinc_modes_ok_p (machine_mode mode, enum arm_auto_incmodes code)
 {
   /* If we are soft float and we do not have ldrd
      then all auto increment forms are ok.  */
-  if (TARGET_SOFT_FLOAT && (TARGET_LDRD || GET_MODE_SIZE (mode) <= 4))
+  if (TARGET_SOFT_FLOAT && (TARGET_LDRD || known_le (GET_MODE_SIZE (mode), 4)))
     return true;
 
   switch (code)
@@ -32428,7 +32428,7 @@ arm_autoinc_modes_ok_p (machine_mode mode, enum arm_auto_incmodes code)
       /* Without LDRD and mode size greater than
 	 word size, there is no point in auto-incrementing
          because ldm and stm will not have these forms.  */
-      if (!TARGET_LDRD && GET_MODE_SIZE (mode) > 4)
+      if (!TARGET_LDRD && known_gt (GET_MODE_SIZE (mode), 4))
 	return false;
 
       /* Vector and floating point modes do not support
@@ -32871,7 +32871,7 @@ arm_block_set_vect_profit_p (unsigned HOST_WIDE_INT length,
 {
   int num;
   bool unaligned_p = ((align & 3) != 0);
-  unsigned int nelt = GET_MODE_NUNITS (mode);
+  unsigned int nelt = GET_MODE_NUNITS (mode).to_constant ();
 
   /* Instruction loading constant value.  */
   num = 1;
@@ -32908,8 +32908,8 @@ arm_block_set_unaligned_vect (rtx dstbase,
   unsigned HOST_WIDE_INT v = value;
   unsigned int offset = 0;
   gcc_assert ((align & 0x3) != 0);
-  nelt_v8 = GET_MODE_NUNITS (V8QImode);
-  nelt_v16 = GET_MODE_NUNITS (V16QImode);
+  nelt_v8 = GET_MODE_NUNITS (V8QImode).to_constant ();
+  nelt_v16 = GET_MODE_NUNITS (V16QImode).to_constant ();
   if (length >= nelt_v16)
     {
       mode = V16QImode;
@@ -32920,7 +32920,7 @@ arm_block_set_unaligned_vect (rtx dstbase,
       mode = V8QImode;
       gen_func = gen_movmisalignv8qi;
     }
-  nelt_mode = GET_MODE_NUNITS (mode);
+  nelt_mode = GET_MODE_NUNITS (mode).to_constant ();
   gcc_assert (length >= nelt_mode);
   /* Skip if it isn't profitable.  */
   if (!arm_block_set_vect_profit_p (length, align, mode))
@@ -33003,14 +33003,14 @@ arm_block_set_aligned_vect (rtx dstbase,
   unsigned int offset = 0;
 
   gcc_assert ((align & 0x3) == 0);
-  nelt_v8 = GET_MODE_NUNITS (V8QImode);
-  nelt_v16 = GET_MODE_NUNITS (V16QImode);
+  nelt_v8 = GET_MODE_NUNITS (V8QImode).to_constant ();
+  nelt_v16 = GET_MODE_NUNITS (V16QImode).to_constant ();
   if (length >= nelt_v16 && unaligned_access && !BYTES_BIG_ENDIAN)
     mode = V16QImode;
   else
     mode = V8QImode;
 
-  nelt_mode = GET_MODE_NUNITS (mode);
+  nelt_mode = GET_MODE_NUNITS (mode).to_constant ();
   gcc_assert (length >= nelt_mode);
   /* Skip if it isn't profitable.  */
   if (!arm_block_set_vect_profit_p (length, align, mode))
@@ -33049,7 +33049,7 @@ arm_block_set_aligned_vect (rtx dstbase,
 	}
       /* Fall through for bytes leftover.  */
       mode = V8QImode;
-      nelt_mode = GET_MODE_NUNITS (mode);
+      nelt_mode = GET_MODE_NUNITS (mode).to_constant ();
       reg = gen_lowpart (V8QImode, reg);
     }
 
@@ -33130,7 +33130,7 @@ arm_block_set_unaligned_non_vect (rtx dstbase,
   val_reg = force_reg (SImode, val_exp);
   reg = gen_lowpart (mode, val_reg);
 
-  for (i = 0; (i + GET_MODE_SIZE (mode) <= length); i += GET_MODE_SIZE (mode))
+  for (i = 0; i + GET_MODE_SIZE (mode).to_constant () <= length; i += GET_MODE_SIZE (mode).to_constant ())
     {
       addr = plus_constant (Pmode, dst, i);
       mem = adjust_automodify_address (dstbase, mode, addr, i);
@@ -34157,7 +34157,7 @@ High Mask:        { 0, 1 }                { 2, 3 }
 rtx
 arm_simd_vect_par_cnst_half (machine_mode mode, bool high)
 {
-  int nunits = GET_MODE_NUNITS (mode);
+  int nunits = GET_MODE_NUNITS (mode).to_constant ();
   rtvec v = rtvec_alloc (nunits / 2);
   int high_base = nunits / 2;
   int low_base = 0;
@@ -34574,9 +34574,9 @@ arm_can_change_mode_class (machine_mode from, machine_mode to,
 			   reg_class_t rclass)
 {
   if (TARGET_BIG_END
-      && !(GET_MODE_SIZE (from) == 16 && GET_MODE_SIZE (to) == 8)
-      && (GET_MODE_SIZE (from) > UNITS_PER_WORD
-	  || GET_MODE_SIZE (to) > UNITS_PER_WORD)
+      && !(known_eq (GET_MODE_SIZE (from), 16) && known_eq (GET_MODE_SIZE (to), 8))
+      && (known_gt (GET_MODE_SIZE (from), UNITS_PER_WORD)
+	  || known_gt (GET_MODE_SIZE (to), UNITS_PER_WORD))
       && reg_classes_intersect_p (VFP_REGS, rclass))
     return false;
   return true;
@@ -34669,7 +34669,7 @@ arm_mve_get_vctp_lanes (rtx_insn *insn)
     {
       machine_mode mode = GET_MODE (SET_SRC (insn_set));
       return ((VECTOR_MODE_P (mode) && VALID_MVE_PRED_MODE (mode))
-	      ? GET_MODE_NUNITS (mode) : 0);
+	      ? GET_MODE_NUNITS (mode).to_constant () : 0);
     }
   return 0;
 }

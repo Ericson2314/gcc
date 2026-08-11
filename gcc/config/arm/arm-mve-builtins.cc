@@ -395,7 +395,7 @@ arm_mve_type_for_scalar_type (tree eltype)
 {
   for (unsigned int i = 0; i < __TYPE_FINAL; ++i)
       if (arm_simd_types[i].eltype == eltype
-	  && GET_MODE_SIZE (arm_simd_types[i].mode) == 16)
+	  && known_eq (GET_MODE_SIZE (arm_simd_types[i].mode), 16))
 	return arm_simd_types[i].itype;
 
   gcc_unreachable ();
@@ -415,13 +415,13 @@ register_builtin_types ()
       if (eltype == boolean_type_node)
 	{
 	  vectype = get_typenode_from_name (UINT16_TYPE);
-	  gcc_assert (GET_MODE_SIZE (TYPE_MODE (vectype)) == 2);
+	  gcc_assert (known_eq (GET_MODE_SIZE (TYPE_MODE (vectype)), 2));
 	}
       else
 	{
 	  vectype = arm_mve_type_for_scalar_type (eltype);
 	  gcc_assert (VECTOR_MODE_P (TYPE_MODE (vectype))
-		      && GET_MODE_SIZE (TYPE_MODE (vectype)) == 16);
+		      && known_eq (GET_MODE_SIZE (TYPE_MODE (vectype)), 16));
 	}
       abi_vector_types[i] = vectype;
     }

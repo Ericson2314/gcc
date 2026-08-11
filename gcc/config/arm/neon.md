@@ -322,12 +322,12 @@
           (match_operand:VD_LANE 3 "s_register_operand" "0,0")
           (match_operand:SI 2 "immediate_operand" "i,i")))]
   "TARGET_NEON
-   && (GET_MODE_NUNITS (<MODE>mode)
-       > (unsigned) exact_log2 (INTVAL (operands[2])))"
+   && known_gt (GET_MODE_NUNITS (<MODE>mode),
+         (unsigned) exact_log2 (INTVAL (operands[2])))"
 {
   int elt = ffs ((int) INTVAL (operands[2])) - 1;
   if (BYTES_BIG_ENDIAN)
-    elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+    elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
   operands[2] = GEN_INT (elt);
 
   if (which_alternative == 0)
@@ -345,12 +345,12 @@
           (match_operand:VQ2 3 "s_register_operand" "0,0")
           (match_operand:SI 2 "immediate_operand" "i,i")))]
   "TARGET_NEON
-   && (GET_MODE_NUNITS (<MODE>mode)
-       > (unsigned) exact_log2 (INTVAL (operands[2])))"
+   && known_gt (GET_MODE_NUNITS (<MODE>mode),
+         (unsigned) exact_log2 (INTVAL (operands[2])))"
 
 {
   HOST_WIDE_INT elem = ffs ((int) INTVAL (operands[2])) - 1;
-  int half_elts = GET_MODE_NUNITS (<MODE>mode) / 2;
+  int half_elts = GET_MODE_NUNITS (<MODE>mode).to_constant () / 2;
   int elt = elem % half_elts;
   int hi = (elem / half_elts) * 2;
   int regno = REGNO (operands[0]);
@@ -377,8 +377,8 @@
           (match_operand:V2DI_ONLY 3 "s_register_operand" "0,0")
           (match_operand:SI 2 "immediate_operand" "i,i")))]
   "TARGET_NEON
-   && (GET_MODE_NUNITS (<MODE>mode)
-       > (unsigned) exact_log2 (INTVAL (operands[2])))"
+   && known_gt (GET_MODE_NUNITS (<MODE>mode),
+         (unsigned) exact_log2 (INTVAL (operands[2])))"
 {
   HOST_WIDE_INT elem = ffs ((int) INTVAL (operands[2])) - 1;
   int regno = REGNO (operands[0]) + 2 * elem;
@@ -403,7 +403,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
 
@@ -474,7 +474,7 @@
           (parallel [(match_operand:SI 2 "immediate_operand" "i,i")])))]
   "TARGET_NEON"
 {
-  int half_elts = GET_MODE_NUNITS (<MODE>mode) / 2;
+  int half_elts = GET_MODE_NUNITS (<MODE>mode).to_constant () / 2;
   int elt = INTVAL (operands[2]) % half_elts;
   int hi = (INTVAL (operands[2]) / half_elts) * 2;
   int regno = REGNO (operands[1]);
@@ -1835,9 +1835,9 @@
  "TARGET_FP16FML"
  {
     int lane = NEON_ENDIAN_LANE_N (<VFML>mode, INTVAL (operands[5]));
-    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode) - 1)
+    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode).to_constant () - 1)
       {
-	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode));
+	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ());
 	return "vfmal.f16\\t%<V_reg>0, %<V_lo>2, %<V_hi>3[%c5]";
       }
     else
@@ -1891,7 +1891,7 @@
  "TARGET_FP16FML"
  {
    int lane = NEON_ENDIAN_LANE_N (<VFMLSEL2>mode, INTVAL (operands[5]));
-   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode);
+   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ();
    int new_lane = lane % elts_per_reg;
    int regdiff = lane / elts_per_reg;
    operands[5] = GEN_INT (new_lane);
@@ -1928,7 +1928,7 @@
  "TARGET_FP16FML"
  {
    int lane = NEON_ENDIAN_LANE_N (<VFMLSEL2>mode, INTVAL (operands[5]));
-   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode);
+   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ();
    int new_lane = lane % elts_per_reg;
    int regdiff = lane / elts_per_reg;
    operands[5] = GEN_INT (new_lane);
@@ -1957,9 +1957,9 @@
  "TARGET_FP16FML"
   {
     int lane = NEON_ENDIAN_LANE_N (<VFML>mode, INTVAL (operands[5]));
-    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode) - 1)
+    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode).to_constant () - 1)
       {
-	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode));
+	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ());
 	return "vfmal.f16\\t%<V_reg>0, %<V_hi>2, %<V_hi>3[%c5]";
       }
     else
@@ -1988,9 +1988,9 @@
  "TARGET_FP16FML"
  {
     int lane = NEON_ENDIAN_LANE_N (<VFML>mode, INTVAL (operands[5]));
-    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode) - 1)
+    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode).to_constant () - 1)
       {
-	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode));
+	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ());
 	return "vfmsl.f16\\t%<V_reg>0, %<V_lo>2, %<V_hi>3[%c5]";
       }
     else
@@ -2026,7 +2026,7 @@
  "TARGET_FP16FML"
  {
    int lane = NEON_ENDIAN_LANE_N (<VFMLSEL2>mode, INTVAL (operands[5]));
-   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode);
+   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ();
    int new_lane = lane % elts_per_reg;
    int regdiff = lane / elts_per_reg;
    operands[5] = GEN_INT (new_lane);
@@ -2064,7 +2064,7 @@
  "TARGET_FP16FML"
  {
    int lane = NEON_ENDIAN_LANE_N (<VFMLSEL2>mode, INTVAL (operands[5]));
-   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode);
+   int elts_per_reg = GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ();
    int new_lane = lane % elts_per_reg;
    int regdiff = lane / elts_per_reg;
    operands[5] = GEN_INT (new_lane);
@@ -2094,9 +2094,9 @@
  "TARGET_FP16FML"
   {
     int lane = NEON_ENDIAN_LANE_N (<VFML>mode, INTVAL (operands[5]));
-    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode) - 1)
+    if (lane > GET_MODE_NUNITS (<VFMLSEL>mode).to_constant () - 1)
       {
-	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode));
+	operands[5] = GEN_INT (lane - GET_MODE_NUNITS (<VFMLSEL>mode).to_constant ());
 	return "vfmsl.f16\\t%<V_reg>0, %<V_hi>2, %<V_hi>3[%c5]";
       }
     else
@@ -3050,9 +3050,9 @@
   "TARGET_DOTPROD"
   {
     int lane = INTVAL (operands[4]);
-    if (lane > GET_MODE_NUNITS (V2SImode) - 1)
+    if (lane > GET_MODE_NUNITS (V2SImode).to_constant () - 1)
       {
-	operands[4] = GEN_INT (lane - GET_MODE_NUNITS (V2SImode));
+	operands[4] = GEN_INT (lane - GET_MODE_NUNITS (V2SImode).to_constant ());
 	return "v<sup>dot.<opsuffix>\\t%<V_reg>0, %<V_reg>2, %f3[%c4]";
       }
     else
@@ -3093,9 +3093,9 @@
   "TARGET_I8MM"
   {
     int lane = INTVAL (operands[4]);
-    if (lane > GET_MODE_NUNITS (V2SImode) - 1)
+    if (lane > GET_MODE_NUNITS (V2SImode).to_constant () - 1)
       {
-	operands[4] = GEN_INT (lane - GET_MODE_NUNITS (V2SImode));
+	operands[4] = GEN_INT (lane - GET_MODE_NUNITS (V2SImode).to_constant ());
 	return "v<sup>dot.<opsuffix>\\t%<V_reg>0, %<V_reg>2, %f3[%c4]";
       }
     else
@@ -3231,7 +3231,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
   return "vmov.s<V_sz_elem>\t%0, %P1[%c2]";
@@ -3250,7 +3250,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
   return "vmov.u<V_sz_elem>\t%0, %P1[%c2]";
@@ -3268,7 +3268,7 @@
 {
   rtx ops[3];
   int regno = REGNO (operands[1]);
-  unsigned int halfelts = GET_MODE_NUNITS (<MODE>mode) / 2;
+  unsigned int halfelts = GET_MODE_NUNITS (<MODE>mode).to_constant () / 2;
   unsigned int elt = INTVAL (operands[2]);
   unsigned int elt_adj = elt % halfelts;
 
@@ -3295,7 +3295,7 @@
 {
   rtx ops[3];
   int regno = REGNO (operands[1]);
-  unsigned int halfelts = GET_MODE_NUNITS (<MODE>mode) / 2;
+  unsigned int halfelts = GET_MODE_NUNITS (<MODE>mode).to_constant () / 2;
   unsigned int elt = INTVAL (operands[2]);
   unsigned int elt_adj = elt % halfelts;
 
@@ -3540,7 +3540,7 @@ if (BYTES_BIG_ENDIAN)
     if (BYTES_BIG_ENDIAN)
       {
 	int elt = INTVAL (operands[2]);
-	elt = GET_MODE_NUNITS (<V_double_vector_mode>mode) - 1 - elt;
+	elt = GET_MODE_NUNITS (<V_double_vector_mode>mode).to_constant () - 1 - elt;
 	operands[2] = GEN_INT (elt);
       }
     if (<Is_d_reg>)
@@ -3554,7 +3554,7 @@ if (BYTES_BIG_ENDIAN)
   {
     unsigned HOST_WIDE_INT elt = UINTVAL (operands[2]);
     if (BYTES_BIG_ENDIAN)
-      elt = GET_MODE_NUNITS (<V_double_vector_mode>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<V_double_vector_mode>mode).to_constant () - 1 - elt;
     unsigned HOST_WIDE_INT size = GET_MODE_SIZE (<V_elem>mode);
     int base_regno = REGNO (operands[1]);
     int regno = (base_regno
@@ -3596,9 +3596,9 @@ if (BYTES_BIG_ENDIAN)
      (clobber (match_dup 3))])]
   {
     HOST_WIDE_INT elt = INTVAL (operands[2]);
-    if (elt >= GET_MODE_NUNITS (<MODE>mode) / 2)
+    if (elt >= GET_MODE_NUNITS (<MODE>mode).to_constant () / 2)
       {
-	elt -= GET_MODE_NUNITS (<MODE>mode) / 2;
+	elt -= GET_MODE_NUNITS (<MODE>mode).to_constant () / 2;
 	operands[1] = simplify_gen_subreg (<V_HALF>mode, operands[1],
 					   <MODE>mode,
 					   GET_MODE_SIZE (<V_HALF>mode));
@@ -3623,7 +3623,7 @@ if (BYTES_BIG_ENDIAN)
     if (BYTES_BIG_ENDIAN)
       {
 	int elt = INTVAL (operands[2]);
-	elt = GET_MODE_NUNITS (<V_double_vector_mode>mode) - 1 - elt;
+	elt = GET_MODE_NUNITS (<V_double_vector_mode>mode).to_constant () - 1 - elt;
 	operands[2] = GEN_INT (elt);
       }
     if (<Is_d_reg>)
@@ -3637,7 +3637,7 @@ if (BYTES_BIG_ENDIAN)
   {
     unsigned HOST_WIDE_INT elt = UINTVAL (operands[2]);
     if (BYTES_BIG_ENDIAN)
-      elt = GET_MODE_NUNITS (<V_double_vector_mode>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<V_double_vector_mode>mode).to_constant () - 1 - elt;
     unsigned HOST_WIDE_INT size = GET_MODE_SIZE (<V_elem>mode);
     int base_regno = REGNO (operands[1]);
     int regno = (base_regno
@@ -4519,7 +4519,7 @@ if (BYTES_BIG_ENDIAN)
                      UNSPEC_VEXT))]
   "TARGET_NEON"
 {
-  arm_const_bounds (operands[3], 0, GET_MODE_NUNITS (<MODE>mode));
+  arm_const_bounds (operands[3], 0, GET_MODE_NUNITS ((machine_mode) <MODE>mode).to_constant ());
   return "vext.<V_sz_elem>\t%<V_reg>0, %<V_reg>1, %<V_reg>2, %3";
 }
   [(set_attr "type" "neon_ext<q>")]
@@ -4854,12 +4854,12 @@ if (BYTES_BIG_ENDIAN)
   op1 = gen_lowpart (TImode, operands[1]);
   op2 = operands[2];
 
-  ofs = subreg_lowpart_offset (V8QImode, V16QImode);
+  ofs = subreg_lowpart_offset (V8QImode, V16QImode).to_constant ();
   part0 = simplify_subreg (V8QImode, op0, V16QImode, ofs);
   part2 = simplify_subreg (V8QImode, op2, V16QImode, ofs);
   emit_insn (gen_neon_vtbl2v8qi (part0, op1, part2));
 
-  ofs = subreg_highpart_offset (V8QImode, V16QImode);
+  ofs = subreg_highpart_offset (V8QImode, V16QImode).to_constant ();
   part0 = simplify_subreg (V8QImode, op0, V16QImode, ofs);
   part2 = simplify_subreg (V8QImode, op2, V16QImode, ofs);
   emit_insn (gen_neon_vtbl2v8qi (part0, op1, part2));
@@ -4885,12 +4885,12 @@ if (BYTES_BIG_ENDIAN)
   op1 = operands[1];
   op2 = operands[2];
 
-  ofs = subreg_lowpart_offset (V8QImode, V16QImode);
+  ofs = subreg_lowpart_offset (V8QImode, V16QImode).to_constant ();
   part0 = simplify_subreg (V8QImode, op0, V16QImode, ofs);
   part2 = simplify_subreg (V8QImode, op2, V16QImode, ofs);
   emit_insn (gen_neon_vtbl2v8qi (part0, op1, part2));
 
-  ofs = subreg_highpart_offset (V8QImode, V16QImode);
+  ofs = subreg_highpart_offset (V8QImode, V16QImode).to_constant ();
   part0 = simplify_subreg (V8QImode, op0, V16QImode, ofs);
   part2 = simplify_subreg (V8QImode, op2, V16QImode, ofs);
   emit_insn (gen_neon_vtbl2v8qi (part0, op1, part2));
@@ -5229,7 +5229,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[3]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS ((machine_mode) <MODE>mode).to_constant ();
   operands[3] = GEN_INT (lane);
   if (max == 1)
     return "vld1.<V_sz_elem>\t%P0, %A1";
@@ -5250,7 +5250,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[3]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   operands[3] = GEN_INT (lane);
   int regno = REGNO (operands[0]);
   if (lane >= max / 2)
@@ -5461,7 +5461,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[2]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS ((machine_mode) <MODE>mode).to_constant ();
   operands[2] = GEN_INT (lane);
   if (max == 1)
     return "vst1.<V_sz_elem>\t{%P1}, %A0";
@@ -5482,7 +5482,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[2]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[1]);
   if (lane >= max / 2)
     {
@@ -5569,7 +5569,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[3]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[0]);
   rtx ops[4];
   if (lane >= max / 2)
@@ -5594,7 +5594,7 @@ if (BYTES_BIG_ENDIAN)
                    UNSPEC_VLD2_DUP))]
   "TARGET_NEON"
 {
-  if (GET_MODE_NUNITS (<MODE>mode) > 1)
+  if (known_gt (GET_MODE_NUNITS (<MODE>mode), 1))
     return "vld2.<V_sz_elem>\t{%e0[], %f0[]}, %A1";
   else
     return "vld1.<V_sz_elem>\t%h0, %A1";
@@ -5697,7 +5697,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[2]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[1]);
   rtx ops[4];
   if (lane >= max / 2)
@@ -5842,7 +5842,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[3]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[0]);
   rtx ops[5];
   if (lane >= max / 2)
@@ -5869,7 +5869,7 @@ if (BYTES_BIG_ENDIAN)
                    UNSPEC_VLD3_DUP))]
   "TARGET_NEON"
 {
-  if (GET_MODE_NUNITS (<MODE>mode) > 1)
+  if (known_gt (GET_MODE_NUNITS (<MODE>mode), 1))
     {
       int regno = REGNO (operands[0]);
       rtx ops[4];
@@ -6033,7 +6033,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[2]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[1]);
   rtx ops[5];
   if (lane >= max / 2)
@@ -6173,7 +6173,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[3]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[0]);
   rtx ops[6];
   if (lane >= max / 2)
@@ -6201,7 +6201,7 @@ if (BYTES_BIG_ENDIAN)
                    UNSPEC_VLD4_DUP))]
   "TARGET_NEON"
 {
-  if (GET_MODE_NUNITS (<MODE>mode) > 1)
+  if (known_gt (GET_MODE_NUNITS (<MODE>mode), 1))
     {
       int regno = REGNO (operands[0]);
       rtx ops[5];
@@ -6363,7 +6363,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_NEON"
 {
   HOST_WIDE_INT lane = NEON_ENDIAN_LANE_N(<MODE>mode, INTVAL (operands[2]));
-  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode);
+  HOST_WIDE_INT max = GET_MODE_NUNITS (<MODE>mode).to_constant ();
   int regno = REGNO (operands[1]);
   rtx ops[6];
   if (lane >= max / 2)
@@ -6758,7 +6758,7 @@ if (BYTES_BIG_ENDIAN)
   "TARGET_BF16_SIMD"
   {
     int lane = INTVAL (operands[4]);
-    int half = GET_MODE_NUNITS (GET_MODE (operands[3])) / 4;
+    int half = GET_MODE_NUNITS (GET_MODE (operands[3])).to_constant () / 4;
     if (lane < half)
       return "vdot.bf16\\t%<V_reg>0, %<V_reg>2, %e3[%c4]";
     else

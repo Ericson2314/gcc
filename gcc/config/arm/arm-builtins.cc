@@ -2013,10 +2013,10 @@ neon_dereference_pointer (tree exp, tree type, machine_mode mem_mode,
   tree elem_type, upper_bound, array_type;
 
   /* Work out the size of the register block in bytes.  */
-  reg_size = GET_MODE_SIZE (reg_mode);
+  reg_size = GET_MODE_SIZE (reg_mode).to_constant ();
 
   /* Work out the size of each vector in bytes.  */
-  vector_size = GET_MODE_SIZE (vector_mode);
+  vector_size = GET_MODE_SIZE (vector_mode).to_constant ();
 
   /* Work out how many vectors there are.  */
   gcc_assert (reg_size % vector_size == 0);
@@ -2064,10 +2064,10 @@ mve_dereference_pointer (tree exp, tree type, machine_mode reg_mode,
   tree elem_type, upper_bound, array_type;
 
   /* Work out the size of each vector in bytes.  */
-  vector_size = GET_MODE_SIZE (vector_mode);
+  vector_size = GET_MODE_SIZE (vector_mode).to_constant ();
 
   /* Work out the size of the register block in bytes.  */
-  reg_size = GET_MODE_SIZE (reg_mode);
+  reg_size = GET_MODE_SIZE (reg_mode).to_constant ();
 
   /* Work out the type of each element.  */
   gcc_assert (POINTER_TYPE_P (type));
@@ -2168,7 +2168,7 @@ arm_general_expand_builtin_args (rtx target, machine_mode map_mode, int fcode,
 	      if (CONST_INT_P (op[argc]))
 		{
 		  neon_lane_bounds (op[argc], 0,
-				    GET_MODE_NUNITS (map_mode), exp);
+				    GET_MODE_NUNITS (map_mode).to_constant (), exp);
 		  /* Keep to GCC-vector-extension lane indices in the RTL.  */
 		  op[argc] =
 		    GEN_INT (NEON_ENDIAN_LANE_N (map_mode, INTVAL (op[argc])));
@@ -2181,7 +2181,7 @@ arm_general_expand_builtin_args (rtx target, machine_mode map_mode, int fcode,
 	      if (CONST_INT_P (op[argc]))
 		{
 		  machine_mode vmode = mode[argc - 1];
-		  neon_lane_bounds (op[argc], 0, GET_MODE_NUNITS (vmode), exp);
+		  neon_lane_bounds (op[argc], 0, GET_MODE_NUNITS (vmode).to_constant (), exp);
 		}
 	      /* If the lane index isn't a constant then error out.  */
 	      goto constant_arg;
@@ -2195,7 +2195,7 @@ arm_general_expand_builtin_args (rtx target, machine_mode map_mode, int fcode,
 		{
 		  machine_mode vmode = mode[argc - 1];
 		  neon_lane_bounds (op[argc], 0,
-				    GET_MODE_NUNITS (vmode) / 2, exp);
+				    GET_MODE_NUNITS (vmode).to_constant () / 2, exp);
 		}
 	      /* If the lane index isn't a constant then error out.  */
 	      goto constant_arg;
@@ -2207,7 +2207,7 @@ arm_general_expand_builtin_args (rtx target, machine_mode map_mode, int fcode,
 		{
 		  machine_mode vmode = mode[argc - 1];
 		  neon_lane_bounds (op[argc], 0,
-				    GET_MODE_NUNITS (vmode) / 4, exp);
+				    GET_MODE_NUNITS (vmode).to_constant () / 4, exp);
 		}
 	      /* If the lane index isn't a constant then error out.  */
 	      goto constant_arg;

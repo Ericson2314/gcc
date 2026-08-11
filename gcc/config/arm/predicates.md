@@ -104,9 +104,9 @@
   if (SUBREG_P (op))
     {
       /* Only allow subregs if they are strictly type punning.	*/
-      if ((GET_MODE_SIZE (GET_MODE (SUBREG_REG (op)))
-	   != GET_MODE_SIZE (GET_MODE (op)))
-	  || SUBREG_BYTE (op) != 0)
+      if (maybe_ne (GET_MODE_SIZE (GET_MODE (SUBREG_REG (op))),
+	      GET_MODE_SIZE (GET_MODE (op)))
+	  || maybe_ne (SUBREG_BYTE (op), 0))
 	return false;
       op = SUBREG_REG (op);
     }
@@ -316,7 +316,7 @@
 
 (define_predicate "const_neon_scalar_shift_amount_operand"
   (and (match_code "const_int")
-       (match_test "IN_RANGE (UINTVAL (op), 1, GET_MODE_BITSIZE (mode))")))
+       (match_test "IN_RANGE (UINTVAL (op), 1, GET_MODE_BITSIZE (mode).to_constant ())")))
 
 (define_predicate "ssat16_imm"
   (and (match_code "const_int")

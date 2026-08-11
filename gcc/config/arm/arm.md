@@ -3299,7 +3299,7 @@
 	    rtx base_addr;
 
 	    if (BYTES_BIG_ENDIAN)
-	      start_bit = GET_MODE_BITSIZE (GET_MODE (operands[3])) - width
+	      start_bit = GET_MODE_BITSIZE (GET_MODE (operands[3])).to_constant () - width
 			  - start_bit;
 
 	    if (width == 32)
@@ -3362,8 +3362,8 @@
     if (GET_CODE (target) == SUBREG)
       {
 	subtarget = gen_reg_rtx (SImode);
-	if (GET_MODE_SIZE (GET_MODE (SUBREG_REG (target)))
-	    < GET_MODE_SIZE (SImode))
+	if (known_lt (GET_MODE_SIZE (GET_MODE (SUBREG_REG (target))),
+	      GET_MODE_SIZE (SImode)))
 	  target = SUBREG_REG (target);
       }
     else
@@ -4837,7 +4837,7 @@
 	    rtx base_addr;
 
 	    if (BYTES_BIG_ENDIAN)
-	      bitpos = GET_MODE_BITSIZE (GET_MODE (operands[0])) - width
+	      bitpos = GET_MODE_BITSIZE (GET_MODE (operands[0])).to_constant () - width
 		       - bitpos;
 
 	    if (width == 32)
@@ -4857,7 +4857,7 @@
 		    && GET_MODE (SUBREG_REG (dest)) == HImode)
 		  dest = SUBREG_REG (dest);
 
-		if (GET_MODE_BITSIZE (GET_MODE (dest)) != width)
+		if (maybe_ne (GET_MODE_BITSIZE (GET_MODE (dest)), width))
 		  FAIL;
 
 		base_addr = adjust_address (operands[1], HImode,
@@ -4922,7 +4922,7 @@
       rtx base_addr;
       
       if (BYTES_BIG_ENDIAN)
-	bitpos = GET_MODE_BITSIZE (GET_MODE (operands[0])) - width - bitpos;
+	bitpos = GET_MODE_BITSIZE (GET_MODE (operands[0])).to_constant () - width - bitpos;
       
       if (width == 32)
         {
@@ -4941,7 +4941,7 @@
 	      && GET_MODE (SUBREG_REG (dest)) == HImode)
 	    dest = SUBREG_REG (dest);
 	  
-	  if (GET_MODE_BITSIZE (GET_MODE (dest)) != width)
+	  if (maybe_ne (GET_MODE_BITSIZE (GET_MODE (dest)), width))
 	    FAIL;
 	  
 	  base_addr = adjust_address (operands[1], HImode,
@@ -9142,7 +9142,7 @@
 
         XVECEXP (par, 0, i) = gen_rtx_EXPR_LIST (VOIDmode, src,
 						 GEN_INT (size));
-        size += GET_MODE_SIZE (GET_MODE (src));
+        size += GET_MODE_SIZE (GET_MODE (src)).to_constant ();
       }
 
     emit_call_insn (gen_call_value (par, operands[0], const0_rtx, NULL));
@@ -9168,7 +9168,7 @@
 	else
 	  {
 	    emit_move_insn (mem, reg);
-	    size = GET_MODE_SIZE (GET_MODE (reg));
+	    size = GET_MODE_SIZE (GET_MODE (reg)).to_constant ();
 	  }
       }
 
@@ -9215,7 +9215,7 @@
 	else
 	  {
 	    emit_move_insn (reg, mem);
-	    size = GET_MODE_SIZE (GET_MODE (reg));
+	    size = GET_MODE_SIZE (GET_MODE (reg)).to_constant ();
 	  }
       }
 

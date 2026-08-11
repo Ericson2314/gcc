@@ -4173,7 +4173,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
   return "vmov.<V_extr_elem>\t%0, %q1[%c2]";
@@ -4209,7 +4209,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
   return "vmov.s<V_sz_elem>\t%0, %q1[%c2]";
@@ -4227,7 +4227,7 @@
   if (BYTES_BIG_ENDIAN)
     {
       int elt = INTVAL (operands[2]);
-      elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+      elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
       operands[2] = GEN_INT (elt);
     }
   return "vmov.u<V_sz_elem>\t%0, %q1[%c2]";
@@ -4249,7 +4249,7 @@
 {
   int elt = ffs ((int) INTVAL (operands[2])) - 1;
   if (BYTES_BIG_ENDIAN)
-    elt = GET_MODE_NUNITS (<MODE>mode) - 1 - elt;
+    elt = GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt;
   operands[2] = GEN_INT (elt);
 
   return "vmov.<V_sz_elem>\t%q0[%c2], %1";
