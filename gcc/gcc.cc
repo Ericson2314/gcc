@@ -455,6 +455,7 @@ static void clear_args (void);
 static void fatal_signal (int);
 #if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)
 static void init_gcc_specs (struct obstack *, const char *, const char *,
+			    const char *,
 			    const char *);
 #endif
 #if defined(HAVE_TARGET_OBJECT_SUFFIX) || defined(HAVE_TARGET_EXECUTABLE_SUFFIX)
@@ -1284,6 +1285,25 @@ static const char *link_eh = "";
    unconditionally-false guard this replaces already produced.  */
 static const char *link_libatomic = "";
 
+/* The linker's spellings for as-needed linking, written by target-specs from
+   what it found this linker to accept, and empty when it found nothing.
+   target-specs has been emitting both of these for some time; the driver had
+   no slot for either, so they were written into every spec file and read by
+   nothing.  Registering them is what connects the probe to a consumer.  */
+static const char *link_as_needed = "";
+static const char *link_no_as_needed = "";
+
+/* Which libgcc to link once -static and -static-libgcc are out of the way:
+   the whole body that USE_LD_AS_NEEDED, its ldscript variant and LINK_EH_SPEC
+   used to vary between (see init_gcc_specs).  The default is the conservative
+   body, which is what the driver has been emitting on every target since it
+   stopped seeing tm.h.  gen-target-specs overrides it for the targets whose
+   headers ask for something else.  */
+static const char *libgcc_nonstatic
+  = "%{!shared:%{!shared-libgcc:-lgcc -lgcc_eh}"
+    "%{shared-libgcc:-lgcc_s -lgcc}}"
+    "%{shared:-lgcc_s}";
+
 /* Linker options -fhardened adds, if this linker has them.  Not referenced
    from any spec string: the driver reads it directly, because whether to
    apply it depends on driver state a spec cannot see.  The default is what
@@ -1743,6 +1763,9 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_buildid",		&link_buildid),
   INIT_STATIC_SPEC ("link_eh",			&link_eh),
   INIT_STATIC_SPEC ("link_libatomic",		&link_libatomic),
+  INIT_STATIC_SPEC ("link_as_needed",		&link_as_needed),
+  INIT_STATIC_SPEC ("link_no_as_needed",	&link_no_as_needed),
+  INIT_STATIC_SPEC ("libgcc_nonstatic",	&libgcc_nonstatic),
   INIT_STATIC_SPEC ("link_hardening",		&link_hardening),
   INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
   INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
@@ -1833,57 +1856,57 @@ static int processing_spec_function;
 
 #if defined(ENABLE_SHARED_LIBGCC) && !defined(REAL_LIBGCC_SPEC)
 
-#ifndef USE_LD_AS_NEEDED
-#define USE_LD_AS_NEEDED 0
-#endif
+/* Build the libgcc spec: which of -lgcc / -lgcc_eh / -lgcc_s to link, for each
+   combination of -static, -static-libgcc, -static-pie, -shared and
+   -shared-libgcc.
+
+   This used to be three different strings chosen by #if between
+   USE_LD_AS_NEEDED, USE_LD_AS_NEEDED_LDSCRIPT and neither, with a fourth
+   variation on #ifdef LINK_EH_SPEC.  All four macros come from tm.h or from
+   probes that no longer run, so every one of the conditionals was
+   unconditionally false and the driver always emitted the most conservative
+   shape -- statically linked -lgcc_eh, on every target, where a stock build
+   emits the shared unwinder.
+
+   What they have in common is only the outermost test: -static and
+   -static-libgcc always link the static pair.  EVERYTHING below that differs,
+   including where -static-pie belongs -- the as-needed shape groups it with
+   -static, the conservative one lets it fall through to the -shared-libgcc
+   arm, and those two give different answers for `-static-pie -shared-libgcc'.
+   (That was measured, not reasoned: an earlier version of this function folded
+   static-pie into the static group on the assumption that it reached the same
+   place by a longer route, and the option-by-option comparison against the
+   previous driver caught the one row where it does not.)
+
+   So the named spec covers the whole non-static body rather than one arm of
+   it, and the shapes stay whole instead of being interleaved.  The default is
+   the conservative body verbatim, so a driver with no spec file behaves
+   exactly as it did.  gen-target-specs overrides `libgcc_nonstatic' for a
+   target whose headers set USE_LD_AS_NEEDED, using the %(link_as_needed)
+   spellings target-specs probed from the actual linker.  */
 
 static void
 init_gcc_specs (struct obstack *obstack, const char *shared_name,
-		const char *static_name, const char *eh_name)
+		const char *static_name, const char *eh_name,
+		const char *nonstatic_payload)
 {
   char *buf;
+  char *dflt = NULL;
 
-#if USE_LD_AS_NEEDED
-#if defined(USE_LD_AS_NEEDED_LDSCRIPT) && !defined(USE_LIBUNWIND_EXCEPTIONS)
-  buf = concat ("%{static|static-libgcc|static-pie:", static_name, " ", eh_name, "}"
-		"%{!static:%{!static-libgcc:%{!static-pie:"
-		"%{!shared-libgcc:",
-		static_name, " ",
-		shared_name, "_asneeded}"
-		"%{shared-libgcc:",
-		shared_name, "%{!shared: ", static_name, "}"
-		"}}"
-#else
-  buf = concat ("%{static|static-libgcc|static-pie:", static_name, " ", eh_name, "}"
-		"%{!static:%{!static-libgcc:%{!static-pie:"
-		"%{!shared-libgcc:",
-		static_name, " " LD_AS_NEEDED_OPTION " ",
-		shared_name, " " LD_NO_AS_NEEDED_OPTION
-		"}"
-		"%{shared-libgcc:",
-		shared_name, "%{!shared: ", static_name, "}"
-		"}}"
-#endif
-#else
-  buf = concat ("%{static|static-libgcc:", static_name, " ", eh_name, "}"
-		"%{!static:%{!static-libgcc:"
-		"%{!shared:"
+  if (nonstatic_payload == NULL)
+    nonstatic_payload = dflt
+      = concat ("%{!shared:"
 		"%{!shared-libgcc:", static_name, " ", eh_name, "}"
 		"%{shared-libgcc:", shared_name, " ", static_name, "}"
 		"}"
-#ifdef LINK_EH_SPEC
-		"%{shared:"
-		"%{shared-libgcc:", shared_name, "}"
-		"%{!shared-libgcc:", static_name, "}"
-		"}"
-#else
-		"%{shared:", shared_name, "}"
-#endif
-#endif
-		"}}", NULL);
+		"%{shared:", shared_name, "}", NULL);
+
+  buf = concat ("%{static|static-libgcc:", static_name, " ", eh_name, "}"
+		"%{!static:%{!static-libgcc:", nonstatic_payload, "}}", NULL);
 
   obstack_grow (obstack, buf, strlen (buf));
   free (buf);
+  free (dflt);
 }
 #endif /* ENABLE_SHARED_LIBGCC */
 
@@ -1964,23 +1987,13 @@ init_spec (void)
       {
 	if (in_sep && *p == '-' && startswith (p, "-lgcc"))
 	  {
-	    init_gcc_specs (&obstack,
-			    "-lgcc_s"
-#ifdef USE_LIBUNWIND_EXCEPTIONS
-			    " -lunwind"
-#endif
-			    ,
-			    "-lgcc",
-			    "-lgcc_eh"
-#ifdef USE_LIBUNWIND_EXCEPTIONS
-# ifdef HAVE_LD_STATIC_DYNAMIC
-			    " %{!static:%{!static-pie:" LD_STATIC_OPTION "}} -lunwind"
-			    " %{!static:%{!static-pie:" LD_DYNAMIC_OPTION "}}"
-# else
-			    " -lunwind"
-# endif
-#endif
-			    );
+	    /* USE_LIBUNWIND_EXCEPTIONS gated three arms here and has no definer
+	       anywhere -- not in config/, not in auto-host.h, not in
+	       configure.ac -- so all three were dead.  Removed rather than
+	       carried, since a guard that cannot be true hides the fact that
+	       nothing selects it.  */
+	    init_gcc_specs (&obstack, "-lgcc_s", "-lgcc", "-lgcc_eh",
+			    "%(libgcc_nonstatic)");
 
 	    p += 5;
 	    in_sep = 0;
@@ -1989,14 +2002,12 @@ init_spec (void)
 	  {
 	    /* Ug.  We don't know shared library extensions.  Hope that
 	       systems that use this form don't do shared libraries.  */
-	    init_gcc_specs (&obstack,
-			    "-lgcc_s",
-			    "libgcc.a%s",
-			    "libgcc_eh.a%s"
-#ifdef USE_LIBUNWIND_EXCEPTIONS
-			    " -lunwind"
-#endif
-			    );
+	    /* No named spec for this one: `libgcc_nonstatic' names the -lgcc form's
+	       libraries, and this call site's are different.  The targets that
+	       reach it link libgcc by filename and none of them sets
+	       USE_LD_AS_NEEDED, so NULL takes the built-in default.  */
+	    init_gcc_specs (&obstack, "-lgcc_s", "libgcc.a%s", "libgcc_eh.a%s",
+			    NULL);
 	    p += 10;
 	    in_sep = 0;
 	  }
@@ -8569,12 +8580,30 @@ driver::set_up_specs () const
   just_machine_suffix = "";
   just_machine_prefix = "";
 
+  /* Compose the built-in specs FIRST, then let the specs file override what it
+     names.  This was an if/else: finding a specs file meant init_spec () never
+     ran at all.
+
+     That was safe only while a specs file was, by construction, a whole
+     -dumpspecs dump -- post-composition text for every spec, so nothing was
+     lost by skipping the composition that produced it.  It is not safe now.
+     The specs file a multi-target build installs is a per-target OVERLAY:
+     target-specs writes the specs it probed, gen-target-specs writes the ones
+     the target's tm.h defines, and everything neither of them mentions is
+     supposed to keep the driver's own value.  Under the old if/else it did not
+     keep the driver's own COMPOSED value -- it kept the raw default, so the
+     libgcc shared/static selection, the sysroot prepend and the buildid
+     composition all silently vanished the moment a target's spec file existed.
+
+     Composing first costs nothing when the file is a full dump, because every
+     composed spec is then overridden anyway.  It is what makes an overlay
+     mean what it says.  */
+  init_spec ();
+
   specs_file = find_a_file (&startfile_prefixes, "specs", true);
   /* Read the specs file unless it is a default one.  */
   if (specs_file != 0 && strcmp (specs_file, "specs"))
     read_specs (specs_file, true, false);
-  else
-    init_spec ();
 
 #ifdef ACCEL_COMPILER
   spec_machine_suffix = machine_suffix;

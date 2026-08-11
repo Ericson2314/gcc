@@ -154,6 +154,41 @@ main (void)
 #ifdef LIBGCC_SPEC
   emit ("libgcc", LIBGCC_SPEC);
 #endif
+
+  /* The one arm of the libgcc spec that varies per target; see init_gcc_specs
+     in gcc.cc, which holds the skeleton this drops into.  Only the choice is
+     made here, and only from things the target's own headers say:
+
+       USE_LD_AS_NEEDED  -- set by config/gnu-user.h, sol2.h, freebsd.h,
+	  netbsd-elf.h, dragonfly.h and four others.  A property of the
+	  operating system, not of the installed linker, so it is source-
+	  derived and belongs on this side.
+       LINK_EH_SPEC      -- six headers define it without USE_LD_AS_NEEDED,
+	  and for those the -shared arm links -lgcc rather than -lgcc_s.
+
+     The SPELLING of the as-needed options is a different question and is not
+     answered here: %(link_as_needed) and %(link_no_as_needed) come from
+     target-specs, which asked the linker.  Where the linker has no such
+     option both expand to nothing, leaving `-lgcc -lgcc_s' -- which is what
+     an as-needed target wants when as-needed is unavailable, and is why the
+     option spelling is a spec reference rather than a string baked in here.  */
+#ifdef USE_LD_AS_NEEDED
+  /* -static-pie belongs with -static here, which is NOT where the driver's
+     conservative default puts it; that difference is real and shows up on
+     `-static-pie -shared-libgcc'.  It is spelled out rather than left to the
+     skeleton, so each shape carries its own answer.  */
+  emit ("libgcc_nonstatic",
+	"%{static-pie:-lgcc -lgcc_eh;"
+	":%{!shared-libgcc:-lgcc %(link_as_needed) -lgcc_s %(link_no_as_needed)}"
+	"%{shared-libgcc:-lgcc_s%{!shared: -lgcc}}}");
+#elif defined (LINK_EH_SPEC)
+  /* Same body as the driver's default except for -shared without
+     -shared-libgcc, where these targets link the static libgcc.  */
+  emit ("libgcc_nonstatic",
+	"%{!shared:%{!shared-libgcc:-lgcc -lgcc_eh}"
+	"%{shared-libgcc:-lgcc_s -lgcc}}"
+	"%{shared:%{shared-libgcc:-lgcc_s}%{!shared-libgcc:-lgcc}}");
+#endif
 #ifdef STARTFILE_SPEC
   emit ("startfile", STARTFILE_SPEC);
 #endif
