@@ -267,6 +267,14 @@ struct target_caps
      the real question.  */
   bool gas_base64;
 
+  /* Assembler accepts the SHF_EXCLUDE section flag -- `e' in the ELF and PE
+     flag strings, `,#exclude' in sparc's syntax.  Was HAVE_GAS_SECTION_EXCLUDE,
+     whose probe folded both spellings.  Read by varasm.cc, sparc.cc, and
+     mingw/winnt.cc, which emits `n' (never-load) instead when it is absent --
+     the two winnt.cc sites were complementary `#if's and are now the two arms
+     of one runtime test, so they cannot disagree.  */
+  bool gas_section_exclude;
+
   /* Assembler supports dwarf2 .file/.loc and preserves file table indices
      exactly as given.  Was HAVE_AS_DWARF2_DEBUG_LINE, which combined a
      debug_line probe with a "buggy .file" probe.  dwarf2out.cc derives

@@ -7234,10 +7234,12 @@ default_elf_asm_named_section (const char *name, unsigned int flags,
     {
       if (!(flags & SECTION_DEBUG))
 	*f++ = 'a';
-#if HAVE_GAS_SECTION_EXCLUDE
-      if (flags & SECTION_EXCLUDE)
+      /* Was `#if HAVE_GAS_SECTION_EXCLUDE'.  Whether the assembler understands
+	 the `e' section flag is a property of that assembler, so it is a
+	 runtime read; an assembler that does not simply gets the section
+	 without the flag, which is what the compiled-out arm did.  */
+      if ((flags & SECTION_EXCLUDE) && targ_caps.gas_section_exclude)
 	*f++ = 'e';
-#endif
       if (flags & SECTION_WRITE)
 	*f++ = 'w';
       if (flags & SECTION_CODE)

@@ -10678,10 +10678,10 @@ sparc_solaris_elf_asm_named_section (const char *name, unsigned int flags,
 
   if (!(flags & SECTION_DEBUG))
     fputs (",#alloc", asm_out_file);
-#if HAVE_GAS_SECTION_EXCLUDE
-  if (flags & SECTION_EXCLUDE)
+  /* Was `#if HAVE_GAS_SECTION_EXCLUDE'; the assembler's support for
+     `,#exclude' is a runtime read now.  */
+  if ((flags & SECTION_EXCLUDE) && targ_caps.gas_section_exclude)
     fputs (",#exclude", asm_out_file);
-#endif
   if (flags & SECTION_WRITE)
     fputs (",#write", asm_out_file);
   if (flags & SECTION_TLS)

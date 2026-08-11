@@ -520,10 +520,11 @@ mingw_pe_asm_named_section (const char *name, unsigned int flags,
 {
   char flagchars[8], *f = flagchars;
 
-#if defined (HAVE_GAS_SECTION_EXCLUDE) && HAVE_GAS_SECTION_EXCLUDE == 1
-  if ((flags & SECTION_EXCLUDE) != 0)
+  /* Was `#if defined (HAVE_GAS_SECTION_EXCLUDE) && ... == 1'.  Paired with the
+     `n' fallback further down, which this used to be the complement of at
+     preprocessor time and is now the else arm of the same runtime test.  */
+  if ((flags & SECTION_EXCLUDE) != 0 && targ_caps.gas_section_exclude)
     *f++ = 'e';
-#endif
 
   if ((flags & (SECTION_CODE | SECTION_WRITE)) == 0)
     /* readonly data */
@@ -541,12 +542,13 @@ mingw_pe_asm_named_section (const char *name, unsigned int flags,
         *f++ = 'w';
       if (flags & SECTION_PE_SHARED)
         *f++ = 's';
-#if !defined (HAVE_GAS_SECTION_EXCLUDE) || HAVE_GAS_SECTION_EXCLUDE == 0
       /* If attribute "e" isn't supported we mark this section as
-         never-load.  */
-      if ((flags & SECTION_EXCLUDE) != 0)
+	 never-load.  Was `#if !defined (HAVE_GAS_SECTION_EXCLUDE) || ... == 0';
+	 the complement of the `e' test above, so it becomes the same runtime
+	 condition negated -- the two cannot disagree now, which at
+	 preprocessor time they could if only one site were converted.  */
+      if ((flags & SECTION_EXCLUDE) != 0 && !targ_caps.gas_section_exclude)
 	*f++ = 'n';
-#endif
     }
 
   /* LTO sections need 1-byte alignment to avoid confusing the
