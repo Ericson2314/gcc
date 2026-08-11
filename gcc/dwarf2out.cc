@@ -98,6 +98,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "attribs.h"
 #include "file-prefix-map.h" /* remap_debug_filename()  */
+#include "target-caps.h"
 
 static void dwarf2out_source_line (unsigned int, unsigned int, const char *,
 				   int, bool);
@@ -137,9 +138,13 @@ static bool is_redundant_typedef (const_tree);
 #define DWARF2_VMS_DEBUG 0
 #endif
 
-#if DWARF2_VMS_DEBUG
+/* Defined in vmsdbgout.cc, outside that file's VMS_DEBUGGING_INFO gate so that
+   it exists on every target: the call sites below are a runtime test on
+   targ_caps.vms_debug, so the symbol has to resolve whether or not it is ever
+   called.  */
 int vms_file_stats_name (const char *, long long *, long *, char *, int *);
 
+#if DWARF2_VMS_DEBUG
 /* Define this macro to be a nonzero value if the directory specifications
     which are output in the debug info should end with a separator.  */
 #define DWARF2_DIR_SHOULD_END_WITH_SEPARATOR 1
@@ -12626,11 +12631,13 @@ output_file_names (void)
 	  const char *filename0 = get_AT_string (comp_unit_die (), DW_AT_name);
 	  if (filename0 == NULL)
 	    filename0 = "";
-#if DWARF2_VMS_DEBUG
-	  dw2_asm_output_data (1, 4, "File name entry format count");
-#else
-	  dw2_asm_output_data (1, 2, "File name entry format count");
-#endif
+	  /* The format count, the format pairs and the per-file data below
+	     are ONE unit: the count declares how many DW_LNCT_/form pairs
+	     follow, and each pair obliges every file entry to carry that
+	     field.  Splitting the test would desync the line table, and a
+	     consumer would silently read format pairs as file entries.  */
+	  dw2_asm_output_data (1, targ_caps.vms_debug ? 4 : 2,
+			       "File name entry format count");
 	  dw2_asm_output_data_uleb128 (DW_LNCT_path, "DW_LNCT_path");
 	  dw2_asm_output_data_uleb128 (str_form, "%s",
 				       get_DW_FORM_name (str_form));
@@ -12638,20 +12645,23 @@ output_file_names (void)
 				       "DW_LNCT_directory_index");
 	  dw2_asm_output_data_uleb128 (DW_FORM_data1, "%s",
 				       get_DW_FORM_name (DW_FORM_data1));
-#if DWARF2_VMS_DEBUG
-	  dw2_asm_output_data_uleb128 (DW_LNCT_timestamp, "DW_LNCT_timestamp");
-	  dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
-	  dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
-	  dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
-#endif
+	  if (targ_caps.vms_debug)
+	    {
+	      dw2_asm_output_data_uleb128 (DW_LNCT_timestamp,
+					   "DW_LNCT_timestamp");
+	      dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
+	      dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
+	      dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
+	    }
 	  dw2_asm_output_data_uleb128 (1, "File names count");
 
 	  output_line_string (str_form, filename0, "File Entry", 0);
 	  dw2_asm_output_data (1, 0, NULL);
-#if DWARF2_VMS_DEBUG
-	  dw2_asm_output_data_uleb128 (0, NULL);
-	  dw2_asm_output_data_uleb128 (0, NULL);
-#endif
+	  if (targ_caps.vms_debug)
+	    {
+	      dw2_asm_output_data_uleb128 (0, NULL);
+	      dw2_asm_output_data_uleb128 (0, NULL);
+	    }
 	}
       else
 	{
@@ -12866,11 +12876,10 @@ output_file_names (void)
 	  if (sum >= HOST_WIDE_INT_UC (2) * (numfiles + 1))
 	    idx_form = DW_FORM_data2;
 	}
-#if DWARF2_VMS_DEBUG
-      dw2_asm_output_data (1, 4, "File name entry format count");
-#else
-      dw2_asm_output_data (1, 2, "File name entry format count");
-#endif
+      /* Same unit as above: count, format pairs, and the per-file fields
+	 emitted in the loop below all have to agree.  */
+      dw2_asm_output_data (1, targ_caps.vms_debug ? 4 : 2,
+			   "File name entry format count");
       dw2_asm_output_data_uleb128 (DW_LNCT_path, "DW_LNCT_path");
       dw2_asm_output_data_uleb128 (str_form, "%s",
 				   get_DW_FORM_name (str_form));
@@ -12878,12 +12887,13 @@ output_file_names (void)
 				   "DW_LNCT_directory_index");
       dw2_asm_output_data_uleb128 (idx_form, "%s",
 				   get_DW_FORM_name (idx_form));
-#if DWARF2_VMS_DEBUG
-      dw2_asm_output_data_uleb128 (DW_LNCT_timestamp, "DW_LNCT_timestamp");
-      dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
-      dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
-      dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
-#endif
+      if (targ_caps.vms_debug)
+	{
+	  dw2_asm_output_data_uleb128 (DW_LNCT_timestamp, "DW_LNCT_timestamp");
+	  dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
+	  dw2_asm_output_data_uleb128 (DW_LNCT_size, "DW_LNCT_size");
+	  dw2_asm_output_data_uleb128 (DW_FORM_udata, "DW_FORM_udata");
+	}
       dw2_asm_output_data_uleb128 (numfiles + 1, "File names count");
 
       output_line_string (str_form, filename0, "File Entry", 0);
@@ -12895,10 +12905,11 @@ output_file_names (void)
       else
 	dw2_asm_output_data_uleb128 (0, NULL);
 
-#if DWARF2_VMS_DEBUG
-      dw2_asm_output_data_uleb128 (0, NULL);
-      dw2_asm_output_data_uleb128 (0, NULL);
-#endif
+      if (targ_caps.vms_debug)
+	{
+	  dw2_asm_output_data_uleb128 (0, NULL);
+	  dw2_asm_output_data_uleb128 (0, NULL);
+	}
     }
 
   /* Now write all the file names.  */
@@ -12907,63 +12918,71 @@ output_file_names (void)
       int file_idx = backmap[i];
       int dir_idx = dirs[files[file_idx].dir_idx].dir_idx;
 
-#if DWARF2_VMS_DEBUG
+      if (targ_caps.vms_debug)
+	{
 #define MAX_VMS_VERSION_LEN 6 /* ";32768" */
 
-      /* Setting these fields can lead to debugger miscomparisons,
-         but VMS Debug requires them to be set correctly.  */
+	  /* Setting these fields can lead to debugger miscomparisons,
+	     but VMS Debug requires them to be set correctly.  */
 
-      int ver;
-      long long cdt;
-      long siz;
-      int maxfilelen = (strlen (files[file_idx].path)
-			+ dirs[dir_idx].length
-			+ MAX_VMS_VERSION_LEN + 1);
-      char *filebuf = XALLOCAVEC (char, maxfilelen);
+	  int ver;
+	  long long cdt;
+	  long siz;
+	  int maxfilelen = (strlen (files[file_idx].path)
+			    + dirs[dir_idx].length
+			    + MAX_VMS_VERSION_LEN + 1);
+	  char *filebuf = XALLOCAVEC (char, maxfilelen);
 
-      vms_file_stats_name (files[file_idx].path, 0, 0, 0, &ver);
-      snprintf (filebuf, maxfilelen, "%s;%d",
-	        files[file_idx].path + dirs[dir_idx].length, ver);
+	  vms_file_stats_name (files[file_idx].path, 0, 0, 0, &ver);
+	  snprintf (filebuf, maxfilelen, "%s;%d",
+		    files[file_idx].path + dirs[dir_idx].length, ver);
 
-      output_line_string (str_form, filebuf, "File Entry", (unsigned) i + 1);
+	  output_line_string (str_form, filebuf, "File Entry",
+			      (unsigned) i + 1);
 
-      /* Include directory index.  */
-      if (dwarf_version >= 5 && idx_form != DW_FORM_udata)
-	dw2_asm_output_data (idx_form == DW_FORM_data1 ? 1 : 2,
-			     dir_idx + idx_offset, NULL);
+	  /* Include directory index.  */
+	  if (dwarf_version >= 5 && idx_form != DW_FORM_udata)
+	    dw2_asm_output_data (idx_form == DW_FORM_data1 ? 1 : 2,
+				 dir_idx + idx_offset, NULL);
+	  else
+	    dw2_asm_output_data_uleb128 (dir_idx + idx_offset, NULL);
+
+	  /* Modification time.  These two are the DW_LNCT_timestamp and
+	     DW_LNCT_size fields promised by the format count above, so they
+	     are emitted for DWARF 5 as well -- unlike the non-VMS path.  */
+	  dw2_asm_output_data_uleb128
+	    ((vms_file_stats_name (files[file_idx].path, &cdt, 0, 0, 0) == 0)
+	     ? cdt : 0, NULL);
+
+	  /* File length in bytes.  */
+	  dw2_asm_output_data_uleb128
+	    ((vms_file_stats_name (files[file_idx].path, 0, &siz, 0, 0) == 0)
+	     ? siz : 0, NULL);
+	}
       else
-	dw2_asm_output_data_uleb128 (dir_idx + idx_offset, NULL);
+	{
+	  output_line_string (str_form,
+			      files[file_idx].path + dirs[dir_idx].length,
+			      "File Entry", (unsigned) i + 1);
 
-      /* Modification time.  */
-      dw2_asm_output_data_uleb128 ((vms_file_stats_name (files[file_idx].path,
-							 &cdt, 0, 0, 0) == 0)
-				   ? cdt : 0, NULL);
+	  /* Include directory index.  */
+	  if (dwarf_version >= 5 && idx_form != DW_FORM_udata)
+	    dw2_asm_output_data (idx_form == DW_FORM_data1 ? 1 : 2,
+				 dir_idx + idx_offset, NULL);
+	  else
+	    dw2_asm_output_data_uleb128 (dir_idx + idx_offset, NULL);
 
-      /* File length in bytes.  */
-      dw2_asm_output_data_uleb128 ((vms_file_stats_name (files[file_idx].path,
-							 0, &siz, 0, 0) == 0)
-				   ? siz : 0, NULL);
-#else
-      output_line_string (str_form,
-			  files[file_idx].path + dirs[dir_idx].length,
-			  "File Entry", (unsigned) i + 1);
+	  /* The format count above promised only two fields, so DWARF 5
+	     stops here.  */
+	  if (dwarf_version >= 5)
+	    continue;
 
-      /* Include directory index.  */
-      if (dwarf_version >= 5 && idx_form != DW_FORM_udata)
-	dw2_asm_output_data (idx_form == DW_FORM_data1 ? 1 : 2,
-			     dir_idx + idx_offset, NULL);
-      else
-	dw2_asm_output_data_uleb128 (dir_idx + idx_offset, NULL);
+	  /* Modification time.  */
+	  dw2_asm_output_data_uleb128 (0, NULL);
 
-      if (dwarf_version >= 5)
-	continue;
-
-      /* Modification time.  */
-      dw2_asm_output_data_uleb128 (0, NULL);
-
-      /* File length in bytes.  */
-      dw2_asm_output_data_uleb128 (0, NULL);
-#endif /* DWARF2_VMS_DEBUG */
+	  /* File length in bytes.  */
+	  dw2_asm_output_data_uleb128 (0, NULL);
+	}
     }
 
   if (dwarf_version < 5)
