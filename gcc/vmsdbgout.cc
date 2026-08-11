@@ -1620,7 +1620,21 @@ vmsdbgout_finish (const char *filename ATTRIBUTE_UNUSED)
   write_modend (0);
 }
 
-/* Need for both Dwarf2 on IVMS and VMS Debug on AVMS */
+#endif /* VMS_DEBUGGING_INFO */
+
+/* Need for both Dwarf2 on IVMS and VMS Debug on AVMS.
+
+   Everything below this point is deliberately OUTSIDE the VMS_DEBUGGING_INFO
+   gate, and the comment above is why: `vms_file_stats_name' is called by
+   dwarf2out.cc (the IVMS/DWARF path) as well as by this file (the AVMS/VMS
+   Debug path).  It was inside the gate, so it only existed when the target
+   was a VMS one -- which happened to work only because dwarf2out.cc's callers
+   were behind the very same macro.  Making that call site a runtime test needs
+   the symbol to exist on every target, so the gate closes here instead.
+
+   Nothing between here and the end of the file depends on VMS_DEBUGGING_INFO:
+   the machinery is selected by `VMS', which is a HOST macro (are we running on
+   OpenVMS?), and the non-VMS host branch is ordinary `stat'.  */
 
 #ifdef VMS
 #define __NEW_STARLET 1
@@ -1850,4 +1864,3 @@ vms_file_stats_name (const char *filename, long long *cdt, long *siz, char *rfo,
   return 0;
 #endif
 }
-#endif
