@@ -48,16 +48,28 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* Target machine header files require this define. */
 #define IN_LIBGCC2
 
-/* FIXME: Including auto-host is incorrect, but until we have
-   identified the set of defines that need to go into auto-target.h,
-   this will have to do.
+/* FIXME: Including gcc's auto-host.h is incorrect -- it is the configuration
+   of the machine the COMPILER runs on, and this file is compiled for the
+   machine the LIBRARY runs on.  The two coincide in a native build and in no
+   other, which is why the mistake survives.
 
-   TARGET_DL_ITERATE_PHDR has now been identified and moved: it is probed by
-   libgcc/configure and comes from auto-target.h below.  What is still taken
-   from gcc's auto-host.h here is HAVE_GAS_HIDDEN and HAVE_LD_EH_FRAME_HDR --
-   assembler and linker capabilities, which this library should also be asking
-   about for itself rather than inheriting the answers gcc got for its own
-   host.  */
+   The list of things it was needed for has been worked down to nothing that
+   this file reads directly.  TARGET_DL_ITERATE_PHDR, HAVE_SYS_SDT_H and
+   HAVE_GAS_HIDDEN are probed by libgcc/configure and arrive in auto-target.h
+   below.  The PT_GNU_EH_FRAME question is now LIBGCC_HAVE_LD_EH_FRAME_HDR,
+   also ours -- and note it had stopped coming from auto-host.h some time ago
+   without anyone noticing: it was reaching this file from gcc's GENERATED
+   tm.h, where mkconfig.sh defines it to 1 for every target so that gcc's own
+   target headers can compose spec strings.  A default for one consumer had
+   quietly become the answer for another.
+
+   What remains, and why this include cannot go yet: DEFAULT_USE_CXA_ATEXIT
+   below.  That is a gcc CONFIGURATION CHOICE (--enable-__cxa_atexit) rather
+   than a fact about a machine, so moving it is a decision about who owns the
+   choice, not a re-probe -- and getting it wrong changes what this file
+   registers at startup.  The five #undef lines under this include are the
+   damage from reading the wrong file: auto-host.h's host typedefs land in a
+   target compile and have to be swept back out.  */
 #include "auto-host.h"
 #undef caddr_t
 #undef pid_t
@@ -95,7 +107,7 @@ call_ ## FUNC (void)					\
 
 #if defined(OBJECT_FORMAT_ELF) \
     && !defined(OBJECT_FORMAT_FLAT) \
-    && defined(HAVE_LD_EH_FRAME_HDR) \
+    && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && !defined(inhibit_libc) && !defined(CRTSTUFFT_O) \
     && defined(BSD_DL_ITERATE_PHDR_AVAILABLE)
 #include <link.h>
@@ -104,7 +116,7 @@ call_ ## FUNC (void)					\
 
 #if defined(OBJECT_FORMAT_ELF) \
     && !defined(OBJECT_FORMAT_FLAT) \
-    && defined(HAVE_LD_EH_FRAME_HDR) && defined(TARGET_DL_ITERATE_PHDR) \
+    && LIBGCC_HAVE_LD_EH_FRAME_HDR && defined(TARGET_DL_ITERATE_PHDR) \
     && !defined(inhibit_libc) && !defined(CRTSTUFFT_O) \
     && defined(__sun__) && defined(__svr4__)
 #include <link.h>
@@ -113,7 +125,7 @@ call_ ## FUNC (void)					\
 
 #if defined(OBJECT_FORMAT_ELF) \
     && !defined(OBJECT_FORMAT_FLAT) \
-    && defined(HAVE_LD_EH_FRAME_HDR) \
+    && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && !defined(inhibit_libc) && !defined(CRTSTUFFT_O) \
     && defined(__GLIBC__) && __GLIBC__ >= 2
 #include <link.h>
@@ -128,7 +140,7 @@ call_ ## FUNC (void)					\
 
 #if defined(OBJECT_FORMAT_ELF) \
     && !defined(OBJECT_FORMAT_FLAT) \
-    && defined(HAVE_LD_EH_FRAME_HDR) \
+    && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && !defined(CRTSTUFFT_O) \
     && defined(inhibit_libc) \
     && (defined(__GLIBC__) || defined(__gnu_linux__) || defined(__GNU__))

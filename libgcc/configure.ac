@@ -305,6 +305,51 @@ if test x$libgcc_cv_dl_iterate_phdr = xyes; then
 fi
 AC_MSG_RESULT($libgcc_cv_dl_iterate_phdr)
 
+dnl Does the linker produce a PT_GNU_EH_FRAME segment?  This decides, for both
+dnl crtstuff.c and unwind-dw2-fde-dip.c, whether exception frames are FOUND at
+dnl unwind time through the program headers or REGISTERED by the startup files.
+dnl The two must agree, so they read one answer.
+dnl
+dnl It was never libgcc's answer to give.  Tracing the real compile command with
+dnl `-E -dD -H' shows exactly one definition of HAVE_LD_EH_FRAME_HDR reaching
+dnl this library, and it comes from gcc's GENERATED tm.h, where gcc/mkconfig.sh
+dnl writes an unconditional `#ifndef/#define 1'.  That default is right FOR GCC
+dnl and its comment says why: target headers test the macro with #ifdef while
+dnl composing spec strings, and the real answer arrives afterwards by
+dnl target-specs/configure overriding the composed spec.  libgcc reads the same
+dnl tm.h and has no spec to override -- the value is compiled into the object,
+dnl permanently.  A default chosen for one consumer's benefit had become another
+dnl consumer's answer, and on a target whose linker lacks --eh-frame-hdr it
+dnl would surface as unwinding not working, three layers from the cause.
+dnl
+dnl NAMED DIFFERENTLY ON PURPOSE, and always given a value.  tm.h's guard is
+dnl `#ifndef HAVE_LD_EH_FRAME_HDR', and auto-target.h is included BEFORE tm.h in
+dnl both consumers.  A conventional AC_DEFINE emits nothing for a negative
+dnl answer, so tm.h would then supply 1 and the "no" would be silently promoted
+dnl to "yes" -- the negative is the only interesting result here, and it is
+dnl exactly the one that could not survive that spelling.  0-or-1 under our own
+dnl name cannot be overridden by anyone.
+dnl
+dnl GCC_NO_EXECUTABLES above means no test program can be linked, so ask the
+dnl linker itself.  $CC is the compiler that will build this library, so
+dnl -print-prog-name names the very linker these objects will go through.
+AC_CACHE_CHECK([whether the linker produces PT_GNU_EH_FRAME],
+	       [libgcc_cv_ld_eh_frame_hdr], [
+  libgcc_cv_ld_eh_frame_hdr=no
+  libgcc_ld=`$CC $CFLAGS $CPPFLAGS $LDFLAGS -print-prog-name=ld 2>/dev/null`
+  if test -n "$libgcc_ld" \
+     && $libgcc_ld --eh-frame-hdr --version >/dev/null 2>&1; then
+    libgcc_cv_ld_eh_frame_hdr=yes
+  fi])
+if test x$libgcc_cv_ld_eh_frame_hdr = xyes; then
+  libgcc_eh_frame_hdr=1
+else
+  libgcc_eh_frame_hdr=0
+fi
+AC_DEFINE_UNQUOTED(LIBGCC_HAVE_LD_EH_FRAME_HDR, [$libgcc_eh_frame_hdr],
+  [Define to 1 if the linker produces a PT_GNU_EH_FRAME segment, 0 if not.
+   Always given a value: a bare #undef would let gcc's tm.h supply 1.])
+
 # Check for decimal float support.
 AC_CACHE_CHECK([whether decimal floating point is supported], [libgcc_cv_dfp],
 	       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[

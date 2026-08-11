@@ -51,38 +51,38 @@
 #include "unwind-compat.h"
 #include "gthr.h"
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 2) \
 	|| (__GLIBC__ == 2 && __GLIBC_MINOR__ == 2 && defined(DT_CONFIG)))
 # define USE_PT_GNU_EH_FRAME
 #endif
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && defined(__BIONIC__)
 # define USE_PT_GNU_EH_FRAME
 #endif
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && defined(TARGET_DL_ITERATE_PHDR) \
     && defined(__linux__)
 # define USE_PT_GNU_EH_FRAME
 #endif
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && defined(TARGET_DL_ITERATE_PHDR) \
     && (defined(__DragonFly__) || defined(__FreeBSD__))
 # define ElfW __ElfN
 # define USE_PT_GNU_EH_FRAME
 #endif
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && defined(TARGET_DL_ITERATE_PHDR) \
     && (defined(__OpenBSD__) || defined(__NetBSD__))
 # define ElfW(type) Elf_##type
 # define USE_PT_GNU_EH_FRAME
 #endif
 
-#if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+#if !defined(inhibit_libc) && LIBGCC_HAVE_LD_EH_FRAME_HDR \
     && defined(TARGET_DL_ITERATE_PHDR) \
     && defined(__sun__) && defined(__svr4__)
 # define USE_PT_GNU_EH_FRAME

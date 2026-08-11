@@ -4837,6 +4837,32 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_dl_iterate_phdr" >&5
 $as_echo "$libgcc_cv_dl_iterate_phdr" >&6; }
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker produces PT_GNU_EH_FRAME" >&5
+$as_echo_n "checking whether the linker produces PT_GNU_EH_FRAME... " >&6; }
+if ${libgcc_cv_ld_eh_frame_hdr+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_ld_eh_frame_hdr=no
+  libgcc_ld=`$CC $CFLAGS $CPPFLAGS $LDFLAGS -print-prog-name=ld 2>/dev/null`
+  if test -n "$libgcc_ld" \
+     && $libgcc_ld --eh-frame-hdr --version >/dev/null 2>&1; then
+    libgcc_cv_ld_eh_frame_hdr=yes
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_ld_eh_frame_hdr" >&5
+$as_echo "$libgcc_cv_ld_eh_frame_hdr" >&6; }
+if test x$libgcc_cv_ld_eh_frame_hdr = xyes; then
+  libgcc_eh_frame_hdr=1
+else
+  libgcc_eh_frame_hdr=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define LIBGCC_HAVE_LD_EH_FRAME_HDR $libgcc_eh_frame_hdr
+_ACEOF
+
+
 # Check for decimal float support.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether decimal floating point is supported" >&5
 $as_echo_n "checking whether decimal floating point is supported... " >&6; }
