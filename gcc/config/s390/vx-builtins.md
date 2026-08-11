@@ -80,7 +80,7 @@
 			    (match_operand:BLK        3 "memory_operand"     "R")
 			    (match_operand:QI         4 "const_mask_operand" "C")]
 			   UNSPEC_VEC_GATHER))]
-  "TARGET_VX && UINTVAL (operands[4]) < GET_MODE_NUNITS (<V_HW_32_64:MODE>mode)"
+  "TARGET_VX && known_lt (UINTVAL (operands[4]), GET_MODE_NUNITS (<V_HW_32_64:MODE>mode))"
   "vge<bhfgq>\t%0,%O3(%v2,%R3),%b4"
   [(set_attr "op_type" "VRV")])
 
@@ -460,7 +460,7 @@
 	(vec_select:<non_vec>
 	 (match_operand:V_HW_32_64        0 "register_operand"   "v")
 	 (parallel [(match_dup 3)])))]
-  "TARGET_VX && UINTVAL (operands[3]) < GET_MODE_NUNITS (<V_HW_32_64:MODE>mode)"
+  "TARGET_VX && known_lt (UINTVAL (operands[3]), GET_MODE_NUNITS (<V_HW_32_64:MODE>mode))"
   "vsce<bhfgq>\t%v0,%O2(%v1,%R2),%3"
   [(set_attr "op_type" "VRV")])
 
@@ -2117,7 +2117,7 @@
 		                           (match_operand:SI        2 "const_int_operand" "C")
 					   (match_operand:V_HW_HSD  3 "register_operand"  "0")]
 		  UNSPEC_VEC_SET))]
-  "TARGET_VXE2 && UINTVAL (operands[2]) < GET_MODE_NUNITS (<V_HW_HSD:MODE>mode)"
+  "TARGET_VXE2 && known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<V_HW_HSD:MODE>mode))"
   "vlebr<bhfgq>\t%v0,%1,%2"
   [(set_attr "op_type" "VRX")])
 
@@ -2131,7 +2131,7 @@
 			   (bswap:V_HW_HSD (match_operand:V_HW_HSD  3 "register_operand"        "0"))]
 			  UNSPEC_VEC_SET)))
    (use (match_operand:V16QI                                        4 "permute_pattern_operand" "X"))]
-  "TARGET_VXE2 && UINTVAL (operands[2]) < GET_MODE_NUNITS (<V_HW_HSD:MODE>mode)"
+  "TARGET_VXE2 && known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<V_HW_HSD:MODE>mode))"
   "vlebr<bhfgq>\t%v0,%1,%2"
   [(set_attr "op_type" "VRX")])
 
@@ -2143,7 +2143,7 @@
 	(vec_select:<non_vec>
 	 (bswap:V_HW_HSD (match_operand:V_HW_HSD  1 "register_operand"  "v"))
 	 (parallel [(match_operand:SI             2 "const_int_operand" "C")])))]
-  "TARGET_VXE2 && UINTVAL (operands[2]) < GET_MODE_NUNITS (<V_HW_HSD:MODE>mode)"
+  "TARGET_VXE2 && known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<V_HW_HSD:MODE>mode))"
   "vstebr<bhfgq>\t%v1,%0,%2"
   [(set_attr "op_type" "VRX")])
 
@@ -2156,7 +2156,7 @@
 	 (vec_select:<non_vec>
 	  (match_operand:V_HW_HSD                 1 "register_operand"  "v")
 	  (parallel [(match_operand:SI            2 "const_int_operand" "C")]))))]
-  "TARGET_VXE2 && UINTVAL (operands[2]) < GET_MODE_NUNITS (<V_HW_HSD:MODE>mode)"
+  "TARGET_VXE2 && known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<V_HW_HSD:MODE>mode))"
   "vstebr<bhfgq>\t%v1,%0,%2"
   [(set_attr "op_type" "VRX")])
 

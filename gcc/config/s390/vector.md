@@ -540,7 +540,7 @@
 	  UNSPEC_VEC_SET))]
   "TARGET_VX
    && (!CONST_INT_P (operands[2])
-       || UINTVAL (operands[2]) < GET_MODE_NUNITS (<VEC_SET_NONFLOAT:MODE>mode))"
+       || known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<VEC_SET_NONFLOAT:MODE>mode)))"
   "@
    vlvg<bhfgq>\t%v0,%1,%Y2
    vle<bhfgq>\t%v0,%1,%2
@@ -568,7 +568,7 @@
 		     UNSPEC_VEC_SET))]
   "TARGET_VX
    && (!CONST_INT_P (operands[2])
-       || UINTVAL (operands[2]) < GET_MODE_NUNITS (V2DFmode))"
+       || known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (V2DFmode)))"
   "@
    vlvgg\t%v0,%1,%Y2
    vleg\t%v0,%1,%2
@@ -583,7 +583,7 @@
 		      (match_operand:V2DF      3 "register_operand"  "")]
 		     UNSPEC_VEC_SET))]
   "TARGET_VX
-   && (UINTVAL (operands[2]) < GET_MODE_NUNITS (V2DFmode))
+   && (known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (V2DFmode)))
    && reload_completed
    && VECTOR_REGNO_P (REGNO (operands[1]))"
    [(set (match_dup 0)
@@ -645,7 +645,7 @@
   "TARGET_VX"
   {
     if (CONST_INT_P (operands[2]))
-	  operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VI:MODE>mode) - 1));
+	  operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VI:MODE>mode).to_constant () - 1));
     if (which_alternative == 0)
       return "vlgv<bhfgq>\t%0,%v1,%Y2";
 	return "vste<bhfgq>\t%v1,%0,%2";
@@ -662,7 +662,7 @@
   "TARGET_VX"
   {
     if (CONST_INT_P (operands[2]))
-      operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VF:MODE>mode) - 1));
+      operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VF:MODE>mode).to_constant () - 1));
     if (which_alternative == 0)
       return "vlgv<bhfgq>\t%0,%v1,%Y2";
     else if (which_alternative == 1)
@@ -686,7 +686,7 @@
               (match_dup 1)
               (parallel [(match_dup 2)]))))]
 {
-    unsigned HOST_WIDE_INT idx = UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VF:MODE>mode) - 1);
+    unsigned HOST_WIDE_INT idx = UINTVAL (operands[2]) & (GET_MODE_NUNITS (<VF:MODE>mode).to_constant () - 1);
     if (idx == 0)
       {
         rtx dest = gen_rtx_REG (<VF:MODE>mode, REGNO (operands[0]));
@@ -736,7 +736,7 @@
   "TARGET_VX"
 {
   if (CONST_INT_P (operands[2]))
-    operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<MODE>mode) - 1));
+    operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<MODE>mode).to_constant () - 1));
   return "vlgv<bhfgq>\t%0,%v1,%Y2";
 }
   [(set_attr "op_type" "VRS")
@@ -752,7 +752,7 @@
   "TARGET_VX"
 {
   if (CONST_INT_P (operands[2]))
-    operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<MODE>mode) - 1));
+    operands[2] = GEN_INT (UINTVAL (operands[2]) & (GET_MODE_NUNITS (<MODE>mode).to_constant () - 1));
   return "vlgv<bhfgq>\t%0,%v1,%Y2";
 }
   [(set_attr "op_type" "VRS")
@@ -793,7 +793,7 @@
 	  (match_operand:V 1 "register_operand"  "v")
 	  (parallel
 	   [(match_operand:QI 2 "const_mask_operand" "C")]))))]
-  "TARGET_VX && UINTVAL (operands[2]) < GET_MODE_NUNITS (<MODE>mode)"
+  "TARGET_VX && known_lt (UINTVAL (operands[2]), GET_MODE_NUNITS (<MODE>mode))"
   "vrep<bhfgq>\t%v0,%v1,%2"
   [(set_attr "op_type" "VRI")])
 
@@ -902,7 +902,7 @@
 	 (vec_select:<non_vec>
 	  (match_dup 0) (parallel [(match_dup 2)]))))]
 {
-  operands[2] = GEN_INT (GET_MODE_NUNITS (<MODE>mode) - 1);
+  operands[2] = GEN_INT (GET_MODE_NUNITS (<MODE>mode).to_constant () - 1);
 })
 
 (define_predicate "vcond_comparison_operator"

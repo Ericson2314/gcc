@@ -886,7 +886,7 @@ s390_vec_n_elem (tree fndecl)
   int n_elem = -1;
 
   if (VECTOR_TYPE_P (TREE_TYPE (TREE_TYPE (fndecl))))
-    n_elem = TYPE_VECTOR_SUBPARTS (TREE_TYPE (TREE_TYPE ((fndecl))));
+    n_elem = TYPE_VECTOR_SUBPARTS (TREE_TYPE (TREE_TYPE ((fndecl)))).to_constant ();
 
   for (b_arg_chain = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
        !VOID_TYPE_P (TREE_VALUE (b_arg_chain));
@@ -895,7 +895,7 @@ s390_vec_n_elem (tree fndecl)
       int tmp_n_elem;
       if (TREE_CODE (TREE_VALUE (b_arg_chain)) != VECTOR_TYPE)
 	continue;
-      tmp_n_elem = TYPE_VECTOR_SUBPARTS (TREE_VALUE (b_arg_chain));
+      tmp_n_elem = TYPE_VECTOR_SUBPARTS (TREE_VALUE (b_arg_chain)).to_constant ();
       if (n_elem != -1 && n_elem != tmp_n_elem)
 	return -1;
       n_elem = tmp_n_elem;

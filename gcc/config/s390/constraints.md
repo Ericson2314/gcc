@@ -495,7 +495,7 @@
   "Memory reference whose address is a naturally aligned symbol reference."
   (match_test "MEM_P (op)
                && s390_check_symref_alignment (XEXP (op, 0),
-                                               GET_MODE_SIZE (GET_MODE (op)))"))
+                                               GET_MODE_SIZE (GET_MODE (op)).to_constant ())"))
 
 ; This defines 'm' as normal memory constraint.  This is only possible
 ; since the standard memory constraint is re-defined in s390.h using

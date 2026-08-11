@@ -148,7 +148,7 @@
       (match_test "(INTVAL (op) & 63) == 63")))
 (define_predicate "nonzero_shift_count_operand"
   (and (match_code "const_int")
-       (match_test "IN_RANGE (INTVAL (op), 1, GET_MODE_BITSIZE (mode) - 1)")))
+       (match_test "IN_RANGE (INTVAL (op), 1, GET_MODE_BITSIZE (mode).to_constant () - 1)")))
 
 ;;  Return true if OP a valid operand for the LARL instruction.
 
@@ -206,7 +206,7 @@
   (match_code "const_int")
 {
   return s390_contiguous_bitmask_p (INTVAL (op), true,
-                                    GET_MODE_BITSIZE (mode), NULL, NULL);
+                                    GET_MODE_BITSIZE (mode).to_constant (), NULL, NULL);
 })
 
 ; Same without wraparound.
@@ -214,7 +214,7 @@
   (match_code "const_int")
 {
   return s390_contiguous_bitmask_p
-    (INTVAL (op), false, GET_MODE_BITSIZE (mode), NULL, NULL);
+    (INTVAL (op), false, GET_MODE_BITSIZE (mode).to_constant (), NULL, NULL);
 })
 
 ;; Return true if OP is legitimate for any LOC instruction.
@@ -423,8 +423,8 @@
 	  || GET_CODE (XEXP (SET_SRC (elt), 0)) != PLUS
 	  || ! rtx_equal_p (XEXP (XEXP (SET_SRC (elt), 0), 0), src_addr)
 	  || GET_CODE (XEXP (XEXP (SET_SRC (elt), 0), 1)) != CONST_INT
-	  || INTVAL (XEXP (XEXP (SET_SRC (elt), 0), 1))
-	     != off + i * GET_MODE_SIZE (elt_mode))
+	  || maybe_ne (INTVAL (XEXP (XEXP (SET_SRC (elt), 0), 1)),
+	        off + i * GET_MODE_SIZE (elt_mode)))
 	return false;
     }
 
@@ -526,8 +526,8 @@
 	  || GET_CODE (XEXP (SET_DEST (elt), 0)) != PLUS
 	  || ! rtx_equal_p (XEXP (XEXP (SET_DEST (elt), 0), 0), dest_addr)
 	  || GET_CODE (XEXP (XEXP (SET_DEST (elt), 0), 1)) != CONST_INT
-	  || INTVAL (XEXP (XEXP (SET_DEST (elt), 0), 1))
-	     != off + i * GET_MODE_SIZE (elt_mode))
+	  || maybe_ne (INTVAL (XEXP (XEXP (SET_DEST (elt), 0), 1)),
+	        off + i * GET_MODE_SIZE (elt_mode)))
 	return false;
     }
   return true;
