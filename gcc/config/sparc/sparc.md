@@ -2992,7 +2992,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (SImode);
       op1_subbyte *= GET_MODE_SIZE (SImode);
       operands[1] = XEXP (operands[1], 0);
@@ -3076,7 +3076,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (DImode);
       op1_subbyte *= GET_MODE_SIZE (DImode);
       operands[1] = XEXP (operands[1], 0);
@@ -3263,7 +3263,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (SImode);
       op1_subbyte *= GET_MODE_SIZE (SImode);
       operands[1] = XEXP (operands[1], 0);
@@ -3296,14 +3296,14 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (SImode);
       op1_subbyte *= GET_MODE_SIZE (SImode);
       operands[1] = XEXP (operands[1], 0);
     }
   if (GET_CODE (operands[0]) == SUBREG)
     {
-      op0_subbyte = SUBREG_BYTE (operands[0]);
+      op0_subbyte = SUBREG_BYTE (operands[0]).to_constant ();
       op0_subbyte /= GET_MODE_SIZE (SImode);
       op0_subbyte *= GET_MODE_SIZE (SImode);
       operands[0] = XEXP (operands[0], 0);
@@ -3336,7 +3336,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (SImode);
       op1_subbyte *= GET_MODE_SIZE (SImode);
       operands[1] = XEXP (operands[1], 0);
@@ -3368,7 +3368,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (DImode);
       op1_subbyte *= GET_MODE_SIZE (DImode);
       operands[1] = XEXP (operands[1], 0);
@@ -3400,7 +3400,7 @@
 
   if (GET_CODE (operands[1]) == SUBREG)
     {
-      op1_subbyte = SUBREG_BYTE (operands[1]);
+      op1_subbyte = SUBREG_BYTE (operands[1]).to_constant ();
       op1_subbyte /= GET_MODE_SIZE (DImode);
       op1_subbyte *= GET_MODE_SIZE (DImode);
       operands[1] = XEXP (operands[1], 0);

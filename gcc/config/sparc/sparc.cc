@@ -1309,7 +1309,7 @@ sparc_do_work_around_errata (void)
 	  && store_insn_p (insn))
 	{
 	  /* Sequence B begins with a double-word store.  */
-	  bool seq_b = GET_MODE_SIZE (GET_MODE (SET_DEST (set))) == 8;
+	  bool seq_b = known_eq (GET_MODE_SIZE (GET_MODE (SET_DEST (set))), 8);
 	  rtx_insn *after;
 	  int i;
 
@@ -1359,7 +1359,7 @@ sparc_do_work_around_errata (void)
       else if (sparc_fix_at697f
 	       && NONJUMP_INSN_P (insn)
 	       && (set = single_set (insn)) != NULL_RTX
-	       && GET_MODE_SIZE (GET_MODE (SET_SRC (set))) == 4
+	       && known_eq (GET_MODE_SIZE (GET_MODE (SET_SRC (set))), 4)
 	       && mem_ref (SET_SRC (set))
 	       && REG_P (SET_DEST (set))
 	       && REGNO (SET_DEST (set)) > 31
@@ -1429,7 +1429,7 @@ sparc_do_work_around_errata (void)
       else if (sparc_fix_ut699
 	       && NONJUMP_INSN_P (insn)
 	       && (set = single_set (insn)) != NULL_RTX
-	       && GET_MODE_SIZE (GET_MODE (SET_SRC (set))) <= 4
+	       && known_le (GET_MODE_SIZE (GET_MODE (SET_SRC (set))), 4)
 	       && (mem_ref (SET_SRC (set)) != NULL_RTX
 		   || INSN_CODE (insn) == CODE_FOR_movsi_pic_gotdata_op)
 	       && REG_P (SET_DEST (set))
@@ -1462,7 +1462,7 @@ sparc_do_work_around_errata (void)
 
 	      /* STD is *not* affected.  */
 	      else if (MEM_P (dest)
-		       && GET_MODE_SIZE (GET_MODE (dest)) <= 4
+		       && known_le (GET_MODE_SIZE (GET_MODE (dest)), 4)
 		       && (src == CONST0_RTX (GET_MODE (dest))
 			   || (REG_P (src)
 			       && REGNO (src) < 32
@@ -1481,7 +1481,7 @@ sparc_do_work_around_errata (void)
       else if (sparc_fix_ut699
 	       && NONJUMP_INSN_P (insn)
 	       && (set = single_set (insn)) != NULL_RTX
-	       && GET_MODE_SIZE (GET_MODE (SET_SRC (set))) == 4
+	       && known_eq (GET_MODE_SIZE (GET_MODE (SET_SRC (set))), 4)
 	       && REG_P (SET_DEST (set))
 	       && REGNO (SET_DEST (set)) > 31)
 	{
@@ -1502,7 +1502,7 @@ sparc_do_work_around_errata (void)
 
 	  /* Look for a second load/operation into the sibling FP register.  */
 	  if (!((set = single_set (next)) != NULL_RTX
-		&& GET_MODE_SIZE (GET_MODE (SET_SRC (set))) == 4
+		&& known_eq (GET_MODE_SIZE (GET_MODE (SET_SRC (set))), 4)
 		&& REG_P (SET_DEST (set))
 		&& REGNO (SET_DEST (set)) == y))
 	    continue;
@@ -1543,7 +1543,7 @@ sparc_do_work_around_errata (void)
 		{
 		  const rtx src = SET_SRC (set);
 		  const rtx dest = SET_DEST (set);
-		  const unsigned int size = GET_MODE_SIZE (GET_MODE (dest));
+		  const unsigned int size = GET_MODE_SIZE (GET_MODE (dest)).to_constant ();
 
 		  /* If the FP register is again modified before the store,
 		     then the store isn't affected.  */
@@ -4058,16 +4058,16 @@ eligible_for_restore_insn (rtx trial, bool return_p)
       && ! src_is_freg)
     {
       if (TARGET_ARCH64)
-        return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
+        return known_le (GET_MODE_SIZE (GET_MODE (src)), GET_MODE_SIZE (DImode));
       else
-        return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (SImode);
+        return known_le (GET_MODE_SIZE (GET_MODE (src)), GET_MODE_SIZE (SImode));
     }
 
   /* The 'restore src,%g0,dest' pattern for double-word mode.  */
   else if (GET_MODE_CLASS (GET_MODE (src)) != MODE_FLOAT
 	   && arith_double_operand (src, GET_MODE (src))
 	   && ! src_is_freg)
-    return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
+    return known_le (GET_MODE_SIZE (GET_MODE (src)), GET_MODE_SIZE (DImode));
 
   /* The 'restore src,%g0,dest' pattern for float if no FPU.  */
   else if (! TARGET_FPU && register_operand (src, SFmode))
@@ -4508,12 +4508,12 @@ sparc_pic_register_p (rtx x)
 #define RTX_OK_FOR_OFFSET_P(X, MODE)			\
   (CONST_INT_P (X)					\
    && INTVAL (X) >= -0x1000				\
-   && INTVAL (X) <= (0x1000 - GET_MODE_SIZE (MODE)))
+   && known_le (INTVAL (X), (0x1000 - GET_MODE_SIZE (MODE))))
 
 #define RTX_OK_FOR_OLO10_P(X, MODE)			\
   (CONST_INT_P (X)					\
    && INTVAL (X) >= -0x1000				\
-   && INTVAL (X) <= (0xc00 - GET_MODE_SIZE (MODE)))
+   && known_le (INTVAL (X), (0xc00 - GET_MODE_SIZE (MODE))))
 
 /* Handle the TARGET_LEGITIMATE_ADDRESS_P target hook.
 
@@ -5355,7 +5355,7 @@ sparc_init_modes (void)
   for (i = 0; i < NUM_MACHINE_MODES; i++)
     {
       machine_mode m = (machine_mode) i;
-      unsigned int size = GET_MODE_SIZE (m);
+      unsigned int size = GET_MODE_SIZE (m).to_constant ();
 
       switch (GET_MODE_CLASS (m))
 	{
@@ -5505,7 +5505,7 @@ sparc_compute_frame_size (HOST_WIDE_INT size, int leaf_function)
   if (leaf_function && !cfun->calls_alloca)
     args_size = 0;
   else
-    args_size = crtl->outgoing_args_size + REG_PARM_STACK_SPACE (cfun->decl);
+    args_size = crtl->outgoing_args_size.to_constant () + REG_PARM_STACK_SPACE (cfun->decl);
 
   /* Calculate space needed for global registers.  */
   if (TARGET_ARCH64)
@@ -5577,7 +5577,7 @@ sparc_initial_elimination_offset (int to)
   int offset;
 
   if (to == STACK_POINTER_REGNUM)
-    offset = sparc_compute_frame_size (get_frame_size (), crtl->is_leaf);
+    offset = sparc_compute_frame_size (get_frame_size ().to_constant (), crtl->is_leaf);
   else
     offset = 0;
 
@@ -5998,7 +5998,7 @@ sparc_expand_prologue (void)
   sparc_leaf_function_p
     = optimize > 0 && crtl->is_leaf && only_leaf_regs_used ();
 
-  size = sparc_compute_frame_size (get_frame_size(), sparc_leaf_function_p);
+  size = sparc_compute_frame_size (get_frame_size().to_constant (), sparc_leaf_function_p);
 
   if (flag_stack_usage_info)
     current_function_static_stack_size = size;
@@ -6103,7 +6103,7 @@ sparc_flat_expand_prologue (void)
 
   sparc_leaf_function_p = optimize > 0 && crtl->is_leaf;
 
-  size = sparc_compute_frame_size (get_frame_size(), sparc_leaf_function_p);
+  size = sparc_compute_frame_size (get_frame_size().to_constant (), sparc_leaf_function_p);
 
   if (flag_stack_usage_info)
     current_function_static_stack_size = size;
@@ -6717,7 +6717,7 @@ sparc_promote_function_mode (const_tree type, machine_mode mode,
 
   /* Integral arguments are passed as full words, as per the ABI.  */
   if (GET_MODE_CLASS (mode) == MODE_INT
-      && GET_MODE_SIZE (mode) < UNITS_PER_WORD)
+      && known_lt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     return word_mode;
 
   return mode;
@@ -6756,7 +6756,7 @@ sparc_pass_by_reference (cumulative_args_t, const function_arg_info &arg)
     return ((type && (AGGREGATE_TYPE_P (type) || VECTOR_FLOAT_TYPE_P (type)))
 	    || mode == SCmode
 	    /* Catch CDImode, TFmode, DCmode and TCmode.  */
-	    || GET_MODE_SIZE (mode) > 8
+	    || known_gt (GET_MODE_SIZE (mode), 8)
 	    || (type
 		&& VECTOR_TYPE_P (type)
 		&& (unsigned HOST_WIDE_INT) int_size_in_bytes (type) > 8));
@@ -6778,7 +6778,7 @@ sparc_pass_by_reference (cumulative_args_t, const function_arg_info &arg)
 	     && (AGGREGATE_TYPE_P (type) || VECTOR_TYPE_P (type))
 	     && (unsigned HOST_WIDE_INT) int_size_in_bytes (type) > 16)
 	    /* Catch CTImode and TCmode.  */
-	    || GET_MODE_SIZE (mode) > 16);
+	    || known_gt (GET_MODE_SIZE (mode), 16));
 }
 
 /* Return true if TYPE is considered as a floating-point type by the ABI.  */
@@ -6943,7 +6943,7 @@ function_arg_slotno (const struct sparc_args *cum, machine_mode mode,
 	  regno = SPARC_FP_ARG_FIRST + slotno * 2;
 	  /* Arguments filling only one single FP register are
 	     right-justified in the outer double FP register.  */
-	  if (GET_MODE_SIZE (mode) <= 4)
+	  if (known_le (GET_MODE_SIZE (mode), 4))
 	    regno++;
 	  break;
 	}
@@ -7079,7 +7079,7 @@ compute_fp_layout (const_tree field, int bitpos, assign_data_t *data,
   if (VECTOR_TYPE_P (TREE_TYPE (field)) && mode == BLKmode)
     {
       mode = TYPE_MODE (TREE_TYPE (TREE_TYPE (field)));
-      nregs = TYPE_VECTOR_SUBPARTS (TREE_TYPE (field));
+      nregs = TYPE_VECTOR_SUBPARTS (TREE_TYPE (field)).to_constant ();
     }
   else if (TREE_CODE (TREE_TYPE (field)) == COMPLEX_TYPE)
     {
@@ -7096,12 +7096,12 @@ compute_fp_layout (const_tree field, int bitpos, assign_data_t *data,
   else
     nregs = 1;
 
-  nslots = CEIL_NWORDS (nregs * GET_MODE_SIZE (mode));
+  nslots = CEIL_NWORDS (nregs * GET_MODE_SIZE (mode).to_constant ());
 
   if (nslots > SPARC_FP_ARG_MAX - this_slotno)
     {
       nslots = SPARC_FP_ARG_MAX - this_slotno;
-      nregs = (nslots * UNITS_PER_WORD) / GET_MODE_SIZE (mode);
+      nregs = (nslots * UNITS_PER_WORD) / GET_MODE_SIZE (mode).to_constant ();
 
       /* We need to pass this field (partly) on the stack.  */
       data->stack = 1;
@@ -7193,7 +7193,7 @@ assign_fp_registers (const_tree field, int bitpos, assign_data_t *data)
 
   const int this_slotno = data->slotno + bitpos / BITS_PER_WORD;
   int regno = SPARC_FP_ARG_FIRST + this_slotno * 2;
-  if (GET_MODE_SIZE (mode) <= 4 && (bitpos & 32) != 0)
+  if (known_le (GET_MODE_SIZE (mode), 4) && (bitpos & 32) != 0)
     regno++;
   int pos = bitpos / BITS_PER_UNIT;
 
@@ -7203,8 +7203,8 @@ assign_fp_registers (const_tree field, int bitpos, assign_data_t *data)
       XVECEXP (data->ret, 0, data->stack + data->nregs)
 	= gen_rtx_EXPR_LIST (VOIDmode, reg, GEN_INT (pos));
       data->nregs += 1;
-      regno += GET_MODE_SIZE (mode) / 4;
-      pos += GET_MODE_SIZE (mode);
+      regno += GET_MODE_SIZE (mode).to_constant () / 4;
+      pos += GET_MODE_SIZE (mode).to_constant ();
     }
   while (--nregs > 0);
 }
@@ -7560,7 +7560,7 @@ sparc_arg_partial_bytes (cumulative_args_t cum, const function_arg_info &arg)
       /* We are guaranteed by pass_by_reference that the size of the
 	 argument is not greater than 8 bytes, so we only need to return
 	 one word if the argument is partially passed in registers.  */
-      const int size = GET_MODE_SIZE (arg.mode);
+      const int size = GET_MODE_SIZE (arg.mode).to_constant ();
 
       if (size > UNITS_PER_WORD && slotno == SPARC_INT_ARG_MAX - 1)
 	return UNITS_PER_WORD;
@@ -7586,7 +7586,7 @@ sparc_arg_partial_bytes (cumulative_args_t cum, const function_arg_info &arg)
 	{
 	  const int size = (arg.type && VECTOR_FLOAT_TYPE_P (arg.type))
 			   ? int_size_in_bytes (arg.type)
-			   : GET_MODE_SIZE (arg.mode);
+			   : GET_MODE_SIZE (arg.mode).to_constant ();
 
 	  if (size > UNITS_PER_WORD && slotno == SPARC_INT_ARG_MAX - 1)
 	    return UNITS_PER_WORD;
@@ -7596,7 +7596,7 @@ sparc_arg_partial_bytes (cumulative_args_t cum, const function_arg_info &arg)
 	{
 	  const int size = (arg.type && VECTOR_FLOAT_TYPE_P (arg.type))
 			   ? int_size_in_bytes (arg.type)
-			   : GET_MODE_SIZE (arg.mode);
+			   : GET_MODE_SIZE (arg.mode).to_constant ();
 
 	  if (size > UNITS_PER_WORD && slotno == SPARC_FP_ARG_MAX - 1)
 	    return UNITS_PER_WORD;
@@ -7625,7 +7625,7 @@ sparc_function_arg_advance (cumulative_args_t cum_v,
   cum->words += padding;
 
   if (TARGET_ARCH32)
-    cum->words += CEIL_NWORDS (GET_MODE_SIZE (mode));
+    cum->words += CEIL_NWORDS (GET_MODE_SIZE (mode).to_constant ());
   else
     {
       /* For types that can have BLKmode, get the size from the type.  */
@@ -7640,7 +7640,7 @@ sparc_function_arg_advance (cumulative_args_t cum_v,
 	    cum->words += CEIL_NWORDS (size);
 	}
       else
-	cum->words += CEIL_NWORDS (GET_MODE_SIZE (mode));
+	cum->words += CEIL_NWORDS (GET_MODE_SIZE (mode).to_constant ());
     }
 }
 
@@ -7845,7 +7845,7 @@ sparc_function_value_1 (const_tree type, machine_mode mode, bool outgoing)
 
       /* We should only have pointer and integer types at this point.  This
 	 must match sparc_promote_function_mode.  */
-      else if (mclass == MODE_INT && GET_MODE_SIZE (mode) < UNITS_PER_WORD)
+      else if (mclass == MODE_INT && known_lt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	mode = word_mode;
     }
 
@@ -7854,7 +7854,7 @@ sparc_function_value_1 (const_tree type, machine_mode mode, bool outgoing)
   else if (TARGET_ARCH32
 	   && !(type && AGGREGATE_TYPE_P (type))
 	   && mclass == MODE_INT
-	   && GET_MODE_SIZE (mode) < UNITS_PER_WORD)
+	   && known_lt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     mode = word_mode;
 
   if ((mclass == MODE_FLOAT || mclass == MODE_COMPLEX_FLOAT) && TARGET_FPU)
@@ -11873,7 +11873,7 @@ static void
 sparc_handle_vis_mul8x16 (vec<tree> *n_elts, enum sparc_builtins fncode,
 			  tree inner_type, tree cst0, tree cst1)
 {
-  unsigned i, num = VECTOR_CST_NELTS (cst0);
+  unsigned i, num = VECTOR_CST_NELTS (cst0).to_constant ();
   int scale;
 
   switch (fncode)
@@ -11960,8 +11960,8 @@ sparc_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED,
 	  tree inner_type = TREE_TYPE (rtype);
 	  unsigned i;
 
-	  tree_vector_builder n_elts (rtype, VECTOR_CST_NELTS (arg0), 1);
-	  for (i = 0; i < VECTOR_CST_NELTS (arg0); ++i)
+	  tree_vector_builder n_elts (rtype, VECTOR_CST_NELTS (arg0).to_constant (), 1);
+	  for (i = 0; known_lt (i, VECTOR_CST_NELTS (arg0)); ++i)
 	    {
 	      unsigned HOST_WIDE_INT val
 		= TREE_INT_CST_LOW (VECTOR_CST_ELT (arg0, i));
@@ -11982,7 +11982,7 @@ sparc_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED,
       if (TREE_CODE (arg0) == VECTOR_CST && TREE_CODE (arg1) == VECTOR_CST)
 	{
 	  tree inner_type = TREE_TYPE (rtype);
-	  tree_vector_builder n_elts (rtype, VECTOR_CST_NELTS (arg0), 1);
+	  tree_vector_builder n_elts (rtype, VECTOR_CST_NELTS (arg0).to_constant (), 1);
 	  sparc_handle_vis_mul8x16 (&n_elts, code, inner_type, arg0, arg1);
 	  return n_elts.build ();
 	}
@@ -11996,9 +11996,9 @@ sparc_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED,
 
       if (TREE_CODE (arg0) == VECTOR_CST && TREE_CODE (arg1) == VECTOR_CST)
 	{
-	  tree_vector_builder n_elts (rtype, 2 * VECTOR_CST_NELTS (arg0), 1);
+	  tree_vector_builder n_elts (rtype, 2 * VECTOR_CST_NELTS (arg0).to_constant (), 1);
 	  unsigned i;
-	  for (i = 0; i < VECTOR_CST_NELTS (arg0); ++i)
+	  for (i = 0; known_lt (i, VECTOR_CST_NELTS (arg0)); ++i)
 	    {
 	      n_elts.quick_push (VECTOR_CST_ELT (arg0, i));
 	      n_elts.quick_push (VECTOR_CST_ELT (arg1, i));
@@ -12031,7 +12031,7 @@ sparc_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED,
 	  widest_int tmp;
 	  unsigned i;
 
-	  for (i = 0; i < VECTOR_CST_NELTS (arg0); ++i)
+	  for (i = 0; known_lt (i, VECTOR_CST_NELTS (arg0)); ++i)
 	    {
 	      tree e0 = VECTOR_CST_ELT (arg0, i);
 	      tree e1 = VECTOR_CST_ELT (arg1, i);
@@ -12301,7 +12301,7 @@ sparc_register_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
     {
       if (TARGET_VIS3)
 	{
-	  int size = GET_MODE_SIZE (mode);
+	  int size = GET_MODE_SIZE (mode).to_constant ();
 	  if (size == 8 || size == 4)
 	    {
 	      if (! TARGET_ARCH32 || size == 4)
@@ -13076,7 +13076,7 @@ sparc_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   /* All 8-byte permutes are supported.  */
   if (!target)
-    return GET_MODE_SIZE (vmode) == 8;
+    return known_eq (GET_MODE_SIZE (vmode), 8);
 
   /* Force target-independent code to convert constant permutations on other
      modes down to V8QI.  Rely on this to avoid the complexity of the byte
@@ -13092,7 +13092,7 @@ sparc_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   unsigned int i, mask;
   for (i = mask = 0; i < 8; ++i)
-    mask |= (sel[i] & 0xf) << (28 - i*4);
+    mask |= (sel[i].to_constant () & 0xf) << (28 - i*4);
   rtx mask_rtx = force_reg (SImode, gen_int_mode (mask, SImode));
 
   emit_insn (gen_bmasksi_vis (gen_reg_rtx (SImode), mask_rtx, const0_rtx));
@@ -13445,7 +13445,7 @@ sparc_expand_vector_init (rtx target, rtx vals)
 {
   const machine_mode mode = GET_MODE (target);
   const machine_mode inner_mode = GET_MODE_INNER (mode);
-  const int n_elts = GET_MODE_NUNITS (mode);
+  const int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int i, n_var = 0;
   bool all_same = true;
   rtx mem;
@@ -13466,23 +13466,23 @@ sparc_expand_vector_init (rtx target, rtx vals)
       return;
     }
 
-  if (GET_MODE_SIZE (inner_mode) == GET_MODE_SIZE (mode))
+  if (known_eq (GET_MODE_SIZE (inner_mode), GET_MODE_SIZE (mode)))
     {
-      if (GET_MODE_SIZE (inner_mode) == 4)
+      if (known_eq (GET_MODE_SIZE (inner_mode), 4))
 	{
 	  emit_move_insn (gen_lowpart (SImode, target),
 			  gen_lowpart (SImode, XVECEXP (vals, 0, 0)));
 	  return;
 	}
-      else if (GET_MODE_SIZE (inner_mode) == 8)
+      else if (known_eq (GET_MODE_SIZE (inner_mode), 8))
 	{
 	  emit_move_insn (gen_lowpart (DImode, target),
 			  gen_lowpart (DImode, XVECEXP (vals, 0, 0)));
 	  return;
 	}
     }
-  else if (GET_MODE_SIZE (inner_mode) == GET_MODE_SIZE (word_mode)
-	   && GET_MODE_SIZE (mode) == 2 * GET_MODE_SIZE (word_mode))
+  else if (known_eq (GET_MODE_SIZE (inner_mode), GET_MODE_SIZE (word_mode))
+	   && known_eq (GET_MODE_SIZE (mode), 2 * GET_MODE_SIZE (word_mode)))
     {
       emit_move_insn (gen_highpart (word_mode, target),
 		      gen_lowpart (word_mode, XVECEXP (vals, 0, 0)));
@@ -13491,7 +13491,7 @@ sparc_expand_vector_init (rtx target, rtx vals)
       return;
     }
 
-  if (all_same && GET_MODE_SIZE (mode) == 8)
+  if (all_same && known_eq (GET_MODE_SIZE (mode), 8))
     {
       if (TARGET_VIS2)
 	{
@@ -13594,8 +13594,8 @@ sparc_secondary_memory_needed (machine_mode mode, reg_class_t class1,
 {
   return ((FP_REG_CLASS_P (class1) != FP_REG_CLASS_P (class2))
 	  && (! TARGET_VIS3
-	      || GET_MODE_SIZE (mode) > 8
-	      || GET_MODE_SIZE (mode) < 4));
+	      || known_gt (GET_MODE_SIZE (mode), 8)
+	      || known_lt (GET_MODE_SIZE (mode), 4)));
 }
 
 /* Implement TARGET_SECONDARY_MEMORY_NEEDED_MODE.
@@ -13609,13 +13609,13 @@ sparc_secondary_memory_needed_mode (machine_mode mode)
 {
   if (TARGET_ARCH64)
     {
-      if (GET_MODE_BITSIZE (mode) < 32)
+      if (known_lt (GET_MODE_BITSIZE (mode), 32))
 	return mode_for_size (32, GET_MODE_CLASS (mode), 0).require ();
       return mode;
     }
   else
     {
-      if (GET_MODE_BITSIZE (mode) < BITS_PER_WORD)
+      if (known_lt (GET_MODE_BITSIZE (mode), BITS_PER_WORD))
 	return mode_for_size (BITS_PER_WORD,
 			      GET_MODE_CLASS (mode), 0).require ();
       return mode;
@@ -13706,7 +13706,7 @@ sparc_regmode_natural_size (machine_mode mode)
 {
   const enum mode_class cl = GET_MODE_CLASS (mode);
 
-  if ((cl == MODE_FLOAT || cl == MODE_VECTOR_INT) && GET_MODE_SIZE (mode) <= 4)
+  if ((cl == MODE_FLOAT || cl == MODE_VECTOR_INT) && known_le (GET_MODE_SIZE (mode), 4))
     return 4;
 
   return UNITS_PER_WORD;
@@ -13728,10 +13728,10 @@ sparc_hard_regno_nregs (unsigned int regno, machine_mode mode)
   if (TARGET_ARCH64)
     {
       if (SPARC_INT_REG_P (regno) || regno == FRAME_POINTER_REGNUM)
-	return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
-      return CEIL (GET_MODE_SIZE (mode), 4);
+	return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
+      return CEIL (GET_MODE_SIZE (mode).to_constant (), 4);
     }
-  return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
+  return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
 }
 
 /* Implement TARGET_HARD_REGNO_MODE_OK.
@@ -13780,8 +13780,8 @@ sparc_modes_tieable_p (machine_mode mode1, machine_mode mode2)
   if (mclass1 != MODE_FLOAT && mclass1 != MODE_VECTOR_INT)
     return true;
 
-  size1 = GET_MODE_SIZE (mode1);
-  size2 = GET_MODE_SIZE (mode2);
+  size1 = GET_MODE_SIZE (mode1).to_constant ();
+  size2 = GET_MODE_SIZE (mode2).to_constant ();
   if ((size1 > 4 && size2 == 4)
       || (size2 > 4 && size1 == 4))
     return false;
@@ -13912,8 +13912,8 @@ sparc_can_change_mode_class (machine_mode from, machine_mode to,
 			     reg_class_t rclass)
 {
   if (TARGET_ARCH64
-      && GET_MODE_SIZE (from) == 4
-      && GET_MODE_SIZE (to) != 4)
+      && known_eq (GET_MODE_SIZE (from), 4)
+      && maybe_ne (GET_MODE_SIZE (to), 4))
     return !reg_classes_intersect_p (rclass, FP_REGS);
   return true;
 }
