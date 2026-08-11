@@ -1245,8 +1245,14 @@ BUILD_ERRORS = build/errors.o
 # rules name as prerequisites (prerequisites are expanded as the makefile is
 # read), and before the genprog* lists are used to build the generators,
 # since the fragment appends to genprogerr.
-multi-target-md.mk: multi-target.manifest $(srcdir)/gen-multi-target-md.awk
-	$(AWK) -v srcdir=$(srcdir) -f $(srcdir)/gen-multi-target-md.awk \
+#
+# multi-target.multilib comes in as well: a few triples name a generated
+# sysroot-suffix header in their tm_file, and that header is built from the
+# target's MULTILIB_* variables, which is what that file records.
+multi-target-md.mk: multi-target.manifest multi-target.multilib \
+  $(srcdir)/gen-multi-target-md.awk
+	$(AWK) -v srcdir=$(srcdir) -v multilib=multi-target.multilib \
+	  -f $(srcdir)/gen-multi-target-md.awk \
 	  multi-target.manifest > tmp-multi-target-md.mk
 	$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-md.mk $@
 -include multi-target-md.mk

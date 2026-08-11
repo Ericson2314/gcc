@@ -38,6 +38,59 @@
 
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
+  tmk = "";
+}
+
+# A few triples name a GENERATED header in their tm_file: sysroot-suffix.h or
+# linux-sysroot-suffix.h, built by a tmake_file fragment.  A multi-target build
+# includes no target's tmake_file, so the rule has to be reproduced here -- the
+# same problem the t-<cpu>-headers fragments solve for arm-isa.h and
+# gcn-device-macros.h, except that this one is per TRIPLE: of sh's four
+# configured triples all four want one, of m68k's fourteen only two do.
+#
+# The work of deciding WHAT such a header should contain is already done, by
+# gen-sysroot-suffix.sh, which configure invokes for the per-back-end
+# sysroot-suffix-<base>.h.  That script takes a triple, so it serves here
+# unchanged; calling it is better than reproducing its reasoning, which is
+# subtle and which it documents at length:
+#
+#   - config/print-sysroot-suffix.sh, reached through the t-sysroot-suffix
+#     fragment, is a pure transformation of MULTILIB_OSDIRNAMES / OPTIONS /
+#     MATCHES / REUSE, so it gives the same answer wherever it runs.
+#   - config/m68k/print-sysroot-suffix.sh and config/bfin/print-sysroot-suffix.sh
+#     `test -d "$sysroot/$dir"', probing the build machine's filesystem for a
+#     target sysroot a multi-target build does not have.  For those the script
+#     writes an honestly empty header saying so, rather than a guess.
+#
+# What is per TRIPLE is WHICH triples want one at all: of sh's four configured
+# triples all four do, of m68k's fourteen only two.  So the header follows tm.h
+# down to the triple like everything else here.
+#
+# RUN IN A SCRATCH DIRECTORY, and this is not tidiness.
+# config/print-sysroot-suffix.sh writes a helper called
+# ./print-sysroot-suffix3.sh in the CURRENT directory, under that fixed name.
+# Two of these running at once in the same directory overwrite each other's
+# helper mid-execution: with -j12 the first attempt died on
+# `./print-sysroot-suffix3.sh: Text file busy' and exit 126.  Per-base there was
+# at most one such rule so it never showed; going per-triple makes eight, and
+# the race becomes the common case.
+function emit_sysroot_suffix(key,	hdr) {
+  if (inc ~ /(^| )linux-sysroot-suffix\.h( |$)/)
+    hdr = "linux-sysroot-suffix.h";
+  else if (inc ~ /(^| )sysroot-suffix\.h( |$)/)
+    hdr = "sysroot-suffix.h";
+  else
+    return "";
+
+  printf "sysroot-suffix-%s.h: multi-target.manifest multi-target.multilib \\\n", key;
+  printf "  $(srcdir)/gen-sysroot-suffix.sh\n";
+  printf "\trm -rf tmp-ssdir-%s && mkdir tmp-ssdir-%s\n", key, key;
+  printf "\tcd tmp-ssdir-%s && $(SHELL) $(srcdir)/gen-sysroot-suffix.sh \\\n", key;
+  printf "\t  %s ../multi-target.manifest ../multi-target.multilib $(srcdir) \\\n", trg;
+  printf "\t  > ../tmp-sysroot-suffix-%s.h\n", key;
+  printf "\trm -rf tmp-ssdir-%s\n", key;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-sysroot-suffix-%s.h $@\n\n", key;
+  return hdr;
 }
 
 function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
@@ -413,7 +466,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 #
 # Skipped for the back ends that share default-common.cc: they have no
 # options-<base>.h or insn-constants-<base>.h to build a tm.h against.
-function emit_triple(	key, hdrs, i, n, parts) {
+function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
   if (cof == "default-common.cc")
     return;
 
@@ -428,7 +481,19 @@ function emit_triple(	key, hdrs, i, n, parts) {
   sub(/(^| )options\.h( |$)/, " options-" cpu ".h ", hdrs);
   sub(/(^| )insn-constants\.h( |$)/, " insn-constants-" cpu ".h ", hdrs);
 
-  printf "tm-%s.h: options-%s.h insn-constants-%s.h Makefile\n", key, cpu, cpu;
+  # A generated sysroot-suffix header, where this triple has one and we can
+  # honestly produce it.  It goes per triple like everything else here, so the
+  # name in the include list has to be rewritten to match.
+  ssh = emit_sysroot_suffix(key);
+  if (ssh != "") {
+    sub("(^| )" ssh "( |$)", " sysroot-suffix-" key ".h ", hdrs);
+    ssdep = " sysroot-suffix-" key ".h";
+  }
+  else
+    ssdep = "";
+
+  printf "tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n",
+	 key, cpu, cpu, ssdep;
   printf "\tTARGET_CPU_DEFAULT=\"\" HEADERS=\"%s\" DEFINES=\"%s\" \\\n", hdrs, def;
   printf "\t  $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n", key;
 
@@ -533,7 +598,27 @@ function emit_asm_ops_registry(	i, n, parts) {
   printf "target-asm-ops-select.o: multi-target-asm-ops.h\n\n";
 }
 
+BEGIN {
+  # Each target's MULTILIB_* set, written by gen-multilib-data.sh.  Only the
+  # handful of triples whose tm_file names a generated sysroot-suffix header
+  # need it; see emit_sysroot_suffix.
+  if (multilib != "")
+    while ((getline line < multilib) > 0) {
+      if (line ~ /^target /)		 { sub(/^target /, "", line); mlt = line }
+      else if (line ~ /^multilib_options /)
+	{ sub(/^multilib_options */, "", line); ml_opt[mlt] = line }
+      else if (line ~ /^multilib_matches /)
+	{ sub(/^multilib_matches */, "", line); ml_match[mlt] = line }
+      else if (line ~ /^multilib_reuse /)
+	{ sub(/^multilib_reuse */, "", line); ml_reuse[mlt] = line }
+      else if (line ~ /^multilib_osdirnames /)
+	{ sub(/^multilib_osdirnames */, "", line); ml_osdir[mlt] = line }
+    }
+  close(multilib);
+}
+
 $1 == "target"	  { trg = $2 }
+$1 == "tmake_file" { tmk = $0 }
 $1 == "cpu_type"  { cpu = $2 }
 $1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }
