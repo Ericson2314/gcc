@@ -2566,9 +2566,29 @@ sarif-replay: $(SARIF_REPLAY_OBJS) $(LIBGDIAGNOSTICS_FILENAME)
 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
 	  $(SARIF_REPLAY_OBJS) $(LIBGDIAGNOSTICS_FILENAME) $(LIBS)
 
-# Dump a specs file to make -B./ read these specs over installed ones.
-$(SPECS): xgcc$(exeext)
-	$(GCC_FOR_TARGET) -dumpspecs > tmp-specs
+# The spec file that -B./ makes this build's own xgcc read.
+#
+# It must be the TARGET's probed spec file, not a dump of the driver's own
+# defaults.  With the target data gone from tm.h those defaults are empty, so
+# `-dumpspecs' wrote a file that says nothing -- in particular an empty
+# *cc1_target_config, so cc1 was never handed a -ftarget-config= and targ_caps
+# kept its built-in values.  Those values are deliberately pessimistic (a
+# compiler told nothing about its target must not claim its libgcc carries
+# __bid_*/__dpd_*), so `_Decimal32 x;' failed with "decimal floating-point not
+# supported for this target" in every ordinary build.  Populating the file is
+# the fix; lowering the defaults would not be.
+#
+# If target-specs could not probe this target (its assembler or linker is not
+# installed) there is no file, and we fall back to the built-in defaults rather
+# than to a spec file synthesised from probes that did not run -- recording
+# "feature absent" everywhere is worse than recording nothing.
+$(SPECS): xgcc$(exeext) target-specs
+	if test -f specs-$(TEST_TARGET); then \
+	  cp specs-$(TEST_TARGET) tmp-specs; \
+	else \
+	  echo "specs: nothing probed for $(TEST_TARGET); using built-in defaults" >&2; \
+	  $(GCC_FOR_TARGET) -dumpspecs > tmp-specs; \
+	fi
 	mv tmp-specs $(SPECS)
 
 # We do want to create an executable named `xgcc', so we can use it to
@@ -2778,7 +2798,7 @@ multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
 	  $(srcdir) "$(MAKE)" "$(AWK)" > tmp-multilib-data
 	$(SHELL) $(srcdir)/../move-if-change tmp-multilib-data $@
 
-target-specs: multi-target.manifest multi-target.multilib
+target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext)
 	@set -e; \
 	tsdir=$(srcdir)/../target-specs; \
 	if test ! -x $$tsdir/configure; then \
@@ -2787,11 +2807,12 @@ target-specs: multi-target.manifest multi-target.multilib
 	fi; \
 	made=0; skipped=0; \
 	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
-	  if test "$$t" = "$(target_noncanonical)"; then \
+	  tas=$$t-as; tld=$$t-ld; \
+	  if ! command -v "$$tas" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
 	    tas=`./xgcc$(exeext) -print-prog-name=as 2>/dev/null || echo $$t-as`; \
+	  fi; \
+	  if ! command -v "$$tld" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
 	    tld=`./xgcc$(exeext) -print-prog-name=ld 2>/dev/null || echo $$t-ld`; \
-	  else \
-	    tas=$$t-as; tld=$$t-ld; \
 	  fi; \
 	  if command -v "$$tas" > /dev/null 2>&1 && command -v "$$tld" > /dev/null 2>&1; then \
 	    rm -rf tmp-ts-$$t; mkdir tmp-ts-$$t; \
