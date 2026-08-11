@@ -71,10 +71,8 @@
 #define TARGET_PROFILE_KERNEL 0
 #endif
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-# ifndef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
-# define HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE 0
-# endif
+#ifndef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
+#define HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE 0
 #endif
 
 #ifndef TARGET_NO_PROTOTYPE
@@ -530,7 +528,6 @@ rs6000_return_in_msb (const_tree valtype)
 	      == PAD_UPWARD));
 }
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
 /* Return TRUE if a call to function FNDECL may be one that
    potentially affects the function calling ABI of the object file.  */
 
@@ -556,7 +553,6 @@ call_ABI_of_interest (tree fndecl)
     }
   return false;
 }
-#endif
 
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
    for a call to a function whose data type is FNTYPE.
@@ -634,8 +630,8 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	       cum->prototype, cum->nargs_prototype);
     }
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-  if (TARGET_ELF && (TARGET_64BIT || DEFAULT_ABI == ABI_V4))
+  if (HAVE_AS_GNU_ATTRIBUTE && TARGET_ELF
+      && (TARGET_64BIT || DEFAULT_ABI == ABI_V4))
     {
       cum->escapes = call_ABI_of_interest (fndecl);
       if (cum->escapes)
@@ -678,7 +674,6 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	    rs6000_passes_vector = true;
 	}
     }
-#endif
 
   if (fntype
       && !TARGET_ALTIVEC
@@ -1078,8 +1073,8 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
   if (depth == 0)
     cum->nargs_prototype--;
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-  if (TARGET_ELF && (TARGET_64BIT || DEFAULT_ABI == ABI_V4)
+  if (HAVE_AS_GNU_ATTRIBUTE && TARGET_ELF
+      && (TARGET_64BIT || DEFAULT_ABI == ABI_V4)
       && cum->escapes)
     {
       if (SCALAR_FLOAT_MODE_P (mode))
@@ -1095,7 +1090,6 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
       if (named && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
 	rs6000_passes_vector = true;
     }
-#endif
 
   if (TARGET_ALTIVEC_ABI
       && (ALTIVEC_OR_VSX_VECTOR_MODE (elt_mode)
@@ -2521,10 +2515,8 @@ rs6000_va_start (tree valist, rtx nextarg)
       TREE_SIDE_EFFECTS (t) = 1;
       expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-      if (call_ABI_of_interest (cfun->decl))
+      if (HAVE_AS_GNU_ATTRIBUTE && call_ABI_of_interest (cfun->decl))
 	rs6000_passes_float = true;
-#endif
     }
 
   /* Find the overflow area.  */

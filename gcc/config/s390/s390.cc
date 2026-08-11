@@ -17170,7 +17170,8 @@ s390_asm_file_start (void)
 static void
 s390_asm_file_end (void)
 {
-#ifdef HAVE_AS_GNU_ATTRIBUTE
+  if (HAVE_AS_GNU_ATTRIBUTE)
+    {
   varpool_node *vnode;
   cgraph_node *cnode;
 
@@ -17186,7 +17187,7 @@ s390_asm_file_end (void)
   if (s390_vector_abi != 0)
     fprintf (asm_out_file, "\t.gnu_attribute 8, %d\n",
 	     s390_vector_abi);
-#endif
+    }
   file_end_indicate_exec_stack ();
 
   if (flag_split_stack)

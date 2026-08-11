@@ -2659,13 +2659,12 @@ msp430_file_end (void)
 	   OFBA_MSPABI_Tag_Data_Model,
 	   TARGET_LARGE ? OFBA_MSPABI_Val_Model_Large
 	   : OFBA_MSPABI_Val_Model_Small);
-#ifdef HAVE_AS_GNU_ATTRIBUTE
   /* Emit .gnu_attribute directive for Tag_GNU_MSP430_Data_Region.  */
-  fprintf (asm_out_file, "\t%s %d, %d\n", gnu_attr, Tag_GNU_MSP430_Data_Region,
-	   msp430_data_region == MSP430_REGION_LOWER
-	   ? Tag_GNU_MSP430_Data_Region_Lower
-	   : Tag_GNU_MSP430_Data_Region_Any);
-#endif
+  if (HAVE_AS_GNU_ATTRIBUTE)
+    fprintf (asm_out_file, "\t%s %d, %d\n", gnu_attr, Tag_GNU_MSP430_Data_Region,
+	     msp430_data_region == MSP430_REGION_LOWER
+	     ? Tag_GNU_MSP430_Data_Region_Lower
+	     : Tag_GNU_MSP430_Data_Region_Any);
 #endif
 }
 

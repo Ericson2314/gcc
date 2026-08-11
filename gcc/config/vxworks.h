@@ -432,8 +432,10 @@ extern void vxworks_asm_out_destructor (rtx symbol, int priority);
 
 #define VXWORKS_KIND VXWORKS_KIND_NORMAL
 
-/* The diab linker does not handle .gnu_attribute sections.  */
-#undef HAVE_AS_GNU_ATTRIBUTE
+/* The diab linker does not handle .gnu_attribute sections.  This used to be
+   `#undef HAVE_AS_GNU_ATTRIBUTE'.  The macro is a runtime capability now and
+   cannot be undefined from a target header, so a VxWorks target must emit
+   `as_gnu_attribute 0' in its target-specs config file instead.  */
 
 /* We call vxworks's cacheTextUpdate instead of CLEAR_INSN_CACHE if
    needed.  We don't want to force a call on targets that don't define

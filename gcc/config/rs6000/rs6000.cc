@@ -128,10 +128,9 @@ static bool xcoff_tls_exec_model_detected = false;
 /* Width in bits of a pointer.  */
 unsigned rs6000_pointer_size;
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-# ifndef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
-# define HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE 0
-# endif
+#ifndef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
+#define HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE 0
+#endif
 /* Flag whether floating point values have been passed/returned.
    Note that this doesn't say whether fprs are used, since the
    Tag_GNU_Power_ABI_FP .gnu.attributes value this flag controls
@@ -143,7 +142,6 @@ bool rs6000_passes_long_double = false;
 bool rs6000_passes_vector = false;
 /* Flag whether small (<= 8 byte) structures have been returned.  */
 bool rs6000_returns_struct = false;
-#endif
 
 /* Value is TRUE if register/mode pair is acceptable.  */
 static bool rs6000_hard_regno_mode_ok_p
@@ -11059,14 +11057,14 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       && GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT)
     gcc_unreachable ();
 
-#ifdef HAVE_AS_GNU_ATTRIBUTE
   /* If we use a long double type, set the flags in .gnu_attribute that say
      what the long double type is.  This is to allow the linker's warning
      message for the wrong long double to be useful, even if the function does
      not do a call (for example, doing a 128-bit add on power9 if the long
      double type is IEEE 128-bit.  Do not set this if __ibm128 or __floa128 are
      used if they aren't the default long dobule type.  */
-  if (rs6000_gnu_attr && (HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT))
+  if (HAVE_AS_GNU_ATTRIBUTE && rs6000_gnu_attr
+      && (HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT))
     {
       if (TARGET_LONG_DOUBLE_128 && (mode == TFmode || mode == TCmode))
 	rs6000_passes_float = rs6000_passes_long_double = true;
@@ -11074,7 +11072,6 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       else if (!TARGET_LONG_DOUBLE_128 && (mode == DFmode || mode == DCmode))
 	rs6000_passes_float = rs6000_passes_long_double = true;
     }
-#endif
 
   /* See if we need to special case SImode/SFmode SUBREG moves.  */
   if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
@@ -21577,11 +21574,10 @@ static void rs6000_elf_file_end (void) ATTRIBUTE_UNUSED;
 static void
 rs6000_elf_file_end (void)
 {
-#ifdef HAVE_AS_GNU_ATTRIBUTE
   /* ??? The value emitted depends on options active at file end.
      Assume anyone using #pragma or attributes that might change
      options knows what they are doing.  */
-  if ((TARGET_64BIT || DEFAULT_ABI == ABI_V4)
+  if (HAVE_AS_GNU_ATTRIBUTE && (TARGET_64BIT || DEFAULT_ABI == ABI_V4)
       && rs6000_passes_float)
     {
       int fp;
@@ -21610,7 +21606,6 @@ rs6000_elf_file_end (void)
 	fprintf (asm_out_file, "\t.gnu_attribute 12, %d\n",
 		 aix_struct_return ? 2 : 1);
     }
-#endif
 #if defined (POWERPC_LINUX) || defined (POWERPC_FREEBSD)
   if (TARGET_32BIT || DEFAULT_ABI == ABI_ELFv2)
     file_end_indicate_exec_stack ();

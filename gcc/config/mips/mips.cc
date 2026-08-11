@@ -10342,11 +10342,10 @@ mips_file_start (void)
 #ifdef HAVE_AS_DOT_MODULE
   /* Record the FP ABI.  See below for comments.  */
   if (TARGET_NO_FLOAT)
-#ifdef HAVE_AS_GNU_ATTRIBUTE
-    fputs ("\t.gnu_attribute 4, 0\n", asm_out_file);
-#else
-    ;
-#endif
+    {
+      if (HAVE_AS_GNU_ATTRIBUTE)
+	fputs ("\t.gnu_attribute 4, 0\n", asm_out_file);
+    }
   else if (!TARGET_HARD_FLOAT_ABI)
     fputs ("\t.module\tsoftfloat\n", asm_out_file);
   else if (!TARGET_DOUBLE_FLOAT)
@@ -10402,7 +10401,7 @@ mips_file_start (void)
     fputs ("\t.module\tloongson-ext\n", asm_out_file);
 
 #else
-#ifdef HAVE_AS_GNU_ATTRIBUTE
+  if (HAVE_AS_GNU_ATTRIBUTE)
   {
     int attr;
 
@@ -10438,7 +10437,6 @@ mips_file_start (void)
     if (ISA_HAS_MSA)
       fprintf (asm_out_file, "\t.gnu_attribute 8, 1\n");
   }
-#endif
 #endif
 
   /* If TARGET_ABICALLS, tell GAS to generate -KPIC code.  */
