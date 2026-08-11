@@ -133,10 +133,10 @@ public:
   void copy_values (rtx dest, rtx src)
   {
     if (REG_P (dest) && REG_P (src)
-	&& GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (GET_MODE (dest)))
+	&& known_le (GET_MODE_SIZE (GET_MODE (src)), GET_MODE_SIZE (GET_MODE (dest))))
       {
-	int n_bytes = std::min (GET_MODE_SIZE (GET_MODE (src)),
-				GET_MODE_SIZE (GET_MODE (dest)));
+	int n_bytes = std::min (GET_MODE_SIZE (GET_MODE (src)).to_constant (),
+				GET_MODE_SIZE (GET_MODE (dest)).to_constant ());
 	copy_values (REGNO (dest), REGNO (src), n_bytes);
       }
   }
@@ -145,7 +145,7 @@ public:
   {
     gcc_assert (REG_P (dest) && CONST_INT_P (src));
     int regno = REGNO (dest);
-    for (int i = 0; i < GET_MODE_SIZE (GET_MODE (dest)); ++i)
+    for (int i = 0; known_lt (i, GET_MODE_SIZE (GET_MODE (dest))); ++i)
       set_value (regno + i, avr_uint8 (src, i));
   }
 

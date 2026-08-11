@@ -60,7 +60,7 @@
 #include "target-def.h"
 
 /* Maximal allowed offset for an address in the LD command */
-#define MAX_LD_OFFSET(MODE) (64 - (signed)GET_MODE_SIZE (MODE))
+#define MAX_LD_OFFSET(MODE) (64 - (signed)GET_MODE_SIZE (MODE).to_constant ())
 
 /* The 4 bits starting at SECTION_MACH_DEP are reserved to store the
    address space where data is to be located.
@@ -340,7 +340,7 @@ avr_rodata_in_flash_p ()
 rtx
 avr_chunk (machine_mode mode, rtx x, int n)
 {
-  gcc_assert (n % GET_MODE_SIZE (mode) == 0);
+  gcc_assert (n % GET_MODE_SIZE (mode).to_constant () == 0);
   machine_mode xmode = GET_MODE (x) == VOIDmode ? DImode : GET_MODE (x);
   return simplify_gen_subreg (mode, x, xmode, n);
 }
@@ -1121,7 +1121,7 @@ static inline int
 avr_outgoing_args_size (void)
 {
   return (ACCUMULATE_OUTGOING_ARGS
-	  ? (HOST_WIDE_INT) crtl->outgoing_args_size
+	  ? (HOST_WIDE_INT) crtl->outgoing_args_size.to_constant ()
 	  : 0);
 }
 
@@ -1231,7 +1231,7 @@ avr_initial_elimination_offset (int from, int to)
       // might not have arguments.  Hence the following is not affected
       // by gasisr prologues.
       offset += avr_regs_to_save (nullptr);
-      return (get_frame_size () + avr_outgoing_args_size ()
+      return (get_frame_size ().to_constant () + avr_outgoing_args_size ()
 	      + avr_pc_size + 1 + offset);
     }
 }
@@ -1247,7 +1247,7 @@ avr_adjust_type_node (tree *node, machine_mode mode, int sat_p)
   TYPE_UNSIGNED (*node) = UNSIGNED_FIXED_POINT_MODE_P (mode);
   TYPE_IBIT (*node) = GET_MODE_IBIT (mode);
   TYPE_FBIT (*node) = GET_MODE_FBIT (mode);
-  TYPE_PRECISION (*node) = GET_MODE_BITSIZE (mode);
+  TYPE_PRECISION (*node) = GET_MODE_BITSIZE (mode).to_constant ();
   SET_TYPE_ALIGN (*node, 8);
   SET_TYPE_MODE (*node, mode);
 
@@ -1324,7 +1324,7 @@ int
 avr_simple_epilogue (void)
 {
   return (! frame_pointer_needed
-	  && get_frame_size () == 0
+	  && known_eq (get_frame_size (), 0)
 	  && avr_outgoing_args_size () == 0
 	  && avr_regs_to_save (nullptr) == 0
 	  && ! cfun->machine->is_interrupt
@@ -1780,7 +1780,7 @@ void
 avr_expand_prologue (void)
 {
   HARD_REG_SET set;
-  HOST_WIDE_INT size = get_frame_size () + avr_outgoing_args_size ();
+  HOST_WIDE_INT size = get_frame_size ().to_constant () + avr_outgoing_args_size ();
 
   cfun->machine->stack_usage = 0;
 
@@ -1974,7 +1974,7 @@ avr_asm_function_end_prologue (FILE *file)
 	     avr_outgoing_args_size ());
 
   fprintf (file, "/* frame size = " HOST_WIDE_INT_PRINT_DEC " */\n",
-	   (HOST_WIDE_INT) get_frame_size ());
+	   (HOST_WIDE_INT) get_frame_size ().to_constant ());
 
   if (!cfun->machine->gasisr.yes)
     {
@@ -2027,7 +2027,7 @@ avr_expand_epilogue (bool sibcall_p)
   HARD_REG_SET set;
   bool isr_p = cfun->machine->is_interrupt || cfun->machine->is_signal;
 
-  HOST_WIDE_INT size = get_frame_size () + avr_outgoing_args_size ();
+  HOST_WIDE_INT size = get_frame_size ().to_constant () + avr_outgoing_args_size ();
 
   /* epilogue: naked  */
   if (cfun->machine->is_naked)
@@ -2286,7 +2286,7 @@ avr_address_tiny_absdata_p (rtx x, machine_mode mode)
     return SYMBOL_REF_FLAGS (x) & AVR_SYMBOL_FLAG_TINY_ABSDATA;
 
   if (CONST_INT_P (x)
-      && IN_RANGE (INTVAL (x), 0, 0xc0 - GET_MODE_SIZE (mode)))
+      && IN_RANGE (INTVAL (x), 0, 0xc0 - GET_MODE_SIZE (mode).to_constant ()))
     return true;
 
   return false;
@@ -2322,7 +2322,7 @@ avr_legitimate_address_p (machine_mode mode, rtx x, bool strict)
 				  MEM, strict);
 
       if (strict
-	  && GET_MODE_SIZE (mode) > 4
+	  && known_gt (GET_MODE_SIZE (mode), 4)
 	  && REG_X == REGNO (x))
 	{
 	  ok = false;
@@ -2667,7 +2667,7 @@ avr_print_operand (FILE *file, rtx x, int code)
       if (REG_P (x) && t_regno < 0 && code == 'T')
 	{
 	  t_regno = REGNO (x);
-	  t_nbits = GET_MODE_BITSIZE (GET_MODE (x));
+	  t_nbits = GET_MODE_BITSIZE (GET_MODE (x)).to_constant ();
 	}
       else if (CONST_INT_P (x) && t_regno >= 0
 	       && IN_RANGE (INTVAL (x), 0, t_nbits - 1))
@@ -3123,7 +3123,7 @@ avr_num_arg_regs (machine_mode mode, const_tree type)
 {
   int size = (mode == BLKmode
 	      ? int_size_in_bytes (type)
-	      : GET_MODE_SIZE (mode));
+	      : GET_MODE_SIZE (mode).to_constant ());
 
   /* Align all function arguments to start in even-numbered registers.
      Odd-sized arguments leave holes above them.  */
@@ -3265,7 +3265,7 @@ bool
 avr_load_libgcc_p (rtx op)
 {
   machine_mode mode = GET_MODE (op);
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   return (n_bytes > 2
 	  && !AVR_HAVE_LPMX
@@ -3280,7 +3280,7 @@ avr_load_libgcc_p (rtx op)
 bool
 avr_xload_libgcc_p (machine_mode mode)
 {
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   return (n_bytes > 1
 	  || avropt_n_flash > 1);
@@ -3573,7 +3573,7 @@ avr_out_lpm_no_lpmx (rtx_insn *insn, rtx *xop, int *plen)
 {
   rtx dest = xop[0];
   rtx addr = xop[1];
-  int n_bytes = GET_MODE_SIZE (GET_MODE (dest));
+  int n_bytes = GET_MODE_SIZE (GET_MODE (dest)).to_constant ();
   int regno_dest;
 
   regno_dest = REGNO (dest);
@@ -3706,7 +3706,7 @@ avr_out_lpm (rtx_insn *insn, rtx *op, int *plen)
   rtx xop[7];
   rtx dest = op[0];
   rtx src = SET_SRC (single_set (insn));
-  int n_bytes = GET_MODE_SIZE (GET_MODE (dest));
+  int n_bytes = GET_MODE_SIZE (GET_MODE (dest)).to_constant ();
   addr_space_t as = MEM_ADDR_SPACE (src);
 
   if (plen)
@@ -3914,7 +3914,7 @@ avr_out_fload (rtx_insn * /*insn*/, rtx *xop, int *plen)
   if (AVR_HAVE_ELPMX)
     avr_asm_len ("out __RAMPZ__,%1", xop, plen, 1);
 
-  const int n_bytes = GET_MODE_SIZE (GET_MODE (xop[0]));
+  const int n_bytes = GET_MODE_SIZE (GET_MODE (xop[0])).to_constant ();
   const char *s_load = AVR_HAVE_ELPMX ? "elpm %0,Z" : "lpm %0,Z";
   const char *s_load_inc = AVR_HAVE_ELPMX ? "elpm %0,Z+" : "lpm %0,Z+";
   const char *s_load_tmp_inc = AVR_HAVE_ELPMX ? "elpm r0,Z+" : "lpm r0,Z+";
@@ -3972,7 +3972,7 @@ output_reload_in_const (rtx *op, rtx clobber_reg, int *len, bool clear_p)
   bool cooked_clobber_p = false;
   bool set_p = false;
   machine_mode mode = GET_MODE (dest);
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   gcc_assert (REG_P (dest)
 	      && CONSTANT_P (src));
@@ -4183,7 +4183,7 @@ output_movqi (rtx_insn *insn, rtx operands[], int *plen)
       return avr_out_lpm (insn, operands, plen);
     }
 
-  gcc_assert (GET_MODE_SIZE (GET_MODE (dest)) == 1);
+  gcc_assert (known_eq (GET_MODE_SIZE (GET_MODE (dest)), 1));
 
   if (REG_P (dest))
     {
@@ -4224,7 +4224,7 @@ output_movhi (rtx_insn *insn, rtx xop[], int *plen)
   rtx dest = xop[0];
   rtx src = xop[1];
 
-  gcc_assert (GET_MODE_SIZE (GET_MODE (dest)) == 2);
+  gcc_assert (known_eq (GET_MODE_SIZE (GET_MODE (dest)), 2));
 
   if (avr_mem_flash_p (src)
       || avr_mem_flash_p (dest))
@@ -4366,7 +4366,7 @@ out_movqi_r_mr (rtx_insn *insn, rtx op[], int *plen)
       bool partial_clobber = (reg_overlap_mentioned_p (dest, base)
 			      && ! reg_unused_after (insn, base2));
 
-      if (disp - GET_MODE_SIZE (GET_MODE (src)) >= 63)
+      if (known_ge (disp - GET_MODE_SIZE (GET_MODE (src)), 63))
 	{
 	  // PR117744: The base register overlaps dest and is
 	  // only partially clobbered.
@@ -5219,7 +5219,7 @@ output_movsisf (rtx_insn *insn, rtx operands[], int *l)
   if (!l)
     l = &dummy;
 
-  gcc_assert (GET_MODE_SIZE (GET_MODE (dest)) == 4);
+  gcc_assert (known_eq (GET_MODE_SIZE (GET_MODE (dest)), 4));
 
   if (REG_P (dest))
     {
@@ -5777,7 +5777,7 @@ out_movqi_mr_r (rtx_insn *insn, rtx op[], int *plen)
       if (AVR_TINY)
 	return avr_out_movqi_mr_r_reg_disp_tiny (insn, op, plen);
 
-      if (disp - GET_MODE_SIZE (GET_MODE (dest)) >= 63)
+      if (known_ge (disp - GET_MODE_SIZE (GET_MODE (dest)), 63))
 	{
 	  if (REGNO (XEXP (x, 0)) != REG_Y)
 	    fatal_insn ("incorrect insn:",insn);
@@ -6293,7 +6293,7 @@ avr_frame_pointer_required_p (void)
 	  || cfun->calls_setjmp
 	  || cfun->has_nonlocal_label
 	  || crtl->args.info.has_stack_args
-	  || get_frame_size () > 0);
+	  || known_gt (get_frame_size (), 0));
 }
 
 
@@ -6489,7 +6489,7 @@ const char *
 avr_out_cmp_lsr (rtx_insn *insn, rtx *xop, int *plen)
 {
   rtx xreg = xop[0];
-  const int n_bytes = GET_MODE_SIZE (GET_MODE (xreg));
+  const int n_bytes = GET_MODE_SIZE (GET_MODE (xreg)).to_constant ();
   const int shift = INTVAL (xop[1]);
   const rtx_code cond = compare_condition (insn);
 
@@ -6558,7 +6558,7 @@ avr_out_compare (rtx_insn *insn, rtx *xop, int *plen)
   rtx xval = xop[1];
 
   /* Number of bytes to operate on.  */
-  int n_bytes = GET_MODE_SIZE (GET_MODE (xreg));
+  int n_bytes = GET_MODE_SIZE (GET_MODE (xreg)).to_constant ();
 
   /* Value (0..0xff) held in clobber register xop[2] or -1 if unknown.  */
   int clobber_val = -1;
@@ -6862,7 +6862,7 @@ const char *
 avr_out_cmp_ext (rtx xop[], rtx_code code, int *plen)
 {
   // The smaller reg is the one that's to be extended.  Get its index as z.
-  int z = GET_MODE_SIZE (GET_MODE (xop[1])) < GET_MODE_SIZE (GET_MODE (xop[0]));
+  int z = known_lt (GET_MODE_SIZE (GET_MODE (xop[1])), GET_MODE_SIZE (GET_MODE (xop[0])));
   rtx zreg = xop[z];
   rtx reg = xop[1 - z];
   machine_mode mode = GET_MODE (reg);
@@ -6878,7 +6878,7 @@ avr_out_cmp_ext (rtx xop[], rtx_code code, int *plen)
   if (code == SIGN_EXTEND)
     {
       // Sign-extend the high-byte of zreg to tmp_reg.
-      int zmsb = GET_MODE_SIZE (zmode) - 1;
+      int zmsb = GET_MODE_SIZE (zmode).to_constant () - 1;
       rtx xzmsb = avr_byte (zreg, zmsb);
 
       avr_asm_len ("mov __tmp_reg__,%0" CR_TAB
@@ -6895,7 +6895,7 @@ avr_out_cmp_ext (rtx xop[], rtx_code code, int *plen)
 
   // Now output n_bytes bytes of the very comparison.
 
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   avr_asm_len ("cp %0,%1", xop, plen, 1);
 
@@ -6903,7 +6903,7 @@ avr_out_cmp_ext (rtx xop[], rtx_code code, int *plen)
     {
       rtx regs[2];
       regs[1 - z] = avr_byte (reg, b);
-      regs[z] = b < GET_MODE_SIZE (zmode) ? avr_byte (zreg, b) : zex;
+      regs[z] = known_lt (b, GET_MODE_SIZE (zmode)) ? avr_byte (zreg, b) : zex;
 
       avr_asm_len ("cpc %0,%1", regs, plen, 1);
     }
@@ -6920,7 +6920,7 @@ avr_out_cmp_ext (rtx xop[], rtx_code code, int *plen)
 static void
 avr_out_shift_1 (rtx_code code, rtx reg, int *plen)
 {
-  const int n_bytes = GET_MODE_SIZE (GET_MODE (reg));
+  const int n_bytes = GET_MODE_SIZE (GET_MODE (reg)).to_constant ();
   const int dir = code == ASHIFT ? 1 : -1;
   const int regno = REGNO (reg);
   const int first = code == ASHIFT ? 0 : n_bytes - 1;
@@ -6957,7 +6957,7 @@ avr_out_shift_with_cnt (rtx_code code, rtx_insn *insn, rtx operands[],
   bool saved_in_tmp = false;
   bool use_zero_reg = false;
   bool tail_bits = false;
-  const int t_len = GET_MODE_SIZE (GET_MODE (operands[0]));
+  const int t_len = GET_MODE_SIZE (GET_MODE (operands[0])).to_constant ();
   const int regno = REGNO (operands[0]);
   const int tail_regno = regno + (code == ASHIFT ? t_len - 1 : 0);
   rtx op[6];
@@ -8652,8 +8652,8 @@ avr_out_plus_ext (rtx_insn *insn, rtx *yop, int *plen)
   gcc_assert (REG_P (xreg)
 	      && (ext == ZERO_EXTEND || ext == SIGN_EXTEND || ext == REG));
 
-  const int n_bytes0 = GET_MODE_SIZE (GET_MODE (xop[0]));
-  const int n_bytes1 = GET_MODE_SIZE (GET_MODE (xop[1]));
+  const int n_bytes0 = GET_MODE_SIZE (GET_MODE (xop[0])).to_constant ();
+  const int n_bytes1 = GET_MODE_SIZE (GET_MODE (xop[1])).to_constant ();
   rtx msb1 = all_regs_rtx[n_bytes1 - 1 + REGNO (xop[1])];
   // Prefer SBCI *,0 over SBC *,__zero_reg__.
   const bool sbci_p = add == MINUS && n_bytes0 > n_bytes1
@@ -8737,9 +8737,9 @@ avr_out_add_msb (rtx_insn *insn, rtx *yop, rtx_code cmp, int *plen)
 {
   const rtx_code add = GET_CODE (SET_SRC (single_set (insn)));
   const machine_mode mode = GET_MODE (yop[0]);
-  const int n_bytes = GET_MODE_SIZE (mode);
+  const int n_bytes = GET_MODE_SIZE (mode).to_constant ();
   rtx sigop = yop[add == PLUS ? 1 : 2];
-  rtx msb = avr_byte (sigop, GET_MODE_SIZE (GET_MODE (sigop)) - 1);
+  rtx msb = avr_byte (sigop, GET_MODE_SIZE (GET_MODE (sigop)).to_constant () - 1);
   rtx op[3] = { yop[0], msb, nullptr };
 
   if (plen)
@@ -8849,7 +8849,7 @@ avr_out_plus_1 (rtx xinsn, rtx *xop, int *plen, rtx_code code,
   scalar_int_mode imode = int_mode_for_mode (mode).require ();
 
   /* Number of bytes to operate on.  */
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   int regno0 = REGNO (xop[0]);
   if (optimize && code_sat == UNKNOWN)
@@ -9385,7 +9385,7 @@ avr_out_plus (rtx insn, rtx *xop, int *plen, bool out_label)
   rtx xdest = SET_DEST (xpattern);
   machine_mode mode = GET_MODE (xdest);
   scalar_int_mode imode = int_mode_for_mode (mode).require ();
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
   rtx_code code_sat = GET_CODE (SET_SRC (xpattern));
   rtx_code code
     = (PLUS == code_sat || SS_PLUS == code_sat || US_PLUS == code_sat
@@ -9516,7 +9516,7 @@ avr_out_plus_set_ZN (rtx *xop, int *plen)
   machine_mode mode = GET_MODE (xreg);
 
   // Number of bytes to operate on.
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   if (n_bytes == 2
       && avr_adiw_reg_p (xreg)
@@ -9756,7 +9756,7 @@ avr_out_bitop (rtx xinsn, rtx *xop, int *plen)
   machine_mode mode = GET_MODE (xop[0]);
 
   /* Number of bytes to operate on.  */
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
 
   /* Value of T-flag (0 or 1) or -1 if unknow.  */
   int set_t = -1;
@@ -9919,8 +9919,8 @@ avr_emit_xior_with_shift (rtx_insn *insn, rtx *xop, int bitoff)
     : 0;
 
   // Work out which hard REGNOs belong to the operands.
-  int size0 = GET_MODE_SIZE (GET_MODE (xop[0]));
-  int size1 = GET_MODE_SIZE (GET_MODE (xop[1]));
+  int size0 = GET_MODE_SIZE (GET_MODE (xop[0])).to_constant ();
+  int size1 = GET_MODE_SIZE (GET_MODE (xop[1])).to_constant ();
   int regno0_lo = REGNO (xop[0]), regno0_hi = regno0_lo + size0 - 1;
   int regno1_lo = REGNO (xop[1]), regno1_hi = regno1_lo + size1 - 1;
   int regoff = regno0_lo - regno1_lo + byteoff;
@@ -9952,8 +9952,8 @@ const char *
 avr_out_sign_extend (rtx_insn *insn, rtx *xop, int *plen)
 {
   // Size in bytes of source resp. destination operand.
-  unsigned n_src = GET_MODE_SIZE (GET_MODE (xop[1]));
-  unsigned n_dest = GET_MODE_SIZE (GET_MODE (xop[0]));
+  unsigned n_src = GET_MODE_SIZE (GET_MODE (xop[1])).to_constant ();
+  unsigned n_dest = GET_MODE_SIZE (GET_MODE (xop[0])).to_constant ();
   rtx r_msb = all_regs_rtx[REGNO (xop[1]) + n_src - 1];
 
   if (plen)
@@ -10115,7 +10115,7 @@ const char*
 avr_out_insv (rtx_insn *insn, rtx xop[], int *plen)
 {
   machine_mode mode = GET_MODE (xop[0]);
-  int n_bytes = GET_MODE_SIZE (mode);
+  int n_bytes = GET_MODE_SIZE (mode).to_constant ();
   rtx xsrc = SET_SRC (single_set (insn));
 
   gcc_assert (AND == GET_CODE (xsrc));
@@ -10144,8 +10144,8 @@ avr_out_insv (rtx_insn *insn, rtx xop[], int *plen)
   int obit = exact_log2 (mask);
   int ibit = obit - shift;
 
-  gcc_assert (IN_RANGE (obit, 0, GET_MODE_BITSIZE (mode) - 1));
-  gcc_assert (IN_RANGE (ibit, 0, GET_MODE_BITSIZE (mode) - 1));
+  gcc_assert (IN_RANGE (obit, 0, GET_MODE_BITSIZE (mode).to_constant () - 1));
+  gcc_assert (IN_RANGE (ibit, 0, GET_MODE_BITSIZE (mode).to_constant () - 1));
 
   // In the remainder, use the sub-bytes that hold the bits.
   rtx op[4] =
@@ -10455,7 +10455,7 @@ avr_out_fract (rtx_insn *insn, rtx operands[], bool intsigned, int *plen)
 
       mode = GET_MODE (xop[i]);
 
-      val[i]->bytes = GET_MODE_SIZE (mode);
+      val[i]->bytes = GET_MODE_SIZE (mode).to_constant ();
       val[i]->regno = REGNO (xop[i]);
       val[i]->regno_msb = REGNO (xop[i]) + val[i]->bytes - 1;
 
@@ -11030,11 +11030,11 @@ avr_rotate_bytes (rtx operands[])
       && QImode == move_mode)
     scratch = simplify_gen_subreg (move_mode, scratch, HImode, 0);
 
-  int move_size = GET_MODE_SIZE (move_mode);
+  int move_size = GET_MODE_SIZE (move_mode).to_constant ();
   /* Number of bytes/words to rotate.  */
   int offset = (num  >> 3) / move_size;
   /* Number of moves needed.  */
-  int size = GET_MODE_SIZE (mode) / move_size;
+  int size = GET_MODE_SIZE (mode).to_constant () / move_size;
   /* Himode byte swap is special case to avoid a scratch register.  */
   if (mode == HImode && same_reg)
     {
@@ -11579,7 +11579,7 @@ avr_class_max_nregs (reg_class_t rclass, machine_mode mode)
   if (rclass == CC_REG && GET_MODE_CLASS (mode) == MODE_CC)
     return 1;
 
-  return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
+  return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
 }
 
 
@@ -12876,7 +12876,7 @@ avr_cbranch_cost (rtx x)
   machine_mode mode = GET_MODE (xreg);
   if (mode == VOIDmode)
     mode = GET_MODE (xval);
-  int size = GET_MODE_SIZE (mode);
+  int size = GET_MODE_SIZE (mode).to_constant ();
 
   if (GET_CODE (xreg) == ZERO_EXTEND
       || GET_CODE (xval) == ZERO_EXTEND)
@@ -12933,7 +12933,7 @@ avr_operand_rtx_cost (rtx x, machine_mode mode, rtx_code outer,
     case CONST_INT:
     case CONST_FIXED:
     case CONST_DOUBLE:
-      return COSTS_N_INSNS (GET_MODE_SIZE (mode));
+      return COSTS_N_INSNS (GET_MODE_SIZE (mode).to_constant ());
 
     default:
       break;
@@ -12973,7 +12973,7 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
 		 int /*opno*/, int *total, bool speed)
 {
   const rtx_code code = GET_CODE (x);
-  const int n_bytes = GET_MODE_SIZE (mode);
+  const int n_bytes = GET_MODE_SIZE (mode).to_constant ();
   const HOST_WIDE_INT val1 = BINARY_P (x) && CONST_INT_P (XEXP (x, 1))
     ? INTVAL (XEXP (x, 1))
     : -1;
@@ -13106,7 +13106,7 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
 
     case ZERO_EXTEND:
       *total = COSTS_N_INSNS (n_bytes
-			      - GET_MODE_SIZE (GET_MODE (XEXP (x, 0))));
+			      - GET_MODE_SIZE (GET_MODE (XEXP (x, 0))).to_constant ());
       *total += avr_operand_rtx_cost (XEXP (x, 0), GET_MODE (XEXP (x, 0)),
 				      code, 0, speed);
       return true;
@@ -13116,14 +13116,14 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
 	  && CONST_INT_P (XEXP (XEXP (x, 0), 1)))
 	{
 	  // "*sext.ashift<QIPSI:mode><HISI:mode>2_split"
-	  int m0 = GET_MODE_SIZE (GET_MODE (XEXP (x, 0)));
-	  int m1 = GET_MODE_SIZE (mode);
+	  int m0 = GET_MODE_SIZE (GET_MODE (XEXP (x, 0))).to_constant ();
+	  int m1 = GET_MODE_SIZE (mode).to_constant ();
 	  *total = COSTS_N_INSNS (m0 * INTVAL (XEXP (XEXP (x, 0), 1))
 				  + m1 - m0);
 	  return true;
 	}
       *total = COSTS_N_INSNS (n_bytes + 2
-			      - GET_MODE_SIZE (GET_MODE (XEXP (x, 0))));
+			      - GET_MODE_SIZE (GET_MODE (XEXP (x, 0))).to_constant ());
       *total += avr_operand_rtx_cost (XEXP (x, 0), GET_MODE (XEXP (x, 0)),
 				      code, 0, speed);
       return true;
@@ -13176,7 +13176,7 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
       if (GET_CODE (XEXP (x, 0)) == SIGN_EXTEND
 	  && REG_P (XEXP (x, 1)))
 	{
-	  int size2 = GET_MODE_SIZE (GET_MODE (XEXP (XEXP (x, 0), 0)));
+	  int size2 = GET_MODE_SIZE (GET_MODE (XEXP (XEXP (x, 0), 0))).to_constant ();
 	  *total = COSTS_N_INSNS (2 + n_bytes
 				  + (n_bytes > 1 + size2));
 	  return true;
@@ -13274,7 +13274,7 @@ avr_rtx_costs_1 (rtx x, machine_mode mode, int outer_code,
       if (REG_P (XEXP (x, 0))
 	  && GET_CODE (XEXP (x, 1)) == SIGN_EXTEND)
 	{
-	  int size2 = GET_MODE_SIZE (GET_MODE (XEXP (XEXP (x, 1), 0)));
+	  int size2 = GET_MODE_SIZE (GET_MODE (XEXP (XEXP (x, 1), 0))).to_constant ();
 	  *total = COSTS_N_INSNS (2 + n_bytes
 				  + (n_bytes > 1 + size2));
 	  return true;
@@ -14288,7 +14288,7 @@ avr_function_value_regno_p (const unsigned int regno)
 static rtx
 avr_libcall_value (machine_mode mode, const_rtx /*func*/)
 {
-  int offs = GET_MODE_SIZE (mode);
+  int offs = GET_MODE_SIZE (mode).to_constant ();
 
   if (offs <= 4)
     offs = (offs + 1) & ~1;
@@ -14413,7 +14413,7 @@ avr_hard_regno_nregs (unsigned int regno, machine_mode mode)
   if (regno == REG_CC && GET_MODE_CLASS (mode) == MODE_CC)
     return 1;
 
-  return CEIL (GET_MODE_SIZE (mode), UNITS_PER_WORD);
+  return CEIL (GET_MODE_SIZE (mode).to_constant (), UNITS_PER_WORD);
 }
 
 
@@ -14437,7 +14437,7 @@ avr_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 
   /* Any GENERAL_REGS register can hold 8-bit values.  */
 
-  if (GET_MODE_SIZE (mode) == 1)
+  if (known_eq (GET_MODE_SIZE (mode), 1))
     return true;
 
   /* All modes larger than 8 bits should start in an even register.  */
@@ -14464,9 +14464,9 @@ avr_hard_regno_call_part_clobbered (unsigned, unsigned regno,
      17/18 or 19/20 (if AVR_TINY), 27/28 and 29/30.  */
 
   return ((regno <= LAST_CALLEE_SAVED_REG
-	   && regno + GET_MODE_SIZE (mode) > 1 + LAST_CALLEE_SAVED_REG)
-	  || (regno < REG_Y && regno + GET_MODE_SIZE (mode) > REG_Y)
-	  || (regno < REG_Z && regno + GET_MODE_SIZE (mode) > REG_Z));
+	   && known_gt (regno + GET_MODE_SIZE (mode), 1 + LAST_CALLEE_SAVED_REG))
+	  || (regno < REG_Y && known_gt (regno + GET_MODE_SIZE (mode), REG_Y))
+	  || (regno < REG_Z && known_gt (regno + GET_MODE_SIZE (mode), REG_Z)));
 }
 
 
@@ -14940,7 +14940,7 @@ avr_out_sextr (rtx_insn *insn, rtx *xop, int *plen)
   rtx dest = xop[0];
   rtx src = xop[1];
   int bit = INTVAL (xop[2]);
-  int n_bytes = GET_MODE_SIZE (GET_MODE (dest));
+  int n_bytes = GET_MODE_SIZE (GET_MODE (dest)).to_constant ();
 
   gcc_assert (bit == 0);
 
@@ -15425,8 +15425,8 @@ avr_legitimate_combined_insn (rtx_insn *insn)
 
       if (SUBREG_P (op)
 	  && MEM_P (SUBREG_REG (op))
-	  && (GET_MODE_SIZE (GET_MODE (op))
-	      > GET_MODE_SIZE (GET_MODE (SUBREG_REG (op)))))
+	  && known_gt (GET_MODE_SIZE (GET_MODE (op)),
+	        GET_MODE_SIZE (GET_MODE (SUBREG_REG (op)))))
 	{
 	  return false;
 	}

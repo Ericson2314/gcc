@@ -6181,8 +6181,8 @@
   [(set (match_dup 2) (match_dup 1))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (QImode, HImode);
-    unsigned int high_off = subreg_highpart_offset (QImode, HImode);
+    unsigned int low_off = subreg_lowpart_offset (QImode, HImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (QImode, HImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (QImode, operands[0], HImode, low_off);
     operands[3] = simplify_gen_subreg (QImode, operands[0], HImode, high_off);
@@ -6212,8 +6212,8 @@
   [(set (match_dup 2) (zero_extend:HI (match_dup 1)))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (HImode, SImode);
-    unsigned int high_off = subreg_highpart_offset (HImode, SImode);
+    unsigned int low_off = subreg_lowpart_offset (HImode, SImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (HImode, SImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (HImode, operands[0], SImode, low_off);
     operands[3] = simplify_gen_subreg (HImode, operands[0], SImode, high_off);
@@ -6262,8 +6262,8 @@
   [(set (match_dup 2) (match_dup 1))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (HImode, SImode);
-    unsigned int high_off = subreg_highpart_offset (HImode, SImode);
+    unsigned int low_off = subreg_lowpart_offset (HImode, SImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (HImode, SImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (HImode, operands[0], SImode, low_off);
     operands[3] = simplify_gen_subreg (HImode, operands[0], SImode, high_off);
@@ -6291,8 +6291,8 @@
   [(set (match_dup 2) (zero_extend:SI (match_dup 1)))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (SImode, DImode);
-    unsigned int high_off = subreg_highpart_offset (SImode, DImode);
+    unsigned int low_off = subreg_lowpart_offset (SImode, DImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (SImode, DImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (SImode, operands[0], DImode, low_off);
     operands[3] = simplify_gen_subreg (SImode, operands[0], DImode, high_off);
@@ -6307,8 +6307,8 @@
   [(set (match_dup 2) (zero_extend:SI (match_dup 1)))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (SImode, DImode);
-    unsigned int high_off = subreg_highpart_offset (SImode, DImode);
+    unsigned int low_off = subreg_lowpart_offset (SImode, DImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (SImode, DImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (SImode, operands[0], DImode, low_off);
     operands[3] = simplify_gen_subreg (SImode, operands[0], DImode, high_off);
@@ -6323,8 +6323,8 @@
   [(set (match_dup 2) (match_dup 1))
    (set (match_dup 3) (const_int 0))]
   {
-    unsigned int low_off = subreg_lowpart_offset (SImode, DImode);
-    unsigned int high_off = subreg_highpart_offset (SImode, DImode);
+    unsigned int low_off = subreg_lowpart_offset (SImode, DImode).to_constant ();
+    unsigned int high_off = subreg_highpart_offset (SImode, DImode).to_constant ();
 
     operands[2] = simplify_gen_subreg (SImode, operands[0], DImode, low_off);
     operands[3] = simplify_gen_subreg (SImode, operands[0], DImode, high_off);
