@@ -275,43 +275,89 @@ extern GTY(()) int darwin_ms_struct;
   "%<y*",								\
   "%<Mach "
 
+/* WHICH ld64 OPTIONS THIS TARGET'S LINKER TAKES.
+   These five used to be AC_DEFINEd by gcc/configure.ac inside
+   `if test x"$ld64_flag" = x"yes"'.  `ld64_flag' is set to `no' at
+   configure.ac:285 and to `yes' NOWHERE -- the `case $target in *darwin*)' that
+   set it was removed, correctly, as a target-scoped guard, and nothing replaced
+   it.  So all five were undefined; they are read with `#if', where an undefined
+   name is a silent 0, so every darwin target got the oldest answer to every
+   question.  Measured in the 188-target build: nine darwin triples out of nine
+   emitting `-macosx_version_min' and `%{rdynamic:%nrdynamic is not supported}',
+   x86_64-apple-darwin21 -- macOS 12, ld64 609 -- among them.
+
+   They are now DERIVED from DEF_LD64_MAJOR, which config.gcc already computes
+   per target from the triple, with upstream's own thresholds.  This is the
+   `declared' source of the two the design calls for; the `probed' source is
+   target-specs asking the real linker, and it overrides by redefining the named
+   specs below, because set_spec replaces rather than appends.
+
+   Note what is NOT here: LD64_VERSION.  It has always had a per-target
+   fallback through DEF_LD64 and was never part of this defect.  */
+
+#ifndef DEF_LD64_MAJOR
+/* Only reachable if a darwin target header is used without config.gcc's
+   tm_defines, which no supported configuration does.  85 is the same floor
+   DEF_LD64 has.  */
+#define DEF_LD64_MAJOR 85
+#endif
+
+#define LD64_HAS_DEMANGLE          (DEF_LD64_MAJOR >= 97)
+#define LD64_HAS_EXPORT_DYNAMIC    (DEF_LD64_MAJOR >= 236)
+#define LD64_HAS_NO_DEDUPLICATE    (DEF_LD64_MAJOR >= 262)
+#define LD64_HAS_PLATFORM_VERSION  (DEF_LD64_MAJOR >= 512)
+#define LD64_HAS_MACOS_VERSION_MIN (DEF_LD64_MAJOR >= 512)
+
 #if LD64_HAS_DEMANGLE
-#define DARWIN_LD_DEMANGLE " -demangle "
+#define DARWIN_LD_DEMANGLE_DECLARED " -demangle "
 #else
-#define DARWIN_LD_DEMANGLE ""
+#define DARWIN_LD_DEMANGLE_DECLARED ""
 #endif
 
 #if LD64_HAS_EXPORT_DYNAMIC
-#define DARWIN_RDYNAMIC "%{rdynamic:-export_dynamic}"
+#define DARWIN_RDYNAMIC_DECLARED "%{rdynamic:-export_dynamic}"
 #else
-#define DARWIN_RDYNAMIC "%{rdynamic:%nrdynamic is not supported}"
+#define DARWIN_RDYNAMIC_DECLARED "%{rdynamic:%nrdynamic is not supported}"
 #endif
 
 #if LD64_HAS_NO_DEDUPLICATE
 /* What we want is "when the optimization level is debug OR when it is
    a compile & link job with implied O0 optimization".  */
-#define DARWIN_LD_NO_DEDUPLICATE \
+#define DARWIN_LD_NO_DEDUPLICATE_DECLARED \
   "%{O0|O1|O|Og: -no_deduplicate} \
    %{!O*:\
      %{.c|.cc|.C|.cpp|.cp|.c++|.cxx|.CPP|.m|.mm|.s|.S|.i|.ii|.mi|.mii|\
        .f|.for|.ftn|.fpp|.f90|.f95|.f03|.f08|.f77|.F|.F90|.F95|.F03|.F08|\
        .d|.mod: -no_deduplicate }} "
 #else
-#define DARWIN_LD_NO_DEDUPLICATE ""
+#define DARWIN_LD_NO_DEDUPLICATE_DECLARED ""
 #endif
 
+/* WRITTEN WHOLE, not as three independent choices.  This is a ladder: the
+   newest spelling wins, and the middle arm is reachable only when the newest is
+   absent.  A consumer handed the three answers separately could assemble a
+   combination no linker has.  */
 #if LD64_HAS_MACOS_VERSION_MIN
-# define DARWIN_PLATFORM_ID \
+# define DARWIN_PLATFORM_ID_DECLARED \
   "%{mmacosx-version-min=*:-macos_version_min %*} "
 #else
 # if LD64_HAS_PLATFORM_VERSION
-#  define DARWIN_PLATFORM_ID \
+#  define DARWIN_PLATFORM_ID_DECLARED \
   "%{mmacosx-version-min=*: -platform_version macos %* 0.0} "
 # else
-#  define DARWIN_PLATFORM_ID \
+#  define DARWIN_PLATFORM_ID_DECLARED \
   "%{mmacosx-version-min=*:-macosx_version_min %*} "
 # endif
 #endif
+
+/* LINK_SPEC refers to the NAMES; the declared text above is registered against
+   them in DARWIN_EXTRA_SPECS.  The indirection is what lets a target-specs
+   probe of the real linker override any of them without touching this header,
+   and it is why the probe half is additive rather than a rewrite.  */
+#define DARWIN_LD_DEMANGLE       "%(darwin_ld_demangle)"
+#define DARWIN_RDYNAMIC          "%(darwin_rdynamic)"
+#define DARWIN_LD_NO_DEDUPLICATE "%(darwin_ld_no_deduplicate)"
+#define DARWIN_PLATFORM_ID       "%(darwin_platform_id)"
 
 /* Code built with mdynamic-no-pic does not support PIE/PIC, so  we disallow
    these combinations; we also ensure that the no_pie option is passed to
@@ -618,7 +664,11 @@ extern GTY(()) int darwin_ms_struct;
   { "darwin_crt3", DARWIN_CRT3_SPEC },					\
   { "darwin_dylib1", DARWIN_DYLIB1_SPEC },				\
   { "darwin_bundle1", DARWIN_BUNDLE1_SPEC },				\
-  { "darwin_rpaths", DARWIN_RPATH_SPEC },
+  { "darwin_rpaths", DARWIN_RPATH_SPEC },					\
+  { "darwin_ld_demangle", DARWIN_LD_DEMANGLE_DECLARED },		\
+  { "darwin_rdynamic", DARWIN_RDYNAMIC_DECLARED },			\
+  { "darwin_ld_no_deduplicate", DARWIN_LD_NO_DEDUPLICATE_DECLARED },	\
+  { "darwin_platform_id", DARWIN_PLATFORM_ID_DECLARED },
 
 #define DARWIN_CRT1_SPEC						\
   "%:version-compare(!> 10.5 mmacosx-version-min= -lcrt1.o)		\

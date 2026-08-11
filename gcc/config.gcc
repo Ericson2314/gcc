@@ -814,6 +814,7 @@ case ${target} in
     macos_min=0
   fi
   def_ld64=85.2
+  def_ld64_major=85
   # Tools hosted on earlier versions of Darwin constrained all object
   # alignment to be 2^15 or smaller.  From Darwin11 (macOS 10.7) the
   # alignment of non-common is allowed to be up to 2^28.  Note that the
@@ -837,6 +838,7 @@ case ${target} in
         # Darwin 20 corresponds to macOS 11, Darwin 21 to macOS 12.
         macos_maj=`expr $darwin_maj - 9`
         def_ld64=609.0
+        def_ld64_major=609
         ;;
       *-*-darwin)
         case ${cpu_type} in
@@ -861,6 +863,10 @@ case ${target} in
   esac
   tm_defines="$tm_defines DEF_MIN_OSX_VERSION=\\\"${macos_maj}.${macos_min}\\\""
   tm_defines="$tm_defines DEF_LD64=\\\"${def_ld64}\\\""
+  # The NUMERIC form of the same fact.  DEF_LD64 is a string, and `#if'
+  # cannot compare strings, so the capability thresholds in darwin.h need
+  # this one.  Two spellings of one datum: keep them together.
+  tm_defines="$tm_defines DEF_LD64_MAJOR=${def_ld64_major}"
   tm_file="${tm_file} ${cpu_type}/darwin.h"
   tm_p_file="${tm_p_file} darwin-protos.h"
   target_gtfiles="$target_gtfiles \$(srcdir)/config/darwin.cc"
