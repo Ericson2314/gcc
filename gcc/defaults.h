@@ -1495,6 +1495,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    the value every caller compares against.  */
 #undef HAVE_LTO_PLUGIN
 #define HAVE_LTO_PLUGIN (targ_caps.lto_plugin ? 2 : 0)
+#undef HAVE_LD_DEMANGLE
+#define HAVE_LD_DEMANGLE (targ_caps.ld_demangle)
 
 /* Not a flag but a byte count: the alignment the linker forces on .TOC..
    rs6000.cc supplies 8 when this is undefined, and the probe only ever chose

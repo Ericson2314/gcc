@@ -122,6 +122,20 @@ struct target_caps
      and dwarf2out.cc already supplied 0 for everyone else.  */
   bool xcoff_dwarf_extras;
 
+  /* Assembler takes `-relax', and the linker relaxes tail calls into branch-
+     always.  Was HAVE_AS_RELAX_OPTION.  Only the codegen half is a runtime
+     value: the spec half (ASM_RELAX_SPEC) is a string baked into the driver's
+     built-in specs before any target config is read, so it uses the spelling
+     every supported assembler accepts and is overridden from the spec file if
+     that is ever wrong.  */
+  bool as_relax_option;
+
+  /* Assembler accepts an offsetable %lo(), i.e. `%lo(sym + N)' and
+     `%lo(sym) + N' assemble the same.  Was HAVE_AS_OFFSETABLE_LO10, reached
+     through sparc.h's USE_AS_OFFSETABLE_LO10; both its consumers are ordinary
+     runtime conditions in sparc.cc and neither appears in any .md.  */
+  bool as_offsetable_lo10;
+
   /* Assembler accepts .gnu_attribute.  Was HAVE_AS_GNU_ATTRIBUTE, probed
      separately in the powerpc, mips, msp430 and s390 arms of the big
      `case "$target"' -- four copies of the same test, because each port
@@ -265,6 +279,15 @@ struct target_caps
      distinguish gold 2.20's "only with -fuse-linker-plugin"; that middle case
      was a judgement about one obsolete linker and is not reproduced.  */
   bool lto_plugin;
+
+  /* Linker demangles C++ symbols in its own diagnostics.  Was
+     HAVE_LD_DEMANGLE.  Note the sense of its uses in collect2.cc: they are
+     `#ifndef', because when the linker cannot demangle, collect2 does it
+     instead and suppresses the linker's attempt via COLLECT_NO_DEMANGLE.
+     False by default -- collect2 demangling is always correct, whereas
+     delegating to a linker that turns out not to demangle loses the symbol
+     names from every diagnostic.  */
+  bool ld_demangle;
 
   /* aarch64 back-end assembler capabilities.  These were the HAVE_AS_* macros
      the aarch64 arm of the `case $target' assembler checks in gcc/configure.ac

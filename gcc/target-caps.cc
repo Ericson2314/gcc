@@ -50,6 +50,8 @@ struct target_caps targ_caps =
   .ld_broken_secrel32 = false,
   .as_ref = false,
   .xcoff_dwarf_extras = false,
+  .as_relax_option = true,
+  .as_offsetable_lo10 = true,
   .as_gnu_attribute = true,
   .cfi_directive = true,
   .cfi_personality = true,
@@ -78,6 +80,7 @@ struct target_caps targ_caps =
   .ld_now = true,
   .ld_relro = true,
   .lto_plugin = true,
+  .ld_demangle = false,
   .as_aarch64_mabi = true,
   .as_aarch64_small_pic_relocs = true,
   .as_aarch64_aeabi_build_attributes = true,
@@ -135,6 +138,10 @@ read_target_caps (const char *file)
 	targ_caps.as_ref = value != 0;
       else if (strcmp (name, "xcoff_dwarf_extras") == 0)
 	targ_caps.xcoff_dwarf_extras = value != 0;
+      else if (strcmp (name, "as_relax_option") == 0)
+	targ_caps.as_relax_option = value != 0;
+      else if (strcmp (name, "as_offsetable_lo10") == 0)
+	targ_caps.as_offsetable_lo10 = value != 0;
       else if (strcmp (name, "as_gnu_attribute") == 0)
 	targ_caps.as_gnu_attribute = value != 0;
       else if (strcmp (name, "cfi_directive") == 0)
@@ -191,6 +198,8 @@ read_target_caps (const char *file)
 	targ_caps.ld_relro = value != 0;
       else if (strcmp (name, "lto_plugin") == 0)
 	targ_caps.lto_plugin = value != 0;
+      else if (strcmp (name, "ld_demangle") == 0)
+	targ_caps.ld_demangle = value != 0;
       else if (strcmp (name, "as_aarch64_mabi") == 0)
 	targ_caps.as_aarch64_mabi = value != 0;
       else if (strcmp (name, "as_aarch64_small_pic_relocs") == 0)

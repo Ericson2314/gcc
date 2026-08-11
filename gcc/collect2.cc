@@ -894,12 +894,21 @@ main (int argc, char **argv)
 
   num_c_args = argc + 9;
 
-#ifndef HAVE_LD_DEMANGLE
-  no_demangle = !! getenv ("COLLECT_NO_DEMANGLE");
+  /* The target config has to be read before anything consults a capability,
+     and the demangling setup just below is the first thing that does.  It is
+     scanned for here rather than in the early-flags loop further down, which
+     runs too late.  */
+  for (i = 1; argv[i] != NULL; i++)
+    if (startswith (argv[i], "-ftarget-config="))
+      read_target_caps (argv[i] + strlen ("-ftarget-config="));
 
-  /* Suppress demangling by the real linker, which may be broken.  */
-  putenv (xstrdup ("COLLECT_NO_DEMANGLE=1"));
-#endif
+  if (!HAVE_LD_DEMANGLE)
+    {
+      no_demangle = !! getenv ("COLLECT_NO_DEMANGLE");
+
+      /* Suppress demangling by the real linker, which may be broken.  */
+      putenv (xstrdup ("COLLECT_NO_DEMANGLE=1"));
+    }
 
 #if defined (COLLECT2_HOST_INITIALIZATION)
   /* Perform system dependent initialization, if necessary.  */
@@ -959,15 +968,6 @@ main (int argc, char **argv)
 	    if (selected_linker == USE_DEFAULT_LD)
 	      selected_linker = USE_PLUGIN_LD;
 	  }
-	/* The capability file the driver probed for this target.  collect2
-	   consults capabilities of its own (HAVE_AS_REF gates SCAN_DWEH on
-	   AIX, HAVE_LD_AT_FILE decides whether @file may be used), and it
-	   links libcommon.a so targ_caps resolves -- but without this it
-	   would only ever see the compiled-in defaults, whatever the spec
-	   file said.  Parsed here, in the early pass, so that it is in effect
-	   before anything reads a capability.  */
-	else if (startswith (argv[i], "-ftarget-config="))
-	  read_target_caps (argv[i] + strlen ("-ftarget-config="));
 	else if (strcmp (argv[i], "-fuse-ld=bfd") == 0)
 	  selected_linker = USE_BFD_LD;
 	else if (strcmp (argv[i], "-fuse-ld=gold") == 0)
@@ -1011,9 +1011,8 @@ main (int argc, char **argv)
     obstack_begin (&temporary_obstack, 0);
     temporary_firstobj = (char *) obstack_alloc (&temporary_obstack, 0);
 
-#ifndef HAVE_LD_DEMANGLE
-  current_demangling_style = auto_demangling;
-#endif
+  if (!HAVE_LD_DEMANGLE)
+    current_demangling_style = auto_demangling;
 
     /* Now pick up any flags we want early from COLLECT_GCC_OPTIONS
        The LTO options are passed here as are other options that might
@@ -1451,28 +1450,32 @@ main (int argc, char **argv)
 	    case '-':
 	      if (strcmp (arg, "--no-demangle") == 0)
 		{
-#ifndef HAVE_LD_DEMANGLE
-		  no_demangle = 1;
-		  ld1--;
-		  ld2--;
-#endif
+		  /* When we do the demangling ourselves we also consume the
+		     option, so it is not passed on to the linker.  */
+		  if (!HAVE_LD_DEMANGLE)
+		    {
+		      no_demangle = 1;
+		      ld1--;
+		      ld2--;
+		    }
 		}
 	      else if (startswith (arg, "--demangle"))
 		{
-#ifndef HAVE_LD_DEMANGLE
-		  no_demangle = 0;
-		  if (arg[10] == '=')
+		  if (!HAVE_LD_DEMANGLE)
 		    {
-		      enum demangling_styles style
-			= cplus_demangle_name_to_style (arg+11);
-		      if (style == unknown_demangling)
-			error ("unknown demangling style %qs", arg+11);
-		      else
-			current_demangling_style = style;
+		      no_demangle = 0;
+		      if (arg[10] == '=')
+			{
+			  enum demangling_styles style
+			    = cplus_demangle_name_to_style (arg+11);
+			  if (style == unknown_demangling)
+			    error ("unknown demangling style %qs", arg+11);
+			  else
+			    current_demangling_style = style;
+			}
+		      ld1--;
+		      ld2--;
 		    }
-		  ld1--;
-		  ld2--;
-#endif
 		}
 	      else if (startswith (arg, "--sysroot="))
 		target_system_root = arg + 10;

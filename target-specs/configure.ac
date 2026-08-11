@@ -1302,6 +1302,56 @@ if test x"$gcc_cv_ld_relro" = xyes; then
   link_hardening="${link_hardening} -z relro"
 fi
 
+dnl sparc: -relax, offsetable %lo(), LEON instructions.  Only the first two feed
+dnl runtime capabilities; AS_LEON_FLAG is compile-time spec text in sparc.h, so
+dnl the LEON answer is probed and reported for the record but not emitted.
+case $target in
+  sparc*-*-*)
+    AC_MSG_CHECKING([assembler for -relax])
+    gcc_cv_as_sparc_relax=no
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -relax -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_sparc_relax=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_sparc_relax])
+
+    dnl Some assemblers accept `%lo(sym + N)' and then encode it differently
+    dnl from `%lo(sym) + N', so this compares the emitted bytes rather than the
+    dnl exit status.  Without objdump there is no way to tell; say no.
+    AC_MSG_CHECKING([assembler for offsetable %lo()])
+    gcc_cv_as_sparc_offsetable_lo10=no
+    if test x"$gcc_cv_objdump" != x; then
+      { echo '.text'
+        echo '	or %g1, %lo(ab) + 12, %g1'
+        echo '	or %g1, %lo(ab + 12), %g1'; } > conftest.s
+      if "$gcc_cv_as" -xarch=v9 -o conftest.o conftest.s > /dev/null 2>&1 \
+         && "$gcc_cv_objdump" -s -j .text conftest.o 2>/dev/null \
+            | grep ' 82106000 82106000' > /dev/null 2>&1; then
+        gcc_cv_as_sparc_offsetable_lo10=yes
+      fi
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_sparc_offsetable_lo10])
+
+    AC_MSG_CHECKING([assembler for LEON instructions])
+    gcc_cv_as_sparc_leon=no
+    { echo '.text'
+      echo '	.register %g2, #scratch'
+      echo '	.register %g3, #scratch'
+      echo '	.align 4'
+      echo '	smac %g2, %g3, %g1'
+      echo '	umac %g2, %g3, %g1'
+      echo '	casa [%g2] 0xb, %g3, %g1'; } > conftest.s
+    if "$gcc_cv_as" -Aleon -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_sparc_leon=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_sparc_leon])
+    if test x"$gcc_cv_as_sparc_leon" != xyes; then
+      AC_MSG_WARN([$gcc_cv_as does not accept -Aleon; GCC emits it unconditionally, so override the asm spec for this target])
+    fi
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1313,6 +1363,8 @@ cat >> "$target_config_file" <<EOF
 ld_broken_secrel32 `ts_bool "$gcc_cv_ld_broken_secrel32"`
 as_ref `ts_bool "$gcc_cv_as_aix_ref"`
 xcoff_dwarf_extras `ts_bool "$gcc_cv_as_aix_dwloc"`
+as_relax_option `ts_bool "$gcc_cv_as_sparc_relax"`
+as_offsetable_lo10 `ts_bool "$gcc_cv_as_sparc_offsetable_lo10"`
 as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
 cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
 cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`
@@ -1359,6 +1411,7 @@ ld_avr_avrxmega4_flmap `ts_bool "$gcc_cv_ld_avr_avrxmega4_flmap"`
 ld_now `ts_bool "$gcc_cv_ld_now"`
 ld_relro `ts_bool "$gcc_cv_ld_relro"`
 lto_plugin `if test "$gcc_cv_lto_plugin" -gt 0; then echo 1; else echo 0; fi`
+ld_demangle `ts_bool "$gcc_cv_ld_demangle"`
 EOF
 
 dnl The driver-side ones are spec fragments.  They are appended as their own
