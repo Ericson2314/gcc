@@ -2491,10 +2491,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_ld_hidden" >&5
 $as_echo "$gcc_cv_ld_hidden" >&6; }
 
-gcc_cv_gas_hidden=no
-if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then
-  gcc_cv_gas_hidden=yes
-fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for read-only/read-write section mixing" >&5
 $as_echo_n "checking linker for read-only/read-write section mixing... " >&6; }
@@ -2866,6 +2862,20 @@ Lframe..0:
 	.vbyte 4,Lframe..0'`
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aix_dwloc" >&5
 $as_echo "$gcc_cv_as_aix_dwloc" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .hidden" >&5
+$as_echo_n "checking assembler for .hidden... " >&6; }
+case "$target" in
+  *-*-aix*) ts_hidden_s='	.globl foobar,hidden' ;;
+  *)        ts_hidden_s='	.hidden foobar
+foobar:' ;;
+esac
+gcc_cv_as_hidden=`ts_asm_ok "$ts_hidden_s"`
+case "$target" in
+    *-*-darwin*) gcc_cv_as_hidden=yes ;;
+esac
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_hidden" >&5
+$as_echo "$gcc_cv_as_hidden" >&6; }
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute" >&5
 $as_echo_n "checking assembler for .gnu_attribute... " >&6; }
@@ -3266,7 +3276,7 @@ as_riscv_march_zaamo_zalrsc `ts_bool "$gcc_cv_as_riscv_march_zaamo_zalrsc"`
 as_riscv_march_b `ts_bool "$gcc_cv_as_riscv_march_b"`
 
 # Linker capabilities.
-gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
+gas_hidden `if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then echo 1; else echo 0; fi`
 ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
 ld_eh_gc_sections `ts_bool "$gcc_cv_ld_eh_gc_sections"`
 ld_ctf `ts_bool "$gcc_cv_ld_ctf"`

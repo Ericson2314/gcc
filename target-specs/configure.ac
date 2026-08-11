@@ -646,12 +646,11 @@ if "$gcc_cv_ld" --help 2>&1 | grep -- '-Bsymbolic' > /dev/null; then
 fi
 AC_MSG_RESULT([$gcc_cv_ld_hidden])
 
-dnl HAVE_GAS_HIDDEN needs both halves; gcc_cv_as_hidden is probed by the
-dnl assembler section of this script.
-gcc_cv_gas_hidden=no
-if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then
-  gcc_cv_gas_hidden=yes
-fi
+dnl HAVE_GAS_HIDDEN needs both halves, and they are probed in different sections
+dnl of this script -- the assembler one runs LATER.  Combining them here read an
+dnl unset gcc_cv_as_hidden and answered no however good the assembler was, which
+dnl is the second way this one capability has been silently lost.  The two are
+dnl combined where the file is written, once both answers exist.
 
 AC_MSG_CHECKING([linker for read-only/read-write section mixing])
 gcc_cv_ld_ro_rw_mix=unknown
@@ -1041,6 +1040,28 @@ gcc_cv_as_aix_dwloc=`ts_asm_ok '	.dwsect 0xA0000
 Lframe..0:
 	.vbyte 4,Lframe..0'`
 AC_MSG_RESULT([$gcc_cv_as_aix_dwloc])
+
+dnl The assembler half of HAVE_GAS_HIDDEN.  This probe was MISSING: the linker
+dnl half below tested `x"$gcc_cv_as_hidden" = xyes' against a variable nothing
+dnl ever assigned, so it was always empty, gas_hidden came out 0 on assemblers
+dnl that have supported .hidden for twenty years, and cc1 stopped emitting
+dnl .hidden entirely -- 61 gcc.dg/visibility-* and ~500 g++.dg/ext/visibility
+dnl subtests.  Nothing noticed because until now no ordinary build read this
+dnl file at all.
+dnl
+dnl AIX spells it as a third argument to .globl rather than as a directive.
+AC_MSG_CHECKING([assembler for .hidden])
+case "$target" in
+  *-*-aix*) ts_hidden_s='	.globl foobar,hidden' ;;
+  *)        ts_hidden_s='	.hidden foobar
+foobar:' ;;
+esac
+gcc_cv_as_hidden=`ts_asm_ok "$ts_hidden_s"`
+case "$target" in
+  dnl Darwin's as has visibility, with a different syntax the probe cannot use.
+  *-*-darwin*) gcc_cv_as_hidden=yes ;;
+esac
+AC_MSG_RESULT([$gcc_cv_as_hidden])
 
 AC_MSG_CHECKING([assembler for .gnu_attribute])
 gcc_cv_as_gnu_attribute=`ts_asm_ok '	.gnu_attribute 4,1'`
@@ -1442,7 +1463,7 @@ as_riscv_march_zaamo_zalrsc `ts_bool "$gcc_cv_as_riscv_march_zaamo_zalrsc"`
 as_riscv_march_b `ts_bool "$gcc_cv_as_riscv_march_b"`
 
 # Linker capabilities.
-gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
+gas_hidden `if test x"$gcc_cv_as_hidden" = xyes && test x"$gcc_cv_ld_hidden" = xyes; then echo 1; else echo 0; fi`
 ld_ro_rw_section_mixing `if test x"$gcc_cv_ld_ro_rw_mix" = xread-write; then echo 1; else echo 0; fi`
 ld_eh_gc_sections `ts_bool "$gcc_cv_ld_eh_gc_sections"`
 ld_ctf `ts_bool "$gcc_cv_ld_ctf"`
