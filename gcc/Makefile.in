@@ -2934,14 +2934,16 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
 	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"; \
 	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
-	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles`; \
-	rm -f tmp-specfiles; \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
+	rc=0; \
+	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
+	  $(srcdir)/../target-specs/configure.ac `cat tmp-specfiles` || rc=1; \
 	if test -s tmp-cfgfiles; then \
-	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles`; \
+	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles` \
+	    || rc=1; \
 	fi; \
-	rm -f tmp-cfgfiles
+	rm -f tmp-specfiles tmp-cfgfiles; \
+	exit $$rc
 
 # Fail the build if a spec file names a spec nothing ever asks for.  Three
 # separate times a spec has been written into every per-target spec file with
@@ -2966,6 +2968,12 @@ check-spec-refs:
 # written into every config file, and reachable only through a defaults.h macro
 # no translation unit consumed.  Nothing diagnosed it; the twelve LTO testsuite
 # failures did, months later, and only once the testsuite could link at all.
+#
+# The target-specs rule above runs BOTH checks and collects their statuses
+# rather than taking the first one.  check-spec-refs fails today on four specs
+# that nothing consults, and under `set -e' that failure ended the recipe -- so
+# a check appended after it never executed in any build, while looking wired up
+# because the build was already red for another reason.
 .PHONY: check-target-caps
 check-target-caps:
 	@find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
