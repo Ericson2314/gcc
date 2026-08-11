@@ -4541,7 +4541,7 @@ case "${target}" in
 			esac
 		fi
 
-		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CM_MEDLOW"
+		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=RISCV_CM_MEDLOW"
 		;;
 
 	mips*-*-*)
@@ -4843,7 +4843,7 @@ case "${target}" in
 		loongarch_multilib_list_c=${loongarch_multilib_list_c%,}
 		loongarch_multilib_list_make=${loongarch_multilib_list_make%,}
 		# --with-cmodel is gone; `medium' was its default.
-		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=CMODEL_MEDIUM"
+		tm_defines="${tm_defines} TARGET_DEFAULT_CMODEL=LARCH_CMODEL_MEDIUM"
 		;;
 
 	nds32*-*-*)
@@ -5106,8 +5106,8 @@ case ${target} in
 		esac
 
 		case ${with_tls} in
-		"" | trad)	tm_defines="$tm_defines DEFAULT_TLS_TYPE=TLS_TRADITIONAL" ;;
-		desc)		tm_defines="$tm_defines DEFAULT_TLS_TYPE=TLS_DESCRIPTORS" ;;
+		"" | trad)	tm_defines="$tm_defines DEFAULT_TLS_TYPE=LARCH_TLS_TRADITIONAL" ;;
+		desc)		tm_defines="$tm_defines DEFAULT_TLS_TYPE=LARCH_TLS_DESCRIPTORS" ;;
 		esac
 
 		tmake_file="loongarch/t-loongarch $tmake_file"

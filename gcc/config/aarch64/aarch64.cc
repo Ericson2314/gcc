@@ -7070,7 +7070,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 
 /* Return the MEM rtx that provides the canary value that should be used
    for stack-smashing protection.  MODE is the mode of the memory.
-   For SSP_GLOBAL, DECL_RTL is the MEM rtx for the canary variable
+   For AARCH64_SSP_GLOBAL, DECL_RTL is the MEM rtx for the canary variable
    (__stack_chk_guard), otherwise it has no useful value.  SALT_TYPE
    indicates whether the caller is performing a SET or a TEST operation.  */
 
@@ -7079,7 +7079,7 @@ aarch64_stack_protect_canary_mem (machine_mode mode, rtx decl_rtl,
 				  aarch64_salt_type salt_type)
 {
   rtx addr;
-  if (aarch64_stack_protector_guard == SSP_GLOBAL)
+  if (aarch64_stack_protector_guard == AARCH64_SSP_GLOBAL)
     {
       gcc_assert (MEM_P (decl_rtl));
       addr = XEXP (decl_rtl, 0);
@@ -20028,7 +20028,7 @@ aarch64_override_options_internal (struct gcc_options *opts,
   if (opts->x_flag_strict_volatile_bitfields < 0 && abi_version_at_least (2))
     opts->x_flag_strict_volatile_bitfields = 1;
 
-  if (aarch64_stack_protector_guard == SSP_GLOBAL
+  if (aarch64_stack_protector_guard == AARCH64_SSP_GLOBAL
       && opts->x_aarch64_stack_protector_guard_offset_str)
     {
       error ("incompatible options %<-mstack-protector-guard=global%> and "
@@ -31685,7 +31685,7 @@ aarch64_get_multilib_abi_name (void)
 static tree
 aarch64_stack_protect_guard (void)
 {
-  if (aarch64_stack_protector_guard == SSP_GLOBAL)
+  if (aarch64_stack_protector_guard == AARCH64_SSP_GLOBAL)
     return default_stack_protect_guard ();
 
   return NULL_TREE;

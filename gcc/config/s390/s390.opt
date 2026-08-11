@@ -54,83 +54,83 @@ Target Ignore
 64 bit ABI.
 
 march=
-Target RejectNegative Joined Enum(processor_type) Var(s390_arch) Init(PROCESSOR_max) Save
+Target RejectNegative Joined Enum(s390_processor_type) Var(s390_arch) Init(S390_PROCESSOR_max) Save
 Generate code for given CPU.
 
 Enum
-Name(processor_type) Type(enum processor_type)
+Name(s390_processor_type) Type(enum s390_processor_type)
 
 EnumValue
-Enum(processor_type) String(z900) Value(PROCESSOR_2064_Z900)
+Enum(s390_processor_type) String(z900) Value(PROCESSOR_2064_Z900)
 
 EnumValue
-Enum(processor_type) String(arch5) Value(PROCESSOR_2064_Z900)
+Enum(s390_processor_type) String(arch5) Value(PROCESSOR_2064_Z900)
 
 EnumValue
-Enum(processor_type) String(z990) Value(PROCESSOR_2084_Z990)
+Enum(s390_processor_type) String(z990) Value(PROCESSOR_2084_Z990)
 
 EnumValue
-Enum(processor_type) String(arch6) Value(PROCESSOR_2084_Z990)
+Enum(s390_processor_type) String(arch6) Value(PROCESSOR_2084_Z990)
 
 EnumValue
-Enum(processor_type) String(z9-109) Value(PROCESSOR_2094_Z9_109)
+Enum(s390_processor_type) String(z9-109) Value(PROCESSOR_2094_Z9_109)
 
 EnumValue
-Enum(processor_type) String(z9-ec) Value(PROCESSOR_2094_Z9_EC)
+Enum(s390_processor_type) String(z9-ec) Value(PROCESSOR_2094_Z9_EC)
 
 EnumValue
-Enum(processor_type) String(arch7) Value(PROCESSOR_2094_Z9_EC)
+Enum(s390_processor_type) String(arch7) Value(PROCESSOR_2094_Z9_EC)
 
 EnumValue
-Enum(processor_type) String(z10) Value(PROCESSOR_2097_Z10)
+Enum(s390_processor_type) String(z10) Value(PROCESSOR_2097_Z10)
 
 EnumValue
-Enum(processor_type) String(arch8) Value(PROCESSOR_2097_Z10)
+Enum(s390_processor_type) String(arch8) Value(PROCESSOR_2097_Z10)
 
 EnumValue
-Enum(processor_type) String(z196) Value(PROCESSOR_2817_Z196)
+Enum(s390_processor_type) String(z196) Value(PROCESSOR_2817_Z196)
 
 EnumValue
-Enum(processor_type) String(arch9) Value(PROCESSOR_2817_Z196)
+Enum(s390_processor_type) String(arch9) Value(PROCESSOR_2817_Z196)
 
 EnumValue
-Enum(processor_type) String(zEC12) Value(PROCESSOR_2827_ZEC12)
+Enum(s390_processor_type) String(zEC12) Value(PROCESSOR_2827_ZEC12)
 
 EnumValue
-Enum(processor_type) String(arch10) Value(PROCESSOR_2827_ZEC12)
+Enum(s390_processor_type) String(arch10) Value(PROCESSOR_2827_ZEC12)
 
 EnumValue
-Enum(processor_type) String(z13) Value(PROCESSOR_2964_Z13)
+Enum(s390_processor_type) String(z13) Value(PROCESSOR_2964_Z13)
 
 EnumValue
-Enum(processor_type) String(arch11) Value(PROCESSOR_2964_Z13)
+Enum(s390_processor_type) String(arch11) Value(PROCESSOR_2964_Z13)
 
 EnumValue
-Enum(processor_type) String(z14) Value(PROCESSOR_3906_Z14)
+Enum(s390_processor_type) String(z14) Value(PROCESSOR_3906_Z14)
 
 EnumValue
-Enum(processor_type) String(arch12) Value(PROCESSOR_3906_Z14)
+Enum(s390_processor_type) String(arch12) Value(PROCESSOR_3906_Z14)
 
 EnumValue
-Enum(processor_type) String(z15) Value(PROCESSOR_8561_Z15)
+Enum(s390_processor_type) String(z15) Value(PROCESSOR_8561_Z15)
 
 EnumValue
-Enum(processor_type) String(arch13) Value(PROCESSOR_8561_Z15)
+Enum(s390_processor_type) String(arch13) Value(PROCESSOR_8561_Z15)
 
 EnumValue
-Enum(processor_type) String(arch14) Value(PROCESSOR_3931_Z16)
+Enum(s390_processor_type) String(arch14) Value(PROCESSOR_3931_Z16)
 
 EnumValue
-Enum(processor_type) String(z16) Value(PROCESSOR_3931_Z16)
+Enum(s390_processor_type) String(z16) Value(PROCESSOR_3931_Z16)
 
 EnumValue
-Enum(processor_type) String(arch15) Value(PROCESSOR_9175_Z17)
+Enum(s390_processor_type) String(arch15) Value(PROCESSOR_9175_Z17)
 
 EnumValue
-Enum(processor_type) String(z17) Value(PROCESSOR_9175_Z17)
+Enum(s390_processor_type) String(z17) Value(PROCESSOR_9175_Z17)
 
 EnumValue
-Enum(processor_type) String(native) Value(PROCESSOR_NATIVE) DriverOnly
+Enum(s390_processor_type) String(native) Value(S390_PROCESSOR_NATIVE) DriverOnly
 
 mbackchain
 Target Mask(BACKCHAIN) Save
@@ -199,18 +199,18 @@ Target RejectNegative Alias(mstack-guard=,0) Negative(mstack-guard=)
 Switches off the -mstack-guard= option.
 
 mstack-protector-guard=
-Target RejectNegative Joined Enum(stack_protector_guard) Var(s390_stack_protector_guard) Init(SP_TLS)
+Target RejectNegative Joined Enum(s390_stack_protector_guard_type) Var(s390_stack_protector_guard) Init(SP_TLS)
 Use given stack-protector guard.
 
 Enum
-Name(stack_protector_guard) Type(enum stack_protector_guard)
+Name(s390_stack_protector_guard_type) Type(enum s390_stack_protector_guard_type)
 Valid arguments to -mstack-protector-guard=:
 
 EnumValue
-Enum(stack_protector_guard) String(tls) Value(SP_TLS)
+Enum(s390_stack_protector_guard_type) String(tls) Value(SP_TLS)
 
 EnumValue
-Enum(stack_protector_guard) String(global) Value(SP_GLOBAL)
+Enum(s390_stack_protector_guard_type) String(global) Value(SP_GLOBAL)
 
 mstack-protector-guard-record
 Target Var(flag_s390_stack_protector_guard_record)
@@ -225,7 +225,7 @@ Target RejectNegative Alias(mstack-size=,0) Negative(mstack-size=)
 Switches off the -mstack-size= option.
 
 mtune=
-Target RejectNegative Joined Enum(processor_type) Var(s390_tune) Init(PROCESSOR_max) Save
+Target RejectNegative Joined Enum(s390_processor_type) Var(s390_tune) Init(S390_PROCESSOR_max) Save
 Schedule code for given CPU.
 
 mmvcle
@@ -265,12 +265,12 @@ Assume data segments are relative to text segment.
 
 
 mindirect-branch=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_indirect_branch) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_indirect_branch) Init(s390_indirect_branch_keep)
 Wrap all indirect branches into execute in order to disable branch
 prediction.
 
 mindirect-branch-jump=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_indirect_branch_jump) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_indirect_branch_jump) Init(s390_indirect_branch_keep)
 Wrap indirect table jumps and computed gotos into execute in order to
 disable branch prediction.  Using thunk or thunk-extern with this
 option requires the thunks to be considered signal handlers to order to
@@ -278,41 +278,41 @@ generate correct CFI.  For environments where unwinding (e.g. for
 exceptions) is required please use thunk-inline instead.
 
 mindirect-branch-call=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_indirect_branch_call) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_indirect_branch_call) Init(s390_indirect_branch_keep)
 Wrap all indirect calls into execute in order to disable branch prediction.
 
 mfunction-return=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_function_return) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_function_return) Init(s390_indirect_branch_keep)
 Wrap all indirect return branches into execute in order to disable branch
 prediction.
 
 mfunction-return-mem=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_function_return_mem) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_function_return_mem) Init(s390_indirect_branch_keep)
 Wrap indirect return branches into execute in order to disable branch
 prediction. This affects only branches where the return address is
 going to be restored from memory.
 
 mfunction-return-reg=
-Target RejectNegative Joined Enum(indirect_branch) Var(s390_function_return_reg) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(s390_indirect_branch_setting) Var(s390_function_return_reg) Init(s390_indirect_branch_keep)
 Wrap indirect return branches into execute in order to disable branch
 prediction. This affects only branches where the return address
 doesn't need to be restored from memory.
 
 Enum
-Name(indirect_branch) Type(enum indirect_branch)
+Name(s390_indirect_branch_setting) Type(enum s390_indirect_branch_setting)
 Known indirect branch choices (for use with the -mindirect-branch=/-mfunction-return= options):
 
 EnumValue
-Enum(indirect_branch) String(keep) Value(indirect_branch_keep)
+Enum(s390_indirect_branch_setting) String(keep) Value(s390_indirect_branch_keep)
 
 EnumValue
-Enum(indirect_branch) String(thunk) Value(indirect_branch_thunk)
+Enum(s390_indirect_branch_setting) String(thunk) Value(s390_indirect_branch_thunk)
 
 EnumValue
-Enum(indirect_branch) String(thunk-inline) Value(indirect_branch_thunk_inline)
+Enum(s390_indirect_branch_setting) String(thunk-inline) Value(s390_indirect_branch_thunk_inline)
 
 EnumValue
-Enum(indirect_branch) String(thunk-extern) Value(indirect_branch_thunk_extern)
+Enum(s390_indirect_branch_setting) String(thunk-extern) Value(s390_indirect_branch_thunk_extern)
 
 mindirect-branch-table
 Target Var(s390_indirect_branch_table) Init(TARGET_DEFAULT_INDIRECT_BRANCH_TABLE)

@@ -69,24 +69,24 @@ mfloat-abi=v1
 Target RejectNegative Alias(mfloat-abi=, softfp) Undocumented
 
 mfloat-abi=
-Target RejectNegative Joined Enum(float_abi_type) Var(csky_float_abi) Init(CSKY_FLOAT_ABI_SOFT)
+Target RejectNegative Joined Enum(csky_float_abi_type) Var(csky_float_abi) Init(CSKY_FLOAT_ABI_SOFT)
 Specify if floating point hardware should be used.
 
 Enum
-Name(float_abi_type) Type(enum float_abi_type)
+Name(csky_float_abi_type) Type(enum csky_float_abi_type)
 Known floating-point ABIs (for use with the -mfloat-abi= option):
 
 EnumValue
-Enum(float_abi_type) String(soft) Value(CSKY_FLOAT_ABI_SOFT)
+Enum(csky_float_abi_type) String(soft) Value(CSKY_FLOAT_ABI_SOFT)
 
 EnumValue
-Enum(float_abi_type) String(softfp) Value(CSKY_FLOAT_ABI_SOFTFP)
+Enum(csky_float_abi_type) String(softfp) Value(CSKY_FLOAT_ABI_SOFTFP)
 
 EnumValue
-Enum(float_abi_type) String(hard) Value(CSKY_FLOAT_ABI_HARD)
+Enum(csky_float_abi_type) String(hard) Value(CSKY_FLOAT_ABI_HARD)
 
 mfpu=
-Target RejectNegative Joined Enum(csky_fpu) Var(csky_fpu_index) Init(TARGET_FPU_auto) Save
+Target RejectNegative Joined Enum(csky_fpu) Var(csky_fpu_index) Init(CSKY_TARGET_FPU_auto) Save
 Specify the target floating-point hardware/format.
 
 mdouble-float

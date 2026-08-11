@@ -344,7 +344,7 @@ const struct s390_processor processor_table[] =
   { "z15",    "arch13", PROCESSOR_8561_Z15,    &zEC12_cost,  13 },
   { "z16",    "arch14", PROCESSOR_3931_Z16,    &zEC12_cost,  14 },
   { "z17",    "arch15", PROCESSOR_9175_Z17,    &zEC12_cost,  15 },
-  { "native", "",       PROCESSOR_NATIVE,      NULL,         0  }
+  { "native", "",       S390_PROCESSOR_NATIVE, NULL,         0  }
 };
 
 extern int reload_completed;
@@ -14317,13 +14317,13 @@ s390_indirect_branch_via_thunk (unsigned int regno,
 	     INDIRECT_BRANCH_THUNK_REGNUM, regno);
 
   if ((option == s390_opt_indirect_branch_jump
-       && cfun->machine->indirect_branch_jump == indirect_branch_thunk)
+       && cfun->machine->indirect_branch_jump == s390_indirect_branch_thunk)
       || (option == s390_opt_indirect_branch_call
-	  && cfun->machine->indirect_branch_call == indirect_branch_thunk)
+	  && cfun->machine->indirect_branch_call == s390_indirect_branch_thunk)
       || (option == s390_opt_function_return_reg
-	  && cfun->machine->function_return_reg == indirect_branch_thunk)
+	  && cfun->machine->function_return_reg == s390_indirect_branch_thunk)
       || (option == s390_opt_function_return_mem
-	  && cfun->machine->function_return_mem == indirect_branch_thunk))
+	  && cfun->machine->function_return_mem == s390_indirect_branch_thunk))
     {
       if (TARGET_CPU_Z10)
 	indirect_branch_z10thunk_mask |= (1 << regno);
@@ -16175,18 +16175,18 @@ s390_option_override_internal (struct gcc_options *opts,
   opts->x_s390_tune_flags = processor_flags_table[opts->x_s390_tune];
 
   /* Sanity checks.  */
-  if (opts->x_s390_arch == PROCESSOR_NATIVE
-      || opts->x_s390_tune == PROCESSOR_NATIVE)
+  if (opts->x_s390_arch == S390_PROCESSOR_NATIVE
+      || opts->x_s390_tune == S390_PROCESSOR_NATIVE)
     gcc_unreachable ();
 
-  if (opts->x_s390_indirect_branch == indirect_branch_thunk_inline
-      || opts->x_s390_indirect_branch_call == indirect_branch_thunk_inline
-      || opts->x_s390_function_return == indirect_branch_thunk_inline
-      || opts->x_s390_function_return_reg == indirect_branch_thunk_inline
-      || opts->x_s390_function_return_mem == indirect_branch_thunk_inline)
+  if (opts->x_s390_indirect_branch == s390_indirect_branch_thunk_inline
+      || opts->x_s390_indirect_branch_call == s390_indirect_branch_thunk_inline
+      || opts->x_s390_function_return == s390_indirect_branch_thunk_inline
+      || opts->x_s390_function_return_reg == s390_indirect_branch_thunk_inline
+      || opts->x_s390_function_return_mem == s390_indirect_branch_thunk_inline)
     error ("thunk-inline is only supported with %<-mindirect-branch-jump%>");
 
-  if (opts->x_s390_indirect_branch != indirect_branch_keep)
+  if (opts->x_s390_indirect_branch != s390_indirect_branch_keep)
     {
       if (!opts_set->x_s390_indirect_branch_call)
 	opts->x_s390_indirect_branch_call = opts->x_s390_indirect_branch;
@@ -16195,7 +16195,7 @@ s390_option_override_internal (struct gcc_options *opts,
 	opts->x_s390_indirect_branch_jump = opts->x_s390_indirect_branch;
     }
 
-  if (opts->x_s390_function_return != indirect_branch_keep)
+  if (opts->x_s390_function_return != s390_indirect_branch_keep)
     {
       if (!opts_set->x_s390_function_return_reg)
 	opts->x_s390_function_return_reg = opts->x_s390_function_return;
@@ -16865,17 +16865,17 @@ s390_can_inline_p (tree caller, tree callee)
    function-return attribute in ATTR.  */
 
 static inline void
-s390_indirect_branch_attrvalue (tree attr, enum indirect_branch *val)
+s390_indirect_branch_attrvalue (tree attr, enum s390_indirect_branch_setting *val)
 {
   const char *str = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr)));
   if (strcmp (str, "keep") == 0)
-    *val = indirect_branch_keep;
+    *val = s390_indirect_branch_keep;
   else if (strcmp (str, "thunk") == 0)
-    *val = indirect_branch_thunk;
+    *val = s390_indirect_branch_thunk;
   else if (strcmp (str, "thunk-inline") == 0)
-    *val = indirect_branch_thunk_inline;
+    *val = s390_indirect_branch_thunk_inline;
   else if (strcmp (str, "thunk-extern") == 0)
-    *val = indirect_branch_thunk_extern;
+    *val = s390_indirect_branch_thunk_extern;
 }
 
 /* Memorize the setting for -mindirect-branch* and -mfunction-return*

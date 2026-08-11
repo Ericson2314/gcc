@@ -376,7 +376,7 @@
 (define_predicate "call_insn_operand"
   (match_operand 0 "general_operand")
 {
-  if (riscv_cmodel == CM_LARGE)
+  if (riscv_cmodel == RISCV_CM_LARGE)
     return register_operand (op, mode);
   else
     return (absolute_symbolic_operand (op, mode)

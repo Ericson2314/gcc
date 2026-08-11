@@ -32,11 +32,11 @@ Name(rs6000_cmodel) Type(enum rs6000_cmodel)
 Known code models (for use with the -mcmodel= option):
 
 EnumValue
-Enum(rs6000_cmodel) String(small) Value(CMODEL_SMALL)
+Enum(rs6000_cmodel) String(small) Value(RS6000_CMODEL_SMALL)
 
 EnumValue
-Enum(rs6000_cmodel) String(medium) Value(CMODEL_MEDIUM)
+Enum(rs6000_cmodel) String(medium) Value(RS6000_CMODEL_MEDIUM)
 
 EnumValue
-Enum(rs6000_cmodel) String(large) Value(CMODEL_LARGE)
+Enum(rs6000_cmodel) String(large) Value(RS6000_CMODEL_LARGE)
 

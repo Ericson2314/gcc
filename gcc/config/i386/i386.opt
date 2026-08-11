@@ -106,7 +106,7 @@ unsigned char arch_specified
 
 ;; -mcmodel= model
 TargetVariable
-enum cmodel ix86_cmodel = CM_32
+enum cmodel ix86_cmodel = IX86_CM_32
 
 ;; -mabi=
 TargetVariable
@@ -162,7 +162,7 @@ int x_ix86_sse2avx
 
 ;; -mstack-protector-guard=
 TargetSave
-enum stack_protector_guard x_ix86_stack_protector_guard
+enum ix86_stack_protector_guard_type x_ix86_stack_protector_guard
 
 ;; -mstringop-strategy=
 TargetSave
@@ -288,7 +288,7 @@ Target RejectNegative Joined UInteger Var(ix86_section_threshold) Init(DEFAULT_L
 -mlarge-data-threshold=<number>	Data greater than given threshold will go into a large data section in x86-64 medium and large code models.
 
 mcmodel=
-Target RejectNegative Joined Enum(cmodel) Var(ix86_cmodel) Init(CM_32)
+Target RejectNegative Joined Enum(cmodel) Var(ix86_cmodel) Init(IX86_CM_32)
 Use given x86-64 code model.
 
 Enum
@@ -302,10 +302,10 @@ EnumValue
 Enum(cmodel) String(medium) Value(CM_MEDIUM)
 
 EnumValue
-Enum(cmodel) String(large) Value(CM_LARGE)
+Enum(cmodel) String(large) Value(IX86_CM_LARGE)
 
 EnumValue
-Enum(cmodel) String(32) Value(CM_32)
+Enum(cmodel) String(32) Value(IX86_CM_32)
 
 EnumValue
 Enum(cmodel) String(kernel) Value(CM_KERNEL)
@@ -1005,18 +1005,18 @@ Target Mask(ISA_PKU) Var(ix86_isa_flags) Save
 Support PKU built-in functions and code generation.
 
 mstack-protector-guard=
-Target RejectNegative Joined Enum(stack_protector_guard) Var(ix86_stack_protector_guard) Init(SSP_TLS)
+Target RejectNegative Joined Enum(ix86_stack_protector_guard_type) Var(ix86_stack_protector_guard) Init(IX86_SSP_TLS)
 Use given stack-protector guard.
 
 Enum
-Name(stack_protector_guard) Type(enum stack_protector_guard)
+Name(ix86_stack_protector_guard_type) Type(enum ix86_stack_protector_guard_type)
 Known stack protector guard (for use with the -mstack-protector-guard= option):
 
 EnumValue
-Enum(stack_protector_guard) String(tls) Value(SSP_TLS)
+Enum(ix86_stack_protector_guard_type) String(tls) Value(IX86_SSP_TLS)
 
 EnumValue
-Enum(stack_protector_guard) String(global) Value(SSP_GLOBAL)
+Enum(ix86_stack_protector_guard_type) String(global) Value(IX86_SSP_GLOBAL)
 
 mstack-protector-guard-reg=
 Target Save RejectNegative Joined Var(ix86_stack_protector_guard_reg_str)
@@ -1063,28 +1063,28 @@ Target Var(flag_force_indirect_call) Init(0)
 Make all function calls indirect.
 
 mindirect-branch=
-Target RejectNegative Joined Enum(indirect_branch) Var(ix86_indirect_branch) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(ix86_indirect_branch_setting) Var(ix86_indirect_branch) Init(ix86_indirect_branch_keep)
 Convert indirect call and jump to call and return thunks.
 
 mfunction-return=
-Target RejectNegative Joined Enum(indirect_branch) Var(ix86_function_return) Init(indirect_branch_keep)
+Target RejectNegative Joined Enum(ix86_indirect_branch_setting) Var(ix86_function_return) Init(ix86_indirect_branch_keep)
 Convert function return to call and return thunk.
 
 Enum
-Name(indirect_branch) Type(enum indirect_branch)
+Name(ix86_indirect_branch_setting) Type(enum ix86_indirect_branch_setting)
 Known indirect branch choices (for use with the -mindirect-branch=/-mfunction-return= options):
 
 EnumValue
-Enum(indirect_branch) String(keep) Value(indirect_branch_keep)
+Enum(ix86_indirect_branch_setting) String(keep) Value(ix86_indirect_branch_keep)
 
 EnumValue
-Enum(indirect_branch) String(thunk) Value(indirect_branch_thunk)
+Enum(ix86_indirect_branch_setting) String(thunk) Value(ix86_indirect_branch_thunk)
 
 EnumValue
-Enum(indirect_branch) String(thunk-inline) Value(indirect_branch_thunk_inline)
+Enum(ix86_indirect_branch_setting) String(thunk-inline) Value(ix86_indirect_branch_thunk_inline)
 
 EnumValue
-Enum(indirect_branch) String(thunk-extern) Value(indirect_branch_thunk_extern)
+Enum(ix86_indirect_branch_setting) String(thunk-extern) Value(ix86_indirect_branch_thunk_extern)
 
 mindirect-branch-cs-prefix
 Target Var(ix86_indirect_branch_cs_prefix) Init(0)

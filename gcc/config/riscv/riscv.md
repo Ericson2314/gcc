@@ -4612,7 +4612,7 @@
   ""
 {
   machine_mode mode = GET_MODE (operands[0]);
-  if (riscv_stack_protector_guard == SSP_TLS)
+  if (riscv_stack_protector_guard == RISCV_SSP_TLS)
   {
     rtx reg = gen_rtx_REG (Pmode, riscv_stack_protector_guard_reg);
     rtx offset = GEN_INT (riscv_stack_protector_guard_offset);
@@ -4657,7 +4657,7 @@
   machine_mode mode = GET_MODE (operands[0]);
 
   result = gen_reg_rtx(mode);
-  if (riscv_stack_protector_guard == SSP_TLS)
+  if (riscv_stack_protector_guard == RISCV_SSP_TLS)
   {
       rtx reg = gen_rtx_REG (Pmode, riscv_stack_protector_guard_reg);
       rtx offset = GEN_INT (riscv_stack_protector_guard_offset);
@@ -4917,7 +4917,7 @@
 (define_insn "*large_load_address"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (mem:DI (match_operand 1 "pcrel_symbol_operand" "")))]
-  "TARGET_64BIT && riscv_cmodel == CM_LARGE"
+  "TARGET_64BIT && riscv_cmodel == RISCV_CM_LARGE"
   "ld\t%0,%1"
   [(set_attr "type" "load")
    (set (attr "length") (const_int 8))])

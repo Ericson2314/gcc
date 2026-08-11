@@ -3144,7 +3144,7 @@ rest_of_insert_endbr_and_patchable_area (bool need_endbr,
 	      || lookup_attribute ("cf_check",
 				   DECL_ATTRIBUTES (cfun->decl)))
 	  && (!cgraph_node::get (cfun->decl)->only_called_directly_p ()
-	      || ix86_cmodel == CM_LARGE
+	      || ix86_cmodel == IX86_CM_LARGE
 	      || ix86_cmodel == CM_LARGE_PIC
 	      || flag_force_indirect_call
 	      || (TARGET_DLLIMPORT_DECL_ATTRIBUTES

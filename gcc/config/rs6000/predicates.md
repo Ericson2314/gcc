@@ -629,7 +629,7 @@
       int load_from_mem_insns = 2;
       if (size > 8)
         load_from_mem_insns++;
-      if (TARGET_CMODEL != CMODEL_SMALL)
+      if (TARGET_CMODEL != RS6000_CMODEL_SMALL)
         load_from_mem_insns++;
       if (num_insns_constant (op, mode) <= load_from_mem_insns)
         return 1;

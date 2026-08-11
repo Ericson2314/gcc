@@ -556,14 +556,14 @@ fallback:
     {
     case CMODEL_TINY:
     case CMODEL_TINY_STATIC:
-    case CMODEL_LARGE:
+    case LARCH_CMODEL_LARGE:
       warning (0, "%qs is not supported, now cmodel is set to %qs",
 	       loongarch_cmodel_strings[t.cmodel], "normal");
       t.cmodel = CMODEL_NORMAL;
       break;
 
     case CMODEL_NORMAL:
-    case CMODEL_MEDIUM:
+    case LARCH_CMODEL_MEDIUM:
       break;
 
     case CMODEL_EXTREME:
@@ -1075,10 +1075,10 @@ loongarch_target_option_override (struct loongarch_target *target,
 	break;
 
       case CMODEL_TINY_STATIC:
-      case CMODEL_MEDIUM:
+      case LARCH_CMODEL_MEDIUM:
       case CMODEL_NORMAL:
       case CMODEL_TINY:
-      case CMODEL_LARGE:
+      case LARCH_CMODEL_LARGE:
 	break;
 
       default:

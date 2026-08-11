@@ -1536,7 +1536,7 @@ typedef struct
 #define SWITCHABLE_TARGET 1
 
 /* Check TLS Descriptors mechanism is selected.  */
-#define TARGET_TLS_DESC (aarch64_tls_dialect == TLS_DESCRIPTORS)
+#define TARGET_TLS_DESC (aarch64_tls_dialect == AARCH64_TLS_DESCRIPTORS)
 
 extern enum aarch64_code_model aarch64_cmodel;
 

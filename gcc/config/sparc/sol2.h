@@ -32,7 +32,7 @@ along with GCC; see the file COPYING3.  If not see
   (MASK_V8PLUS + MASK_APP_REGS + MASK_FPU + MASK_LONG_DOUBLE_128)
 #endif
 
-/* The default code model used to be CM_MEDANY on Solaris
+/* The default code model used to be SPARC_CM_MEDANY on Solaris
    but even Sun eventually found it to be quite wasteful
    and changed it to CM_MEDMID in the Studio 9 compiler.  */
 #undef SPARC_DEFAULT_CMODEL

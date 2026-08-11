@@ -2037,9 +2037,9 @@ riscv_classify_symbol (const_rtx x)
 
   switch (riscv_cmodel)
     {
-    case CM_MEDLOW:
+    case RISCV_CM_MEDLOW:
       return SYMBOL_ABSOLUTE;
-    case CM_LARGE:
+    case RISCV_CM_LARGE:
       if (SYMBOL_REF_P (x))
 	return CONSTANT_POOL_ADDRESS_P (x) ? SYMBOL_PCREL : SYMBOL_FORCE_TO_MEM;
       return SYMBOL_PCREL;
@@ -8768,7 +8768,7 @@ riscv_in_small_data_p (const_tree x)
   /* Because default_use_anchors_for_symbol_p doesn't gather small data to use
      the anchor symbol to address nearby objects.  In large model, it can get
      the better result using the anchor optimization.  */
-  if (riscv_cmodel == CM_LARGE)
+  if (riscv_cmodel == RISCV_CM_LARGE)
     return false;
 
   if (TREE_CODE (x) == STRING_CST || TREE_CODE (x) == FUNCTION_DECL)
@@ -8841,7 +8841,7 @@ riscv_unique_section (tree decl, int reloc)
 static inline bool
 riscv_can_use_per_function_literal_pools_p (void)
 {
-  return riscv_cmodel == CM_LARGE;
+  return riscv_cmodel == RISCV_CM_LARGE;
 }
 
 static bool
@@ -12225,13 +12225,13 @@ riscv_option_override (void)
 
   /* Always prefer medlow than medany for RV32 since medlow can access
      full address space. */
-  if (riscv_cmodel == CM_LARGE && !TARGET_64BIT)
-    riscv_cmodel = CM_MEDLOW;
+  if (riscv_cmodel == RISCV_CM_LARGE && !TARGET_64BIT)
+    riscv_cmodel = RISCV_CM_MEDLOW;
 
-  if (riscv_cmodel == CM_LARGE && TARGET_EXPLICIT_RELOCS)
+  if (riscv_cmodel == RISCV_CM_LARGE && TARGET_EXPLICIT_RELOCS)
     sorry ("code model %qs with %qs", "large", "-mexplicit-relocs");
 
-  if (riscv_cmodel == CM_LARGE && flag_pic)
+  if (riscv_cmodel == RISCV_CM_LARGE && flag_pic)
     sorry ("code model %qs with %qs", "large",
 	   global_options.x_flag_pic > 1 ? "-fPIC" : "-fpic");
 
@@ -12253,10 +12253,10 @@ riscv_option_override (void)
       global_options.x_flag_omit_frame_pointer = 1;
     }
 
-  /* We get better code with explicit relocs for CM_MEDLOW, but
+  /* We get better code with explicit relocs for RISCV_CM_MEDLOW, but
      worse code for the others (for now).  Pick the best default.  */
   if ((target_flags_explicit & MASK_EXPLICIT_RELOCS) == 0)
-    if (riscv_cmodel == CM_MEDLOW)
+    if (riscv_cmodel == RISCV_CM_MEDLOW)
       target_flags |= MASK_EXPLICIT_RELOCS;
 
   /* Require that the ISA supports the requested floating-point ABI.  */
@@ -12326,7 +12326,7 @@ riscv_option_override (void)
 	       " [%<-mriscv-attribute%>]");
     }
 
-  if (riscv_stack_protector_guard == SSP_GLOBAL
+  if (riscv_stack_protector_guard == RISCV_SSP_GLOBAL
       && OPTION_SET_P (riscv_stack_protector_guard_offset_str))
     {
       error ("incompatible options %<-mstack-protector-guard=global%> and "
@@ -12334,7 +12334,7 @@ riscv_option_override (void)
 	     riscv_stack_protector_guard_offset_str);
     }
 
-  if (riscv_stack_protector_guard == SSP_TLS
+  if (riscv_stack_protector_guard == RISCV_SSP_TLS
       && !(OPTION_SET_P (riscv_stack_protector_guard_offset_str)
 	   && OPTION_SET_P (riscv_stack_protector_guard_reg_str)))
     {
@@ -12769,7 +12769,7 @@ riscv_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
   /* Don't use sibcalls in the large model, because a sibcall instruction
      expanding and an epilogue expanding both use RISCV_PROLOGUE_TEMP
      register.  */
-  if (riscv_cmodel == CM_LARGE)
+  if (riscv_cmodel == RISCV_CM_LARGE)
     return false;
 
   return true;

@@ -149,13 +149,13 @@ Name(code_model) Type(enum riscv_code_model)
 Known code models (for use with the -mcmodel= option):
 
 EnumValue
-Enum(code_model) String(medlow) Value(CM_MEDLOW)
+Enum(code_model) String(medlow) Value(RISCV_CM_MEDLOW)
 
 EnumValue
-Enum(code_model) String(medany) Value(CM_MEDANY)
+Enum(code_model) String(medany) Value(RISCV_CM_MEDANY)
 
 EnumValue
-Enum(code_model) String(large) Value(CM_LARGE)
+Enum(code_model) String(large) Value(RISCV_CM_LARGE)
 
 mexplicit-relocs
 Target Mask(EXPLICIT_RELOCS)
@@ -210,18 +210,18 @@ EnumValue
 Enum(riscv_align_data) String(natural) Value(riscv_align_data_type_natural)
 
 mstack-protector-guard=
-Target RejectNegative Joined Enum(stack_protector_guard) Var(riscv_stack_protector_guard) Init(SSP_GLOBAL)
+Target RejectNegative Joined Enum(riscv_stack_protector_guard_type) Var(riscv_stack_protector_guard) Init(RISCV_SSP_GLOBAL)
 Use given stack-protector guard.
 
 Enum
-Name(stack_protector_guard) Type(enum stack_protector_guard)
+Name(riscv_stack_protector_guard_type) Type(enum riscv_stack_protector_guard_type)
 Valid arguments to -mstack-protector-guard=:
 
 EnumValue
-Enum(stack_protector_guard) String(tls) Value(SSP_TLS)
+Enum(riscv_stack_protector_guard_type) String(tls) Value(RISCV_SSP_TLS)
 
 EnumValue
-Enum(stack_protector_guard) String(global) Value(SSP_GLOBAL)
+Enum(riscv_stack_protector_guard_type) String(global) Value(RISCV_SSP_GLOBAL)
 
 mstack-protector-guard-reg=
 Target RejectNegative Joined Var(riscv_stack_protector_guard_reg_str)
@@ -421,13 +421,13 @@ Name(riscv_tls_type) Type(enum riscv_tls_type)
 The possible TLS dialects:
 
 EnumValue
-Enum(riscv_tls_type) String(trad) Value(TLS_TRADITIONAL)
+Enum(riscv_tls_type) String(trad) Value(RISCV_TLS_TRADITIONAL)
 
 EnumValue
-Enum(riscv_tls_type) String(desc) Value(TLS_DESCRIPTORS)
+Enum(riscv_tls_type) String(desc) Value(RISCV_TLS_DESCRIPTORS)
 
 mtls-dialect=
-Target RejectNegative Joined Enum(riscv_tls_type) Var(riscv_tls_dialect) Init(TLS_TRADITIONAL) Save
+Target RejectNegative Joined Enum(riscv_tls_type) Var(riscv_tls_dialect) Init(RISCV_TLS_TRADITIONAL) Save
 Specify TLS dialect.
 
 mfence-tso

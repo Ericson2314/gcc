@@ -23,7 +23,7 @@ config/mn10300/mn10300-opts.h
 
 ; The selected processor.
 Variable
-enum processor_type mn10300_processor = PROCESSOR_DEFAULT
+enum mn10300_processor_type mn10300_processor = PROCESSOR_DEFAULT
 
 mam33
 Target

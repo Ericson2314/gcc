@@ -233,7 +233,7 @@ Target Mask(SIMD_SET)
 Enable generation of ARC SIMD instructions via target-specific builtins.
 
 mcpu=
-Target RejectNegative Joined Var(arc_cpu) Enum(processor_type) Init(PROCESSOR_NONE)
+Target RejectNegative Joined Var(arc_cpu) Enum(arc_processor_type) Init(PROCESSOR_NONE)
 -mcpu=CPU	Compile code for ARC variant CPU.
 
 msize-level=

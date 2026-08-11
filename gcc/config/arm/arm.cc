@@ -861,7 +861,7 @@ static int max_insns_skipped = 5;
 int making_const_table;
 
 /* The processor for which instructions should be scheduled.  */
-enum processor_type arm_tune = TARGET_CPU_arm_none;
+enum arm_processor_type arm_tune = TARGET_CPU_arm_none;
 
 /* The current tuning set.  */
 const struct tune_params *current_tune;
@@ -1072,7 +1072,7 @@ const char *fp_sysreg_names[NB_FP_SYSREGS] = {
 
 struct cpu_tune
 {
-  enum processor_type scheduler;
+  enum arm_processor_type scheduler;
   unsigned int tune_flags;
   const struct tune_params *tune;
 };
@@ -3211,7 +3211,7 @@ arm_option_override_internal (struct gcc_options *opts,
   if (TARGET_THUMB2_P (opts->x_target_flags))
     opts->x_inline_asm_unified = true;
 
-  if (arm_stack_protector_guard == SSP_GLOBAL
+  if (arm_stack_protector_guard == ARM_SSP_GLOBAL
       && opts->x_arm_stack_protector_guard_offset_str)
     {
       error ("incompatible options %<-mstack-protector-guard=global%> and "
@@ -3368,7 +3368,7 @@ arm_configure_build_target (struct arm_build_target *target,
 	     specific FPU, then ignore any bits that depend on the FPU
 	     configuration.  Do similarly if using the soft-float
 	     ABI.  */
-	  if (opts->x_arm_fpu_index != TARGET_FPU_auto
+	  if (opts->x_arm_fpu_index != ARM_TARGET_FPU_auto
 	      || arm_float_abi == ARM_FLOAT_ABI_SOFT)
 	    bitmap_and_compl (isa_delta, isa_delta, isa_all_fpbits);
 
@@ -3524,7 +3524,7 @@ arm_configure_build_target (struct arm_build_target *target,
   gcc_assert (arm_selected_cpu);
   gcc_assert (arm_selected_arch);
 
-  if (opts->x_arm_fpu_index != TARGET_FPU_auto)
+  if (opts->x_arm_fpu_index != ARM_TARGET_FPU_auto)
     {
       arm_selected_fpu = &all_fpus[opts->x_arm_fpu_index];
       auto_sbitmap fpu_bits (isa_num_bits);
@@ -33659,7 +33659,7 @@ arm_option_print (FILE *file, int indent, struct cl_target_option *ptr)
   int flags = ptr->x_target_flags;
   const char *fpu_name;
 
-  fpu_name = (ptr->x_arm_fpu_index == TARGET_FPU_auto
+  fpu_name = (ptr->x_arm_fpu_index == ARM_TARGET_FPU_auto
 	      ? "auto" : all_fpus[ptr->x_arm_fpu_index].name);
 
   fprintf (file, "%*sselected isa %s\n", indent, "",
@@ -33793,7 +33793,7 @@ arm_valid_target_attribute_rec (tree args, struct gcc_options *opts)
 	      error ("invalid fpu for target attribute or pragma %qs", q);
 	      return false;
 	    }
-	  if (fpu_index == TARGET_FPU_auto)
+	  if (fpu_index == ARM_TARGET_FPU_auto)
 	    {
 	      /* This doesn't really make sense until we support
 		 general dynamic selection of the architecture and all
@@ -33966,7 +33966,7 @@ arm_identify_fpu_from_isa (sbitmap isa)
   if (bitmap_empty_p (fpubits))
     return "softvfp";
 
-  for (unsigned int i = 0; i < TARGET_FPU_auto; i++)
+  for (unsigned int i = 0; i < ARM_TARGET_FPU_auto; i++)
     {
       arm_initialize_isa (cand_fpubits, all_fpus[i].isa_bits);
       if (bitmap_equal_p (fpubits, cand_fpubits))
@@ -36007,7 +36007,7 @@ arm_test_fpu_data (void)
     = { ISA_ALL_FPU_INTERNAL, isa_nobit };
   arm_initialize_isa (isa_all_fpubits_internal, fpu_bitlist_internal);
 
-  for (unsigned int i = 0; i < TARGET_FPU_auto; i++)
+  for (unsigned int i = 0; i < ARM_TARGET_FPU_auto; i++)
   {
     arm_initialize_isa (fpubits, all_fpus[i].isa_bits);
     bitmap_and_compl (tmpset, isa_all_fpubits_internal, fpubits);
@@ -36042,7 +36042,7 @@ arm_run_selftests (void)
 static tree
 arm_stack_protect_guard (void)
 {
-  if (arm_stack_protector_guard == SSP_GLOBAL)
+  if (arm_stack_protector_guard == ARM_SSP_GLOBAL)
     return default_stack_protect_guard ();
 
   return NULL_TREE;

@@ -908,9 +908,9 @@ extern enum riscv_cc get_riscv_cc (const rtx use);
 #define ASM_OUTPUT_OPCODE(STREAM, PTR)	\
   (PTR) = riscv_asm_output_opcode (STREAM, PTR)
 
-#define JUMP_TABLES_IN_TEXT_SECTION (riscv_cmodel == CM_LARGE)
+#define JUMP_TABLES_IN_TEXT_SECTION (riscv_cmodel == RISCV_CM_LARGE)
 #define CASE_VECTOR_MODE SImode
-#define CASE_VECTOR_PC_RELATIVE (riscv_cmodel != CM_MEDLOW)
+#define CASE_VECTOR_PC_RELATIVE (riscv_cmodel != RISCV_CM_MEDLOW)
 
 #define LOCAL_SYM_P(sym)						\
      ((SYMBOL_REF_P (sym) && SYMBOL_REF_LOCAL_P (sym))			\
@@ -920,11 +920,11 @@ extern enum riscv_cc get_riscv_cc (const rtx use);
 
 /* The load-address macro is used for PC-relative addressing of symbols
    that bind locally.  Don't use it for symbols that should be addressed
-   via the GOT.  Also, avoid it for CM_MEDLOW, where LUI addressing
+   via the GOT.  Also, avoid it for RISCV_CM_MEDLOW, where LUI addressing
    currently results in more opportunities for linker relaxation.  */
 #define USE_LOAD_ADDRESS_MACRO(sym)					\
   (!TARGET_EXPLICIT_RELOCS &&						\
-   ((flag_pic && LOCAL_SYM_P (sym)) || riscv_cmodel == CM_MEDANY))
+   ((flag_pic && LOCAL_SYM_P (sym)) || riscv_cmodel == RISCV_CM_MEDANY))
 
 /* Define this as 1 if `char' should by default be signed; else as 0.  */
 #define DEFAULT_SIGNED_CHAR 0
@@ -1314,7 +1314,7 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 #define HAVE_PRE_MODIFY_DISP  TARGET_XTHEADMEMIDX
 
 /* Check TLS Descriptors mechanism is selected.  */
-#define TARGET_TLSDESC (riscv_tls_dialect == TLS_DESCRIPTORS)
+#define TARGET_TLSDESC (riscv_tls_dialect == RISCV_TLS_DESCRIPTORS)
 
 /* This value is the amount of bytes a caller is allowed to drop the stack
    before probing has to be done for stack clash protection.  */

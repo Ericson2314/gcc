@@ -367,7 +367,7 @@ s390_cpu_cpp_builtins_internal (cpp_reader *pfile,
       "__bool=__attribute__((s390_vector_bool)) unsigned", "__bool");
   {
     char macro_def[64];
-    gcc_assert (s390_arch != PROCESSOR_NATIVE);
+    gcc_assert (s390_arch != S390_PROCESSOR_NATIVE);
     sprintf (macro_def, "__ARCH__=%d", processor_table[s390_arch].arch_level);
     cpp_undef (pfile, "__ARCH__");
     cpp_define (pfile, macro_def);

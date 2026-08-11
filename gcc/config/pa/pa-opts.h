@@ -22,7 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Which processor to schedule for.  */
 
-enum processor_type
+enum pa_processor_type
 {
   PROCESSOR_700,
   PROCESSOR_7100,

@@ -528,7 +528,7 @@ struct arm_build_target
   /* Tables with more detailed tuning information.  */
   const struct tune_params *tune;
   /* CPU identifier for the tuning target.  */
-  enum processor_type tune_core;
+  enum arm_processor_type tune_core;
 };
 
 extern struct arm_build_target arm_active_target;
@@ -579,7 +579,7 @@ struct arch_option
   /* The profile letter for the architecture, upper case by convention.  */
   const char profile;
   /* Default tune target (in the absence of any more specific data).  */
-  enum processor_type tune_id;
+  enum arm_processor_type tune_id;
 };
 
 /* Table entry for a CPU entry.  */

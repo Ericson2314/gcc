@@ -58,10 +58,10 @@ Name(aarch64_tls_type) Type(enum aarch64_tls_type)
 The possible TLS dialects:
 
 EnumValue
-Enum(aarch64_tls_type) String(trad) Value(TLS_TRADITIONAL)
+Enum(aarch64_tls_type) String(trad) Value(AARCH64_TLS_TRADITIONAL)
 
 EnumValue
-Enum(aarch64_tls_type) String(desc) Value(TLS_DESCRIPTORS)
+Enum(aarch64_tls_type) String(desc) Value(AARCH64_TLS_DESCRIPTORS)
 
 ; The code model option names for -mcmodel.
 
@@ -160,7 +160,7 @@ Target Var(flag_omit_leaf_frame_pointer) Init(2) Save
 Omit the frame pointer in leaf functions.
 
 mtls-dialect=
-Target RejectNegative Joined Enum(aarch64_tls_type) Var(aarch64_tls_dialect) Init(TLS_DESCRIPTORS) Save
+Target RejectNegative Joined Enum(aarch64_tls_type) Var(aarch64_tls_dialect) Init(AARCH64_TLS_DESCRIPTORS) Save
 Specify TLS dialect.
 
 mtls-size=
@@ -338,18 +338,18 @@ Enable the copy of the AArch64 load/store pair fusion pass that runs after
 register allocation.
 
 mstack-protector-guard=
-Target RejectNegative Joined Enum(stack_protector_guard) Var(aarch64_stack_protector_guard) Init(SSP_GLOBAL)
+Target RejectNegative Joined Enum(aarch64_stack_protector_guard_type) Var(aarch64_stack_protector_guard) Init(AARCH64_SSP_GLOBAL)
 Use given stack-protector guard.
 
 Enum
-Name(stack_protector_guard) Type(enum stack_protector_guard)
+Name(aarch64_stack_protector_guard_type) Type(enum aarch64_stack_protector_guard_type)
 Valid arguments to -mstack-protector-guard=:
 
 EnumValue
-Enum(stack_protector_guard) String(sysreg) Value(SSP_SYSREG)
+Enum(aarch64_stack_protector_guard_type) String(sysreg) Value(SSP_SYSREG)
 
 EnumValue
-Enum(stack_protector_guard) String(global) Value(SSP_GLOBAL)
+Enum(aarch64_stack_protector_guard_type) String(global) Value(AARCH64_SSP_GLOBAL)
 
 mstack-protector-guard-reg=
 Target Joined RejectNegative String Var(aarch64_stack_protector_guard_reg_str)

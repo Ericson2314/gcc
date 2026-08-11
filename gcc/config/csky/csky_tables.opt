@@ -248,4 +248,4 @@ EnumValue
 Enum(csky_fpu) String(fpv3) Value(TARGET_FPU_fpv3)
 
 EnumValue
-Enum(csky_fpu) String(auto) Value(TARGET_FPU_auto)
+Enum(csky_fpu) String(auto) Value(CSKY_TARGET_FPU_auto)

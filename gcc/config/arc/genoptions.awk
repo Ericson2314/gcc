@@ -68,7 +68,7 @@ END {
   m_option = ""
   for (c = 0; c < n_cores; c++)
     {
-      m_options = m_options "EnumValue\nEnum(processor_type) String(" \
+      m_options = m_options "EnumValue\nEnum(arc_processor_type) String(" \
 	cores[c] ") Value(PROCESSOR_" cores[c] ")\n\n"
     }
 
@@ -79,7 +79,7 @@ END {
   if (FORMAT == "Makefile")
     {
 	print "\nEnum"
-	print "Name(processor_type) Type(enum processor_type)"
+	print "Name(arc_processor_type) Type(enum arc_processor_type)"
 	print "Known ARC CPUs (for use with the -mcpu= option):\n"
 	print m_options
     }

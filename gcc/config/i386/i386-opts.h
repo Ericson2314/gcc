@@ -58,11 +58,11 @@ enum tls_dialect
 };
 
 enum cmodel {
-  CM_32,	/* The traditional 32-bit ABI.  */
+  IX86_CM_32,	/* The traditional 32-bit ABI.  */
   CM_SMALL,	/* Assumes all code and data fits in the low 31 bits.  */
   CM_KERNEL,	/* Assumes all code and data fits in the high 31 bits.  */
   CM_MEDIUM,	/* Assumes code fits in the low 31 bits; data unlimited.  */
-  CM_LARGE,	/* No assumptions.  */
+  IX86_CM_LARGE,	/* No assumptions.  */
   CM_SMALL_PIC,	/* Assumes code+data+got/plt fits in a 31 bit region.  */
   CM_MEDIUM_PIC,/* Assumes code+got/plt fits in a 31 bit region.  */
   CM_LARGE_PIC	/* No assumptions.  */
@@ -91,9 +91,9 @@ enum ix86_veclibabi {
   ix86_veclibabi_type_aocl
 };
 
-enum stack_protector_guard {
-  SSP_TLS,      /* per-thread canary in TLS block */
-  SSP_GLOBAL    /* global canary */
+enum ix86_stack_protector_guard_type {
+  IX86_SSP_TLS,      /* per-thread canary in TLS block */
+  IX86_SSP_GLOBAL    /* global canary */
 };
 
 enum prefer_vector_width {
@@ -108,12 +108,12 @@ enum prefer_vector_width {
    Spectre.  They convert indirect branches and function returns to
    call and return thunks to avoid speculative execution via indirect
    call, jmp and ret.  */
-enum indirect_branch {
-  indirect_branch_unset = 0,
-  indirect_branch_keep,
-  indirect_branch_thunk,
-  indirect_branch_thunk_inline,
-  indirect_branch_thunk_extern
+enum ix86_indirect_branch_setting {
+  ix86_indirect_branch_unset = 0,
+  ix86_indirect_branch_keep,
+  ix86_indirect_branch_thunk,
+  ix86_indirect_branch_thunk_inline,
+  ix86_indirect_branch_thunk_extern
 };
 
 enum instrument_return {

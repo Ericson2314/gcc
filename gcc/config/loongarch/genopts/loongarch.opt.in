@@ -277,10 +277,10 @@ EnumValue
 Enum(loongarch_cmodel) String(@@STR_CMODEL_TS@@) Value(CMODEL_TINY_STATIC)
 
 EnumValue
-Enum(loongarch_cmodel) String(@@STR_CMODEL_MEDIUM@@) Value(CMODEL_MEDIUM)
+Enum(loongarch_cmodel) String(@@STR_CMODEL_MEDIUM@@) Value(LARCH_CMODEL_MEDIUM)
 
 EnumValue
-Enum(loongarch_cmodel) String(@@STR_CMODEL_LARGE@@) Value(CMODEL_LARGE)
+Enum(loongarch_cmodel) String(@@STR_CMODEL_LARGE@@) Value(LARCH_CMODEL_LARGE)
 
 EnumValue
 Enum(loongarch_cmodel) String(@@STR_CMODEL_EXTREME@@) Value(CMODEL_EXTREME)
@@ -312,10 +312,10 @@ Name(loongarch_tls_type) Type(int)
 The possible TLS dialects:
 
 EnumValue
-Enum(loongarch_tls_type) String(trad) Value(TLS_TRADITIONAL)
+Enum(loongarch_tls_type) String(trad) Value(LARCH_TLS_TRADITIONAL)
 
 EnumValue
-Enum(loongarch_tls_type) String(desc) Value(TLS_DESCRIPTORS)
+Enum(loongarch_tls_type) String(desc) Value(LARCH_TLS_DESCRIPTORS)
 
 mtls-dialect=
 Target RejectNegative Joined Enum(loongarch_tls_type) Var(la_opt_tls_dialect) Init(M_OPT_UNSET) Save

@@ -454,7 +454,7 @@ static void
 arm_print_hint_for_fpu_option (const char *target)
 {
   auto_vec<const char*> candidates;
-  for (int i = 0; i < TARGET_FPU_auto; i++)
+  for (int i = 0; i < ARM_TARGET_FPU_auto; i++)
     candidates.safe_push (all_fpus[i].name);
   char *s;
   const char *hint = candidates_list_and_hint (target, s, candidates);
@@ -472,7 +472,7 @@ arm_parse_fpu_option (const char *opt)
 {
   int i;
 
-  for (i = 0; i < TARGET_FPU_auto; i++)
+  for (i = 0; i < ARM_TARGET_FPU_auto; i++)
     {
       if (strcmp (all_fpus[i].name, opt) == 0)
 	return all_fpus + i;
@@ -1038,7 +1038,7 @@ arm_asm_auto_mfpu (int argc, const char **argv)
     {
       unsigned int i;
       auto_sbitmap cand_fpubits (isa_num_bits);
-      for (i = 0; i < TARGET_FPU_auto; i++)
+      for (i = 0; i < ARM_TARGET_FPU_auto; i++)
 	{
 	  arm_initialize_isa (cand_fpubits, all_fpus[i].isa_bits);
 	  if (bitmap_equal_p (fpubits, cand_fpubits))
@@ -1048,7 +1048,7 @@ arm_asm_auto_mfpu (int argc, const char **argv)
 	    }
 	}
 
-      gcc_assert (i != TARGET_FPU_auto
+      gcc_assert (i != ARM_TARGET_FPU_auto
 		  || bitmap_bit_p (target_isa, isa_bit_vfp_base));
     }
 

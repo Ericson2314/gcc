@@ -40,9 +40,9 @@
   while (0)
 
 #define TARGET_CMODEL_SMALL \
-  (or1k_code_model == CMODEL_SMALL)
+  (or1k_code_model == OR1K_CMODEL_SMALL)
 #define TARGET_CMODEL_LARGE \
-  (or1k_code_model == CMODEL_LARGE)
+  (or1k_code_model == OR1K_CMODEL_LARGE)
 
 /* Storage layout.  */
 

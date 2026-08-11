@@ -49,7 +49,7 @@ Target RejectNegative Joined Var(visium_cpu) Enum(visium_processor_type) Init(PR
 Schedule code for given CPU.
 
 Enum
-Name(visium_processor_type) Type(enum processor_type)
+Name(visium_processor_type) Type(enum visium_processor_type)
 
 EnumValue
 Enum(visium_processor_type) String(mcm) Value(PROCESSOR_GR5)

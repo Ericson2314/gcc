@@ -50,7 +50,7 @@ enum arm_abi_type
   ARM_ABI_AAPCS_LINUX
 };
 
-enum float_abi_type
+enum arm_float_abi_type
 {
   ARM_FLOAT_ABI_SOFT,
   ARM_FLOAT_ABI_SOFTFP,
@@ -73,8 +73,8 @@ enum arm_tls_type {
 };
 
 /* Where to get the canary for the stack protector.  */
-enum stack_protector_guard {
+enum arm_stack_protector_guard_type {
   SSP_TLSREG,                  /* per-thread canary in TLS register */
-  SSP_GLOBAL                   /* global canary */
+  ARM_SSP_GLOBAL               /* global canary */
 };
 #endif

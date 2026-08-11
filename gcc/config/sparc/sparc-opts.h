@@ -48,15 +48,15 @@ enum sparc_processor_type {
   PROCESSOR_NIAGARA4,
   PROCESSOR_NIAGARA7,
   PROCESSOR_M8,
-  PROCESSOR_NATIVE
+  SPARC_PROCESSOR_NATIVE
 };
 
 /* SPARC-V9 code model type.  See sparc.h for the full description.  */
 enum sparc_code_model_type {
-  CM_32,	/* 32-bit address space.  */
-  CM_MEDLOW,	/* 32-bit address space.  */
+  SPARC_CM_32,	/* 32-bit address space.  */
+  SPARC_CM_MEDLOW,	/* 32-bit address space.  */
   CM_MEDMID,	/* 44-bit address space.  */
-  CM_MEDANY,	/* 64-bit address space.  */
+  SPARC_CM_MEDANY,	/* 64-bit address space.  */
   CM_EMBMEDANY	/* 64-bit address space.  */
 };
 

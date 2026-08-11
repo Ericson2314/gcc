@@ -51,7 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* The default code model.  */
 #undef SPARC_DEFAULT_CMODEL
-#define SPARC_DEFAULT_CMODEL CM_MEDLOW
+#define SPARC_DEFAULT_CMODEL SPARC_CM_MEDLOW
 
 #undef WCHAR_TYPE
 #define WCHAR_TYPE "int"

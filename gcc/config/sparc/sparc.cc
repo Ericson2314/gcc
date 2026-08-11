@@ -1978,7 +1978,7 @@ sparc_option_override (void)
   else
     {
       if (TARGET_ARCH32)
-	sparc_code_model = CM_32;
+	sparc_code_model = SPARC_CM_32;
       else
 	sparc_code_model = SPARC_DEFAULT_CMODEL;
     }
@@ -2083,7 +2083,7 @@ sparc_option_override (void)
     case PROCESSOR_M8:
       sparc_costs = &m8_costs;
       break;
-    case PROCESSOR_NATIVE:
+    case SPARC_PROCESSOR_NATIVE:
       gcc_unreachable ();
     };
 
@@ -2502,7 +2502,7 @@ sparc_emit_set_symbolic_const64 (rtx op0, rtx op1, rtx temp)
   /* SPARC-V9 code model support.  */
   switch (sparc_code_model)
     {
-    case CM_MEDLOW:
+    case SPARC_CM_MEDLOW:
       /* The range spanned by all instructions in the object is less
 	 than 2^31 bytes (2GB) and the distance from any instruction
 	 to the location of the label _GLOBAL_OFFSET_TABLE_ is less
@@ -2555,7 +2555,7 @@ sparc_emit_set_symbolic_const64 (rtx op0, rtx op1, rtx temp)
       emit_insn (gen_setl44 (op0, temp3, op1));
       break;
 
-    case CM_MEDANY:
+    case SPARC_CM_MEDANY:
       /* The range spanned by all instructions in the object is less
 	 than 2^31 bytes (2GB) and the distance from any instruction
 	 to the location of the label _GLOBAL_OFFSET_TABLE_ is less
@@ -5071,7 +5071,7 @@ sparc_legitimize_reload_address (rtx x, machine_mode mode,
       && GET_MODE (x) == SImode
       && GET_CODE (x) != LO_SUM
       && GET_CODE (x) != HIGH
-      && sparc_code_model <= CM_MEDLOW
+      && sparc_code_model <= SPARC_CM_MEDLOW
       && !(flag_pic
 	   && (symbolic_operand (x, Pmode) || pic_address_needs_scratch (x))))
     {
@@ -12527,13 +12527,13 @@ sparc_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
         {
 	  switch (sparc_code_model)
 	    {
-	    case CM_MEDLOW:
+	    case SPARC_CM_MEDLOW:
 	    case CM_MEDMID:
 	      /* The destination can serve as a temporary.  */
 	      sparc_emit_set_symbolic_const64 (scratch, funexp, scratch);
 	      break;
 
-	    case CM_MEDANY:
+	    case SPARC_CM_MEDANY:
 	    case CM_EMBMEDANY:
 	      /* The destination cannot serve as a temporary.  */
 	      spill_reg = gen_rtx_REG (DImode, 15);  /* %o7 */

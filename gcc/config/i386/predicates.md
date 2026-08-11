@@ -229,7 +229,7 @@
 	  rtx op1 = XEXP (XEXP (op, 0), 0);
 	  rtx op2 = XEXP (XEXP (op, 0), 1);
 
-	  if (ix86_cmodel == CM_LARGE && GET_CODE (op1) != UNSPEC)
+	  if (ix86_cmodel == IX86_CM_LARGE && GET_CODE (op1) != UNSPEC)
 	    return false;
 	  if (!CONST_INT_P (op2))
 	    return false;
@@ -338,7 +338,7 @@
 	  rtx op1 = XEXP (XEXP (op, 0), 0);
 	  rtx op2 = XEXP (XEXP (op, 0), 1);
 
-	  if (ix86_cmodel == CM_LARGE)
+	  if (ix86_cmodel == IX86_CM_LARGE)
 	    return false;
 	  if (!CONST_INT_P (op2))
 	    return false;
@@ -669,7 +669,7 @@
 ;; The comments above seem to apply only to VxWorks releases before 7.
 (define_predicate "gotoff_operand"
   (and (ior (not (match_test "TARGET_VXWORKS_VAROFF"))
-            (match_test "ix86_cmodel == CM_LARGE")
+            (match_test "ix86_cmodel == IX86_CM_LARGE")
             (match_test "ix86_cmodel == CM_LARGE_PIC"))
        (match_operand 0 "local_symbolic_operand")))
 
@@ -690,7 +690,7 @@
 (define_predicate "constant_call_address_operand"
   (match_code "symbol_ref")
 {
-  if (ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC
+  if (ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC
       || flag_force_indirect_call
       || (TARGET_INDIRECT_BRANCH_REGISTER
           && ix86_nopic_noplt_attribute_p (op)))

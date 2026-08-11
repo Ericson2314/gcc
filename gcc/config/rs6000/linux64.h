@@ -503,7 +503,7 @@ extern int dot_symbols;
 	   && SYMBOL_REF_P (XEXP (XEXP (X, 0), 0)))			\
        || GET_CODE (X) == LABEL_REF					\
        || (CONST_INT_P (X)						\
-	   && TARGET_CMODEL != CMODEL_MEDIUM				\
+	   && TARGET_CMODEL != RS6000_CMODEL_MEDIUM				\
 	   && known_le (GET_MODE_BITSIZE (MODE), GET_MODE_BITSIZE (Pmode)))	\
        || (CONST_DOUBLE_P (X)						\
 	   && ((TARGET_64BIT						\
@@ -568,5 +568,5 @@ extern int dot_symbols;
    the medium/large code models.  */
 #define PCREL_SUPPORTED_BY_OS	(TARGET_POWER10 && TARGET_PREFIXED	\
 				 && ELFv2_ABI_CHECK			\
-				 && (TARGET_CMODEL == CMODEL_MEDIUM	\
-				     || TARGET_CMODEL == CMODEL_LARGE))
+				 && (TARGET_CMODEL == RS6000_CMODEL_MEDIUM	\
+				     || TARGET_CMODEL == RS6000_CMODEL_LARGE))

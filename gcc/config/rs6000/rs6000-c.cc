@@ -733,10 +733,10 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     {
       /* Deliberately omit __CMODEL_SMALL__ since that was the default
 	 before --mcmodel support was added.  */
-    case CMODEL_MEDIUM:
+    case RS6000_CMODEL_MEDIUM:
       builtin_define ("__CMODEL_MEDIUM__");
       break;
-    case CMODEL_LARGE:
+    case RS6000_CMODEL_LARGE:
       builtin_define ("__CMODEL_LARGE__");
       break;
     default:

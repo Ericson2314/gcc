@@ -23,7 +23,7 @@ config/pa/pa-opts.h
 
 ; Which cpu we are scheduling for.
 Variable
-enum processor_type pa_cpu = TARGET_SCHED_DEFAULT
+enum pa_processor_type pa_cpu = TARGET_SCHED_DEFAULT
 
 march=1.0
 Target RejectNegative
@@ -127,7 +127,7 @@ Target RejectNegative Joined Enum(pa_schedule) Var(pa_cpu)
 Specify CPU for scheduling purposes.  Valid arguments are 700, 7100, 7100LC, 7200, 7300, and 8000.
 
 Enum
-Name(pa_schedule) Type(enum processor_type)
+Name(pa_schedule) Type(enum pa_processor_type)
 
 EnumValue
 Enum(pa_schedule) String(8000) Value(PROCESSOR_8000)

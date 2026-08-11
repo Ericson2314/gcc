@@ -142,7 +142,7 @@
   (const_string "none"))
 
 ;; Processor type (for scheduling, not code generation) -- this attribute
-;; must exactly match the processor_type enumeration in pa.h.
+;; must exactly match the pa_processor_type enumeration in pa.h.
 ;;
 ;; FIXME: Add 800 scheduling for completeness?
 

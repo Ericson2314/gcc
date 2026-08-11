@@ -34,9 +34,9 @@ enum riscv_abi_type {
 extern enum riscv_abi_type riscv_abi;
 
 enum riscv_code_model {
-  CM_MEDLOW,
-  CM_MEDANY,
-  CM_LARGE,
+  RISCV_CM_MEDLOW,
+  RISCV_CM_MEDANY,
+  RISCV_CM_LARGE,
   CM_PIC
 };
 extern enum riscv_code_model riscv_cmodel;
@@ -85,9 +85,9 @@ enum riscv_zilsd_align_type {
 };
 
 /* Where to get the canary for the stack protector.  */
-enum stack_protector_guard {
-  SSP_TLS,			/* per-thread canary in TLS block */
-  SSP_GLOBAL			/* global canary */
+enum riscv_stack_protector_guard_type {
+  RISCV_SSP_TLS,			/* per-thread canary in TLS block */
+  RISCV_SSP_GLOBAL			/* global canary */
 };
 
 /* RISC-V auto-vectorization RVV LMUL.  */
@@ -181,8 +181,8 @@ enum rvv_vector_bits_enum {
 
 /* TLS types.  */
 enum riscv_tls_type {
-  TLS_TRADITIONAL,
-  TLS_DESCRIPTORS
+  RISCV_TLS_TRADITIONAL,
+  RISCV_TLS_DESCRIPTORS
 };
 
 /* On some microarchitectures, vector segment loads and stores are excessively

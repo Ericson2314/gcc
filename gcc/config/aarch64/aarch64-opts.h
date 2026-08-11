@@ -57,8 +57,8 @@ enum aarch64_arch
 
 /* TLS types.  */
 enum aarch64_tls_type {
-  TLS_TRADITIONAL,
-  TLS_DESCRIPTORS
+  AARCH64_TLS_TRADITIONAL,
+  AARCH64_TLS_DESCRIPTORS
 };
 
 /* The code model defines the address generation strategy.  */
@@ -96,9 +96,9 @@ enum aarch64_sve_vector_bits_enum {
 };
 
 /* Where to get the canary for the stack protector.  */
-enum stack_protector_guard {
+enum aarch64_stack_protector_guard_type {
   SSP_SYSREG,			/* per-thread canary in special system register */
-  SSP_GLOBAL			/* global canary */
+  AARCH64_SSP_GLOBAL			/* global canary */
 };
 
 /* The key type that -msign-return-address should use.  */

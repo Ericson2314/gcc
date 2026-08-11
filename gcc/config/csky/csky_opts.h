@@ -54,12 +54,12 @@ enum csky_fpu_type
 #undef CSKY_FPU
 #define CSKY_FPU(NAME, CNAME, ISA) TARGET_FPU_##CNAME,
 #include "csky_cores.def"
-  TARGET_FPU_auto
+  CSKY_TARGET_FPU_auto
 #undef CSKY_FPU
 };
 #define CSKY_TARGET_FPU_GET(name) TARGET_FPU_ ## name
 
-enum float_abi_type
+enum csky_float_abi_type
 {
   CSKY_FLOAT_ABI_SOFT,
   CSKY_FLOAT_ABI_SOFTFP,

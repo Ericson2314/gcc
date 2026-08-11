@@ -17,7 +17,7 @@
 #include "config/gcn/gcn-opts.h"
 
 extern const struct gcn_device_def {
-  enum processor_type id;
+  enum gcn_processor_type id;
   const char *name;
   const char *NAME;
   enum gcn_isa isa;

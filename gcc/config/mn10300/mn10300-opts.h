@@ -20,7 +20,7 @@
 #ifndef MN10300_OPTS_H
 #define MN10300_OPTS_H
 
-enum processor_type
+enum mn10300_processor_type
 {
   PROCESSOR_MN10300,
   PROCESSOR_AM33,

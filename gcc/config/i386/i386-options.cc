@@ -922,7 +922,7 @@ ix86_function_specific_post_stream_in (struct cl_target_option *ptr)
 	ptr->x_ix86_cmodel = CM_MEDIUM_PIC;
 	break;
 
-      case CM_LARGE:
+      case IX86_CM_LARGE:
 	ptr->x_ix86_cmodel = CM_LARGE_PIC;
 	break;
 
@@ -945,7 +945,7 @@ ix86_function_specific_post_stream_in (struct cl_target_option *ptr)
 	break;
 
       case CM_LARGE_PIC:
-	ptr->x_ix86_cmodel = CM_LARGE;
+	ptr->x_ix86_cmodel = IX86_CM_LARGE;
 	break;
 
       default:
@@ -2246,7 +2246,7 @@ ix86_option_override_internal (bool main_args_p,
 		   "medium");
 	  break;
 
-	case CM_LARGE:
+	case IX86_CM_LARGE:
 	case CM_LARGE_PIC:
 	  if (opts->x_flag_pic)
 	    opts->x_ix86_cmodel = CM_LARGE_PIC;
@@ -2258,7 +2258,7 @@ ix86_option_override_internal (bool main_args_p,
 		   "large");
 	  break;
 
-	case CM_32:
+	case IX86_CM_32:
 	  if (opts->x_flag_pic)
 	    error ("code model %s does not support PIC mode", "32");
 	  if (TARGET_64BIT_P (opts->x_ix86_isa_flags))
@@ -2270,7 +2270,7 @@ ix86_option_override_internal (bool main_args_p,
 	  if (opts->x_flag_pic)
 	    {
 	      error ("code model %s does not support PIC mode", "kernel");
-	      opts->x_ix86_cmodel = CM_32;
+	      opts->x_ix86_cmodel = IX86_CM_32;
 	    }
 	  if (!TARGET_64BIT_P (opts->x_ix86_isa_flags))
 	    error ("code model %qs not supported in the %s bit mode",
@@ -2293,7 +2293,7 @@ ix86_option_override_internal (bool main_args_p,
       else if (TARGET_64BIT_P (opts->x_ix86_isa_flags))
 	opts->x_ix86_cmodel = opts->x_flag_pic ? CM_SMALL_PIC : CM_SMALL;
       else
-	opts->x_ix86_cmodel = CM_32;
+	opts->x_ix86_cmodel = IX86_CM_32;
     }
   if (TARGET_MACHO && opts->x_ix86_asm_dialect == ASM_INTEL)
     {
@@ -3028,10 +3028,10 @@ ix86_option_override_internal (bool main_args_p,
     {
 #ifdef TARGET_THREAD_SSP_OFFSET
       if (!TARGET_HAS_BIONIC)
-	opts->x_ix86_stack_protector_guard = SSP_TLS;
+	opts->x_ix86_stack_protector_guard = IX86_SSP_TLS;
       else
 #endif
-	opts->x_ix86_stack_protector_guard = SSP_GLOBAL;
+	opts->x_ix86_stack_protector_guard = IX86_SSP_GLOBAL;
     }
 
   if (opts_set->x_ix86_stack_protector_guard_offset_str)
@@ -3160,7 +3160,7 @@ ix86_option_override_internal (bool main_args_p,
 
   /* PR86952: jump table usage with retpolines is slow.
      The PR provides some numbers about the slowness.  */
-  if (ix86_indirect_branch != indirect_branch_keep)
+  if (ix86_indirect_branch != ix86_indirect_branch_keep)
     SET_OPTION_IF_UNSET (opts, opts_set, flag_jump_tables, 0);
 
   SET_OPTION_IF_UNSET (opts, opts_set, param_ira_consider_dup_in_all_alts, 0);
@@ -3367,7 +3367,7 @@ ix86_set_func_type (tree fndecl)
 static void
 ix86_set_indirect_branch_type (tree fndecl)
 {
-  if (cfun->machine->indirect_branch_type == indirect_branch_unset)
+  if (cfun->machine->indirect_branch_type == ix86_indirect_branch_unset)
     {
       tree attr = lookup_attribute ("indirect_branch",
 				    DECL_ATTRIBUTES (fndecl));
@@ -3378,13 +3378,13 @@ ix86_set_indirect_branch_type (tree fndecl)
 	    gcc_unreachable ();
 	  tree cst = TREE_VALUE (args);
 	  if (strcmp (TREE_STRING_POINTER (cst), "keep") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_keep;
+	    cfun->machine->indirect_branch_type = ix86_indirect_branch_keep;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk;
+	    cfun->machine->indirect_branch_type = ix86_indirect_branch_thunk;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-inline") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk_inline;
+	    cfun->machine->indirect_branch_type = ix86_indirect_branch_thunk_inline;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-extern") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk_extern;
+	    cfun->machine->indirect_branch_type = ix86_indirect_branch_thunk_extern;
 	  else
 	    gcc_unreachable ();
 	}
@@ -3393,26 +3393,26 @@ ix86_set_indirect_branch_type (tree fndecl)
 
       /* -mcmodel=large is not compatible with -mindirect-branch=thunk
 	 nor -mindirect-branch=thunk-extern.  */
-      if ((ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+      if ((ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
 	  && ((cfun->machine->indirect_branch_type
-	       == indirect_branch_thunk_extern)
+	       == ix86_indirect_branch_thunk_extern)
 	      || (cfun->machine->indirect_branch_type
-		  == indirect_branch_thunk)))
+		  == ix86_indirect_branch_thunk)))
 	error ("%<-mindirect-branch=%s%> and %<-mcmodel=large%> are not "
 	       "compatible",
 	       ((cfun->machine->indirect_branch_type
-		 == indirect_branch_thunk_extern)
+		 == ix86_indirect_branch_thunk_extern)
 		? "thunk-extern" : "thunk"));
 
-      if (cfun->machine->indirect_branch_type != indirect_branch_keep
+      if (cfun->machine->indirect_branch_type != ix86_indirect_branch_keep
 	  && (cfun->machine->indirect_branch_type
-	      != indirect_branch_thunk_extern)
+	      != ix86_indirect_branch_thunk_extern)
 	  && (flag_cf_protection & CF_RETURN))
 	error ("%<-mindirect-branch%> and %<-fcf-protection%> are not "
 	       "compatible");
     }
 
-  if (cfun->machine->function_return_type == indirect_branch_unset)
+  if (cfun->machine->function_return_type == ix86_indirect_branch_unset)
     {
       tree attr = lookup_attribute ("function_return",
 				    DECL_ATTRIBUTES (fndecl));
@@ -3423,13 +3423,13 @@ ix86_set_indirect_branch_type (tree fndecl)
 	    gcc_unreachable ();
 	  tree cst = TREE_VALUE (args);
 	  if (strcmp (TREE_STRING_POINTER (cst), "keep") == 0)
-	    cfun->machine->function_return_type = indirect_branch_keep;
+	    cfun->machine->function_return_type = ix86_indirect_branch_keep;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk;
+	    cfun->machine->function_return_type = ix86_indirect_branch_thunk;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-inline") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk_inline;
+	    cfun->machine->function_return_type = ix86_indirect_branch_thunk_inline;
 	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-extern") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk_extern;
+	    cfun->machine->function_return_type = ix86_indirect_branch_thunk_extern;
 	  else
 	    gcc_unreachable ();
 	}
@@ -3438,20 +3438,20 @@ ix86_set_indirect_branch_type (tree fndecl)
 
       /* -mcmodel=large is not compatible with -mfunction-return=thunk
 	 nor -mfunction-return=thunk-extern.  */
-      if ((ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+      if ((ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
 	  && ((cfun->machine->function_return_type
-	       == indirect_branch_thunk_extern)
+	       == ix86_indirect_branch_thunk_extern)
 	      || (cfun->machine->function_return_type
-		  == indirect_branch_thunk)))
+		  == ix86_indirect_branch_thunk)))
 	error ("%<-mfunction-return=%s%> and %<-mcmodel=large%> are not "
 	       "compatible",
 	       ((cfun->machine->function_return_type
-		 == indirect_branch_thunk_extern)
+		 == ix86_indirect_branch_thunk_extern)
 		? "thunk-extern" : "thunk"));
 
-      if (cfun->machine->function_return_type != indirect_branch_keep
+      if (cfun->machine->function_return_type != ix86_indirect_branch_keep
 	  && (cfun->machine->function_return_type
-	      != indirect_branch_thunk_extern)
+	      != ix86_indirect_branch_thunk_extern)
 	  && (flag_cf_protection & CF_RETURN))
 	error ("%<-mfunction-return%> and %<-fcf-protection%> are not "
 	       "compatible");

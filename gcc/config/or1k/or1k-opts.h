@@ -23,8 +23,8 @@
 
 /* The OpenRISC code generation models available.  */
 enum or1k_cmodel_type {
-  CMODEL_SMALL,
-  CMODEL_LARGE
+  OR1K_CMODEL_SMALL,
+  OR1K_CMODEL_LARGE
 };
 
 #endif /* GCC_OR1K_OPTS_H */

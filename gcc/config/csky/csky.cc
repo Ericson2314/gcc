@@ -2616,7 +2616,7 @@ csky_option_override (void)
     {
       const struct csky_fpu_desc *csky_selected_fpu = NULL;
 
-      if (csky_fpu_index == TARGET_FPU_auto)
+      if (csky_fpu_index == CSKY_TARGET_FPU_auto)
 	{
 	  const char *target_fpu_name;
 	  bool ok;
@@ -2647,7 +2647,7 @@ csky_option_override (void)
       if (CSKY_TARGET_ARCH (CK801) || CSKY_TARGET_ARCH (CK802))
 	error ("%qs is not supported by arch %qs",
 	       "-mhard-float", csky_active_target.arch_pp_name);
-      else if (csky_fpu_index == TARGET_FPU_auto)
+      else if (csky_fpu_index == CSKY_TARGET_FPU_auto)
 	error ("%<-mhard-float%> is not supported by the selected CPU");
       else
 	{

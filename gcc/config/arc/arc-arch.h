@@ -103,7 +103,7 @@ typedef struct
   const arc_arch_t *arch_info;
 
   /* Specific processor type.  */
-  enum processor_type processor;
+  enum arc_processor_type processor;
 
   /* Specific flags.  */
   const unsigned long long flags;

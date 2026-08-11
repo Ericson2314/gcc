@@ -885,11 +885,11 @@ enum nds32_builtins
   (nds32_cpu_option == CPU_SIMPLE)
 
 #define TARGET_CMODEL_SMALL \
-   (nds32_cmodel_option == CMODEL_SMALL)
+   (nds32_cmodel_option == NDS32_CMODEL_SMALL)
 #define TARGET_CMODEL_MEDIUM \
-   (nds32_cmodel_option == CMODEL_MEDIUM)
+   (nds32_cmodel_option == NDS32_CMODEL_MEDIUM)
 #define TARGET_CMODEL_LARGE \
-   (nds32_cmodel_option == CMODEL_LARGE)
+   (nds32_cmodel_option == NDS32_CMODEL_LARGE)
 
 #define TARGET_ICT_MODEL_SMALL \
    (nds32_ict_model == ICT_MODEL_SMALL)
@@ -900,8 +900,8 @@ enum nds32_builtins
 /* When -mcmodel=small or -mcmodel=medium,
    compiler may generate gp-base instruction directly.  */
 #define TARGET_GP_DIRECT \
-   (nds32_cmodel_option == CMODEL_SMALL\
-    || nds32_cmodel_option == CMODEL_MEDIUM)
+   (nds32_cmodel_option == NDS32_CMODEL_SMALL\
+    || nds32_cmodel_option == NDS32_CMODEL_MEDIUM)
 
 #define TARGET_MUL_SLOW \
   (nds32_mul_config == MUL_TYPE_SLOW)

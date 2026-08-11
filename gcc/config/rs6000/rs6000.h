@@ -231,7 +231,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #endif
 
 #ifndef TARGET_CMODEL
-#define TARGET_CMODEL CMODEL_SMALL
+#define TARGET_CMODEL RS6000_CMODEL_SMALL
 #endif
 
 #define TARGET_32BIT		(! TARGET_64BIT)

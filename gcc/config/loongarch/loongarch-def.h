@@ -125,8 +125,8 @@ enum {
   CMODEL_NORMAL		= 0,
   CMODEL_TINY		= 1,
   CMODEL_TINY_STATIC	= 2,
-  CMODEL_MEDIUM		= 3,
-  CMODEL_LARGE		= 4,
+  LARCH_CMODEL_MEDIUM		= 3,
+  LARCH_CMODEL_LARGE		= 4,
   CMODEL_EXTREME	= 5,
   N_CMODEL_TYPES	= 6
 };
@@ -217,8 +217,8 @@ enum {
 
 /* TLS types.  */
 enum {
-  TLS_TRADITIONAL = 0,
-  TLS_DESCRIPTORS = 1
+  LARCH_TLS_TRADITIONAL = 0,
+  LARCH_TLS_DESCRIPTORS = 1
 };
 
 /* Target preset properties */

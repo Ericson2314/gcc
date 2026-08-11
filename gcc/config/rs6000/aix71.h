@@ -44,18 +44,18 @@ do {									\
        & OPTION_MASK_MINIMAL_TOC) != 0)					\
     {									\
       if (OPTION_SET_P (rs6000_current_cmodel)			\
-	  && rs6000_current_cmodel != CMODEL_SMALL)			\
+	  && rs6000_current_cmodel != RS6000_CMODEL_SMALL)			\
 	error ("%<-mcmodel%> incompatible with other toc options"); 	\
-      SET_CMODEL (CMODEL_SMALL);					\
+      SET_CMODEL (RS6000_CMODEL_SMALL);					\
     }									\
-  if (rs6000_current_cmodel != CMODEL_SMALL)				\
+  if (rs6000_current_cmodel != RS6000_CMODEL_SMALL)				\
     {									\
       TARGET_NO_FP_IN_TOC = 1;						\
       TARGET_NO_SUM_IN_TOC = 1;						\
     }									\
-  if (rs6000_current_cmodel == CMODEL_MEDIUM)				\
+  if (rs6000_current_cmodel == RS6000_CMODEL_MEDIUM)				\
     {									\
-      rs6000_current_cmodel = CMODEL_LARGE;				\
+      rs6000_current_cmodel = RS6000_CMODEL_LARGE;				\
     }									\
   if (! strcmp (lang_hooks.name, "GNU Go")				\
       && TARGET_32BIT)							\

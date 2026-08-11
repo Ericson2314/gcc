@@ -24,11 +24,11 @@ along with GCC; see the file COPYING3.  If not see
    that mirrors this list, so changes to ia64.md must be made at the
    same time.  */
 
-enum processor_type
+enum ia64_processor_type
 {
   PROCESSOR_ITANIUM,			/* Original Itanium.  */
   PROCESSOR_ITANIUM2,
-  PROCESSOR_max
+  IA64_PROCESSOR_max
 };
 
 #endif

@@ -1794,7 +1794,7 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 struct rs6000_ptt
 {
   const char *const name;		/* Canonical processor name.  */
-  const enum processor_type processor;	/* Processor type enum value.  */
+  const enum rs6000_processor_type processor;	/* Processor type enum value.  */
   const HOST_WIDE_INT target_enable;	/* Target flags to enable.  */
 };
 
@@ -2547,9 +2547,9 @@ rs6000_debug_reg_global (void)
 
   switch (rs6000_current_cmodel)
     {
-    case CMODEL_SMALL:	cmodel_str = "small";	break;
-    case CMODEL_MEDIUM:	cmodel_str = "medium";	break;
-    case CMODEL_LARGE:	cmodel_str = "large";	break;
+    case RS6000_CMODEL_SMALL:	cmodel_str = "small";	break;
+    case RS6000_CMODEL_MEDIUM:	cmodel_str = "medium";	break;
+    case RS6000_CMODEL_LARGE:	cmodel_str = "large";	break;
     default:		cmodel_str = "unknown";	break;
     }
 
@@ -3548,26 +3548,26 @@ rs6000_linux64_override_options ()
 	  error ("%<-m64%> requires a PowerPC64 cpu");
 	}
       if (!OPTION_SET_P (rs6000_current_cmodel))
-	SET_CMODEL (CMODEL_MEDIUM);
+	SET_CMODEL (RS6000_CMODEL_MEDIUM);
       if ((rs6000_isa_flags_explicit & OPTION_MASK_MINIMAL_TOC) != 0)
 	{
 	  if (OPTION_SET_P (rs6000_current_cmodel)
-	      && rs6000_current_cmodel != CMODEL_SMALL)
+	      && rs6000_current_cmodel != RS6000_CMODEL_SMALL)
 	    error ("%<-mcmodel%> incompatible with other toc options");
 	  if (TARGET_MINIMAL_TOC)
-	    SET_CMODEL (CMODEL_SMALL);
+	    SET_CMODEL (RS6000_CMODEL_SMALL);
 	  else if (TARGET_PCREL
 		   || (PCREL_SUPPORTED_BY_OS
 		       && (rs6000_isa_flags_explicit & OPTION_MASK_PCREL) == 0))
 	    /* Ignore -mno-minimal-toc.  */
 	    ;
 	  else
-	    SET_CMODEL (CMODEL_SMALL);
+	    SET_CMODEL (RS6000_CMODEL_SMALL);
 	}
-      if (rs6000_current_cmodel != CMODEL_SMALL)
+      if (rs6000_current_cmodel != RS6000_CMODEL_SMALL)
 	{
 	  if (!OPTION_SET_P (TARGET_NO_FP_IN_TOC))
-	    TARGET_NO_FP_IN_TOC = rs6000_current_cmodel == CMODEL_MEDIUM;
+	    TARGET_NO_FP_IN_TOC = rs6000_current_cmodel == RS6000_CMODEL_MEDIUM;
 	  if (!OPTION_SET_P (TARGET_NO_SUM_IN_TOC))
 	    TARGET_NO_SUM_IN_TOC = 0;
 	}
@@ -3590,7 +3590,7 @@ rs6000_linux64_override_options ()
 	}
       if (OPTION_SET_P (rs6000_current_cmodel))
 	{
-	  SET_CMODEL (CMODEL_SMALL);
+	  SET_CMODEL (RS6000_CMODEL_SMALL);
 	  error (INVALID_32BIT, "cmodel");
 	}
     }
@@ -3839,7 +3839,7 @@ rs6000_option_override_internal (bool global_init_p)
   else
     {
       size_t i;
-      enum processor_type tune_proc
+      enum rs6000_processor_type tune_proc
 	= (TARGET_POWERPC64 ? PROCESSOR_DEFAULT64 : PROCESSOR_DEFAULT);
 
       tune_index = -1;
@@ -4429,8 +4429,8 @@ rs6000_option_override_internal (bool global_init_p)
   /* -mpcrel requires medium or large code models, but we can't check
       TARGET_CMODEL until after the subtarget override options are done.  */
   else if (TARGET_PCREL
-	   && TARGET_CMODEL != CMODEL_MEDIUM
-	   && TARGET_CMODEL != CMODEL_LARGE)
+	   && TARGET_CMODEL != RS6000_CMODEL_MEDIUM
+	   && TARGET_CMODEL != RS6000_CMODEL_LARGE)
     {
       if ((rs6000_isa_flags_explicit & OPTION_MASK_PCREL) != 0)
 	error ("%qs requires %qs or %qs", "-mpcrel", "-mcmodel=medium",
@@ -4573,9 +4573,9 @@ rs6000_option_override_internal (bool global_init_p)
   /* Handle stack protector */
   if (!OPTION_SET_P (rs6000_stack_protector_guard))
 #ifdef TARGET_THREAD_SSP_OFFSET
-    rs6000_stack_protector_guard = SSP_TLS;
+    rs6000_stack_protector_guard = RS6000_SSP_TLS;
 #else
-    rs6000_stack_protector_guard = SSP_GLOBAL;
+    rs6000_stack_protector_guard = RS6000_SSP_GLOBAL;
 #endif
 
 #ifdef TARGET_THREAD_SSP_OFFSET
@@ -4614,7 +4614,7 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_stack_protector_guard_reg = reg;
     }
 
-  if (rs6000_stack_protector_guard == SSP_TLS
+  if (rs6000_stack_protector_guard == RS6000_SSP_TLS
       && !IN_RANGE (rs6000_stack_protector_guard_reg, 1, 31))
     error ("%qs needs a valid base register", "-mstack-protector-guard=tls");
 
@@ -8926,7 +8926,7 @@ create_TOC_reference (rtx symbol, rtx largetoc_reg)
 
   tocreg = gen_rtx_REG (Pmode, TOC_REGISTER);
   tocrel = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, symbol, tocreg), UNSPEC_TOCREL);
-  if (TARGET_CMODEL == CMODEL_SMALL || can_create_pseudo_p ())
+  if (TARGET_CMODEL == RS6000_CMODEL_SMALL || can_create_pseudo_p ())
     return tocrel;
 
   hi = gen_rtx_HIGH (Pmode, copy_rtx (tocrel));
@@ -8956,7 +8956,7 @@ toc_relative_expr_p (const_rtx op, bool strict, const_rtx *tocrel_base_ret,
   if (!TARGET_TOC)
     return false;
 
-  if (TARGET_CMODEL != CMODEL_SMALL)
+  if (TARGET_CMODEL != RS6000_CMODEL_SMALL)
     {
       /* When strict ensure we have everything tidy.  */
       if (strict
@@ -9000,7 +9000,7 @@ legitimate_constant_pool_address_p (const_rtx x, machine_mode mode,
 {
   const_rtx tocrel_base, tocrel_offset;
   return (toc_relative_expr_p (x, strict, &tocrel_base, &tocrel_offset)
-	  && (TARGET_CMODEL != CMODEL_MEDIUM
+	  && (TARGET_CMODEL != RS6000_CMODEL_MEDIUM
 	      || constant_pool_expr_p (XVECEXP (tocrel_base, 0, 0))
 	      || mode == QImode
 	      || offsettable_ok_by_alignment (XVECEXP (tocrel_base, 0, 0),
@@ -9167,7 +9167,7 @@ legitimate_lo_sum_address_p (machine_mode mode, rtx x, int strict)
 	 transformations can generate correct code for address reloads.
 	 It cannot manage only some LO_SUM cases.  So we need to add
 	 code here saying that some addresses are still valid.  */
-      large_toc_ok = (lra_in_progress && TARGET_CMODEL != CMODEL_SMALL
+      large_toc_ok = (lra_in_progress && TARGET_CMODEL != RS6000_CMODEL_SMALL
 		      && small_toc_ref (x, VOIDmode));
       if (TARGET_TOC && ! large_toc_ok)
 	return false;
@@ -9497,7 +9497,7 @@ rs6000_delegitimize_address (rtx orig_x)
     x = XEXP (x, 0);
 
   y = x;
-  if (TARGET_CMODEL != CMODEL_SMALL && GET_CODE (y) == LO_SUM)
+  if (TARGET_CMODEL != RS6000_CMODEL_SMALL && GET_CODE (y) == LO_SUM)
     y = XEXP (y, 1);
 
   offset = NULL_RTX;
@@ -9905,7 +9905,7 @@ rs6000_legitimize_tls_address (rtx addr, enum tls_model model)
 static tree
 rs6000_init_stack_protect_guard (void)
 {
-  if (rs6000_stack_protector_guard == SSP_GLOBAL)
+  if (rs6000_stack_protector_guard == RS6000_SSP_GLOBAL)
     return default_stack_protect_guard ();
 
   return NULL_TREE;
@@ -9945,7 +9945,7 @@ use_toc_relative_ref (rtx sym, machine_mode mode)
   return ((constant_pool_expr_p (sym)
 	   && ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (get_pool_constant (sym),
 					       get_pool_mode (sym)))
-	  || (TARGET_CMODEL == CMODEL_MEDIUM
+	  || (TARGET_CMODEL == RS6000_CMODEL_MEDIUM
 	      && SYMBOL_REF_LOCAL_P (sym)
 	      && known_le (GET_MODE_SIZE (mode), POWERPC64_TOC_POINTER_ALIGNMENT)));
 }
@@ -11417,9 +11417,9 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 		    && FP_REGNO_P (REGNO (operands[0])))
 		   || !CONST_INT_P (operands[1])
 		   || (num_insns_constant (operands[1], mode)
-		       > (TARGET_CMODEL != CMODEL_SMALL ? 3 : 2)))
+		       > (TARGET_CMODEL != RS6000_CMODEL_SMALL ? 3 : 2)))
 	       && !toc_relative_expr_p (operands[1], false, NULL, NULL)
-	       && (TARGET_CMODEL == CMODEL_SMALL
+	       && (TARGET_CMODEL == RS6000_CMODEL_SMALL
 		   || can_create_pseudo_p ()
 		   || (REG_P (operands[0])
 		       && INT_REG_OK_FOR_BASE_P (operands[0], true))))
@@ -12403,7 +12403,7 @@ rs6000_secondary_reload_toc_costs (addr_mask_type addr_mask)
 {
   int ret;
 
-  if (TARGET_CMODEL != CMODEL_SMALL)
+  if (TARGET_CMODEL != RS6000_CMODEL_SMALL)
     ret = ((addr_mask & RELOAD_REG_OFFSET) == 0) ? 1 : 2;
 
   else
@@ -12675,7 +12675,7 @@ rs6000_secondary_reload_memory (rtx addr,
 
       /* TOC references look like offsetable memory.  */
     case UNSPEC:
-      if (TARGET_CMODEL == CMODEL_SMALL || XINT (addr, 1) != UNSPEC_TOCREL)
+      if (TARGET_CMODEL == RS6000_CMODEL_SMALL || XINT (addr, 1) != UNSPEC_TOCREL)
 	{
 	  fail_msg = "bad UNSPEC";
 	  extra_cost = -1;
@@ -17948,7 +17948,7 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
       /* Mark large TOC symbols on AIX with [TE] so they are mapped
 	 after other TOC symbols, reducing overflow of small TOC access
 	 to [TC] symbols.  */
-      fputs (TARGET_XCOFF && TARGET_CMODEL != CMODEL_SMALL
+      fputs (TARGET_XCOFF && TARGET_CMODEL != RS6000_CMODEL_SMALL
 	     ? "[TE]," : "[TC],", file);
     }
 
@@ -21530,7 +21530,7 @@ rs6000_elf_declare_function_name (FILE *file, const char *name, tree decl)
   ASM_OUTPUT_TYPE_DIRECTIVE (file, name, "function");
   ASM_DECLARE_RESULT (file, DECL_RESULT (decl));
 
-  if (TARGET_CMODEL == CMODEL_LARGE && !TARGET_PCREL
+  if (TARGET_CMODEL == RS6000_CMODEL_LARGE && !TARGET_PCREL
       && rs6000_global_entry_point_prologue_needed_p ())
     {
       char buf[256];
@@ -26624,7 +26624,7 @@ rs6000_fndecl_pcrel_p (const_tree fndecl)
   struct cl_target_option *opts = target_opts_for_fn (fndecl);
 
   return ((opts->x_rs6000_isa_flags & OPTION_MASK_PCREL) != 0
-	  && TARGET_CMODEL == CMODEL_MEDIUM);
+	  && TARGET_CMODEL == RS6000_CMODEL_MEDIUM);
 }
 
 /* Return whether we should generate PC-relative code for *FN.  */
@@ -26637,7 +26637,7 @@ rs6000_function_pcrel_p (struct function *fn)
   /* Optimize usual case.  */
   if (fn == cfun)
     return ((rs6000_isa_flags & OPTION_MASK_PCREL) != 0
-	    && TARGET_CMODEL == CMODEL_MEDIUM);
+	    && TARGET_CMODEL == RS6000_CMODEL_MEDIUM);
 
   return rs6000_fndecl_pcrel_p (fn->decl);
 }
@@ -26649,7 +26649,7 @@ rs6000_pcrel_p ()
 {
   return (DEFAULT_ABI == ABI_ELFv2
 	  && (rs6000_isa_flags & OPTION_MASK_PCREL) != 0
-	  && TARGET_CMODEL == CMODEL_MEDIUM);
+	  && TARGET_CMODEL == RS6000_CMODEL_MEDIUM);
 }
 
 

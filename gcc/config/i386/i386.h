@@ -570,8 +570,8 @@ extern unsigned char ix86_prefetch_sse;
 #define TARGET_TLS_DIRECT_SEG_REFS_DEFAULT 0
 #endif
 
-#define TARGET_SSP_GLOBAL_GUARD (ix86_stack_protector_guard == SSP_GLOBAL)
-#define TARGET_SSP_TLS_GUARD    (ix86_stack_protector_guard == SSP_TLS)
+#define TARGET_SSP_GLOBAL_GUARD (ix86_stack_protector_guard == IX86_SSP_GLOBAL)
+#define TARGET_SSP_TLS_GUARD    (ix86_stack_protector_guard == IX86_SSP_TLS)
 
 /* Fence to use after loop using storent.  */
 
@@ -2932,14 +2932,14 @@ struct GTY(()) machine_function {
   enum function_type func_type : 2;
 
   /* How to generate indirec branch.  */
-  enum indirect_branch indirect_branch_type : 3;
+  enum ix86_indirect_branch_setting indirect_branch_type : 3;
 
   /* If true, the current function has local indirect jumps, like
      "indirect_jump" or "tablejump".  */
   bool has_local_indirect_jump : 1;
 
   /* How to generate function return.  */
-  enum indirect_branch function_return_type : 3;
+  enum ix86_indirect_branch_setting function_return_type : 3;
 
   /* Call saved registers type.  */
   enum call_saved_registers_type call_saved_registers : 3;
@@ -3093,7 +3093,7 @@ extern void debug_dispatch_window (int);
 
 #define TARGET_INDIRECT_BRANCH_REGISTER \
   (ix86_indirect_branch_register \
-   || cfun->machine->indirect_branch_type != indirect_branch_keep)
+   || cfun->machine->indirect_branch_type != ix86_indirect_branch_keep)
 
 #define IX86_HLE_ACQUIRE (1 << 16)
 #define IX86_HLE_RELEASE (1 << 17)

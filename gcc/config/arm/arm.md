@@ -9274,7 +9274,7 @@
 		      UNSPEC_SP_SET))
       (clobber (match_scratch:SI 2 ""))
       (clobber (match_scratch:SI 3 ""))])]
-  "arm_stack_protector_guard == SSP_GLOBAL"
+  "arm_stack_protector_guard == ARM_SSP_GLOBAL"
   ""
 )
 
@@ -9358,7 +9358,7 @@
       (clobber (match_scratch:SI 3 ""))
       (clobber (match_scratch:SI 4 ""))
       (clobber (reg:CC CC_REGNUM))])]
-  "arm_stack_protector_guard == SSP_GLOBAL"
+  "arm_stack_protector_guard == ARM_SSP_GLOBAL"
   ""
 )
 

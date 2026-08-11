@@ -93,5 +93,5 @@ awk -F'[(, 	]+' '
 }
 END {
     print "EnumValue"
-    print "Enum(csky_fpu) String(auto) Value(TARGET_FPU_auto)"
+    print "Enum(csky_fpu) String(auto) Value(CSKY_TARGET_FPU_auto)"
 }' $1/csky_cores.def

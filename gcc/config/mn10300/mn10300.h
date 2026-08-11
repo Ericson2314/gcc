@@ -62,7 +62,7 @@
 #include "config/mn10300/mn10300-opts.h"
 #endif
 
-extern enum processor_type mn10300_tune_cpu;
+extern enum mn10300_processor_type mn10300_tune_cpu;
 
 #define TARGET_AM33	(mn10300_processor >= PROCESSOR_AM33)
 #define TARGET_AM33_2	(mn10300_processor >= PROCESSOR_AM33_2)

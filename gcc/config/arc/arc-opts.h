@@ -21,7 +21,7 @@
 #ifndef ARC_OPTS_H
 #define ARC_OPTS_H
 
-enum processor_type
+enum arc_processor_type
 {
   PROCESSOR_NONE = 0,
 #define ARC_CPU(NAME, ARCH, FLAGS, EXTRA, TUNE)  PROCESSOR_##NAME,

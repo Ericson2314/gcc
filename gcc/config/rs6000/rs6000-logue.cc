@@ -3962,7 +3962,7 @@ rs6000_output_function_prologue (FILE *file)
       const char *name = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
       (*targetm.asm_out.internal_label) (file, "LCF", rs6000_pic_labelno);
 
-      if (TARGET_CMODEL != CMODEL_LARGE)
+      if (TARGET_CMODEL != RS6000_CMODEL_LARGE)
 	{
 	  /* In the small and medium code models, we assume the TOC is less
 	     2 GB away from the text section, so it can be computed via the

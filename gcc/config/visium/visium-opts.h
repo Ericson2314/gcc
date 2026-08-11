@@ -22,7 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Processor type.
    These must match the values for the cpu attribute in visium.md.  */
-enum processor_type {
+enum visium_processor_type {
   PROCESSOR_GR5,
   PROCESSOR_GR6
 };

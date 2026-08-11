@@ -50,7 +50,7 @@ extern char arm_arch_name[];
 #include "config/arm/arm-opts.h"
 
 /* The processor for which instructions should be scheduled.  */
-extern enum processor_type arm_tune;
+extern enum arm_processor_type arm_tune;
 
 typedef enum arm_cond_code
 {

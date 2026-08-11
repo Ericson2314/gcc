@@ -22,7 +22,7 @@
 
 /* Which processor to schedule for.  */
 
-enum processor_type
+enum iq2000_processor_type
 {
   PROCESSOR_DEFAULT,
   PROCESSOR_IQ2000,

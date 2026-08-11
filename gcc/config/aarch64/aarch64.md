@@ -8344,7 +8344,7 @@
  [(set (match_operand:PTR 0 "register_operand" "=r")
        (unspec:PTR [(match_operand 1 "const_int_operand")]
 		   UNSPEC_SSP_SYSREG))]
- "aarch64_stack_protector_guard != SSP_GLOBAL"
+ "aarch64_stack_protector_guard != AARCH64_SSP_GLOBAL"
  {
    char buf[150];
    snprintf (buf, 150, "mrs\\t%%<w>0, %s",

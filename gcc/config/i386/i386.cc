@@ -485,7 +485,7 @@ ix86_using_red_zone (void)
 	      || (cfun->machine->call_saved_registers
 		  != TYPE_NO_CALLER_SAVED_REGISTERS))
 	  && (!cfun->machine->has_local_indirect_jump
-	      || cfun->machine->indirect_branch_type == indirect_branch_keep));
+	      || cfun->machine->indirect_branch_type == ix86_indirect_branch_keep));
 }
 
 /* Return true, if profiling code should be emitted before
@@ -718,7 +718,7 @@ static bool
 ix86_in_large_data_p (tree exp)
 {
   if (ix86_cmodel != CM_MEDIUM && ix86_cmodel != CM_MEDIUM_PIC
-      && ix86_cmodel != CM_LARGE && ix86_cmodel != CM_LARGE_PIC)
+      && ix86_cmodel != IX86_CM_LARGE && ix86_cmodel != CM_LARGE_PIC)
     return false;
 
   if (exp == NULL_TREE)
@@ -948,7 +948,7 @@ x86_elf_aligned_decl_common (FILE *file, tree decl,
 			unsigned align)
 {
   if ((ix86_cmodel == CM_MEDIUM || ix86_cmodel == CM_MEDIUM_PIC
-       || ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+       || ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
       && size > (unsigned int)ix86_section_threshold)
     {
       switch_to_section (get_named_section (decl, ".lbss", 0));
@@ -970,7 +970,7 @@ x86_output_aligned_bss (FILE *file, tree decl, const char *name,
 		       	unsigned HOST_WIDE_INT size, unsigned align)
 {
   if ((ix86_cmodel == CM_MEDIUM || ix86_cmodel == CM_MEDIUM_PIC
-       || ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+       || ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
       && size > (unsigned int)ix86_section_threshold)
     switch_to_section (get_named_section (decl, ".lbss", 0));
   else
@@ -6175,7 +6175,7 @@ indirect_thunk_need_prefix (rtx_insn *insn)
 {
   enum indirect_thunk_prefix need_prefix;
   if ((cfun->machine->indirect_branch_type
-	    == indirect_branch_thunk_extern)
+	    == ix86_indirect_branch_thunk_extern)
 	   && ix86_notrack_prefixed_insn_p (insn))
     {
       /* NOTRACK prefix is only used with external thunk so that it
@@ -11043,7 +11043,7 @@ ix86_expand_split_stack_prologue (void)
 	}
 
       if (flag_force_indirect_call
-	  || ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+	  || ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
 	{
 	  HOST_WIDE_INT argval;
 
@@ -11076,7 +11076,7 @@ ix86_expand_split_stack_prologue (void)
 	      x = gen_const_mem (Pmode, x);
 	      fn = copy_to_suggested_reg (x, reg11, Pmode);
 	    }
-	  else if (ix86_cmodel == CM_LARGE)
+	  else if (ix86_cmodel == IX86_CM_LARGE)
 	    fn = copy_to_suggested_reg (fn, reg11, Pmode);
 
 	  /* When using the large model we need to load the address
@@ -11608,7 +11608,7 @@ ix86_force_load_from_GOT_p (rtx x, bool call_p)
   return ((TARGET_64BIT || (!flag_pic && HAVE_AS_IX86_GOT32X))
 	  && !TARGET_PECOFF && !TARGET_MACHO
 	  && (!flag_pic || this_is_asm_operands)
-	  && ix86_cmodel != CM_LARGE
+	  && ix86_cmodel != IX86_CM_LARGE
 	  && ix86_cmodel != CM_LARGE_PIC
 	  && SYMBOL_REF_P (x)
 	  && ((!call_p
@@ -17362,7 +17362,7 @@ ix86_ifunc_ref_local_ok (void)
 bool
 ix86_nopic_noplt_attribute_p (rtx call_op)
 {
-  if (flag_pic || ix86_cmodel == CM_LARGE
+  if (flag_pic || ix86_cmodel == IX86_CM_LARGE
       || !(TARGET_64BIT || HAVE_AS_IX86_GOT32X)
       || TARGET_MACHO || TARGET_SEH || TARGET_PECOFF
       || SYMBOL_REF_LOCAL_P (call_op))
@@ -17419,9 +17419,9 @@ ix86_output_indirect_branch_via_reg (rtx call_op, bool sibcall_p)
   int regno = REGNO (call_op);
 
   if (cfun->machine->indirect_branch_type
-      != indirect_branch_thunk_inline)
+      != ix86_indirect_branch_thunk_inline)
     {
-      if (cfun->machine->indirect_branch_type == indirect_branch_thunk)
+      if (cfun->machine->indirect_branch_type == ix86_indirect_branch_thunk)
 	SET_HARD_REG_BIT (indirect_thunks_used, regno);
 
       indirect_thunk_name (thunk_name_buf, regno, need_prefix, false);
@@ -17503,9 +17503,9 @@ ix86_output_indirect_branch_via_push (rtx call_op, const char *xasm,
   int regno = -1;
 
   if (cfun->machine->indirect_branch_type
-      != indirect_branch_thunk_inline)
+      != ix86_indirect_branch_thunk_inline)
     {
-      if (cfun->machine->indirect_branch_type == indirect_branch_thunk)
+      if (cfun->machine->indirect_branch_type == ix86_indirect_branch_thunk)
 	indirect_thunk_needed = true;
       indirect_thunk_name (thunk_name_buf, regno, need_prefix, false);
       thunk_name = thunk_name_buf;
@@ -17605,7 +17605,7 @@ ix86_output_indirect_branch (rtx call_op, const char *xasm,
 const char *
 ix86_output_indirect_jmp (rtx call_op)
 {
-  if (cfun->machine->indirect_branch_type != indirect_branch_keep)
+  if (cfun->machine->indirect_branch_type != ix86_indirect_branch_keep)
     {
       /* We can't have red-zone since "call" in the indirect thunk
          pushes the return address onto stack, destroying red-zone.  */
@@ -17660,17 +17660,17 @@ ix86_output_function_return (bool long_p)
 {
   output_return_instrumentation ();
 
-  if (cfun->machine->function_return_type != indirect_branch_keep)
+  if (cfun->machine->function_return_type != ix86_indirect_branch_keep)
     {
       char thunk_name[32];
       enum indirect_thunk_prefix need_prefix
 	= indirect_thunk_need_prefix (current_output_insn);
 
       if (cfun->machine->function_return_type
-	  != indirect_branch_thunk_inline)
+	  != ix86_indirect_branch_thunk_inline)
 	{
 	  bool need_thunk = (cfun->machine->function_return_type
-			     == indirect_branch_thunk);
+			     == ix86_indirect_branch_thunk);
 	  indirect_thunk_name (thunk_name, INVALID_REGNUM, need_prefix,
 			       true);
 	  indirect_return_needed |= need_thunk;
@@ -17694,7 +17694,7 @@ ix86_output_function_return (bool long_p)
 const char *
 ix86_output_indirect_function_return (rtx ret_op)
 {
-  if (cfun->machine->function_return_type != indirect_branch_keep)
+  if (cfun->machine->function_return_type != ix86_indirect_branch_keep)
     {
       char thunk_name[32];
       enum indirect_thunk_prefix need_prefix
@@ -17703,10 +17703,10 @@ ix86_output_indirect_function_return (rtx ret_op)
       gcc_assert (regno == CX_REG);
 
       if (cfun->machine->function_return_type
-	  != indirect_branch_thunk_inline)
+	  != ix86_indirect_branch_thunk_inline)
 	{
 	  bool need_thunk = (cfun->machine->function_return_type
-			     == indirect_branch_thunk);
+			     == ix86_indirect_branch_thunk);
 	  indirect_thunk_name (thunk_name, regno, need_prefix, true);
 
 	  if (need_thunk)
@@ -17738,7 +17738,7 @@ ix86_output_call_insn (rtx_insn *insn, rtx call_op)
   bool direct_p = constant_call_address_operand (call_op, VOIDmode);
   bool output_indirect_p
     = (!TARGET_SEH
-       && cfun->machine->indirect_branch_type != indirect_branch_keep);
+       && cfun->machine->indirect_branch_type != ix86_indirect_branch_keep);
   bool seh_nop_p = false;
   const char *xasm;
 
@@ -24476,7 +24476,7 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 	{
 	  switch (ix86_cmodel)
 	    {
-	    case CM_LARGE:
+	    case IX86_CM_LARGE:
 	      scratch = x86_64_select_profile_regnum (true);
 	      reg = hi_reg_name[scratch];
 	      if (LEGACY_INT_REGNO_P (scratch))

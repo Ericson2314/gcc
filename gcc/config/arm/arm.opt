@@ -115,7 +115,7 @@ Target Save RejectNegative Negative(mcpu=) ToLower Joined Var(arm_cpu_string)
 Specify the name of the target CPU.
 
 mfloat-abi=
-Target RejectNegative Joined Enum(float_abi_type) Var(arm_float_abi) Init(TARGET_DEFAULT_FLOAT_ABI)
+Target RejectNegative Joined Enum(arm_float_abi_type) Var(arm_float_abi) Init(TARGET_DEFAULT_FLOAT_ABI)
 Specify if floating point hardware should be used.
 
 mcmse
@@ -123,17 +123,17 @@ Target RejectNegative Var(use_cmse)
 Specify that the compiler should target secure code as per ARMv8-M Security Extensions.
 
 Enum
-Name(float_abi_type) Type(enum float_abi_type)
+Name(arm_float_abi_type) Type(enum arm_float_abi_type)
 Known floating-point ABIs (for use with the -mfloat-abi= option):
 
 EnumValue
-Enum(float_abi_type) String(soft) Value(ARM_FLOAT_ABI_SOFT)
+Enum(arm_float_abi_type) String(soft) Value(ARM_FLOAT_ABI_SOFT)
 
 EnumValue
-Enum(float_abi_type) String(softfp) Value(ARM_FLOAT_ABI_SOFTFP)
+Enum(arm_float_abi_type) String(softfp) Value(ARM_FLOAT_ABI_SOFTFP)
 
 EnumValue
-Enum(float_abi_type) String(hard) Value(ARM_FLOAT_ABI_HARD)
+Enum(arm_float_abi_type) String(hard) Value(ARM_FLOAT_ABI_HARD)
 
 mflip-thumb
 Target Var(TARGET_FLIP_THUMB) Undocumented
@@ -157,7 +157,7 @@ EnumValue
 Enum(arm_fp16_format_type) String(alternative) Value(ARM_FP16_FORMAT_ALTERNATIVE)
 
 mfpu=
-Target RejectNegative Joined Enum(arm_fpu) Var(arm_fpu_index) Init(TARGET_FPU_auto) Save
+Target RejectNegative Joined Enum(arm_fpu) Var(arm_fpu_index) Init(ARM_TARGET_FPU_auto) Save
 Specify the name of the target floating point hardware/format.
 
 mhard-float
@@ -254,10 +254,10 @@ Print CPU tuning information as comment in assembler file.  This is
 an option used only for regression testing of the compiler and not
 intended for ordinary use in compiling code.
 
-; Other processor_type values are loaded from arm-tables.opt
+; Other arm_processor_type values are loaded from arm-tables.opt
 ; but that is a generated file and this is an odd-one-out.
 EnumValue
-Enum(processor_type) String(native) Value(-1) DriverOnly
+Enum(arm_processor_type) String(native) Value(-1) DriverOnly
 
 mvectorize-with-neon-quad
 Target RejectNegative InverseMask(NEON_VECTORIZE_DOUBLE)
@@ -343,18 +343,18 @@ Target Mask(FDPIC)
 Enable Function Descriptor PIC mode.
 
 mstack-protector-guard=
-Target RejectNegative Joined Enum(stack_protector_guard) Var(arm_stack_protector_guard) Init(SSP_GLOBAL)
+Target RejectNegative Joined Enum(arm_stack_protector_guard_type) Var(arm_stack_protector_guard) Init(ARM_SSP_GLOBAL)
 Use given stack-protector guard.
 
 Enum
-Name(stack_protector_guard) Type(enum stack_protector_guard)
+Name(arm_stack_protector_guard_type) Type(enum arm_stack_protector_guard_type)
 Valid arguments to -mstack-protector-guard=:
 
 EnumValue
-Enum(stack_protector_guard) String(tls) Value(SSP_TLSREG)
+Enum(arm_stack_protector_guard_type) String(tls) Value(SSP_TLSREG)
 
 EnumValue
-Enum(stack_protector_guard) String(global) Value(SSP_GLOBAL)
+Enum(arm_stack_protector_guard_type) String(global) Value(ARM_SSP_GLOBAL)
 
 mstack-protector-guard-offset=
 Target Joined RejectNegative String Var(arm_stack_protector_guard_offset_str)

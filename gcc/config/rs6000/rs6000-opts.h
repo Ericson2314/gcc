@@ -28,7 +28,7 @@
 #define RS6000_OPTS_H
 
 /* Processor type.  Order must match cpu attribute in MD file.  */
-enum processor_type
+enum rs6000_processor_type
  {
    PROCESSOR_PPC601,
    PROCESSOR_PPC603,
@@ -129,9 +129,9 @@ enum  rs6000_traceback_type {
    medium: 32-bit toc offsets, static data and code within 2G of TOC pointer.
    large: 32-bit toc offsets, no limit on static data and code.  */
 enum rs6000_cmodel {
-  CMODEL_SMALL,
-  CMODEL_MEDIUM,
-  CMODEL_LARGE
+  RS6000_CMODEL_SMALL,
+  RS6000_CMODEL_MEDIUM,
+  RS6000_CMODEL_LARGE
 };
 
 /* Describe which vector unit to use for a given machine mode.  The
@@ -145,9 +145,9 @@ enum rs6000_vector {
 };
 
 /* Where to get the canary for the stack protector.  */
-enum stack_protector_guard {
-  SSP_TLS,			/* per-thread canary in TLS block */
-  SSP_GLOBAL			/* global canary */
+enum rs6000_stack_protector_guard_type {
+  RS6000_SSP_TLS,			/* per-thread canary in TLS block */
+  RS6000_SSP_GLOBAL			/* global canary */
 };
 
 /* No enumeration is defined to index the -mcpu= values (entries in

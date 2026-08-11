@@ -21,7 +21,7 @@
 ; <http://www.gnu.org/licenses/>.
 
 Enum
-Name(gpu_type) Type(enum processor_type)
+Name(gpu_type) Type(enum gcn_processor_type)
 GCN GPU type to use:
 
 EnumValue

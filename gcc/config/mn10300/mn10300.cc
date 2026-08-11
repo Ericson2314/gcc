@@ -63,7 +63,7 @@
 int mn10300_protect_label;
 
 /* Selected processor type for tuning.  */
-enum processor_type mn10300_tune_cpu = PROCESSOR_DEFAULT;
+enum mn10300_processor_type mn10300_tune_cpu = PROCESSOR_DEFAULT;
 
 #define CC_FLAG_Z	1
 #define CC_FLAG_N	2

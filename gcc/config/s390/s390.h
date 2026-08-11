@@ -973,7 +973,7 @@ struct s390_processor
   const char *const name;
   /* CPU name as it should be passed to Binutils via .machine  */
   const char *const binutils_name;
-  const enum processor_type processor;
+  const enum s390_processor_type processor;
   const struct processor_costs *cost;
   int arch_level;
 };
@@ -1070,36 +1070,36 @@ struct GTY(()) machine_function
      structure.  */
   rtx split_stack_varargs_pointer;
 
-  enum indirect_branch indirect_branch_jump;
-  enum indirect_branch indirect_branch_call;
+  enum s390_indirect_branch_setting indirect_branch_jump;
+  enum s390_indirect_branch_setting indirect_branch_call;
 
-  enum indirect_branch function_return_mem;
-  enum indirect_branch function_return_reg;
+  enum s390_indirect_branch_setting function_return_mem;
+  enum s390_indirect_branch_setting function_return_reg;
 };
 #endif
 
 #define TARGET_INDIRECT_BRANCH_NOBP_RET_OPTION				\
-  (cfun->machine->function_return_reg != indirect_branch_keep		\
-   || cfun->machine->function_return_mem != indirect_branch_keep)
+  (cfun->machine->function_return_reg != s390_indirect_branch_keep		\
+   || cfun->machine->function_return_mem != s390_indirect_branch_keep)
 
 #define TARGET_INDIRECT_BRANCH_NOBP_RET					\
-  ((cfun->machine->function_return_reg != indirect_branch_keep		\
+  ((cfun->machine->function_return_reg != s390_indirect_branch_keep		\
     && !s390_return_addr_from_memory ())				\
-   || (cfun->machine->function_return_mem != indirect_branch_keep	\
+   || (cfun->machine->function_return_mem != s390_indirect_branch_keep	\
        && s390_return_addr_from_memory ()))
 
 #define TARGET_INDIRECT_BRANCH_NOBP_JUMP				\
-  (cfun->machine->indirect_branch_jump != indirect_branch_keep)
+  (cfun->machine->indirect_branch_jump != s390_indirect_branch_keep)
 
 #define TARGET_INDIRECT_BRANCH_NOBP_JUMP_THUNK				\
-  (cfun->machine->indirect_branch_jump == indirect_branch_thunk		\
-   || cfun->machine->indirect_branch_jump == indirect_branch_thunk_extern)
+  (cfun->machine->indirect_branch_jump == s390_indirect_branch_thunk		\
+   || cfun->machine->indirect_branch_jump == s390_indirect_branch_thunk_extern)
 
 #define TARGET_INDIRECT_BRANCH_NOBP_JUMP_INLINE_THUNK			\
-  (cfun->machine->indirect_branch_jump == indirect_branch_thunk_inline)
+  (cfun->machine->indirect_branch_jump == s390_indirect_branch_thunk_inline)
 
 #define TARGET_INDIRECT_BRANCH_NOBP_CALL			\
-  (cfun->machine->indirect_branch_call != indirect_branch_keep)
+  (cfun->machine->indirect_branch_call != s390_indirect_branch_keep)
 
 #ifndef TARGET_DEFAULT_INDIRECT_BRANCH_TABLE
 #define TARGET_DEFAULT_INDIRECT_BRANCH_TABLE 0

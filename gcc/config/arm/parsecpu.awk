@@ -129,7 +129,7 @@ function print_isa_bits_for (flist, indent) {
 function gen_headers () {
     boilerplate("C")
 
-    print "enum processor_type"
+    print "enum arm_processor_type"
     print "{"
 
     ncpus = split (cpu_list, cpus)
@@ -159,7 +159,7 @@ function gen_headers () {
     for (n = 1; n <= nfpus; n++) {
 	print "  TARGET_FPU_"fpu_cnames[fpus[n]]","
     }
-    print "  TARGET_FPU_auto"
+    print "  ARM_TARGET_FPU_auto"
     print "};"
 }
 
@@ -474,14 +474,14 @@ function gen_opt () {
     boilerplate("md")
 
     print "Enum"
-    print "Name(processor_type) Type(enum processor_type)"
+    print "Name(arm_processor_type) Type(enum arm_processor_type)"
     print "Known ARM CPUs (for use with the -mcpu= and -mtune= options):\n"
 
     ncpus = split (cpu_list, cpus)
 
     for (n = 1; n <= ncpus; n++) {
 	print "EnumValue"
-	print "Enum(processor_type) String(" cpus[n] \
+	print "Enum(arm_processor_type) String(" cpus[n] \
 	    ") Value( TARGET_CPU_"cpu_cnames[cpus[n]]")"
 	print ""
     }
@@ -513,7 +513,7 @@ function gen_opt () {
     }
 
     print "EnumValue"
-    print "Enum(arm_fpu) String(auto) Value(TARGET_FPU_auto)"
+    print "Enum(arm_fpu) String(auto) Value(ARM_TARGET_FPU_auto)"
 }
 
 function check_cpu (name) {

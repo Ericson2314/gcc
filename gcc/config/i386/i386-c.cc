@@ -557,11 +557,11 @@ ix86_target_macros_internal (HOST_WIDE_INT isa_flag,
     case CM_MEDIUM_PIC:
       def_or_undef (parse_in, "__code_model_medium__");
       break;
-    case CM_LARGE:
+    case IX86_CM_LARGE:
     case CM_LARGE_PIC:
       def_or_undef (parse_in, "__code_model_large__");
       break;
-    case CM_32:
+    case IX86_CM_32:
       def_or_undef (parse_in, "__code_model_32__");
       break;
     case CM_KERNEL:

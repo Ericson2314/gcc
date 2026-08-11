@@ -26,7 +26,7 @@ along with GCC; see the file COPYING3.  If not see
    `processor_table' and `processor_flags_table' in s390.cc (the enumeration
    values are used as indices into these tables).  */
 
-enum processor_type
+enum s390_processor_type
 {
   PROCESSOR_2064_Z900,
   PROCESSOR_2084_Z990,
@@ -40,23 +40,23 @@ enum processor_type
   PROCESSOR_8561_Z15,
   PROCESSOR_3931_Z16,
   PROCESSOR_9175_Z17,
-  PROCESSOR_NATIVE,
-  PROCESSOR_max
+  S390_PROCESSOR_NATIVE,
+  S390_PROCESSOR_max
 };
 
 
 /* Values for -mindirect-branch and -mfunction-return options.  */
-enum indirect_branch {
-  indirect_branch_unset = 0,
-  indirect_branch_keep,
-  indirect_branch_thunk,
-  indirect_branch_thunk_inline,
-  indirect_branch_thunk_extern
+enum s390_indirect_branch_setting {
+  s390_indirect_branch_unset = 0,
+  s390_indirect_branch_keep,
+  s390_indirect_branch_thunk,
+  s390_indirect_branch_thunk_inline,
+  s390_indirect_branch_thunk_extern
 };
 
 
 /* Where to get the canary for the stack protector.  */
-enum stack_protector_guard
+enum s390_stack_protector_guard_type
 {
   SP_TLS,       /* per-thread canary in TLS block */
   SP_GLOBAL     /* global canary */

@@ -53,9 +53,9 @@ enum nds32_cpu_type
 /* The code model defines the address generation strategy.  */
 enum nds32_cmodel_type
 {
-  CMODEL_SMALL,
-  CMODEL_MEDIUM,
-  CMODEL_LARGE
+  NDS32_CMODEL_SMALL,
+  NDS32_CMODEL_MEDIUM,
+  NDS32_CMODEL_LARGE
 };
 
 /* The code model defines the address generation strategy.  */

@@ -3423,7 +3423,7 @@ reg_to_stack (void)
      on zero, which we can get from `fldz'.  */
 
   if ((flag_pic && !TARGET_64BIT)
-      || ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
+      || ix86_cmodel == IX86_CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
     not_a_num = CONST0_RTX (SFmode);
   else
     {

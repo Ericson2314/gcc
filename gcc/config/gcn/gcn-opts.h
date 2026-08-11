@@ -18,7 +18,7 @@
 #define GCN_OPTS_H
 
 /* Create constants for PROCESSOR_GFX???.  */
-enum processor_type
+enum gcn_processor_type
 {
 #define GCN_DEVICE(name, NAME, ...) \
   PROCESSOR_ ## NAME,

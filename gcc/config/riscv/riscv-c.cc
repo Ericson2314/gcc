@@ -99,16 +99,16 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
 
   switch (riscv_cmodel)
     {
-    case CM_MEDLOW:
+    case RISCV_CM_MEDLOW:
       builtin_define ("__riscv_cmodel_medlow");
       break;
 
-    case CM_LARGE:
+    case RISCV_CM_LARGE:
       builtin_define ("__riscv_cmodel_large");
       break;
 
     case CM_PIC:
-    case CM_MEDANY:
+    case RISCV_CM_MEDANY:
       builtin_define ("__riscv_cmodel_medany");
       break;
     }

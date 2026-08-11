@@ -104,7 +104,7 @@
 ;;
 
 ; Attribute for cpu type.
-; These must match the values for enum processor_type in visium-opts.h.
+; These must match the values for enum visium_processor_type in visium-opts.h.
 (define_attr "cpu" "gr5,gr6" (const (symbol_ref "visium_cpu_attr")))
 
 ; Instruction type.

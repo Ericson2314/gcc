@@ -44,7 +44,7 @@ BEGIN {
   print "; <http://www.gnu.org/licenses/>."
   print ""
   print "Enum"
-  print "Name(gpu_type) Type(enum processor_type)"
+  print "Name(gpu_type) Type(enum gcn_processor_type)"
   print "GCN GPU type to use:"
 }
 

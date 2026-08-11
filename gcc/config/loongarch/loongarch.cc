@@ -3104,7 +3104,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
 							  const0_rtx));
 	  break;
 
-	case CMODEL_MEDIUM:
+	case LARCH_CMODEL_MEDIUM:
 	    {
 	      if (la_opt_explicit_relocs != EXPLICIT_RELOCS_NONE)
 		{
@@ -3140,7 +3140,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
 
 	/* code model extreme not support plt.  */
 	case CMODEL_EXTREME:
-	case CMODEL_LARGE:
+	case LARCH_CMODEL_LARGE:
 	case CMODEL_TINY:
 	case CMODEL_TINY_STATIC:
 	default:
@@ -3154,7 +3154,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
       switch (la_target.cmodel)
 	{
 	case CMODEL_NORMAL:
-	case CMODEL_MEDIUM:
+	case LARCH_CMODEL_MEDIUM:
 	    {
 	      if (loongarch_explicit_relocs_p (SYMBOL_GOT_DISP))
 		{
@@ -3203,7 +3203,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
 	    }
 	  break;
 
-	case CMODEL_LARGE:
+	case LARCH_CMODEL_LARGE:
 	case CMODEL_TINY:
 	case CMODEL_TINY_STATIC:
 	default:
