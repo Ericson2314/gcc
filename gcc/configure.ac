@@ -41,9 +41,8 @@ ACX_NONCANONICAL_HOST
 # Used for constructing correct paths for offload compilers.
 accel_dir_suffix=
 
-# Determine the build- and host-specific subdirectories.  GCC_TOPLEV_SUBDIRS
-# would do this, but it also derives a target_subdir and requires a canonical
-# target for it.
+# Determine the build- and host-specific subdirectories.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:44".
 build_subdir="build-${build_noncanonical}"
 if ( test $srcdir = . && test -d ../gcc ) \
    || test -d $srcdir/../host-${host_noncanonical}; then
@@ -289,10 +288,8 @@ AC_SUBST(GENINSRC)
 # -------------------
 
 
-# --with-demangler-in-ld is gone.  It only ever turned the linker --demangle
-# probe off; its default -- run the probe -- is now the only behaviour, and
-# whether a particular ld supports --demangle is a question for that ld, asked
-# by target-specs after the build rather than by this script.
+# --with-demangler-in-ld is gone.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:292".
 demangler_in_ld=yes
 
 dsymutil_vers=
@@ -715,13 +712,10 @@ fi
 # -------------------------------
 
 
-# Additional target machines this compiler should be able to serve, beyond the
-# one named by --target.  Comma-separated list, or "all".  Compare binutils'
-# --enable-targets, which GCC has never had.
 #
-# This does not yet build additional back ends; it collects each extra target's
-# configuration so that target-specific data can be emitted per target rather
-# than frozen into the binary at configure time.
+# Additional target machines this compiler should be able to serve, beyond
+# the one named by --target.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:718".
 AC_ARG_ENABLE(targets,
 [AS_HELP_STRING([--enable-targets=all|LIST],
 		[additional target machines to support])],
@@ -810,29 +804,13 @@ dnl --with-dwarf2 is gone.
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:844".
 dwarf2=no
 
-# --enable-shared/--disable-shared meaning "do (not) provide a shared libgcc"
-# is gone from here.  It was a SECOND AUTHORITY AND-ed on top of a target fact:
-# DRIVER_DEFINES used to read
 #
-#     $(if $(SHLIB),$(if $(filter yes,@enable_shared@),-DENABLE_SHARED_LIBGCC))
 #
-# where $(SHLIB) comes from config/t-slibgcc via the target's tmake_file, and
-# @enable_shared@ came from this option.  Two different questions -- "does this
-# target have a shared libgcc" and "did the builder ask for one" -- sharing one
-# name, in one file, with no way to tell which had produced a given answer.
 #
-# The option half goes because libgcc/configure.ac:52 asks it already, in the
-# place that owns it, and because `--enable-shared' given to a package means
-# THAT PACKAGE's host: given to gcc it has to mean gcc's own host, which is what
-# the option below now means.  Only the $(SHLIB) half remains, so the default
-# (enable_shared=yes) is unchanged; a build that explicitly passed
-# --disable-shared to gcc no longer suppresses shared-libgcc specs, and should
-# pass it to libgcc instead.
 #
-# THE TARGET HALF IS STILL BROKEN AND IS NOT FIXED HERE.  $(SHLIB) reaches the
-# driver from the PRIMARY target's config.gcc, so in an --enable-targets=all
-# build one target's answer is applied to all of them.  See scratchpad/STATE.md,
-# "ENABLE_SHARED_LIBGCC flows through the privileged-target channel".
+# --enable-shared/--disable-shared meaning "do (not) provide a shared
+# libgcc" is gone from here.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:813".
 
 dnl Whether to build libgcov and the related host tools.
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:871".
@@ -1672,17 +1650,8 @@ fi
 
 target_gtfiles=
 
-# Canonicalise ${target} before config.gcc dispatches on it.  AC_CANONICAL_TARGET
-# is deliberately gone -- it is what gave one target a privileged position --
-# but autoconf's legacy `target=$target_alias' assignment remains, and that
-# leaves ${target} holding exactly what was typed on the command line.
-# config.gcc matches canonical triples only, and its arms are ordered globs, so
-# an uncanonical name does not fail: it silently matches a LATER arm.
-# --target=aarch64-linux-gnu splits as aarch64/linux/gnu, misses
-# `aarch64*-*-linux*' and hits `aarch64*-*-gnu*' -- the GNU/Hurd port -- while
-# --enable-targets, which does canonicalise, records the Linux one.  The build
-# then had tm.h describing Hurd and tm-aarch64.h describing Linux.
-# The --enable-targets loop below does the same thing for the same reason.
+# Canonicalise ${target} before config.gcc dispatches on it.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1675".
 if test x"${target}" != x; then
   target_canon=`${srcdir}/../config.sub ${target} 2>/dev/null`
   if test x"${target_canon}" = x; then
@@ -1694,28 +1663,18 @@ fi
 # Collect target-machine-specific information.
 . ${srcdir}/config.gcc || exit 1
 
-# Multi-target: collect the same information for each additional target named by
-# --enable-targets.  config.gcc dispatches on ${target} and assigns tm_file &c.
-# unconditionally, so every extra target is handled by sourcing it again inside a
-# subshell; that keeps the primary target's variables above untouched and lets an
-# unsupported target fail as a non-zero exit we can report.
 #
-# The result is a manifest, one stanza per target, which later build steps read
-# to emit per-target data instead of freezing one target's values into the
-# binary.  No additional back end is compiled yet.
+# Multi-target: collect the same information for each additional target
+# named by --enable-targets.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1697".
 gcc_extra_targets=
 case ${enable_targets} in
   no | "")
     ;;
   all)
-    # config.gcc matches targets with shell globs, so it cannot be enumerated.
-    # contrib/config-list.mk carries the list GCC itself uses to build every
-    # configuration, which is the same question asked for the same reason, so
-    # take it from there rather than inventing a second list that would drift.
     #
-    # Entries may carry configure options as a trailing OPT-with-cpu=... ; only
-    # the triple is wanted here.  \134 is a backslash, spelled in octal so that
-    # neither m4 nor the shell has to be argued with about quoting.
+    # config.gcc matches targets with shell globs, so it cannot be enumerated.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1711".
     gcc_extra_targets=`sed -n '/^LIST = /,/^ *$/p' ${srcdir}/../contrib/config-list.mk \
       | sed -e 's/^LIST = //' \
       | tr -d '\134' \
@@ -1749,17 +1708,14 @@ gcc_all_common_objects=
 gcc_all_common_symbols=
 gcc_common_mk=multi-target-common.mk
 echo "# Generated by configure: one rule per target's common hook table." > ${gcc_common_mk}
-# Registry of the tables, as data for common/common-target-select.cc.  Built in
-# two pieces because every declaration has to precede the table that uses them,
-# and they are produced in the same pass.
+# Registry of the tables, as data for common/common-target-select.cc.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1752".
 gcc_common_ext=multi-target-common.ext
 gcc_common_ent=multi-target-common.ent
 : > ${gcc_common_ext}
 : > ${gcc_common_ent}
-# The same two pieces for the driver's spec-function tables.  Kept in step with
-# the common-hook registry above, from the same loop over the same manifest, so
-# that the two cannot come to disagree about which targets exist -- gcc.cc
-# checks that they have not.
+# The same two pieces for the driver's spec-function tables.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1759".
 gcc_all_spec_fn_objects=
 gcc_sf_ext=multi-target-spec-functions.ext
 gcc_sf_ent=multi-target-spec-functions.ent
@@ -1769,19 +1725,9 @@ gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
 
-# Canonicalise the list, and deduplicate it once canonical.  Targets are named
-# the way one would type them on a command line -- aarch64-elf, alpha-netbsd --
-# and configure would normally expand those before anyone sees them.
-# config.gcc matches canonical triples only, and answers a short form with
-# "Configuration ... not supported".
 #
-# The dedup is not cosmetic.  ${target} is in this list unconditionally (see
-# above), so a user who also names the build's own triple -- and
-# --enable-targets=all names several i386 ones -- would otherwise get the same
-# object built by two identical make rules and listed twice in OBJS, and two
-# registry entries for one triple.  Two spellings of one triple only become
-# comparable after config.sub, which is why this happens here and not where the
-# list is assembled.
+# Canonicalise the list, and deduplicate it once canonical.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1772".
 gcc_mt_canon=
 for gcc_mt in ${gcc_manifest_targets}; do
   gcc_mt_c=`${srcdir}/../config.sub ${gcc_mt} 2>/dev/null`
@@ -1801,11 +1747,8 @@ done
 gcc_manifest_targets=${gcc_mt_canon}
 
 for gcc_mt in ${gcc_manifest_targets}; do
-  # The with_* group no longer needs clearing here: config.gcc clears it itself,
-  # because --with-cpu/--with-arch/--with-tune/... are gone.  What used to leak
-  # from the primary target into every other one (aarch64 rejecting x86's
-  # --with-arch=x86-64) cannot arise any more; each target's CPU/ABI defaults are
-  # inferred from its own triple and reported below as option_defaults.
+  # The with_* group no longer needs clearing here:
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1804".
   gcc_mt_data=`
     target=${gcc_mt}
     tm_defines= cpu_type= target_cpu_default=
@@ -1816,47 +1759,32 @@ for gcc_mt in ${gcc_manifest_targets}; do
     TM_MULTILIB_CONFIG=
     . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
     # config.gcc leaves these unset for most targets; the primary target gets
-    # them defaulted just below, so apply the same rules here or the manifest
-    # would claim the target has no machine description.
+    # them defaulted just below, ...
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1818".
     test x"${tm_file}" = x && tm_file=${cpu_type}/${cpu_type}.h
     test x"${md_file}" = x && md_file=${cpu_type}/${cpu_type}.md
     test x"${out_file}" = x && out_file=${cpu_type}/${cpu_type}.cc
     echo "target ${gcc_mt}"
     echo "cpu_type ${cpu_type}"
     # This targets own CPU/ABI defaults, as name=value pairs whose names are
-    # the OPTION_DEFAULT_SPECS keys of its back end.  These were the values of
-    # the undeclared --with-cpu/--with-arch/--with-tune/... options; with those
-    # gone they are inferred from the triple, per target rather than one array
-    # compiled into the driver.  target-specs turns them into the
-    # option_defaults spec of this targets spec file.  (No apostrophes or
-    # backticks in here: this whole block is inside a command substitution.)
+    # the OPTION_DEFAULT_SPECS ...
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1826".
     echo "option_defaults ${target_option_defaults}"
     # Target properties cc1 needs that are decided by the triple, not probed.
     echo "decimal_float ${target_decimal_float}"
     echo "decimal_bid_format ${target_decimal_bid_format}"
     # Which common-hook table this target uses, and the name it will be
-    # compiled under.  Recorded per target so that several can be built and
-    # linked together; config.gcc applies this defaulting itself, after the
-    # per-target clauses have had their say.
+    # compiled under.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1837".
     echo "common_out_file ${common_out_file}"
-    # Use $( ) here, not backticks.  This runs inside the outer command
-    # substitution that captures the stanza, and a nested backtick closes that
-    # early -- which silently emptied the whole thing.  (Not even in a comment:
-    # the closing backtick is found while parsing, before the comment applies.)
+    # Use $( ) here, not backticks.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1842".
     echo "common_out_symbol targetm_common_$(basename ${common_out_file} .cc | sed 's/-/_/g')"
     echo "tm_file ${tm_file}"
     echo "tm_p_file ${tm_p_file}"
     echo "tmake_file ${tmake_file}"
-    # Which of those fragments actually exist.  tmake_file names some that do
-    # not -- sh-unknown-elf asks for sh/t-elf, which is not in the tree -- and
-    # an include of a missing file is a hard error in make, so everything that
-    # feeds these to make has to filter them first.  (No backtick in this
-    # comment: the whole block is one command substitution, and a stray one
-    # closes it while the file is parsed, long before the comment applies.)
-    # Filtered once here, where
-    # the answer is already known, rather than by each consumer in turn: this
-    # is the same test the primary target's own tmake_file loop applies further
-    # down, and it was the last fact the manifest left its readers to re-derive.
+    # Which of those fragments actually exist.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1850".
     mt_tmake_present=
     for mt_tf in ${tmake_file}; do
       if test -f ${srcdir}/config/${mt_tf}; then
@@ -1869,14 +1797,8 @@ for gcc_mt in ${gcc_manifest_targets}; do
     echo "out_file ${out_file}"
     echo "md_file ${md_file}"
     # The header list this target's tm.h is built from, in the same form the
-    # single-target path uses.  $( ) rather than backticks: this is inside the
-    # substitution capturing the stanza.
-    # The tail the single-target path appends to tm_file further down --
-    # initfini-array.h, tm-dwarf2.h, and defaults.h last of all -- is added
-    # after this loop has run, so mirror it here.  The two lists must agree:
-    # anything the primary tm.h gets and a per-back-end tm-<base>.h does not is
-    # a macro some back end will turn out to need, and defaults.h in particular
-    # is where target_unit and friends come from.
+    # single-target path uses.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1871".
     mt_tm_file="${tm_file} initfini-array.h"
     if test x"${dwarf2}" = xyes; then
       mt_tm_file="${mt_tm_file} tm-dwarf2.h"
@@ -1896,18 +1818,11 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # The value TARGET_CPU_DEFAULT must have in this target's tm.h.  Without it
     # a back end that reads the macro -- nds32 does -- does not compile.
     echo "target_cpu_default ${target_cpu_default}"
-    # This back end's extra machine modes.  The generators are built once per
-    # back end against these (see gen-multi-target-md.awk); reading a target's
-    # .md without them fails on the modes only that target defines.  Recorded
-    # rather than derived: most back ends do call the file
-    # <cpu>/<cpu>-modes.def, but config.gcc is the authority and nothing
-    # obliges a back end to follow the convention.
+    # This back end's extra machine modes.
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1899".
     echo "extra_modes ${extra_modes}"
-    # Headers this target's tm.h includes that no source tree contains: the
-    # tmake_file fragments generate them into the build directory.  They are
-    # listed separately because their names have to be made unique per back end
-    # (three different back ends generate a file called sysroot-suffix.h) and
-    # because something has to create them.
+    # Headers this target's tm.h includes that no source tree contains:
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1906".
     mt_tm_gen_headers=
     for mt_f in ${tm_file}; do
       case ${mt_f} in
@@ -1915,23 +1830,13 @@ for gcc_mt in ${gcc_manifest_targets}; do
       esac
     done
     echo "tm_generated_headers ${mt_tm_gen_headers}"
-    # The multilib set is NOT a config.gcc variable: MULTILIB_OPTIONS,
-    # MULTILIB_MATCHES, MULTILIB_REUSE and MULTILIB_OSDIRNAMES are make
-    # variables, assigned by the 136 t-* fragments named in tmake_file, so they
-    # cannot be captured by sourcing config.gcc here.  Reading them needs make
-    # to evaluate that target's fragments; see the multilib rules in
-    # gcc/Makefile.in.
     #
-    # What config.gcc does own is the input those fragments compute from, and
-    # without it the answer is wrong rather than merely missing -- sh/t-sh
-    # derives MULTILIB_OPTIONS from $(TM_MULTILIB_CONFIG) and yields an empty
-    # list when it is unset.  So it is recorded here, for the make side to feed
-    # back in.
+    # The multilib set is NOT a config.gcc variable:
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1918".
     echo "tm_multilib_config ${TM_MULTILIB_CONFIG}"
   ` || {
-    # Read the message here, not in the AC_MSG_ERROR argument: that argument is
-    # m4-quoted, so a substitution written inside it is emitted literally and the
-    # user is shown the backtick expression instead of what config.gcc said.
+    # Read the message here, not in the AC_MSG_ERROR argument:
+    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1932".
     gcc_mt_msg=`cat ${gcc_mt_err} 2>/dev/null | tr '\n' ' '`
     AC_MSG_ERROR([--enable-targets: config.gcc failed for ${gcc_mt}: ${gcc_mt_msg}])
   }
@@ -1939,9 +1844,8 @@ for gcc_mt in ${gcc_manifest_targets}; do
   echo "" >> ${gcc_target_manifest}
 
   # Collect each target's common-hook table so the build can compile all of
-  # them.  Duplicates are real: several targets share one common file (and every
-  # target without its own uses default-common.cc), so the same object must not
-  # be listed, or built, twice.
+  # them.
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1941".
   gcc_mt_cof=`echo "${gcc_mt_data}" | sed -n 's/^common_out_file //p'`
   gcc_mt_sym=`echo "${gcc_mt_data}" | sed -n 's/^common_out_symbol //p'`
   gcc_mt_obj=`basename ${gcc_mt_cof} .cc`.o
@@ -1950,20 +1854,17 @@ for gcc_mt in ${gcc_manifest_targets}; do
   gcc_mt_tmdef=`echo "${gcc_mt_data}" | sed -n 's/^tm_defines //p'`
   gcc_mt_eopts=`echo "${gcc_mt_data}" | sed -n 's/^extra_options //p'`
   # This target's tm.h must pull in this target's options.h, not the generic
-  # one: the types and enums a back end needs -- aarch64_feature_flags, bfin's
-  # WA_*, alpha's MASK_SOFT_FP -- reach a build through the .opt files'
-  # HeaderInclude directives, and so exist only in a generated options header
-  # that was built with those .opt files.
+  # one:
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1952".
   gcc_mt_md=`echo "${gcc_mt_data}" | sed -n 's/^md_file //p'`
   gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|^options\.h|options-${gcc_mt_base}.h|" -e "s|insn-constants\.h|insn-constants-${gcc_mt_base}.h|"`
   # config.gcc sets this per target and some back ends' tm.h reads it (nds32
-  # builds its default ISA out of it); passing the primary target's value, or
-  # nothing at all, is not an option.
+  # builds its default ISA out ...
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1959".
   gcc_mt_tcd=`echo "${gcc_mt_data}" | sed -n 's/^target_cpu_default //p'`
   # The same treatment for the headers a target's tmake_file would generate
-  # into the build directory.  These need it more than options.h does: three
-  # different back ends generate a file called sysroot-suffix.h, so under one
-  # name at most one of them could be right.
+  # into the build directory.
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1963".
   gcc_mt_genh=`echo "${gcc_mt_data}" | sed -n 's/^tm_generated_headers //p'`
   gcc_mt_genh_files=
   for gcc_mt_h in ${gcc_mt_genh}; do
@@ -1977,34 +1878,17 @@ for gcc_mt in ${gcc_manifest_targets}; do
     *" ${gcc_mt_obj} "*) ;;
     *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
        gcc_all_common_symbols="${gcc_all_common_symbols} ${gcc_mt_sym}"
-       # One rule per object.  A pattern rule cannot serve here: the objects
-       # sit in the build root but their sources are under
-       # common/config/<cpu>/, and vpath cannot glob those directories.  The
-       # -D is what gives each table a name of its own.
-       # Each back end gets a tm.h of its own, under a name of its own, rather
-       # than every back end sharing the one tm.h and 46 of them getting some
-       # other target's macros.  default-common.cc includes no tm.h and so
-       # needs none.
+       # One rule per object. A pattern rule cannot serve here:
+       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1980".
        if test x"${gcc_mt_base}" != xdefault; then
-         # This back end's own options header is NOT emitted here.  It cannot
-         # be: it has to be built from the .opt files of ALL this back end's
-         # triples, and inside this loop only the first one has been seen.  See
-         # the union pass after the loop.
-         # ... and this back end's constants, from its own machine description
-         # rather than whichever target happened to generate insn-constants.h.
+         # This back end's own options header is NOT emitted here.
+         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1989".
          printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
            "${gcc_mt_base}" "${gcc_mt_md}" "${gcc_mt_md}" >> ${gcc_common_mk}
-         # The build-directory headers this target's tm.h includes, holding
-         # multilib-derived spec macros -- SYSROOT_SUFFIX_SPEC and friends.
          #
-         # These were empty placeholders while the multilib data did not exist:
-         # a multi-target build includes no single target's tmake_file, so
-         # MULTILIB_OPTIONS and friends were unset and the generators had
-         # nothing to work from.  That data is now extracted per target into
-         # multi-target.multilib, so the real content can be produced.
-         # gen-sysroot-suffix.sh does it, and documents which targets still
-         # cannot be answered on this side of the build, and why.
-         # Two kinds end up in this list and they need different treatment.
+         # The build-directory headers this target's tm.h includes, holding
+         # multilib-derived spec macros -- ...
+         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1997".
          for gcc_mt_h in ${gcc_mt_genh_files}; do
            case ${gcc_mt_h} in
              *sysroot-suffix*)
@@ -2012,14 +1896,9 @@ for gcc_mt in ${gcc_manifest_targets}; do
                  "${gcc_mt_h}" "${gcc_mt}" >> ${gcc_common_mk}
                ;;
              *)
-               # The rest are headers a config/<cpu>/t-<cpu>-headers fragment
-               # already generates under its plain name, which we then renamed
-               # per back end so that two back ends generating the same name do
-               # not collide.  The renamed copy has to be the fragment's output;
-               # generating it empty meant tm-gcn.h included a
-               # gcn-device-macros-gcn.h with nothing in it while the real
-               # 158-line gcn-device-macros.h sat unused beside it.  That was
-               # true before this rule existed and would have kept being true.
+               # The rest are headers a config/<cpu>/t-<cpu>-headers fragment already
+               # generates under its plain ...
+               # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2015".
                gcc_mt_horig=`echo "${gcc_mt_h}" | sed "s/-${gcc_mt_base}\\.h\$/.h/"`
                printf '%s: %s\n\tcp $< $@\n\n' \
                  "${gcc_mt_h}" "${gcc_mt_horig}" >> ${gcc_common_mk}
@@ -2032,24 +1911,13 @@ for gcc_mt in ${gcc_manifest_targets}; do
            "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_base}" "${gcc_mt_sym}" >> ${gcc_common_mk}
          gcc_all_common_tm_headers="${gcc_all_common_tm_headers} tm-${gcc_mt_base}.h"
          # This back end's driver spec functions, from the same tm-<base>.h.
-         # Only bases that HAVE one: the handful that share default-common.cc
-         # have no tm-<base>.h to compile against, and are mapped to the empty
-         # table below.  Checked, not assumed -- none of the sixteen headers
-         # that define EXTRA_SPEC_FUNCTIONS belongs to that group.
-         # The -D has to reach the compiler as -DTM_H_FILE='"tm-<base>.h"':
-         # a string literal for #include, single-quoted so make and the shell
-         # keep the inner quotes.  Assembled here rather than nested inside the
-         # printf format, where three layers of quoting (m4, shell, make) had
-         # to be got right at once and a mistake produces a valid-looking rule
-         # that includes the wrong header.
+         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2034".
          gcc_mt_tmflag="-DTM_H_FILE='\"tm-${gcc_mt_base}.h\"'"
          printf 'spec-functions-%s.o: $(srcdir)/spec-functions.cc tm-%s.h $(GCC_H)\n\t$(COMPILE) %s -DSPEC_FUNCTIONS_SYMBOL=extra_spec_functions_%s $(srcdir)/spec-functions.cc\n\t$(POSTCOMPILE)\n\n' \
            "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_tmflag}" "${gcc_mt_base}" >> ${gcc_common_mk}
          gcc_all_spec_fn_objects="${gcc_all_spec_fn_objects} spec-functions-${gcc_mt_base}.o"
-         # @<:@ and @:>@ are the m4 quadrigraphs for [ and ].  Written literally
-         # they are eaten as m4 quotes and the declaration comes out as a
-         # scalar -- which still compiles, because the registry then takes its
-         # address, and links to a table read one element long.
+         # @<:@ and @:>@ are the m4 quadrigraphs for [ and ].
+         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2049".
          printf 'extern const struct spec_function extra_spec_functions_%s@<:@@:>@;\n' \
            "${gcc_mt_base}" >> ${gcc_sf_ext}
        else
@@ -2059,16 +1927,11 @@ for gcc_mt in ${gcc_manifest_targets}; do
        printf 'extern struct gcc_targetm_common %s;\n' "${gcc_mt_sym}" >> ${gcc_common_ext}
        ;;
   esac
-  # One entry per target, not per object: several targets can share a table.
-  # This is also what forces the tables into the compiler at all -- they are
-  # linked from an archive, and a member nothing refers to is simply not pulled
-  # in, so without the registry only the --target one ends up in the binary.
+  # One entry per target, not per object:
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2062".
   printf '  TARGETM_COMMON_ENTRY ("%s", %s) \\\n' "${gcc_mt}" "${gcc_mt_sym}" >> ${gcc_common_ent}
-  # And one spec-function entry per target, for the same reason.  A base with
-  # no tm-<base>.h of its own (the group sharing default-common.cc) gets the
-  # EMPTY table rather than no entry: "this target publishes no spec functions"
-  # and "this target is not in the registry" must stay distinguishable, because
-  # gcc.cc treats the second as the two registries having drifted apart.
+  # And one spec-function entry per target, for the same reason.
+  # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2067".
   if test x"${gcc_mt_base}" != xdefault; then
     printf '  SPEC_FUNCTIONS_ENTRY ("%s", extra_spec_functions_%s) \\\n' \
       "${gcc_mt}" "${gcc_mt_base}" >> ${gcc_sf_ent}
@@ -2079,34 +1942,12 @@ for gcc_mt in ${gcc_manifest_targets}; do
 done
 rm -f ${gcc_mt_err}
 
+#
+#
+#
 # The options header of a back end, built from the UNION of its triples'
 # extra_options.
-#
-# This has to be a second pass.  Every other per-back-end rule above can be
-# emitted the first time a triple of that back end is seen, because what it
-# needs -- the .md file, the cpu_type -- is a property of the back end and every
-# triple reports the same value.  extra_options is not like that: it is a
-# property of the TRIPLE, it is where the OS brings its own options in, and the
-# triples of one back end genuinely disagree.  Emitting the rule from the first
-# triple therefore silently picked one OS's answer for all of them, which is the
-# "first-triple-wins" defect.
-#
-# What it cost, concretely.  rs6000's first manifest triple is a Darwin one,
-# whose extra_options has no rs6000/sysv4.opt.  TARGET_LITTLE_ENDIAN is
-# `Mask(LITTLE_ENDIAN)' in that .opt and so was absent from options-rs6000.h;
-# config/rs6000/sysv4.h:50 defines TARGET_BIG_ENDIAN in terms of it, a
-# constraint in rs6000's .md reaches it through BYTES_BIG_ENDIAN, and
-# gencondmd failed to compile for the twelve rs6000 triples whose tm.h chain
-# includes sysv4.h.  cc1 could not be linked at all.
-#
-# The union is taken WITHIN a back end only.  Across back ends it would not be
-# safe -- the option names genuinely conflict there, and the Mask() bits do not
-# fit -- and that is separate work.  Within a back end it was measured clean:
-# for all 45 back ends the unioned .opt set produces an options-<base>.h with no
-# `#error', because opt-read.awk merges same-named records (which is how an
-# ordinary single-target build already copes with, say, gnu-user.opt and
-# linux.opt both declaring -pthread).  One back end needed help to stay inside
-# the 32-bit target_flags word: see the note in config/vxworks.opt.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2082".
 ${AWK} '
   # Manifest stanzas are blank-line separated `key value...` lines.
   /^common_out_file / {
@@ -2135,11 +1976,8 @@ ${AWK} '
 	  seen[[base SUBSEP f]] = 1
 	  files[[base]] = files[[base]] " $(srcdir)/config/" f
 	}
-	# ... and the same files unioned across ALL back ends.  This list is
-	# NOT used to generate any table: it is used only to collect the set of
-	# option NAMES, so that every generated options header in the build can
-	# be padded up to it, so that enum opt_code means one thing.  See
-	# gcc/opt-stub.awk for why the data must not be unioned with it.
+	# ... and the same files unioned across ALL back ends.
+	# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2138".
 	if (!(f in seenall)) {
 	  seenall[[f]] = 1
 	  allfiles = allfiles " $(srcdir)/config/" f
@@ -2160,13 +1998,8 @@ ${AWK} '
     for (i = 1; i <= nbase; i++) {
       b = order[[i]]
       # This back end own records, PLUS a placeholder for every name in the
-      # vocabulary it does not declare.  Without the padding this header
-      # numbers enum opt_code by this back end option set alone, while
-      # opts.cc is numbered by the shared one, and the two disagree: an OPT_
-      # value produced in common/config/<cpu>/<cpu>-common.cc and consumed in
-      # opts.cc then names a different option.  That is what made
-      # default_options_optimization walk this back end
-      # option_optimization_table straight into parse_sanitizer_options.
+      # vocabulary it does not declare.
+      # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2162".
       printf "optionlist-%s: $(lang_opt_files)%s optionlist-vocab $(srcdir)/opt-gather.awk $(srcdir)/opt-functions.awk $(srcdir)/opt-stub.awk\n", b, files[[b]]
       printf "\tLC_ALL=C; export LC_ALL; \\\n"
       printf "\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@.own\n", files[[b]]
@@ -2178,10 +2011,9 @@ ${AWK} '
       printf "\trm -f $@.own $@.stub\n\n"
       printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
-      # A guard of its own.  Sharing one guard across the shared options.h and
-      # the other 44 made a second include of the family a silent no-op instead
-      # of an error, so which options a TU got depended on include ORDER.
-      # See opth-gen.awk.
+      # A guard of its own. Sharing one guard across the shared options.h and
+      # the other 44 made a second ...
+      # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2181".
       printf "\t  -v guard_name=OPTIONS_%s_H \\\n", toupper(b)
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
     }
@@ -2243,9 +2075,8 @@ if test x"$tmake_file" = x
 then tmake_file=$cpu_type/t-$cpu_type
 fi
 
-# initfini-array.h is self-guarding: its body is wrapped in
-# `#if HAVE_INITFINI_ARRAY_SUPPORT', which config/elfos.h raises for ELF
-# targets, so it can simply always be in the bundle.
+# initfini-array.h is self-guarding:
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2246".
 tm_file="${tm_file} initfini-array.h"
 
 if test x"$dwarf2" = xyes
@@ -2610,15 +2441,8 @@ tmake_file="${tmake_file_}${omp_device_property_tmake_file}"
 out_object_file=`basename $out_file .cc`.o
 common_out_object_file=`basename $common_out_file .cc`.o
 
-# Name this target's common hook table is defined under.  Every target used to
-# call it `targetm_common', which is why two of them could never be linked into
-# the same compiler.  Derived from the file name so it needs no new data, and
-# sanitised because it becomes a C identifier.
-# NB: no brackets in the sed expression.  `[' and `]' are m4 quote characters, so
-# a character class here is silently eaten and the substitution never happens --
-# which produced `targetm_common_i386-common' and a compile error on the `-'.
-# Hyphen is the only character these file names contain that a C identifier
-# cannot, so replacing it directly avoids the problem entirely.
+# Name this target's common hook table is defined under.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2613".
 common_out_symbol=targetm_common_`basename $common_out_file .cc | sed 's/-/_/g'`
 AC_SUBST(common_out_symbol)
 
@@ -2921,12 +2745,8 @@ if $gcc_cv_as --help 2>&1 | grep -- --fatal-warnings > /dev/null; then
   fw_as_opt=--fatal-warnings
 fi
 
-# --enable-ld and --enable-gold are gone.  They chose which of two in-tree
-# linkers this compiler would drive -- one of a set of mutually exclusive target
-# tools, decided once at build time.  Which linker runs is a property of the
-# invocation, and the linker to use already has a home: the `linker' static spec
-# in the driver.  Neither was passed by almost any build, so the in-tree ld is
-# what the search below now finds, exactly as before.
+# --enable-ld and --enable-gold are gone.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2924".
 
 # Identify the linker which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the linker
@@ -2960,10 +2780,8 @@ if test x$PLUGIN_LD_SUFFIX = xld-new \
    || test x$PLUGIN_LD_SUFFIX = xcollect-ld ; then
   PLUGIN_LD_SUFFIX=ld
 fi
-# --with-plugin-ld is gone: it named the linker the LTO plugin should be handed
-# to, another single target tool chosen at build time.  Not passing it left the
-# suffix as the basename of the linker found above -- normally plain `ld' -- and
-# that is now the only answer this script gives.
+# --with-plugin-ld is gone:
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2963".
 AC_SUBST(ORIGINAL_PLUGIN_LD_FOR_TARGET)
 AC_DEFINE_UNQUOTED(PLUGIN_LD_SUFFIX, "$PLUGIN_LD_SUFFIX", [Specify plugin linker])
 
@@ -3862,34 +3680,38 @@ AC_ARG_WITH([diagnostics-urls],
 AC_DEFINE_UNQUOTED(DIAGNOSTICS_URLS_DEFAULT, $DIAGNOSTICS_URLS_DEFAULT,
 		   [The default for -fdiagnostics-urls option])
 
+#
+#
+#
 # The triple the target libraries in THIS BUILD TREE are being built for.
-#
-# This is emphatically NOT "the compiler's target": this compiler has none, and
-# nothing that gets compiled into it may depend on this value.  Read the
-# FIXINCLUDES_MACHINE comment in Makefile.in before reaching for it -- putting
-# the privileged target back is exactly what this project removed.
-#
-# It exists for one purpose: so the build directory can hold a driver named the
-# way an INSTALLED driver is named, `<triple>-gcc', for the in-tree target
-# libraries (libgcc, libstdc++, ...) to invoke.  A bare `xgcc' has no way to
-# know which target it is compiling for, and with the empty back end that is a
-# hard error rather than a silent default; naming the in-tree driver the way
-# the installed one is named means the two paths are ONE mechanism instead of
-# two, so whatever verifies one verifies the other.
-#
-# ${target} is appended to gcc_manifest_targets unconditionally above, so this
-# triple is always one this compiler was configured to serve.  The toplevel
-# Makefile spells the same name as $(target)-gcc out of its own @target@; both
-# come from AC_CANONICAL_TARGET over the same arguments, so they agree.
+# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3865".
 build_target_triple=${target}
 AC_SUBST(build_target_triple)
 
 # Generate gcc-driver-name.h containing GCC_DRIVER_NAME for the benefit
 # of jit/jit-playback.cc.
+#
+# This used to be "${target_noncanonical}-gcc-${version}${exeext}".
+# ACX_NONCANONICAL_TARGET went with AC_CANONICAL_TARGET, so
+# ${target_noncanonical} has been EMPTY here ever since, and the header was
+# being written as
+#
+#     #define GCC_DRIVER_NAME "-gcc-15.0.0"
+#
+# i.e. libgccjit spawning a program whose name begins with a dash -- which does
+# not exist, and which anything that execs it through a shell would read as an
+# option rather than a filename.  An empty variable in a string concatenation
+# produces a plausible-looking result and no diagnostic; this is the same
+# silent-emptiness failure the rest of the canonicalisation fallout has.
+#
+# The unprefixed name is now the correct one, not merely a workaround: the
+# driver serves every target in the build, so there is no triple to name it
+# after.  The <triple>-gcc spellings are per-target INSTALL ALIASES and belong
+# with the manifest, not baked into a compiled-once header.
 gcc_driver_version=`eval "${get_gcc_base_ver} $srcdir/BASE-VER"`
 echo "gcc_driver_version: ${gcc_driver_version}"
 cat > gcc-driver-name.h <<EOF
-#define GCC_DRIVER_NAME "${target_noncanonical}-gcc-${gcc_driver_version}${exeext}"
+#define GCC_DRIVER_NAME "gcc-${gcc_driver_version}${exeext}"
 EOF
 
 # Check whether --enable-versioned-jit was given.
