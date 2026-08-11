@@ -105,6 +105,9 @@ struct target_caps targ_caps =
   .as_mips_nan = true,
   .as_mips_micromips = true,
   .as_mips_dspr1_mult = true,
+  .as_mips_explicit_relocs = true,
+  .as_mips_explicit_relocs_pcrel = true,
+  .as_ld_mips_jalr_reloc = true,
   .as_riscv_attribute = true,
   .as_riscv_misa_spec = true,
   .as_riscv_march_zifencei = true,
@@ -337,6 +340,12 @@ read_target_caps (const char *file)
 	targ_caps.as_mips_micromips = value != 0;
       else if (strcmp (name, "as_mips_dspr1_mult") == 0)
 	targ_caps.as_mips_dspr1_mult = value != 0;
+      else if (strcmp (name, "as_mips_explicit_relocs") == 0)
+	targ_caps.as_mips_explicit_relocs = value != 0;
+      else if (strcmp (name, "as_mips_explicit_relocs_pcrel") == 0)
+	targ_caps.as_mips_explicit_relocs_pcrel = value != 0;
+      else if (strcmp (name, "as_ld_mips_jalr_reloc") == 0)
+	targ_caps.as_ld_mips_jalr_reloc = value != 0;
       else if (strcmp (name, "as_riscv_attribute") == 0)
 	targ_caps.as_riscv_attribute = value != 0;
       else if (strcmp (name, "as_riscv_misa_spec") == 0)

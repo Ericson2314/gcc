@@ -25,6 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target-def.h"
 #include "opts.h"
 #include "flags.h"
+#include "target-caps.h"
+#include "config/mips/mips-opts.h"
 
 /* Implement TARGET_HANDLE_OPTION.  */
 
@@ -55,6 +57,53 @@ mips_handle_option (struct gcc_options *opts,
       return true;
     }
 }
+
+/* Implement TARGET_OPTION_INIT_STRUCT.
+
+   Two defaults that used to be answered when GCC itself was configured, by
+   probing one assembler and one linker, and frozen into the build:
+
+     MIPS_EXPLICIT_RELOCS  reached mips.opt as the `Init (...)' of
+			   -mexplicit-relocs=, through tm_defines;
+     MASK_RELAX_PIC_CALLS  was OR'd into target_cpu_default, i.e. into
+			   TARGET_DEFAULT_TARGET_FLAGS below.
+
+   Neither could stay where it was.  `Init (...)' becomes a static initializer
+   in generated options.cc and TARGET_DEFAULT_TARGET_FLAGS is a DEFHOOKPOD;
+   both need constant expressions, and neither can read targ_caps.  This hook
+   can: it runs after the Init values are installed and BEFORE the command line
+   is decoded, so it sets a default that an explicit -mexplicit-relocs= still
+   overrides.
+
+   The enum is DERIVED here rather than recorded in targ_caps.  What the
+   assembler accepts is two independent yes/no answers; which of NONE/BASE/PCREL
+   to default to is a decision about this back end, and it belongs where the
+   enum is visible.  Storing the decision would also let it disagree with the
+   two answers it came from.  */
+
+static void
+mips_option_init_struct (struct gcc_options *opts)
+{
+  if (targ_caps.as_mips_explicit_relocs_pcrel)
+    opts->x_mips_opt_explicit_relocs = MIPS_EXPLICIT_RELOCS_PCREL;
+  else if (targ_caps.as_mips_explicit_relocs)
+    opts->x_mips_opt_explicit_relocs = MIPS_EXPLICIT_RELOCS_BASE;
+  else
+    opts->x_mips_opt_explicit_relocs = MIPS_EXPLICIT_RELOCS_NONE;
+
+  /* Relaxing an indirect call through $25 into a direct branch needs the
+     explicit R_MIPS_JALR relocation from BOTH the assembler and the linker,
+     and target-specs asks both.  It also needs the explicit relocation
+     operators the answer above is about, which is why the old probe was nested
+     inside that one -- and why, when that one was removed, this one silently
+     answered "no" on every target rather than failing.  */
+  if (targ_caps.as_ld_mips_jalr_reloc
+      && opts->x_mips_opt_explicit_relocs != MIPS_EXPLICIT_RELOCS_NONE)
+    opts->x_target_flags |= MASK_RELAX_PIC_CALLS;
+}
+
+#undef TARGET_OPTION_INIT_STRUCT
+#define TARGET_OPTION_INIT_STRUCT mips_option_init_struct
 
 #undef TARGET_DEFAULT_TARGET_FLAGS
 #define TARGET_DEFAULT_TARGET_FLAGS		\

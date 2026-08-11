@@ -158,8 +158,14 @@ Enum(mips_explicit_relocs) String(base) Value(MIPS_EXPLICIT_RELOCS_BASE)
 EnumValue
 Enum(mips_explicit_relocs) String(pcrel) Value(MIPS_EXPLICIT_RELOCS_PCREL)
 
+; The real default is applied by mips_option_init_struct in
+; common/config/mips/mips-common.cc, from what target-specs found this
+; assembler to accept.  Init() lands in a static initializer in generated
+; options.cc and so must be a constant expression, which rules out reading
+; targ_caps here; this is the floor, not the default.  NONE is the right floor
+; because it is the answer that is correct against every assembler.
 mexplicit-relocs=
-Target RejectNegative Joined Enum(mips_explicit_relocs) Var(mips_opt_explicit_relocs) Init(MIPS_EXPLICIT_RELOCS)
+Target RejectNegative Joined Enum(mips_explicit_relocs) Var(mips_opt_explicit_relocs) Init(MIPS_EXPLICIT_RELOCS_NONE)
 Use %reloc() assembly operators.
 
 mexplicit-relocs

@@ -1252,6 +1252,9 @@ dnl ---------------------------------------------------------------------------
 gcc_cv_as_mips_nan=no
 gcc_cv_as_micromips_support=no
 gcc_cv_as_mips_dspr1_mult=no
+gcc_cv_as_mips_explicit_relocs=no
+gcc_cv_as_mips_explicit_relocs_pcrel=no
+gcc_cv_as_ld_mips_jalr_reloc=no
 case ${target} in
   mips*-*-*)
     AC_MSG_CHECKING([assembler for -mnan= support])
@@ -1266,18 +1269,78 @@ case ${target} in
     if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
       gcc_cv_as_micromips_support=yes
     fi
-    AC_MSG_RESULT([])
+    AC_MSG_RESULT([$gcc_cv_as_micromips_support])
 
+    dnl Register names here are `$ac3', `$4', `$5'.  The version this replaces
+    dnl read `multu ,,' and ran `if "" -32 ...' -- every `$' had been eaten by a
+    dnl shell or perl expansion somewhere upstream of the file, taking the
+    dnl assembler's own name with it.  The empty command always fails, so the
+    dnl probe answered "no" on every toolchain and nothing said so.  Quote any
+    dnl edit of this block.
     AC_MSG_CHECKING([assembler for DSPR1 mult with four accumulators])
     cat > conftest.s <<'TSEOF'
 	.set	mips32r2
 	.set	nodspr2
-	multu	,,
+	.set	dsp
+	madd	$ac3,$4,$5
+	maddu	$ac3,$4,$5
+	msub	$ac3,$4,$5
+	msubu	$ac3,$4,$5
+	mult	$ac3,$4,$5
+	multu	$ac3,$4,$5
 TSEOF
-    if "" -32 -mdspr2 -o conftest.o conftest.s > /dev/null 2>&1; then
+    if "$gcc_cv_as" -32 -mdspr2 -o conftest.o conftest.s > /dev/null 2>&1; then
       gcc_cv_as_mips_dspr1_mult=yes
     fi
-    AC_MSG_RESULT([])
+    AC_MSG_RESULT([$gcc_cv_as_mips_dspr1_mult])
+
+    dnl Explicit relocation operators, and the JALR relocation that needs them.
+    dnl These three were gcc/configure.ac's; MIPS_EXPLICIT_RELOCS reached
+    dnl mips.opt as an `Init (...)' through tm_defines, which is why losing it
+    dnl broke GENERATED options.cc and stopped every mips target building.
+    dnl They are applied at run time now, in mips_option_init_struct.
+    AC_MSG_CHECKING([assembler for %pcrel_hi/%pcrel_lo])
+    echo '	lui $4,%pcrel_hi(foo)' > conftest.s
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_explicit_relocs_pcrel=yes
+      gcc_cv_as_mips_explicit_relocs=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_mips_explicit_relocs_pcrel])
+
+    if test x"$gcc_cv_as_mips_explicit_relocs" != xyes; then
+      AC_MSG_CHECKING([assembler for %gp_rel])
+      echo '	lw $4,%gp_rel(foo)($4)' > conftest.s
+      if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+	gcc_cv_as_mips_explicit_relocs=yes
+      fi
+      AC_MSG_RESULT([$gcc_cv_as_mips_explicit_relocs])
+    fi
+
+    dnl Needs the assembler, the linker AND objdump, and it is only meaningful
+    dnl when the operators above exist -- that nesting is what made the removal
+    dnl of the outer probe silently answer "no" here rather than fail.
+    AC_MSG_CHECKING([assembler and linker for explicit JALR relocation])
+    if test x"$gcc_cv_as_mips_explicit_relocs" = xyes \
+       && test x"$gcc_cv_objdump" != x; then
+      cat > conftest.s <<'TSEOF'
+	.ent x
+x:	lw $2,%got_disp(y)($3)
+	lw $25,%call16(y)($28)
+	.reloc	1f,R_MIPS_JALR,y
+1:	jalr $25
+	.reloc	1f,R_MIPS_JALR,x
+1:	jalr $25
+	.end x
+TSEOF
+      if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1 \
+	 && "$gcc_cv_ld" -shared -o conftest.so conftest.o > /dev/null 2>&1; then
+	if "$gcc_cv_objdump" -d conftest.so | grep jalr > /dev/null 2>&1 \
+	   && "$gcc_cv_objdump" -d conftest.so | grep "bal.*<x>" > /dev/null 2>&1; then
+	  gcc_cv_as_ld_mips_jalr_reloc=yes
+	fi
+      fi
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_ld_mips_jalr_reloc])
 
     rm -f conftest.s conftest.o
     ;;
@@ -1510,6 +1573,9 @@ as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
 as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
 as_mips_dspr1_mult `ts_bool "$gcc_cv_as_mips_dspr1_mult"`
+as_mips_explicit_relocs `ts_bool "$gcc_cv_as_mips_explicit_relocs"`
+as_mips_explicit_relocs_pcrel `ts_bool "$gcc_cv_as_mips_explicit_relocs_pcrel"`
+as_ld_mips_jalr_reloc `ts_bool "$gcc_cv_as_ld_mips_jalr_reloc"`
 
 # riscv back-end assembler capabilities.
 as_riscv_attribute `ts_bool "$gcc_cv_as_riscv_attribute"`

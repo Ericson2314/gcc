@@ -384,6 +384,59 @@ struct target_caps
   bool as_mips_micromips;
   bool as_mips_dspr1_mult;
 
+  /* Assembler takes the `%gp_rel(sym)' explicit relocation operators, and the
+     newer `%pcrel_hi'/`%pcrel_lo' pair.  These two decide the DEFAULT of
+     -mexplicit-relocs=, which used to be MIPS_EXPLICIT_RELOCS, an AC_DEFINE
+     reaching mips.opt through tm_defines and used as `Init (...)'.
+
+     THAT IS A FOURTH WAY A PROBE ANSWER GETS CONSUMED, beside spec text, a C
+     variable and a %(name) reference: the `Init (...)' of a .opt file, which
+     becomes a STATIC INITIALIZER in generated options.cc.  It has two
+     properties that make it the worst of the four to migrate.  A static
+     initializer needs a constant expression, so it cannot read this struct at
+     all -- the default has to be applied later, by the common
+     option_init_struct hook, which runs before the command line is decoded and
+     so still loses to an explicit -mexplicit-relocs=.  And when the macro goes
+     missing the failure lands in GENERATED code: `options.cc:4024: error:
+     MIPS_EXPLICIT_RELOCS was not declared', a file nobody edited, naming
+     nothing that suggests a configure probe.  Any other probe whose answer
+     reaches a .opt file has the same shape and is worth sweeping for.
+
+     TWO BOOLS RATHER THAN ONE ENUM, and the enum is derived from them in
+     common/config/mips/mips-common.cc.  They are two separate assembler
+     questions with two separate answers, and this struct records what the
+     assembler said; turning that into NONE/BASE/PCREL is a decision, and a
+     decision belongs with the back end that has the enum.  Storing the derived
+     value here would also make it possible for it to disagree with the pair.
+
+     True by default, like the three above and for the same reason -- a modern
+     GNU assembler has both, and the probes answered "no" only when there was
+     nothing to ask.  Note the asymmetry, because it is the reason this is worth
+     a sentence: a wrong "yes" here produces assembler errors, while a wrong
+     "no" only costs optimisation.  It is tolerable because a compiler in this
+     tree refuses to run at all without a target-config file, so these defaults
+     are reachable only from a config file written by an OLDER target-specs
+     that did not have these keys -- and that file's other mips answers would be
+     equally stale.  */
+  bool as_mips_explicit_relocs;
+  bool as_mips_explicit_relocs_pcrel;
+
+  /* Assembler and linker between them implement the explicit R_MIPS_JALR
+     relocation, so the linker can relax an indirect call through $25 into a
+     direct branch.  Was gcc_cv_as_ld_jalr_reloc in gcc/configure.ac, which
+     OR'd MASK_RELAX_PIC_CALLS into target_cpu_default -- i.e. into
+     TARGET_DEFAULT_TARGET_FLAGS, a DEFHOOKPOD, which must be a constant and
+     therefore cannot read this struct either.  Applied in the same
+     option_init_struct hook.
+
+     This half was the SILENT one.  With the probe gone, `test
+     $gcc_cv_as_mips_explicit_relocs = yes' tested an unset variable, so the
+     JALR probe answered "no" whatever the toolchain could do, and the only
+     symptom was slightly worse code.  The loud half -- the missing
+     MIPS_EXPLICIT_RELOCS breaking generated options.cc -- is what got anyone's
+     attention, and the two came from removing one probe.  */
+  bool as_ld_mips_jalr_reloc;
+
   /* riscv back-end assembler capabilities.  True by default, as above.
      Every one of these gates a "skip this extension because older binutils
      does not know it" flag in common/config/riscv/riscv-common.cc, so true

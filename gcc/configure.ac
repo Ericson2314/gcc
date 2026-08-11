@@ -4024,40 +4024,24 @@ LCF0:
     dnl through HAVE_AS_DSPR1_MULT in defaults.h so ISA_HAS_DSP_MULT keeps working
     dnl in mips.md C bodies and in the constraints.md register constraint.
 
-    AC_MSG_CHECKING(assembler and linker for explicit JALR relocation)
-    gcc_cv_as_ld_jalr_reloc=no
-    if test $gcc_cv_as_mips_explicit_relocs = yes; then
-      if test $in_tree_ld = yes ; then
-        if gcc_fn_gld_elf_min_version 2 20; then
-          gcc_cv_as_ld_jalr_reloc=yes
-        fi
-      elif test x"$gcc_cv_as" != x -a x"$gcc_cv_ld" != x -a x"$gcc_cv_objdump" != x; then
-        echo '	.ent x' > conftest.s
-        echo 'x:	lw $2,%got_disp(y)($3)' >> conftest.s
-        echo '	lw $25,%call16(y)($28)' >> conftest.s
-        echo '	.reloc	1f,R_MIPS_JALR,y' >> conftest.s
-        echo '1:	jalr $25' >> conftest.s
-        echo '	.reloc	1f,R_MIPS_JALR,x' >> conftest.s
-        echo '1:	jalr $25' >> conftest.s
-        echo '	.end x' >> conftest.s
-        if $gcc_cv_as -o conftest.o conftest.s >/dev/null 2>&AS_MESSAGE_LOG_FD \
-           && $gcc_cv_ld -shared -o conftest.so conftest.o >/dev/null 2>&AS_MESSAGE_LOG_FD; then
-	  if $gcc_cv_objdump -d conftest.so | grep jalr >/dev/null 2>&1 \
-	     && $gcc_cv_objdump -d conftest.so | grep "bal.*<x>" >/dev/null 2>&1; then
-            gcc_cv_as_ld_jalr_reloc=yes
-	  fi
-        fi
-        rm -f conftest.*
-      fi
-    fi
-    if test $gcc_cv_as_ld_jalr_reloc = yes; then
-      if test x$target_cpu_default = x; then
-        target_cpu_default=MASK_RELAX_PIC_CALLS
-      else
-        target_cpu_default="($target_cpu_default)|MASK_RELAX_PIC_CALLS"
-      fi
-    fi
-    AC_MSG_RESULT($gcc_cv_as_ld_jalr_reloc)
+dnl The explicit-relocation probes and the JALR probe that depended on them have
+dnl all moved to target-specs; targ_caps.as_mips_explicit_relocs,
+dnl .as_mips_explicit_relocs_pcrel and .as_ld_mips_jalr_reloc.
+dnl
+dnl MIPS_EXPLICIT_RELOCS reached mips.opt through tm_defines as the `Init (...)'
+dnl of -mexplicit-relocs=, and MASK_RELAX_PIC_CALLS was OR'd into
+dnl target_cpu_default here.  Both are applied at run time now, by
+dnl mips_option_init_struct in common/config/mips/mips-common.cc.
+dnl
+dnl WHAT WENT WRONG WHEN THE FIRST PROBE WAS REMOVED IS WORTH KEEPING.  Its
+dnl AC_DEFINE went with it and nothing replaced it, so `options.cc:4024: error:
+dnl MIPS_EXPLICIT_RELOCS was not declared in this scope' -- in GENERATED code,
+dnl naming a macro no source file mentions, and NO mips target could be built at
+dnl all.  Meanwhile the JALR probe below still read the shell variable that
+dnl probe had set, which was now unset, so its `test' errored and it answered
+dnl "no" on every
+dnl toolchain: worse code, silently, at the same time.  One removed probe, one
+dnl loud failure at a distance and one silent wrong answer.
 
     dnl -mnan= moved to target-specs; targ_caps.as_mips_nan.  The --with-nan
     dnl consistency error goes with it: that option is gone.
