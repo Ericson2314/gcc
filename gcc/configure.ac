@@ -4297,10 +4297,10 @@ LCF0:
     ;;
 
   mips*-*-*)
-    gcc_GAS_CHECK_FEATURE([-mno-shared support],
-      gcc_cv_as_mips_no_shared,[-mno-shared], [nop],,
-      [AC_DEFINE(HAVE_AS_NO_SHARED, 1,
-		 [Define if the assembler understands -mno-shared.])])
+    dnl -mno-shared: now spec-only.  NO_SHARED_SPECS in config/mips/gnu-user.h
+    dnl uses the spelling every supported assembler takes; a spec is baked into
+    dnl the driver before any target config is read, so it cannot be a runtime
+    dnl test.  An unusual assembler overrides that spec in its spec file.
 
     gcc_GAS_CHECK_FEATURE([.module support],
       gcc_cv_as_mips_dot_module,[-32],
@@ -4314,11 +4314,7 @@ LCF0:
 	[Requesting --with-fp-32= requires assembler support for .module.])
     fi
 
-    gcc_GAS_CHECK_FEATURE([.micromips support],
-      gcc_cv_as_micromips_support,[$fw_as_opt],
-      [.set micromips],,
-      [AC_DEFINE(HAVE_GAS_MICROMIPS, 1,
-          [Define if your assembler supports the .set micromips directive])])
+    dnl .micromips moved to target-specs; targ_caps.as_mips_micromips.
 
     gcc_GAS_CHECK_FEATURE([.dtprelword support],
       gcc_cv_as_mips_dtprelword,,
@@ -4379,16 +4375,8 @@ x:
     fi
     AC_MSG_RESULT($gcc_cv_as_ld_jalr_reloc)
 
-    gcc_GAS_CHECK_FEATURE([-mnan= support],
-      gcc_cv_as_mips_nan,
-      [-mnan=2008],,,
-      [AC_DEFINE(HAVE_AS_NAN, 1,
-		 [Define if the assembler understands -mnan=.])])
-    if test x$gcc_cv_as_mips_nan = xno \
-       && test x$with_nan != x; then
-      AC_MSG_ERROR(
-	[Requesting --with-nan= requires assembler support for -mnan=])
-    fi
+    dnl -mnan= moved to target-specs; targ_caps.as_mips_nan.  The --with-nan
+    dnl consistency error goes with it: that option is gone.
     ;;
     msp430-*-*)
     gcc_GAS_CHECK_FEATURE([.mspabi_attribute support],

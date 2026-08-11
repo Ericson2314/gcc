@@ -2970,6 +2970,33 @@ $as_echo "$gcc_cv_as_aarch64_aeabi" >&6; }
 esac
 
 
+gcc_cv_as_mips_nan=no
+gcc_cv_as_micromips_support=no
+case ${target} in
+  mips*-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mnan= support" >&5
+$as_echo_n "checking assembler for -mnan= support... " >&6; }
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mnan=2008 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_nan=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_mips_nan" >&5
+$as_echo "$gcc_cv_as_mips_nan" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .micromips support" >&5
+$as_echo_n "checking assembler for .micromips support... " >&6; }
+    echo '	.set micromips' > conftest.s
+    if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_micromips_support=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_micromips_support" >&5
+$as_echo "$gcc_cv_as_micromips_support" >&6; }
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
+
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
 }
@@ -2992,6 +3019,10 @@ dwarf2_debug_view `ts_bool ""`
 as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
 as_aarch64_small_pic_relocs `ts_bool "$gcc_cv_as_aarch64_picreloc"`
 as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
+
+# mips back-end assembler capabilities.
+as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
+as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
 
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`

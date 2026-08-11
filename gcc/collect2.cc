@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "file-find.h"
 #include "simple-object.h"
 #include "lto-section-names.h"
+#include "target-caps.h"
 
 /* TARGET_64BIT may be defined to use driver specific functionality. */
 #undef TARGET_64BIT
@@ -958,6 +959,15 @@ main (int argc, char **argv)
 	    if (selected_linker == USE_DEFAULT_LD)
 	      selected_linker = USE_PLUGIN_LD;
 	  }
+	/* The capability file the driver probed for this target.  collect2
+	   consults capabilities of its own (HAVE_AS_REF gates SCAN_DWEH on
+	   AIX, HAVE_LD_AT_FILE decides whether @file may be used), and it
+	   links libcommon.a so targ_caps resolves -- but without this it
+	   would only ever see the compiled-in defaults, whatever the spec
+	   file said.  Parsed here, in the early pass, so that it is in effect
+	   before anything reads a capability.  */
+	else if (startswith (argv[i], "-ftarget-config="))
+	  read_target_caps (argv[i] + strlen ("-ftarget-config="));
 	else if (strcmp (argv[i], "-fuse-ld=bfd") == 0)
 	  selected_linker = USE_BFD_LD;
 	else if (strcmp (argv[i], "-fuse-ld=gold") == 0)
@@ -1263,6 +1273,11 @@ main (int argc, char **argv)
   first_file = 1;
   while ((arg = *++argv) != (char *) 0)
     {
+      /* Consumed by collect2 itself in the early pass above; the linker has
+	 never heard of it, so it must not be copied through.  */
+      if (startswith (arg, "-ftarget-config="))
+	continue;
+
       *ld1++ = *ld2++ = arg;
 
       if (arg[0] == '-')

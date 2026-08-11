@@ -1478,6 +1478,30 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define POWERPC64_TOC_POINTER_ALIGNMENT (targ_caps.ld_toc_align ? 8 : 4)
 #endif
 
+/* How this linker spells "link the following statically" and "back to
+   dynamic", and whether it can do so at all.  These came from a configure
+   probe of one linker (gcc_cv_ld_static_option, AC_SUBST'ed into auto-host.h),
+   which a compiler serving many toolchains cannot have.
+
+   Defaulting them here matters more than it looks: the guards are `#ifdef', so
+   with the macro simply gone the sanitizer link specs in every lang_specific
+   driver -- g++, gfortran, gdc, go, gm2, cobol, algol68 -- quietly lost
+   -Bstatic/-Bdynamic rather than choosing a different spelling, and nothing
+   diagnosed it.  A linker that spells them differently (AIX, HP-UX) is
+   answered by target-specs/configure probing the real linker.
+
+   gcc.cc carries its own copy of these: it deliberately includes no tm.h and
+   so never reaches this header.  */
+#ifndef LD_STATIC_OPTION
+#define LD_STATIC_OPTION "-Bstatic"
+#endif
+#ifndef LD_DYNAMIC_OPTION
+#define LD_DYNAMIC_OPTION "-Bdynamic"
+#endif
+#ifndef HAVE_LD_STATIC_DYNAMIC
+#define HAVE_LD_STATIC_DYNAMIC 1
+#endif
+
 /* Nonzero if the target object format has COMDAT groups (ELF section groups,
    or the Sun as `.group' spelling of them).  ELF targets define this to 1 in
    config/elfos.h; PE/COFF and Mach-O leave it 0 and fall back to

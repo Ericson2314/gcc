@@ -1125,6 +1125,35 @@ TSEOF
     ;;
 esac
 
+dnl ---------------------------------------------------------------------------
+dnl BACK-END ASSEMBLER SECTION: mips
+dnl
+dnl From the mips arm of the same `case "$target"'.  Guarded on the target so a
+dnl probe written in mips assembly is not run against a foreign assembler.
+dnl ---------------------------------------------------------------------------
+
+gcc_cv_as_mips_nan=no
+gcc_cv_as_micromips_support=no
+case ${target} in
+  mips*-*-*)
+    AC_MSG_CHECKING([assembler for -mnan= support])
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mnan=2008 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_mips_nan=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_mips_nan])
+
+    AC_MSG_CHECKING([assembler for .micromips support])
+    echo '	.set micromips' > conftest.s
+    if "$gcc_cv_as" $fw_as_opt -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_micromips_support=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_micromips_support])
+
+    rm -f conftest.s conftest.o
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1149,6 +1178,10 @@ dwarf2_debug_view `ts_bool ""`
 as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
 as_aarch64_small_pic_relocs `ts_bool "$gcc_cv_as_aarch64_picreloc"`
 as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
+
+# mips back-end assembler capabilities.
+as_mips_nan `ts_bool "$gcc_cv_as_mips_nan"`
+as_mips_micromips `ts_bool "$gcc_cv_as_micromips_support"`
 
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`

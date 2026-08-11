@@ -61,6 +61,52 @@ for def in $DEFINES; do
     echo "#endif" >> ${output}T
 done
 
+# Linker capabilities that target headers test with #ifdef while composing
+# spec strings.  These used to come from configure probes of one linker, via
+# auto-host.h, which is included before any target header.  A multi-target
+# compiler has no such linker to probe, and with the macros simply gone every
+# one of those guards was silently false -- config/freebsd.h, netbsd.h,
+# netbsd-elf.h, openbsd.h, dragonfly.h, sol2.h, alpha/elf.h, alpha/linux.h,
+# arm/uclinux-elf.h, rs6000/freebsd64.h and i386/linux-common.h between them
+# dropped --eh-frame-hdr, --as-needed, -Bstatic/-Bdynamic, -pie and
+# --push-state from their link specs, with no diagnostic anywhere.
+#
+# The guards run while this header is being processed, long before defaults.h,
+# so they cannot be defaulted there; they are emitted here instead, ahead of
+# the target headers, which is where auto-host.h used to supply them.
+#
+# Every linker these targets can be linked by has these features.  A linker
+# that does not, or spells an option differently, is answered by
+# target-specs/configure probing the real linker and overriding the resulting
+# spec -- not by the driver silently omitting the option.
+case $output in
+    tm.h | tm-*.h )
+	cat >> ${output}T <<EOF
+#ifndef HAVE_LD_EH_FRAME_HDR
+# define HAVE_LD_EH_FRAME_HDR 1
+#endif
+#ifndef HAVE_LD_AS_NEEDED
+# define HAVE_LD_AS_NEEDED 1
+#endif
+#ifndef HAVE_LD_STATIC_DYNAMIC
+# define HAVE_LD_STATIC_DYNAMIC 1
+#endif
+#ifndef HAVE_LD_PIE
+# define HAVE_LD_PIE 1
+#endif
+#ifndef HAVE_LD_PUSHPOPSTATE_SUPPORT
+# define HAVE_LD_PUSHPOPSTATE_SUPPORT 1
+#endif
+#ifndef LD_STATIC_OPTION
+# define LD_STATIC_OPTION "-Bstatic"
+#endif
+#ifndef LD_DYNAMIC_OPTION
+# define LD_DYNAMIC_OPTION "-Bdynamic"
+#endif
+EOF
+    ;;
+esac
+
 # The first entry in HEADERS may be auto-FOO.h ;
 # it wants to be included even when not -DIN_GCC.
 # Postpone including defaults.h until after the insn-*
