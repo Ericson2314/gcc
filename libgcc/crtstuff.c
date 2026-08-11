@@ -48,36 +48,27 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* Target machine header files require this define. */
 #define IN_LIBGCC2
 
-/* FIXME: Including gcc's auto-host.h is incorrect -- it is the configuration
-   of the machine the COMPILER runs on, and this file is compiled for the
-   machine the LIBRARY runs on.  The two coincide in a native build and in no
-   other, which is why the mistake survives.
+/* gcc's auto-host.h used to be included here, and it was always wrong: it is
+   the configuration of the machine the COMPILER runs on, while this file is
+   compiled for the machine the LIBRARY runs on.  The two coincide in a native
+   build and in no other, which is why the mistake survived so long.
 
-   The list of things it was needed for has been worked down to nothing that
-   this file reads directly.  TARGET_DL_ITERATE_PHDR, HAVE_SYS_SDT_H and
-   HAVE_GAS_HIDDEN are probed by libgcc/configure and arrive in auto-target.h
-   below.  The PT_GNU_EH_FRAME question is now LIBGCC_HAVE_LD_EH_FRAME_HDR,
-   also ours -- and note it had stopped coming from auto-host.h some time ago
-   without anyone noticing: it was reaching this file from gcc's GENERATED
-   tm.h, where mkconfig.sh defines it to 1 for every target so that gcc's own
-   target headers can compose spec strings.  A default for one consumer had
-   quietly become the answer for another.
+   Everything it was read for now comes from libgcc's own auto-target.h, which
+   is probed with the compiler that will actually build this library:
+   TARGET_DL_ITERATE_PHDR, HAVE_SYS_SDT_H and HAVE_GAS_HIDDEN always did;
+   the PT_GNU_EH_FRAME question became LIBGCC_HAVE_LD_EH_FRAME_HDR; and
+   DEFAULT_USE_CXA_ATEXIT became LIBGCC_USE_CXA_ATEXIT, probed against the C
+   library these objects will be linked with and falling back to a declared
+   value -- recording that it did -- for the bootstrap case where there is no
+   C library yet to ask.
 
-   DEFAULT_USE_CXA_ATEXIT has now gone the same way: this file asks
-   LIBGCC_USE_CXA_ATEXIT, which libgcc/configure probes against the C library
-   these objects will be linked with, falling back to a declared value (and
-   recording that it did) for the bootstrap case where there is no C library
-   yet to ask.
-
-   So nothing this file reads comes from auto-host.h any more, and the include
-   and the five #undef lines below -- which sweep out the host typedefs that
-   arrive through it, the damage from reading the wrong file -- are next.  */
-#include "auto-host.h"
-#undef caddr_t
-#undef pid_t
-#undef rlim_t
-#undef ssize_t
-#undef vfork
+   Deleting the include takes two other things with it.  The five #undef lines
+   that stood here (caddr_t, pid_t, rlim_t, ssize_t, vfork) were sweeping host
+   typedefs back out of a target compile, damage caused by reading the wrong
+   file; they have no work left to do.  And the include sat BEFORE tconfig.h,
+   which is what defines USED_FOR_TARGET, so gcc's host answers arrived through
+   a guard that was still open -- that is why they leaked at all, and why the
+   sweeping was needed.  */
 #include "auto-target.h"
 #include "tconfig.h"
 #include "tsystem.h"
