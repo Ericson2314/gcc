@@ -1850,9 +1850,7 @@ backend_init (void)
      probed capability would be read here before the probe result existed, and
      the symptom would be a silently wrong section directive rather than a
      crash.  */
-  /* init_targetm_asm_ops is withdrawn while the asm-ops hooks move from POD
-     strings to functions; see Makefile.in.  The ordering note above stands for
-     whatever replaces it.  */
+  init_targetm_asm_ops ();
   init_varasm_once ();
   save_register_info ();
 

@@ -1511,12 +1511,13 @@ ANALYZER_OBJS = \
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
 # The per-back-end assembler-directive tables (target-asm-ops-select.o and
-# $(MULTI_TARGET_ASM_OPS_OBJS)) are deliberately absent from OBJS while the
-# asm-ops hooks are converted from POD strings to functions.  A table keyed by
-# target identity cannot hold an option-dependent value -- see
-# target-asm-ops.cc -- so the boundary between what stays in the table and what
-# becomes a function hook has to be settled before they are generated again.
-# The sources are kept; only the wiring is withdrawn.
+# $(MULTI_TARGET_ASM_OPS_OBJS)) are back.  They were withdrawn "while the
+# asm-ops hooks are converted from POD strings to functions"; that conversion
+# landed in dd862cc8825, of which the withdrawal is an ANCESTOR, so the reason
+# had already expired -- the hooks are `const char *(*)(void)' now
+# (target-asm-ops.h) and an option-dependent directive such as rx's
+# `TARGET_AS100_SYNTAX ? "\t.GLB\t" : "\t.global\t"' is evaluated inside the
+# wrapper at use time rather than frozen into the table.
 #
 # Note the comment sits here rather than among the entries below: a `#' inside
 # a backslash-continued assignment comments out the rest of the joined line, so
@@ -1989,6 +1990,8 @@ OBJS = \
 	wide-int.o \
 	wide-int-print.o \
 	attr-callback.o \
+	target-asm-ops-select.o \
+	$(MULTI_TARGET_ASM_OPS_OBJS) \
 	$(out_object_file) \
 	$(ANALYZER_OBJS) \
 	$(EXTRA_OBJS) \

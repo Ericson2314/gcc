@@ -445,14 +445,21 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # the configured target's config/<cpu>/<cpu>.cc is linked, and this is the
   # cheap part of fixing that -- the values that are plain strings.
   #
-  # mmix is excluded because on mmix they are not.  DATA_SECTION_ASM_OP there
-  # is `mmix_data_section_asm_op ()', a call into the back end, so the table
-  # cannot be statically initialised for it.  That is not a limitation of this
-  # file: targetm.asm_out.data_section_asm_op is a POD `const char *' hook, so
-  # mmix cannot be represented in it at all, and TARGET_INITIALIZER would
-  # reject the same expression the moment config/mmix/mmix.cc were compiled.
-  # Excluded loudly here rather than silently producing a wrong directive;
-  # making that hook a function on mmix's behalf is the owner's call.
+  # mmix is still excluded, but the REASON HAS CHANGED and the old one is no
+  # longer true.  It used to be "the table cannot be statically initialised
+  # for it", because the hook was a POD `const char *' and mmix's
+  # DATA_SECTION_ASM_OP is `mmix_data_section_asm_op ()'.  The hooks are
+  # function pointers now (target-asm-ops.h), GCC_TARGET_ASM_OP_WRAPPER wraps
+  # each macro in a static inline, and a wrapper whose body is a call is a
+  # perfectly good constant expression.  So mmix is now REPRESENTABLE.
+  #
+  # What excludes it is one step further out: the function that wrapper calls,
+  # `mmix_data_section_asm_op', is defined in config/mmix/mmix.cc, and only
+  # the PRIMARY target's back-end sources are linked -- OBJS carries a
+  # singular $(out_object_file).  target-asm-ops-mmix.o would compile and then
+  # fail to link with an undefined reference whenever mmix is not the primary.
+  # This exclusion therefore ends when the per-back-end compiler objects go
+  # into OBJS, not before, and it is one more consumer of that work.
   #
   # Back ends that share default-common.cc are skipped as well, and for a
   # duller reason: tm-<base>.h is generated per *common file* base, not per
@@ -460,13 +467,10 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # compile against.  Every other rule in this file happens to be safe because
   # cpu_type and the common-file base coincide for the 45 back ends that have
   # their own; these five are where the two keys come apart.
-  if (1) {
-    # Withdrawn while the asm-ops hooks move from POD strings to functions;
-    # see the note in Makefile.in.  Emitting nothing rather than deleting the
-    # code, so the boundary decision can turn it back on in one place.
+  if (cpu == "mmix") {
+    printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP calls mmix_data_section_asm_op (),\n";
+    printf "# which is defined in config/mmix/mmix.cc -- not linked unless mmix is the primary.\n\n";
   }
-  else if (cpu == "mmix")
-    printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP is a function call.\n\n";
   else if (cof == "default-common.cc")
     printf "# target-asm-ops-%s.o omitted: no tm-%s.h (shares default-common.cc).\n\n",
 	   cpu, cpu;
@@ -673,8 +677,6 @@ function emit_condition_intersections(	c) {
 function emit_asm_ops_registry(	i, n, parts) {
   n = split(asm_ops_bases, parts, " ");
 
-  printf "# MULTI_TARGET_ASM_OPS_OBJS withdrawn; see Makefile.in.\n";
-  return;
   printf "MULTI_TARGET_ASM_OPS_OBJS =%s\n", asm_ops_objs;
   printf "multi-target-asm-ops.h: multi-target.manifest\n";
   printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
