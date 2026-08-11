@@ -73,7 +73,7 @@
 #
 # Usage: check-spec-refs.sh GCC_CC REFSRC... -- SPECFILE...
 #
-# The REFSRC files are reference sources and not checked files.  Two kinds are
+# The REFSRC files are reference sources and not checked files.  Three kinds are
 # passed today:
 #
 #   target-specs/configure.ac -- it emits spec TEXT of its own (`*link_arch:'
@@ -93,6 +93,27 @@
 #     failure mode is the WORST one available here -- a false positive on a
 #     spec that is not merely live but load-bearing, which is precisely the
 #     kind of report that gets a checker demoted to advisory.
+#
+#   every target header, `config/*.h' and `config/*/*.h' -- THE SAME DEFECT ON
+#     THE --enable-targets AXIS.  target-specs writes a spec such as
+#     `*asm_mrelax' or `*asm_fp_module' into EVERY per-target file, and the only
+#     %(name) reference to it is in ONE back end's header (loongarch-driver.h,
+#     mips.h).  That reference reaches the corpus only through the generated
+#     `specs-src-<target>' of a target in THIS build, so a build with no
+#     loongarch target saw the spec emitted and the reference nowhere and this
+#     check called it dead -- fatally, in every such build, from the moment the
+#     spec was introduced.
+#
+#     THIS IS A WIDENING, SO THE QUESTION IS WHETHER IT WEAKENS THE CHECK, and
+#     the answer is no: the shape this exists for is a name emitted into every
+#     spec file and referred to from NOWHERE IN THE TREE, and a name in a target
+#     header is referred to somewhere in the tree.  All three real instances
+#     (`link_eh', `link_as_needed', `link_no_as_needed') appear in no target
+#     header and are still flagged.  Calibrated in
+#     `scratchpad/ct-specrefs-cal.sh' with four must-hits and the two known
+#     false positives; the must-hits are the historical bugs and a name that
+#     exists in no file at all, deliberately NOT drawn from the class the
+#     widening affects.
 
 set -e
 

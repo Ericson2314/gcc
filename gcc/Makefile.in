@@ -715,6 +715,29 @@ lang_specs_files=@lang_specs_files@
 # configuration-dependent verdicts, and a check that fails on a legitimate
 # configuration is a check that gets turned off.
 ALL_LANG_SPECS_FILES = $(wildcard $(srcdir)/*/lang-specs.h)
+
+# Every target header in the SOURCE TREE, for exactly the same reason, on the
+# other axis.  The languages case above is about --enable-languages; this one is
+# about --enable-targets, and it is the same defect.
+#
+# A spec that target-specs writes into every per-target file may be referred to
+# from ONE back end's header -- `*asm_mrelax' from loongarch-driver.h's
+# ASM_SPEC, `*asm_fp_module' from mips.h's FP_ASM_SPEC.  That reference reaches
+# the corpus only through the generated `specs-src-<target>' of a target that is
+# IN THIS BUILD, so a build with no loongarch target sees the spec emitted and
+# the reference nowhere, and check-spec-refs correctly-by-its-own-lights calls a
+# live spec dead.  It did: `make target-specs' was FATAL in every build without a
+# loongarch target from the moment `f413570602a' landed, and it went unseen only
+# because no build here had yet probed a non-x86_64 target successfully.
+#
+# Adding the headers does NOT weaken the check.  The shape it exists to catch is
+# sharper than this -- a name emitted into EVERY spec file and referred to from
+# NOWHERE IN THE TREE -- and all three real instances (`*link_eh',
+# `*link_as_needed', `*link_no_as_needed') are still caught, because none of
+# them appears in any target header.  There is a calibration for that in
+# check-spec-refs.sh.
+ALL_TARGET_HEADER_FILES = $(wildcard $(srcdir)/config/*.h) \
+			  $(wildcard $(srcdir)/config/*/*.h)
 lang_tree_files=@lang_tree_files@
 target_cpu_default=@target_cpu_default@
 extra_modes_file=@extra_modes_file@
@@ -3010,6 +3033,7 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	rc=0; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
+	  $(ALL_TARGET_HEADER_FILES) \
 	  -- `cat tmp-specfiles` || rc=1; \
 	if test -s tmp-cfgfiles; then \
 	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles` \
@@ -3037,6 +3061,7 @@ check-spec-refs:
 	  > tmp-specfiles; \
 	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
 	  $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
+	  $(ALL_TARGET_HEADER_FILES) \
 	  -- `cat tmp-specfiles`; \
 	rc=$$?; rm -f tmp-specfiles; exit $$rc
 
