@@ -36,7 +36,7 @@
 # triple); they also share md_file and tm_p_file, so the first record for a
 # given cpu_type wins and the rest are skipped.
 
-function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk, condmd) {
+function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   if (cpu == "" || seen[cpu])
     { cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; return }
   seen[cpu] = 1;
@@ -181,44 +181,47 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk, condmd) {
     printf "\t  insn-conditions-%s.md\n", cpu;
     printf "\t$(STAMP) s-condmd-%s\n\n", cpu;
 
-    condmd = "insn-conditions-" cpu ".md";
   }
   else {
     printf "# no gencondmd-%s: no tm-%s.h (shares default-common.cc).\n\n",
 	   cpu, cpu;
-    condmd = "";
   }
 
   # tm-<base>.h names this, so that a back end compiled against it gets its own
-  # HAVE_* rather than the configured target's.  insn-conditions-<base>.md goes
-  # in alongside the machine description, the way upstream feeds genflags
-  # insn-conditions.md: it resolves each pattern's condition to 1 or 0 up front,
-  # so HAVE_<pattern> comes out as a constant wherever the condition is one.
-  # Without it genflags emits the condition itself as the body of the macro --
-  # what GCC did before gencondmd existed, correct but not pre-evaluated.
+  # HAVE_* rather than the configured target's.
   #
-  # The back ends that share default-common.cc have no gencondmd of their own
-  # (see above), so for them genflags still runs without it.
+  # DELIBERATELY NOT FED insn-conditions-<base>.md.  Upstream passes genflags
+  # the conditions file so that each pattern's condition is resolved to 1 or 0
+  # up front; here that would be a bad trade, and the measurement is worth
+  # keeping because the change is a two-line one and looks like a free win.
   #
-  # CAVEAT, and it is not small.  Pre-evaluation is only as good as the tm.h it
-  # is done against, and tm-<base>.h is built from the FIRST triple in the
-  # manifest that names this back end -- so tm-i386.h is an i686-apple-darwin
-  # and tm-sparc.h is a 32-bit sparc.  Where a condition turns on an OS or ABI
-  # choice rather than on the back end, folding it here bakes that one triple's
-  # answer, e.g.
+  # Pre-evaluation is only as good as the tm.h it is done against, and
+  # tm-<base>.h is built from whichever triple came FIRST in the manifest --
+  # tm-i386.h is an i686-apple-darwin, tm-sparc.h is a 32-bit sparc.  Folding a
+  # condition that turns on an OS or ABI choice rather than on the back end
+  # therefore bakes that arbitrary triple's answer:
   #	-#define HAVE_adddi3_sp32 (TARGET_ARCH32)
   #	+#define HAVE_adddi3_sp32 1
-  # and the symbolic form was the more nearly runtime-correct of the two.
-  # Upstream has no such gap because there tm.h *is* the configured target.
-  # So this is a straight win only once tm-<base>.h stops being "whichever
-  # triple came first"; until then it trades deferred evaluation for a
-  # constant chosen by manifest order.  Measured: sparc 1124 changed lines,
-  # i386 4270, rs6000 1423, aarch64 0.
+  # and the symbolic form is the more nearly runtime-correct of the two.  In
+  # insn-conditions-i386.md the same cause turns `!TARGET_MACHO' from -1
+  # (unknown, decided later) into 0, i.e. "definitely not Mach-O" recorded for
+  # a back end whose representative triple is Darwin -- wrong in both
+  # directions at once.  Upstream has no such gap because there tm.h *is* the
+  # configured target.
+  #
+  # Cost of turning it on, measured: 1124 changed lines in insn-flags-sparc.h,
+  # 4270 in i386, 1423 in rs6000, 0 in aarch64.  That is 4270 lines of one
+  # arbitrary target choice baked in, in the name of an optimisation, in a
+  # tree whose purpose is to remove exactly that.
+  #
+  # Turn it back on once tm-<base>.h is keyed properly rather than by
+  # first-triple-wins: append insn-conditions-<base>.md to both the
+  # prerequisites and the command line below, and skip it for the back ends
+  # that share default-common.cc, which have no gencondmd of their own.
   printf "insn-flags-%s.h: build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s%s\n", md, (condmd == "" ? "" : " " condmd);
+  printf "  $(srcdir)/config/%s\n", md;
   printf "\t$(RUN_GEN) build/genflags-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
-  printf "\t  $(srcdir)/config/%s%s > tmp-flags-%s.h\n",
-	 md, (condmd == "" ? "" : " " condmd), cpu;
+  printf "\t  $(srcdir)/config/%s > tmp-flags-%s.h\n", md, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-flags-%s.h $@\n", cpu;
   printf "%s-common.o: insn-flags-%s.h insn-modes-%s.h\n\n", cpu, cpu, cpu;
 
