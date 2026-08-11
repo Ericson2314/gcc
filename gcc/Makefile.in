@@ -1447,9 +1447,19 @@ ANALYZER_OBJS = \
 # We put the *-match.o and insn-*.o files first so that a parallel make
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
+# The per-back-end assembler-directive tables (target-asm-ops-select.o and
+# $(MULTI_TARGET_ASM_OPS_OBJS)) are deliberately absent from OBJS while the
+# asm-ops hooks are converted from POD strings to functions.  A table keyed by
+# target identity cannot hold an option-dependent value -- see
+# target-asm-ops.cc -- so the boundary between what stays in the table and what
+# becomes a function hook has to be settled before they are generated again.
+# The sources are kept; only the wiring is withdrawn.
+#
+# Note the comment sits here rather than among the entries below: a `#' inside
+# a backslash-continued assignment comments out the rest of the joined line, so
+# commenting an entry in place silently empties the whole of OBJS -- which
+# builds an empty libbackend.a and 24k undefined references.
 OBJS = \
-	target-asm-ops-select.o \
-	$(MULTI_TARGET_ASM_OPS_OBJS) \
 	$(GIMPLE_MATCH_PD_SEQ_O) \
 	gimple-match-exports.o \
 	$(GENERIC_MATCH_PD_SEQ_O) \

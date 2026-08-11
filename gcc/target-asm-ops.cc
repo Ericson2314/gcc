@@ -43,43 +43,27 @@ along with GCC; see the file COPYING3.  If not see
    these hooks is NULL -- so NULL here means exactly what it means there: this
    target has no such section, which consumers must treat as the old #ifdef
    did rather than as an empty directive.  */
-#ifndef TARGET_ASM_GLOBAL_OP
-#define TARGET_ASM_GLOBAL_OP NULL
-#endif
-#ifndef TARGET_ASM_TEXT_SECTION_ASM_OP
-#define TARGET_ASM_TEXT_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_DATA_SECTION_ASM_OP
-#define TARGET_ASM_DATA_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_SDATA_SECTION_ASM_OP
-#define TARGET_ASM_SDATA_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_READONLY_DATA_SECTION_ASM_OP
-#define TARGET_ASM_READONLY_DATA_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_BSS_SECTION_ASM_OP
-#define TARGET_ASM_BSS_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_SBSS_SECTION_ASM_OP
-#define TARGET_ASM_SBSS_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_CTORS_SECTION_ASM_OP
-#define TARGET_ASM_CTORS_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_DTORS_SECTION_ASM_OP
-#define TARGET_ASM_DTORS_SECTION_ASM_OP NULL
-#endif
-#ifndef TARGET_ASM_INIT_SECTION_ASM_OP
-#define TARGET_ASM_INIT_SECTION_ASM_OP NULL
-#endif
 
 /* `extern' is not redundant.  A namespace-scope `const' object has internal
    linkage in C++, so without it this compiles to a file-local symbol -- the
    table is built correctly and then cannot be named from anywhere, and the
-   selector's registry fails to link against all 44 of them at once.  */
+   selector's registry fails to link against all 44 of them at once.
+
+   `constexpr' is not decoration either, and it is what makes this file safe.
+   C++ accepts a non-constant initialiser at namespace scope by emitting a
+   static constructor, so a back end whose directive is option-dependent --
+   rx's `(TARGET_AS100_SYNTAX ? "\t.GLB\t" : "\t.global\t")' reads target_flags
+   -- compiles and links clean and is silently wrong twice over: the
+   constructor runs before options are decoded, so it captures the default
+   flags rather than the user's, and the value is then frozen against
+   `#pragma GCC target'.  rx, arm and pdp11 were each emitting an .init_array
+   entry here.  constexpr turns that into a compile error naming the back end,
+   which is the whole point: a value that depends on a command-line flag is
+   per-compilation, not per-target, and cannot live in a table keyed by target
+   identity whatever its type.  Those belong in function hooks evaluated at use
+   time.  */
 extern const struct target_asm_ops TARGETM_ASM_OPS_SYMBOL;
-const struct target_asm_ops TARGETM_ASM_OPS_SYMBOL =
+constexpr struct target_asm_ops TARGETM_ASM_OPS_SYMBOL =
 {
   TARGET_ASM_GLOBAL_OP,
   TARGET_ASM_TEXT_SECTION_ASM_OP,

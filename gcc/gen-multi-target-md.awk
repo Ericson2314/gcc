@@ -205,7 +205,12 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # compile against.  Every other rule in this file happens to be safe because
   # cpu_type and the common-file base coincide for the 45 back ends that have
   # their own; these five are where the two keys come apart.
-  if (cpu == "mmix")
+  if (1) {
+    # Withdrawn while the asm-ops hooks move from POD strings to functions;
+    # see the note in Makefile.in.  Emitting nothing rather than deleting the
+    # code, so the boundary decision can turn it back on in one place.
+  }
+  else if (cpu == "mmix")
     printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP is a function call.\n\n";
   else if (cof == "default-common.cc")
     printf "# target-asm-ops-%s.o omitted: no tm-%s.h (shares default-common.cc).\n\n",
@@ -230,6 +235,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 function emit_asm_ops_registry(	i, n, parts) {
   n = split(asm_ops_bases, parts, " ");
 
+  printf "# MULTI_TARGET_ASM_OPS_OBJS withdrawn; see Makefile.in.\n";
+  return;
   printf "MULTI_TARGET_ASM_OPS_OBJS =%s\n", asm_ops_objs;
   printf "multi-target-asm-ops.h: multi-target.manifest\n";
   printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
