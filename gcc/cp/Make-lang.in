@@ -88,6 +88,18 @@ g++-cross$(exeext): xg++$(exeext)
 	-rm -f g++-cross$(exeext)
 	cp xg++$(exeext) g++-cross$(exeext)
 
+# The C++ driver under its INSTALLED name, for the same reason the C driver
+# gets one (see $(BUILD_DRIVER_NAME) in ../Makefile.in): the in-tree target
+# libraries then invoke a driver named the way the installed one is named, so
+# there is one mechanism to verify instead of two.  The name is derived by the
+# same rule libstdc++-v3/scripts/testsuite_flags.in uses -- trailing `gcc'
+# becomes `g++' -- and that script's check is what fails loudly if the two
+# ever disagree.
+BUILD_CXX_DRIVER_NAME = $(build_target_triple)-g++$(exeext)
+$(BUILD_CXX_DRIVER_NAME): xg++$(exeext)
+	-rm -f $@
+	cp xg++$(exeext) $@
+
 # The compiler itself.
 # Shared with C front end:
 CXX_C_OBJS = attribs.o \
@@ -243,8 +255,8 @@ create_fdas_for_cc1plus: ../stage1-gcc/cc1plus$(exeext) ../prev-gcc/$(PERF_DATA)
 #
 # Build hooks:
 
-c++.all.cross: g++-cross$(exeext)
-c++.start.encap: xg++$(exeext)
+c++.all.cross: g++-cross$(exeext) $(BUILD_CXX_DRIVER_NAME)
+c++.start.encap: xg++$(exeext) $(BUILD_CXX_DRIVER_NAME)
 c++.rest.encap:
 c++.info:
 c++.install-info:
@@ -387,7 +399,8 @@ c++.mostlyclean:
 	-rm -f doc/g++.1
 	-rm -f cp/*$(objext)
 	-rm -f cp/*$(coverageexts)
-	-rm -f xg++$(exeext) g++-cross$(exeext) cc1plus$(exeext) cc1plus*.fda
+	-rm -f xg++$(exeext) g++-cross$(exeext) $(BUILD_CXX_DRIVER_NAME)
+	-rm -f cc1plus$(exeext) cc1plus*.fda
 c++.clean:
 c++.distclean:
 	-rm -f cp/config.status cp/Makefile

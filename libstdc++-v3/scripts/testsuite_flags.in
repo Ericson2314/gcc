@@ -46,8 +46,27 @@ case ${query} in
       echo ${CXX}
       ;;
     --build-cxx)
+      # @CXX@ here is RAW_CXX_FOR_TARGET: it runs the build tree's C driver.
+      # Turn it into the C++ driver.  Both drivers in the build tree are named
+      # by ONE rule -- the C++ one is the C one with the trailing `gcc'
+      # replaced by `g++' -- which covers `xgcc' -> `xg++' and, now that the
+      # build tree also carries the driver under its installed name,
+      # `<triple>-gcc' -> `<triple>-g++'.
+      #
+      # This is a rewrite of a command string, so its failure mode is silence:
+      # if the pattern does not match, the C driver is returned and the whole
+      # C++ testsuite is compiled by it, with no diagnostic anywhere.  The old
+      # form matched the literal `gcc/xgcc ' and did exactly that the moment
+      # the driver was named anything else.  Hence both the general rule and
+      # the check below -- do not replace either with a literal.
       CXX_build="@CXX@"
-      CXX=`echo "$CXX_build" | sed 's,gcc/xgcc ,gcc/xg++ ,'`
+      CXX=`echo "$CXX_build" | sed 's,\(/\)\([^/ ]*\)gcc \(.*\)$,\1\2g++ \3,'`
+      case "$CXX" in
+        *g++\ *) ;;
+        *) echo "testsuite_flags: --build-cxx: cannot derive the C++ driver's" \
+                "name from [$CXX_build]" 1>&2
+           exit 1 ;;
+      esac
       echo ${CXX}
       ;;
     --build-cc)

@@ -19,7 +19,7 @@
 #<http://www.gnu.org/licenses/>.
 
 # QUIAT=@
-XGCC = ./xgcc -B./
+XGCC = ./$(BUILD_DRIVER_NAME) -B./
 GM2_2 = ./gm2 -B./m2/m2obj2 -g -fm2-g
 
 # m2/ppg$(exeext)  is the recursive descent parser generator.

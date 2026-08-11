@@ -607,8 +607,35 @@ install-gnatlib: ../stamp-gnatlib-$(RTSDIR) install-gcc-specs
 
 # GCC_FOR_TARGET has paths relative to the gcc directory, so we need to adjust
 # for running it from ada/rts.
+#
+# This is a REWRITE OF ANOTHER MAKEFILE'S TEXT, and that makes it a hiding
+# place: if the pattern stops matching, nothing fails -- the string is simply
+# left unrewritten and we run a compiler at a path that means something else
+# from here.  It used to match the literal `xgcc', so renaming the in-tree
+# driver would have done exactly that, silently.  Two changes:
+#
+#   - match $(BUILD_DRIVER_NAME), which gcc/Makefile.in exports and which IS
+#     the name it runs, so the two cannot drift apart; and
+#   - check that the substitution fired, so a future change to GCC_FOR_TARGET
+#     that this file does not anticipate stops the build with the reason
+#     instead of producing a command that runs the wrong program.
+#
+# The check is written into a recursively-expanded variable on purpose: it
+# fires when GCC_FOR_ADA_RTS is EXPANDED, not when this makefile is read, so
+# targets that never use it (and invocations where GCC_FOR_TARGET is not in
+# the environment at all) are unaffected.
+#
+# Note also that the two substitutions cannot be collapsed into a single
+# $(subst ./,../../,...): GCC_FOR_TARGET ends in -L$(objdir)/../ld, and "../ld"
+# contains "./".
 
-GCC_FOR_ADA_RTS=$(subst ./xgcc,../../xgcc,$(subst -B./, -B../../,$(GCC_FOR_TARGET)))
+# Defaulted so this fragment can still be read when gcc/Makefile did not export
+# it; the check below is what catches a value that does not match.
+BUILD_DRIVER_NAME ?= xgcc
+
+ADA_RTS_GCC = $(subst ./$(BUILD_DRIVER_NAME),../../$(BUILD_DRIVER_NAME),$(subst -B./,-B../../,$(GCC_FOR_TARGET)))
+
+GCC_FOR_ADA_RTS = $(if $(findstring ../../$(BUILD_DRIVER_NAME),$(ADA_RTS_GCC)),$(ADA_RTS_GCC),$(error GCC_FOR_ADA_RTS: cannot make GCC_FOR_TARGET relative to ada/rts: it does not run ./$(BUILD_DRIVER_NAME) [$(GCC_FOR_TARGET)]))
 
 # The main ada source directory must be on the include path for #include "..."
 # because s-oscons-tmplt.c requires adaint.h, gsocket.h, and any file included

@@ -638,6 +638,7 @@ CET_HOST_FLAGS
 LD_PICFLAG
 PICFLAG
 libgccjit_version
+build_target_triple
 enable_host_bind_now
 LIBGDIAGNOSTICS
 enable_libgdiagnostics
@@ -21523,7 +21524,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21526 "configure"
+#line 21527 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21629,7 +21630,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21632 "configure"
+#line 21633 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -29094,6 +29095,28 @@ fi
 cat >>confdefs.h <<_ACEOF
 #define DIAGNOSTICS_URLS_DEFAULT $DIAGNOSTICS_URLS_DEFAULT
 _ACEOF
+
+
+# The triple the target libraries in THIS BUILD TREE are being built for.
+#
+# This is emphatically NOT "the compiler's target": this compiler has none, and
+# nothing that gets compiled into it may depend on this value.  Read the
+# FIXINCLUDES_MACHINE comment in Makefile.in before reaching for it -- putting
+# the privileged target back is exactly what this project removed.
+#
+# It exists for one purpose: so the build directory can hold a driver named the
+# way an INSTALLED driver is named, `<triple>-gcc', for the in-tree target
+# libraries (libgcc, libstdc++, ...) to invoke.  A bare `xgcc' has no way to
+# know which target it is compiling for, and with the empty back end that is a
+# hard error rather than a silent default; naming the in-tree driver the way
+# the installed one is named means the two paths are ONE mechanism instead of
+# two, so whatever verifies one verifies the other.
+#
+# ${target} is appended to gcc_manifest_targets unconditionally above, so this
+# triple is always one this compiler was configured to serve.  The toplevel
+# Makefile spells the same name as $(target)-gcc out of its own @target@; both
+# come from AC_CANONICAL_TARGET over the same arguments, so they agree.
+build_target_triple=${target}
 
 
 # Generate gcc-driver-name.h containing GCC_DRIVER_NAME for the benefit

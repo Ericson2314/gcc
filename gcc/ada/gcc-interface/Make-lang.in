@@ -205,7 +205,7 @@ ifeq ($(build), $(host))
     # This is a regular native. Use the compiler from our
     # current build tree.
     ADA_TOOLS_FLAGS_TO_PASS=\
-        CC="../../xgcc -B../../" \
+        CC="../../$(BUILD_DRIVER_NAME) -B../../" \
         CXX="$(CXX)" \
         $(COMMON_FLAGS_TO_PASS) $(ADA_FLAGS_TO_PASS) \
         ADA_INCLUDES="-I- -I../generated -I../rts" \

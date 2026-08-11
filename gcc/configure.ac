@@ -5215,6 +5215,28 @@ AC_ARG_WITH([diagnostics-urls],
 AC_DEFINE_UNQUOTED(DIAGNOSTICS_URLS_DEFAULT, $DIAGNOSTICS_URLS_DEFAULT,
 		   [The default for -fdiagnostics-urls option])
 
+# The triple the target libraries in THIS BUILD TREE are being built for.
+#
+# This is emphatically NOT "the compiler's target": this compiler has none, and
+# nothing that gets compiled into it may depend on this value.  Read the
+# FIXINCLUDES_MACHINE comment in Makefile.in before reaching for it -- putting
+# the privileged target back is exactly what this project removed.
+#
+# It exists for one purpose: so the build directory can hold a driver named the
+# way an INSTALLED driver is named, `<triple>-gcc', for the in-tree target
+# libraries (libgcc, libstdc++, ...) to invoke.  A bare `xgcc' has no way to
+# know which target it is compiling for, and with the empty back end that is a
+# hard error rather than a silent default; naming the in-tree driver the way
+# the installed one is named means the two paths are ONE mechanism instead of
+# two, so whatever verifies one verifies the other.
+#
+# ${target} is appended to gcc_manifest_targets unconditionally above, so this
+# triple is always one this compiler was configured to serve.  The toplevel
+# Makefile spells the same name as $(target)-gcc out of its own @target@; both
+# come from AC_CANONICAL_TARGET over the same arguments, so they agree.
+build_target_triple=${target}
+AC_SUBST(build_target_triple)
+
 # Generate gcc-driver-name.h containing GCC_DRIVER_NAME for the benefit
 # of jit/jit-playback.cc.
 gcc_driver_version=`eval "${get_gcc_base_ver} $srcdir/BASE-VER"`

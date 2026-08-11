@@ -503,10 +503,25 @@ USER_H_INC_NEXT_POST = @user_headers_inc_next_post@
 T_GLIMITS_H = $(srcdir)/glimits.h
 T_STDINT_GCC_H = $(srcdir)/ginclude/stdint-gcc.h
 
+# The triple the target libraries in this build tree are being built for, and
+# the driver named after it.  See the build_target_triple comment in
+# configure.ac: this is NOT the compiler's target -- it has none -- it is the
+# name under which this build tree offers a driver that can work out which
+# target it is compiling for, which a bare `xgcc' cannot.
+#
+# ANYTHING THAT REWRITES A COMPILER COMMAND BY MATCHING THE DRIVER'S NAME MUST
+# MATCH THIS VARIABLE, NOT THE LITERAL `xgcc'.  A literal does not fail when
+# the name changes: the pattern stops matching, the string is left unrewritten,
+# and the wrong compiler runs with no diagnostic at all.  There are two such
+# rewrites in the tree (gcc/ada/gcc-interface/Makefile.in and
+# libstdc++-v3/scripts/testsuite_flags.in) and both now check that they fired.
+build_target_triple = @build_target_triple@
+BUILD_DRIVER_NAME = $(build_target_triple)-gcc$(exeext)
+
 # The GCC to use for compiling crt*.o.
 # Usually the one we just built.
 # Don't use this as a dependency--use $(GCC_PASSES).
-GCC_FOR_TARGET = $(STAGE_CC_WRAPPER) ./xgcc -B./ -B$(build_tooldir)/bin/ -isystem $(build_tooldir)/include -isystem $(build_tooldir)/sys-include -L$(objdir)/../ld $(TFLAGS)
+GCC_FOR_TARGET = $(STAGE_CC_WRAPPER) ./$(BUILD_DRIVER_NAME) -B./ -B$(build_tooldir)/bin/ -isystem $(build_tooldir)/include -isystem $(build_tooldir)/sys-include -L$(objdir)/../ld $(TFLAGS)
 
 # The GCC to use when running selftests
 GCC_FOR_SELFTESTS = LC_ALL=C GCC_COLORS= $(GCC_FOR_TARGET)
@@ -904,7 +919,7 @@ COMPILERS = @all_compilers@
 
 # List of things which should already be built whenever we try to use xgcc
 # to compile anything (without linking).
-GCC_PASSES=xgcc$(exeext) specs
+GCC_PASSES=xgcc$(exeext) $(BUILD_DRIVER_NAME) specs
 
 # Directory to link to, when using the target `maketest'.
 DIR = ../gcc
@@ -1318,6 +1333,7 @@ export AR_EXTRACT_FOR_TARGET
 export AWK
 export DESTDIR
 export GCC_FOR_TARGET
+export BUILD_DRIVER_NAME
 export INCLUDES
 export INSTALL_DATA
 export LIPO_FOR_TARGET
@@ -2081,7 +2097,7 @@ MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  tree-check.h min-insn-modes.cc insn-modes.cc insn-modes.h insn-modes-inline.h \
  genrtl.h gt-*.h gtype-*.h gtype-desc.cc gtyp-input.list \
  case-cfn-macros.h cfn-operators.pd \
- xgcc$(exeext) cpp$(exeext) $(FULL_DRIVER_NAME) \
+ xgcc$(exeext) $(BUILD_DRIVER_NAME) cpp$(exeext) $(FULL_DRIVER_NAME) \
  $(EXTRA_PROGRAMS) gcc-cross$(exeext) \
  $(SPECS) collect2$(exeext) gcc-ar$(exeext) gcc-nm$(exeext) \
  gcc-ranlib$(exeext) \
@@ -2366,10 +2382,10 @@ quickstrap: all
 
 all.internal: start.encap rest.encap doc selftest
 # This is what to compile if making a cross-compiler.
-all.cross: native gcc-cross$(exeext) cpp$(exeext) specs \
+all.cross: native gcc-cross$(exeext) $(BUILD_DRIVER_NAME) cpp$(exeext) specs \
 	libgcc-support lang.all.cross doc selftest @GENINSRC@ srcextra
 # This is what must be made before installing GCC and converting libraries.
-start.encap: native xgcc$(exeext) cpp$(exeext) specs \
+start.encap: native xgcc$(exeext) $(BUILD_DRIVER_NAME) cpp$(exeext) specs \
 	libgcc-support lang.start.encap @LIBGDIAGNOSTICS@ @GENINSRC@ srcextra
 # These can't be made until after GCC can run.
 rest.encap: lang.rest.encap
@@ -2645,6 +2661,15 @@ $(SPECS): xgcc$(exeext) target-specs
 # Also create gcc-cross, so that install-common will install properly.
 gcc-cross$(exeext): xgcc$(exeext)
 	cp xgcc$(exeext) gcc-cross$(exeext)
+
+# The driver under its INSTALLED name.  Same binary as xgcc; the NAME is the
+# point.  An installed <triple>-gcc and this one are then the same program
+# reached the same way, so the in-tree build of libgcc and friends exercises
+# the mechanism the installed compiler uses rather than a second one that only
+# the build tree has.
+$(BUILD_DRIVER_NAME): xgcc$(exeext)
+	-rm -f $@
+	cp xgcc$(exeext) $@
 
 checksum-options:
 	echo "$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS)" > checksum-options.tmp \
