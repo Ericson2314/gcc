@@ -96,8 +96,12 @@ along with GCC; see the file COPYING3.  If not see
 #define DWARF2_DEBUGGING_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
-/* None of these other formats is supported.  */
-#undef VMS_DEBUGGING_INFO
+/* None of these other formats is supported.  The `#undef VMS_DEBUGGING_INFO'
+   that stood here is gone with the two `#define's it existed to cancel:
+   target-specs emits targ_caps.vms_debug only for `alpha*-dec-*vms*' and
+   `ia64-hp-*vms*', so a vxworks target never receives it.  Removing this alone
+   would have read as a deliberate vxworks opt-out that the generator never
+   had.  */
 
 /* ------------------------ Misc configuration bits ----------------------  */
 

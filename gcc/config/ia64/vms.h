@@ -36,8 +36,9 @@ along with GCC; see the file COPYING3.  If not see
 /* The structure return address arrives as an "argument" on VMS.  */
 #undef PCC_STATIC_STRUCT_RETURN
 
-/* Turn on VMS specific Dwarf2 features.  */
-#define VMS_DEBUGGING_INFO 1
+/* Turn on VMS specific Dwarf2 features.  VMS_DEBUGGING_INFO was defined here;
+   it is targ_caps.vms_debug now, emitted by target-specs for the
+   `ia64-hp-*vms*' arm.  */
 
 #define ASM_OUTPUT_DWARF_VMS_DELTA(FILE,SIZE,LABEL1,LABEL2) \
 do {                                          \

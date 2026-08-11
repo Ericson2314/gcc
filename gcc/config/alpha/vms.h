@@ -202,7 +202,10 @@ typedef struct {int num_args; enum avms_arg_type atypes[6];} avms_arg_info;
 #define TARGET_ASM_DESTRUCTOR   vms_asm_out_destructor
 
 #define DWARF2_DEBUGGING_INFO 1
-#define VMS_DEBUGGING_INFO 1
+
+/* VMS_DEBUGGING_INFO was defined here.  It is targ_caps.vms_debug now, and
+   target-specs emits it for this triple family; see the `alpha*-dec-*vms*'
+   arm there.  */
 
 #define DWARF2_UNWIND_INFO 1
 
