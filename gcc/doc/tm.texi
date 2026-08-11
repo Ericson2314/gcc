@@ -1035,6 +1035,21 @@ cannot disagree; @code{STACK_REG_P} is derived from the range rather than
 being a hook of its own.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_STACK_REG_MODE_P (machine_mode @var{mode})
+Return true if a value of @var{mode} is held in the target's stack-register
+file.  This is the run-time form of the @code{IS_STACK_MODE} target macro.
+
+This is deliberately a separate question from @code{TARGET_STACK_REGS}, and
+is not derivable from it: whether a mode lives on the register stack can
+depend on command-line options as well as on the mode.  On i386,
+@code{DFmode} is a stack mode with @option{-mfpmath=387} and not with
+@option{-mfpmath=sse}, while the register file is the same either way.  The
+default asks @code{TARGET_HARD_REGNO_MODE_OK} about the first stack register,
+and is false whenever the range is empty -- so a target with no stack
+registers answers false without having to define anything, and callers need
+no separate @code{empty_p} test.
+@end deftypefn
+
 @deftypefn {Target Hook} {enum ptr_extend_kind} TARGET_POINTERS_EXTEND_KIND (void)
 Return how a value of @code{ptr_mode} is to be extended to @code{Pmode}
 when the two modes differ.  This is the run-time form of the

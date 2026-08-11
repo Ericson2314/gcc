@@ -958,6 +958,8 @@ The middle end reads this macro through
 
 @hook TARGET_STACK_REGS
 
+@hook TARGET_STACK_REG_MODE_P
+
 @hook TARGET_POINTERS_EXTEND_KIND
 
 @defmac PROMOTE_MODE (@var{m}, @var{unsignedp}, @var{type})

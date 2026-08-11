@@ -55,6 +55,7 @@ extern scalar_int_mode default_libgcc_cmp_return_mode (void);
 extern scalar_int_mode default_libgcc_shift_count_mode (void);
 extern scalar_int_mode default_unwind_word_mode (void);
 extern struct stack_reg_range default_stack_regs (void);
+extern bool default_stack_reg_mode_p (machine_mode);
 extern enum ptr_extend_kind default_pointers_extend_kind (void);
 extern unsigned HOST_WIDE_INT default_shift_truncation_mask
   (machine_mode);

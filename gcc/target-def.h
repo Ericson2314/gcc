@@ -238,6 +238,19 @@ target_def_stack_regs (void)
 #define TARGET_STACK_REGS target_def_stack_regs
 #endif
 
+/* Carry IS_STACK_MODE into targetm.stack_reg_mode_p, for the same reason and
+   in the same place as the range above -- so that a target which has a
+   register stack cannot end up describing the file and the modes through two
+   different mechanisms.  */
+#if defined (STACK_REGS) && !defined (TARGET_STACK_REG_MODE_P)
+static bool
+target_def_stack_reg_mode_p (machine_mode mode)
+{
+  return IS_STACK_MODE (mode);
+}
+#define TARGET_STACK_REG_MODE_P target_def_stack_reg_mode_p
+#endif
+
 /* Carry the target's POINTERS_EXTEND_UNSIGNED into
    targetm.pointers_extend_kind.  The middle-end files that used to read the
    macro (explow.cc, expr.cc, except.cc, emit-rtl.cc, ...) are compiled once for

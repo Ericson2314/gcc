@@ -307,6 +307,22 @@ default_stack_regs (void)
   return { 1, 0 };
 }
 
+/* The default implementation of TARGET_STACK_REG_MODE_P.  Derived from the
+   register file rather than being a fourth independent fact: an empty range
+   has no stack modes, and otherwise the generic question "can this mode live
+   in a stack register" is what TARGET_HARD_REGNO_MODE_OK already answers.  A
+   target whose answer depends on options as well as on the mode -- i386's
+   -mfpmath, say -- overrides this; see target-def.h.  */
+
+bool
+default_stack_reg_mode_p (machine_mode mode)
+{
+  stack_reg_range range = targetm.stack_regs ();
+  if (range.empty_p ())
+    return false;
+  return targetm.hard_regno_mode_ok (range.first, mode);
+}
+
 /* The default implementation of TARGET_POINTERS_EXTEND_KIND.  A target that
    defines POINTERS_EXTEND_UNSIGNED gets an overriding definition from
    target-def.h; everything else says nothing, which is a state of its own and
