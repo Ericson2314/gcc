@@ -93,6 +93,7 @@ struct target_caps targ_caps =
   .ld_avr_avrxmega3_rodata_in_flash = false,
   .ld_avr_avrxmega2_flmap = false,
   .ld_avr_avrxmega4_flmap = false,
+  .ld_pie = true,
   .ld_now = true,
   .ld_relro = true,
   .lto_plugin = true,
@@ -241,6 +242,8 @@ read_target_caps (const char *file)
 	targ_caps.ld_avr_avrxmega2_flmap = value != 0;
       else if (strcmp (name, "ld_avr_avrxmega4_flmap") == 0)
 	targ_caps.ld_avr_avrxmega4_flmap = value != 0;
+      else if (strcmp (name, "ld_pie") == 0)
+	targ_caps.ld_pie = value != 0;
       else if (strcmp (name, "ld_now") == 0)
 	targ_caps.ld_now = value != 0;
       else if (strcmp (name, "ld_relro") == 0)

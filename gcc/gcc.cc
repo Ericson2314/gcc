@@ -1016,14 +1016,16 @@ proper position among the other output files.  */
 #define FPIE_OR_FPIC_SPEC	FPIE_SPEC "|" FPIC_SPEC
 #define NO_FPIE_AND_FPIC_SPEC	FPIE_OR_FPIC_SPEC ":;"
 
-#ifndef LINK_PIE_SPEC
-#ifdef HAVE_LD_PIE
+/* LD_PIE_SPEC is concatenated into the LINK_PIE_SPEC string literal below, so
+   it has to be a compile-time constant and cannot consult targ_caps.  It was
+   gated on HAVE_LD_PIE, which has had no definition anywhere since that probe
+   was removed -- so the guard was silently false and LD_PIE_SPEC was "",
+   meaning -pie was never emitted for any link.  Every linker GCC supports
+   takes -pie; one that does not is handled by overriding the spec.  */
 #ifndef LD_PIE_SPEC
 #define LD_PIE_SPEC "-pie"
 #endif
-#else
-#define LD_PIE_SPEC ""
-#endif
+#ifndef LINK_PIE_SPEC
 #define LINK_PIE_SPEC "%{static|shared|r:;" PIE_SPEC ":" LD_PIE_SPEC "} "
 #endif
 
@@ -5067,9 +5069,12 @@ process_command (unsigned int decoded_options_count,
     {
       if (!avoid_linker_hardening_p && !static_p)
 	{
-#if defined HAVE_LD_PIE && defined LD_PIE_SPEC
-	  save_switch (LD_PIE_SPEC, 0, NULL, /*validated=*/true, /*known=*/false);
-#endif
+	  /* -fhardened implies -pie.  This was
+	     `#if defined HAVE_LD_PIE && defined LD_PIE_SPEC'; HAVE_LD_PIE had no
+	     definition left, so the guard was silently false and -fhardened
+	     stopped adding -pie while still reporting that it hardens.  */
+	  if (targ_caps.ld_pie)
+	    save_switch (LD_PIE_SPEC, 0, NULL, /*validated=*/true, /*known=*/false);
 	  /* The linker hardening options, which were HAVE_LD_NOW_SUPPORT and
 	     HAVE_LD_RELRO_SUPPORT out of auto-host.h.  The spec supplies both
 	     the capability and the option spelling -- an empty spec means this

@@ -318,6 +318,13 @@ struct target_caps
   /* Linker understands -z now and -z relro.  Were HAVE_LD_NOW_SUPPORT and
      HAVE_LD_RELRO_SUPPORT, both already consumed with a runtime `if' rather
      than an #ifdef, so only the value had to move.  */
+  /* Linker accepts `-pie'.  Was HAVE_LD_PIE, which had NO definition anywhere
+     -- not configure.ac, not config.in, not auto-host.h -- while three
+     preprocessor sites still tested it, so it was a silent 0.  See gcc.cc and
+     opts.cc.  The spec text LD_PIE_SPEC stays a compile-time constant; only
+     the guards are runtime.  */
+  bool ld_pie;
+
   bool ld_now;
   bool ld_relro;
 

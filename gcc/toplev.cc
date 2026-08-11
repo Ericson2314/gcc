@@ -2328,6 +2328,16 @@ toplev::main (int argc, char **argv)
 
   expandargv (&argc, &argv);
 
+  /* The target config has to be read before ANY option decoding, not merely
+     before the passes: --help= is serviced from inside common_handle_option
+     while options are still being decoded, so print_help_hardened runs before
+     target_config_file has been set.  Scanned straight out of argv for that
+     reason -- the same ordering hazard, and the same fix, as driver::main and
+     collect2.  */
+  for (int i = 1; i < argc; i++)
+    if (startswith (argv[i], "-ftarget-config="))
+      read_target_caps (argv[i] + strlen ("-ftarget-config="));
+
   /* Initialization of GCC's environment, and diagnostics.  */
   general_init (argv[0], m_init_signals, std::move (original_argv));
 
@@ -2371,15 +2381,16 @@ toplev::main (int argc, char **argv)
   global_dc->get_file_cache ().tune (param_file_cache_files,
 				     param_file_cache_lines);
 
-  /* Target assembler/linker capabilities.  The driver passes this out of the
-     target's spec file; without one the built-in defaults apply.  Must run
-     after option decoding (it is what sets target_config_file) and before any
-     pass consults targ_caps.
+  /* Target assembler/linker capabilities have already been read, from the argv
+     scan at the top of this function.  This second read is kept only for the
+     case where the path arrives by some route other than the command line;
+     read_target_caps is idempotent, so re-reading the same file is harmless.
 
-     Note this is much later than general_init, and in particular later than
-     init_varasm_once and init_targetm_asm_ops.  Nothing those two read may
-     depend on targ_caps: at that point the file has not been read and every
-     capability still holds its built-in default.  */
+     The earlier note here said the file had NOT been read by the time
+     init_varasm_once and init_targetm_asm_ops run, and that nothing they read
+     may depend on targ_caps.  That was true when the only read happened here;
+     the argv scan now runs before general_init, so both of those DO see the
+     real capabilities.  */
   if (target_config_file != NULL)
     read_target_caps (target_config_file);
 

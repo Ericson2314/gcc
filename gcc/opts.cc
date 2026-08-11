@@ -2606,9 +2606,8 @@ print_help_hardened ()
   printf ("  %s\n", "-D_FORTIFY_SOURCE=3 (or =2 for glibc < 2.35)");
   printf ("  %s\n", "-D_GLIBCXX_ASSERTIONS");
   printf ("  %s\n", "-ftrivial-auto-var-init=zero");
-#ifdef HAVE_LD_PIE
-  printf ("  %s  %s\n", "-fPIE", "-pie");
-#endif
+  if (HAVE_LD_PIE)
+    printf ("  %s  %s\n", "-fPIE", "-pie");
   if (HAVE_LD_NOW_SUPPORT)
     printf ("  %s\n", "-Wl,-z,now");
   if (HAVE_LD_RELRO_SUPPORT)
