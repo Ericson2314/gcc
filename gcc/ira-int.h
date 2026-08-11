@@ -287,7 +287,16 @@ struct ira_dependent_filter
    nested regions, it is represented in the region by special allocno
    called *cap*.  There may be more one cap representing the same
    pseudo-register in region.  It means that the corresponding
-   pseudo-register lives in more one non-intersected subregion.  */
+   pseudo-register lives in more one non-intersected subregion.
+
+   NOTE ON LAYOUT: no member of this struct may be conditional on a tm.h
+   target macro.  Twelve translation units include this header, and if the
+   macro were to differ between any two of them they would disagree about the
+   offset of every following member -- a silent memory-corruption bug, not a
+   build failure, and one no existing check would catch.  The stack-register
+   members below were once under #ifdef STACK_REGS for that reason; they now
+   cost two bits on the 44 targets that never read them, which is the right
+   price for a struct that cannot disagree with itself.  */
 struct ira_allocno
 {
   /* The allocno order number starting with 0.  Each allocno has an
@@ -320,12 +329,11 @@ struct ira_allocno
      when we removed memory-memory move insn before each iteration of
      the reload.  */
   unsigned int dont_reassign_p : 1;
-#ifdef STACK_REGS
   /* Set to TRUE if allocno can't be assigned to the stack hard
      register correspondingly in this region and area including the
-     region and all its subregions recursively.  */
+     region and all its subregions recursively.  Present unconditionally:
+     see the note on struct layout at the top of this file.  */
   unsigned int no_stack_reg_p : 1, total_no_stack_reg_p : 1;
-#endif
   /* TRUE value means that there is no sense to spill the allocno
      during coloring because the spill will result in additional
      reloads in reload pass.  */
@@ -478,10 +486,8 @@ struct ira_allocno
 #define ALLOCNO_SOMEWHERE_RENAMED_P(A) ((A)->somewhere_renamed_p)
 #define ALLOCNO_CHILD_RENAMED_P(A) ((A)->child_renamed_p)
 #define ALLOCNO_DONT_REASSIGN_P(A) ((A)->dont_reassign_p)
-#ifdef STACK_REGS
 #define ALLOCNO_NO_STACK_REG_P(A) ((A)->no_stack_reg_p)
 #define ALLOCNO_TOTAL_NO_STACK_REG_P(A) ((A)->total_no_stack_reg_p)
-#endif
 #define ALLOCNO_BAD_SPILL_P(A) ((A)->bad_spill_p)
 #define ALLOCNO_ASSIGNED_P(A) ((A)->assigned_p)
 #define ALLOCNO_MODE(A) ((A)->mode)

@@ -1020,6 +1020,21 @@ The middle end reads this macro through
 @code{TARGET_POINTERS_EXTEND_KIND} rather than directly.
 @end defmac
 
+@deftypefn {Target Hook} {struct stack_reg_range} TARGET_STACK_REGS (void)
+Return the inclusive hard register number range that makes up the target's
+stack-register file, as a @code{struct stack_reg_range} with @code{first} and
+@code{last} members.  This is the run-time form of the @code{STACK_REGS},
+@code{FIRST_STACK_REG} and @code{LAST_STACK_REG} target macros, and the
+default definition returns @code{@{FIRST_STACK_REG, LAST_STACK_REG@}} where
+@code{STACK_REGS} is defined.
+
+An @emph{empty} range (@code{last < first}) means the target has no stack
+registers, which is the run-time form of @code{STACK_REGS} being undefined,
+and is the default.  Presence and the two bounds travel together so that they
+cannot disagree; @code{STACK_REG_P} is derived from the range rather than
+being a hook of its own.
+@end deftypefn
+
 @deftypefn {Target Hook} {enum ptr_extend_kind} TARGET_POINTERS_EXTEND_KIND (void)
 Return how a value of @code{ptr_mode} is to be extended to @code{Pmode}
 when the two modes differ.  This is the run-time form of the

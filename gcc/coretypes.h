@@ -302,6 +302,37 @@ ptr_extend_unsignedp (enum ptr_extend_kind kind)
   return kind == PTR_EXTEND_ZERO ? 1 : kind == PTR_EXTEND_INSN ? -1 : 0;
 }
 
+/* The target's stack-register file: the inclusive hard register number range
+   [first, last], i.e. the runtime form of the STACK_REGS / FIRST_STACK_REG /
+   LAST_STACK_REG family.
+
+   An EMPTY range is the "this target has no stack registers" state -- the
+   runtime form of STACK_REGS being undefined, which is every back end but
+   i386.  Presence and the two bounds are ONE value on purpose, exactly as for
+   ptr_extend_kind above: a separate have_p predicate alongside first/last
+   could drift out of step with them, and there is no register number that can
+   stand in for "absent".
+
+   STACK_REG_P is not a separate hook because it is derived: it is just
+   includes_p on this range.  */
+
+struct stack_reg_range
+{
+  /* First and last stack hard register, inclusive.  LAST < FIRST means the
+     target has none.  */
+  int first;
+  int last;
+
+  bool empty_p () const { return first > last; }
+
+  /* True if REGNO is one of the target's stack registers.  Always false when
+     the range is empty, so callers need not test that separately.  */
+  bool includes_p (unsigned int regno) const
+  {
+    return (int) regno >= first && (int) regno <= last;
+  }
+};
+
 /* Callgraph node profile representation.  */
 enum node_frequency {
   /* This function most likely won't be executed at all.

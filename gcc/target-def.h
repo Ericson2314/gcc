@@ -220,6 +220,24 @@ target_def_use_local_thunk_alias_p (tree decl ATTRIBUTE_UNUSED)
 #define TARGET_ASM_USE_LOCAL_THUNK_ALIAS_P target_def_use_local_thunk_alias_p
 #endif
 
+/* Carry the target's stack-register file into targetm.stack_regs.  STACK_REGS,
+   FIRST_STACK_REG, LAST_STACK_REG and STACK_REG_P are a single family -- only
+   i386 defines any of them, and none of them is guarded independently -- so
+   they have to become runtime data together or not at all.  STACK_REG_P is not
+   bridged: it is derived from the range (see stack_reg_range::includes_p).
+
+   Same reasoning as for TARGET_POINTERS_EXTEND_KIND below: this belongs in
+   target-def.h rather than defaults.h, because defaults.h is included at the
+   end of tm.h and would therefore win.  */
+#if defined (STACK_REGS) && !defined (TARGET_STACK_REGS)
+static struct stack_reg_range
+target_def_stack_regs (void)
+{
+  return { FIRST_STACK_REG, LAST_STACK_REG };
+}
+#define TARGET_STACK_REGS target_def_stack_regs
+#endif
+
 /* Carry the target's POINTERS_EXTEND_UNSIGNED into
    targetm.pointers_extend_kind.  The middle-end files that used to read the
    macro (explow.cc, expr.cc, except.cc, emit-rtl.cc, ...) are compiled once for

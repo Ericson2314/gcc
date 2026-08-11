@@ -956,6 +956,8 @@ The middle end reads this macro through
 @code{TARGET_POINTERS_EXTEND_KIND} rather than directly.
 @end defmac
 
+@hook TARGET_STACK_REGS
+
 @hook TARGET_POINTERS_EXTEND_KIND
 
 @defmac PROMOTE_MODE (@var{m}, @var{unsignedp}, @var{type})

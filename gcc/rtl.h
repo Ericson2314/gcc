@@ -4257,11 +4257,11 @@ extern bool lra_in_progress;
 
 #define can_create_pseudo_p() (!reload_in_progress && !reload_completed)
 
-#ifdef STACK_REGS
 /* Nonzero after end of regstack pass.
-   Set to 1 or 0 by reg-stack.cc.  */
+   Set to 1 or 0 by reg-stack.cc.  Declared unconditionally: whether the target
+   has a stack-register file is a run-time question (targetm.stack_regs), so
+   this may not depend on a tm.h macro.  */
 extern int regstack_completed;
-#endif
 
 /* If this is nonzero, we do not bother generating VOLATILE
    around volatile memory references, and we are willing to
@@ -4629,9 +4629,7 @@ extern bool get_reg_known_equiv_p (unsigned int);
 extern rtx get_reg_base_value (unsigned int);
 extern rtx extract_mem_from_operand (rtx);
 
-#ifdef STACK_REGS
 extern bool stack_regs_mentioned (const_rtx insn);
-#endif
 
 /* In toplev.cc */
 extern GTY(()) rtx stack_limit_rtx;

@@ -176,6 +176,11 @@
 #include "rtl-iter.h"
 #include "function-abi.h"
 
+/* Nonzero after end of regstack pass.  Defined outside the STACK_REGS body
+   below because rtl.h declares it unconditionally and final.cc clears it on
+   every target.  */
+int regstack_completed = 0;
+
 #ifdef STACK_REGS
 
 /* We use this array to cache info about insns, because otherwise we
@@ -187,8 +192,6 @@
 static vec<char> stack_regs_mentioned_data;
 
 #define REG_STACK_SIZE (LAST_STACK_REG - FIRST_STACK_REG + 1)
-
-int regstack_completed = 0;
 
 /* This is the basic stack record.  TOP is an index into REG[] such
    that REG[TOP] is the top of stack.  If TOP is -1 the stack is empty.

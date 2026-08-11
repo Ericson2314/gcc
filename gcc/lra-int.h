@@ -107,10 +107,10 @@ public:
      the both hard registers defined, the first hard register has not
      less profit than the second one.  */
   int preferred_hard_regno_profit1, preferred_hard_regno_profit2;
-#ifdef STACK_REGS
-  /* True if the pseudo should not be assigned to a stack register.  */
+  /* True if the pseudo should not be assigned to a stack register.  Present
+     unconditionally so that this struct has one layout for every target; see
+     the note in ira-int.h.  */
   bool no_stack_p;
-#endif
   /* Number of references and execution frequencies of the register in
      *non-debug* insns.	 */
   int nrefs, freq;

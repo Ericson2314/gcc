@@ -297,6 +297,16 @@ default_unwind_word_mode (void)
   return word_mode;
 }
 
+/* The default implementation of TARGET_STACK_REGS.  An empty range: all back
+   ends but i386 lack a stack-register file, and "absent" is a state of the
+   range itself rather than a separate flag.  */
+
+struct stack_reg_range
+default_stack_regs (void)
+{
+  return { 1, 0 };
+}
+
 /* The default implementation of TARGET_POINTERS_EXTEND_KIND.  A target that
    defines POINTERS_EXTEND_UNSIGNED gets an overriding definition from
    target-def.h; everything else says nothing, which is a state of its own and

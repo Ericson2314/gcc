@@ -2441,6 +2441,24 @@ The default is to use @code{word_mode}.",
  scalar_int_mode, (void),
  default_unwind_word_mode)
 
+/* Runtime form of the STACK_REGS/FIRST_STACK_REG/LAST_STACK_REG family.  */
+DEFHOOK
+(stack_regs,
+ "Return the inclusive hard register number range that makes up the target's\n\
+stack-register file, as a @code{struct stack_reg_range} with @code{first} and\n\
+@code{last} members.  This is the run-time form of the @code{STACK_REGS},\n\
+@code{FIRST_STACK_REG} and @code{LAST_STACK_REG} target macros, and the\n\
+default definition returns @code{@{FIRST_STACK_REG, LAST_STACK_REG@}} where\n\
+@code{STACK_REGS} is defined.\n\
+\n\
+An @emph{empty} range (@code{last < first}) means the target has no stack\n\
+registers, which is the run-time form of @code{STACK_REGS} being undefined,\n\
+and is the default.  Presence and the two bounds travel together so that they\n\
+cannot disagree; @code{STACK_REG_P} is derived from the range rather than\n\
+being a hook of its own.",
+ struct stack_reg_range, (void),
+ default_stack_regs)
+
 /* Runtime form of the POINTERS_EXTEND_UNSIGNED target macro.  */
 DEFHOOK
 (pointers_extend_kind,
