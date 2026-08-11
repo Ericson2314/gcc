@@ -128,11 +128,15 @@ $(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
 $(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
   $(eval CFLAGS-$(o:.o=)-i386.o += -DTARGET_POLY_AWARE))
 
-# gencondmd is compiled once per configured triple and the triple cannot be
-# spelled here, so this one does need a pattern.  Its prerequisites are
-# generated .cc files rather than objects, so nothing shared inherits the flag
-# -- and build/genconditions.o, which does, has no IN_TARGET_CODE, which is
-# what both switches are keyed on, so the define is inert there.
+# gencondmd is target code -- genconditions.cc writes `#define IN_TARGET_CODE
+# 1' into the file it generates -- so it needs the opt-in too.
+#
+# ONLY the single-target object is named here.  The per-triple ones
+# (build/gencondmd-<triple>.o) used to be matched by patterns in this file,
+# which was wrong twice over.  A fragment is read only when its back end is
+# the PRIMARY target, so those patterns did nothing in exactly the builds that
+# needed them; and spelling triples as patterns here duplicated a rule
+# gen-multi-target-md.awk already emits.  That generator now reads the
+# declaration above and flags each configured triple itself, so both back ends
+# are on one mechanism and a triple is spelled in one place.
 build/gencondmd.o : T_CFLAGS += -DTARGET_POLY_AWARE
-build/gencondmd-i386%.o : T_CFLAGS += -DTARGET_POLY_AWARE
-build/gencondmd-x86_64%.o : T_CFLAGS += -DTARGET_POLY_AWARE

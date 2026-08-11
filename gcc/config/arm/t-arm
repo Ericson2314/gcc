@@ -205,8 +205,8 @@ $(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
 $(foreach o,$(INSNEMIT_SEQ_O) $(INSNRECOG_SEQ_O),\
   $(eval CFLAGS-$(o:.o=)-arm.o += -DTARGET_POLY_AWARE))
 
-# gencondmd is compiled once per configured triple and the triple cannot be
-# spelled here, so this one does need a pattern.  Its prerequisites are
-# generated .cc files rather than objects, so nothing shared inherits the flag.
+# gencondmd is target code -- genconditions.cc writes `#define IN_TARGET_CODE
+# 1' into the file it generates -- so it needs the opt-in too.  Only the
+# single-target object is named here; gen-multi-target-md.awk flags each
+# configured triple, reading the declaration above to decide.  See t-i386.
 build/gencondmd.o : T_CFLAGS += -DTARGET_POLY_AWARE
-build/gencondmd-arm%.o : T_CFLAGS += -DTARGET_POLY_AWARE
