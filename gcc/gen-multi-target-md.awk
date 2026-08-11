@@ -116,7 +116,8 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # genconditions.cc wants it for the same reason and for one more: the file
   # it *writes* names four back-end headers, and which four is settled when
   # genconditions itself is compiled (see the GENCONDMD_* defines below).
-  n = split("preds flags conditions codes config attr attr-common emit recog",
+  n = split("preds flags conditions codes config attr attr-common emit recog " \
+	    "output extract peep automata target-def attrtab opinit",
 	    parts, " ");
   for (i = 1; i <= n; i++) {
     printf "build/gen%s-%s.o : gen%s.cc tm-%s.h insn-modes-%s.h \\\n",
@@ -254,6 +255,28 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # where some generators saw the file and others did not would disagree about
   # what every insn code means.
   #
+  # KNOWN FAILURE, deliberately not worked around: **gcn does not build under
+  # this policy.**  genrecog-gcn rejects config/gcn/gcn-valu.md:836 with 831
+  # `element mode mismatch between vec_select QImode and its operand HImode'
+  # and friends.  The pattern is vec_extract<V_1REG:mode><V_1REG_ALT:mode>_nop,
+  # a cross product of two mode iterators whose condition
+  #	MODE_VF (<V_1REG_ALT:MODE>mode) < MODE_VF (<V_1REG:MODE>mode)
+  #	&& <V_1REG_ALT:SCALAR_MODE>mode == <V_1REG:SCALAR_MODE>mode
+  # IS the filter that removes the invalid pairs from the product.  gcn writes
+  # a deliberately over-broad product and relies on the condition being
+  # statically false to keep genrecog from ever seeing a mismatched pair.
+  # Measured with one binary and one .md: exit 0 with insn-conditions-gcn.md,
+  # exit 1 without.  So elision is not purely an optimisation for every back
+  # end, and this policy is not the final answer.
+  #
+  # It is left FAILING rather than special-cased.  A back end that visibly does
+  # not build is safer than one whose patterns are silently deleted, and the
+  # fix in flight is to fold only what is invariant across all of a back end's
+  # triples -- run gencondmd once per triple and intersect, so a condition is
+  # recorded false only if it is false for every triple.  gcn's conditions
+  # above are pure mode arithmetic and are invariant, so they would still fold;
+  # sparc's TARGET_ARCH32 and i386's TARGET_MACHO vary and would not.
+  #
   # Passing it to none keeps every condition deferred to run time, which is
   # what a multi-target compiler wants, and is how GCC behaved before gencondmd
   # existed.  Elision is then inert by construction rather than by our
@@ -285,6 +308,56 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.h $@\n\n",
 	   parts[i], cpu;
   }
+
+  # genautomata is the one generator that needs a library the others do not.
+  printf "build/genautomata-%s$(build_exeext): BUILD_LIBS += -lm\n\n", cpu;
+
+  # The generated .cc files that do go to stdout, and gentarget-def's header.
+  # genoutput belongs to the same group as genpreds: it is the second
+  # generator that genuinely reads a target macro (TARGET_MEM_CONSTRAINT), so
+  # being compiled against this back end's own tm.h is load-bearing for it
+  # rather than incidental.
+  n = split("output extract peep automata", parts, " ");
+  for (i = 1; i <= n; i++) {
+    printf "insn-%s-%s.cc: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	   parts[i], cpu, parts[i], cpu;
+    printf "  $(srcdir)/config/%s\n", md;
+    printf "\t$(RUN_GEN) build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	   parts[i], cpu;
+    printf "\t  $(srcdir)/config/%s > tmp-%s-%s.cc\n", md, parts[i], cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-%s-%s.cc $@\n\n",
+	   parts[i], cpu;
+  }
+
+  printf "insn-target-def-%s.h: build/gentarget-def-%s$(build_exeext) \\\n", cpu, cpu;
+  printf "  $(srcdir)/common.md $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/gentarget-def-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s > tmp-target-def-%s.h\n", md, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-target-def-%s.h $@\n\n", cpu;
+
+  # genattrtab writes three files, genopinit two; neither uses stdout.
+  printf "insn-attrtab-%s.cc insn-dfatab-%s.cc insn-latencytab-%s.cc: \\\n",
+	 cpu, cpu, cpu;
+  printf "  s-attrtab-%s; @true\n", cpu;
+  printf "s-attrtab-%s: build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
+  printf "  $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genattrtab-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s -Atmp-attrtab-%s.cc -Dtmp-dfatab-%s.cc \\\n",
+	 md, cpu, cpu;
+  printf "\t  -Ltmp-latencytab-%s.cc\n", cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-attrtab-%s.cc insn-attrtab-%s.cc\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-dfatab-%s.cc insn-dfatab-%s.cc\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-latencytab-%s.cc insn-latencytab-%s.cc\n", cpu, cpu;
+  printf "\t$(STAMP) s-attrtab-%s\n\n", cpu;
+
+  printf "insn-opinit-%s.cc insn-opinit-%s.h: s-opinit-%s; @true\n", cpu, cpu, cpu;
+  printf "s-opinit-%s: build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
+  printf "  $(srcdir)/config/%s\n", md;
+  printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t  $(srcdir)/config/%s -htmp-opinit-%s.h -ctmp-opinit-%s.cc\n", md, cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.h insn-opinit-%s.h\n", cpu, cpu;
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.cc insn-opinit-%s.cc\n", cpu, cpu;
+  printf "\t$(STAMP) s-opinit-%s\n\n", cpu;
 
   # genemit and genrecog do not write to stdout: they split their output over
   # NUM_INSNEMIT_SPLITS files named by -O, and genrecog writes a header named
