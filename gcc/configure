@@ -12607,6 +12607,15 @@ ${AWK} '
 	  seen[base SUBSEP f] = 1
 	  files[base] = files[base] " $(srcdir)/config/" f
 	}
+	# ... and the same files unioned across ALL back ends.  This list is
+	# NOT used to generate any table: it is used only to collect the set of
+	# option NAMES, so that every generated options header in the build can
+	# be padded up to it, so that enum opt_code means one thing.  See
+	# gcc/opt-stub.awk for why the data must not be unioned with it.
+	if (!(f in seenall)) {
+	  seenall[f] = 1
+	  allfiles = allfiles " $(srcdir)/config/" f
+	}
       }
       if (!(base in emitted)) {
 	emitted[base] = 1
@@ -12617,11 +12626,28 @@ ${AWK} '
   }
 
   END {
+    # The .opt files of every configured back end.  gcc/Makefile.in feeds this to
+    # opt-gather.awk to build optionlist-vocab, the union of option NAMES.
+    printf "MT_OPT_UNION_FILES =%s\n\n", allfiles
     for (i = 1; i <= nbase; i++) {
       b = order[i]
-      printf "optionlist-%s: $(lang_opt_files)%s $(srcdir)/opt-gather.awk\n", b, files[b]
+      # This back end own records, PLUS a placeholder for every name in the
+      # vocabulary it does not declare.  Without the padding this header
+      # numbers enum opt_code by this back end option set alone, while
+      # opts.cc is numbered by the shared one, and the two disagree: an OPT_
+      # value produced in common/config/<cpu>/<cpu>-common.cc and consumed in
+      # opts.cc then names a different option.  That is what made
+      # default_options_optimization walk this back end
+      # option_optimization_table straight into parse_sanitizer_options.
+      printf "optionlist-%s: $(lang_opt_files)%s optionlist-vocab $(srcdir)/opt-gather.awk $(srcdir)/opt-stub.awk\n", b, files[b]
       printf "\tLC_ALL=C; export LC_ALL; \\\n"
-      printf "\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@\n\n", files[b]
+      printf "\t$(AWK) -f $(srcdir)/opt-gather.awk $(lang_opt_files)%s > $@.own\n", files[b]
+      printf "\t$(AWK) -f $(srcdir)/opt-stub.awk -v vocab=optionlist-vocab \\\n"
+      printf "\t  optionlist-vocab $@.own > $@.stub\n"
+      printf "\t@echo \"$@: `wc -l < $@.own` own + `wc -l < $@.stub` placeholder records\"\n"
+      printf "\tLC_ALL=C; export LC_ALL; \\\n"
+      printf "\tcat $@.own $@.stub | sort > $@\n"
+      printf "\trm -f $@.own $@.stub\n\n"
       printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
@@ -21459,7 +21485,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21462 "configure"
+#line 21488 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21565,7 +21591,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21568 "configure"
+#line 21594 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H

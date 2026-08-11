@@ -3006,11 +3006,37 @@ s-specs : Makefile
 	$(SHELL) $(srcdir)/../move-if-change tmp-specs.h specs.h
 	$(STAMP) s-specs
 
-optionlist: s-options ; @true
-s-options: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) Makefile $(srcdir)/opt-gather.awk
+# The option-code VOCABULARY: every option name any generated options header in
+# this build will contain.  `enum opt_code' ordinals are the rank of a name in
+# the sorted record list and depend on nothing else -- even an alias, which
+# opth-gen.awk comments out, still consumes an ordinal -- so two headers agree
+# on the numbering exactly when they agree on the set of names.
+#
+# MT_OPT_UNION_FILES is the .opt files of every configured back end, and is set
+# by multi-target-common.mk.  In a single-target build it is empty, this file
+# is byte-identical to the un-stubbed optionlist, opt-stub.awk emits nothing,
+# and no generated file changes at all.
+optionlist-vocab: s-options-vocab ; @true
+s-options-vocab: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) $(MT_OPT_UNION_FILES) \
+    Makefile $(srcdir)/opt-gather.awk
 	LC_ALL=C ; export LC_ALL ; \
-	$(AWK) -f $(srcdir)/opt-gather.awk $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) > tmp-optionlist
+	$(AWK) -f $(srcdir)/opt-gather.awk $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) \
+	  $(MT_OPT_UNION_FILES) > tmp-optionlist-vocab
+	$(SHELL) $(srcdir)/../move-if-change tmp-optionlist-vocab optionlist-vocab
+	$(STAMP) s-options-vocab
+
+optionlist: s-options ; @true
+s-options: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) optionlist-vocab Makefile \
+    $(srcdir)/opt-gather.awk $(srcdir)/opt-stub.awk
+	LC_ALL=C ; export LC_ALL ; \
+	$(AWK) -f $(srcdir)/opt-gather.awk $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) > tmp-optionlist-own
+	$(AWK) -f $(srcdir)/opt-stub.awk -v vocab=optionlist-vocab \
+	  optionlist-vocab tmp-optionlist-own > tmp-optionlist-stub
+	@echo "optionlist: `wc -l < tmp-optionlist-own` own + `wc -l < tmp-optionlist-stub` placeholder records"
+	LC_ALL=C ; export LC_ALL ; \
+	cat tmp-optionlist-own tmp-optionlist-stub | sort > tmp-optionlist
 	$(SHELL) $(srcdir)/../move-if-change tmp-optionlist optionlist
+	rm -f tmp-optionlist-own tmp-optionlist-stub
 	$(STAMP) s-options
 
 options.cc: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
@@ -4421,7 +4447,8 @@ clean: mostlyclean lang.clean
 	-rm -f libunwind*
 	-rm -f config.h tconfig.h bconfig.h tm_p.h tm.h
 	-rm -f etlist
-	-rm -f options.cc options.h optionlist
+	-rm -f options.cc options.h optionlist optionlist-vocab optionlist-[a-z0-9]*
+	-rm -f options-[a-z0-9]*.h
 	-rm -f cs-*
 	-rm -f doc/*.dvi
 	-rm -f doc/*.pdf
