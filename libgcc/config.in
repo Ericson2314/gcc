@@ -37,6 +37,10 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if your linker links a mix of read-only and read-write sections into
+   a read-write section. */
+#undef HAVE_LD_RO_RW_SECTION_MIXING
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
