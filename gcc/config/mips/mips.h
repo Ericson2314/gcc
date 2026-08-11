@@ -228,12 +228,16 @@ struct mips_cpu_info {
   (TARGET_ABICALLS && !TARGET_ABSOLUTE_ABICALLS)
 
 /* True if the output must have a writable .eh_frame.
-   See ASM_PREFERRED_EH_DATA_FORMAT for details.  */
-#ifdef HAVE_LD_PERSONALITY_RELAXATION
-#define TARGET_WRITABLE_EH_FRAME 0
-#else
-#define TARGET_WRITABLE_EH_FRAME (flag_pic && TARGET_SHARED)
-#endif
+   See ASM_PREFERRED_EH_DATA_FORMAT for details.
+
+   Was an `#ifdef HAVE_LD_PERSONALITY_RELAXATION' choosing between the two arms.
+   defaults.h defines that macro unconditionally now, as
+   `(targ_caps.ld_personality_relaxation)', so the `#else' was dead and this was
+   pinned to 0 on every build -- mips stopped asking for a writable .eh_frame
+   whatever the linker could actually relax.  Both arms were already constant
+   expressions, so only the choice between them moves.  */
+#define TARGET_WRITABLE_EH_FRAME \
+  (HAVE_LD_PERSONALITY_RELAXATION ? 0 : (flag_pic && TARGET_SHARED))
 
 /* DSP Rev 1 or 2, depending on whether the assembler takes DSPR1 mult with
    four accumulators.  defaults.h redefines HAVE_AS_DSPR1_MULT to read targ_caps,

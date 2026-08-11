@@ -1337,7 +1337,12 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 #undef TARGET_ASM_INTEGER
 #define TARGET_ASM_INTEGER rs6000_assemble_integer
 
-#if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
+/* Was `#if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO'.  Only the TARGET_MACHO
+   half is a compile-time question; defaults.h defines HAVE_GAS_HIDDEN
+   unconditionally, so `defined' was vacuously true and the hook was being
+   installed regardless.  The capability is now tested inside the hook, which is
+   where a runtime value belongs.  */
+#if !TARGET_MACHO
 #undef TARGET_ASM_ASSEMBLE_VISIBILITY
 #define TARGET_ASM_ASSEMBLE_VISIBILITY rs6000_assemble_visibility
 #endif
@@ -15382,13 +15387,21 @@ rs6000_pltseq_template (rtx *operands, int which)
   return str;
 }
 
-#if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO
+/* Was `#if defined (HAVE_GAS_HIDDEN) && !TARGET_MACHO'; see the hook
+   registration above for why only the TARGET_MACHO half survives.  */
+#if !TARGET_MACHO
 /* Emit an assembler directive to set symbol visibility for DECL to
    VISIBILITY_TYPE.  */
 
 static void
 rs6000_assemble_visibility (tree decl, int vis)
 {
+  /* The assembler half of the old `#ifdef'.  Without `.hidden' there is
+     nothing to emit, and default_assemble_visibility would warn and drop the
+     attribute anyway -- so return before either.  */
+  if (!HAVE_GAS_HIDDEN)
+    return;
+
   if (TARGET_XCOFF)
     return;
 
@@ -22065,9 +22078,15 @@ rs6000_declare_alias (struct symtab_node *n, void *d)
 }
 
 
-#ifdef HAVE_GAS_HIDDEN
 /* Helper function to calculate visibility of a DECL
-   and return the value as a const string.  */
+   and return the value as a const string.
+
+   Was wrapped in `#ifdef HAVE_GAS_HIDDEN'.  defaults.h defines that macro
+   UNCONDITIONALLY now, as `(targ_caps.gas_hidden)', so the guard had become
+   vacuously true and this function was already being compiled on every build.
+   Dropping the guard is therefore textually inert; what is NOT inert is the
+   callers below, which used the same dead `#ifdef' in place of a test and so
+   emitted visibility whatever the assembler could do.  */
 
 static const char *
 rs6000_xcoff_visibility (tree decl)
@@ -22079,7 +22098,6 @@ rs6000_xcoff_visibility (tree decl)
   enum symbol_visibility vis = DECL_VISIBILITY (decl);
   return visibility_types[vis];
 }
-#endif
 
 
 /* This macro produces the initial definition of a function name.
@@ -22121,9 +22139,8 @@ rs6000_xcoff_declare_function_name (FILE *file, const char *name, tree decl)
 	    }
 	  fputs ("\t.globl .", file);
 	  RS6000_OUTPUT_BASENAME (file, buffer);
-#ifdef HAVE_GAS_HIDDEN
-	  fputs (rs6000_xcoff_visibility (decl), file);
-#endif
+	  if (HAVE_GAS_HIDDEN)
+	    fputs (rs6000_xcoff_visibility (decl), file);
 	  putc ('\n', file);
 	}
     }
@@ -22179,9 +22196,8 @@ rs6000_xcoff_asm_globalize_decl_name (FILE *stream, tree decl)
   const char *name = XSTR (XEXP (DECL_RTL (decl), 0), 0);
   fputs (GLOBAL_ASM_OP, stream);
   assemble_name (stream, name);
-#ifdef HAVE_GAS_HIDDEN
-  fputs (rs6000_xcoff_visibility (decl), stream);
-#endif
+  if (HAVE_GAS_HIDDEN)
+    fputs (rs6000_xcoff_visibility (decl), stream);
   putc ('\n', stream);
 }
 
@@ -22233,10 +22249,8 @@ rs6000_xcoff_asm_output_aligned_decl_common (FILE *stream,
 	       "\t.comm %s," HOST_WIDE_INT_PRINT_UNSIGNED ",%u" ,
 	       name, size, align2);
 
-#ifdef HAVE_GAS_HIDDEN
-      if (decl != NULL)
+      if (HAVE_GAS_HIDDEN && decl != NULL)
 	fputs (rs6000_xcoff_visibility (decl), stream);
-#endif
       putc ('\n', stream);
     }
   else
@@ -27243,11 +27257,12 @@ rs6000_adjust_insn_length (rtx_insn *insn, int length)
 }
 
 
-#ifdef HAVE_GAS_HIDDEN
-# define USE_HIDDEN_LINKONCE 1
-#else
-# define USE_HIDDEN_LINKONCE 0
-#endif
+/* Was an `#ifdef HAVE_GAS_HIDDEN' choosing between 1 and 0.  That macro is
+   defined unconditionally by defaults.h now, so the `#else' arm was dead and
+   this was pinned to 1 on every build.  Both uses below are runtime `if's, so
+   the expression form is all that was ever needed -- and it is the shape
+   i386.cc, s390.cc and sparc.cc were already converted to.  */
+#define USE_HIDDEN_LINKONCE (HAVE_GAS_HIDDEN)
 
 /* Fills in the label name that should be used for a 476 link stack thunk.  */
 

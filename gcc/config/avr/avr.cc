@@ -120,23 +120,18 @@ const avr_addrspace_t avr_addrspace[ADDR_SPACE_COUNT] =
 };
 
 
-#ifdef HAVE_LD_AVR_AVRXMEGA2_FLMAP
-static const bool have_avrxmega2_flmap = true;
-#else
-static const bool have_avrxmega2_flmap = false;
-#endif
+/* Three `#ifdef'-selected namespace-scope constants used to live here, one per
+   linker capability.  defaults.h defines all three macros unconditionally now
+   (`HAVE_LD_AVR_AVRXMEGA2_FLMAP' etc. read targ_caps), so every `#else' arm was
+   dead and all three constants were pinned to `true' -- avr assumed a linker
+   with flmap and rodata-in-flash support on every build.
 
-#ifdef HAVE_LD_AVR_AVRXMEGA4_FLMAP
-static const bool have_avrxmega4_flmap = true;
-#else
-static const bool have_avrxmega4_flmap = false;
-#endif
-
-#ifdef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
-static const bool have_avrxmega3_rodata_in_flash = true;
-#else
-static const bool have_avrxmega3_rodata_in_flash = false;
-#endif
+   They are NOT replaced by `static const bool x = HAVE_LD_...;'.  That would be
+   a namespace-scope initialiser reading targ_caps, which runs BEFORE
+   read_target_caps and would silently capture the built-in default instead of
+   the probed answer -- the same trap cppdefault.h documents.  The only consumer
+   is avr_rodata_in_flash_p below, so the capabilities are read there, inside a
+   function, where the config file has certainly been read.  */
 
 
 /* Holding RAM addresses of some SFRs used by the compiler and that
@@ -320,13 +315,15 @@ avr_rodata_in_flash_p ()
       return true;
 
     case ARCH_AVRXMEGA3:
-      return have_avrxmega3_rodata_in_flash;
+      return HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH;
 
     case ARCH_AVRXMEGA2:
-      return avropt_flmap && have_avrxmega2_flmap && avropt_rodata_in_ram != 1;
+      return (avropt_flmap && HAVE_LD_AVR_AVRXMEGA2_FLMAP
+	      && avropt_rodata_in_ram != 1);
 
     case ARCH_AVRXMEGA4:
-      return avropt_flmap && have_avrxmega4_flmap && avropt_rodata_in_ram != 1;
+      return (avropt_flmap && HAVE_LD_AVR_AVRXMEGA4_FLMAP
+	      && avropt_rodata_in_ram != 1);
     }
 
   return false;
