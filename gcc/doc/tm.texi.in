@@ -5737,6 +5737,8 @@ You may wish to use @code{ASM_OUTPUT_SIZE_DIRECTIVE} and/or
 @code{ASM_OUTPUT_MEASURED_SIZE} in the definition of this macro.
 @end defmac
 
+@hook TARGET_ASM_GLOBAL_OP
+
 @hook TARGET_ASM_GLOBALIZE_LABEL
 
 @hook TARGET_ASM_GLOBALIZE_DECL_NAME

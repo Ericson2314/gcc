@@ -8088,18 +8088,30 @@ decl_replaceable_p (tree decl, bool semantic_interposition_p)
   return !decl_binds_to_current_def_p (decl);
 }
 
-/* Default function to output code that will globalize a label.  A
-   target must define GLOBAL_ASM_OP or provide its own function to
-   globalize a label.  */
-#ifdef GLOBAL_ASM_OP
+/* Default function to output code that will globalize a label.  A target
+   must supply TARGET_ASM_GLOBAL_OP (normally by defining GLOBAL_ASM_OP,
+   which defaults.h carries into the hook) or provide its own
+   TARGET_ASM_GLOBALIZE_LABEL.
+
+   This was previously compiled only #ifdef GLOBAL_ASM_OP, reading the macro
+   directly.  varasm.cc is compiled once, so that baked whichever target's
+   tm.h happened to win into every target -- and the directive genuinely
+   varies between back ends.  Taking it from targetm instead makes it
+   per-target, since targetm is instantiated per back end.
+
+   The absence of a definition used to be a link error (this function simply
+   did not exist).  It is now an ICE here instead: still loud, but deferred
+   to run time, so state it explicitly rather than letting a null reach
+   fputs.  */
+
 void
 default_globalize_label (FILE * stream, const char *name)
 {
-  fputs (GLOBAL_ASM_OP, stream);
+  gcc_assert (targetm.asm_out.global_op != NULL);
+  fputs (targetm.asm_out.global_op, stream);
   assemble_name (stream, name);
   putc ('\n', stream);
 }
-#endif /* GLOBAL_ASM_OP */
 
 /* Default function to output code that will globalize a declaration.  */
 void

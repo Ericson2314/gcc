@@ -142,6 +142,18 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_DEFERRED_OUTPUT_DEFS(DECL,TARGET) false
 #endif
 
+/* Carry the target's GLOBAL_ASM_OP into the targetm.asm_out.global_op hook.
+   varasm.cc is compiled once for the whole compiler, so it cannot read
+   GLOBAL_ASM_OP directly without baking one target's directive into every
+   target; targetm, by contrast, is instantiated per back end.  Placed here
+   because defaults.h is included at the END of tm.h, after every CPU and OS
+   header, so GLOBAL_ASM_OP already has its final value (several OS headers,
+   e.g. config/openbsd.h, #undef and redefine it).  A back end that supplies
+   its own TARGET_ASM_GLOBALIZE_LABEL need not define GLOBAL_ASM_OP at all.  */
+#if defined GLOBAL_ASM_OP && !defined TARGET_ASM_GLOBAL_OP
+#define TARGET_ASM_GLOBAL_OP GLOBAL_ASM_OP
+#endif
+
 /* This is how to output the definition of a user-level label named
    NAME, such as the label on variable NAME.  */
 

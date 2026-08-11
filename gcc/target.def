@@ -114,6 +114,24 @@ terminate an initialized variable declaration.",
  void, (void),
  hook_void_void)
 
+/* The assembler directive that makes a label global.  */
+DEFHOOKPOD
+(global_op,
+ "A C string constant, the assembler directive that makes a label global;\n\
+for example @code{\"\\t.globl\\t\"}.  It is emitted by the default\n\
+@code{TARGET_ASM_GLOBALIZE_LABEL} immediately before the label name.\n\
+\n\
+Defaults to the target macro @code{GLOBAL_ASM_OP} if that is defined, and\n\
+to @code{NULL} otherwise.  A target must supply either this hook or its own\n\
+@code{TARGET_ASM_GLOBALIZE_LABEL}.\n\
+\n\
+This is a hook rather than a bare macro because @file{varasm.cc} is compiled\n\
+once for the whole compiler, so a macro read there would bake a single\n\
+target's directive into every target.  The directive genuinely varies\n\
+(@code{\"\\t.globl\\t\"}, @code{\"\\t.global\\t\"}, @code{\"\\t.export\\t\"},\n\
+and spellings with no leading tab all occur in tree).",
+ const char *, NULL)
+
 /* Output code that will globalize a label.  */
 DEFHOOK
 (globalize_label,
@@ -121,8 +139,8 @@ DEFHOOK
 @var{stream} some commands that will make the label @var{name} global;\n\
 that is, available for reference from other files.\n\
 \n\
-The default implementation relies on a proper definition of\n\
-@code{GLOBAL_ASM_OP}.",
+The default implementation emits @code{TARGET_ASM_GLOBAL_OP} followed by\n\
+the label name.",
  void, (FILE *stream, const char *name),
  default_globalize_label)
 

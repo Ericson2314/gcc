@@ -9121,13 +9121,29 @@ You may wish to use @code{ASM_OUTPUT_SIZE_DIRECTIVE} and/or
 @code{ASM_OUTPUT_MEASURED_SIZE} in the definition of this macro.
 @end defmac
 
+@deftypevr {Target Hook} {const char *} TARGET_ASM_GLOBAL_OP
+A C string constant, the assembler directive that makes a label global;
+for example @code{"\t.globl\t"}.  It is emitted by the default
+@code{TARGET_ASM_GLOBALIZE_LABEL} immediately before the label name.
+
+Defaults to the target macro @code{GLOBAL_ASM_OP} if that is defined, and
+to @code{NULL} otherwise.  A target must supply either this hook or its own
+@code{TARGET_ASM_GLOBALIZE_LABEL}.
+
+This is a hook rather than a bare macro because @file{varasm.cc} is compiled
+once for the whole compiler, so a macro read there would bake a single
+target's directive into every target.  The directive genuinely varies
+(@code{"\t.globl\t"}, @code{"\t.global\t"}, @code{"\t.export\t"},
+and spellings with no leading tab all occur in tree).
+@end deftypevr
+
 @deftypefn {Target Hook} void TARGET_ASM_GLOBALIZE_LABEL (FILE *@var{stream}, const char *@var{name})
 This target hook is a function to output to the stdio stream
 @var{stream} some commands that will make the label @var{name} global;
 that is, available for reference from other files.
 
-The default implementation relies on a proper definition of
-@code{GLOBAL_ASM_OP}.
+The default implementation emits @code{TARGET_ASM_GLOBAL_OP} followed by
+the label name.
 @end deftypefn
 
 @deftypefn {Target Hook} void TARGET_ASM_GLOBALIZE_DECL_NAME (FILE *@var{stream}, tree @var{decl})
