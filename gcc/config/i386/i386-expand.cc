@@ -258,7 +258,7 @@ ix86_expand_clear (rtx dest)
   gcc_assert (reload_completed);
 
   /* Avoid HImode and its attendant prefix byte.  */
-  if (GET_MODE_SIZE (GET_MODE (dest)) < 4)
+  if (known_lt (GET_MODE_SIZE (GET_MODE (dest)), 4))
     dest = gen_rtx_REG (SImode, REGNO (dest));
   tmp = gen_rtx_SET (dest, const0_rtx);
 
@@ -692,7 +692,7 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
     }
 
   if (can_create_pseudo_p ()
-      && GET_MODE_SIZE (mode) >= 16
+      && known_ge (GET_MODE_SIZE (mode), 16)
       && VECTOR_MODE_P (mode)
       && (MEM_P (op1)
 	  && SYMBOL_REF_P (XEXP (op1, 0))
@@ -748,7 +748,7 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
 
   /* Special case TImode to 128-bit vector conversions via V2DI.  */
   if (VECTOR_MODE_P (mode)
-      && GET_MODE_SIZE (mode) == 16
+      && known_eq (GET_MODE_SIZE (mode), 16)
       && SUBREG_P (op1)
       && GET_MODE (SUBREG_REG (op1)) == TImode
       && TARGET_64BIT && TARGET_SSE
@@ -939,7 +939,7 @@ ix86_expand_vector_move_misalign (machine_mode mode, rtx operands[])
   op1 = operands[1];
 
   /* Use unaligned load/store for AVX512 or when optimizing for size.  */
-  if (GET_MODE_SIZE (mode) == 64 || optimize_insn_for_size_p ())
+  if (known_eq (GET_MODE_SIZE (mode), 64) || optimize_insn_for_size_p ())
     {
       emit_insn (gen_rtx_SET (op0, op1));
       return;
@@ -947,7 +947,7 @@ ix86_expand_vector_move_misalign (machine_mode mode, rtx operands[])
 
   if (TARGET_AVX)
     {
-      if (GET_MODE_SIZE (mode) == 32)
+      if (known_eq (GET_MODE_SIZE (mode), 32))
 	ix86_avx256_split_vector_move_misalign (op0, op1);
       else
 	/* Always use 128-bit mov<mode>_internal pattern for AVX.  */
@@ -1399,7 +1399,7 @@ ix86_expand_vector_logical_operator (enum rtx_code code, machine_mode mode,
       && !TARGET_SSE_PACKED_SINGLE_INSN_OPTIMAL
       && (SUBREG_P (op2) || CONST_VECTOR_P (op2))
       && GET_MODE_CLASS (GET_MODE (SUBREG_REG (op1))) == MODE_VECTOR_FLOAT
-      && GET_MODE_SIZE (GET_MODE (SUBREG_REG (op1))) == GET_MODE_SIZE (mode)
+      && known_eq (GET_MODE_SIZE (GET_MODE (SUBREG_REG (op1))), GET_MODE_SIZE (mode))
       && SUBREG_BYTE (op1) == 0
       && (CONST_VECTOR_P (op2)
 	  || (GET_MODE (SUBREG_REG (op1)) == GET_MODE (SUBREG_REG (op2))
@@ -2123,7 +2123,7 @@ ix86_expand_adjust_ufix_to_sfix_si (rtx val, rtx *xorp)
   rtx two31r, tmp[4];
   machine_mode mode = GET_MODE (val);
   machine_mode scalarmode = GET_MODE_INNER (mode);
-  machine_mode intmode = GET_MODE_SIZE (mode) == 32 ? V8SImode : V4SImode;
+  machine_mode intmode = known_eq (GET_MODE_SIZE (mode), 32) ? V8SImode : V4SImode;
   rtx (*cmp) (rtx, rtx, rtx, rtx);
   int i;
 
@@ -2472,7 +2472,7 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
   if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT
       || (mode == TImode && !TARGET_64BIT)
       || mode == OImode
-      || GET_MODE_SIZE (mode) == 64)
+      || known_eq (GET_MODE_SIZE (mode), 64))
     {
       unsigned msize = GET_MODE_SIZE (mode);
       machine_mode p_mode
@@ -3111,7 +3111,7 @@ ix86_expand_int_compare (enum rtx_code code, rtx op0, rtx op1)
       && VECTOR_MODE_P (GET_MODE (SUBREG_REG (op0)))
       && TARGET_SSE4_1
       && GET_MODE (op0) == TImode
-      && GET_MODE_SIZE (GET_MODE (SUBREG_REG (op0))) == 16)
+      && known_eq (GET_MODE_SIZE (GET_MODE (SUBREG_REG (op0))), 16))
     {
       tmp = SUBREG_REG (op0);
       if (GET_MODE (tmp) == V8HFmode || GET_MODE (tmp) == V8BFmode)
@@ -4346,7 +4346,7 @@ ix86_emit_vec_binop (enum rtx_code code, machine_mode mode,
 
   tmp = gen_rtx_SET (dst, gen_rtx_fmt_ee (code, mode, src1, src2));
 
-  if (GET_MODE_SIZE (mode) <= GET_MODE_SIZE (SImode)
+  if (known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE (SImode))
       && GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
     {
       rtx clob = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (CCmode, FLAGS_REG));
@@ -4450,7 +4450,7 @@ ix86_expand_sse_movcc (rtx dest, rtx cmp, rtx op_true, rtx op_false)
     {
       op_true = force_reg (mode, op_true);
 
-      if (GET_MODE_SIZE (mode) < 16
+      if (known_lt (GET_MODE_SIZE (mode), 16)
 	  || !nonimmediate_operand (op_false, mode))
 	op_false = force_reg (mode, op_false);
 
@@ -4575,7 +4575,7 @@ ix86_expand_sse_movcc (rtx dest, rtx cmp, rtx op_true, rtx op_false)
 
   if (gen != NULL)
     {
-      if (GET_MODE_SIZE (mode) < 16
+      if (known_lt (GET_MODE_SIZE (mode), 16)
 	  || !vector_operand (op_true, mode))
 	op_true = force_reg (mode, op_true);
       op_false = force_reg (mode, op_false);
@@ -4922,7 +4922,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
   /* XOP supports all of the comparisons on all 128-bit vector int types.  */
   if (TARGET_XOP
       && GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-      && GET_MODE_SIZE (mode) <= 16)
+      && known_le (GET_MODE_SIZE (mode), 16))
     ;
   /* AVX512F supports all of the comparisons
      on all 128/256/512-bit vector int types.  */
@@ -5075,14 +5075,14 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	 When using masks, do it for SI/DImode element types, as it is shorter
 	 than the two subtractions.  */
       if ((code != EQ
-	   && GET_MODE_SIZE (mode) != 64
+	   && maybe_ne (GET_MODE_SIZE (mode), 64)
 	   && vector_all_ones_operand (opfalse, data_mode)
 	   && optrue == CONST0_RTX (data_mode))
 	  || (code == GTU
 	      && GET_MODE_SIZE (GET_MODE_INNER (mode)) >= 4
 	      /* Don't do it if not using integer masks and we'd end up with
 		 the right values in the registers though.  */
-	      && (GET_MODE_SIZE (mode) == 64
+	      && (known_eq (GET_MODE_SIZE (mode), 64)
 		  || !vector_all_ones_operand (optrue, data_mode)
 		  || opfalse != CONST0_RTX (data_mode))))
 	{
@@ -5267,7 +5267,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
     x = ix86_expand_sse_cmp (dest, code, cop0, cop1, op_true, op_false);
   else
     {
-      gcc_assert (GET_MODE_SIZE (data_mode) == GET_MODE_SIZE (mode));
+      gcc_assert (known_eq (GET_MODE_SIZE (data_mode), GET_MODE_SIZE (mode)));
       x = ix86_expand_sse_cmp (gen_reg_rtx (mode), code, cop0, cop1,
 			       op_true, op_false);
       if (GET_MODE (x) == mode)
@@ -5292,7 +5292,7 @@ ix86_expand_int_vec_cmp (rtx operands[])
 
   if (negate)
     {
-      if (TARGET_AVX512F && GET_MODE_SIZE (GET_MODE (cmp)) >= 16)
+      if (TARGET_AVX512F && known_ge (GET_MODE_SIZE (GET_MODE (cmp)), 16))
 	cmp = gen_rtx_XOR (GET_MODE (cmp), cmp, CONSTM1_RTX (GET_MODE (cmp)));
       else
 	{
@@ -5380,8 +5380,8 @@ ix86_expand_int_vcond (rtx operands[])
       && operands[1 + (code == LT)] == CONST0_RTX (data_mode)
       && GET_MODE_UNIT_SIZE (data_mode) > 1
       && GET_MODE_UNIT_SIZE (data_mode) <= 8
-      && (GET_MODE_SIZE (data_mode) == 16
-	  || (TARGET_AVX2 && GET_MODE_SIZE (data_mode) == 32)))
+      && (known_eq (GET_MODE_SIZE (data_mode), 16)
+	  || (TARGET_AVX2 && known_eq (GET_MODE_SIZE (data_mode), 32))))
     {
       rtx negop = operands[2 - (code == LT)];
       int shift = GET_MODE_UNIT_BITSIZE (data_mode) - 1;
@@ -5828,7 +5828,7 @@ ix86_expand_vec_perm (rtx operands[])
 	  goto merge_two;
 
 	default:
-	  gcc_assert (GET_MODE_SIZE (mode) <= 16);
+	  gcc_assert (known_le (GET_MODE_SIZE (mode), 16));
 	  break;
 	}
     }
@@ -6136,7 +6136,7 @@ ix86_expand_sse_unpack (rtx dest, rtx src, bool unsigned_p, bool high_p)
 	  gcc_unreachable ();
 	}
 
-      if (GET_MODE_SIZE (imode) >= 32)
+      if (known_ge (GET_MODE_SIZE (imode), 32))
 	{
 	  tmp = gen_reg_rtx (halfmode);
 	  emit_insn (extract (tmp, src));
@@ -6435,7 +6435,7 @@ ix86_split_long_move (rtx operands[])
   /* The DFmode expanders may ask us to move double.
      For 64bit target this is single move.  By hiding the fact
      here we simplify i386.md splitters.  */
-  if (TARGET_64BIT && GET_MODE_SIZE (GET_MODE (operands[0])) == 8)
+  if (TARGET_64BIT && known_eq (GET_MODE_SIZE (GET_MODE (operands[0])), 8))
     {
       /* Optimize constant pool reference to immediates.  This is used by
 	 fp moves, that force all constants to memory to allow combining.  */
@@ -6837,7 +6837,7 @@ ix86_split_ashr (rtx *operands, rtx scratch, machine_mode mode)
       split_double_mode (mode, operands, 2, low, high);
       count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (mode) - 1);
 
-      if (count == GET_MODE_BITSIZE (mode) - 1)
+      if (known_eq (count, GET_MODE_BITSIZE (mode) - 1))
 	{
 	  emit_move_insn (high[0], high[1]);
 	  emit_insn (gen_ashr3 (high[0], high[0],
@@ -8227,7 +8227,7 @@ emit_memmov (rtx destmem, rtx *srcmem, rtx destptr, rtx srcptr,
 
   /* Find the corresponding vector mode with the same size as MOVE_MODE.
      MOVE_MODE is an integer mode at the moment (SI, DI, TI, etc.).  */
-  if (GET_MODE_SIZE (move_mode) > GET_MODE_SIZE (word_mode))
+  if (known_gt (GET_MODE_SIZE (move_mode), GET_MODE_SIZE (word_mode)))
     {
       int nunits = GET_MODE_SIZE (move_mode) / GET_MODE_SIZE (word_mode);
       if (!mode_for_vector (word_mode, nunits).exists (&move_mode)
@@ -8419,7 +8419,7 @@ emit_memset (rtx destmem, rtx destptr, rtx promoted_val,
   move_mode = GET_MODE (promoted_val);
   if (move_mode == VOIDmode)
     move_mode = QImode;
-  if (size_to_move < GET_MODE_SIZE (move_mode))
+  if (known_lt (size_to_move, GET_MODE_SIZE (move_mode)))
     {
       unsigned int move_bits = size_to_move * BITS_PER_UNIT;
       move_mode = int_mode_for_size (move_bits, 0).require ();
@@ -8678,7 +8678,7 @@ expand_set_or_cpymem_prologue (rtx destmem, rtx srcmem,
 	  rtx_code_label *label = ix86_expand_aligntest (destptr, i, false);
 	  if (issetmem)
 	    {
-	      if (vec_value && i > GET_MODE_SIZE (GET_MODE (value)))
+	      if (vec_value && known_gt (i, GET_MODE_SIZE (GET_MODE (value))))
 		destmem = emit_memset (destmem, destptr, vec_value, i);
 	      else
 		destmem = emit_memset (destmem, destptr, value, i);
@@ -8717,7 +8717,7 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
 	{
 	  if (GET_MODE (value) == VOIDmode && size > 8)
 	    mode = Pmode;
-	  else if (GET_MODE_SIZE (mode) > GET_MODE_SIZE (GET_MODE (value)))
+	  else if (known_gt (GET_MODE_SIZE (mode), GET_MODE_SIZE (GET_MODE (value))))
 	    mode = GET_MODE (value);
 	}
       else
@@ -8752,7 +8752,7 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
 	mode = TARGET_SSE ? V16QImode : DImode;
       srcmem = change_address (srcmem, mode, srcptr);
     }
-  if (issetmem && vec_value && GET_MODE_SIZE (mode) > size)
+  if (issetmem && vec_value && known_gt (GET_MODE_SIZE (mode), size))
     {
       /* For memset with vector and the size is smaller than the vector
 	 size, first try the narrower vector, otherwise, use the
@@ -8780,8 +8780,8 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
     }
   destmem = change_address (destmem, mode, destptr);
   modesize = GEN_INT (GET_MODE_SIZE (mode));
-  gcc_assert (GET_MODE_SIZE (mode) <= size);
-  for (n = 0; n * GET_MODE_SIZE (mode) < size; n++)
+  gcc_assert (known_le (GET_MODE_SIZE (mode), size));
+  for (n = 0; known_lt (n * GET_MODE_SIZE (mode), size); n++)
     {
       if (issetmem)
 	emit_move_insn (destmem, gen_lowpart (mode, value));
@@ -8802,7 +8802,7 @@ expand_small_cpymem_or_setmem (rtx destmem, rtx srcmem,
       srcmem = offset_address (srcmem, GEN_INT (-2 * size),
 			       GET_MODE_SIZE (mode));
     }
-  for (n = 0; n * GET_MODE_SIZE (mode) < size; n++)
+  for (n = 0; known_lt (n * GET_MODE_SIZE (mode), size); n++)
     {
       if (issetmem)
 	emit_move_insn (destmem, gen_lowpart (mode, value));
@@ -8895,7 +8895,7 @@ expand_set_or_cpymem_prologue_epilogue_by_misaligned_moves (rtx destmem, rtx src
     mode_value = vec_value;
   else
     mode_value = value;
-  gcc_assert (GET_MODE_SIZE (mode) <= size);
+  gcc_assert (known_le (GET_MODE_SIZE (mode), size));
 
   /* See if block is big or small, handle small blocks.  */
   if (!CONST_INT_P (*count) && *min_size < (unsigned HOST_WIDE_INT)size)
@@ -8996,7 +8996,7 @@ expand_set_or_cpymem_prologue_epilogue_by_misaligned_moves (rtx destmem, rtx src
 			       1);
       emit_move_insn (destmem, srcmem);
     }
-  for (n = 1; n * GET_MODE_SIZE (mode) < size; n++)
+  for (n = 1; known_lt (n * GET_MODE_SIZE (mode), size); n++)
     {
       destmem = offset_address (destmem, modesize, 1);
       if (issetmem)
@@ -9093,7 +9093,7 @@ expand_set_or_cpymem_constant_prologue (rtx dst, rtx *srcp, rtx destreg,
 	{
 	  if (issetmem)
 	    {
-	      if (vec_value && piece_size > GET_MODE_SIZE (GET_MODE (value)))
+	      if (vec_value && known_gt (piece_size, GET_MODE_SIZE (GET_MODE (value))))
 		dst = emit_memset (dst, destreg, vec_value, piece_size);
 	      else
 		dst = emit_memset (dst, destreg, value, piece_size);
@@ -10095,7 +10095,7 @@ ix86_expand_unroll_movmem (rtx dst, rtx src, rtx destreg, rtx srcreg,
     {
       mode = smallest_int_mode_for_size
 	(count * BITS_PER_UNIT).require ();
-      if (count == GET_MODE_SIZE (mode))
+      if (known_eq (count, GET_MODE_SIZE (mode)))
 	moves = 1;
       else
 	{
@@ -10418,7 +10418,7 @@ ix86_expand_less_move_set_or_movmem (rtx dst, rtx src, rtx *memset_vals,
   machine_mode count_mode = counter_mode (count_exp);
 
   rtx_code_label *between_32_63_label
-    = GET_MODE_SIZE (mode) > 32 ? gen_label_rtx () : nullptr;
+    = known_gt (GET_MODE_SIZE (mode), 32) ? gen_label_rtx () : nullptr;
   /* Jump to BETWEEN_32_64_LABEL if size >= 32 and size < 64.  */
   if (between_32_63_label)
     {
@@ -10435,7 +10435,7 @@ ix86_expand_less_move_set_or_movmem (rtx dst, rtx src, rtx *memset_vals,
     }
 
   rtx_code_label *between_16_31_label
-    = (!skip && GET_MODE_SIZE (mode) > 16) ? gen_label_rtx () : nullptr;
+    = (!skip && known_gt (GET_MODE_SIZE (mode), 16)) ? gen_label_rtx () : nullptr;
   /* Jump to BETWEEN_16_31_LABEL if size >= 16 and size < 31.  */
   if (between_16_31_label)
     {
@@ -10452,7 +10452,7 @@ ix86_expand_less_move_set_or_movmem (rtx dst, rtx src, rtx *memset_vals,
     }
 
   rtx_code_label *between_8_15_label
-    = (!skip && GET_MODE_SIZE (mode) > 8) ? gen_label_rtx () : nullptr;
+    = (!skip && known_gt (GET_MODE_SIZE (mode), 8)) ? gen_label_rtx () : nullptr;
   /* Jump to BETWEEN_8_15_LABEL if size >= 8 and size < 15.  */
   if (between_8_15_label)
     {
@@ -10469,7 +10469,7 @@ ix86_expand_less_move_set_or_movmem (rtx dst, rtx src, rtx *memset_vals,
     }
 
   rtx_code_label *between_4_7_label
-    = (!skip && GET_MODE_SIZE (mode) > 4) ? gen_label_rtx () : nullptr;
+    = (!skip && known_gt (GET_MODE_SIZE (mode), 4)) ? gen_label_rtx () : nullptr;
   /* Jump to BETWEEN_4_7_LABEL if size >= 4 and size < 7.  */
   if (between_4_7_label)
     {
@@ -10486,7 +10486,7 @@ ix86_expand_less_move_set_or_movmem (rtx dst, rtx src, rtx *memset_vals,
     }
 
   rtx_code_label *between_2_3_label
-    = (!skip && GET_MODE_SIZE (mode) > 2) ? gen_label_rtx () : nullptr;
+    = (!skip && known_gt (GET_MODE_SIZE (mode), 2)) ? gen_label_rtx () : nullptr;
   /* Jump to BETWEEN_2_3_LABEL if size >= 2 and size < 3.  */
   if (between_2_3_label)
     {
@@ -10686,7 +10686,7 @@ ix86_expand_set_or_movmem (rtx operands[], bool iscpymem, bool issetmem)
       mode = smallest_int_mode_for_size
 	(probable_max_size * BITS_PER_UNIT).require ();
       /* Reduce MOVE_MAX by half so that MOVE_MAX can be used.  */
-      if (GET_MODE_SIZE (mode) > probable_max_size)
+      if (known_gt (GET_MODE_SIZE (mode), probable_max_size))
 	mode = smallest_int_mode_for_size
 	  (GET_MODE_BITSIZE (mode) / 2).require ();
       move_max = GET_MODE_SIZE (mode);
@@ -16877,7 +16877,7 @@ rdseed_step:
 			   && REAL_VALUE_NEGATIVE (TREE_REAL_CST (cst)))
 		    negative++;
 		}
-	      if (negative == TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg3)))
+	      if (known_eq (negative, TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg3))))
 		op0 = pc_rtx;
 	    }
 	  else if (TREE_CODE (arg3) == SSA_NAME
@@ -17623,7 +17623,7 @@ ix86_vector_duplicate_value (machine_mode mode, rtx target, rtx val)
 
       if (!TARGET_PREFER_BCST_FROM_INTEGER && CONST_INT_P (val)
 	  && GET_MODE_BITSIZE (innermode) <= HOST_BITS_PER_WIDE_INT
-	  && GET_MODE_BITSIZE(mode) >= 128)
+	  && known_ge (GET_MODE_BITSIZE(mode), 128))
 	reg = validize_mem (force_const_mem (innermode, val));
       else
 	{
@@ -17652,8 +17652,8 @@ get_mode_wider_vector (machine_mode o)
 {
   /* ??? Rely on the ordering that genmodes.cc gives to vectors.  */
   machine_mode n = GET_MODE_NEXT_MODE (o).require ();
-  gcc_assert (GET_MODE_NUNITS (o) == GET_MODE_NUNITS (n) * 2);
-  gcc_assert (GET_MODE_SIZE (o) == GET_MODE_SIZE (n));
+  gcc_assert (known_eq (GET_MODE_NUNITS (o), GET_MODE_NUNITS (n) * 2));
+  gcc_assert (known_eq (GET_MODE_SIZE (o), GET_MODE_SIZE (n)));
   return n;
 }
 
@@ -20185,7 +20185,7 @@ ix86_expand_vector_init (bool mmx_ok, rtx target, rtx vals)
       rtx subtarget = target;
       x = XVECEXP (vals, 0, 0);
       gcc_assert (GET_MODE_INNER (GET_MODE (x)) == inner_mode);
-      if (GET_MODE_NUNITS (GET_MODE (x)) * 2 == n_elts)
+      if (known_eq (GET_MODE_NUNITS (GET_MODE (x)) * 2, n_elts))
 	{
 	  rtx ops[2] = { XVECEXP (vals, 0, 0), XVECEXP (vals, 0, 1) };
 	  if (inner_mode == QImode
@@ -21961,7 +21961,7 @@ ix86_emit_swsqrtsf (rtx res, rtx a, machine_mode mode, bool recip)
       mthree = ix86_build_const_vector (mode, true, mthree);
       mhalf = ix86_build_const_vector (mode, true, mhalf);
       /* There is no 512-bit rsqrt.  There is however rsqrt14.  */
-      if (GET_MODE_SIZE (mode) == 64)
+      if (known_eq (GET_MODE_SIZE (mode), 64))
 	unspec = UNSPEC_RSQRT14;
     }
 
@@ -21981,7 +21981,7 @@ ix86_emit_swsqrtsf (rtx res, rtx a, machine_mode mode, bool recip)
       rtx mask;
 
       /* Handle masked compare.  */
-      if (VECTOR_MODE_P (mode) && GET_MODE_SIZE (mode) == 64)
+      if (VECTOR_MODE_P (mode) && known_eq (GET_MODE_SIZE (mode), 64))
 	{
 	  mask = gen_reg_rtx (HImode);
 	  /* Imm value 0x4 corresponds to not-equal comparison.  */
@@ -22913,18 +22913,18 @@ expand_vec_perm_blend (struct expand_vec_perm_d *d)
 
   if (d->one_operand_p)
     return false;
-  if (TARGET_AVX512F && GET_MODE_SIZE (vmode) == 64
+  if (TARGET_AVX512F && known_eq (GET_MODE_SIZE (vmode), 64)
       && (TARGET_AVX512BW
 	  || GET_MODE_UNIT_SIZE (vmode) >= 4))
     ;
-  else if (TARGET_AVX2 && GET_MODE_SIZE (vmode) == 32)
+  else if (TARGET_AVX2 && known_eq (GET_MODE_SIZE (vmode), 32))
     ;
   else if (TARGET_AVX && (vmode == V4DFmode || vmode == V8SFmode))
     ;
   else if (TARGET_SSE4_1
-	   && (GET_MODE_SIZE (vmode) == 16
-	       || (TARGET_MMX_WITH_SSE && GET_MODE_SIZE (vmode) == 8)
-	       || GET_MODE_SIZE (vmode) == 4))
+	   && (known_eq (GET_MODE_SIZE (vmode), 16)
+	       || (TARGET_MMX_WITH_SSE && known_eq (GET_MODE_SIZE (vmode), 8))
+	       || known_eq (GET_MODE_SIZE (vmode), 4)))
     ;
   else
     return false;
@@ -23013,11 +23013,11 @@ expand_vec_perm_blend (struct expand_vec_perm_d *d)
 	    vperm = gen_rtx_CONST_VECTOR (vmode, gen_rtvec_v (nelt, rperm));
 	    vperm = force_reg (vmode, vperm);
 
-	    if (GET_MODE_SIZE (vmode) == 4)
+	    if (known_eq (GET_MODE_SIZE (vmode), 4))
 	      emit_insn (gen_mmx_pblendvb_v4qi (target, op0, op1, vperm));
-	    else if (GET_MODE_SIZE (vmode) == 8)
+	    else if (known_eq (GET_MODE_SIZE (vmode), 8))
 	      emit_insn (gen_mmx_pblendvb_v8qi (target, op0, op1, vperm));
-	    else if (GET_MODE_SIZE (vmode) == 16)
+	    else if (known_eq (GET_MODE_SIZE (vmode), 16))
 	      emit_insn (gen_sse4_1_pblendvb (target, op0, op1, vperm));
 	    else
 	      emit_insn (gen_avx2_pblendvb (target, op0, op1, vperm));
@@ -23307,10 +23307,10 @@ valid_perm_using_mode_p (machine_mode vmode, struct expand_vec_perm_d *d)
 
   if (GET_MODE_CLASS (vmode) != MODE_VECTOR_INT
       || GET_MODE_CLASS (d->vmode) != MODE_VECTOR_INT
-      || GET_MODE_SIZE (vmode) != GET_MODE_SIZE (d->vmode))
+      || maybe_ne (GET_MODE_SIZE (vmode), GET_MODE_SIZE (d->vmode)))
     return false;
 
-  if (GET_MODE_NUNITS (vmode) >= d->nelt)
+  if (known_ge (GET_MODE_NUNITS (vmode), d->nelt))
     return true;
 
   chunk = d->nelt / GET_MODE_NUNITS (vmode);
@@ -23659,7 +23659,7 @@ ix86_expand_vec_one_operand_perm_avx512 (struct expand_vec_perm_d *d)
     return false;
 
   /* Accept VNxHImode and VNxQImode now.  */
-  if (!TARGET_AVX512VL && GET_MODE_SIZE (mode) < 64)
+  if (!TARGET_AVX512VL && known_lt (GET_MODE_SIZE (mode), 64))
     return false;
 
   /* vpermw.  */
@@ -24092,7 +24092,7 @@ expand_vec_perm_pshuflw_pshufhw (struct expand_vec_perm_d *d)
 static bool
 expand_vec_perm_punpckldq_pshuf (struct expand_vec_perm_d *d)
 {
-  if (GET_MODE_BITSIZE (d->vmode) != 64
+  if (maybe_ne (GET_MODE_BITSIZE (d->vmode), 64)
       || !TARGET_MMX_WITH_SSE
       || d->one_operand_p)
     return false;
@@ -24174,8 +24174,8 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
 
   /* Even with AVX, palignr only operates on 128-bit vectors,
      in AVX2 palignr operates on both 128-bit lanes.  */
-  if ((!TARGET_SSSE3 || GET_MODE_SIZE (d->vmode) != 16)
-      && (!TARGET_AVX2 || GET_MODE_SIZE (d->vmode) != 32))
+  if ((!TARGET_SSSE3 || maybe_ne (GET_MODE_SIZE (d->vmode), 16))
+      && (!TARGET_AVX2 || maybe_ne (GET_MODE_SIZE (d->vmode), 32)))
     return false;
 
   min = 2 * nelt;
@@ -24186,7 +24186,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
     {
       unsigned e = d->perm[i];
       unsigned eswap = d->perm[i] ^ nelt;
-      if (GET_MODE_SIZE (d->vmode) == 32)
+      if (known_eq (GET_MODE_SIZE (d->vmode), 32))
 	{
 	  e = (e & ((nelt / 2) - 1)) | ((e & nelt) >> 1);
 	  eswap = e ^ (nelt / 2);
@@ -24201,11 +24201,11 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
 	maxswap = eswap;
     }
   if (min == 0
-      || max - min >= (GET_MODE_SIZE (d->vmode) == 32 ? nelt / 2 : nelt))
+      || max - min >= (known_eq (GET_MODE_SIZE (d->vmode), 32) ? nelt / 2 : nelt))
     {
       if (d->one_operand_p
 	  || minswap == 0
-	  || maxswap - minswap >= (GET_MODE_SIZE (d->vmode) == 32
+	  || maxswap - minswap >= (known_eq (GET_MODE_SIZE (d->vmode), 32)
 				   ? nelt / 2 : nelt))
 	return false;
       swap = true;
@@ -24217,7 +24217,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
      single operand permutation after the palignr with pshufb for
      128-bit vectors.  If SINGLE_INSN_ONLY_P, in_order has to be computed
      first.  */
-  if (d->testing_p && GET_MODE_SIZE (d->vmode) == 16 && !single_insn_only_p)
+  if (d->testing_p && known_eq (GET_MODE_SIZE (d->vmode), 16) && !single_insn_only_p)
     return true;
 
   dcopy = *d;
@@ -24233,7 +24233,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
   for (i = 0; i < nelt; ++i)
     {
       unsigned e = dcopy.perm[i];
-      if (GET_MODE_SIZE (d->vmode) == 32
+      if (known_eq (GET_MODE_SIZE (d->vmode), 32)
 	  && e >= nelt
 	  && (e & (nelt / 2 - 1)) < min)
 	e = e - min - (nelt / 2);
@@ -24258,7 +24258,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
     }
 
   shift = GEN_INT (min * GET_MODE_UNIT_BITSIZE (d->vmode));
-  if (GET_MODE_SIZE (d->vmode) == 16)
+  if (known_eq (GET_MODE_SIZE (d->vmode), 16))
     {
       target = gen_reg_rtx (V1TImode);
       emit_insn (gen_ssse3_palignrv1ti (target,
@@ -24286,7 +24286,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
     }
 
   ok = expand_vec_perm_1 (&dcopy);
-  gcc_assert (ok || GET_MODE_SIZE (d->vmode) == 32);
+  gcc_assert (ok || known_eq (GET_MODE_SIZE (d->vmode), 32));
 
   return ok;
 }
@@ -24306,14 +24306,14 @@ expand_vec_perm_pblendv (struct expand_vec_perm_d *d)
   /* Use the same checks as in expand_vec_perm_blend.  */
   if (d->one_operand_p)
     return false;
-  if (TARGET_AVX2 && GET_MODE_SIZE (vmode) == 32)
+  if (TARGET_AVX2 && known_eq (GET_MODE_SIZE (vmode), 32))
     ;
   else if (TARGET_AVX && (vmode == V4DFmode || vmode == V8SFmode))
     ;
   else if (TARGET_SSE4_1
-	   && (GET_MODE_SIZE (vmode) == 16
-	       || (TARGET_MMX_WITH_SSE && GET_MODE_SIZE (vmode) == 8)
-	       || GET_MODE_SIZE (vmode) == 4))
+	   && (known_eq (GET_MODE_SIZE (vmode), 16)
+	       || (TARGET_MMX_WITH_SSE && known_eq (GET_MODE_SIZE (vmode), 8))
+	       || known_eq (GET_MODE_SIZE (vmode), 4)))
     ;
   else
     return false;
@@ -24335,7 +24335,7 @@ expand_vec_perm_pblendv (struct expand_vec_perm_d *d)
      respective lanes and 8 >= 8, but 2 not.  */
   if (which != 1 && which != 2)
     return false;
-  if (d->testing_p && GET_MODE_SIZE (vmode) == 16)
+  if (d->testing_p && known_eq (GET_MODE_SIZE (vmode), 16))
     return true;
 
   /* First we apply one operand permutation to the part where
@@ -24353,7 +24353,7 @@ expand_vec_perm_pblendv (struct expand_vec_perm_d *d)
     dcopy.perm[i] = d->perm[i] & (nelt - 1);
 
   ok = expand_vec_perm_1 (&dcopy);
-  if (GET_MODE_SIZE (vmode) != 16 && !ok)
+  if (maybe_ne (GET_MODE_SIZE (vmode), 16) && !ok)
     return false;
   else
     gcc_assert (ok);
@@ -24392,14 +24392,14 @@ expand_vec_perm_interleave2 (struct expand_vec_perm_d *d)
   rtx_insn *seq;
   bool ok, same_halves = false;
 
-  if (GET_MODE_SIZE (d->vmode) == 4
-      || GET_MODE_SIZE (d->vmode) == 8
-      || GET_MODE_SIZE (d->vmode) == 16)
+  if (known_eq (GET_MODE_SIZE (d->vmode), 4)
+      || known_eq (GET_MODE_SIZE (d->vmode), 8)
+      || known_eq (GET_MODE_SIZE (d->vmode), 16))
     {
       if (d->one_operand_p)
 	return false;
     }
-  else if (GET_MODE_SIZE (d->vmode) == 32)
+  else if (known_eq (GET_MODE_SIZE (d->vmode), 32))
     {
       if (!TARGET_AVX)
 	return false;
@@ -24429,8 +24429,8 @@ expand_vec_perm_interleave2 (struct expand_vec_perm_d *d)
   memset (remap, 0xff, sizeof (remap));
   dremap = *d;
 
-  if (GET_MODE_SIZE (d->vmode) == 4
-      || GET_MODE_SIZE (d->vmode) == 8)
+  if (known_eq (GET_MODE_SIZE (d->vmode), 4)
+      || known_eq (GET_MODE_SIZE (d->vmode), 8))
     {
       unsigned HOST_WIDE_INT h1, h2, h3, h4;
 
@@ -24467,7 +24467,7 @@ expand_vec_perm_interleave2 (struct expand_vec_perm_d *d)
       else
 	return false;
     }
-  else if (GET_MODE_SIZE (d->vmode) == 16)
+  else if (known_eq (GET_MODE_SIZE (d->vmode), 16))
     {
       unsigned HOST_WIDE_INT h1, h2, h3, h4;
 
@@ -24788,7 +24788,7 @@ expand_vec_perm_vperm2f128 (struct expand_vec_perm_d *d)
   bool ok;
 
   if (!TARGET_AVX
-      || GET_MODE_SIZE (d->vmode) != 32
+      || maybe_ne (GET_MODE_SIZE (d->vmode), 32)
       || (d->vmode != V8SFmode && d->vmode != V4DFmode && !TARGET_AVX2))
     return false;
 
@@ -24905,7 +24905,7 @@ expand_vec_perm_interleave3 (struct expand_vec_perm_d *d)
 
   if (d->one_operand_p)
     return false;
-  if (TARGET_AVX2 && GET_MODE_SIZE (d->vmode) == 32)
+  if (TARGET_AVX2 && known_eq (GET_MODE_SIZE (d->vmode), 32))
     ;
   else if (TARGET_AVX && (d->vmode == V8SFmode || d->vmode == V4DFmode))
     ;
@@ -25051,14 +25051,14 @@ expand_vec_perm_2perm_interleave (struct expand_vec_perm_d *d, bool two_insn)
   if (d->one_operand_p)
     return false;
 
-  if (GET_MODE_SIZE (d->vmode) == 16)
+  if (known_eq (GET_MODE_SIZE (d->vmode), 16))
     {
       if (!TARGET_SSE)
 	return false;
       if (d->vmode != V4SFmode && d->vmode != V2DFmode && !TARGET_SSE2)
 	return false;
     }
-  else if (GET_MODE_SIZE (d->vmode) == 32)
+  else if (known_eq (GET_MODE_SIZE (d->vmode), 32))
     {
       if (!TARGET_AVX)
 	return false;
@@ -25169,14 +25169,14 @@ expand_vec_perm_2perm_pblendv (struct expand_vec_perm_d *d, bool two_insn)
   /* Use the same checks as in expand_vec_perm_blend.  */
   if (d->one_operand_p)
     return false;
-  if (TARGET_AVX2 && GET_MODE_SIZE (vmode) == 32)
+  if (TARGET_AVX2 && known_eq (GET_MODE_SIZE (vmode), 32))
     ;
   else if (TARGET_AVX && (vmode == V4DFmode || vmode == V8SFmode))
     ;
   else if (TARGET_SSE4_1
-	   && (GET_MODE_SIZE (vmode) == 16
-	       || (TARGET_MMX_WITH_SSE && GET_MODE_SIZE (vmode) == 8)
-	       || GET_MODE_SIZE (vmode) == 4))
+	   && (known_eq (GET_MODE_SIZE (vmode), 16)
+	       || (TARGET_MMX_WITH_SSE && known_eq (GET_MODE_SIZE (vmode), 8))
+	       || known_eq (GET_MODE_SIZE (vmode), 4)))
     ;
   else
     return false;
@@ -25212,7 +25212,7 @@ expand_vec_perm_2perm_pblendv (struct expand_vec_perm_d *d, bool two_insn)
   for (i = 0; i < nelt; ++i)
     if (dfirst.perm[i] == 0xff)
       {
-	if (GET_MODE_SIZE (vmode) == 32
+	if (known_eq (GET_MODE_SIZE (vmode), 32)
 	    && dfirst.perm[i ^ (nelt / 2)] != 0xff)
 	  dfirst.perm[i] = dfirst.perm[i ^ (nelt / 2)] ^ (nelt / 2);
 	else
@@ -25220,7 +25220,7 @@ expand_vec_perm_2perm_pblendv (struct expand_vec_perm_d *d, bool two_insn)
       }
     else
       {
-	if (GET_MODE_SIZE (vmode) == 32
+	if (known_eq (GET_MODE_SIZE (vmode), 32)
 	    && dsecond.perm[i ^ (nelt / 2)] != 0xff)
 	  dsecond.perm[i] = dsecond.perm[i ^ (nelt / 2)] ^ (nelt / 2);
 	else
@@ -25493,9 +25493,9 @@ expand_vec_perm_pshufb2 (struct expand_vec_perm_d *d)
   machine_mode mode;
   rtx (*gen) (rtx, rtx, rtx);
 
-  if (!TARGET_SSSE3 || (GET_MODE_SIZE (d->vmode) != 16
-			&& GET_MODE_SIZE (d->vmode) != 8
-			&& GET_MODE_SIZE (d->vmode) != 4))
+  if (!TARGET_SSSE3 || (maybe_ne (GET_MODE_SIZE (d->vmode), 16)
+			&& maybe_ne (GET_MODE_SIZE (d->vmode), 8)
+			&& maybe_ne (GET_MODE_SIZE (d->vmode), 4)))
     return false;
   gcc_assert (!d->one_operand_p);
 
@@ -26961,7 +26961,7 @@ ix86_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
   d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
   d.testing_p = !target;
 
-  gcc_assert (sel.length () == nelt);
+  gcc_assert (known_eq (sel.length (), nelt));
   gcc_checking_assert (sizeof (d.perm) == sizeof (perm));
 
   /* Given sufficient ISA support we can just return true here
@@ -28777,7 +28777,7 @@ ix86_gen_bcst_mem (machine_mode mode, rtx x)
 {
   if (!TARGET_AVX512F
       || !CONST_VECTOR_P (x)
-      || (!TARGET_AVX512VL && GET_MODE_SIZE (mode) != 64)
+      || (!TARGET_AVX512VL && maybe_ne (GET_MODE_SIZE (mode), 64))
       || !VALID_BCST_MODE_P (GET_MODE_INNER (mode))
 	 /* Disallow HFmode broadcast.  */
       || GET_MODE_SIZE (GET_MODE_INNER (mode)) < 4)
@@ -29530,7 +29530,7 @@ ix86_expand_trunc_with_avx2_noavx512f (rtx output, rtx input, machine_mode cvt_m
   machine_mode out_mode = GET_MODE (output);
   machine_mode in_mode = GET_MODE (input);
   int len = GET_MODE_SIZE (in_mode);
-  gcc_assert (len == GET_MODE_SIZE (cvt_mode)
+  gcc_assert (known_eq (len, GET_MODE_SIZE (cvt_mode))
 	      && GET_MODE_INNER (out_mode) == GET_MODE_INNER (cvt_mode)
 	      && (REG_P (input) || SUBREG_P (input)));
   scalar_mode inner_out_mode = GET_MODE_INNER (out_mode);
@@ -29551,7 +29551,7 @@ ix86_expand_trunc_with_avx2_noavx512f (rtx output, rtx input, machine_mode cvt_m
   for (int i = 0; i < d.nelt; ++i)
     {
       d.perm[i] = i;
-      if (i < GET_MODE_NUNITS (out_mode))
+      if (known_lt (i, GET_MODE_NUNITS (out_mode)))
 	d.perm[i] = i * (in_innersize / out_innersize);
     }
 
@@ -29708,7 +29708,7 @@ ix86_expand_gfni_bitreverse (rtx dest, rtx src)
       emit_move_insn (dest, lowpart_subreg (QImode, temp1, SImode));
       return;
     }
-  rtx target = gen_reg_rtx ((GET_MODE_SIZE (mode) < 4 || !TARGET_64BIT)
+  rtx target = gen_reg_rtx ((known_lt (GET_MODE_SIZE (mode), 4) || !TARGET_64BIT)
 			    ? SImode : mode == TImode ? DImode : mode);
   emit_move_insn (target, lowpart_subreg (GET_MODE (target), temp, V16QImode));
   if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)

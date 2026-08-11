@@ -2045,7 +2045,7 @@ type_natural_mode (const_tree type, const CUMULATIVE_ARGS *cum,
       HOST_WIDE_INT size = int_size_in_bytes (type);
       if ((size == 8 || size == 16 || size == 32 || size == 64)
 	  /* ??? Generic code allows us to create width 1 vectors.  Ignore.  */
-	  && TYPE_VECTOR_SUBPARTS (type) > 1)
+	  && known_gt (TYPE_VECTOR_SUBPARTS (type), 1))
 	{
 	  machine_mode innermode = TYPE_MODE (TREE_TYPE (type));
 
@@ -2064,7 +2064,7 @@ type_natural_mode (const_tree type, const CUMULATIVE_ARGS *cum,
 
 	  /* Get the mode which has this inner mode and number of units.  */
 	  FOR_EACH_MODE_FROM (mode, mode)
-	    if (GET_MODE_NUNITS (mode) == TYPE_VECTOR_SUBPARTS (type)
+	    if (known_eq (GET_MODE_NUNITS (mode), TYPE_VECTOR_SUBPARTS (type))
 		&& GET_MODE_INNER (mode) == innermode)
 	      {
 		if (size == 64 && !TARGET_AVX512F && !TARGET_IAMCU)
@@ -2688,7 +2688,7 @@ classify_argument (machine_mode mode, const_tree type,
 
       gcc_assert (GET_MODE_CLASS (GET_MODE_INNER (mode)) == MODE_INT);
 
-      if (bit_offset + GET_MODE_BITSIZE (mode) <= 32)
+      if (known_le (bit_offset + GET_MODE_BITSIZE (mode), 32))
 	classes[0] = X86_64_INTEGERSI_CLASS;
       else
 	classes[0] = X86_64_INTEGER_CLASS;
@@ -4180,22 +4180,22 @@ function_value_32 (machine_mode orig_mode, machine_mode mode,
   /* 8-byte vector modes in %mm0. See ix86_return_in_memory for where
      we normally prevent this case when mmx is not available.  However
      some ABIs may require the result to be returned like DImode.  */
-  if (VECTOR_MODE_P (mode) && GET_MODE_SIZE (mode) == 8)
+  if (VECTOR_MODE_P (mode) && known_eq (GET_MODE_SIZE (mode), 8))
     regno = FIRST_MMX_REG;
 
   /* 16-byte vector modes in %xmm0.  See ix86_return_in_memory for where
      we prevent this case when sse is not available.  However some ABIs
      may require the result to be returned like integer TImode.  */
   else if (mode == TImode
-	   || (VECTOR_MODE_P (mode) && GET_MODE_SIZE (mode) == 16))
+	   || (VECTOR_MODE_P (mode) && known_eq (GET_MODE_SIZE (mode), 16)))
     regno = FIRST_SSE_REG;
 
   /* 32-byte vector modes in %ymm0.   */
-  else if (VECTOR_MODE_P (mode) && GET_MODE_SIZE (mode) == 32)
+  else if (VECTOR_MODE_P (mode) && known_eq (GET_MODE_SIZE (mode), 32))
     regno = FIRST_SSE_REG;
 
   /* 64-byte vector modes in %zmm0.   */
-  else if (VECTOR_MODE_P (mode) && GET_MODE_SIZE (mode) == 64)
+  else if (VECTOR_MODE_P (mode) && known_eq (GET_MODE_SIZE (mode), 64))
     regno = FIRST_SSE_REG;
 
   /* Floating point return values in %st(0) (unless -mno-fp-ret-in-387).  */
@@ -4320,7 +4320,7 @@ function_value_ms_32 (machine_mode orig_mode, machine_mode mode,
   /* Floating point return values in %st(0)
      (unless -mno-fp-ret-in-387 or aggregate type of up to 8 bytes).  */
   if (X87_FLOAT_MODE_P (mode) && TARGET_FLOAT_RETURNS_IN_80387
-	   && (GET_MODE_SIZE (mode) > 8
+	   && (known_gt (GET_MODE_SIZE (mode), 8)
 	       || valtype == NULL_TREE || !AGGREGATE_TYPE_P (valtype)))
   {
     regno = FIRST_FLOAT_REG;
@@ -4463,10 +4463,10 @@ ix86_return_in_memory (const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
 	       || VECTOR_FLOAT_TYPE_P (type))
 	      && VECTOR_MODE_P (mode)
 	      && !COMPLEX_MODE_P (mode)
-	      && ((GET_MODE_SIZE (mode) == 16 || size == 16)
-		  || (TARGET_AVX && (GET_MODE_SIZE (mode) == 32 || size == 32))
+	      && ((known_eq (GET_MODE_SIZE (mode), 16) || size == 16)
+		  || (TARGET_AVX && (known_eq (GET_MODE_SIZE (mode), 32) || size == 32))
 		  || (TARGET_AVX512F
-		      && (GET_MODE_SIZE (mode) == 64 || size == 64))))
+		      && (known_eq (GET_MODE_SIZE (mode), 64) || size == 64))))
 	    return false;
 
 	  /* Otherwise, the size must be exactly in [1248]. */
@@ -5181,7 +5181,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 
 	      dest_addr = fold_convert (daddr_type, addr);
 	      dest_addr = fold_build_pointer_plus_hwi (dest_addr, prev_size);
-	      if (cur_size == GET_MODE_SIZE (mode))
+	      if (known_eq (cur_size, GET_MODE_SIZE (mode)))
 		{
 		  src = build_va_arg_indirect_ref (src_addr);
 		  dest = build_va_arg_indirect_ref (dest_addr);
@@ -5630,12 +5630,12 @@ standard_sse_constant_opcode (rtx_insn *insn, rtx *operands)
    }
   else if (vector_all_ones_zero_extend_half_operand (x, mode))
     {
-      if (GET_MODE_SIZE (mode) == 64)
+      if (known_eq (GET_MODE_SIZE (mode), 64))
 	{
 	  gcc_assert (TARGET_AVX512F);
 	  return "vpcmpeqd\t%t0, %t0, %t0";
 	}
-      else if (GET_MODE_SIZE (mode) == 32)
+      else if (known_eq (GET_MODE_SIZE (mode), 32))
 	{
 	  gcc_assert (TARGET_AVX);
 	  return "vpcmpeqd\t%x0, %x0, %x0";
@@ -5744,7 +5744,7 @@ ix86_get_ssemov (rtx *operands, unsigned size,
      we can only use zmm register move without memory operand.  */
   if (evex_reg_p
       && !TARGET_AVX512VL
-      && GET_MODE_SIZE (mode) < 64)
+      && known_lt (GET_MODE_SIZE (mode), 64))
     {
       /* NB: Even though ix86_hard_regno_mode_ok doesn't allow
 	 xmm16-xmm31 nor ymm16-ymm31 in 128/256 bit modes when
@@ -15538,7 +15538,7 @@ ix86_check_avx_upper_register (const_rtx exp)
       const_rtx x = *iter;
       if (SSE_REG_P (x)
 	  && !EXT_REX_SSE_REG_P (x)
-	  && GET_MODE_BITSIZE (GET_MODE (x)) > 128)
+	  && known_gt (GET_MODE_BITSIZE (GET_MODE (x)), 128))
 	return true;
     }
 
@@ -15552,7 +15552,7 @@ ix86_check_avx_upper_stores (rtx dest, const_rtx, void *data)
 {
   if (SSE_REG_P (dest)
       && !EXT_REX_SSE_REG_P (dest)
-      && GET_MODE_BITSIZE (GET_MODE (dest)) > 128)
+      && known_gt (GET_MODE_BITSIZE (GET_MODE (dest)), 128))
     {
       bool *used = (bool *) data;
       *used = true;
@@ -15618,7 +15618,7 @@ ix86_avx_u128_mode_needed (rtx_insn *insn)
       rtx src = SET_SRC (set);
       if (SSE_REG_P (dest)
 	  && !EXT_REX_SSE_REG_P (dest)
-	  && GET_MODE_BITSIZE (GET_MODE (dest)) > 128)
+	  && known_gt (GET_MODE_BITSIZE (GET_MODE (dest)), 128))
 	{
 	  /* This is an YMM/ZMM load.  Return AVX_U128_DIRTY if the
 	     source isn't zero.  */
@@ -21074,7 +21074,7 @@ ix86_preferred_reload_class (rtx x, reg_class_t regclass)
     {
       if (TARGET_INTER_UNIT_MOVES_FROM_VEC
 	  && TARGET_INTER_UNIT_MOVES_TO_VEC
-	  && GET_MODE_SIZE (mode) <= GET_MODE_SIZE (word_mode))
+	  && known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE (word_mode)))
 	return INT_SSE_CLASS_P (regclass) ? regclass : NO_REGS;
       else
 	return SSE_CLASS_P (regclass) ? regclass : NO_REGS;
@@ -21385,7 +21385,7 @@ ix86_secondary_memory_needed (machine_mode mode, reg_class_t class1,
 static machine_mode
 ix86_secondary_memory_needed_mode (machine_mode mode)
 {
-  if (GET_MODE_BITSIZE (mode) < 32 && INTEGRAL_MODE_P (mode))
+  if (known_lt (GET_MODE_BITSIZE (mode), 32) && INTEGRAL_MODE_P (mode))
     return mode_for_size (32, GET_MODE_CLASS (mode), 0).require ();
   return mode;
 }
@@ -21442,8 +21442,8 @@ ix86_can_change_mode_class (machine_mode from, machine_mode to,
 	 the vec_dupv4hi pattern.
 	 NB: SSE2 can load 16bit data to sse register via pinsrw.  */
       int mov_size = MAYBE_SSE_CLASS_P (regclass) && TARGET_SSE2 ? 2 : 4;
-      if (GET_MODE_SIZE (from) < mov_size
-	  || GET_MODE_SIZE (to) < mov_size)
+      if (known_lt (GET_MODE_SIZE (from), mov_size)
+	  || known_lt (GET_MODE_SIZE (to), mov_size))
 	return false;
     }
 
@@ -21719,9 +21719,9 @@ ix86_register_move_cost (machine_mode mode, reg_class_t class1_i,
     return ix86_cost->hard_register.fp_move;
   if (MAYBE_SSE_CLASS_P (class1))
     {
-      if (GET_MODE_BITSIZE (mode) <= 128)
+      if (known_le (GET_MODE_BITSIZE (mode), 128))
 	return ix86_cost->hard_register.xmm_move;
-      if (GET_MODE_BITSIZE (mode) <= 256)
+      if (known_le (GET_MODE_BITSIZE (mode), 256))
 	return ix86_cost->hard_register.ymm_move;
       return ix86_cost->hard_register.zmm_move;
     }
@@ -22145,7 +22145,7 @@ ix86_hard_regno_call_part_clobbered (unsigned int abi_id, unsigned int regno,
     case ABI_VZEROUPPER:
       /* Special ABI for vzeroupper which only clobbers higher part of
 	 SSE registers.  */
-      return (GET_MODE_SIZE (mode) > 16
+      return (known_gt (GET_MODE_SIZE (mode), 16)
 	      && ((TARGET_64BIT && REX_SSE_REGNO_P (regno))
 		  || LEGACY_SSE_REGNO_P (regno)));
 
@@ -22172,7 +22172,7 @@ ix86_hard_regno_call_part_clobbered (unsigned int abi_id, unsigned int regno,
       gcc_unreachable ();
     }
 
-  return SSE_REGNO_P (regno) && GET_MODE_SIZE (mode) > 16;
+  return SSE_REGNO_P (regno) && known_gt (GET_MODE_SIZE (mode), 16);
 }
 
 /* A subroutine of ix86_modes_tieable_p.  Return true if MODE is a
@@ -22234,18 +22234,18 @@ ix86_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 	(subreg:DI (reg:TI 99) 0))
      to avoid unnecessary move from SSE register to integer register.
    */
-  if (GET_MODE_SIZE (mode2) >= 16
-      && (GET_MODE_SIZE (mode1) == GET_MODE_SIZE (mode2)
+  if (known_ge (GET_MODE_SIZE (mode2), 16)
+      && (known_eq (GET_MODE_SIZE (mode1), GET_MODE_SIZE (mode2))
 	  || ((VECTOR_MODE_P (mode1) || SCALAR_FLOAT_MODE_P (mode1))
-	      && GET_MODE_SIZE (mode1) <= GET_MODE_SIZE (mode2)))
+	      && known_le (GET_MODE_SIZE (mode1), GET_MODE_SIZE (mode2))))
       && ix86_hard_regno_mode_ok (FIRST_SSE_REG, mode2))
     return ix86_hard_regno_mode_ok (FIRST_SSE_REG, mode1);
 
   /* If MODE2 is appropriate for an MMX register, then tie
      with any other mode acceptable to MMX registers.  */
-  if (GET_MODE_SIZE (mode2) == 8
+  if (known_eq (GET_MODE_SIZE (mode2), 8)
       && ix86_hard_regno_mode_ok (FIRST_MMX_REG, mode2))
-    return (GET_MODE_SIZE (mode1) == 8
+    return (known_eq (GET_MODE_SIZE (mode1), 8)
 	    && ix86_hard_regno_mode_ok (FIRST_MMX_REG, mode1));
 
   /* SCmode and DImode can be tied.  */
@@ -22320,13 +22320,13 @@ ix86_vec_cost (machine_mode mode, int cost)
   if (!VECTOR_MODE_P (mode))
     return cost;
 
-  if (GET_MODE_BITSIZE (mode) == 128
+  if (known_eq (GET_MODE_BITSIZE (mode), 128)
       && TARGET_SSE_SPLIT_REGS)
     return cost * GET_MODE_BITSIZE (mode) / 64;
-  else if (GET_MODE_BITSIZE (mode) > 128
+  else if (known_gt (GET_MODE_BITSIZE (mode), 128)
       && TARGET_AVX256_SPLIT_REGS)
     return cost * GET_MODE_BITSIZE (mode) / 128;
-  else if (GET_MODE_BITSIZE (mode) > 256
+  else if (known_gt (GET_MODE_BITSIZE (mode), 256)
       && TARGET_AVX512_SPLIT_REGS)
     return cost * GET_MODE_BITSIZE (mode) / 256;
   return cost;
@@ -22788,11 +22788,11 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
   int src_cost;
 
   /* Handling different vternlog variants.  */
-  if ((GET_MODE_SIZE (mode) == 64
+  if ((known_eq (GET_MODE_SIZE (mode), 64)
        ? TARGET_AVX512F
        : (TARGET_AVX512VL
 	  || (TARGET_AVX512F && !TARGET_PREFER_AVX256)))
-      && GET_MODE_SIZE (mode) >= 16
+      && known_ge (GET_MODE_SIZE (mode), 16)
       && outer_code_i == SET
       && ternlog_operand (x, mode))
     {
@@ -22889,8 +22889,8 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	 it'll probably end up.  Add a penalty for size.  */
       *total = (COSTS_N_INSNS (1)
 		+ (!TARGET_64BIT && flag_pic)
-		+ (GET_MODE_SIZE (mode) <= 4
-		   ? 0 : GET_MODE_SIZE (mode) <= 8 ? 1 : 2));
+		+ (known_le (GET_MODE_SIZE (mode), 4)
+		   ? 0 : known_le (GET_MODE_SIZE (mode), 8) ? 1 : 2));
       return true;
 
     case ZERO_EXTEND:
@@ -23140,10 +23140,10 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	{
 	  /* (ior (not ...) ...) can be a single insn in AVX512.  */
 	  if (GET_CODE (XEXP (x, 0)) == NOT && TARGET_AVX512F
-	      && (GET_MODE_SIZE (mode) == 64
+	      && (known_eq (GET_MODE_SIZE (mode), 64)
 		  || (TARGET_AVX512VL
-		      && (GET_MODE_SIZE (mode) == 32
-			  || GET_MODE_SIZE (mode) == 16))))
+		      && (known_eq (GET_MODE_SIZE (mode), 32)
+			  || known_eq (GET_MODE_SIZE (mode), 16)))))
 	    {
 	      rtx right = GET_CODE (XEXP (x, 1)) != NOT
 			  ? XEXP (x, 1) : XEXP (XEXP (x, 1), 0);
@@ -23231,10 +23231,10 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 
 	      /* (and (not ...) (not ...)) can be a single insn in AVX512.  */
 	      if (GET_CODE (right) == NOT && TARGET_AVX512F
-		  && (GET_MODE_SIZE (mode) == 64
+		  && (known_eq (GET_MODE_SIZE (mode), 64)
 		      || (TARGET_AVX512VL
-			  && (GET_MODE_SIZE (mode) == 32
-			      || GET_MODE_SIZE (mode) == 16))))
+			  && (known_eq (GET_MODE_SIZE (mode), 32)
+			      || known_eq (GET_MODE_SIZE (mode), 16)))))
 		right = XEXP (right, 0);
 
 	      *total = ix86_vec_cost (mode, cost->sse_op)
@@ -23301,10 +23301,10 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	{
 	  /* (not (xor ...)) can be a single insn in AVX512.  */
 	  if (GET_CODE (XEXP (x, 0)) == XOR && TARGET_AVX512F
-	      && (GET_MODE_SIZE (mode) == 64
+	      && (known_eq (GET_MODE_SIZE (mode), 64)
 		  || (TARGET_AVX512VL
-		      && (GET_MODE_SIZE (mode) == 32
-			  || GET_MODE_SIZE (mode) == 16))))
+		      && (known_eq (GET_MODE_SIZE (mode), 32)
+			  || known_eq (GET_MODE_SIZE (mode), 16)))))
 	    {
 	      *total = ix86_vec_cost (mode, cost->sse_op)
 		       + rtx_cost (XEXP (XEXP (x, 0), 0), mode,
@@ -23633,9 +23633,9 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 		       && register_operand (XEXP (mask, 0), GET_MODE (mask))
 		       && CONST_INT_P (XEXP (mask, 1))
 		       && ((INTVAL (XEXP (mask, 1)) == 3
-			    && GET_MODE_NUNITS (mode) == 2)
+			    && known_eq (GET_MODE_NUNITS (mode), 2))
 			   || (INTVAL (XEXP (mask, 1)) == 15
-			       && GET_MODE_NUNITS (mode) == 4)))))
+			       && known_eq (GET_MODE_NUNITS (mode), 4))))))
 	{
 	  *total = rtx_cost (XEXP (x, 0), mode, outer_code, opno, speed)
 		   + rtx_cost (XEXP (x, 1), mode, outer_code, opno, speed);
@@ -23693,7 +23693,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
       /* CONST_VECTOR_DUPLICATE_P in constant_pool is just broadcast.
 	 or variants in ix86_vector_duplicate_simode_const.  */
 
-      if (GET_MODE_SIZE (mode) >= 16
+      if (known_ge (GET_MODE_SIZE (mode), 16)
 	  && VECTOR_MODE_P (mode)
 	  && SYMBOL_REF_P (XEXP (x, 0))
 	  && CONSTANT_POOL_ADDRESS_P (XEXP (x, 0))
@@ -23745,7 +23745,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case IF_THEN_ELSE:
       if (TARGET_XOP
 	  && VECTOR_MODE_P (mode)
-	  && (GET_MODE_SIZE (mode) == 16 || GET_MODE_SIZE (mode) == 32))
+	  && (known_eq (GET_MODE_SIZE (mode), 16) || GET_MODE_SIZE (mode) == 32))
 	{
 	  /* vpcmov.  */
 	  *total = speed ? COSTS_N_INSNS (2) : COSTS_N_BYTES (6);
@@ -23780,7 +23780,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case LTU:
       if (TARGET_SSE2
 	  && GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-	  && GET_MODE_SIZE (mode) >= 8)
+	  && known_ge (GET_MODE_SIZE (mode), 8))
 	{
 	  /* vpcmpeq */
 	  *total = speed ? COSTS_N_INSNS (1) : COSTS_N_BYTES (4);
@@ -23792,7 +23792,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	}
       if (TARGET_XOP
 	  && GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-	  && GET_MODE_SIZE (mode) <= 16)
+	  && known_le (GET_MODE_SIZE (mode), 16))
 	{
 	  /* vpcomeq */
 	  *total = speed ? COSTS_N_INSNS (1) : COSTS_N_BYTES (6);
@@ -23809,7 +23809,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
     case GEU:
       if (TARGET_XOP
 	  && GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-	  && GET_MODE_SIZE (mode) <= 16)
+	  && known_le (GET_MODE_SIZE (mode), 16))
 	{
 	  /* vpcomneq */
 	  *total = speed ? COSTS_N_INSNS (1) : COSTS_N_BYTES (6);
@@ -23821,9 +23821,9 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	}
       if (TARGET_SSE2
 	  && GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-	  && GET_MODE_SIZE (mode) >= 8)
+	  && known_ge (GET_MODE_SIZE (mode), 8))
 	{
-	  if (TARGET_AVX512F && GET_MODE_SIZE (mode) >= 16)
+	  if (TARGET_AVX512F && known_ge (GET_MODE_SIZE (mode), 16))
 	    /* vpcmpeq + vpternlog */
 	    *total = speed ? COSTS_N_INSNS (2) : COSTS_N_BYTES (11);
 	  else
@@ -25878,7 +25878,7 @@ asm_preferred_eh_data_format (int code, int global)
 static int
 ix86_vector_cd_cost (machine_mode vecmode, machine_mode elmode)
 {
-  if (GET_MODE_BITSIZE (vecmode) < 128)
+  if (known_lt (GET_MODE_BITSIZE (vecmode), 128))
     return ((GET_MODE_BITSIZE (vecmode) / GET_MODE_BITSIZE (elmode) - 1)
 	    * ix86_cost->sse_op);
 
@@ -25886,13 +25886,13 @@ ix86_vector_cd_cost (machine_mode vecmode, machine_mode elmode)
   int cost = 0;
   /* Element inserts/extracts into/from N SSE vectors, the possible
      GPR <-> XMM moves have to be accounted for elsewhere.  */
-  if (GET_MODE_BITSIZE (elmode) < 128)
+  if (known_lt (GET_MODE_BITSIZE (elmode), 128))
     cost += n * (128 / GET_MODE_BITSIZE (elmode) - 1) * ix86_cost->sse_op;
-  if (GET_MODE_BITSIZE (vecmode) >= 256
-      && GET_MODE_BITSIZE (elmode) < 256)
+  if (known_ge (GET_MODE_BITSIZE (vecmode), 256)
+      && known_lt (GET_MODE_BITSIZE (elmode), 256))
     /* N/2 vinserti128/vextracti128 for SSE <-> AVX256.  */
     cost += n * ix86_vec_cost (V32QImode, ix86_cost->sse_op) / 2;
-  if (GET_MODE_BITSIZE (vecmode) == 512)
+  if (known_eq (GET_MODE_BITSIZE (vecmode), 512))
     /* One vinserti64x4/vextracti64x4 for AVX256 <-> AVX512.  */
     cost += ix86_vec_cost (vecmode, ix86_cost->sse_op);
   return cost;
@@ -26138,11 +26138,11 @@ ix86_reassociation_width (tree_code op, machine_mode mode)
 	width = 6;
 
       /* Account for targets that splits wide vectors into multiple parts.  */
-      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 256)
+      if (TARGET_AVX512_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 256))
 	div = GET_MODE_BITSIZE (mode) / 256;
-      else if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
+      else if (TARGET_AVX256_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 128))
 	div = GET_MODE_BITSIZE (mode) / 128;
-      else if (TARGET_SSE_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 64)
+      else if (TARGET_SSE_SPLIT_REGS && known_gt (GET_MODE_BITSIZE (mode), 64))
 	div = GET_MODE_BITSIZE (mode) / 64;
       width = (width + div - 1) / div;
     }
@@ -26816,9 +26816,9 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
     {
       int scale = 1;
       if (vectype
-	  && ((GET_MODE_SIZE (TYPE_MODE (vectype)) == 64
+	  && ((known_eq (GET_MODE_SIZE (TYPE_MODE (vectype)), 64)
 	      && TARGET_AVX512_SPLIT_REGS)
-	      || (GET_MODE_SIZE (TYPE_MODE (vectype)) == 32
+	      || (known_eq (GET_MODE_SIZE (TYPE_MODE (vectype)), 32)
 		  && TARGET_AVX256_SPLIT_REGS)))
 	scale = 2;
 
@@ -26904,14 +26904,14 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 		      /* vpdpbusd.  */
 		      if (signop1_p != signop2_p)
 			native_vnni_p
-			  = (GET_MODE_SIZE (mode) == 64
+			  = (known_eq (GET_MODE_SIZE (mode), 64)
 			     ? TARGET_AVX512VNNI
 			     : ((TARGET_AVX512VNNI && TARGET_AVX512VL)
 				|| TARGET_AVXVNNI));
 		      else
 			/* vpdpbssd.  */
 			native_vnni_p
-			  = (GET_MODE_SIZE (mode) == 64
+			  = (known_eq (GET_MODE_SIZE (mode), 64)
 			     ? TARGET_AVX10_2
 			     : (TARGET_AVXVNNIINT8 || TARGET_AVX10_2));
 		    }
@@ -27052,7 +27052,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	  if (gimple_assign_load_p (def)
 	      && tree_nop_conversion_p (TREE_TYPE (op),
 					TREE_TYPE (gimple_assign_lhs (def)))
-	      && (GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (op))) > 1
+	      && (known_gt (GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (op))), 1)
 		  || TARGET_SSE4_1))
 	    ;
 	  /* When the component is extracted from a vector it is already
@@ -27257,14 +27257,14 @@ ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
      a AVX2 and a SSE epilogue for AVX512 vectorized loops.  */
   if (loop_vinfo
       && LOOP_VINFO_EPILOGUE_P (loop_vinfo)
-      && GET_MODE_SIZE (loop_vinfo->vector_mode) == 32
+      && known_eq (GET_MODE_SIZE (loop_vinfo->vector_mode), 32)
       && ix86_tune_features[X86_TUNE_AVX512_TWO_EPILOGUES])
     m_suggested_epilogue_mode = V16QImode;
   /* When a 128bit SSE vectorized epilogue still has a VF of 16 or larger
      enable a 64bit SSE epilogue.  */
   if (loop_vinfo
       && LOOP_VINFO_EPILOGUE_P (loop_vinfo)
-      && GET_MODE_SIZE (loop_vinfo->vector_mode) == 16
+      && known_eq (GET_MODE_SIZE (loop_vinfo->vector_mode), 16)
       && LOOP_VINFO_VECT_FACTOR (loop_vinfo).to_constant () >= 16)
     m_suggested_epilogue_mode = V8QImode;
 
@@ -27460,8 +27460,8 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
   int ret = 1;
 
   if (clonei->simdlen
-      && (clonei->simdlen < 2
-	  || clonei->simdlen > 1024
+      && (known_lt (clonei->simdlen, 2)
+	  || known_gt (clonei->simdlen, 1024)
 	  || (clonei->simdlen & (clonei->simdlen - 1)) != 0))
     {
       if (explicit_p)
@@ -27567,7 +27567,7 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 	clonei->mask_mode = SImode;
       break;
     }
-  if (clonei->simdlen == 0)
+  if (known_eq (clonei->simdlen, 0))
     {
       if (SCALAR_INT_MODE_P (TYPE_MODE (base_type)))
 	clonei->simdlen = clonei->vecsize_int;
@@ -27576,7 +27576,7 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
       clonei->simdlen = clonei->simdlen
 			/ GET_MODE_BITSIZE (TYPE_MODE (base_type));
     }
-  else if (clonei->simdlen > 16)
+  else if (known_gt (clonei->simdlen, 16))
     {
       /* For compatibility with ICC, use the same upper bounds
 	 for simdlen.  In particular, for CTYPE below, use the return type,

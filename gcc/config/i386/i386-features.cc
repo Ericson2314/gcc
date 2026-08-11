@@ -5001,7 +5001,7 @@ pass_x86_cse::x86_cse (void)
 
 		/* Record the maximum vector size.  */
 		if (kind <= X86_CSE_VEC_DUP
-		    && load->size < GET_MODE_SIZE (mode))
+		    && known_lt (load->size, GET_MODE_SIZE (mode)))
 		  load->size = GET_MODE_SIZE (mode);
 
 		/* Record the basic block.  */

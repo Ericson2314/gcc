@@ -611,8 +611,8 @@ ix86_fuse_mov_alu_p (rtx_insn *mov, rtx_insn *alu)
   rtx reg = SET_DEST (set1);
   /*  - it should have 0x89 or 0x8B opcode.  */
   if (!INTEGRAL_MODE_P (GET_MODE (reg))
-      || GET_MODE_SIZE (GET_MODE (reg)) < 2
-      || GET_MODE_SIZE (GET_MODE (reg)) > 8)
+      || known_lt (GET_MODE_SIZE (GET_MODE (reg)), 2)
+      || known_gt (GET_MODE_SIZE (GET_MODE (reg)), 8))
     return false;
   /* Validate ALU.  */
   if (GET_CODE (PATTERN (alu)) != PARALLEL)
