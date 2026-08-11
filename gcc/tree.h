@@ -21,7 +21,15 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_TREE_H
 
 #include "tree-core.h"
+/* Some options header, not necessarily the shared one: a TU that already has
+   its target's `options-<base>.h' must not also pull in `options.h', because
+   each now carries its own include guard and the two define the same types.
+   OPTIONS_H_INCLUDED is the family-wide marker opth-gen.awk emits for exactly
+   this, and asking for it rather than naming a file is the point -- a header
+   that needs AN options header cannot know WHICH one it is getting.  */
+#ifndef OPTIONS_H_INCLUDED
 #include "options.h"
+#endif
 #include "vec.h"
 
 /* Convert a target-independent built-in function code to a combined_fn.  */

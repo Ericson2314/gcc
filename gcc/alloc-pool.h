@@ -21,7 +21,11 @@ along with GCC; see the file COPYING3.  If not see
 #define ALLOC_POOL_H
 
 #include "memory-block.h"
-#include "options.h"	    // for flag_checking
+/* For flag_checking.  Guarded: see the note in tree.h -- a TU that already has
+   its target's `options-<base>.h' must not also include `options.h'.  */
+#ifndef OPTIONS_H_INCLUDED
+#include "options.h"
+#endif
 
 extern void dump_alloc_pool_statistics (void);
 
