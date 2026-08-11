@@ -4676,8 +4676,22 @@ dnl every target's spec file and put -latomic on 182 link lines that have no
 dnl such library.  ${target} is already canonicalised here (see the top of this
 dnl file), so it compares equal to the manifest entry Makefile.in matches it
 dnl against.
+dnl TARGET_CONFIGDIRS reaches this script only as an ENVIRONMENT VARIABLE
+dnl exported by the top-level Makefile (Makefile.tpl:252) when it configures
+dnl gcc.  A `config.status --recheck' run by hand does not have it, and the
+dnl answer then silently flips to "no libatomic" -- which is how a spec file
+dnl that had `--as-needed -latomic --no-as-needed' in it came back empty after
+dnl an unrelated re-configure.  Upstream's AC_DEFINE had exactly the same
+dnl dependency and exactly the same silence.  Distinguish the two cases and say
+dnl which, so a re-configure that loses it leaves a line in the log instead of
+dnl quietly changing every link line.
 libatomic_target=
-if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
+if test -z "${TARGET_CONFIGDIRS+set}"; then
+  AC_MSG_NOTICE([TARGET_CONFIGDIRS is not set: assuming no libatomic for ${target}.])
+  AC_MSG_NOTICE([  This is normal only if configure was not run by the top-level])
+  AC_MSG_NOTICE([  Makefile.  A `config.status --recheck' by hand loses it, and])
+  AC_MSG_NOTICE([  -latomic then disappears from the target's link line.])
+elif echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
   libatomic_target=${target}
   AC_DEFINE(TARGET_PROVIDES_LIBATOMIC, 1,
 	    [Define if libatomic is built for the target.])

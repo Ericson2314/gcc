@@ -28346,7 +28346,16 @@ fi
 
 
 libatomic_target=
-if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
+if test -z "${TARGET_CONFIGDIRS+set}"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: TARGET_CONFIGDIRS is not set: assuming no libatomic for ${target}." >&5
+$as_echo "$as_me: TARGET_CONFIGDIRS is not set: assuming no libatomic for ${target}." >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}:   This is normal only if configure was not run by the top-level" >&5
+$as_echo "$as_me:   This is normal only if configure was not run by the top-level" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}:   Makefile.  A \`config.status --recheck' by hand loses it, and" >&5
+$as_echo "$as_me:   Makefile.  A \`config.status --recheck' by hand loses it, and" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}:   -latomic then disappears from the target's link line." >&5
+$as_echo "$as_me:   -latomic then disappears from the target's link line." >&6;}
+elif echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
   libatomic_target=${target}
 
 $as_echo "#define TARGET_PROVIDES_LIBATOMIC 1" >>confdefs.h
