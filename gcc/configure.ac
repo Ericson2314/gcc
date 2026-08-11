@@ -1432,6 +1432,49 @@ CFLAGS="$CFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 saved_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 
+dnl Every probe from here to the end of this block compiles a program that
+dnl includes "system.h", which reaches gmp.h through $GMPINC.  Autoconf records
+dnl a compile that fails for ANY reason as "the feature is absent" -- a missing
+dnl gmp.h counts the same as a genuinely undeclared function.  So an environment
+dnl without those headers does not fail here; it quietly answers "no" about
+dnl fifty times.  Every HAVE_DECL_* below goes to 0, and the rlim_t probe writes
+dnl
+dnl     #define rlim_t long
+dnl
+dnl into auto-host.h over the real glibc typedef.  The build then dies in every
+dnl object with "declaration does not declare anything", pointing at everything
+dnl except the cause.  It has cost several people an hour each, and because there
+dnl is no cache variable it happens again on every configure.
+dnl
+dnl None of that is preventable by care in the source: the wrong answer comes
+dnl from the environment.  What is preventable is its being silent.  Assert the
+dnl precondition once, here, where CFLAGS and GMPINC are already set to exactly
+dnl what the probes will use.
+dnl Assert gmp.h specifically rather than system.h as a whole.  A bare
+dnl `#include "ansidecl.h"' plus `#include "system.h"' does NOT compile on glibc
+dnl and is not meant to: libiberty.h declares char *basename(const char *) while
+dnl glibc's string.h declares the C++ overload const char *basename(const char *),
+dnl and g++ rejects the pair as ambiguating.  That is precisely why the first
+dnl probe below carries its own `#define HAVE_DECL_BASENAME 1' prologue.  So a
+dnl plain system.h compile is not a precondition of this block, and asserting it
+dnl would fail every glibc build -- which is what the first version of this check
+dnl did.  system.h:718 is the line that actually depends on the environment.
+AC_MSG_CHECKING([for gmp.h, which system.h needs and every probe below depends on])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]], [[]])],
+  [AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])
+   AC_MSG_NOTICE([GMPINC is: $GMPINC])
+   AC_MSG_ERROR([gmp.h cannot be included, but system.h includes it at line 718.
+
+Every feature probe that follows compiles a program that includes system.h, and
+a compile that fails for ANY reason is recorded as "feature absent".  Continuing
+would write about fifty wrong answers into auto-host.h -- among them rlim_t,
+whose bogus definition makes every object fail to build with an error that names
+anything but this.
+
+Put the GMP headers on the include path, or pass GMPINC; its current value is
+shown above.  See config.log for the compiler output.])])
+
 # gcc_AC_CHECK_DECLS doesn't support overloaded functions, so use the
 # normal autoconf function for these.  But force definition of
 # HAVE_DECL_BASENAME like gcc_AC_CHECK_DECLS does, to suppress the bizarre

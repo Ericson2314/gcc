@@ -11344,6 +11344,40 @@ CFLAGS="$CFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 saved_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for gmp.h, which system.h needs and every probe below depends on" >&5
+$as_echo_n "checking for gmp.h, which system.h needs and every probe below depends on... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <gmp.h>
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+   { $as_echo "$as_me:${as_lineno-$LINENO}: GMPINC is: $GMPINC" >&5
+$as_echo "$as_me: GMPINC is: $GMPINC" >&6;}
+   as_fn_error $? "gmp.h cannot be included, but system.h includes it at line 718.
+
+Every feature probe that follows compiles a program that includes system.h, and
+a compile that fails for ANY reason is recorded as \"feature absent\".  Continuing
+would write about fifty wrong answers into auto-host.h -- among them rlim_t,
+whose bogus definition makes every object fail to build with an error that names
+anything but this.
+
+Put the GMP headers on the include path, or pass GMPINC; its current value is
+shown above.  See config.log for the compiler output." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 # gcc_AC_CHECK_DECLS doesn't support overloaded functions, so use the
 # normal autoconf function for these.  But force definition of
 # HAVE_DECL_BASENAME like gcc_AC_CHECK_DECLS does, to suppress the bizarre
@@ -21425,7 +21459,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21428 "configure"
+#line 21462 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21531,7 +21565,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21534 "configure"
+#line 21568 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
