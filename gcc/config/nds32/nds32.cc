@@ -442,10 +442,10 @@ nds32_compute_stack_frame (void)
   /* Get local variables, incoming variables, and temporary variables size.
      Note that we need to make sure it is 8-byte alignment because
      there may be no padding bytes if we are using LRA.  */
-  cfun->machine->local_size = NDS32_ROUND_UP_DOUBLE_WORD (get_frame_size ());
+  cfun->machine->local_size = NDS32_ROUND_UP_DOUBLE_WORD (get_frame_size ().to_constant ());
 
   /* Get outgoing arguments size.  */
-  cfun->machine->out_args_size = crtl->outgoing_args_size;
+  cfun->machine->out_args_size = crtl->outgoing_args_size.to_constant ();
 
   /* If $fp value is required to be saved on stack, it needs 4 bytes space.
      Check whether $fp is ever live.  */
@@ -1419,7 +1419,7 @@ nds32_naked_function_p (tree func)
 bool
 nds32_use_load_post_increment (machine_mode mode)
 {
-  return (GET_MODE_SIZE (mode) <= GET_MODE_SIZE(E_DImode));
+  return (known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE(E_DImode)));
 }
 
 /* Function that check if 'X' is a valid address register.
@@ -1475,7 +1475,7 @@ nds32_legitimate_index_p (machine_mode outer_mode,
 
     case CONST_INT:
       /* The alignment of the integer value is determined by 'outer_mode'.  */
-      switch (GET_MODE_SIZE (outer_mode))
+      switch (GET_MODE_SIZE (outer_mode).to_constant ())
 	{
 	case 1:
 	  /* Further check if the value is legal for the 'outer_mode'.  */
@@ -1736,7 +1736,7 @@ nds32_class_max_nregs (reg_class_t rclass ATTRIBUTE_UNUSED,
 {
   /* Return the maximum number of consecutive registers
      needed to represent "mode" in a register of "rclass".  */
-  return ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD);
+  return ((GET_MODE_SIZE (mode).to_constant () + UNITS_PER_WORD - 1) / UNITS_PER_WORD);
 }
 
 static int
@@ -1771,7 +1771,7 @@ nds32_can_change_mode_class (machine_mode from,
   /* Don't spill double-precision register to two single-precision
      registers  */
   if ((TARGET_FPU_SINGLE || TARGET_FPU_DOUBLE)
-       && GET_MODE_SIZE (from) != GET_MODE_SIZE (to))
+       && maybe_ne (GET_MODE_SIZE (from), GET_MODE_SIZE (to)))
     {
       return !reg_classes_intersect_p (rclass, FP_REGS);
     }
@@ -3017,7 +3017,7 @@ nds32_register_move_cost (machine_mode mode,
   /* In graywolf cpu, FPR to GPR is cheaper than other cpu.  */
   if (TARGET_PIPELINE_GRAYWOLF)
     {
-      if (GET_MODE_SIZE (mode) == 8)
+      if (known_eq (GET_MODE_SIZE (mode), 8))
 	{
 	  /* DPR to GPR.  */
 	  if (from == FP_REGS && to != FP_REGS)
@@ -3874,7 +3874,7 @@ nds32_dwarf_register_span (rtx reg)
 				   gen_rtvec (4, dwarf_low_re, dwarf_high_re,
 						 dwarf_high_im, dwarf_low_im));
 	}
-      else if (GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
+      else if (known_le (GET_MODE_SIZE (mode), UNITS_PER_WORD))
 	{
 	  return NULL_RTX;
 	}
@@ -4391,7 +4391,7 @@ static unsigned
 nds32_hard_regno_nregs (unsigned regno ATTRIBUTE_UNUSED,
 			machine_mode mode)
 {
-  return ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD);
+  return ((GET_MODE_SIZE (mode).to_constant () + UNITS_PER_WORD - 1) / UNITS_PER_WORD);
 }
 
 /* Implement TARGET_HARD_REGNO_MODE_OK.  */
@@ -4430,11 +4430,11 @@ nds32_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
   if ((GET_MODE_CLASS (mode1) == MODE_INT
        && GET_MODE_CLASS (mode2) == MODE_INT)
-      && GET_MODE_SIZE (mode1) <= UNITS_PER_WORD
-      && GET_MODE_SIZE (mode2) <= UNITS_PER_WORD)
+      && known_le (GET_MODE_SIZE (mode1), UNITS_PER_WORD)
+      && known_le (GET_MODE_SIZE (mode2), UNITS_PER_WORD))
     return true;
 
-  if (GET_MODE_SIZE (mode1) == GET_MODE_SIZE (mode2))
+  if (known_eq (GET_MODE_SIZE (mode1), GET_MODE_SIZE (mode2)))
     {
       if ((TARGET_FPU_SINGLE && !TARGET_FPU_DOUBLE)
 	  && (mode1 == DFmode || mode2 == DFmode))

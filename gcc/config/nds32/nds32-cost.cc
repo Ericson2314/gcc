@@ -61,7 +61,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
   rtx op1;
   machine_mode mode = GET_MODE (x);
   /* Scale cost by mode size.  */
-  int cost = COSTS_N_INSNS (GET_MODE_SIZE (mode) / GET_MODE_SIZE (SImode));
+  int cost = COSTS_N_INSNS (GET_MODE_SIZE (mode).to_constant () / GET_MODE_SIZE (SImode));
 
   switch (code)
     {
@@ -107,7 +107,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
       op1 = SET_SRC (x);
       mode = GET_MODE (op0);
       /* Scale cost by mode size.  */
-      cost = COSTS_N_INSNS (GET_MODE_SIZE (mode) / GET_MODE_SIZE (SImode));
+      cost = COSTS_N_INSNS (GET_MODE_SIZE (mode).to_constant () / GET_MODE_SIZE (SImode));
 
       switch (GET_CODE (op1))
 	{
@@ -115,7 +115,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 	case SUBREG:
 	  /* Register move and Store instructions.  */
 	  if ((REG_P (op0) || MEM_P (op0))
-	      && GET_MODE_SIZE (mode) <= GET_MODE_SIZE (DImode))
+	      && known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	    *total = COSTS_N_INSNS (1);
 	  else
 	    *total = cost;
@@ -123,7 +123,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 
 	case MEM:
 	  /* Load instructions.  */
-	  if (REG_P (op0) && GET_MODE_SIZE (mode) <= GET_MODE_SIZE (DImode))
+	  if (REG_P (op0) && known_le (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	    *total = COSTS_N_INSNS (1);
 	  else
 	    *total = cost;
@@ -131,7 +131,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 
 	case CONST_INT:
 	  /* movi instruction.  */
-	  if (REG_P (op0) && GET_MODE_SIZE (mode) < GET_MODE_SIZE (DImode))
+	  if (REG_P (op0) && known_lt (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	    {
 	      if (satisfies_constraint_Is20 (op1))
 		*total = COSTS_N_INSNS (1) - 1;
@@ -146,7 +146,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 	case SYMBOL_REF:
 	case LABEL_REF:
 	  /* la instruction.  */
-	  if (REG_P (op0) && GET_MODE_SIZE (mode) < GET_MODE_SIZE (DImode))
+	  if (REG_P (op0) && known_lt (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	    *total = COSTS_N_INSNS (1) - 1;
 	  else
 	    *total = cost;
@@ -164,7 +164,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
       op0 = XEXP (x, 0);
       op1 = XEXP (x, 1);
 
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (GET_CODE (op0) == MULT || GET_CODE (op0) == LSHIFTRT
 	       || GET_CODE (op1) == MULT || GET_CODE (op1) == LSHIFTRT)
@@ -185,7 +185,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
       op0 = XEXP (x, 0);
       op1 = XEXP (x, 1);
 
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (GET_CODE (op0) == MULT || GET_CODE (op0) == LSHIFTRT
 	       || GET_CODE (op1) == MULT || GET_CODE (op1) == LSHIFTRT)
@@ -223,7 +223,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 	    return COSTS_N_INSNS (10);
 	}
 
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (GET_CODE (op0) == ASHIFT || GET_CODE (op0) == LSHIFTRT)
 	*total = COSTS_N_INSNS (2);
@@ -246,7 +246,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 	  || GET_CODE (XEXP (x, 1)) == ZERO_EXTEND)
 	/* MUL instructions */
 	*total = COSTS_N_INSNS (1);
-      else if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      else if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (outer_code == PLUS || outer_code == MINUS)
 	*total = COSTS_N_INSNS (2);
@@ -265,7 +265,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
       return true;
 
     case LSHIFTRT:
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (outer_code == PLUS || outer_code == MINUS
 	       || outer_code == AND || outer_code == IOR
@@ -282,7 +282,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
       return true;
 
     case ASHIFT:
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if (outer_code == AND || outer_code == IOR
 	       || outer_code == XOR)
@@ -299,7 +299,7 @@ nds32_rtx_costs_speed_prefer (rtx x ATTRIBUTE_UNUSED,
 
     case ASHIFTRT:
     case ROTATERT:
-      if (GET_MODE_SIZE (mode) >= GET_MODE_SIZE (DImode))
+      if (known_ge (GET_MODE_SIZE (mode), GET_MODE_SIZE (DImode)))
 	*total = cost;
       else if ((GET_CODE (XEXP (x, 1)) == CONST_INT
 	       && satisfies_constraint_Iu05 (XEXP (x, 1)))

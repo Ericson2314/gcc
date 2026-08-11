@@ -80,7 +80,7 @@ nds32_legitimize_argument (enum insn_code icode, int opnum, rtx arg)
   else if (VECTOR_MODE_P (mode) && CONST_INT_P (arg))
     {
       /* Handle CONST_INT covert to CONST_VECTOR.  */
-      int nunits = GET_MODE_NUNITS (mode);
+      int nunits = GET_MODE_NUNITS (mode).to_constant ();
       int i, shift = 0;
       rtvec v = rtvec_alloc (nunits);
       int val = INTVAL (arg);

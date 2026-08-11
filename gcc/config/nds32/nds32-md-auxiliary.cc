@@ -1322,7 +1322,7 @@ nds32_expand_extv (rtx *operands)
   if (MEM_P (src)
       && width == 32
       && (bitpos % BITS_PER_UNIT)  == 0
-      && GET_MODE_BITSIZE (GET_MODE (dst)) == width)
+      && known_eq (GET_MODE_BITSIZE (GET_MODE (dst)), width))
     {
       rtx newmem = adjust_address (src, GET_MODE (dst),
 				   bitpos / BITS_PER_UNIT);
@@ -1348,7 +1348,7 @@ nds32_expand_insv (rtx *operands)
   if (MEM_P (dst)
       && width == 32
       && (bitpos % BITS_PER_UNIT)  == 0
-      && GET_MODE_BITSIZE (GET_MODE (src)) == width)
+      && known_eq (GET_MODE_BITSIZE (GET_MODE (src)), width))
     {
       rtx newmem = adjust_address (dst, GET_MODE (src),
 				      bitpos / BITS_PER_UNIT);
@@ -2297,7 +2297,7 @@ nds32_output_float_load (rtx *operands)
   char buff[100];
   const char *pattern;
   rtx addr, addr_op0, addr_op1;
-  int dp = GET_MODE_SIZE (GET_MODE (operands[0])) == 8;
+  int dp = known_eq (GET_MODE_SIZE (GET_MODE (operands[0])), 8);
   addr = XEXP (operands[1], 0);
   switch (GET_CODE (addr))
     {
@@ -2375,7 +2375,7 @@ nds32_output_float_store (rtx *operands)
   char buff[100];
   const char *pattern;
   rtx addr, addr_op0, addr_op1;
-  int dp = GET_MODE_SIZE (GET_MODE (operands[0])) == 8;
+  int dp = known_eq (GET_MODE_SIZE (GET_MODE (operands[0])), 8);
   addr = XEXP (operands[0], 0);
   switch (GET_CODE (addr))
     {
@@ -2584,12 +2584,12 @@ void
 nds32_expand_unaligned_load (rtx *operands, enum machine_mode mode)
 {
   /* Initial memory offset.  */
-  int offset = WORDS_BIG_ENDIAN ? GET_MODE_SIZE (mode) - 1 : 0;
+  int offset = WORDS_BIG_ENDIAN ? GET_MODE_SIZE (mode).to_constant () - 1 : 0;
   int offset_adj = WORDS_BIG_ENDIAN ? -1 : 1;
   /* Initial register shift byte.  */
   int shift = 0;
   /* The first load byte instruction is not the same. */
-  int width = GET_MODE_SIZE (mode) - 1;
+  int width = GET_MODE_SIZE (mode).to_constant () - 1;
   rtx mem[2];
   rtx reg[2];
   rtx sub_reg;
@@ -2677,12 +2677,12 @@ void
 nds32_expand_unaligned_store (rtx *operands, enum machine_mode mode)
 {
   /* Initial memory offset.  */
-  int offset = WORDS_BIG_ENDIAN ? GET_MODE_SIZE (mode) - 1 : 0;
+  int offset = WORDS_BIG_ENDIAN ? GET_MODE_SIZE (mode).to_constant () - 1 : 0;
   int offset_adj = WORDS_BIG_ENDIAN ? -1 : 1;
   /* Initial register shift byte.  */
   int shift = 0;
   /* The first load byte instruction is not the same. */
-  int width = GET_MODE_SIZE (mode) - 1;
+  int width = GET_MODE_SIZE (mode).to_constant () - 1;
   rtx mem[2];
   rtx reg[2];
   rtx sub_reg;
@@ -3843,7 +3843,7 @@ nds32_valid_smw_lwm_base_p (rtx op)
 /* Auxiliary functions for manipulation DI mode.  */
 rtx nds32_di_high_part_subreg(rtx reg)
 {
-  unsigned high_part_offset = subreg_highpart_offset (SImode, DImode);
+  unsigned high_part_offset = subreg_highpart_offset (SImode, DImode).to_constant ();
 
   return simplify_gen_subreg (
 	   SImode, reg,
@@ -3852,7 +3852,7 @@ rtx nds32_di_high_part_subreg(rtx reg)
 
 rtx nds32_di_low_part_subreg(rtx reg)
 {
-  unsigned low_part_offset = subreg_lowpart_offset (SImode, DImode);
+  unsigned low_part_offset = subreg_lowpart_offset (SImode, DImode).to_constant ();
 
   return simplify_gen_subreg (
 	   SImode, reg,

@@ -169,7 +169,7 @@ enum nds32_16bit_address_type
 #define NDS32_NEED_N_REGS_FOR_ARG(mode, type)                            \
   ((mode == BLKmode)                                                     \
    ? ((int_size_in_bytes (type) + UNITS_PER_WORD - 1) / UNITS_PER_WORD)  \
-   : ((GET_MODE_SIZE (mode)     + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
+   : ((GET_MODE_SIZE (mode).to_constant ()     + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 /* This macro is used to return the register number for passing argument.
    We need to obey the following rules:

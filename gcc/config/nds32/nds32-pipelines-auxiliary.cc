@@ -336,10 +336,10 @@ movd44_even_dep_p (rtx_insn *insn, rtx def_reg)
 	   && GET_MODE (def_reg) == SImode
 	   && rtx_equal_p (SUBREG_REG (def_reg), use_rtx))
     {
-      if (TARGET_BIG_ENDIAN && SUBREG_BYTE (def_reg) == 4)
+      if (TARGET_BIG_ENDIAN && known_eq (SUBREG_BYTE (def_reg), 4))
 	return true;
 
-      if (!TARGET_BIG_ENDIAN && SUBREG_BYTE (def_reg) == 0)
+      if (!TARGET_BIG_ENDIAN && known_eq (SUBREG_BYTE (def_reg), 0))
 	return true;
 
       return false;
@@ -387,9 +387,9 @@ wext_odd_dep_p (rtx insn, rtx def_reg)
 	return true;
 
       if (!TARGET_BIG_ENDIAN)
-	return SUBREG_BYTE (def_reg) == 4;
+	return known_eq (SUBREG_BYTE (def_reg), 4);
       else
-	return SUBREG_BYTE (def_reg) == 0;
+	return known_eq (SUBREG_BYTE (def_reg), 0);
     }
 
   return false;
