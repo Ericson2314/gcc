@@ -1815,14 +1815,35 @@ case ${enable_targets} in
 esac
 
 dnl --enable-targets names every target, and there is no other source for the
-dnl list.  In particular there is no falling back on --target: autoconf sets
-dnl `target' from `target_alias' whenever --target is passed, so a fallback
-dnl would silently reinstate a default target and give it a privileged position
-dnl again -- which is the thing being removed.
+dnl list: there is no falling back on --target when the list is empty, because
+dnl a fallback would make --target mean "the target" again, which is the thing
+dnl being removed.
 if test x"${gcc_extra_targets}" = x; then
   AC_MSG_ERROR([--enable-targets=LIST is required])
 fi
-gcc_manifest_targets="${gcc_extra_targets}"
+
+dnl `${target}' IS added to the manifest, and that is not the fallback refused
+dnl above.  It is not a default and confers no privilege: since the compiler
+dnl now starts with an EMPTY common hook table (common/common-target-select.cc)
+dnl and installs one only when something selects a target by name, an entry in
+dnl this list is just an entry -- being first, or being the build's own triple,
+dnl buys nothing at run time.
+dnl
+dnl What it buys is a link that works.  `${target}' still picks out_file, tm.h
+dnl and md_file, so THAT back end's <cpu>.cc is compiled into cc1 whatever
+dnl --enable-targets says, and it refers to symbols in its own
+dnl common/config/<cpu>/<cpu>-common.cc -- processor_alias_table, pta_size,
+dnl processor_names, num_arch_names, ix86_handle_option for i386.  Only the
+dnl manifest emits a rule building that object.  So a list that did not name
+dnl the build's own triple produced a cc1 and an lto1 that would not link, for
+dnl a target nobody had asked for; --enable-targets=all merely hid it by
+dnl happening to name i386.  The compiled-in back end has to be in the list
+dnl because it is compiled in, not because it is anyone's default.
+dnl
+dnl Duplicates are removed by the canonicalisation loop below, not here: the
+dnl user writes `x86_64-linux-gnu' and ${target} is `x86_64-pc-linux-gnu', so
+dnl the two spellings only become comparable after config.sub has seen them.
+gcc_manifest_targets="${gcc_extra_targets} ${target}"
 
 gcc_all_common_objects=
 gcc_all_common_symbols=
@@ -1839,17 +1860,34 @@ gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
 gcc_mt_err=conftest.mterr
 
-# Canonicalise the list.  Targets are named the way one would type them on a
-# command line -- aarch64-elf, alpha-netbsd -- and configure would normally
-# expand those before anyone sees them.  config.gcc matches canonical triples
-# only, and answers a short form with "Configuration ... not supported".
+# Canonicalise the list, and deduplicate it once canonical.  Targets are named
+# the way one would type them on a command line -- aarch64-elf, alpha-netbsd --
+# and configure would normally expand those before anyone sees them.
+# config.gcc matches canonical triples only, and answers a short form with
+# "Configuration ... not supported".
+#
+# The dedup is not cosmetic.  ${target} is in this list unconditionally (see
+# above), so a user who also names the build's own triple -- and
+# --enable-targets=all names several i386 ones -- would otherwise get the same
+# object built by two identical make rules and listed twice in OBJS, and two
+# registry entries for one triple.  Two spellings of one triple only become
+# comparable after config.sub, which is why this happens here and not where the
+# list is assembled.
 gcc_mt_canon=
 for gcc_mt in ${gcc_manifest_targets}; do
   gcc_mt_c=`${srcdir}/../config.sub ${gcc_mt} 2>/dev/null`
   if test x"${gcc_mt_c}" = x; then
     AC_MSG_ERROR([--enable-targets: ${gcc_mt} is not a recognised target name])
   fi
-  gcc_mt_canon="${gcc_mt_canon} ${gcc_mt_c}"
+  gcc_mt_seen=no
+  for gcc_mt_have in ${gcc_mt_canon}; do
+    if test x"${gcc_mt_have}" = x"${gcc_mt_c}"; then
+      gcc_mt_seen=yes
+    fi
+  done
+  if test x"${gcc_mt_seen}" = xno; then
+    gcc_mt_canon="${gcc_mt_canon} ${gcc_mt_c}"
+  fi
 done
 gcc_manifest_targets=${gcc_mt_canon}
 
