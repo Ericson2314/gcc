@@ -78,8 +78,14 @@ struct mode_traits<machine_mode>
 };
 
 /* Always treat machine modes as fixed-size while compiling code specific
-   to targets that have no variable-size modes.  */
-#if defined (IN_TARGET_CODE) && NUM_POLY_INT_COEFFS == 1
+   to targets that have no variable-size modes.
+
+   A back end opts out by defining TARGET_POLY_AWARE, saying its sources have
+   been converted and no longer want the fixed-size shorthand.  See
+   coretypes.h, which carries the other half of the same switch and the
+   explanation of what the opt-in is for.  */
+#if defined (IN_TARGET_CODE) && NUM_POLY_INT_COEFFS == 1 \
+    && !defined (TARGET_POLY_AWARE)
 #define ONLY_FIXED_SIZE_MODES 1
 #else
 #define ONLY_FIXED_SIZE_MODES 0

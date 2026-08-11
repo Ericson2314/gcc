@@ -559,9 +559,34 @@ typedef unsigned char uchar;
    should be able to treat poly_int like a normal constant, with a
    conversion operator going from the former to the latter.  We also
    allow this for gencondmd.cc for all targets, so that we can treat
-   machine_modes as enums without causing build failures.  */
+   machine_modes as enums without causing build failures.
+
+   TARGET_POLY_AWARE is a back end's declaration that it no longer wants
+   either shorthand -- that its sources say known_lt, maybe_ne and
+   to_constant () explicitly, as aarch64 and riscv already must.
+
+   It exists because making the machine modes one shared vocabulary forces
+   NUM_POLY_INT_COEFFS to 2 for everyone: poly_int is the container itself,
+   not a name, so it cannot be kept per back end.  At 2 this conversion
+   operator is gone, and every back end that relied on it stops compiling --
+   548 sites in i386 alone.  Converting all 43 at once, in the same commit
+   that flips the constant, would be a change nobody could review or bisect.
+
+   With this opt-in a back end gets the 2-coefficient discipline while the
+   constant is still 1, so it can be converted, built and proved
+   codegen-identical on its own, one commit at a time.  The flip then changes
+   nothing for any back end already opted in.
+
+   It has to arrive on the command line, the way IN_TARGET_CODE does -- a
+   back end's tmake fragment adding it to T_CFLAGS.  tm.h is far too late:
+   this header is reached through coretypes.h, which nearly every source
+   includes before tm.h.
+
+   DELETE THIS, and every definition of it, together with the flip.  A
+   migration switch that outlives its migration is just a list to fall off.  */
 #if (defined (IN_TARGET_CODE) \
-     && (defined (USE_ENUM_MODES) || NUM_POLY_INT_COEFFS == 1))
+     && (defined (USE_ENUM_MODES) \
+	 || (NUM_POLY_INT_COEFFS == 1 && !defined (TARGET_POLY_AWARE))))
 #define POLY_INT_CONVERSION 1
 #else
 #define POLY_INT_CONVERSION 0
