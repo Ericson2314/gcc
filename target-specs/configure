@@ -2828,6 +2828,12 @@ esac
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_cfi_sections_directive" >&5
 $as_echo "$gcc_cv_as_cfi_sections_directive" >&6; }
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute" >&5
+$as_echo_n "checking assembler for .gnu_attribute... " >&6; }
+gcc_cv_as_gnu_attribute=`ts_asm_ok '	.gnu_attribute 4,1'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_gnu_attribute" >&5
+$as_echo "$gcc_cv_as_gnu_attribute" >&6; }
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .loc is_stmt" >&5
 $as_echo_n "checking assembler for .loc is_stmt... " >&6; }
 gcc_cv_as_is_stmt=`ts_asm_ok '	.text
@@ -2899,12 +2905,60 @@ $as_echo "$gcc_cv_as_dwarf2_debug_view" >&6; }
 rm -f conftest.s conftest.o
 
 
+gcc_cv_as_aarch64_mabi=no
+gcc_cv_as_aarch64_picreloc=no
+gcc_cv_as_aarch64_aeabi=no
+case ${target} in
+  aarch64*-*-*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mabi option" >&5
+$as_echo_n "checking assembler for -mabi option... " >&6; }
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mabi=lp64 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_mabi=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_mabi" >&5
+$as_echo "$gcc_cv_as_aarch64_mabi" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -fpic relocs" >&5
+$as_echo_n "checking assembler for -fpic relocs... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.text
+	ldr     x0, x2, #:gotpage_lo15:globalsym
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_picreloc=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_picreloc" >&5
+$as_echo "$gcc_cv_as_aarch64_picreloc" >&6; }
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for AEABI build attributes" >&5
+$as_echo_n "checking assembler for AEABI build attributes... " >&6; }
+    cat > conftest.s <<'TSEOF'
+	.aeabi_subsection aeabi_feature_and_bits, optional, ULEB128
+	.aeabi_attribute Tag_Feature_BTI, 1
+	.aeabi_attribute Tag_Feature_PAC, 1
+	.aeabi_attribute Tag_Feature_GCS, 1
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_aeabi=yes
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_aeabi" >&5
+$as_echo "$gcc_cv_as_aarch64_aeabi" >&6; }
+
+    rm -f conftest.s conftest.o
+    ;;
+  *)
+                ;;
+esac
+
+
 ts_bool () {
   if test x"$1" = xyes; then echo 1; else echo 0; fi
 }
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
 cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
 cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`
 cfi_sections `ts_bool "$gcc_cv_as_cfi_sections_directive"`
@@ -2912,7 +2966,12 @@ gas_loc_stmt `ts_bool "$gcc_cv_as_is_stmt"`
 gas_discriminator `ts_bool "$gcc_cv_as_discriminator"`
 as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
 dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
-dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
+dwarf2_debug_view `ts_bool ""`
+
+# aarch64 back-end assembler capabilities.
+as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
+as_aarch64_small_pic_relocs `ts_bool "$gcc_cv_as_aarch64_picreloc"`
+as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`

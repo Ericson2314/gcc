@@ -126,11 +126,16 @@
   " %{!mabi=*:" ABI_SPEC "}" \
   MCPU_MTUNE_NATIVE_SPECS
 
-#ifdef HAVE_AS_MABI_OPTION
+/* The spec half of what was HAVE_AS_MABI_OPTION.  The other half -- the ILP32
+   diagnostic in aarch64_override_options_internal -- is a runtime test on
+   targ_caps.as_aarch64_mabi; this one cannot be, because a spec string is baked
+   into the driver's built-in defaults before any target config is read.
+
+   So the default is what every binutils from 2.24 onwards accepts.  Only
+   binutils 2.23 needs the other spelling, and a target whose assembler is that
+   old says so by overriding the `asm' spec in its spec file, which is the
+   channel all the other per-target spec text now comes through.  */
 #define ASM_MABI_SPEC	"%{mabi=*:-mabi=%*}"
-#else
-#define ASM_MABI_SPEC	"%{mabi=lp64:}"
-#endif
 
 #ifndef ASM_SPEC
 #define ASM_SPEC "\

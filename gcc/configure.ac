@@ -3774,49 +3774,21 @@ esac
 
 case "$target" in
   aarch64*-*-*)
-    gcc_GAS_CHECK_FEATURE([-mabi option], gcc_cv_as_aarch64_mabi,
-                          [-mabi=lp64], [.text],,,)
-    if test x$gcc_cv_as_aarch64_mabi = xyes; then
-      AC_DEFINE(HAVE_AS_MABI_OPTION, 1,
-                [Define if your assembler supports the -mabi option.])
-    else
-      if test x$with_abi = xilp32; then
-        AC_MSG_ERROR([Assembler does not support -mabi=ilp32.\
-                     Upgrade the Assembler.])
-      fi
-      if test x"$with_multilib_list" = xdefault; then
-        TM_MULTILIB_CONFIG=lp64
-      else
-        aarch64_multilibs=`echo $with_multilib_list | sed -e 's/,/ /g'`
-        for aarch64_multilib in ${aarch64_multilibs}; do
-          case ${aarch64_multilib} in
-            ilp32)
-              AC_MSG_ERROR([Assembler does not support -mabi=ilp32.\
-                            Upgrade the Assembler.])
-              ;;
-            *)
-              ;;
-          esac
-        done
-      fi
-    fi
-    # Check if we have binutils support for relocations types needed by -fpic
-    gcc_GAS_CHECK_FEATURE([-fpic relocs], gcc_cv_as_aarch64_picreloc,,
-    [
-	.text
-	ldr     x0, [[x2, #:gotpage_lo15:globalsym]]
-    ],,[AC_DEFINE(HAVE_AS_SMALL_PIC_RELOCS, 1,
-	[Define if your assembler supports relocs needed by -fpic.])])
-    # Check if we have binutils support for AEABI build attributes.
-    gcc_GAS_CHECK_FEATURE([support of AEABI build attributes], gcc_cv_as_aarch64_aeabi_build_attributes,,
-    [
-	.aeabi_subsection aeabi_feature_and_bits, optional, ULEB128
-	.aeabi_attribute Tag_Feature_BTI, 1
-	.aeabi_attribute Tag_Feature_PAC, 1
-	.aeabi_attribute Tag_Feature_GCS, 1
-    ],,[AC_DEFINE(HAVE_AS_AEABI_BUILD_ATTRIBUTES, 1,
-	[Define if your assembler supports AEABI build attributes.])])
-    # Check if we have binutils support for DTPREL relocation.
+    dnl The aarch64 assembler probes -- -mabi, -fpic relocs, AEABI build
+    dnl attributes -- have moved to target-specs, which asks the assembler that
+    dnl will actually be used rather than whichever one this script found.  They
+    dnl arrive as targ_caps.as_aarch64_mabi, .as_aarch64_small_pic_relocs and
+    dnl .as_aarch64_aeabi_build_attributes.
+    dnl
+    dnl The -mabi probe also used to force TM_MULTILIB_CONFIG=lp64 when the
+    dnl assembler was too old for ILP32.  Multilibs are a per-target build
+    dnl concern and --with-multilib-list is gone, so that goes with it; the
+    dnl ILP32 diagnostic survives as a runtime check in aarch64.cc.
+    dnl
+    dnl HAVE_AS_DTPREL_RELOC is deliberately NOT moved yet: its consumers are
+    dnl guarded by `#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)'
+    dnl and HAVE_AS_TLS belongs to the generic assembler cluster.  Converting
+    dnl half of that condition would leave the other half frozen.
     gcc_GAS_CHECK_FEATURE([support of DTPREL relocation], gcc_cv_as_aarch64_dtprel_relocation,,
     [
 	.xword %dtprel(expr)
@@ -3830,7 +3802,6 @@ case "$target" in
     dnl already has a default in config/aarch64/aarch64.h, so the options are
     dnl simply gone.
     ;;
-
   # All TARGET_ABI_OSF targets.
   alpha*-*-linux* | alpha*-*-*bsd*)
     gcc_GAS_CHECK_FEATURE([explicit relocation support],
@@ -4303,12 +4274,6 @@ LCF0:
 	lxvd2x 1,2,3';;
     esac
 
-    gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
-      gcc_cv_as_powerpc_gnu_attribute,,
-      [.gnu_attribute 4,1],,
-      [AC_DEFINE(HAVE_AS_GNU_ATTRIBUTE, 1,
-	  [Define if your assembler supports .gnu_attribute.])])
-
     gcc_GAS_CHECK_FEATURE([prologue entry point marker support],
       gcc_cv_as_powerpc_entry_markers,-a64 $fw_as_opt,
       [ .reloc .,R_PPC64_ENTRY; nop],,
@@ -4351,12 +4316,6 @@ LCF0:
       gcc_cv_as_mips_no_shared,[-mno-shared], [nop],,
       [AC_DEFINE(HAVE_AS_NO_SHARED, 1,
 		 [Define if the assembler understands -mno-shared.])])
-
-    gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
-      gcc_cv_as_mips_gnu_attribute,,
-      [.gnu_attribute 4,1],,
-      [AC_DEFINE(HAVE_AS_GNU_ATTRIBUTE, 1,
-	  [Define if your assembler supports .gnu_attribute.])])
 
     gcc_GAS_CHECK_FEATURE([.module support],
       gcc_cv_as_mips_dot_module,[-32],
@@ -4447,13 +4406,6 @@ x:
     fi
     ;;
     msp430-*-*)
-    # Earlier GAS versions generically support .gnu_attribute, but the
-    # msp430 assembler will not do anything with it.
-    gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
-      gcc_cv_as_msp430_gnu_attribute,,
-      [.gnu_attribute 4,1],,
-      [AC_DEFINE(HAVE_AS_GNU_ATTRIBUTE, 1,
-	  [Define if your assembler supports .gnu_attribute.])])
     gcc_GAS_CHECK_FEATURE([.mspabi_attribute support],
       gcc_cv_as_msp430_mspabi_attribute,,
       [.mspabi_attribute 4,2],,
@@ -4543,11 +4495,6 @@ x:
 	  [Define if your assembler supports LSX and SCQ for 16B atomic.])])
     ;;
     s390x-*-*)
-    gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
-      gcc_cv_as_s390_gnu_attribute,,
-      [.gnu_attribute 8,1],,
-      [AC_DEFINE(HAVE_AS_GNU_ATTRIBUTE, 1,
-	  [Define if your assembler supports .gnu_attribute.])])
     gcc_GAS_CHECK_FEATURE([.machine and .machinemode support],
       gcc_cv_as_s390_machine_machinemode,,
       [	.machinemode push

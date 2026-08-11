@@ -26818,132 +26818,7 @@ esac
 
 case "$target" in
   aarch64*-*-*)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -mabi option" >&5
-$as_echo_n "checking assembler for -mabi option... " >&6; }
-if ${gcc_cv_as_aarch64_mabi+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_aarch64_mabi=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '.text' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags -mabi=lp64 -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_aarch64_mabi=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_mabi" >&5
-$as_echo "$gcc_cv_as_aarch64_mabi" >&6; }
-
-
-    if test x$gcc_cv_as_aarch64_mabi = xyes; then
-
-$as_echo "#define HAVE_AS_MABI_OPTION 1" >>confdefs.h
-
-    else
-      if test x$with_abi = xilp32; then
-        as_fn_error $? "Assembler does not support -mabi=ilp32.\
-                     Upgrade the Assembler." "$LINENO" 5
-      fi
-      if test x"$with_multilib_list" = xdefault; then
-        TM_MULTILIB_CONFIG=lp64
-      else
-        aarch64_multilibs=`echo $with_multilib_list | sed -e 's/,/ /g'`
-        for aarch64_multilib in ${aarch64_multilibs}; do
-          case ${aarch64_multilib} in
-            ilp32)
-              as_fn_error $? "Assembler does not support -mabi=ilp32.\
-                            Upgrade the Assembler." "$LINENO" 5
-              ;;
-            *)
-              ;;
-          esac
-        done
-      fi
-    fi
-    # Check if we have binutils support for relocations types needed by -fpic
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -fpic relocs" >&5
-$as_echo_n "checking assembler for -fpic relocs... " >&6; }
-if ${gcc_cv_as_aarch64_picreloc+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_aarch64_picreloc=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '
-	.text
-	ldr     x0, [x2, #:gotpage_lo15:globalsym]
-    ' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_aarch64_picreloc=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_picreloc" >&5
-$as_echo "$gcc_cv_as_aarch64_picreloc" >&6; }
-if test $gcc_cv_as_aarch64_picreloc = yes; then
-
-$as_echo "#define HAVE_AS_SMALL_PIC_RELOCS 1" >>confdefs.h
-
-fi
-
-    # Check if we have binutils support for AEABI build attributes.
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for support of AEABI build attributes" >&5
-$as_echo_n "checking assembler for support of AEABI build attributes... " >&6; }
-if ${gcc_cv_as_aarch64_aeabi_build_attributes+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_aarch64_aeabi_build_attributes=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '
-	.aeabi_subsection aeabi_feature_and_bits, optional, ULEB128
-	.aeabi_attribute Tag_Feature_BTI, 1
-	.aeabi_attribute Tag_Feature_PAC, 1
-	.aeabi_attribute Tag_Feature_GCS, 1
-    ' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_aarch64_aeabi_build_attributes=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_aarch64_aeabi_build_attributes" >&5
-$as_echo "$gcc_cv_as_aarch64_aeabi_build_attributes" >&6; }
-if test $gcc_cv_as_aarch64_aeabi_build_attributes = yes; then
-
-$as_echo "#define HAVE_AS_AEABI_BUILD_ATTRIBUTES 1" >>confdefs.h
-
-fi
-
-    # Check if we have binutils support for DTPREL relocation.
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for support of DTPREL relocation" >&5
+                                                                { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for support of DTPREL relocation" >&5
 $as_echo_n "checking assembler for support of DTPREL relocation... " >&6; }
 if ${gcc_cv_as_aarch64_dtprel_relocation+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -26977,7 +26852,6 @@ $as_echo "#define HAVE_AS_DTPREL_RELOC 1" >>confdefs.h
 fi
 
                                 ;;
-
   # All TARGET_ABI_OSF targets.
   alpha*-*-linux* | alpha*-*-*bsd*)
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for explicit relocation support" >&5
@@ -28298,38 +28172,6 @@ fi
 	lxvd2x 1,2,3';;
     esac
 
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute support" >&5
-$as_echo_n "checking assembler for .gnu_attribute support... " >&6; }
-if ${gcc_cv_as_powerpc_gnu_attribute+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_powerpc_gnu_attribute=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '.gnu_attribute 4,1' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_powerpc_gnu_attribute=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_gnu_attribute" >&5
-$as_echo "$gcc_cv_as_powerpc_gnu_attribute" >&6; }
-if test $gcc_cv_as_powerpc_gnu_attribute = yes; then
-
-$as_echo "#define HAVE_AS_GNU_ATTRIBUTE 1" >>confdefs.h
-
-fi
-
-
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for prologue entry point marker support" >&5
 $as_echo_n "checking assembler for prologue entry point marker support... " >&6; }
 if ${gcc_cv_as_powerpc_entry_markers+:} false; then :
@@ -28500,38 +28342,6 @@ $as_echo "$gcc_cv_as_mips_no_shared" >&6; }
 if test $gcc_cv_as_mips_no_shared = yes; then
 
 $as_echo "#define HAVE_AS_NO_SHARED 1" >>confdefs.h
-
-fi
-
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute support" >&5
-$as_echo_n "checking assembler for .gnu_attribute support... " >&6; }
-if ${gcc_cv_as_mips_gnu_attribute+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_mips_gnu_attribute=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '.gnu_attribute 4,1' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_mips_gnu_attribute=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_mips_gnu_attribute" >&5
-$as_echo "$gcc_cv_as_mips_gnu_attribute" >&6; }
-if test $gcc_cv_as_mips_gnu_attribute = yes; then
-
-$as_echo "#define HAVE_AS_GNU_ATTRIBUTE 1" >>confdefs.h
 
 fi
 
@@ -28755,39 +28565,6 @@ fi
     fi
     ;;
     msp430-*-*)
-    # Earlier GAS versions generically support .gnu_attribute, but the
-    # msp430 assembler will not do anything with it.
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute support" >&5
-$as_echo_n "checking assembler for .gnu_attribute support... " >&6; }
-if ${gcc_cv_as_msp430_gnu_attribute+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_msp430_gnu_attribute=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '.gnu_attribute 4,1' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_msp430_gnu_attribute=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_msp430_gnu_attribute" >&5
-$as_echo "$gcc_cv_as_msp430_gnu_attribute" >&6; }
-if test $gcc_cv_as_msp430_gnu_attribute = yes; then
-
-$as_echo "#define HAVE_AS_GNU_ATTRIBUTE 1" >>confdefs.h
-
-fi
-
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .mspabi_attribute support" >&5
 $as_echo_n "checking assembler for .mspabi_attribute support... " >&6; }
 if ${gcc_cv_as_msp430_mspabi_attribute+:} false; then :
@@ -29241,37 +29018,6 @@ fi
 
     ;;
     s390x-*-*)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .gnu_attribute support" >&5
-$as_echo_n "checking assembler for .gnu_attribute support... " >&6; }
-if ${gcc_cv_as_s390_gnu_attribute+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  gcc_cv_as_s390_gnu_attribute=no
-  if test x"$gcc_cv_as" != x; then
-    $as_echo '.gnu_attribute 8,1' > conftest.s
-    if { ac_try='$gcc_cv_as $gcc_cv_as_flags  -o conftest.o conftest.s >&5'
-  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }
-    then
-	gcc_cv_as_s390_gnu_attribute=yes
-    else
-      echo "configure: failed program was" >&5
-      cat conftest.s >&5
-    fi
-    rm -f conftest.o conftest.s
-  fi
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_s390_gnu_attribute" >&5
-$as_echo "$gcc_cv_as_s390_gnu_attribute" >&6; }
-if test $gcc_cv_as_s390_gnu_attribute = yes; then
-
-$as_echo "#define HAVE_AS_GNU_ATTRIBUTE 1" >>confdefs.h
-
-fi
-
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for .machine and .machinemode support" >&5
 $as_echo_n "checking assembler for .machine and .machinemode support... " >&6; }
 if ${gcc_cv_as_s390_machine_machinemode+:} false; then :

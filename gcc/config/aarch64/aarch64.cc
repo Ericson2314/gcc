@@ -57,6 +57,7 @@
 #include "reload.h"
 #include "langhooks.h"
 #include "opts.h"
+#include "target-caps.h"
 #include "gimplify.h"
 #include "dwarf2.h"
 #include "dwarf2out.h"
@@ -115,10 +116,6 @@
 /* Maximum bytes set for an inline memset expansion.  With -Os use 3 STP
    and 1 MOVI/DUP (same size as a call).  */
 #define MAX_SET_SIZE(speed) (speed ? 256 : 96)
-
-#ifndef HAVE_AS_AEABI_BUILD_ATTRIBUTES
-#define HAVE_AS_AEABI_BUILD_ATTRIBUTES 0
-#endif
 
 /* Not on Windows ABI unless explicitly set.  */
 #ifndef TARGET_AARCH64_MS_ABI
@@ -20531,12 +20528,10 @@ aarch64_override_options (void)
 #endif
     }
 
-#ifndef HAVE_AS_MABI_OPTION
-  /* The compiler may have been configured with 2.23.* binutils, which does
-     not have support for ILP32.  */
-  if (TARGET_ILP32)
+  /* binutils 2.23.* has no ILP32 support.  Whether the assembler in hand does
+     is asked of that assembler now, not of the one configure found.  */
+  if (TARGET_ILP32 && !targ_caps.as_aarch64_mabi)
     error ("assembler does not support %<-mabi=ilp32%>");
-#endif
   if (TARGET_ILP32)
     warning (OPT_Wdeprecated, "%<-mabi=ilp32%> is deprecated");
 
@@ -30826,11 +30821,10 @@ aarch64_empty_mask_is_expensive (unsigned)
 bool
 aarch64_use_pseudo_pic_reg (void)
 {
-#ifdef HAVE_AS_SMALL_PIC_RELOCS
-  return flag_pic == 1 && aarch64_cmodel == AARCH64_CMODEL_SMALL;
-#else
-  return false;
-#endif
+  /* Needs the relocations -fpic wants; asked of the real assembler after the
+     build rather than of whichever one configure happened to find.  */
+  return (targ_caps.as_aarch64_small_pic_relocs
+	  && flag_pic == 1 && aarch64_cmodel == AARCH64_CMODEL_SMALL);
 }
 
 /* Implement TARGET_UNSPEC_MAY_TRAP_P.  */
@@ -32081,7 +32075,7 @@ aarch64_file_end_indicate_exec_stack ()
 
   /* Check whether the current assembler supports AEABI build attributes, if
      not fallback to .note.gnu.property section.  */
-  if (HAVE_AS_AEABI_BUILD_ATTRIBUTES)
+  if (targ_caps.as_aarch64_aeabi_build_attributes)
     {
       using namespace aarch64;
       aeabi_subsection<BA_TagFeature_t, bool, 3>

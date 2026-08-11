@@ -47,6 +47,7 @@ struct target_caps targ_caps =
   .glibc_minor = 0,
   .libc_hwcap_in_tcb = false,
   .libc_gnustack = false,
+  .as_gnu_attribute = true,
   .cfi_directive = true,
   .cfi_personality = true,
   .cfi_sections = true,
@@ -118,6 +119,8 @@ read_target_caps (const char *file)
 	targ_caps.libc_hwcap_in_tcb = value != 0;
       else if (strcmp (name, "libc_gnustack") == 0)
 	targ_caps.libc_gnustack = value != 0;
+      else if (strcmp (name, "as_gnu_attribute") == 0)
+	targ_caps.as_gnu_attribute = value != 0;
       else if (strcmp (name, "cfi_directive") == 0)
 	targ_caps.cfi_directive = value != 0;
       else if (strcmp (name, "cfi_personality") == 0)

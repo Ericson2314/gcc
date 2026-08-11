@@ -102,6 +102,16 @@ struct target_caps
      original probes answered "no" for a cross build with no assembler to ask,
      which silently cost debug quality rather than failing.  */
 
+  /* Assembler accepts .gnu_attribute.  Was HAVE_AS_GNU_ATTRIBUTE, probed
+     separately in the powerpc, mips, msp430 and s390 arms of the big
+     `case "$target"' -- four copies of the same test, because each port
+     wanted it and the probe was written per arm.  One capability now.
+
+     config/vxworks.h used to #undef it, because the diab linker cannot handle
+     .gnu_attribute sections; a runtime value cannot be #undef'd, so a VxWorks
+     target must emit `as_gnu_attribute 0' from target-specs instead.  */
+  bool as_gnu_attribute;
+
   /* Assembler accepts .cfi_startproc and friends, and encodes cfi advances
      correctly.  Was HAVE_GAS_CFI_DIRECTIVE, which seeded flag_dwarf2_cfi_asm
      through Init() in common.opt.  Init() needs a compile-time constant, so

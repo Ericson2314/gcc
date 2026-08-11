@@ -32,6 +32,7 @@
 #include "c-family/c-pragma.h"
 #include "langhooks.h"
 #include "target.h"
+#include "target-caps.h"
 
 #define builtin_define(TXT) cpp_define (pfile, TXT)
 #define builtin_assert(TXT) cpp_assert (pfile, TXT)
@@ -69,9 +70,9 @@ aarch64_define_unconditional_macros (cpp_reader *pfile)
   builtin_define_with_int_value ("__ARM_ARCH_PROFILE",
       TARGET_V8R ? 'R' : 'A');
 
-#if HAVE_AS_AEABI_BUILD_ATTRIBUTES
-  builtin_define_with_int_value ("__ARM_BUILDATTR64_FV", 'A');
-#endif
+  /* Only claim AEABI build attributes if the assembler in hand takes them.  */
+  if (targ_caps.as_aarch64_aeabi_build_attributes)
+    builtin_define_with_int_value ("__ARM_BUILDATTR64_FV", 'A');
 
   builtin_define ("__ARM_FEATURE_CLZ");
   builtin_define ("__ARM_FEATURE_IDIV");

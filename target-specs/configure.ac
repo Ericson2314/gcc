@@ -981,6 +981,14 @@ case $target in
 esac
 AC_MSG_RESULT([$gcc_cv_as_cfi_sections_directive])
 
+dnl .gnu_attribute.  gcc/configure.ac probed this four separate times, once each
+dnl in the powerpc, mips, msp430 and s390 arms of `case "$target"' -- the same
+dnl directive every time (s390 used tag 8 rather than 4, which tests nothing
+dnl different).  One probe here serves all four ports.
+AC_MSG_CHECKING([assembler for .gnu_attribute])
+gcc_cv_as_gnu_attribute=`ts_asm_ok '	.gnu_attribute 4,1'`
+AC_MSG_RESULT([$gcc_cv_as_gnu_attribute])
+
 AC_MSG_CHECKING([assembler for .loc is_stmt])
 gcc_cv_as_is_stmt=`ts_asm_ok '	.text
 	.file 1 "conf.c"
@@ -1047,6 +1055,59 @@ AC_MSG_RESULT([$gcc_cv_as_dwarf2_debug_view])
 
 rm -f conftest.s conftest.o
 
+dnl ===========================================================================
+dnl BACK-END ASSEMBLER SECTION: aarch64
+dnl
+dnl These were the aarch64 arm of the `case "$target"' CPU-specific assembler
+dnl checks in gcc/configure.ac.  They are guarded on the target so that a probe
+dnl written in aarch64 assembly is not run against, say, a mips assembler --
+dnl gcc/configure got that for free from the case statement, and this file has
+dnl to be explicit about it.
+dnl ===========================================================================
+
+gcc_cv_as_aarch64_mabi=no
+gcc_cv_as_aarch64_picreloc=no
+gcc_cv_as_aarch64_aeabi=no
+case ${target} in
+  aarch64*-*-*)
+    AC_MSG_CHECKING([assembler for -mabi option])
+    echo '	.text' > conftest.s
+    if "$gcc_cv_as" -mabi=lp64 -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_mabi=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_aarch64_mabi])
+
+    AC_MSG_CHECKING([assembler for -fpic relocs])
+    cat > conftest.s <<'TSEOF'
+	.text
+	ldr     x0, [x2, #:gotpage_lo15:globalsym]
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_picreloc=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_aarch64_picreloc])
+
+    AC_MSG_CHECKING([assembler for AEABI build attributes])
+    cat > conftest.s <<'TSEOF'
+	.aeabi_subsection aeabi_feature_and_bits, optional, ULEB128
+	.aeabi_attribute Tag_Feature_BTI, 1
+	.aeabi_attribute Tag_Feature_PAC, 1
+	.aeabi_attribute Tag_Feature_GCS, 1
+TSEOF
+    if "$gcc_cv_as" -o conftest.o conftest.s > /dev/null 2>&1; then
+      gcc_cv_as_aarch64_aeabi=yes
+    fi
+    AC_MSG_RESULT([$gcc_cv_as_aarch64_aeabi])
+
+    rm -f conftest.s conftest.o
+    ;;
+  *)
+    dnl Not aarch64: leave the defaults alone.  cc1 only consults these from the
+    dnl aarch64 back end, so the value is irrelevant, but writing 0 rather than
+    dnl 1 keeps "not probed" and "probed and absent" from looking alike.
+    ;;
+esac
+
 dnl --- Emit. -----------------------------------------------------------------
 
 ts_bool () {
@@ -1055,6 +1116,7 @@ ts_bool () {
 
 cat >> "$target_config_file" <<EOF
 # Assembler debug/CFI capabilities.
+as_gnu_attribute `ts_bool "$gcc_cv_as_gnu_attribute"`
 cfi_directive `if test x"$gcc_cv_as_cfi_directive" = xyes && test x"$gcc_cv_as_cfi_advance_working" = xyes; then echo 1; else echo 0; fi`
 cfi_personality `ts_bool "$gcc_cv_as_cfi_personality_directive"`
 cfi_sections `ts_bool "$gcc_cv_as_cfi_sections_directive"`
@@ -1062,7 +1124,12 @@ gas_loc_stmt `ts_bool "$gcc_cv_as_is_stmt"`
 gas_discriminator `ts_bool "$gcc_cv_as_discriminator"`
 as_line_zero `ts_bool "$gcc_cv_as_line_zero"`
 dwarf2_debug_line `ts_bool "$gcc_cv_as_dwarf2_debug_line"`
-dwarf2_debug_view `ts_bool "$gcc_cv_as_dwarf2_debug_view"`
+dwarf2_debug_view `ts_bool ""`
+
+# aarch64 back-end assembler capabilities.
+as_aarch64_mabi `ts_bool "$gcc_cv_as_aarch64_mabi"`
+as_aarch64_small_pic_relocs `ts_bool "$gcc_cv_as_aarch64_picreloc"`
+as_aarch64_aeabi_build_attributes `ts_bool "$gcc_cv_as_aarch64_aeabi"`
 
 # Linker capabilities.
 gas_hidden `ts_bool "$gcc_cv_gas_hidden"`
