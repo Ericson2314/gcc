@@ -1145,7 +1145,7 @@ swap_const_vector_halves (rtx *op_ptr)
   enum rtx_code code = GET_CODE (op);
   if (GET_CODE (op) == CONST_VECTOR)
     {
-      int units = GET_MODE_NUNITS (GET_MODE (op));
+      int units = GET_MODE_NUNITS (GET_MODE (op)).to_constant ();
       rtx_vector_builder builder (GET_MODE (op), units, 1);
       for (i = 0; i < units / 2; ++i)
 	builder.quick_push (CONST_VECTOR_ELT (op, i + units / 2));
@@ -1173,10 +1173,10 @@ adjust_subreg_index (rtx op)
 {
   enum rtx_code code = GET_CODE (op);
   if (code == SUBREG
-      && (GET_MODE_SIZE (GET_MODE (op))
-	  < GET_MODE_SIZE (GET_MODE (XEXP (op, 0)))))
+      && known_lt (GET_MODE_SIZE (GET_MODE (op)),
+	    GET_MODE_SIZE (GET_MODE (XEXP (op, 0)))))
     {
-      unsigned int index = SUBREG_BYTE (op);
+      unsigned int index = SUBREG_BYTE (op).to_constant ();
       if (index < 8)
 	index += 8;
       else
@@ -1202,7 +1202,7 @@ permute_load (rtx_insn *insn)
   rtx mem_op = SET_SRC (body);
   rtx tgt_reg = SET_DEST (body);
   machine_mode mode = GET_MODE (tgt_reg);
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int half_elts = n_elts / 2;
   rtx par = gen_rtx_PARALLEL (mode, rtvec_alloc (n_elts));
   int i, j;
@@ -1227,7 +1227,7 @@ permute_store (rtx_insn *insn)
   rtx body = PATTERN (insn);
   rtx src_reg = SET_SRC (body);
   machine_mode mode = GET_MODE (src_reg);
-  int n_elts = GET_MODE_NUNITS (mode);
+  int n_elts = GET_MODE_NUNITS (mode).to_constant ();
   int half_elts = n_elts / 2;
   rtx par = gen_rtx_PARALLEL (mode, rtvec_alloc (n_elts));
   int i, j;
@@ -1258,7 +1258,7 @@ adjust_extract (rtx_insn *insn)
      account for that.  */
   rtx sel = GET_CODE (src) == VEC_DUPLICATE ? XEXP (src, 0) : src;
   rtx par = XEXP (sel, 1);
-  int half_elts = GET_MODE_NUNITS (GET_MODE (XEXP (sel, 0))) >> 1;
+  int half_elts = GET_MODE_NUNITS (GET_MODE (XEXP (sel, 0))).to_constant () >> 1;
   int lane = INTVAL (XVECEXP (par, 0, 0));
   lane = lane >= half_elts ? lane - half_elts : lane + half_elts;
   XVECEXP (par, 0, 0) = GEN_INT (lane);
@@ -1276,7 +1276,7 @@ adjust_splat (rtx_insn *insn)
 {
   rtx body = PATTERN (insn);
   rtx unspec = XEXP (body, 1);
-  int half_elts = GET_MODE_NUNITS (GET_MODE (unspec)) >> 1;
+  int half_elts = GET_MODE_NUNITS (GET_MODE (unspec)).to_constant () >> 1;
   int lane = INTVAL (XVECEXP (unspec, 0, 1));
   lane = lane >= half_elts ? lane - half_elts : lane + half_elts;
   XVECEXP (unspec, 0, 1) = GEN_INT (lane);
@@ -1571,7 +1571,7 @@ mimic_memory_attributes_and_flags (rtx new_mem_exp, const_rtx original_mem_exp)
 
   if (original_attrs.offset_known_p)
     {
-      HOST_WIDE_INT offset = original_attrs.offset;
+      HOST_WIDE_INT offset = original_attrs.offset.to_constant ();
       set_mem_offset (new_mem_exp, offset);
     }
   else
@@ -1579,7 +1579,7 @@ mimic_memory_attributes_and_flags (rtx new_mem_exp, const_rtx original_mem_exp)
 
   if (original_attrs.size_known_p)
     {
-      HOST_WIDE_INT size = original_attrs.size;
+      HOST_WIDE_INT size = original_attrs.size.to_constant ();
       set_mem_size (new_mem_exp, size);
     }
   else

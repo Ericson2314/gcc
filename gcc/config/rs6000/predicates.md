@@ -596,7 +596,7 @@
 ;; or non-special register.
 (define_predicate "reg_or_logical_cint_operand"
   (if_then_else (match_code "const_int")
-    (match_test "(GET_MODE_BITSIZE (mode) > HOST_BITS_PER_WIDE_INT
+    (match_test "(known_gt (GET_MODE_BITSIZE (mode), HOST_BITS_PER_WIDE_INT)
 		  && INTVAL (op) >= 0)
 		 || ((INTVAL (op) & GET_MODE_MASK (mode)
 		      & (~ (unsigned HOST_WIDE_INT) 0xffffffff)) == 0)")
@@ -622,7 +622,7 @@
       if (!TARGET_POWERPC64)
         return 1;
 
-      int size = GET_MODE_SIZE (mode);
+      int size = GET_MODE_SIZE (mode).to_constant ();
       if (size < 8)
         return 1;
 
@@ -811,7 +811,7 @@
   int elt;
   if (mode == V2DImode || mode == V2DFmode)
     return 0;
-  elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode) - 1 : 0;
+  elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode).to_constant () - 1 : 0;
   val = const_vector_elt_as_int (op, elt);
   val = sext_hwi (val, 8);
   return EASY_VECTOR_15_ADD_SELF (val);
@@ -827,10 +827,10 @@
   HOST_WIDE_INT val;
   int elt, sz = easy_altivec_constant (op, mode);
   machine_mode inner = GET_MODE_INNER (mode);
-  int isz = GET_MODE_SIZE (inner);
+  int isz = GET_MODE_SIZE (inner).to_constant ();
   if (mode == V2DImode || mode == V2DFmode)
     return 0;
-  elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode) - 1 : 0;
+  elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (mode).to_constant () - 1 : 0;
   if (isz < sz)
     {
       if (const_vector_elt_as_int (op, elt) != 0)
@@ -876,7 +876,7 @@
   else
     return false;
 
-  unsigned int esize = GET_MODE_SIZE (emode);
+  unsigned int esize = GET_MODE_SIZE (emode).to_constant ();
   unsigned char byte0 = eval & 0xff;
   for (unsigned int i = 1; i < esize; i++)
     {
@@ -944,7 +944,7 @@
   if (GET_CODE (op) == CONST_VECTOR)
     {
       unsigned HOST_WIDE_INT first = UINTVAL (CONST_VECTOR_ELT (op, 0));
-      unsigned nunits = GET_MODE_NUNITS (mode);
+      unsigned nunits = GET_MODE_NUNITS (mode).to_constant ();
       unsigned i;
 
       if (!IN_RANGE (first, min_value, max_value))
@@ -1017,7 +1017,7 @@
   if (!TARGET_QUAD_MEMORY && !TARGET_SYNC_TI)
     return false;
 
-  if (GET_MODE_SIZE (mode) != 16 || MEM_ALIGN (op) < 128)
+  if (maybe_ne (GET_MODE_SIZE (mode), 16) || MEM_ALIGN (op) < 128)
     return false;
 
   return quad_address_p (XEXP (op, 0), mode, false);
@@ -1349,7 +1349,7 @@
   /* For floating-point or multi-word mode, the only remaining valid type
      is a register.  */
   if (SCALAR_FLOAT_MODE_P (mode)
-      || GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      || known_gt (GET_MODE_SIZE (mode), UNITS_PER_WORD))
     return register_operand (op, mode);
 
   /* We don't allow moving the carry bit around.  */
@@ -2206,8 +2206,8 @@
 
 (define_predicate "lowpart_subreg_operator"
   (and (match_code "subreg")
-       (match_test "subreg_lowpart_offset (mode, GET_MODE (SUBREG_REG (op)))
-		    == SUBREG_BYTE (op)")))
+       (match_test "known_eq (subreg_lowpart_offset (mode, GET_MODE (SUBREG_REG (op))),
+		       SUBREG_BYTE (op))")))
 
 ; Else operand for LEN_LOAD.
 (define_predicate "lxvl_else_operand"

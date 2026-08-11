@@ -4006,7 +4006,7 @@
     {
       HOST_WIDE_INT elt = INTVAL (operands[2]);
       HOST_WIDE_INT elt_adj = (!BYTES_BIG_ENDIAN
-			       ? GET_MODE_NUNITS (<MODE>mode) - 1 - elt
+			       ? GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - elt
 			       : elt);
 
       HOST_WIDE_INT unit_size = GET_MODE_UNIT_SIZE (<MODE>mode);
@@ -4158,7 +4158,7 @@
   int value;
 
   if (!BYTES_BIG_ENDIAN)
-    element = GEN_INT (GET_MODE_NUNITS (<MODE>mode) - 1 - INTVAL (element));
+    element = GEN_INT (GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 - INTVAL (element));
 
   /* If the value is in the correct position, we can avoid doing the VSPLT<x>
      instruction.  */
@@ -4623,7 +4623,7 @@
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_P9_VECTOR && TARGET_POWERPC64"
 {
   int ele = INTVAL (operands[3]);
-  int nunits = GET_MODE_NUNITS (<MODE>mode);
+  int nunits = GET_MODE_NUNITS (<MODE>mode).to_constant ();
 
   if (!BYTES_BIG_ENDIAN)
     ele = nunits - 1 - ele;

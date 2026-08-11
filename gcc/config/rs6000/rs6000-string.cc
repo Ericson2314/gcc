@@ -513,7 +513,7 @@ static void
 do_load_mask_compare (const machine_mode load_mode, rtx diff, rtx cmp_rem, rtx dcond,
 		      rtx src1_addr, rtx src2_addr, rtx orig_src1, rtx orig_src2)
 {
-  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode);
+  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
   rtx shift_amount = gen_reg_rtx (word_mode);
   rtx d1 = gen_reg_rtx (word_mode);
   rtx d2 = gen_reg_rtx (word_mode);
@@ -575,7 +575,7 @@ do_overlap_load_compare (machine_mode load_mode, bool isConst,
 			rtx cmp_rem, rtx dcond, rtx src1_addr, rtx src2_addr,
 			rtx orig_src1, rtx orig_src2)
 {
-  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode);
+  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
   HOST_WIDE_INT addr_adj = load_mode_size - bytes_rem;
   rtx d1 = gen_reg_rtx (word_mode);
   rtx d2 = gen_reg_rtx (word_mode);
@@ -692,7 +692,7 @@ expand_cmp_vec_sequence (unsigned HOST_WIDE_INT bytes_to_compare,
       */
 
       load_mode = V16QImode;
-      load_mode_size = GET_MODE_SIZE (load_mode);
+      load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
 
       if (bytes_to_compare >= load_mode_size)
 	cmp_bytes = load_mode_size;
@@ -1000,10 +1000,10 @@ expand_compare_loop (rtx operands[])
    word_mode is DImode.  */
   if (!bytes_is_const)
     {
-      if (GET_MODE_SIZE (GET_MODE (bytes_rtx)) > GET_MODE_SIZE (word_mode))
+      if (known_gt (GET_MODE_SIZE (GET_MODE (bytes_rtx)), GET_MODE_SIZE (word_mode)))
 	/* Do not expect length longer than word_mode.  */
 	return false;
-      else if (GET_MODE_SIZE (GET_MODE (bytes_rtx)) < GET_MODE_SIZE (word_mode))
+      else if (known_lt (GET_MODE_SIZE (GET_MODE (bytes_rtx)), GET_MODE_SIZE (word_mode)))
 	{
 	  bytes_rtx = force_reg (GET_MODE (bytes_rtx), bytes_rtx);
 	  bytes_rtx = force_reg (word_mode,
@@ -1016,7 +1016,7 @@ expand_compare_loop (rtx operands[])
     }
 
   machine_mode load_mode = word_mode;
-  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode);
+  HOST_WIDE_INT load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
 
   /* Number of bytes per iteration of the unrolled loop.  */
   HOST_WIDE_INT loop_bytes = 2 * load_mode_size;
@@ -1747,7 +1747,7 @@ expand_block_compare_gpr(unsigned HOST_WIDE_INT bytes, unsigned int base_align,
     {
       unsigned int align = compute_current_alignment (base_align, offset);
       load_mode = select_block_compare_mode (offset, bytes, align);
-      load_mode_size = GET_MODE_SIZE (load_mode);
+      load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
       if (bytes >= load_mode_size)
 	cmp_bytes = load_mode_size;
       else if (!targetm.slow_unaligned_access (load_mode,
@@ -1807,7 +1807,7 @@ expand_block_compare_gpr(unsigned HOST_WIDE_INT bytes, unsigned int base_align,
 	}
 
       int remain = bytes - cmp_bytes;
-      if (GET_MODE_SIZE (GET_MODE (final_result)) > GET_MODE_SIZE (load_mode))
+      if (known_gt (GET_MODE_SIZE (GET_MODE (final_result)), GET_MODE_SIZE (load_mode)))
 	{
 	  /* Final_result is larger than load size so we don't need to
 	     reduce result size.  */
@@ -2155,7 +2155,7 @@ expand_strncmp_gpr_sequence (unsigned HOST_WIDE_INT bytes_to_compare,
 
       unsigned int align = compute_current_alignment (base_align, offset);
       load_mode = select_block_compare_mode (offset, bytes_to_compare, align);
-      load_mode_size = GET_MODE_SIZE (load_mode);
+      load_mode_size = GET_MODE_SIZE (load_mode).to_constant ();
       if (bytes_to_compare >= load_mode_size)
 	cmp_bytes = load_mode_size;
       else if (!targetm.slow_unaligned_access (load_mode,

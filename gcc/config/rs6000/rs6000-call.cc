@@ -196,7 +196,7 @@ rs6000_aggregate_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -259,7 +259,7 @@ rs6000_aggregate_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -294,7 +294,7 @@ rs6000_aggregate_candidate (const_tree type, machine_mode *modep,
 
 	/* There must be no padding.  */
 	if (wi::to_wide (TYPE_SIZE (type))
-	    != count * GET_MODE_BITSIZE (*modep))
+	    != count * GET_MODE_BITSIZE (*modep).to_constant ())
 	  return -1;
 
 	return count;
@@ -336,7 +336,7 @@ rs6000_discover_homogeneous_aggregate (machine_mode mode, const_tree type,
       if (field_count > 0)
 	{
 	  int reg_size = ALTIVEC_OR_VSX_VECTOR_MODE (field_mode) ? 16 : 8;
-	  int field_size = ROUND_UP (GET_MODE_SIZE (field_mode), reg_size);
+	  int field_size = ROUND_UP (GET_MODE_SIZE (field_mode).to_constant (), reg_size);
 
 	  /* The ELFv2 ABI allows homogeneous aggregates to occupy
 	     up to AGGR_ARG_NUM_REG registers.  */
@@ -697,7 +697,7 @@ rs6000_promote_function_mode (const_tree type ATTRIBUTE_UNUSED,
 			      const_tree, int for_return ATTRIBUTE_UNUSED)
 {
   if (GET_MODE_CLASS (mode) == MODE_INT
-      && GET_MODE_SIZE (mode) < (TARGET_32BIT ? 4 : 8))
+      && known_lt (GET_MODE_SIZE (mode), (TARGET_32BIT ? 4 : 8)))
     mode = TARGET_32BIT ? SImode : DImode;
 
   return mode;
@@ -779,7 +779,7 @@ rs6000_function_arg_padding (machine_mode mode, const_tree type)
 		size = int_size_in_bytes (type);
 	    }
 	  else
-	    size = GET_MODE_SIZE (mode);
+	    size = GET_MODE_SIZE (mode).to_constant ();
 
 	  if (size == 1 || size == 2 || size == 4)
 	    return PAD_DOWNWARD;
@@ -819,7 +819,7 @@ rs6000_function_arg_boundary (machine_mode mode, const_tree type)
   rs6000_discover_homogeneous_aggregate (mode, type, &elt_mode, &n_elts);
 
   if (DEFAULT_ABI == ABI_V4
-      && (GET_MODE_SIZE (mode) == 8
+      && (known_eq (GET_MODE_SIZE (mode), 8)
 	  || (TARGET_HARD_FLOAT
 	      && !is_complex_IBM_long_double (mode)
 	      && FLOAT128_2REG_P (mode))))
@@ -892,7 +892,7 @@ rs6000_arg_size (machine_mode mode, const_tree type)
   unsigned long size;
 
   if (mode != BLKmode)
-    size = GET_MODE_SIZE (mode);
+    size = GET_MODE_SIZE (mode).to_constant ();
   else
     size = int_size_in_bytes (type);
 
@@ -988,7 +988,7 @@ rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *cum,
 	  rs6000_darwin64_record_arg_advance_recurse (cum, ftype, bitpos);
 	else if (USE_FP_FOR_ARG_P (cum, mode))
 	  {
-	    unsigned n_fpregs = (GET_MODE_SIZE (mode) + 7) >> 3;
+	    unsigned n_fpregs = (GET_MODE_SIZE (mode).to_constant () + 7) >> 3;
 	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos, 0);
 	    cum->fregno += n_fpregs;
 	    /* Single-precision floats present a special problem for
@@ -1194,7 +1194,7 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 
 	  if (cum->fregno + (FLOAT128_2REG_P (mode) ? 1 : 0)
 	      <= FP_ARG_V4_MAX_REG)
-	    cum->fregno += (GET_MODE_SIZE (mode) + 7) >> 3;
+	    cum->fregno += (GET_MODE_SIZE (mode).to_constant () + 7) >> 3;
 	  else
 	    {
 	      cum->fregno = FP_ARG_V4_MAX_REG + 1;
@@ -1256,7 +1256,7 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	     odd.  */
 	  if (elt_mode == TDmode && (cum->fregno % 2) == 1)
 	    cum->fregno++;
-	  cum->fregno += n_elts * ((GET_MODE_SIZE (elt_mode) + 7) >> 3);
+	  cum->fregno += n_elts * ((GET_MODE_SIZE (elt_mode).to_constant () + 7) >> 3);
 	}
 
       if (TARGET_DEBUG_ARG)
@@ -1376,7 +1376,7 @@ rs6000_darwin64_record_arg_recurse (CUMULATIVE_ARGS *cum, const_tree type,
 	  rs6000_darwin64_record_arg_recurse (cum, ftype, bitpos, rvec, k);
 	else if (cum->named && USE_FP_FOR_ARG_P (cum, mode))
 	  {
-	    unsigned n_fpreg = (GET_MODE_SIZE (mode) + 7) >> 3;
+	    unsigned n_fpreg = (GET_MODE_SIZE (mode).to_constant () + 7) >> 3;
 #if 0
 	    switch (mode)
 	      {
@@ -1555,7 +1555,7 @@ rs6000_psave_function_arg (machine_mode mode, const_tree type,
 	  do
 	    {
 	      rtx r = gen_rtx_REG (rmode, GP_ARG_MIN_REG + align_words);
-	      rtx off = GEN_INT (i++ * GET_MODE_SIZE (rmode));
+	      rtx off = GEN_INT (i++ * GET_MODE_SIZE (rmode).to_constant ());
 	      rvec[k++] = gen_rtx_EXPR_LIST (VOIDmode, r, off);
 	    }
 	  while (++align_words < GP_ARG_NUM_REG && --n_words != 0);
@@ -1693,7 +1693,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
       for (i = 0; i < n_elts && cum->vregno + i <= ALTIVEC_ARG_MAX_REG; i++)
 	{
 	  r = gen_rtx_REG (elt_mode, cum->vregno + i);
-	  off = GEN_INT (i * GET_MODE_SIZE (elt_mode));
+	  off = GEN_INT (i * GET_MODE_SIZE (elt_mode).to_constant ());
 	  rvec[k++] =  gen_rtx_EXPR_LIST (VOIDmode, r, off);
 	}
 
@@ -1796,7 +1796,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	  rtx rvec[GP_ARG_NUM_REG + AGGR_ARG_NUM_REG + 1];
 	  rtx r, off;
 	  int i, k = 0;
-	  unsigned long n_fpreg = (GET_MODE_SIZE (elt_mode) + 7) >> 3;
+	  unsigned long n_fpreg = (GET_MODE_SIZE (elt_mode).to_constant () + 7) >> 3;
 	  int fpr_words;
 
 	  /* Do we also need to pass this argument in the parameter
@@ -1822,7 +1822,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 		}
 
 	      r = gen_rtx_REG (fmode, cum->fregno + i * n_fpreg);
-	      off = GEN_INT (i * GET_MODE_SIZE (elt_mode));
+	      off = GEN_INT (i * GET_MODE_SIZE (elt_mode).to_constant ());
 	      rvec[k++] = gen_rtx_EXPR_LIST (VOIDmode, r, off);
 	    }
 
@@ -1838,7 +1838,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	     For unnamed arguments, we already set up GPRs to cover the
 	     whole argument in rs6000_psave_function_arg, so there is
 	     nothing further to do at this point.  */
-	  fpr_words = (i * GET_MODE_SIZE (elt_mode)) / (TARGET_32BIT ? 4 : 8);
+	  fpr_words = (i * GET_MODE_SIZE (elt_mode).to_constant ()) / (TARGET_32BIT ? 4 : 8);
 	  if (i < n_elts && align_words + fpr_words < GP_ARG_NUM_REG
 	      && cum->nargs_prototype > 0)
             {
@@ -1851,7 +1851,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	      do
 		{
 		  r = gen_rtx_REG (rmode, GP_ARG_MIN_REG + align_words);
-		  off = GEN_INT (fpr_words++ * GET_MODE_SIZE (rmode));
+		  off = GEN_INT (fpr_words++ * GET_MODE_SIZE (rmode).to_constant ());
 		  rvec[k++] = gen_rtx_EXPR_LIST (VOIDmode, r, off);
 		}
 	      while (++align_words < GP_ARG_NUM_REG && --n_words != 0);
@@ -1921,7 +1921,7 @@ rs6000_arg_partial_bytes (cumulative_args_t cum_v,
   if (USE_FP_FOR_ARG_P (cum, elt_mode)
       && !(TARGET_AIX && !TARGET_ELF && arg.aggregate_type_p ()))
     {
-      unsigned long n_fpreg = (GET_MODE_SIZE (elt_mode) + 7) >> 3;
+      unsigned long n_fpreg = (GET_MODE_SIZE (elt_mode).to_constant () + 7) >> 3;
 
       /* If we are passing this arg in the fixed parameter save area
          (gprs or memory) as well as FPRs, we do not use the partial
@@ -1946,7 +1946,7 @@ rs6000_arg_partial_bytes (cumulative_args_t cum_v,
 	     in GPRs if everything were passed there, so we fall back to
 	     the GPR code below to compute the appropriate value.  */
 	  int fpr = ((FP_ARG_MAX_REG + 1 - cum->fregno)
-		     * MIN (8, GET_MODE_SIZE (elt_mode)));
+		     * MIN (8, GET_MODE_SIZE (elt_mode).to_constant ()));
 	  int fpr_words = fpr / (TARGET_32BIT ? 4 : 8);
 
 	  if (align_words + fpr_words < GP_ARG_NUM_REG)
@@ -2616,7 +2616,7 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 	{
 	  tree elem_type = TREE_TYPE (type);
 	  machine_mode elem_mode = TYPE_MODE (elem_type);
-	  int elem_size = GET_MODE_SIZE (elem_mode);
+	  int elem_size = GET_MODE_SIZE (elem_mode).to_constant ();
 
 	  if (elem_size < UNITS_PER_WORD)
 	    {

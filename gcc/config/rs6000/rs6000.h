@@ -411,7 +411,7 @@ extern int rs6000_vector_align[];
 #define VECTOR_ALIGN(MODE)						\
   ((rs6000_vector_align[(MODE)] != 0)					\
    ? rs6000_vector_align[(MODE)]					\
-   : (int)GET_MODE_BITSIZE ((MODE)))
+   : (int) GET_MODE_BITSIZE ((machine_mode) (MODE)).to_constant ())
 
 /* Element number of the 64-bit value in a 128-bit vector that can be accessed
    with scalar instructions.  */
@@ -1301,9 +1301,10 @@ extern enum reg_class rs6000_constraints[RS6000_CONSTRAINT_MAX];
 
 #define RS6000_STARTING_FRAME_OFFSET					\
   (cfun->calls_alloca							\
-   ? (RS6000_ALIGN (crtl->outgoing_args_size + RS6000_SAVE_AREA,	\
+   ? (RS6000_ALIGN (crtl->outgoing_args_size.to_constant ()	\
+		    + RS6000_SAVE_AREA,	\
 		    (TARGET_ALTIVEC || TARGET_VSX) ? 16 : 8 ))		\
-   : (RS6000_ALIGN (crtl->outgoing_args_size,				\
+   : (RS6000_ALIGN (crtl->outgoing_args_size.to_constant (),				\
 		    (TARGET_ALTIVEC || TARGET_VSX) ? 16 : 8)		\
       + RS6000_SAVE_AREA))
 

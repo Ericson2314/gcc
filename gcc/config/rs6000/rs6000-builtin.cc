@@ -284,9 +284,9 @@ rs6000_builtin_md_vectorized_function (tree fndecl, tree type_out,
     return NULL_TREE;
 
   out_mode = TYPE_MODE (TREE_TYPE (type_out));
-  out_n = TYPE_VECTOR_SUBPARTS (type_out);
+  out_n = TYPE_VECTOR_SUBPARTS (type_out).to_constant ();
   in_mode = TYPE_MODE (TREE_TYPE (type_in));
-  in_n = TYPE_VECTOR_SUBPARTS (type_in);
+  in_n = TYPE_VECTOR_SUBPARTS (type_in).to_constant ();
 
   enum rs6000_gen_builtins fn
     = (enum rs6000_gen_builtins) DECL_MD_FUNCTION_CODE (fndecl);
@@ -800,7 +800,7 @@ rs6000_init_builtins (void)
   vector_pair_type_node = make_node (OPAQUE_TYPE);
   SET_TYPE_MODE (vector_pair_type_node, OOmode);
   TYPE_SIZE (vector_pair_type_node) = bitsize_int (GET_MODE_BITSIZE (OOmode));
-  TYPE_PRECISION (vector_pair_type_node) = GET_MODE_BITSIZE (OOmode);
+  TYPE_PRECISION (vector_pair_type_node) = GET_MODE_BITSIZE (OOmode).to_constant ();
   TYPE_SIZE_UNIT (vector_pair_type_node) = size_int (GET_MODE_SIZE (OOmode));
   SET_TYPE_ALIGN (vector_pair_type_node, 256);
   TYPE_USER_ALIGN (vector_pair_type_node) = 0;
@@ -812,7 +812,7 @@ rs6000_init_builtins (void)
   vector_quad_type_node = make_node (OPAQUE_TYPE);
   SET_TYPE_MODE (vector_quad_type_node, XOmode);
   TYPE_SIZE (vector_quad_type_node) = bitsize_int (GET_MODE_BITSIZE (XOmode));
-  TYPE_PRECISION (vector_quad_type_node) = GET_MODE_BITSIZE (XOmode);
+  TYPE_PRECISION (vector_quad_type_node) = GET_MODE_BITSIZE (XOmode).to_constant ();
   TYPE_SIZE_UNIT (vector_quad_type_node) = size_int (GET_MODE_SIZE (XOmode));
   SET_TYPE_ALIGN (vector_quad_type_node, 512);
   TYPE_USER_ALIGN (vector_quad_type_node) = 0;
@@ -828,7 +828,7 @@ rs6000_init_builtins (void)
   dmr1024_type_node = make_node (OPAQUE_TYPE);
   SET_TYPE_MODE (dmr1024_type_node, TDOmode);
   TYPE_SIZE (dmr1024_type_node) = bitsize_int (GET_MODE_BITSIZE (TDOmode));
-  TYPE_PRECISION (dmr1024_type_node) = GET_MODE_BITSIZE (TDOmode);
+  TYPE_PRECISION (dmr1024_type_node) = GET_MODE_BITSIZE (TDOmode).to_constant ();
   TYPE_SIZE_UNIT (dmr1024_type_node) = size_int (GET_MODE_SIZE (TDOmode));
   SET_TYPE_ALIGN (dmr1024_type_node, 512);
   TYPE_USER_ALIGN (dmr1024_type_node) = 0;
@@ -1020,7 +1020,7 @@ fold_mergehl_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_high)
   tree arg1 = gimple_call_arg (stmt, 1);
   tree lhs = gimple_call_lhs (stmt);
   tree lhs_type = TREE_TYPE (lhs);
-  int n_elts = TYPE_VECTOR_SUBPARTS (lhs_type);
+  int n_elts = TYPE_VECTOR_SUBPARTS (lhs_type).to_constant ();
   int midpoint = n_elts / 2;
   int offset = 0;
 
@@ -1032,7 +1032,7 @@ fold_mergehl_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_high)
      matches size.  */
   tree permute_type;
   permute_type = map_to_integral_tree_type (lhs_type);
-  tree_vector_builder elts (permute_type, VECTOR_CST_NELTS (arg0), 1);
+  tree_vector_builder elts (permute_type, VECTOR_CST_NELTS (arg0).to_constant (), 1);
 
   for (int i = 0; i < midpoint; i++)
     {
@@ -1057,7 +1057,7 @@ fold_mergeeo_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_odd)
   tree arg1 = gimple_call_arg (stmt, 1);
   tree lhs = gimple_call_lhs (stmt);
   tree lhs_type = TREE_TYPE (lhs);
-  int n_elts = TYPE_VECTOR_SUBPARTS (lhs_type);
+  int n_elts = TYPE_VECTOR_SUBPARTS (lhs_type).to_constant ();
 
   /* The permute_type will match the lhs for integral types.  For double and
      float types, the permute type needs to map to the V2 or V4 type that
@@ -1065,7 +1065,7 @@ fold_mergeeo_helper (gimple_stmt_iterator *gsi, gimple *stmt, int use_odd)
   tree permute_type;
   permute_type = map_to_integral_tree_type (lhs_type);
 
-  tree_vector_builder elts (permute_type, VECTOR_CST_NELTS (arg0), 1);
+  tree_vector_builder elts (permute_type, VECTOR_CST_NELTS (arg0).to_constant (), 1);
 
  /* Build the permute vector.  */
   for (int i = 0; i < n_elts / 2; i++)
@@ -1831,7 +1831,7 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	location_t loc = gimple_location (stmt);
 	/* Force arg1 into the range valid matching the arg0 type.  */
 	/* Build a vector consisting of the max valid bit-size values.  */
-	int n_elts = VECTOR_CST_NELTS (arg1);
+	int n_elts = VECTOR_CST_NELTS (arg1).to_constant ();
 	tree element_size = build_int_cst (unsigned_element_type,
 					   128 / n_elts);
 	tree_vector_builder elts (unsigned_arg1_type, n_elts, 1);
@@ -1874,7 +1874,7 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	lhs = gimple_call_lhs (stmt);
 	/* Force arg1 into the range valid matching the arg0 type.  */
 	/* Build a vector consisting of the max valid bit-size values.  */
-	int n_elts = VECTOR_CST_NELTS (arg1);
+	int n_elts = VECTOR_CST_NELTS (arg1).to_constant ();
 	int tree_size_in_bits = TREE_INT_CST_LOW (size_in_bytes (arg1_type))
 				* BITS_PER_UNIT;
 	tree element_size = build_int_cst (unsigned_element_type,
@@ -1916,7 +1916,7 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 			  unsigned_type_for (TREE_TYPE (arg0)), arg0);
 	/* Force arg1 into the range valid matching the arg0 type.  */
 	/* Build a vector consisting of the max valid bit-size values.  */
-	int n_elts = VECTOR_CST_NELTS (arg1);
+	int n_elts = VECTOR_CST_NELTS (arg1).to_constant ();
 	tree element_size = build_int_cst (unsigned_element_type,
 					   128 / n_elts);
 	tree_vector_builder elts (unsigned_arg1_type, n_elts, 1);
@@ -2219,7 +2219,7 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	arg1 = gimple_call_arg (stmt, 1); /* index into arg0.  */
 	/* Only fold the vec_splat_*() if arg1 is both a constant value and
 	   is a valid index into the arg0 vector.  */
-	unsigned int n_elts = VECTOR_CST_NELTS (arg0);
+	unsigned int n_elts = VECTOR_CST_NELTS (arg0).to_constant ();
 	if (TREE_CODE (arg1) != INTEGER_CST
 	    || TREE_INT_CST_LOW (arg1) > (n_elts -1))
 	  return false;
@@ -2483,7 +2483,7 @@ altivec_expand_vec_ext_builtin (tree exp, rtx target)
   if (TREE_CODE (arg1) == INTEGER_CST)
     {
       unsigned HOST_WIDE_INT elt;
-      unsigned HOST_WIDE_INT size = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+      unsigned HOST_WIDE_INT size = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)).to_constant ();
       unsigned int truncated_selector;
       /* Even if !tree_fits_uhwi_p (arg1)), TREE_INT_CST_LOW (arg0)
 	 returns low-order bits of INTEGER_CST for modulo indexing.  */

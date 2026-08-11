@@ -322,7 +322,7 @@
   if (mode != <MODE>mode)
     dest = gen_lowpart (mode, dest);
 
-  num_elements = GET_MODE_NUNITS (mode);
+  num_elements = GET_MODE_NUNITS (mode).to_constant ();
   v = rtvec_alloc (num_elements);
   for (i = 0; i < num_elements; i++)
     RTVEC_ELT (v, i) = constm1_rtx;
@@ -374,7 +374,7 @@
 		   UNSPEC_VSLDOI))]
 {
   rtx op1 = operands[1];
-  int elt = (BYTES_BIG_ENDIAN) ? 0 : GET_MODE_NUNITS (<MODE>mode) - 1;
+  int elt = (BYTES_BIG_ENDIAN) ? 0 : GET_MODE_NUNITS ((machine_mode) <MODE>mode).to_constant () - 1;
   HOST_WIDE_INT val = const_vector_elt_as_int (op1, elt);
   rtx rtx_val = GEN_INT (val);
   int shift = vspltis_shifted (op1);
@@ -3749,7 +3749,7 @@
   rtx vtmp1 = gen_reg_rtx (V4SImode);
   rtx vtmp2 = gen_reg_rtx (<MODE>mode);
   rtx dest = gen_lowpart (V4SImode, vtmp2);
-  int elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (<MODE>mode) - 1 : 0;
+  int elt = BYTES_BIG_ENDIAN ? GET_MODE_NUNITS (<MODE>mode).to_constant () - 1 : 0;
 
   emit_insn (gen_altivec_vspltisw (vzero, const0_rtx));
   emit_insn (gen_altivec_vsum4s<VI_char>s (vtmp1, operands[1], vzero));
@@ -4247,7 +4247,7 @@
   rtx mask = gen_reg_rtx (V16QImode);
 
   size = GET_MODE_UNIT_SIZE (<MODE>mode);
-  num_elements = GET_MODE_NUNITS (<MODE>mode);
+  num_elements = GET_MODE_NUNITS (<MODE>mode).to_constant ();
 
   for (j = 0; j < num_elements; j++)
     for (i = 0; i < size; i++)

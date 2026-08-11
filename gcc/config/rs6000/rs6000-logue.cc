@@ -761,13 +761,13 @@ rs6000_stack_info (void)
   /* Determine various sizes.  */
   info->reg_size     = reg_size;
   info->fixed_size   = RS6000_SAVE_AREA;
-  info->vars_size    = RS6000_ALIGN (get_frame_size (), 8);
+  info->vars_size    = RS6000_ALIGN (get_frame_size ().to_constant (), 8);
   if (cfun->calls_alloca)
     info->parm_size  =
-      RS6000_ALIGN (crtl->outgoing_args_size + info->fixed_size,
+      RS6000_ALIGN (crtl->outgoing_args_size.to_constant () + info->fixed_size,
 		    STACK_BOUNDARY / BITS_PER_UNIT) - info->fixed_size;
   else
-    info->parm_size  = RS6000_ALIGN (crtl->outgoing_args_size,
+    info->parm_size  = RS6000_ALIGN (crtl->outgoing_args_size.to_constant (),
 				     TARGET_ALTIVEC ? 16 : 8);
   if (FRAME_GROWS_DOWNWARD)
     info->vars_size
@@ -2411,7 +2411,7 @@ rs6000_emit_savres_rtx (rs6000_stack_t *info,
 {
   int i;
   int offset, start_reg, end_reg, n_regs, use_reg;
-  int reg_size = GET_MODE_SIZE (reg_mode);
+  int reg_size = GET_MODE_SIZE (reg_mode).to_constant ();
   rtx sym;
   rtvec p;
   rtx par;
@@ -5443,7 +5443,7 @@ rs6000_output_function_epilogue (FILE *file)
 		    }
 		  else
 		    {
-		      fixed_parms += ((GET_MODE_SIZE (mode)
+		      fixed_parms += ((GET_MODE_SIZE (mode).to_constant ()
 				       + (UNITS_PER_WORD - 1))
 				      / UNITS_PER_WORD);
 		      next_parm_info_bit -= 1;

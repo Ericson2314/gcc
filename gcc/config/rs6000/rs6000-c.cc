@@ -1388,7 +1388,7 @@ resolve_vec_extract (resolution *res, vec<tree, va_gc> *arglist,
   if (VECTOR_MEM_VSX_P (mode))
     {
       tree call = NULL_TREE;
-      int nunits = GET_MODE_NUNITS (mode);
+      int nunits = GET_MODE_NUNITS (mode).to_constant ();
       arg2 = fold_for_warn (arg2);
 
       /* If the second argument is an integer constant, generate
@@ -1566,7 +1566,7 @@ resolve_vec_insert (resolution *res, vec<tree, va_gc> *arglist,
        VIEW_CONVERT_EXPR<int[4]>(D.3192)[_1] = i;
        v1 = D.3192;
        D.3194 = v1;  */
-  if (TYPE_VECTOR_SUBPARTS (arg1_type) == 1)
+  if (known_eq (TYPE_VECTOR_SUBPARTS (arg1_type), 1))
     arg2 = build_int_cst (TREE_TYPE (arg2), 0);
   else
     {
@@ -2042,8 +2042,8 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
 	/* If any supplied arguments are wider than 32 bits, resolve to
 	   64-bit variant of built-in function.  */
-	if (GET_MODE_PRECISION (arg1_mode) > 32
-	    || GET_MODE_PRECISION (arg2_mode) > 32)
+	if (known_gt (GET_MODE_PRECISION (arg1_mode), 32)
+	    || known_gt (GET_MODE_PRECISION (arg2_mode), 32))
 	  /* Assure all argument and result types are compatible with
 	     the built-in function represented by RS6000_BIF_CMPB.  */
 	  instance_code = RS6000_BIF_CMPB;
@@ -2064,7 +2064,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
 	/* If supplied first argument is wider than 64 bits, resolve to
 	   128-bit variant of built-in function.  */
-	if (GET_MODE_PRECISION (arg1_mode) > 64)
+	if (known_gt (GET_MODE_PRECISION (arg1_mode), 64))
 	  {
 	    /* If first argument is of float variety, choose the variant that
 	       expects __ieee128 argument.  If the first argument is vector
