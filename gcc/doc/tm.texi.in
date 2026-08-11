@@ -7011,11 +7011,14 @@ is referenced by a function.
 Here are macros for VMS debug format.
 
 @defmac VMS_DEBUGGING_INFO
-Define this macro if GCC should produce debugging output for VMS
-in response to the @option{-g} option.  The default behavior for VMS
-is to generate minimal debug info for a traceback in the absence of
-@option{-g} unless explicitly overridden with @option{-g0}.  This
-behavior is controlled by @code{TARGET_OPTION_OPTIMIZATION} and
+This macro no longer exists.  Whether GCC produces debugging output for VMS
+in response to the @option{-g} option is now the runtime capability
+@code{targ_caps.vms_debug}, supplied per target configuration rather than
+baked into @file{tm.h}: it is a property of the configuration and not of the
+back end, so a single back end must be able to answer both ways.  The default
+behavior for VMS is still to generate minimal debug info for a traceback in
+the absence of @option{-g} unless explicitly overridden with @option{-g0},
+controlled by @code{TARGET_OPTION_OPTIMIZATION} and
 @code{TARGET_OPTION_OVERRIDE}.
 @end defmac
 

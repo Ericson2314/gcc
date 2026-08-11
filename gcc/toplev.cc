@@ -1493,10 +1493,17 @@ process_options ()
   else if (btf_debuginfo_p ())
     debug_hooks = &dwarf2_debug_hooks;
 #endif
-#ifdef VMS_DEBUGGING_INFO
-  else if (write_symbols == VMS_DEBUG || write_symbols == VMS_AND_DWARF2_DEBUG)
+  /* Was `#ifdef VMS_DEBUGGING_INFO'.  `-gvms' is an ordinary target-independent
+     option in common.opt, so the only thing this arm ever decided was whether
+     this configuration can honour it -- a per-CONFIGURATION answer that a
+     compiler serving many targets has to make at runtime.  The `else' below
+     still rejects `-gvms' with "target system does not support the %qs debug
+     format" when the capability is false, which is what used to happen when
+     the macro was undefined.  */
+  else if (targ_caps.vms_debug
+	   && (write_symbols == VMS_DEBUG
+	       || write_symbols == VMS_AND_DWARF2_DEBUG))
     debug_hooks = &vmsdbg_debug_hooks;
-#endif
 #ifdef DWARF2_LINENO_DEBUGGING_INFO
   else if (write_symbols == DWARF2_DEBUG)
     debug_hooks = &dwarf2_lineno_debug_hooks;

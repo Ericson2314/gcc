@@ -115,48 +115,35 @@ static bool is_redundant_typedef (const_tree);
 #define HAVE_XCOFF_DWARF_EXTRAS 0
 #endif
 
-/* Nonzero when this target emits VMS Debug information alongside DWARF.
-
-   This is the ONLY place in this file that tests VMS_DEBUGGING_INFO, and
-   DWARF2_VMS_DEBUG is always spelled as a VALUE -- `#if DWARF2_VMS_DEBUG`,
-   never `#ifdef`.  That is deliberate and it is load-bearing.
-
-   VMS_DEBUGGING_INFO has no default definition anywhere in GCC, and this
-   file used to test it BOTH ways: ten `#ifdef` sites and six `#if` sites.
-   Giving it the obvious default (`#ifndef VMS_DEBUGGING_INFO / #define
-   VMS_DEBUGGING_INFO 0`) would have been silently catastrophic, because
-   `#ifdef` is TRUE for a macro defined to 0 -- every one of those ten sites
-   would have switched ON for every target, while the six `#if` sites stayed
-   correctly off.  config/vx-common.h:100 `#undef`s the macro, which only
-   makes sense against `#ifdef` semantics, so both spellings were live.
-
-   A single-spelling value macro cannot be got wrong that way: there is
-   nothing to default, and `#ifdef DWARF2_VMS_DEBUG` is never written.  */
-#ifdef VMS_DEBUGGING_INFO
-#define DWARF2_VMS_DEBUG 1
-#else
-#define DWARF2_VMS_DEBUG 0
-#endif
-
 /* Defined in vmsdbgout.cc, outside that file's VMS_DEBUGGING_INFO gate so that
    it exists on every target: the call sites below are a runtime test on
    targ_caps.vms_debug, so the symbol has to resolve whether or not it is ever
    called.  */
 int vms_file_stats_name (const char *, long long *, long *, char *, int *);
 
-#if DWARF2_VMS_DEBUG
-/* Define this macro to be a nonzero value if the directory specifications
-    which are output in the debug info should end with a separator.  */
-#define DWARF2_DIR_SHOULD_END_WITH_SEPARATOR 1
-/* Define this macro to evaluate to a nonzero value if GCC should refrain
-   from generating indirect strings in DWARF2 debug information, for instance
-   if your target is stuck with an old version of GDB that is unable to
-   process them properly or uses VMS Debug.  */
-#define DWARF2_INDIRECT_STRING_SUPPORT_MISSING_ON_TARGET 1
-#else
-#define DWARF2_DIR_SHOULD_END_WITH_SEPARATOR 0
-#define DWARF2_INDIRECT_STRING_SUPPORT_MISSING_ON_TARGET 0
-#endif
+/* Whether this target emits VMS Debug information alongside DWARF used to be
+   the preprocessor macro DWARF2_VMS_DEBUG, derived from `#ifdef
+   VMS_DEBUGGING_INFO'.  It is now targ_caps.vms_debug, read at runtime, and
+   nothing in this file tests VMS_DEBUGGING_INFO any more.
+
+   VMS_DEBUGGING_INFO is a property of the CONFIGURATION, not of the back end:
+   config/alpha serves five triple families and only alpha*-dec-*vms* includes
+   vms.h, so one alpha back end needs both answers.  A compile-time macro
+   coming out of tm.h cannot express that; targ_caps can.
+
+   The default is false and that matters.  Guessing true corrupts the DWARF 5
+   line table for every other target, and it does so SILENTLY: the extra
+   DW_LNCT_timestamp/DW_LNCT_size format pairs would be read by a consumer as
+   file entries.
+
+   Nonzero if the directory specifications output in the debug info should end
+   with a separator.  */
+#define DWARF2_DIR_SHOULD_END_WITH_SEPARATOR (targ_caps.vms_debug)
+
+/* Nonzero if GCC should refrain from generating indirect strings in DWARF2
+   debug information, for instance if your target is stuck with an old version
+   of GDB that is unable to process them properly or uses VMS Debug.  */
+#define DWARF2_INDIRECT_STRING_SUPPORT_MISSING_ON_TARGET (targ_caps.vms_debug)
 
 /* ??? Poison these here until it can be done generically.  They've been
    totally replaced in this file; make sure it stays that way.  */
@@ -1184,6 +1171,11 @@ dwarf2out_vms_end_prologue (unsigned int line ATTRIBUTE_UNUSED,
 {
   char label[MAX_ARTIFICIAL_LABEL_BYTES];
 
+  /* Registered unconditionally in dwarf2_debug_hooks; the VMS test that used
+     to select the hook is here instead.  */
+  if (!targ_caps.vms_debug)
+    return;
+
   /* Output a label to mark the endpoint of the code generated for this
      function.  */
   ASM_GENERATE_INTERNAL_LABEL (label, PROLOGUE_END_LABEL,
@@ -1201,9 +1193,15 @@ void
 dwarf2out_vms_begin_epilogue (unsigned int line ATTRIBUTE_UNUSED,
 			  const char *file ATTRIBUTE_UNUSED)
 {
-  dw_fde_ref fde = cfun->fde;
+  dw_fde_ref fde;
   char label[MAX_ARTIFICIAL_LABEL_BYTES];
 
+  /* Registered unconditionally in dwarf2_debug_hooks; the VMS test that used
+     to select the hook is here instead.  */
+  if (!targ_caps.vms_debug)
+    return;
+
+  fde = cfun->fde;
   if (fde->dw_fde_vms_begin_epilogue)
     return;
 
@@ -2934,13 +2932,12 @@ const struct gcc_debug_hooks dwarf2_debug_hooks =
   dwarf2out_source_line,
   dwarf2out_set_ignored_loc,
   dwarf2out_begin_prologue,
-#if DWARF2_VMS_DEBUG
+  /* These two used to be swapped for debug_nothing_int_charstar under
+     `#if DWARF2_VMS_DEBUG'.  A static initializer needs a constant, so the
+     runtime test moved INSIDE the two functions, which now return
+     immediately unless targ_caps.vms_debug.  */
   dwarf2out_vms_end_prologue,
   dwarf2out_vms_begin_epilogue,
-#else
-  debug_nothing_int_charstar,
-  debug_nothing_int_charstar,
-#endif
   dwarf2out_end_epilogue,
   dwarf2out_begin_function,
   dwarf2out_end_function,	/* end_function */
@@ -4025,10 +4022,8 @@ static void prune_unused_types (void);
 static int maybe_emit_file (struct dwarf_file_data *fd);
 static inline const char *AT_vms_delta1 (dw_attr_node *);
 static inline const char *AT_vms_delta2 (dw_attr_node *);
-#if DWARF2_VMS_DEBUG
 static inline void add_AT_vms_delta (dw_die_ref, enum dwarf_attribute,
 				     const char *, const char *);
-#endif
 static void append_entry_to_tmpl_value_parm_die_table (dw_die_ref, tree);
 static void gen_remaining_tmpl_value_param_die_attribute (void);
 static bool generic_type_p (tree);
@@ -5313,8 +5308,8 @@ AT_file (dw_attr_node *a)
   return a->dw_attr_val.v.val_file;
 }
 
-#if DWARF2_VMS_DEBUG
-/* Add a vms delta attribute value to a DIE.  */
+/* Add a vms delta attribute value to a DIE.  Compiled on every target now
+   that its caller is a runtime test on targ_caps.vms_debug.  */
 
 static inline void
 add_AT_vms_delta (dw_die_ref die, enum dwarf_attribute attr_kind,
@@ -5329,7 +5324,6 @@ add_AT_vms_delta (dw_die_ref die, enum dwarf_attribute attr_kind,
   attr.dw_attr_val.v.val_vms_delta.lbl2 = xstrdup (lbl2);
   add_dwarf_attr (die, &attr);
 }
-#endif
 
 /* Add a symbolic view identifier attribute value to a DIE.  */
 
@@ -22538,16 +22532,15 @@ add_name_and_src_coords_attributes (dw_die_ref die, tree decl,
   else
     add_desc_attribute (die, decl);
 
-#if DWARF2_VMS_DEBUG
   /* Get the function's name, as described by its RTL.  This may be different
      from the DECL_NAME name used in the source file.  */
-  if (TREE_CODE (decl) == FUNCTION_DECL && TREE_ASM_WRITTEN (decl))
+  if (targ_caps.vms_debug
+      && TREE_CODE (decl) == FUNCTION_DECL && TREE_ASM_WRITTEN (decl))
     {
       add_AT_addr (die, DW_AT_VMS_rtnbeg_pd_address,
                   XEXP (DECL_RTL (decl), 0), false);
       vec_safe_push (used_rtx_array, XEXP (DECL_RTL (decl), 0));
     }
-#endif /* DWARF2_VMS_DEBUG */
 }
 
 /* Add VALUE as a DW_AT_discr_value attribute to DIE.  */
@@ -22588,8 +22581,9 @@ AT_discr_list (dw_attr_node *attr)
   return attr->dw_attr_val.v.val_discr_list;
 }
 
-#if DWARF2_VMS_DEBUG
-/* Output the debug main pointer die for VMS */
+/* Output the debug main pointer die for VMS.  Compiled on every target; the
+   only caller, config/vms/vms.cc:vms_start_function, is itself gated on
+   targ_caps.vms_debug.  */
 
 void
 dwarf2out_vms_debug_main_pointer (void)
@@ -22617,7 +22611,6 @@ dwarf2out_vms_debug_main_pointer (void)
       comp_unit_die ()->die_child = die;
     }
 }
-#endif /* DWARF2_VMS_DEBUG */
 
 /* walk_tree helper function for uses_local_type, below.  */
 
@@ -24326,7 +24319,6 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
                                  false);
 	    }
 
-#if DWARF2_VMS_DEBUG
       /* HP OpenVMS Industry Standard 64: DWARF Extensions
 	 Section 2.3 Prologue and Epilogue Attributes:
 	 When a breakpoint is set on entry to a function, it is generally
@@ -24339,16 +24331,16 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	 breakpoint set on exit from a function. The prologue and epilogue
 	 attributes allow a compiler to communicate the location(s) to use.  */
 
-      {
-        if (fde->dw_fde_vms_end_prologue)
-          add_AT_vms_delta (subr_die, DW_AT_HP_prologue,
-	    fde->dw_fde_begin, fde->dw_fde_vms_end_prologue);
+      if (targ_caps.vms_debug)
+	{
+	  if (fde->dw_fde_vms_end_prologue)
+	    add_AT_vms_delta (subr_die, DW_AT_HP_prologue,
+	      fde->dw_fde_begin, fde->dw_fde_vms_end_prologue);
 
-        if (fde->dw_fde_vms_begin_epilogue)
-          add_AT_vms_delta (subr_die, DW_AT_HP_epilogue,
-	    fde->dw_fde_begin, fde->dw_fde_vms_begin_epilogue);
-      }
-#endif
+	  if (fde->dw_fde_vms_begin_epilogue)
+	    add_AT_vms_delta (subr_die, DW_AT_HP_epilogue,
+	      fde->dw_fde_begin, fde->dw_fde_vms_begin_epilogue);
+	}
 
 	}
       else

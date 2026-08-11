@@ -437,9 +437,17 @@ extern void debug_dwarf_loc_descr (dw_loc_descr_ref);
 extern void debug (die_struct &ref);
 extern void debug (die_struct *ptr);
 extern void dwarf2out_set_demangle_name_func (const char *(*) (const char *));
-#ifdef VMS_DEBUGGING_INFO
+/* Special VMS debugger symbol recording the entry point.  This was
+   VMS_DEBUG_MAIN_POINTER in config/vms/vms.h, and it had to move with the
+   block that uses it: dwarf2out_vms_debug_main_pointer is now compiled on
+   every target, so a name visible only through a VMS tm.h no longer works.
+   The string is a fixed part of the VMS debug format, not a target choice.  */
+#define VMS_DEBUG_MAIN_POINTER "TRANSFER$BREAK$GO"
+
+/* Declared unconditionally: the definition is no longer behind
+   VMS_DEBUGGING_INFO, and the caller decides at runtime via
+   targ_caps.vms_debug.  */
 extern void dwarf2out_vms_debug_main_pointer (void);
-#endif
 
 enum array_descr_ordering
 {

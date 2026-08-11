@@ -24,7 +24,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 
-#ifdef VMS_DEBUGGING_INFO
+/* Everything below used to sit inside `#ifdef VMS_DEBUGGING_INFO', so on every
+   non-VMS target this file compiled to almost nothing and `vmsdbg_debug_hooks'
+   did not exist.  That is why toplev.cc had to spell its `-gvms' arm as an
+   `#ifdef' too.
+
+   Whether a configuration wants VMS Debug output is now targ_caps.vms_debug,
+   read at runtime, so the hooks table has to exist on every target.  Nothing
+   in the gated region needed a VMS tm.h: the assembler pseudo-ops it uses
+   (VMS_UNALIGNED_*_ASM_OP, ASM_OUTPUT_DEBUG_*) are all defined in this file
+   with `#ifndef' defaults, and the file compiles clean for x86_64-linux.  */
+
 #include "alias.h"
 #include "tree.h"
 #include "varasm.h"
@@ -243,7 +253,7 @@ const struct gcc_debug_hooks vmsdbg_debug_hooks
 
 /* Definitions of defaults for formats and names of various special
    (artificial) labels which may be generated within this file (when the -g
-   options is used and VMS_DEBUGGING_INFO is in effect.  If necessary, these
+   options is used and targ_caps.vms_debug is set).  If necessary, these
    may be overridden from within the tm.h file, but typically, overriding these
    defaults is unnecessary.  */
 
@@ -1620,21 +1630,16 @@ vmsdbgout_finish (const char *filename ATTRIBUTE_UNUSED)
   write_modend (0);
 }
 
-#endif /* VMS_DEBUGGING_INFO */
-
 /* Need for both Dwarf2 on IVMS and VMS Debug on AVMS.
 
-   Everything below this point is deliberately OUTSIDE the VMS_DEBUGGING_INFO
-   gate, and the comment above is why: `vms_file_stats_name' is called by
-   dwarf2out.cc (the IVMS/DWARF path) as well as by this file (the AVMS/VMS
-   Debug path).  It was inside the gate, so it only existed when the target
-   was a VMS one -- which happened to work only because dwarf2out.cc's callers
-   were behind the very same macro.  Making that call site a runtime test needs
-   the symbol to exist on every target, so the gate closes here instead.
+   `vms_file_stats_name' is called by dwarf2out.cc (the IVMS/DWARF path) as
+   well as by this file (the AVMS/VMS Debug path).  It used to sit inside the
+   VMS_DEBUGGING_INFO gate, so it only existed when the target was a VMS one --
+   which happened to work only because dwarf2out.cc's callers were behind the
+   very same macro.  The gate is gone from this file entirely now.
 
-   Nothing between here and the end of the file depends on VMS_DEBUGGING_INFO:
-   the machinery is selected by `VMS', which is a HOST macro (are we running on
-   OpenVMS?), and the non-VMS host branch is ordinary `stat'.  */
+   What still varies here is `VMS', which is a HOST macro (are we running on
+   OpenVMS?), not a target one; the non-VMS host branch is ordinary `stat'.  */
 
 #ifdef VMS
 #define __NEW_STARLET 1

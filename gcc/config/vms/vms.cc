@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+#include "target-caps.h"
 #include "tree.h"
 #include "stringpool.h"
 #include "alias.h"
@@ -300,8 +301,11 @@ vms_function_section (tree decl ATTRIBUTE_UNUSED,
 void
 vms_start_function (const char *fnname)
 {
-#if VMS_DEBUGGING_INFO
-  if (vms_debug_main
+  /* Was `#if VMS_DEBUGGING_INFO'.  Whether VMS Debug info is emitted is a
+     property of the configuration, not of this back end, so it is read from
+     targ_caps at runtime.  VMS_DEBUG_MAIN_POINTER now comes from dwarf2out.h.  */
+  if (targ_caps.vms_debug
+      && vms_debug_main
       && debug_info_level > DINFO_LEVEL_NONE
       && startswith (vms_debug_main, fnname))
     {
@@ -310,7 +314,6 @@ vms_start_function (const char *fnname)
       dwarf2out_vms_debug_main_pointer ();
       vms_debug_main = 0;
     }
-#endif
 
   /* Registers flags used for function main.  This is necessary for
      crt0 code.  */

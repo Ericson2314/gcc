@@ -84,8 +84,10 @@ extern void vms_c_register_includes (const char *, const char *, int);
 /* No libm on VMS.  */
 #define MATH_LIBRARY ""
 
-/* Special VMS debugger symbol to record the entry point.  */
-#define VMS_DEBUG_MAIN_POINTER "TRANSFER$BREAK$GO"
+/* VMS_DEBUG_MAIN_POINTER used to be defined here.  It moved to dwarf2out.h
+   with the code that uses it: dwarf2out_vms_debug_main_pointer no longer sits
+   behind VMS_DEBUGGING_INFO, so it cannot see a name that only a VMS tm.h
+   defines.  */
 
 #undef TARGET_LIBC_HAS_FUNCTION
 #define TARGET_LIBC_HAS_FUNCTION no_c99_libc_has_function
