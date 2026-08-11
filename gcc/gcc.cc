@@ -1291,6 +1291,16 @@ static const char *link_no_as_needed = "";
 static const char *link_static = "-Bstatic";
 static const char *link_dynamic = "-Bdynamic";
 
+/* How to hand -mrelax to the assembler.  Referenced from loongarch's ASM_SPEC
+   and by nothing else; written by target-specs from a probe of the real
+   assembler.  The default is the opt-in form -- ask the assembler for nothing
+   unless the user says -mpass-mrelax-to-as -- which is what the dead
+   `#if HAVE_AS_MRELAX_OPTION' ladder produced on every target that was not the
+   one GCC happened to be configured for.  */
+static const char *asm_mrelax
+  = "%{mpass-mrelax-to-as:%{mrelax} %{mno-relax} "
+    "%{!mrelax:%{!mno-relax:-mno-relax}}}";
+
 /* How to hand the LTO plugin to the linker.  Written by target-specs, which
    asks the linker whether it takes -plugin at all and, if so, whether to use
    it by default or only under an explicit -fuse-linker-plugin.  The default is
@@ -1794,6 +1804,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("link_no_as_needed",	&link_no_as_needed),
   INIT_STATIC_SPEC ("link_static",		&link_static),
   INIT_STATIC_SPEC ("link_dynamic",		&link_dynamic),
+  INIT_STATIC_SPEC ("asm_mrelax",		&asm_mrelax),
   INIT_STATIC_SPEC ("link_plugin",		&link_plugin),
   INIT_STATIC_SPEC ("lto_plugin",		&lto_plugin_spec),
   INIT_STATIC_SPEC ("cplusplus_cpp",		&cplusplus_cpp),
@@ -7051,6 +7062,28 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		    break;
 		  }
 
+	      /* AN UNKNOWN NAME EXPANDS TO NOTHING, AND THAT SILENCE IS
+		 ARCHITECTURAL RATHER THAN AN OVERSIGHT.  There is no else
+		 branch here and there cannot usefully be one: specs are
+		 composed from several packages, and a name this driver has
+		 never heard of is routinely supplied later by a spec file that
+		 libsanitizer, libitm or a target's own generator writes at
+		 build time.  Diagnosing "unknown spec" at expansion time would
+		 fire on all of those.
+
+		 The cost is that a spec which is never provided -- because of
+		 a typo, or because its writer was removed -- produces a
+		 correct-looking command with a piece missing, on every
+		 compilation, forever.  `%(linker_liitle_emulation)' lived in
+		 config/arm/netbsd-eabi.h that way, emitting `-m' with no
+		 argument on every little-endian ARM NetBSD link.
+
+		 So the check has to be EXTERNAL, over the union of every
+		 provider form: INIT_STATIC_SPEC, EXTRA_SPECS, `*name:' stanzas
+		 in spec files, and generators that print such stanzas
+		 (config/avr/gen-avr-mmcu-specs.cc).  check-spec-refs.sh does
+		 the other direction -- provided but never referenced -- and
+		 the two together are what makes this construct safe.  */
 	      if (sl)
 		{
 		  value = do_spec_1 (name, 0, NULL);

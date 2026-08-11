@@ -100,6 +100,6 @@
 #undef LINK_SPEC
 #define LINK_SPEC						\
   "-X %{mbig-endian:-EB -m %(linker_big_emulation)} "		\
-  "%{mlittle-endian:-EL -m %(linker_liitle_emulation)} "	\
+  "%{mlittle-endian:-EL -m %(linker_little_emulation)} "	\
   "%{!mbig-endian:%{!mlittle-endian:-m %(linker_emulation)}} "	\
   "%(target_fix_v4bx_spec) %(netbsd_link_spec)"
