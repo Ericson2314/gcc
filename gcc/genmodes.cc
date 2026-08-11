@@ -885,6 +885,42 @@ static int bits_per_unit;
 static int max_bitsize_mode_any_int;
 static int max_bitsize_mode_any_mode;
 
+#ifdef GENMODES_UNION
+/* `MAX_BITSIZE_MODE_ANY_INT' and `MAX_BITSIZE_MODE_ANY_MODE' are plain
+   `#define's in the back ends that raise them, so reading them once after
+   including 45 modes files gives whichever file came last, not the largest.
+   That happens to be right today only because riscv's 32768 follows
+   aarch64's 8192 in alphabetical order, with a `-Wmacro-redefined' warning
+   as the sole evidence.  Nothing may depend on that.
+
+   The union input file must therefore, after each `#include', pass the
+   current values here and `#undef' them, so that each file is read on its
+   own and the largest wins:
+
+	#include "config/aarch64/aarch64-modes.def"
+	#ifdef MAX_BITSIZE_MODE_ANY_INT
+	  union_note_max_bitsize (MAX_BITSIZE_MODE_ANY_INT, 0);
+	  #undef MAX_BITSIZE_MODE_ANY_INT
+	#endif
+	...
+
+   A file that fails to report leaves the maximum to be computed from the
+   modes themselves, which is a lower bound -- the back ends that set these
+   explicitly do so precisely because their widest mode is not a bound (a
+   riscv RVV vector has no compile-time size).  */
+static int union_max_any_int;
+static int union_max_any_mode;
+
+static void ATTRIBUTE_UNUSED
+union_note_max_bitsize (int any_int, int any_mode)
+{
+  if (any_int > union_max_any_int)
+    union_max_any_int = any_int;
+  if (any_mode > union_max_any_mode)
+    union_max_any_mode = any_mode;
+}
+#endif
+
 static void
 create_modes (void)
 {
@@ -898,6 +934,14 @@ create_modes (void)
   bits_per_unit = 8;
 #endif
 
+#ifdef GENMODES_UNION
+  /* Whatever survived to here is one arbitrary file's value; the running
+     maxima above are the answer.  Zero means nobody reported, and
+     `emit_max_int' then computes a bound from the modes.  */
+  max_bitsize_mode_any_int = union_max_any_int;
+  max_bitsize_mode_any_mode = union_max_any_mode;
+#else
+
 #ifdef MAX_BITSIZE_MODE_ANY_INT
   max_bitsize_mode_any_int = MAX_BITSIZE_MODE_ANY_INT;
 #else
@@ -908,6 +952,8 @@ create_modes (void)
   max_bitsize_mode_any_mode = MAX_BITSIZE_MODE_ANY_MODE;
 #else
   max_bitsize_mode_any_mode = 0;
+#endif
+
 #endif
 }
 
