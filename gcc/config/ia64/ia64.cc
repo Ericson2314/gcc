@@ -4292,7 +4292,7 @@ ia64_hard_regno_rename_ok (int from, int to)
 /* Implement TARGET_HARD_REGNO_NREGS.
 
    ??? We say that BImode PR values require two registers.  This allows us to
-   easily store the normal and inverted values.  We use CCImode to indicate
+   easily store the normal and inverted values.  We use CC_PREDmode to indicate
    a single predicate register.  */
 
 static unsigned int
@@ -4302,7 +4302,7 @@ ia64_hard_regno_nregs (unsigned int regno, machine_mode mode)
     return 64;
   if (PR_REGNO_P (regno) && (mode) == BImode)
     return 2;
-  if ((PR_REGNO_P (regno) || GR_REGNO_P (regno)) && mode == CCImode)
+  if ((PR_REGNO_P (regno) || GR_REGNO_P (regno)) && mode == CC_PREDmode)
     return 1;
   if (FR_REGNO_P (regno) && mode == XFmode)
     return 1;
@@ -5361,9 +5361,9 @@ ia64_zero_call_used_regs (HARD_REG_SET need_zeroed_hardregs)
       {
 	rtx_insn *last_insn = get_last_insn ();
 	/* Prepare PR0 register, which is hardwired to 1 */
-	rtx zero = gen_rtx_REG (CCImode, PR_REG (0));
-	rtx regno_rtx = gen_rtx_REG (CCImode, regno);
-	enum insn_code code = optab_handler (mov_optab, CCImode);
+	rtx zero = gen_rtx_REG (CC_PREDmode, PR_REG (0));
+	rtx regno_rtx = gen_rtx_REG (CC_PREDmode, regno);
+	enum insn_code code = optab_handler (mov_optab, CC_PREDmode);
 
 	gcc_assert (code != CODE_FOR_nothing);
 

@@ -69,11 +69,11 @@ INT_MODE (OI, 32);
 
 /* Add any extra modes needed to represent the condition code.
 
-   CCImode is used to mark a single predicate register instead
+   CC_PREDmode is used to mark a single predicate register instead
    of a register pair.  This is currently only used in reg_raw_mode
    so that flow doesn't do something stupid.  */
 
-CC_MODE (CCI);
+CC_MODE (CC_PRED);
 
 /* Vector modes.  */
 VECTOR_MODES (INT, 4);		/* V4QI V2HI */

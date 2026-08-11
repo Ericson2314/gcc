@@ -421,7 +421,7 @@ while (0)
 #define LOCAL_REGNO(REGNO) \
   (IN_REGNO_P (REGNO) || LOC_REGNO_P (REGNO))
 
-/* We define CCImode in ia64-modes.def so we need a selector.  */
+/* We define CC_PREDmode in ia64-modes.def so we need a selector.  */
 
 #define SELECT_CC_MODE(OP,X,Y)  CCmode
 
