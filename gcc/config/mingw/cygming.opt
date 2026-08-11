@@ -43,7 +43,7 @@ Target
 Create GUI application.
 
 mpe-aligned-commons
-Target Var(use_pe_aligned_common) Init(HAVE_GAS_ALIGNED_COMM)
+Target Var(use_pe_aligned_common) Init(1)
 Use the GNU extension to the PE format for aligned common data.
 
 muse-libstdc-wrappers

@@ -472,9 +472,11 @@ do {						\
 
 #define STACK_CHECK_PROTECT (TARGET_64BIT ? 20 * 1024 : 12 * 1024)
 
-#ifndef HAVE_GAS_ALIGNED_COMM
-# define HAVE_GAS_ALIGNED_COMM 0
-#endif
+/* HAVE_GAS_ALIGNED_COMM is gone.  It existed only to seed Init() on
+   -mpe-aligned-commons, and Init() needs a compile-time constant, so the option
+   now defaults to 1 outright -- every binutils PE assembler GCC supports takes
+   the three-operand `.comm'.  An older one is handled with
+   -mno-pe-aligned-commons.  */
 
 #define PE_COFF_LEGITIMIZE_EXTERN_DECL(RTX) \
   (ix86_cmodel == CM_LARGE_PIC || ix86_cmodel == CM_MEDIUM_PIC)

@@ -104,6 +104,16 @@ along with GCC; see the file COPYING3.  If not see
   --wrap _ZdaPvRKSt9nothrow_t \
 "
 
+/* Was an AC_DEFINE from a configure probe that ran AC_CHECK_FUNC(__wrap__Znaj)
+   against the BUILD host, and could only do so when host == target == i686
+   cygwin; every cross build simply assumed yes.  The macro feeds
+   CXX_WRAP_SPEC_OPT, which is concatenated into the CXX_WRAP_SPEC string
+   literal below, and an existence test in mingw/cygming.opt -- neither can be a
+   runtime value.  So it takes the answer every cross build already got.  */
+#ifndef USE_CYGWIN_LIBSTDCXX_WRAPPERS
+#define USE_CYGWIN_LIBSTDCXX_WRAPPERS 1
+#endif
+
 #if defined (USE_CYGWIN_LIBSTDCXX_WRAPPERS)
 
 #if USE_CYGWIN_LIBSTDCXX_WRAPPERS

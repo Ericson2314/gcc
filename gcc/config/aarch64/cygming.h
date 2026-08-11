@@ -235,7 +235,8 @@ still needed for compilation.  */
 /* Define this to be nonzero if static stack checking is supported.  */
 #define STACK_CHECK_STATIC_BUILTIN 1
 
-#define HAVE_GAS_ALIGNED_COMM 1
+/* HAVE_GAS_ALIGNED_COMM is gone; -mpe-aligned-commons now defaults to 1 for
+   every PE target, which is what this define was asserting.  */
 
 #undef MAX_OFILE_ALIGNMENT
 #define MAX_OFILE_ALIGNMENT (8192 * 8)
