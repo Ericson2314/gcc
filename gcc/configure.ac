@@ -584,9 +584,13 @@ dnl exactly; 0 would silently change it everywhere.  GCC_TARGET_TEMPLATE lifts
 dnl the `#ifndef USED_FOR_TARGET' guard that would otherwise keep them out of
 dnl the target-library build.  The compiler proper still gets the runtime value:
 dnl defaults.h #undefs both and redefines them in terms of targ_caps.
-GCC_TARGET_TEMPLATE([HAVE_GAS_HIDDEN])
-AC_DEFINE(HAVE_GAS_HIDDEN, 1,
-  [Define if your assembler and linker support .hidden.])
+dnl HAVE_GAS_HIDDEN is gone from here entirely.  The compiler proper reads
+dnl targ_caps.gas_hidden (defaults.h), so this AC_DEFINE existed for exactly one
+dnl reason: to push a value across GCC_TARGET_TEMPLATE into libgcc, which had no
+dnl probe of its own.  libgcc/configure.ac now has one -- and a better one, since
+dnl it runs the assembler that will actually assemble libgcc's objects.
+dnl Consumers were libgcc's crtstuff.c, libgcc2.c, libgcov.h, offloadstuff.c and
+dnl the visium and stormy16 lib2funcs; none in gcc/.
 GCC_TARGET_TEMPLATE([HAVE_LD_RO_RW_SECTION_MIXING])
 AC_DEFINE(HAVE_LD_RO_RW_SECTION_MIXING, 1,
   [Define if your linker links a mix of read-only

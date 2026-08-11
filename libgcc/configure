@@ -4738,6 +4738,72 @@ fi
 done
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports .hidden" >&5
+$as_echo_n "checking whether the assembler supports .hidden... " >&6; }
+if ${libgcc_cv_as_hidden+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  case "$host" in
+    *-*-darwin*)
+                  libgcc_cv_as_hidden=yes ;;
+    *-*-aix*)
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+__asm__ (".globl foobar,hidden");
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  libgcc_cv_as_hidden=yes
+else
+  libgcc_cv_as_hidden=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext ;;
+    *)
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+__asm__ (".hidden foobar\nfoobar:");
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  libgcc_cv_as_hidden=yes
+else
+  libgcc_cv_as_hidden=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext ;;
+  esac
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_as_hidden" >&5
+$as_echo "$libgcc_cv_as_hidden" >&6; }
+if test x$libgcc_cv_as_hidden = xyes; then
+
+$as_echo "#define HAVE_GAS_HIDDEN 1" >>confdefs.h
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the assembler supports .weak" >&5
+$as_echo_n "checking whether the assembler supports .weak... " >&6; }
+if ${libgcc_cv_as_weak+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+__asm__ (".weak foobar");
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  libgcc_cv_as_weak=yes
+else
+  libgcc_cv_as_weak=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_as_weak" >&5
+$as_echo "$libgcc_cv_as_weak" >&6; }
+if test x$libgcc_cv_as_weak = xyes; then
+
+$as_echo "#define HAVE_GAS_WEAK 1" >>confdefs.h
+
+fi
+
 case "$host" in
   *-*-dragonfly* | *-*-freebsd*)
     cat confdefs.h - <<_ACEOF >conftest.$ac_ext

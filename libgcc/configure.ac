@@ -244,6 +244,43 @@ dnl against.  AC_CHECK_HEADERS spells it HAVE_SYS_SDT_H, which is exactly the
 dnl name unwind-dw2.c and unwind-arm-common.inc already test.
 AC_CHECK_HEADERS(sys/sdt.h)
 
+dnl Assembler capabilities this library needs for its own code generation.
+dnl
+dnl These used to come from gcc's auto-host.h through tconfig.h, and by the end
+dnl HAVE_GAS_HIDDEN was not even probed there -- gcc/configure AC_DEFINE'd it to
+dnl a flat 1, with a comment saying so, because the compiler proper had moved to
+dnl the runtime targ_caps.gas_hidden and the only remaining reader was this
+dnl library.  A constant 1 is a guess that happens to be right on every host GCC
+dnl currently builds on; it is not an answer.
+dnl
+dnl Asking here is strictly better than asking in gcc/ ever was: $CC is the
+dnl compiler that will actually build this library, so the probe drives the very
+dnl assembler the objects will go through, rather than the one gcc's configure
+dnl happened to find.
+AC_CACHE_CHECK([whether the assembler supports .hidden], [libgcc_cv_as_hidden], [
+  case "$host" in
+    *-*-darwin*)
+      dnl Darwin's assembler has visibility, spelled differently; the directive
+      dnl probe would say no and take .hidden away from a target that has it.
+      libgcc_cv_as_hidden=yes ;;
+    *-*-aix*)
+      AC_COMPILE_IFELSE([AC_LANG_SOURCE([[__asm__ (".globl foobar,hidden");]])],
+			[libgcc_cv_as_hidden=yes], [libgcc_cv_as_hidden=no]) ;;
+    *)
+      AC_COMPILE_IFELSE([AC_LANG_SOURCE([[__asm__ (".hidden foobar\nfoobar:");]])],
+			[libgcc_cv_as_hidden=yes], [libgcc_cv_as_hidden=no]) ;;
+  esac])
+if test x$libgcc_cv_as_hidden = xyes; then
+  AC_DEFINE(HAVE_GAS_HIDDEN, 1, [Define if your assembler supports .hidden.])
+fi
+
+AC_CACHE_CHECK([whether the assembler supports .weak], [libgcc_cv_as_weak], [
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([[__asm__ (".weak foobar");]])],
+		    [libgcc_cv_as_weak=yes], [libgcc_cv_as_weak=no])])
+if test x$libgcc_cv_as_weak = xyes; then
+  AC_DEFINE(HAVE_GAS_WEAK, 1, [Define if your assembler supports .weak.])
+fi
+
 dnl The BSDs are the only ones that need looking at: elsewhere the answer
 dnl follows from the C library, and on Solaris and musl it is unconditional.
 dnl A separate cache variable rather than an AC_EGREP_HEADER nested inside an
