@@ -20,6 +20,12 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_CALLS_H
 #define GCC_CALLS_H
 
+/* For cumulative_args_t and pack_cumulative_args.  See the note by
+   pass_by_reference below for why the interface is in terms of the opaque
+   wrapper and not CUMULATIVE_ARGS, which is a different type in every back
+   end and therefore a different mangled name in every back end.  */
+#include "target.h"
+
 /* Describes a function argument.
 
    Each argument conceptually has a gimple-level type.  Usually this type
@@ -124,12 +130,50 @@ extern bool shift_return_value (machine_mode, bool, rtx);
 extern rtx expand_call (tree, rtx, int);
 extern void fixup_tail_calls (void);
 
-extern bool pass_by_reference (CUMULATIVE_ARGS *, function_arg_info);
+/* These three take cumulative_args_t rather than CUMULATIVE_ARGS *, and the
+   difference is not cosmetic.  CUMULATIVE_ARGS is a per-target type -- a
+   `struct ix86_args' on i386, an anonymous struct given the name by typedef on
+   aarch64 -- so `apply_pass_by_reference_rules (CUMULATIVE_ARGS *, ...)'
+   MANGLES DIFFERENTLY in every back end.  calls.cc, compiled once against the
+   primary's tm.h, defined the i386 spelling; aarch64.cc called the aarch64
+   one; the link failed with
+
+     undefined reference to
+       apply_pass_by_reference_rules(CUMULATIVE_ARGS*, function_arg_info&)
+
+   which reads as a missing object and is nothing of the kind.  cumulative_args_t
+   is target.h's opaque wrapper and exists for exactly this: it is one type in
+   every back end.
+
+   The CUMULATIVE_ARGS * overloads below keep all thirty-odd existing call
+   sites -- most of them in config/, which this project does not edit -- saying
+   what they already say.  They are inline, so they add no symbol and no
+   per-target name.  */
+extern bool pass_by_reference (cumulative_args_t, function_arg_info);
 extern bool pass_va_arg_by_reference (tree);
-extern bool apply_pass_by_reference_rules (CUMULATIVE_ARGS *,
+extern bool apply_pass_by_reference_rules (cumulative_args_t,
 					   function_arg_info &);
-extern bool reference_callee_copied (CUMULATIVE_ARGS *,
+extern bool reference_callee_copied (cumulative_args_t,
 				     const function_arg_info &);
+
+inline bool
+pass_by_reference (CUMULATIVE_ARGS *ca, function_arg_info arg)
+{
+  return pass_by_reference (pack_cumulative_args (ca), arg);
+}
+
+inline bool
+apply_pass_by_reference_rules (CUMULATIVE_ARGS *ca, function_arg_info &arg)
+{
+  return apply_pass_by_reference_rules (pack_cumulative_args (ca), arg);
+}
+
+inline bool
+reference_callee_copied (CUMULATIVE_ARGS *ca, const function_arg_info &arg)
+{
+  return reference_callee_copied (pack_cumulative_args (ca), arg);
+}
+
 extern void maybe_complain_about_tail_call (tree, const char *);
 
 extern rtx rtx_for_static_chain (const_tree, bool);

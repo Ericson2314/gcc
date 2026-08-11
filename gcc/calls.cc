@@ -936,7 +936,7 @@ call_expr_flags (const_tree t)
 /* Return true if ARG should be passed by invisible reference.  */
 
 bool
-pass_by_reference (CUMULATIVE_ARGS *ca, function_arg_info arg)
+pass_by_reference (cumulative_args_t ca, function_arg_info arg)
 {
   if (tree type = arg.type)
     {
@@ -958,7 +958,7 @@ pass_by_reference (CUMULATIVE_ARGS *ca, function_arg_info arg)
 	}
     }
 
-  return targetm.calls.pass_by_reference (pack_cumulative_args (ca), arg);
+  return targetm.calls.pass_by_reference (ca, arg);
 }
 
 /* Return true if TYPE should be passed by reference when passed to
@@ -967,7 +967,8 @@ pass_by_reference (CUMULATIVE_ARGS *ca, function_arg_info arg)
 bool
 pass_va_arg_by_reference (tree type)
 {
-  return pass_by_reference (NULL, function_arg_info (type, /*named=*/false));
+  return pass_by_reference (pack_cumulative_args (NULL),
+			    function_arg_info (type, /*named=*/false));
 }
 
 /* Decide whether ARG, which occurs in the state described by CA,
@@ -975,7 +976,7 @@ pass_va_arg_by_reference (tree type)
    ARG accordingly.  */
 
 bool
-apply_pass_by_reference_rules (CUMULATIVE_ARGS *ca, function_arg_info &arg)
+apply_pass_by_reference_rules (cumulative_args_t ca, function_arg_info &arg)
 {
   if (pass_by_reference (ca, arg))
     {
@@ -991,11 +992,11 @@ apply_pass_by_reference_rules (CUMULATIVE_ARGS *ca, function_arg_info &arg)
    copied instead of caller copied.  */
 
 bool
-reference_callee_copied (CUMULATIVE_ARGS *ca, const function_arg_info &arg)
+reference_callee_copied (cumulative_args_t ca, const function_arg_info &arg)
 {
   if (arg.type && TREE_ADDRESSABLE (arg.type))
     return false;
-  return targetm.calls.callee_copies (pack_cumulative_args (ca), arg);
+  return targetm.calls.callee_copies (ca, arg);
 }
 
 
