@@ -228,7 +228,7 @@ output_prologue (void)
   printf ("#include \"varasm.h\"\n");
   printf ("#include \"stor-layout.h\"\n");
   printf ("#include \"calls.h\"\n");
-  printf ("#include \"insn-config.h\"\n");
+  print_gen_include (stdout, "insn-config");
   printf ("#include \"expmed.h\"\n");
   printf ("#include \"dojump.h\"\n");
   printf ("#include \"explow.h\"\n");
@@ -236,16 +236,17 @@ output_prologue (void)
   printf ("#include \"emit-rtl.h\"\n");
   printf ("#include \"stmt.h\"\n");
   printf ("#include \"expr.h\"\n");
-  printf ("#include \"insn-codes.h\"\n");
-  printf ("#include \"tm_p.h\"\n");
+  print_gen_include (stdout, "insn-codes");
+  print_gen_include (stdout, "tm_p");
   printf ("#include \"regs.h\"\n");
   printf ("#include \"conditions.h\"\n");
-  printf ("#include \"insn-attr.h\"\n\n");
+  print_gen_include (stdout, "insn-attr");
+  printf ("\n");
   printf ("#include \"recog.h\"\n\n");
   printf ("#include \"diagnostic-core.h\"\n");
   printf ("#include \"output.h\"\n");
   printf ("#include \"target.h\"\n");
-  printf ("#include \"tm-constrs.h\"\n");
+  print_gen_include (stdout, "tm-constrs");
 }
 
 static void

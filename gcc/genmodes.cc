@@ -1428,6 +1428,13 @@ emit_insn_modes_inline_h (void)
 #endif /* insn-modes-inline.h */");
 }
 
+/* Multi-target: the `tm.h' this emits is NOT yet suffixed.  genmodes is built
+   per back end, but only its -h/-i/-m outputs are (insn-modes-<base>.h,
+   insn-modes-inline-<base>.h, min-insn-modes-<base>.cc); insn-modes.cc itself
+   is still produced once.  genmodes also does not link gensupport.o, so it has
+   no print_gen_include.  Whoever makes insn-modes.cc per back end must fix
+   this line at the same time.  */
+
 static void
 emit_insn_modes_c_header (void)
 {

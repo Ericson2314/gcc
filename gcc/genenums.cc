@@ -59,6 +59,13 @@ main (int argc, const char **argv)
   puts ("   from the machine description file.  */\n");
   puts ("#include \"config.h\"\n");
   puts ("#include \"system.h\"\n");
+  /* Multi-target: NOT yet suffixed with GEN_HDR_SUFFIX, because genenums is
+     still built once rather than once per back end (it is absent from the
+     parts list in gen-multi-target-md.awk).  Whoever makes insn-enums.cc
+     per back end must route this through print_gen_include at the same time:
+     its two exported tables, unspec_strings and unspecv_strings, are read by
+     the middle end, so a stale insn-constants.h here mis-numbers them
+     silently.  */
   puts ("#include \"insn-constants.h\"\n");
 
   reader.traverse_enum_types (print_enum_type, 0);

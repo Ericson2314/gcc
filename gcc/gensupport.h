@@ -23,6 +23,28 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-set.h"
 #include "read-md.h"
 
+/* Multi-target: in a multi-target build each of these programs runs once per
+   back end and writes insn-<thing>-<base>.{h,cc}, so the headers its output
+   INCLUDES must carry the same <base> suffix -- otherwise a back end's
+   generated source is compiled against some other back end's insn-config.h /
+   insn-codes.h / insn-attr.h / tm_p.h and mis-generates SILENTLY: it still
+   compiles, because the names all exist, they just describe the wrong target.
+   Which suffix to emit is settled when the generator itself is compiled, the
+   same knob as TM_H_FILE (see gen-multi-target-md.awk).  Empty, i.e. the
+   upstream names, in a single-target build.
+
+   Applies ONLY to generated headers.  Hand-written ones the output also names
+   (insn-addr.h, recog.h, ...) exist once and must not be suffixed.  */
+#ifndef GEN_HDR_SUFFIX
+#define GEN_HDR_SUFFIX ""
+#endif
+
+/* Write `#include "NAME<suffix>.h"' to OUTF.  NAME is given without the
+   ".h".  Use this for every GENERATED header a generator's output names, so
+   that adding a back end cannot leave one of them pointing at another back
+   end's file.  */
+extern void print_gen_include (FILE *outf, const char *name);
+
 struct obstack;
 extern struct obstack *rtl_obstack;
 

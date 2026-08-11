@@ -9645,30 +9645,31 @@ main (int argc, const char **argv)
       expand_automata ();
       if (!have_error)
 	{
-	  puts ("/* Generated automatically by the program `genautomata'\n"
+	  printf ("/* Generated automatically by the program `genautomata'\n"
 		"   from the machine description file `md'.  */\n\n"
 		"#define IN_TARGET_CODE 1\n"
 		"#include \"config.h\"\n"
 		"#include \"system.h\"\n"
-		"#include \"coretypes.h\"\n"
-		"#include \"tm.h\"\n"
-		"#include \"alias.h\"\n"
-		"#include \"tree.h\"\n"
-		"#include \"varasm.h\"\n"
-		"#include \"stor-layout.h\"\n"
-		"#include \"calls.h\"\n"
-		"#include \"rtl.h\"\n"
-		"#include \"memmodel.h\"\n"
-		"#include \"tm_p.h\"\n"
-		"#include \"insn-config.h\"\n"
-		"#include \"recog.h\"\n"
-		"#include \"regs.h\"\n"
-		"#include \"output.h\"\n"
-		"#include \"insn-attr.h\"\n"
+		"#include \"coretypes.h\"\n");
+	  print_gen_include (stdout, "tm");
+	  printf ("#include \"alias.h\"\n"
+		  "#include \"tree.h\"\n"
+		  "#include \"varasm.h\"\n"
+		  "#include \"stor-layout.h\"\n"
+		  "#include \"calls.h\"\n"
+		  "#include \"rtl.h\"\n"
+		  "#include \"memmodel.h\"\n");
+	  print_gen_include (stdout, "tm_p");
+	  print_gen_include (stdout, "insn-config");
+	  printf ("#include \"recog.h\"\n"
+		  "#include \"regs.h\"\n"
+		  "#include \"output.h\"\n");
+	  print_gen_include (stdout, "insn-attr");
+	  printf (
                 "#include \"diagnostic-core.h\"\n"
 		"#include \"flags.h\"\n"
 		"#include \"function.h\"\n"
-		"#include \"emit-rtl.h\"\n");
+		"#include \"emit-rtl.h\"\n\n");
 	         /* FIXME: emit-rtl.h can go away once crtl is in rtl.h.  */
 
 	  write_automata ();

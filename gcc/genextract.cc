@@ -368,10 +368,11 @@ print_header (void)
 #define IN_TARGET_CODE 1\n\
 #include \"config.h\"\n\
 #include \"system.h\"\n\
-#include \"coretypes.h\"\n\
-#include \"tm.h\"\n\
-#include \"rtl.h\"\n\
-#include \"insn-config.h\"\n\
+#include \"coretypes.h\"");
+  print_gen_include (stdout, "tm");
+  puts ("#include \"rtl.h\"");
+  print_gen_include (stdout, "insn-config");
+  puts ("\
 #include \"recog.h\"\n\
 #include \"diagnostic-core.h\"\n\
 \n\

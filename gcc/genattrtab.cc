@@ -5191,14 +5191,14 @@ write_header (FILE *outf)
   fprintf (outf, "#include \"tree.h\"\n");
   fprintf (outf, "#include \"rtl.h\"\n");
   fprintf (outf, "#include \"alias.h\"\n");
-  fprintf (outf, "#include \"options.h\"\n");
+  print_gen_include (outf, "options");
   fprintf (outf, "#include \"varasm.h\"\n");
   fprintf (outf, "#include \"stor-layout.h\"\n");
   fprintf (outf, "#include \"calls.h\"\n");
-  fprintf (outf, "#include \"insn-attr.h\"\n");
+  print_gen_include (outf, "insn-attr");
   fprintf (outf, "#include \"memmodel.h\"\n");
-  fprintf (outf, "#include \"tm_p.h\"\n");
-  fprintf (outf, "#include \"insn-config.h\"\n");
+  print_gen_include (outf, "tm_p");
+  print_gen_include (outf, "insn-config");
   fprintf (outf, "#include \"recog.h\"\n");
   fprintf (outf, "#include \"regs.h\"\n");
   fprintf (outf, "#include \"real.h\"\n");

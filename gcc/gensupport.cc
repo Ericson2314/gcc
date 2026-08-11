@@ -3967,3 +3967,11 @@ choose_output (const vec<FILE *> &parts, unsigned &idx)
   return parts[idx];
 #endif
 }
+
+/* Write `#include "NAME<suffix>.h"' to OUTF.  See gensupport.h.  */
+
+void
+print_gen_include (FILE *outf, const char *name)
+{
+  fprintf (outf, "#include \"%s%s.h\"\n", name, GEN_HDR_SUFFIX);
+}

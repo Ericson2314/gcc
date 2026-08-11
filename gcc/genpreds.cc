@@ -1876,9 +1876,10 @@ write_insn_preds_c (void)
 #include \"varasm.h\"\n\
 #include \"stor-layout.h\"\n\
 #include \"calls.h\"\n\
-#include \"memmodel.h\"\n\
-#include \"tm_p.h\"\n\
-#include \"insn-config.h\"\n\
+#include \"memmodel.h\"");
+  print_gen_include (stdout, "tm_p");
+  print_gen_include (stdout, "insn-config");
+  puts ("\
 #include \"recog.h\"\n\
 #include \"output.h\"\n\
 #include \"flags.h\"\n\
@@ -1887,9 +1888,9 @@ write_insn_preds_c (void)
 #include \"diagnostic-core.h\"\n\
 #include \"reload.h\"\n\
 #include \"regs.h\"\n\
-#include \"emit-rtl.h\"\n\
-#include \"tm-constrs.h\"\n\
-#include \"target.h\"\n");
+#include \"emit-rtl.h\"");
+  print_gen_include (stdout, "tm-constrs");
+  puts ("#include \"target.h\"\n");
 
   printf ("\n"
 	  "struct target_constraints default_target_constraints;\n"

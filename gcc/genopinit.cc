@@ -347,17 +347,20 @@ main (int argc, const char **argv)
 	   "#include \"varasm.h\"\n"
 	   "#include \"stor-layout.h\"\n"
 	   "#include \"calls.h\"\n"
-	   "#include \"memmodel.h\"\n"
-	   "#include \"tm_p.h\"\n"
-	   "#include \"flags.h\"\n"
-	   "#include \"insn-config.h\"\n"
+	   "#include \"memmodel.h\"\n");
+  print_gen_include (s_file, "tm_p");
+  fprintf (s_file,
+	   "#include \"flags.h\"\n");
+  print_gen_include (s_file, "insn-config");
+  fprintf (s_file,
 	   "#include \"expmed.h\"\n"
 	   "#include \"dojump.h\"\n"
 	   "#include \"explow.h\"\n"
 	   "#include \"emit-rtl.h\"\n"
 	   "#include \"stmt.h\"\n"
-	   "#include \"expr.h\"\n"
-	   "#include \"insn-codes.h\"\n"
+	   "#include \"expr.h\"\n");
+  print_gen_include (s_file, "insn-codes");
+  fprintf (s_file,
 	   "#include \"optabs.h\"\n"
 	   "\n"
 	   "struct optab_pat {\n"

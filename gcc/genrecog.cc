@@ -4273,10 +4273,12 @@ write_header (FILE *f, const char *header_filename)
 #include \"backend.h\"\n\
 #include \"predict.h\"\n\
 #include \"rtl.h\"\n\
-#include \"memmodel.h\"\n\
-#include \"tm_p.h\"\n\
-#include \"emit-rtl.h\"\n\
-#include \"insn-config.h\"\n\
+#include \"memmodel.h\"\n");
+  print_gen_include (f, "tm_p");
+  fprintf (f, "%s", "\
+#include \"emit-rtl.h\"\n");
+  print_gen_include (f, "insn-config");
+  fprintf (f, "%s", "\
 #include \"recog.h\"\n\
 #include \"output.h\"\n\
 #include \"flags.h\"\n\
@@ -4284,8 +4286,8 @@ write_header (FILE *f, const char *header_filename)
 #include \"resource.h\"\n\
 #include \"diagnostic-core.h\"\n\
 #include \"reload.h\"\n\
-#include \"regs.h\"\n\
-#include \"tm-constrs.h\"\n");
+#include \"regs.h\"\n");
+  print_gen_include (f, "tm-constrs");
 
   fprintf (f, "#include \"%s\"\n", header_filename);
   fprintf (f, "%s", "\n");

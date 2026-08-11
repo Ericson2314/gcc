@@ -159,7 +159,8 @@ main (int argc, const char **argv)
   puts ("#ifndef GCC_INSN_ATTR_H");
   puts ("#define GCC_INSN_ATTR_H\n");
 
-  puts ("#include \"insn-attr-common.h\"\n");
+  print_gen_include (stdout, "insn-attr-common");
+  printf ("\n");
 
   /* Read the machine description.  */
 

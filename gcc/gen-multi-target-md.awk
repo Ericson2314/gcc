@@ -121,7 +121,12 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "  errors.h $(READ_MD_H) $(GENSUPPORT_H) $(HASH_TABLE_H) $(OBSTACK_H)\n";
   printf "$(MULTI_TARGET_GEN_OBJS_%s) : BUILD_CPPFLAGS += \\\n", cpu;
   printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
-  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"'\n\n", cpu;
+  printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"' \\\n", cpu;
+  # gensupport.cc is where print_gen_include lives, so this shared library has
+  # to see the same GEN_HDR_SUFFIX as the gen*.o that call it.  Set on only one
+  # of the two and it compiles clean and emits the unsuffixed names -- a silent
+  # no-op, which is the failure mode this whole knob exists to prevent.
+  printf "  -DGEN_HDR_SUFFIX='\"-%s\"'\n\n", cpu;
 
   # The programs themselves.  Each holds a main(), so they cannot share one
   # link; they share the library above instead.  genpreds.cc additionally
@@ -141,7 +146,13 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "build/gen%s-%s.o : BUILD_CPPFLAGS += \\\n", parts[i], cpu;
     printf "  -DINSN_MODES_H='\"insn-modes-%s.h\"' \\\n", cpu;
     printf "  -DINSN_MODES_INLINE_H='\"insn-modes-inline-%s.h\"' \\\n", cpu;
-    printf "  -DTM_H_FILE='\"tm-%s.h\"'\n", cpu;
+    printf "  -DTM_H_FILE='\"tm-%s.h\"' \\\n", cpu;
+    # And the suffix these programs put on the generated headers their OUTPUT
+    # includes.  Without it a back end's insn-recog-<base>.cc is compiled
+    # against whichever insn-config.h / insn-codes.h / tm_p.h the single-target
+    # build left lying around -- it still compiles, it just describes another
+    # target.  See GEN_HDR_SUFFIX in gensupport.h.
+    printf "  -DGEN_HDR_SUFFIX='\"-%s\"'\n", cpu;
     printf "build/gen%s-%s$(build_exeext): build/gen%s-%s.o \\\n",
 	   parts[i], cpu, parts[i], cpu;
     printf "  $(MULTI_TARGET_GEN_OBJS_%s) $(BUILD_LIBDEPS)\n", cpu;
