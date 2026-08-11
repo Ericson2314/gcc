@@ -1925,14 +1925,19 @@ default_named_section_asm_out_destructor (rtx symbol, int priority)
   assemble_addr_to_section (symbol, sec);
 }
 
-#ifdef DTORS_SECTION_ASM_OP
+/* Defined unconditionally: this was #ifdef DTORS_SECTION_ASM_OP, so the
+   function existed only when the single compiled-in back end had that
+   section.  A back end selecting it must be able to find it whichever other
+   back ends share the binary.  dtors_section is null exactly when the hook
+   is, so assert rather than let a null reach assemble_addr_to_section.  */
+
 void
 default_dtor_section_asm_out_destructor (rtx symbol,
 					 int priority ATTRIBUTE_UNUSED)
 {
+  gcc_assert (dtors_section != NULL);
   assemble_addr_to_section (symbol, dtors_section);
 }
-#endif
 
 void
 default_named_section_asm_out_constructor (rtx symbol, int priority)
@@ -1948,14 +1953,15 @@ default_named_section_asm_out_constructor (rtx symbol, int priority)
   assemble_addr_to_section (symbol, sec);
 }
 
-#ifdef CTORS_SECTION_ASM_OP
+/* Defined unconditionally -- see default_dtor_section_asm_out_destructor.  */
+
 void
 default_ctor_section_asm_out_constructor (rtx symbol,
 					  int priority ATTRIBUTE_UNUSED)
 {
+  gcc_assert (ctors_section != NULL);
   assemble_addr_to_section (symbol, ctors_section);
 }
-#endif
 
 /* CONSTANT_POOL_BEFORE_FUNCTION may be defined as an expression with
    a nonzero value if the constant pool should be output before the
@@ -6970,47 +6976,46 @@ init_varasm_once (void)
 
   shared_constant_pool = create_constant_pool ();
 
-#ifdef TEXT_SECTION_ASM_OP
-  text_section = get_unnamed_section (SECTION_CODE, output_section_asm_op,
-				      TEXT_SECTION_ASM_OP);
-#endif
+  /* These were #ifdef tests of the corresponding TEXT_SECTION_ASM_OP family
+     of macros.  varasm.cc is compiled once for the whole compiler, so that
+     bound one back end's directives into every target; targetm is
+     instantiated per back end.  A null hook means "this target has no such
+     section" and leaves the section pointer null, exactly as the absent
+     #ifdef did.  */
+  if (targetm.asm_out.text_section_asm_op)
+    text_section = get_unnamed_section (SECTION_CODE, output_section_asm_op,
+					targetm.asm_out.text_section_asm_op);
 
-#ifdef DATA_SECTION_ASM_OP
-  data_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-				      DATA_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.data_section_asm_op)
+    data_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+					targetm.asm_out.data_section_asm_op);
 
-#ifdef SDATA_SECTION_ASM_OP
-  sdata_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-				       SDATA_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.sdata_section_asm_op)
+    sdata_section = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+					 targetm.asm_out.sdata_section_asm_op);
 
-#ifdef READONLY_DATA_SECTION_ASM_OP
-  readonly_data_section = get_unnamed_section (0, output_section_asm_op,
-					       READONLY_DATA_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.readonly_data_section_asm_op)
+    readonly_data_section
+      = get_unnamed_section (0, output_section_asm_op,
+			     targetm.asm_out.readonly_data_section_asm_op);
 
-#ifdef CTORS_SECTION_ASM_OP
-  ctors_section = get_unnamed_section (0, output_section_asm_op,
-				       CTORS_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.ctors_section_asm_op)
+    ctors_section = get_unnamed_section (0, output_section_asm_op,
+					 targetm.asm_out.ctors_section_asm_op);
 
-#ifdef DTORS_SECTION_ASM_OP
-  dtors_section = get_unnamed_section (0, output_section_asm_op,
-				       DTORS_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.dtors_section_asm_op)
+    dtors_section = get_unnamed_section (0, output_section_asm_op,
+					 targetm.asm_out.dtors_section_asm_op);
 
-#ifdef BSS_SECTION_ASM_OP
-  bss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
-				     output_section_asm_op,
-				     BSS_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.bss_section_asm_op)
+    bss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+				       output_section_asm_op,
+				       targetm.asm_out.bss_section_asm_op);
 
-#ifdef SBSS_SECTION_ASM_OP
-  sbss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
-				      output_section_asm_op,
-				      SBSS_SECTION_ASM_OP);
-#endif
+  if (targetm.asm_out.sbss_section_asm_op)
+    sbss_section = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+					output_section_asm_op,
+					targetm.asm_out.sbss_section_asm_op);
 
   tls_comm_section = get_noswitch_section (SECTION_WRITE | SECTION_BSS
 					   | SECTION_COMMON, emit_tls_common);

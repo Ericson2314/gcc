@@ -132,6 +132,76 @@ target's directive into every target.  The directive genuinely varies\n\
 and spellings with no leading tab all occur in tree).",
  const char *, NULL)
 
+/* The assembler directives that switch to each of the standard sections.
+   These mirror the TEXT_SECTION_ASM_OP family of target macros, which are
+   still defined by the back ends and carried into these hooks by defaults.h.
+   They are hooks as well because both consumers -- init_varasm_once in
+   varasm.cc and the __LIBGCC_* predefines in c-family/c-cppbuiltin.cc -- are
+   compiled once for the whole compiler, so reading the macros there bakes a
+   single target's directives into every target.
+
+   NULL means the target has no such section, and both consumers must treat
+   that exactly as the old "#ifdef" did: varasm.cc leaves the section pointer
+   null, and c-cppbuiltin.cc omits the predefine entirely, which preserves
+   libgcc's #elif/#ifndef fallbacks.  */
+DEFHOOKPOD
+(text_section_asm_op,
+ "A C string constant, the assembler directive to switch to the text section,\n\
+or @code{NULL} if the target has none.  Defaults to the target macro\n\
+@code{TEXT_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(data_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the data section.  Defaults to\n\
+@code{DATA_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(sdata_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small data section.\n\
+Defaults to @code{SDATA_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(readonly_data_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the read-only data section.\n\
+Defaults to @code{READONLY_DATA_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(bss_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the BSS section.  Defaults to\n\
+@code{BSS_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(sbss_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small BSS section.\n\
+Defaults to @code{SBSS_SECTION_ASM_OP}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(ctors_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the constructors section.\n\
+Defaults to @code{CTORS_SECTION_ASM_OP}.  Targets using @code{.init_array}\n\
+leave this @code{NULL}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(dtors_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the destructors section.\n\
+Defaults to @code{DTORS_SECTION_ASM_OP}.  Targets using @code{.fini_array}\n\
+leave this @code{NULL}.",
+ const char *, NULL)
+
+DEFHOOKPOD
+(init_section_asm_op,
+ "As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the @code{.init} section.\n\
+Defaults to @code{INIT_SECTION_ASM_OP}.  Used only to emit\n\
+@code{__LIBGCC_INIT_SECTION_ASM_OP__} for libgcc.",
+ const char *, NULL)
+
 /* Output code that will globalize a label.  */
 DEFHOOK
 (globalize_label,

@@ -9121,6 +9121,55 @@ You may wish to use @code{ASM_OUTPUT_SIZE_DIRECTIVE} and/or
 @code{ASM_OUTPUT_MEASURED_SIZE} in the definition of this macro.
 @end defmac
 
+@deftypevr {Target Hook} {const char *} TARGET_ASM_TEXT_SECTION_ASM_OP
+A C string constant, the assembler directive to switch to the text section,
+or @code{NULL} if the target has none.  Defaults to the target macro
+@code{TEXT_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_DATA_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the data section.  Defaults to
+@code{DATA_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_SDATA_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small data section.
+Defaults to @code{SDATA_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_READONLY_DATA_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the read-only data section.
+Defaults to @code{READONLY_DATA_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_BSS_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the BSS section.  Defaults to
+@code{BSS_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_SBSS_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the small BSS section.
+Defaults to @code{SBSS_SECTION_ASM_OP}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_CTORS_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the constructors section.
+Defaults to @code{CTORS_SECTION_ASM_OP}.  Targets using @code{.init_array}
+leave this @code{NULL}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_DTORS_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the destructors section.
+Defaults to @code{DTORS_SECTION_ASM_OP}.  Targets using @code{.fini_array}
+leave this @code{NULL}.
+@end deftypevr
+
+@deftypevr {Target Hook} {const char *} TARGET_ASM_INIT_SECTION_ASM_OP
+As @code{TARGET_ASM_TEXT_SECTION_ASM_OP}, for the @code{.init} section.
+Defaults to @code{INIT_SECTION_ASM_OP}.  Used only to emit
+@code{__LIBGCC_INIT_SECTION_ASM_OP__} for libgcc.
+@end deftypevr
+
 @deftypevr {Target Hook} {const char *} TARGET_ASM_GLOBAL_OP
 A C string constant, the assembler directive that makes a label global;
 for example @code{"\t.globl\t"}.  It is emitted by the default

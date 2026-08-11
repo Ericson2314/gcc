@@ -822,7 +822,8 @@ write_pclines (int dosizeonly)
     totsize += 4;
   else
     {
-      ASM_OUTPUT_DEBUG_ADDR (asm_out_file, TEXT_SECTION_ASM_OP);
+      ASM_OUTPUT_DEBUG_ADDR (asm_out_file,
+			     targetm.asm_out.text_section_asm_op);
       if (flag_verbose_asm)
 	fprintf (asm_out_file, "\t%s line_num", ASM_COMMENT_START);
       fputc ('\n', asm_out_file);
@@ -843,7 +844,7 @@ write_pclines (int dosizeonly)
   totsize += write_debug_data4 (ln ? ln - 1 : 0, buff, dosizeonly);
 
   lastln = ln;
-  strcpy (lastlabel, TEXT_SECTION_ASM_OP);
+  strcpy (lastlabel, targetm.asm_out.text_section_asm_op);
   for (i = 1; i < line_info_table_in_use; i++)
     {
       int extrabytes;
