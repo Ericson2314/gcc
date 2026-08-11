@@ -12273,6 +12273,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     extra_objs= extra_options= extra_headers=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
+    TM_MULTILIB_CONFIG=
     . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
     # config.gcc leaves these unset for most targets; the primary target gets
     # them defaulted just below, so apply the same rules here or the manifest
@@ -12357,6 +12358,19 @@ for gcc_mt in ${gcc_manifest_targets}; do
       esac
     done
     echo "tm_generated_headers ${mt_tm_gen_headers}"
+    # The multilib set is NOT a config.gcc variable: MULTILIB_OPTIONS,
+    # MULTILIB_MATCHES, MULTILIB_REUSE and MULTILIB_OSDIRNAMES are make
+    # variables, assigned by the 136 t-* fragments named in tmake_file, so they
+    # cannot be captured by sourcing config.gcc here.  Reading them needs make
+    # to evaluate that target's fragments; see the multilib rules in
+    # gcc/Makefile.in.
+    #
+    # What config.gcc does own is the input those fragments compute from, and
+    # without it the answer is wrong rather than merely missing -- sh/t-sh
+    # derives MULTILIB_OPTIONS from $(TM_MULTILIB_CONFIG) and yields an empty
+    # list when it is unset.  So it is recorded here, for the make side to feed
+    # back in.
+    echo "tm_multilib_config ${TM_MULTILIB_CONFIG}"
   ` || {
     # Read the message here, not in the AC_MSG_ERROR argument: that argument is
     # m4-quoted, so a substitution written inside it is emitted literally and the
@@ -21285,7 +21299,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21288 "configure"
+#line 21302 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21391,7 +21405,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21394 "configure"
+#line 21408 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
