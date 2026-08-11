@@ -1,11 +1,5 @@
 /* config.in.  Generated from configure.ac by autoheader.  */
 
-/* Define if this compiler should be built as the offload target compiler. */
-#ifndef USED_FOR_TARGET
-#undef ACCEL_COMPILER
-#endif
-
-
 /* Define if building universal (internal helper macro) */
 #ifndef USED_FOR_TARGET
 #undef AC_APPLE_UNIVERSAL_BUILD
@@ -101,32 +95,6 @@
 #endif
 
 
-/* Define to 1 to specify that we are using the BID decimal floating point
-   format instead of DPD */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_DECIMAL_BID_FORMAT
-#endif
-
-
-/* Define to 1 to enable decimal float extension to C. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_DECIMAL_FLOAT
-#endif
-
-
-/* Define if your target supports default PIE and it is enabled. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_DEFAULT_PIE
-#endif
-
-
-/* Define if your target supports default stack protector and it is enabled.
-   */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_DEFAULT_SSP
-#endif
-
-
 /* Define if you want more run-time sanity checks for dataflow. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_DF_CHECKING
@@ -170,12 +138,6 @@
 #endif
 
 
-/* Define if gcc should always pass --build-id to linker. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_LD_BUILDID
-#endif
-
-
 /* Define to 1 to enable libquadmath support */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_LIBQUADMATH_SUPPORT
@@ -185,12 +147,6 @@
 /* Define to enable LTO support. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_LTO
-#endif
-
-
-/* If --with-multiarch option is used */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_MULTIARCH
 #endif
 
 
@@ -231,10 +187,6 @@
 /* Define if you want runtime assertions enabled. This is a cheap check. */
 #undef ENABLE_RUNTIME_CHECKING
 
-/* Define to enable evaluating float expressions with double precision in
-   standards-compatible mode on s390 targets. */
-#undef ENABLE_S390_EXCESS_FLOAT_PRECISION
-
 /* Define if the -stdlib= option should be enabled. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_STDLIB_OPTION
@@ -269,22 +221,10 @@
 #endif
 
 
-/* Define 0/1 if vtable verification feature is enabled. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_VTABLE_VERIFY
-#endif
-
-
 /* Define to 1 if installation paths should be looked up in the Windows
    Registry. Ignored on non-Windows hosts. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_WIN32_REGISTRY
-#endif
-
-
-/* Define to enable -mfentry by default on x86-64. */
-#ifndef USED_FOR_TARGET
-#undef ENABLE_X86_64_MFENTRY
 #endif
 
 
@@ -331,21 +271,9 @@
 #endif
 
 
-/* Define to 1 if using the AIX assembler. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AIX_AS
-#endif
-
-
 /* Define if your assembler supports LSX and SCQ for 16B atomic. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_16B_ATOMIC
-#endif
-
-
-/* Define if your assembler supports AEABI build attributes. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_AEABI_BUILD_ATTRIBUTES
 #endif
 
 
@@ -391,28 +319,9 @@
 #endif
 
 
-/* Define if your assembler supports .dtprelword. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DTPRELWORD
-#endif
-
-
 /* Define if your assembler supports DTPREL relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_DTPREL_RELOC
-#endif
-
-
-/* Define if your assembler supports dwarf2 .file/.loc directives, and
-   preserves file table indices exactly as given. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DWARF2_DEBUG_LINE
-#endif
-
-
-/* Define if your assembler supports views in dwarf2 .loc directives. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DWARF2_DEBUG_VIEW
 #endif
 
 
@@ -431,12 +340,6 @@
 /* Define if your assembler supports explicit relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_EXPLICIT_RELOCS
-#endif
-
-
-/* Define if your assembler supports .gnu_attribute. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_GNU_ATTRIBUTE
 #endif
 
 
@@ -500,12 +403,6 @@
 #endif
 
 
-/* Define if your assembler supports the swap suffix. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_IX86_SWAP
-#endif
-
-
 /* Define if your assembler and linker support @tlsgdplt. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_IX86_TLSGDPLT
@@ -543,33 +440,15 @@
 #endif
 
 
-/* Define if your assembler supports .sleb128 and .uleb128. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_LEB128
-#endif
-
-
 /* Define if your assembler supports LEON instructions. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_LEON
 #endif
 
 
-/* Define if the assembler won't complain about a line such as # 0 "" 2. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_LINE_ZERO
-#endif
-
-
 /* Define if your assembler supports ltoffx and ldxmov relocations. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_LTOFFX_LDXMOV_RELOCS
-#endif
-
-
-/* Define if your assembler supports the -mabi option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MABI_OPTION
 #endif
 
 
@@ -585,33 +464,9 @@
 #endif
 
 
-/* Define if the assembler understands -march=rv*_b. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MARCH_B
-#endif
-
-
-/* Define if the assembler understands -march=rv*_zaamo_zalrsc. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MARCH_ZAAMO_ZALRSC
-#endif
-
-
-/* Define if the assembler understands -march=rv*_zifencei. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MARCH_ZIFENCEI
-#endif
-
-
 /* Define if your assembler supports mfcr field. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MFCRF
-#endif
-
-
-/* Define if the assembler understands -misa-spec=. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MISA_SPEC
 #endif
 
 
@@ -639,21 +494,9 @@
 #endif
 
 
-/* Define if the assembler understands -mnan=. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_NAN
-#endif
-
-
 /* Define if your assembler supports the -no-mul-bug-abort option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_NO_MUL_BUG_ABORT_OPTION
-#endif
-
-
-/* Define if the assembler understands -mno-shared. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_NO_SHARED
 #endif
 
 
@@ -675,12 +518,6 @@
 #endif
 
 
-/* Define if your assembler supports .ref */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_REF
-#endif
-
-
 /* Define if your assembler supports R_PPC_REL16 relocs. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_REL16
@@ -693,22 +530,10 @@
 #endif
 
 
-/* Define if your assembler supports .attribute. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_RISCV_ATTRIBUTE
-#endif
-
-
 /* Define 0/1 if your assembler and linker support R_X86_64_CODE_6_GOTTPOFF.
    */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_R_X86_64_CODE_6_GOTTPOFF
-#endif
-
-
-/* Define if your assembler supports relocs needed by -fpic. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_SMALL_PIC_RELOCS
 #endif
 
 
@@ -741,12 +566,6 @@
    alignment hint argument on z13. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13
-#endif
-
-
-/* Define if your assembler supports VSX instructions. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_VSX
 #endif
 
 
@@ -797,12 +616,6 @@
 /* Define if <time.h> defines clock_t. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_CLOCK_T
-#endif
-
-
-/* Define 0/1 if your assembler and linker support COMDAT groups. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_COMDAT_GROUP
 #endif
 
 
@@ -1282,12 +1095,6 @@
 #endif
 
 
-/* Define 0/1 if -fhardened is supported */
-#ifndef USED_FOR_TARGET
-#undef HAVE_FHARDENED_SUPPORT
-#endif
-
-
 /* Define to 1 if you have the `fileno_unlocked' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_FILENO_UNLOCKED
@@ -1368,30 +1175,9 @@
 #endif
 
 
-/* Define 0/1 if your assembler supports CFI directives. */
-#undef HAVE_GAS_CFI_DIRECTIVE
-
-/* Define 0/1 if your assembler supports .cfi_personality. */
-#undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
-
-/* Define 0/1 if your assembler supports .cfi_sections. */
-#undef HAVE_GAS_CFI_SECTIONS_DIRECTIVE
-
 /* Define if your assembler supports .cv_ucomp. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GAS_CV_UCOMP
-#endif
-
-
-/* Define if your assembler supports the .loc discriminator sub-directive. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_DISCRIMINATOR
-#endif
-
-
-/* Define if your assembler supports @gnu_unique_object. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_GNU_UNIQUE_OBJECT
 #endif
 
 
@@ -1410,12 +1196,6 @@
 #endif
 
 
-/* Define if your assembler supports the .loc is_stmt sub-directive. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_LOC_STMT
-#endif
-
-
 /* Define if your assembler supports specifying the maximum number of bytes to
    skip when using the GAS .p2align command. */
 #ifndef USED_FOR_TARGET
@@ -1423,22 +1203,9 @@
 #endif
 
 
-/* Define if your assembler supports the .set micromips directive */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_MICROMIPS
-#endif
-
-
 /* Define if your assembler supports .nsubspa comdat option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GAS_NSUBSPA_COMDAT
-#endif
-
-
-/* Define if your assembler and linker support 32-bit section relative relocs
-   via '.secrel32 label'. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_PE_SECREL32_RELOC
 #endif
 
 
@@ -1534,12 +1301,6 @@
 #endif
 
 
-/* Define if your system supports gnu indirect functions. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GNU_INDIRECT_FUNCTION
-#endif
-
-
 /* Define if the gold linker supports split stack and is available as a
    non-default */
 #ifndef USED_FOR_TARGET
@@ -1556,13 +1317,6 @@
 /* Define to 1 if you have the <iconv.h> header file. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_ICONV_H
-#endif
-
-
-/* Define 0/1 if .init_array/.fini_array sections are available and working.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_INITFINI_ARRAY_SUPPORT
 #endif
 
 
@@ -1614,164 +1368,9 @@
 #endif
 
 
-/* Define if your linker supports --as-needed/--no-as-needed or equivalent
-   options. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_AS_NEEDED
-#endif
-
-
-/* Define if your linker supports GNU style response files. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_AT_FILE
-#endif
-
-
-/* Define if your linker supports emulation avrxmega2_flmap. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_AVR_AVRXMEGA2_FLMAP
-#endif
-
-
-/* Define if your default avr linker script for avrxmega3 leaves .rodata in
-   flash. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
-#endif
-
-
-/* Define if your linker supports emulation avrxmega4_flmap. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_AVR_AVRXMEGA4_FLMAP
-#endif
-
-
-/* Define if your linker supports -z bndplt */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_BNDPLT_SUPPORT
-#endif
-
-
-/* Define if the PE linker has broken DWARF 5 support. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_BROKEN_PE_DWARF5
-#endif
-
-
-/* Define if your linker supports --build-id. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_BUILDID
-#endif
-
-
-/* Define if your linker supports -z ctf. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_CTF
-#endif
-
-
-/* Define if your linker supports --demangle option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_DEMANGLE
-#endif
-
-
-/* Define if your linker supports .eh_frame_hdr. */
-#undef HAVE_LD_EH_FRAME_HDR
-
-/* Define if your linker supports garbage collection of sections in presence
-   of EH frames. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_EH_GC_SECTIONS
-#endif
-
-
-/* Define if your linker has buggy garbage collection of sections support when
-   .text.startup.foo like sections are used. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_EH_GC_SECTIONS_BUG
-#endif
-
-
-/* Define if your PowerPC64 linker supports a large TOC. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_LARGE_TOC
-#endif
-
-
-/* Define 0/1 if your linker supports -z now */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_NOW_SUPPORT
-#endif
-
-
-/* Define if your PowerPC64 linker only needs function descriptor syms. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_NO_DOT_SYMS
-#endif
-
-
-/* Define if your linker can relax absolute .eh_frame personality pointers
-   into PC-relative form. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PERSONALITY_RELAXATION
-#endif
-
-
-/* Define if the PE linker supports --disable-dynamicbase option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PE_DISABLE_DYNAMICBASE
-#endif
-
-
-/* Define if your linker supports PIE option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PIE
-#endif
-
-
-/* Define 0/1 if your linker supports -pie option with copy reloc. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PIE_COPYRELOC
-#endif
-
-
-/* Define if your PowerPC linker has .gnu.attributes long double support. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE
-#endif
-
-
-/* Define if your linker supports --push-state/--pop-state */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_PUSHPOPSTATE_SUPPORT
-#endif
-
-
-/* Define 0/1 if your linker supports -z relro */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_RELRO_SUPPORT
-#endif
-
-
 /* Define if your linker links a mix of read-only and read-write sections into
    a read-write section. */
-#ifndef USED_FOR_TARGET
 #undef HAVE_LD_RO_RW_SECTION_MIXING
-#endif
-
-
-/* Define if your linker supports -Bstatic/-Bdynamic or equivalent options. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_STATIC_DYNAMIC
-#endif
-
-
-/* Define if your linker supports --sysroot. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LD_SYSROOT
-#endif
-
 
 /* Define to 1 if you have the <libgen.h> header file. */
 #ifndef USED_FOR_TARGET
@@ -1800,12 +1399,6 @@
 /* Define to 1 if the system has the type `long long int'. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_LONG_LONG_INT
-#endif
-
-
-/* Define to the level of your linker's plugin support. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_LTO_PLUGIN
 #endif
 
 
@@ -1887,13 +1480,6 @@
 #endif
 
 
-/* Define if GCC has been configured with --enable-newlib-nano-formatted-io.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_NEWLIB_NANO_FORMATTED_IO
-#endif
-
-
 /* Define to 1 if you have the `nl_langinfo' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_NL_LANGINFO
@@ -1939,18 +1525,6 @@
 /* Define if <sys/signal.h> defines sighandler_t */
 #ifndef USED_FOR_TARGET
 #undef HAVE_SIGHANDLER_T
-#endif
-
-
-/* Define to 1 if using the Solaris assembler. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_SOLARIS_AS
-#endif
-
-
-/* Define to 1 if using the Solaris linker. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_SOLARIS_LD
 #endif
 
 
@@ -2168,13 +1742,6 @@
 #endif
 
 
-/* Define if your assembler supports AIX debug frame section label reference.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_XCOFF_DWARF_EXTRAS
-#endif
-
-
 /* Define if you have a working <zstd.h> header file. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_ZSTD_H
@@ -2272,36 +1839,6 @@
 #endif
 
 
-/* Define to the linker option to ignore unused dependencies. */
-#ifndef USED_FOR_TARGET
-#undef LD_AS_NEEDED_OPTION
-#endif
-
-
-/* Define to the linker option to enable use of shared objects. */
-#ifndef USED_FOR_TARGET
-#undef LD_DYNAMIC_OPTION
-#endif
-
-
-/* Define to the linker option to keep unused dependencies. */
-#ifndef USED_FOR_TARGET
-#undef LD_NO_AS_NEEDED_OPTION
-#endif
-
-
-/* Define to the linker option to disable use of shared objects. */
-#ifndef USED_FOR_TARGET
-#undef LD_STATIC_OPTION
-#endif
-
-
-/* The linker hash style */
-#ifndef USED_FOR_TARGET
-#undef LINKER_HASH_STYLE
-#endif
-
-
 /* Define to the name of the LTO plugin DSO that must be passed to the
    linker's -plugin=LIB option. */
 #ifndef USED_FOR_TARGET
@@ -2316,33 +1853,9 @@
 #endif
 
 
-/* Define if we should link mingw executables with --large-address-aware */
-#ifndef USED_FOR_TARGET
-#undef MINGW_DEFAULT_LARGE_ADDR_AWARE
-#endif
-
-
-/* Value to set mingw's _dowildcard to. */
-#ifndef USED_FOR_TARGET
-#undef MINGW_DOWILDCARD
-#endif
-
-
-/* Define if assembler supports %reloc. */
-#ifndef USED_FOR_TARGET
-#undef MIPS_EXPLICIT_RELOCS
-#endif
-
-
 /* Define if host mkdir takes a single argument. */
 #ifndef USED_FOR_TARGET
 #undef MKDIR_TAKES_ONE_ARG
-#endif
-
-
-/* Define to 1 to if -foffload is defaulted */
-#ifndef USED_FOR_TARGET
-#undef OFFLOAD_DEFAULTED
 #endif
 
 
@@ -2391,18 +1904,6 @@
 /* Specify plugin linker */
 #ifndef USED_FOR_TARGET
 #undef PLUGIN_LD_SUFFIX
-#endif
-
-
-/* Define to .TOC. alignment forced by your linker. */
-#ifndef USED_FOR_TARGET
-#undef POWERPC64_TOC_POINTER_ALIGNMENT
-#endif
-
-
-/* Define to PREFIX/include if cpp should also search that directory. */
-#ifndef USED_FOR_TARGET
-#undef PREFIX_INCLUDE_DIR
 #endif
 
 
@@ -2460,44 +1961,8 @@
 #endif
 
 
-/* Define if TFmode long double should be the default */
-#ifndef USED_FOR_TARGET
-#undef TARGET_DEFAULT_LONG_DOUBLE_128
-#endif
-
-
 /* Define if your target C library provides the `dl_iterate_phdr' function. */
 #undef TARGET_DL_ITERATE_PHDR
-
-/* GNU C Library major version number used on the target, or 0. */
-#ifndef USED_FOR_TARGET
-#undef TARGET_GLIBC_MAJOR
-#endif
-
-
-/* GNU C Library minor version number used on the target, or 0. */
-#ifndef USED_FOR_TARGET
-#undef TARGET_GLIBC_MINOR
-#endif
-
-
-/* Define if your target C Library properly handles PT_GNU_STACK */
-#ifndef USED_FOR_TARGET
-#undef TARGET_LIBC_GNUSTACK
-#endif
-
-
-/* Define if your target C Library provides the AT_HWCAP value in the TCB */
-#ifndef USED_FOR_TARGET
-#undef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
-#endif
-
-
-/* Define if your target C library provides stack protector support */
-#ifndef USED_FOR_TARGET
-#undef TARGET_LIBC_PROVIDES_SSP
-#endif
-
 
 /* Define if libatomic is built for the target. */
 #ifndef USED_FOR_TARGET
@@ -2508,13 +1973,6 @@
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #ifndef USED_FOR_TARGET
 #undef TIME_WITH_SYS_TIME
-#endif
-
-
-/* Define to the flag used to mark TLS sections if the default (`T') doesn't
-   work. */
-#ifndef USED_FOR_TARGET
-#undef TLS_SECTION_ASM_FLAG
 #endif
 
 
@@ -2531,22 +1989,10 @@
 #endif
 
 
-/* Define if your linker supports AS_NEEDED in linker scripts. */
-#ifndef USED_FOR_TARGET
-#undef USE_LD_AS_NEEDED_LDSCRIPT
-#endif
-
-
 /* Define to 1 if the 'long long' type is wider than 'long' but still
    efficiently supported by the host hardware. */
 #ifndef USED_FOR_TARGET
 #undef USE_LONG_LONG_FOR_WIDEST_FAST_INT
-#endif
-
-
-/* Define if we should use leading underscore on 64 bit mingw targets */
-#ifndef USED_FOR_TARGET
-#undef USE_MINGW64_LEADING_UNDERSCORES
 #endif
 
 

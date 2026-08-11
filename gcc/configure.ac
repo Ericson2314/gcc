@@ -564,6 +564,34 @@ if test x$ac_gimple_checking != x ; then
 the high-level optimizers) to be checked for dynamic type safety at
 runtime.  This is moderately expensive.])
 fi
+dnl Two assembler/linker capabilities that the target libraries read, and that
+dnl therefore cannot be runtime values.  libgcc compiles with USED_FOR_TARGET,
+dnl which is exactly the case defaults.h guards its targ_caps redefinitions out
+dnl of -- deliberately, since target-library code cannot reach targ_caps at all
+dnl -- so for those TUs auto-host.h is the only source.  When the probes were
+dnl deleted the macros became undefined there, and crtstuff.c (7 sites),
+dnl libgcc2.c, libgcov.h, offloadstuff.c and the visium and stormy16
+dnl lib2funcs.c silently stopped emitting `.hidden' for __dso_handle,
+dnl __EH_FRAME_BEGIN__ and __TMC_END__, making them globally visible.  That is a
+dnl linkage and interposition change, and `make all-gcc' cannot see it because
+dnl it never builds libgcc.
+dnl
+dnl Defined unconditionally rather than probed.  Restoring the probe is not an
+dnl option -- removing it is the point -- and there is no runtime alternative on
+dnl this side, so the choice is between 1 and 0.  1 is what a stock build's
+dnl auto-host.h contains on every supported host, so it preserves behaviour
+dnl exactly; 0 would silently change it everywhere.  GCC_TARGET_TEMPLATE lifts
+dnl the `#ifndef USED_FOR_TARGET' guard that would otherwise keep them out of
+dnl the target-library build.  The compiler proper still gets the runtime value:
+dnl defaults.h #undefs both and redefines them in terms of targ_caps.
+GCC_TARGET_TEMPLATE([HAVE_GAS_HIDDEN])
+AC_DEFINE(HAVE_GAS_HIDDEN, 1,
+  [Define if your assembler and linker support .hidden.])
+GCC_TARGET_TEMPLATE([HAVE_LD_RO_RW_SECTION_MIXING])
+AC_DEFINE(HAVE_LD_RO_RW_SECTION_MIXING, 1,
+  [Define if your linker links a mix of read-only
+   and read-write sections into a read-write section.])
+
 GCC_TARGET_TEMPLATE(ENABLE_RUNTIME_CHECKING)
 if test x$ac_runtime_checking != x ; then
   AC_DEFINE(ENABLE_RUNTIME_CHECKING, 1,
@@ -3497,37 +3525,13 @@ case "$target" in
     ;;
 
   sparc*-*-*)
-    gcc_GAS_CHECK_FEATURE([-relax option], gcc_cv_as_sparc_relax,
-      [-relax], [.text],,
-      [AC_DEFINE(HAVE_AS_RELAX_OPTION, 1,
-		[Define if your assembler supports -relax option.])])
-
-    gcc_GAS_CHECK_FEATURE([offsetable %lo()],
-      gcc_cv_as_sparc_offsetable_lo10,
-      [-xarch=v9],
-[.text
-	or %g1, %lo(ab) + 12, %g1
-	or %g1, %lo(ab + 12), %g1],
-      [if test x$gcc_cv_objdump != x \
-       && $gcc_cv_objdump -s -j .text conftest.o 2> /dev/null \
-          | grep ' 82106000 82106000' > /dev/null 2>&1; then
-	 gcc_cv_as_sparc_offsetable_lo10=yes
-       fi],
-       [AC_DEFINE(HAVE_AS_OFFSETABLE_LO10, 1,
-	         [Define if your assembler supports offsetable %lo().])])
-
-    gcc_GAS_CHECK_FEATURE([LEON instructions],
-      gcc_cv_as_sparc_leon,
-      [-Aleon],
-      [.text
-       .register %g2, #scratch
-       .register %g3, #scratch
-       .align 4
-       smac %g2, %g3, %g1
-       umac %g2, %g3, %g1
-       casa [[%g2]] 0xb, %g3, %g1],,
-      [AC_DEFINE(HAVE_AS_LEON, 1,
-                [Define if your assembler supports LEON instructions.])])
+    dnl The -relax, offsetable %lo() and LEON probes moved to
+    dnl target-specs/configure.ac.  Two of the three answers cannot be runtime
+    dnl values: ASM_RELAX_SPEC and AS_LEON_FLAG are spec text concatenated into
+    dnl string literals in sparc.h before any target config is read, so they use
+    dnl the spelling every supported assembler accepts.  Only
+    dnl USE_AS_OFFSETABLE_LO10 and LEAF_SIBCALL_SLOT_RESERVED_P became
+    dnl targ_caps lookups.
     ;;
 
 changequote(,)dnl
