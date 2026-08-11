@@ -240,6 +240,7 @@ static bool at_file_supplied;
 
 /* Definition of string containing the arguments given to configure.  */
 #include "configargs.h"
+#include "target-caps.h"
 
 /* Flag saying to print the command line options understood by gcc and its
    sub-processes.  */
@@ -8322,6 +8323,16 @@ driver::main (int argc, char **argv)
 
   set_progname (argv[0]);
   expand_at_files (&argc, &argv);
+
+  /* The target config has to be read before anything consults a capability.
+     set_up_specs() calls process_command() BEFORE it calls find_a_file/
+     read_specs, so several consumers run before any spec file has been seen --
+     the spec file cannot be the channel for the driver's own use of a
+     capability, only for what it passes to cc1.  Scanned straight out of argv
+     here for that reason, the same way collect2 does it.  */
+  for (int i = 1; i < argc; i++)
+    if (startswith (argv[i], "-ftarget-config="))
+      read_target_caps (argv[i] + strlen ("-ftarget-config="));
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
   build_multilib_strings ();
@@ -8602,18 +8613,22 @@ driver::set_up_specs () const
         target_sysroot_suffix = xstrdup (argbuf.last ());
     }
 
-#ifdef HAVE_LD_SYSROOT
   /* Pass the --sysroot option to the linker, if it supports that.  If
      there is a sysroot_suffix_spec, it has already been processed by
      this point, so target_system_root really is the system root we
-     should be using.  */
-  if (target_system_root)
+     should be using.
+
+     This was `#ifdef HAVE_LD_SYSROOT'.  That macro moved to target-specs and
+     became targ_caps.ld_sysroot, which no `#ifdef' can see -- so the guard was
+     silently false and the driver stopped prepending %(sysroot_spec) to the
+     link spec entirely, dropping --sysroot from every link.  targ_caps is read
+     from argv at the top of driver::main, before this runs.  */
+  if (targ_caps.ld_sysroot && target_system_root)
     {
       obstack_grow (&obstack, "%(sysroot_spec) ", strlen ("%(sysroot_spec) "));
       obstack_grow0 (&obstack, link_spec, strlen (link_spec));
       set_spec ("link", XOBFINISH (&obstack, const char *), false);
     }
-#endif
 
   /* Process sysroot_hdrs_suffix_spec.  */
   if (*sysroot_hdrs_suffix_spec != 0
