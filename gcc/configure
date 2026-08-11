@@ -3637,8 +3637,6 @@ fi
 # -------------------
 
 
-
-
 # --with-demangler-in-ld is gone.  It only ever turned the linker --demangle
 # probe off; its default -- run the probe -- is now the only behaviour, and
 # whether a particular ld supports --demangle is a question for that ld, asked
@@ -3646,7 +3644,6 @@ fi
 demangler_in_ld=yes
 
 dsymutil_vers=
-
 
 
 # ---------------
@@ -21574,7 +21571,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21577 "configure"
+#line 21574 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21680,7 +21677,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21683 "configure"
+#line 21680 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -25248,7 +25245,7 @@ elif test x$gcc_cv_ld != x; then
   fi
 fi
 case "$host" in
-        *-*-solaris2*)
+      *-*-solaris2*)
     gcc_cv_ld_version_script=yes
     ld_version_script_option='-M'
     ;;
@@ -25464,8 +25461,6 @@ esac
 
 
 
-
-
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the host/build supports symbol aliases" >&5
 $as_echo_n "checking whether the host/build supports symbol aliases... " >&6; }
 if ${gcc_cv_have_attribute_alias+:} false; then :
@@ -25510,9 +25505,6 @@ $as_echo "#define HAVE_ATTRIBUTE_ALIAS 1" >>confdefs.h
 
 
 
-
-
-
 $as_echo "#define HAVE_AS_TLS 1" >>confdefs.h
 
 
@@ -25520,11 +25512,6 @@ $as_echo "#define HAVE_AS_TLS 1" >>confdefs.h
 
 
 $as_echo "#define HAVE_AS_DTPREL_RELOC 1" >>confdefs.h
-
-
-
-
-
 
 
 
@@ -26810,7 +26797,6 @@ $as_echo "$aarch64_spe_support" >&6; }
       ;;
   esac
 fi
-
 
 
 

@@ -289,8 +289,6 @@ AC_SUBST(GENINSRC)
 # -------------------
 
 
-
-
 # --with-demangler-in-ld is gone.  It only ever turned the linker --demangle
 # probe off; its default -- run the probe -- is now the only behaviour, and
 # whether a particular ld supports --demangle is a question for that ld, asked
@@ -298,7 +296,6 @@ AC_SUBST(GENINSRC)
 demangler_in_ld=yes
 
 dsymutil_vers=
-
 
 
 # ---------------
@@ -735,33 +732,19 @@ esac],
 [enable_targets=no])
 
 dnl --enable-multiarch selected the Debian-style multiarch library layout.
-dnl MULTIARCH_DIRNAME is a target path convention, so ENABLE_MULTIARCH is now
-dnl a target-header macro; config/mips/mips.h already tests it with `#ifndef',
-dnl and no target header raises it, which reproduces the stock default (the
-dnl option defaulted to `auto', and only an explicit --enable-multiarch ever
-dnl produced the AC_DEFINE).
-dnl
-dnl The make-side residue is gone too: Makefile.in no longer defines
-dnl enable_multiarch and if_multiarch now expands to nothing, so the
-dnl BUILD_SYSTEM_HEADER_DIR crti.o wildcard probe that used to guess the
-dnl target's path convention from the build machine is gone with it.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:737".
 
 dnl with_cpu/with_float were AC_SUBSTed only to build the multiarch name for
-dnl soft-float/hard-float ABIs.  Multiarch is gone (see above) and so are the
-dnl options themselves, so nothing is left to substitute.
+dnl soft-float/hard-float ABIs.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:749".
 
 # needed for restricting the fixedincludes multilibs that we install
 AC_SUBST(with_multi_buildlist)
 
 # default stack clash protection guard size as power of twos in bytes.
 # Please keep these in sync with params.def.
-dnl --with-stack-clash-protection-guard-size is gone.  It set one guard size for
-dnl whichever target the compiler was built for, and the back ends that read it
-dnl (aarch64, i386, powerpc, s390) each have their own idea of what is valid.
-dnl Zero was its default and means "use the back end's own default", so nothing
-dnl changes for a build that did not pass it; a build that did should say
-dnl -fstack-clash-protection with --param stack-clash-protection-guard-size
-dnl instead, which is per compilation rather than per compiler.
+dnl --with-stack-clash-protection-guard-size is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:758".
 AC_DEFINE(DEFAULT_STK_CLASH_GUARD_SIZE, 0,
 	[Define to larger than zero set the default stack clash protector size.])
 
@@ -797,37 +780,19 @@ AC_ARG_ENABLE(__cxa_atexit,
 [], [])
 
 dnl --enable-decimal-float is gone, and with it GCC_AC_ENABLE_DECIMAL_FLOAT.
-dnl That macro was a `case $target' naming the CPU/OS pairs whose libgcc carries
-dnl the decimal support functions, with a fall-through arm that warned and said
-dnl no -- so with no $target it would have quietly disabled decimal float for
-dnl every target at once, which is the fall-through hazard this project keeps
-dnl running into.
-dnl
-dnl Both halves of the answer are per target: whether decimal float is usable at
-dnl all, and whether the ABI encodes it as BID or DPD.  gcc/config.gcc derives
-dnl them from the triple (the same list, kept diff-able against ../config/dfp.m4,
-dnl which libgcc and libdecnumber still use for their own per-target builds) and
-dnl they reach cc1 at run time as targ_caps.decimal_float and
-dnl targ_caps.decimal_bid_format.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:799".
 
 
-dnl --enable-threads is gone.  It picked one thread package for one target and
-dnl froze it in as thread_model[[]] and gthr-default.h -- one of a set of
-dnl mutually exclusive target choices.  Every arm of config.gcc reads an empty
-dnl value as "this target's own default" (posix on GNU/Linux, rtems on RTEMS,
-dnl and so on), which is what a build that did not pass the option had, so the
-dnl thread model each target gets is unchanged.
+dnl --enable-threads is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:814".
 enable_threads=''
 
-dnl --enable-tls is gone.  It was not a feature switch: it OVERRODE the
-dnl assembler TLS probe, forcing a yes or no answer about a specific as.  The
-dnl probe it overrode is gone too (HAVE_AS_TLS is a build-time constant now),
-dnl so the variable had no remaining consumer and is removed with it.
+dnl --enable-tls is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:822".
 
-dnl --enable-vtable-verify selected whether libvtv is available to link against.
-dnl That is a target runtime library question, so ENABLE_VTABLE_VERIFY is now a
-dnl target-header macro with a 0 default in defaults.h -- the same answer the
-dnl option gave by default.  config/sol2.h already tests it with `#if'.
+dnl --enable-vtable-verify selected whether libvtv is available to link
+dnl against.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:827".
 
 AC_ARG_ENABLE(analyzer,
 [AS_HELP_STRING([--disable-analyzer],
@@ -841,12 +806,8 @@ analyzer=1)
 AC_DEFINE_UNQUOTED(ENABLE_ANALYZER, $analyzer,
 [Define 0/1 if static analyzer feature is enabled.])
 
-dnl --with-dwarf2 is gone.  It appended tm-dwarf2.h to ONE tm_file, forcing the
-dnl default debug format for whichever target the compiler was built for.  Its
-dnl default was no, so nothing changes for a build that did not pass it, and the
-dnl targets that genuinely want it -- i386/nto, and the two nvptx/gcn arms --
-dnl already name tm-dwarf2.h in config.gcc themselves.  A target that wants
-dnl DWARF by default should say so there, per target, not here.
+dnl --with-dwarf2 is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:844".
 dwarf2=no
 
 AC_ARG_ENABLE(shared,
@@ -868,18 +829,13 @@ AC_ARG_ENABLE(shared,
 ], [enable_shared=yes])
 AC_SUBST(enable_shared)
 
-dnl Whether to build libgcov and the related host tools.  This used to be
-dnl selectable with --disable-gcov, whose default was keyed on $target
-dnl (bpf-*-* opted out).  A multi-target compiler cannot answer that at
-dnl configure time, so the host tools are always built.
+dnl Whether to build libgcov and the related host tools.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:871".
 enable_gcov=yes
 AC_SUBST(enable_gcov)
 
-dnl --with-specs is gone.  It froze a spec string into the driver as
-dnl CONFIGURE_SPECS, one of driver_self_specs[[]] -- a spec that could not be
-dnl overridden or even seen, since -dumpspecs does not show driver self specs.
-dnl Specs belong in a spec file, which is the whole point of the exercise, and
-dnl an empty CONFIGURE_SPECS is what every build that did not pass it had.
+dnl --with-specs is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:878".
 CONFIGURE_SPECS=
 AC_SUBST(CONFIGURE_SPECS)
 
@@ -955,25 +911,14 @@ else
 fi
 AC_SUBST(gnat_install_lib)
 
-dnl --enable-as-accelerator-for is gone.  It was never declared with
-dnl AC_ARG_ENABLE, so it never appeared in "configure --help"; it named ONE
-dnl host target that this compiler was to be the offload compiler for, and
-dnl rewrote the program names and the library subdirectory around it.  Picking
-dnl one target out of the set a multi-target compiler serves is exactly the
-dnl thing being removed, and it was built out of target_noncanonical, which no
-dnl longer exists.  enable_as_accelerator, accel_dir_suffix and real_target_noncanonical
-dnl stay AC_SUBSTed, empty: that is the ordinary non-accelerator build, which is
-dnl what every native configuration already got.
+dnl --enable-as-accelerator-for is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:958".
 AC_SUBST(enable_as_accelerator)
 AC_SUBST(real_target_noncanonical)
 AC_SUBST(accel_dir_suffix)
 
-dnl --enable-offload-targets is gone with the same reasoning: another undeclared
-dnl option, naming a fixed list of other targets to offload to and freezing it
-dnl into OFFLOAD_TARGETS.  Which targets a compiler can offload to is a property
-dnl of the configured target set, not a separate build-time list, and
-dnl the value left here -- no offload targets -- is what a plain native build
-dnl always produced.
+dnl --enable-offload-targets is gone with the same reasoning:
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:971".
 AC_SUBST(omp_device_properties)
 AC_SUBST(omp_device_property_deps)
 
@@ -982,25 +927,14 @@ AC_DEFINE_UNQUOTED(OFFLOAD_TARGETS, "$offload_targets",
 AC_DEFINE(ENABLE_OFFLOADING, 0,
   [Define this to enable support for offloading.])
 
-dnl --enable-offload-defaulted went with them; OFFLOAD_DEFAULTED stays undefined,
-dnl as in a build that did not pass it.
 
-dnl --with-multilib-list and --with-multilib-generator are gone.  They named the
-dnl multilib set for ONE target, and a compiler serving several has several
-dnl multilib sets; which libraries exist for a target is that target's own
-dnl configuration, not a property of the compiler binary.  `default' is what
-dnl every arm of config.gcc treats as "use this target's own set", and it is what
-dnl a build that did not pass either option always had, so behaviour is
-dnl unchanged.  (config.gcc sets the same two values itself, so that sourcing it
-dnl directly agrees with sourcing it from here.)
+dnl --with-multilib-list and --with-multilib-generator are gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:988".
 with_multilib_list=default
 with_multilib_generator=default
 
-dnl --with-picolibc is gone.  It turned picolibc support on for a target whose
-dnl triple does not say picolibc -- i.e. it named the target C library out of
-dnl band, which is precisely what a compiler serving several targets cannot
-dnl carry.  config.gcc still recognises a *-picolibc-* triple, which is the
-dnl half that is the target's own business.
+dnl --with-picolibc is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:999".
 
 # -------------------------
 # Checks for other programs
@@ -1437,32 +1371,8 @@ saved_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 
 dnl Every probe from here to the end of this block compiles a program that
-dnl includes "system.h", which reaches gmp.h through $GMPINC.  Autoconf records
-dnl a compile that fails for ANY reason as "the feature is absent" -- a missing
-dnl gmp.h counts the same as a genuinely undeclared function.  So an environment
-dnl without those headers does not fail here; it quietly answers "no" about
-dnl fifty times.  Every HAVE_DECL_* below goes to 0, and the rlim_t probe writes
-dnl
-dnl     #define rlim_t long
-dnl
-dnl into auto-host.h over the real glibc typedef.  The build then dies in every
-dnl object with "declaration does not declare anything", pointing at everything
-dnl except the cause.  It has cost several people an hour each, and because there
-dnl is no cache variable it happens again on every configure.
-dnl
-dnl None of that is preventable by care in the source: the wrong answer comes
-dnl from the environment.  What is preventable is its being silent.  Assert the
-dnl precondition once, here, where CFLAGS and GMPINC are already set to exactly
-dnl what the probes will use.
-dnl Assert gmp.h specifically rather than system.h as a whole.  A bare
-dnl `#include "ansidecl.h"' plus `#include "system.h"' does NOT compile on glibc
-dnl and is not meant to: libiberty.h declares char *basename(const char *) while
-dnl glibc's string.h declares the C++ overload const char *basename(const char *),
-dnl and g++ rejects the pair as ambiguating.  That is precisely why the first
-dnl probe below carries its own `#define HAVE_DECL_BASENAME 1' prologue.  So a
-dnl plain system.h compile is not a precondition of this block, and asserting it
-dnl would fail every glibc build -- which is what the first version of this check
-dnl did.  system.h:718 is the line that actually depends on the environment.
+dnl includes "system.h", which ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1439".
 AC_MSG_CHECKING([for gmp.h, which system.h needs and every probe below depends on])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]], [[]])],
   [AC_MSG_RESULT([yes])],
@@ -1818,35 +1728,16 @@ case ${enable_targets} in
     ;;
 esac
 
-dnl --enable-targets names every target, and there is no other source for the
-dnl list: there is no falling back on --target when the list is empty, because
-dnl a fallback would make --target mean "the target" again, which is the thing
-dnl being removed.
+dnl --enable-targets names every target, and there is no other source for
+dnl the list:
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1821".
 if test x"${gcc_extra_targets}" = x; then
   AC_MSG_ERROR([--enable-targets=LIST is required])
 fi
 
-dnl `${target}' IS added to the manifest, and that is not the fallback refused
-dnl above.  It is not a default and confers no privilege: since the compiler
-dnl now starts with an EMPTY common hook table (common/common-target-select.cc)
-dnl and installs one only when something selects a target by name, an entry in
-dnl this list is just an entry -- being first, or being the build's own triple,
-dnl buys nothing at run time.
-dnl
-dnl What it buys is a link that works.  `${target}' still picks out_file, tm.h
-dnl and md_file, so THAT back end's <cpu>.cc is compiled into cc1 whatever
-dnl --enable-targets says, and it refers to symbols in its own
-dnl common/config/<cpu>/<cpu>-common.cc -- processor_alias_table, pta_size,
-dnl processor_names, num_arch_names, ix86_handle_option for i386.  Only the
-dnl manifest emits a rule building that object.  So a list that did not name
-dnl the build's own triple produced a cc1 and an lto1 that would not link, for
-dnl a target nobody had asked for; --enable-targets=all merely hid it by
-dnl happening to name i386.  The compiled-in back end has to be in the list
-dnl because it is compiled in, not because it is anyone's default.
-dnl
-dnl Duplicates are removed by the canonicalisation loop below, not here: the
-dnl user writes `x86_64-linux-gnu' and ${target} is `x86_64-pc-linux-gnu', so
-dnl the two spellings only become comparable after config.sub has seen them.
+dnl `${target}' IS added to the manifest, and that is not the fallback
+dnl refused above.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1829".
 gcc_manifest_targets="${gcc_extra_targets} ${target}"
 
 gcc_all_common_objects=
@@ -2857,40 +2748,14 @@ ALL=all.internal				AC_SUBST(ALL)
 SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
 BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
-dnl target_header_dir is GONE.  It was how the target's sysroot reached this
-dnl script, and the compiler must not care about target sysroots.
-dnl
-dnl Every one of its consumers has now been moved out, and not one of them was
-dnl the compiler's own question:
-dnl   glibc version                 -> targ_caps.glibc_major/minor
-dnl   TARGET_LIBC_PROVIDES_HWCAP_IN_TCB, TARGET_LIBC_GNUSTACK -> targ_caps
-dnl   HAVE_SYS_SDT_H                -> libgcc/configure.ac  (AC_CHECK_HEADERS)
-dnl   TARGET_DL_ITERATE_PHDR        -> libgcc/configure.ac  (keyed on $host)
-dnl   inhibit_libc                  -> decided from gcc's own options; the
-dnl                                    "are the headers really there" half is
-dnl                                    libgcc's, which can just compile a test
-dnl
-dnl BUILD_SYSTEM_HEADER_DIR stays: fixincludes genuinely does have a directory
-dnl of headers to fix, and it is named, not guessed at.
+dnl target_header_dir is GONE.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2860".
 if test "x$with_build_sysroot" != x; then
   BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
 fi
 
 dnl The machine whose system headers fixincludes is fixing.
-dnl
-dnl This is NOT the compiler's target -- gcc/ no longer has one -- it is a
-dnl property of BUILD_SYSTEM_HEADER_DIR, i.e. of the header tree being fixed.
-dnl With no --with-build-sysroot that tree is the NATIVE one, so the machine it
-dnl belongs to is the host.  With a build sysroot the headers are some other
-dnl machine's and nothing here can name it; say so rather than guess.
-dnl
-dnl It must never be empty.  fixincl.c:403 turns an empty TARGET_MACHINE into
-dnl `pz_machine = NULL', which is its self-test mode: per-machine gating is
-dnl switched off entirely and EVERY machine's fixes are applied to whatever
-dnl headers it is handed.  A vacuous filter is permissive, not empty.  That is
-dnl how config/vxworks' unistd.h wrapper (`#include <ioLib.h>') was written into
-dnl a glibc include-fixed and made libgcc unbuildable.  Makefile.in refuses to
-dnl run fixincludes when this is empty.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2879".
 AC_ARG_WITH(fixincludes-machine,
 [AS_HELP_STRING([--with-fixincludes-machine=MACHINE],
                 [machine name whose system headers fixincludes should fix;
@@ -2908,16 +2773,9 @@ AC_SUBST(fixincludes_machine)
 # then define inhibit_libc in LIBGCC2_CFLAGS.
 # This prevents libgcc2 from containing any code which requires libc
 # support.
-dnl
 dnl The second half of the old test -- "--with-headers was given but the
-dnl headers are not actually there", which stat'd stdio.h inside the target
-dnl sysroot -- is gone along with that sysroot path.  It is libgcc's question
-dnl anyway: libgcc has a working compiler and can simply try to include
-dnl <stdio.h>, where gcc could only guess at a directory.  What is left here is
-dnl the part gcc genuinely knows, which is what its own options said.
-dnl
-dnl These are dnl comments on purpose, so that grepping the GENERATED configure
-dnl for the old variable name stays a valid check that it is really gone.
+dnl headers are not actually ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2911".
 : ${inhibit_libc=false}
 if test x$with_newlib = xyes && test "x$with_headers" = xno; then
        inhibit_libc=true
@@ -3139,48 +2997,11 @@ fi
 AC_MSG_RESULT($ld_is_wild)
 
 dnl The "is gold available as a non-default linker, and does its split-stack
-dnl support cover this target" check stood here.  It is REMOVED, and the
-dnl replacement is not yet written -- said plainly, because a comment that
-dnl claims a hazard is closed when it is only named is worse than no comment.
-dnl
-dnl Both halves of it were about a target: the linker it interrogated is
-dnl `$gcc_cv_ld.gold', a target linker, and the version ladder it applied to
-dnl the answer was a `case' arm for powerpc64 big- and little-endian, which is
-dnl where gold acquired complete split-stack support later than everywhere
-dnl else.  So it cannot stay.
-dnl
-dnl It is not a targ_caps capability either.  Its one consumer is
-dnl `#ifdef HAVE_GOLD_NON_DEFAULT_SPLIT_STACK' in gcc.cc, and what it selects
-dnl is SPEC TEXT, which the driver has before it reads any target config.  The
-dnl channel is therefore a named spec written by target-specs, exactly like
-dnl *link_eh and *asm_debug -- and until that spec and its slot in gcc.cc both
-dnl exist, a probe would be an answer with nowhere to go, which is the thing
-dnl this file keeps being caught doing.
-dnl
-dnl What changes meanwhile: the macro is undefined, so gcc.cc takes the arm it
-dnl already took on every host without a non-default gold -- which is nearly
-dnl all of them.  QUEUED, not done.
+dnl support cover this target" ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3141".
 
-dnl How to give a HOST shared library a version script and an soname.  These
-dnl two belong here and not in target-specs/, and the distinction is the whole
-dnl reason they are back:
-dnl
-dnl   the library being linked is libgccjit.so / libgdiagnostics.so -- HOST
-dnl   objects, linked by $(LLINKER) during this build.  Nothing about a target
-dnl   enters into it.  target-specs/ runs AFTER the build and writes spec files,
-dnl   so a probe placed there is structurally incapable of reaching a Makefile
-dnl   variable the build already needed -- and Makefile.in:1306-1307 still said
-dnl   `LD_VERSION_SCRIPT_OPTION = @ld_version_script_option@'.  With nothing
-dnl   AC_SUBSTing it, that is not empty, it is LEFT UNSUBSTITUTED, so
-dnl   `$(if $(LD_VERSION_SCRIPT_OPTION),...)' tested true and the link line for
-dnl   libgdiagnostics.so read
-dnl       -Wl,@ld_version_script_option@,.../libgdiagnostics.map
-dnl   Measured on a configured Makefile, not inferred.  It has not bitten only
-dnl   because --enable-languages=c builds neither library.
-dnl
-dnl Keyed on $host, not $target as upstream had it: it is the host's linker
-dnl linking a host library.  That upstream used $target here was already wrong;
-dnl it happened to work because the two agree in a native build.
+dnl How to give a HOST shared library a version script and an soname.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3164".
 AC_MSG_CHECKING(linker version script option)
 gcc_cv_ld_version_script=no
 ld_version_script_option=''
@@ -3194,9 +3015,8 @@ elif test x$gcc_cv_ld != x; then
   fi
 fi
 case "$host" in
-  dnl Solaris 2 ld always supports -M.  It supports a subset of
-  dnl --version-script since Solaris 11.4, but only under
-  dnl -z gnu-version-script-compat, so -M stays the one to use.
+  dnl Solaris 2 ld always supports -M.
+  dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3197".
   *-*-solaris2*)
     gcc_cv_ld_version_script=yes
     ld_version_script_option='-M'
@@ -3292,11 +3112,8 @@ case "$ORIGINAL_NM_FOR_TARGET" in
 esac
 
 
-dnl The objdump, readelf and otool searches are gone.  All three were found,
-dnl printed and never used again -- no AC_SUBST, no Makefile variable, no probe
-dnl left that consults them.  They are TARGET tools in any case, and
-dnl target-specs/configure.ac has its own search for objdump, readelf and nm,
-dnl prefixed for the target it is probing.
+dnl The objdump, readelf and otool searches are gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3295".
 
 # Figure out the dsymutil we will use.
 AS_VAR_SET_IF(gcc_cv_dsymutil,, [
@@ -3318,54 +3135,22 @@ case "$ORIGINAL_DSYMUTIL_FOR_TARGET" in
 esac 
 
 
-
-
 gcc_AC_INITFINI_ARRAY
 
 gcc_CHECK_ATTRIBUTE_ALIAS
 
 
-dnl The .sleb128/.uleb128 probe lives in target-specs/configure.ac; the pin
-dnl that used to stand in for it here is gone with the DWARF2_DEBUG_VIEW probe.
-
 dnl The CFI probe cluster (.cfi_startproc/.cfi_offset/.cfi_escape, working
-dnl cfi advance, .cfi_personality, .cfi_sections) and the gcc_fn_eh_frame_ro
-dnl helper have moved to target-specs/configure.ac.  Every arm of them was
-dnl target knowledge: a case over $target for hppa-hpux, Solaris (which reads
-dnl gcc_cv_ld_ro_rw_mix) and Darwin, plus a case over $target_os for PE for
-dnl .cfi_sections.  cc1 now reads cfi_personality and cfi_sections from
-dnl targ_caps.
+dnl cfi advance, ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3331".
 
 
+dnl --enable-newlib-nano-formatted-io mirrored a newlib configure flag so
+dnl GCC could gate features on it.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3343".
 
-dnl The .loc is_stmt and .loc discriminator probes moved to target-specs.
-
-dnl --enable-newlib-nano-formatted-io mirrored a newlib configure flag so GCC
-dnl could gate features on it.  Which newlib variant will be linked is a target
-dnl libc property, so HAVE_NEWLIB_NANO_FORMATTED_IO is now a target-header
-dnl macro with a 0 default in defaults.h, matching the stock default (the
-dnl option was off unless explicitly given).
-
-dnl Thread-local storage.  gcc/configure.ac used to answer HAVE_AS_TLS with a
-dnl ~400-line parameterized probe: a `case "$target"' supplying a different
-dnl conftest_s and tls_as_opt for each of ~20 architectures, then one
-dnl gcc_GAS_CHECK_FEATURE over the result, plus a Windows-only linker check for
-dnl broken @secrel32 relocations.
-dnl
-dnl HAVE_AS_TLS does NOT become a targ_caps capability, for two reasons:
-dnl
-dnl   - It is read from ~55 insn conditions in config/*/*.md (rs6000, alpha,
-dnl     mips, frv, xtensa, loongarch).  Those compile into generated TUs that
-dnl     see tm.h but not target-caps.h, so `targ_caps' is not in scope there.
-dnl   - It is already a target-header macro.  Eight target headers supply an
-dnl     `#ifndef HAVE_AS_TLS / #define HAVE_AS_TLS 0' fallback and the Lynx
-dnl     headers #undef it, so simply dropping the define here would silently
-dnl     turn TLS off on rs6000, sparc, alpha, mips, frv, xtensa and loongarch.
-dnl
-dnl So it stays a build-time constant, defined unconditionally: every assembler
-dnl any supported binutils ships has had TLS for close to two decades.  A target
-dnl whose assembler lacks it still says so in its own header, exactly as the
-dnl Lynx ports already do.
+dnl Thread-local storage.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3349".
 AC_DEFINE(HAVE_AS_TLS, 1,
 	  [Define if your assembler and linker support thread-local storage.])
 
@@ -3412,31 +3197,12 @@ AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
 	[Define if your assembler supports DTPREL relocation.])
 
 
+dnl --with-glibc-version is gone, and so is the probe that stood in for it:
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3420".
 
+dnl --enable-gnu-unique-object and its probe lived here.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3432".
 
-
-
-
-dnl --with-glibc-version is gone, and so is the probe that stood in for it: a
-dnl grep for __GLIBC__ in $target_header_dir/features.h, i.e. gcc/configure
-dnl opening the target sysroot and freezing what it found into TARGET_GLIBC_MAJOR
-dnl and TARGET_GLIBC_MINOR.  The compiler must not care about target sysroots,
-dnl and the failure mode was the familiar one: no target headers meant no
-dnl answer, so it recorded 0.0 and silently changed behaviour (this is what made
-dnl --with-long-double-128 flip an ABI).
-dnl
-dnl The version is now targ_caps.glibc_major/minor, supplied per target through
-dnl the target config file; target-specs takes --with-glibc-version.  0.0 still
-dnl means unknown, and every consumer tests `>= X.Y' so unknown enables nothing.
-
-dnl --enable-gnu-unique-object and its probe lived here.  The probe assembled
-dnl `.type foo, @gnu_unique_object' using $target_type_format_char from
-dnl config.gcc and then required glibc >= 2.11 for ld.so support.  Both halves
-dnl describe the target, so the decision now lives in the libc target headers
-dnl as USE_GNU_UNIQUE_OBJECT (config/linux.h, config/gnu.h), defaulting to 0 in
-dnl defaults.h.  config/elfos.h consumes it from inside ASM_DECLARE_OBJECT_NAME.
-
-dnl The "tolerance to line number 0" probe moved to target-specs.
 
 AC_MSG_CHECKING(support for thin archives)
 thin_archive_support=no
@@ -3453,40 +3219,17 @@ AC_SUBST(thin_archive_support)
 
 
 dnl The ld64 and dsymutil probe blocks that stood here are gone to
-dnl target-specs/configure.ac -- as a DELETION, not a transcription, and the
-dnl distinction matters for anyone auditing this.
-dnl
-dnl Both were guarded by `if test x"$ld64_flag" = xyes' and
-dnl `if test x"$dsymutil_flag" = xyes', and this file sets both variables to
-dnl `no' at the top and never to anything else -- the `case $target in *darwin*'
-dnl that used to set them went with the target canonicalisation.  So neither
-dnl block had run on any target for some time, LD64_HAS_* were undefined
-dnl everywhere, and `#if LD64_HAS_DEMANGLE' on an undefined macro is a silent 0.
-dnl That is what e1c6eb651c9 fixed, on the consumer side: config/darwin.h now
-dnl derives the five LD64_HAS_* from DEF_LD64_MAJOR, and defines them
-dnl unconditionally, so an AC_DEFINE here would now be a redefinition of a macro
-dnl the target header already owns.
-dnl
-dnl Removing unreachable code is behaviour-neutral by construction, which is why
-dnl this one needs no follow-up: every consumer was already taking the floor.
-dnl LD64_VERSION keeps its "85.2.1" floor in darwin.h and DSYMUTIL_VERSION its
-dnl DET_UNKNOWN floor in darwin.cc, which is exactly what they had yesterday.
-dnl The real answers are a question for the ld64 that will actually link, i.e.
-dnl for target-specs.
+dnl target-specs/configure.ac -- as a ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3455".
 
 
 dnl --enable-libssp and the gcc_cv_libc_provides_ssp probe used to decide
-dnl TARGET_LIBC_PROVIDES_SSP by inspecting the target C library: a
-dnl `case "$target"' over musl/linux/gnu/darwin/*bsd plus greps of
-dnl $target_header_dir/features.h.  That is a property of the target, so
-dnl TARGET_LIBC_PROVIDES_SSP now comes from the target headers
-dnl (config/gnu-user.h, config/freebsd.h, config/netbsd.h, config/darwin.h)
-dnl with a 0 default in defaults.h.
+dnl TARGET_LIBC_PROVIDES_SSP by ...
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3478".
 
 dnl --enable-default-ssp used to AC_DEFINE(ENABLE_DEFAULT_SSP), gated on a
-dnl `case "$target"' that excluded ia64.  ENABLE_DEFAULT_SSP is now purely a
-dnl target-header knob; defaults.h supplies DEFAULT_FLAG_SSP 0 when no target
-dnl header defines it.
+dnl `case "$target"' that excluded ia64.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3486".
 
 dnl libatomic_target names the ONE triple this build will have a libatomic for,
 dnl and is empty when there is none.  LINK_LIBATOMIC_SPEC needs it: -latomic is
@@ -3524,50 +3267,22 @@ elif echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
 fi
 AC_SUBST(libatomic_target)
 
-dnl The <sys/sdt.h> probe is gone.  Nothing in gcc/ ever read HAVE_SYS_SDT_H:
-dnl its only consumers are libgcc/unwind-dw2.c and unwind-arm-common.inc, which
-dnl received it through tconfig.h -> auto-host.h.  It describes the target C
-dnl library, i.e. libgcc's own host, and gcc answered it by looking inside
-dnl $target_header_dir -- a target sysroot a compiler serving many targets has
-dnl no business reading.  libgcc/configure.ac now does AC_CHECK_HEADERS(sys/sdt.h),
-dnl which spells it the same way, and those two files include auto-target.h.
+dnl The <sys/sdt.h> probe is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3527".
 
-dnl --with-long-double-128 and the probe behind it are gone.  The question --
-dnl does this target.s C library use 128-bit long double -- was answered by
-dnl reading __GLIBC__ out of $target_header_dir/features.h, i.e. by looking
-dnl inside the target sysroot, which a compiler serving many targets has no
-dnl business doing.  Worse, a cross build with no headers installed silently got
-dnl "no": the probe cannot run, so it records the wrong answer rather than
-dnl failing.  gcc/config.gcc now decides it from the triple, which is where the
-dnl musl half of the old logic already lived.  glibc 2.4 is from 2006 and every
-dnl glibc GCC supports is far past it, so the probe had exactly one answer.
+dnl --with-long-double-128 and the probe behind it are gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3535".
 
-dnl --with-long-double-format is gone.  It picked one of two mutually exclusive
-dnl ABIs -- IBM double-double or IEEE binary128 -- for powerpc64 Linux and froze
-dnl it into the compiler as TARGET_IEEEQUAD_DEFAULT.  config/rs6000/rs6000.cc
-dnl carries its own #ifndef fallback keyed on POWERPC_LINUX/POWERPC_FREEBSD,
-dnl which is what a build that did not pass the option always got, so nothing
-dnl changes for anyone who did not use it.  -mabi=ieeelongdouble still selects it
-dnl per compilation.
+dnl --with-long-double-format is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3545".
 
 dnl TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and TARGET_LIBC_GNUSTACK are gone from
-dnl here.  Both combined a `case $target' with a glibc version test, and both
-dnl described the target's C library rather than this compiler.  They are now
-dnl targ_caps.libc_hwcap_in_tcb and targ_caps.libc_gnustack, worked out by
-dnl target-specs -- the step that knows the triple AND the glibc version -- and
-dnl read at run time by config/rs6000/ and config/mips/.
+dnl here.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3553".
 
 dnl The dl_iterate_phdr probe is gone, for the same reason and to the same
-dnl place: libgcc/configure.ac.  Nothing in gcc/ reads TARGET_DL_ITERATE_PHDR;
-dnl its consumers are libgcc/unwind-dw2-fde-dip.c and libgcc/crtstuff.c.
-dnl
-dnl It was doubly wrong here.  It keyed on `case "$target"', and $target is
-dnl empty in this tree, so it fell through to `unknown' and the macro was never
-dnl defined for ANY target -- USE_PT_GNU_EH_FRAME silently off on Solaris, the
-dnl BSDs and musl.  And the FreeBSD arm of it grepped
-dnl $target_header_dir/sys/link_elf.h.  libgcc keys on $host, which is the same
-dnl machine under the name that is correct there, and greps the headers it is
-dnl actually compiling against.
+dnl place:
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3560".
 
 # We no longer support different GC mechanisms.  Emit an error if
 # the user configures with --with-gc.
@@ -4092,10 +3807,8 @@ if test "${ENABLE_LIBQUADMATH_SUPPORT}" != "no" ; then
 fi
 
 
-dnl --with-linker-hash-style is gone.  It baked one linker's hash format into
-dnl the driver, prepended to link_spec inside init_spec().  A target that wants
-dnl --hash-style= can say so in its own link spec; a build that did not pass the
-dnl option prepended nothing, which is now the only behaviour.
+dnl --with-linker-hash-style is gone.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:4095".
 
 # Specify what should be the default of -fdiagnostics-color option.
 AC_ARG_WITH([diagnostics-color],
@@ -4257,14 +3970,9 @@ esac
 AC_SUBST(CET_HOST_FLAGS)
 
 
-dnl --enable-s390-excess-float-precision is gone, and so is the probe behind it.
-dnl On s390 the target C library has historically typedef'ed float_t to double,
-dnl and the compiler has to agree with whatever its libc does.  The default
-dnl answered that by compiling `#include <math.h>' against the target sysroot --
-dnl a build-time look inside the target's C library, which is the thing a
-dnl multi-target compiler cannot do.  It is now targ_caps.s390_excess_float_precision,
-dnl read at run time from the target config file (see gcc/target-caps.h), and
-dnl config/s390/s390.cc tests it with an ordinary `if'.
+dnl --enable-s390-excess-float-precision is gone, and so is the probe behind
+dnl it.
+dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:4260".
 
 # On x86-64, when profiling is enabled with shrink wrapping, the mcount
 # call may not be placed at the function entry after
@@ -4298,7 +4006,6 @@ if test x$PERF != xno; then
 fi
 AC_SUBST(PERF)
 AC_SUBST(AFDO_PROFILER)
-
 
 
 # Configure the subdirectories
