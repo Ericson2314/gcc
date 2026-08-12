@@ -2062,6 +2062,10 @@ else
   spec_shared_libgcc=no
 fi
 
+case $spec_shared_libgcc in
+  yes | no ) ;;
+  * ) as_fn_error $? "--with-shared-libgcc must be \`yes' or \`no', not \`$spec_shared_libgcc'; it says whether ${target} has a shared libgcc, and any other value would silently select the static libgcc specs for that target alone" "$LINENO" 5 ;;
+esac
 
 # Check whether --with-glibc-version was given.
 if test "${with_glibc_version+set}" = set; then :

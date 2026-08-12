@@ -202,6 +202,14 @@ AC_ARG_WITH([shared-libgcc],
   [AS_HELP_STRING([--with-shared-libgcc=yes|no],
      [this target has a shared libgcc (config.gcc gave it t-slibgcc)])],
   [spec_shared_libgcc=$withval], [spec_shared_libgcc=no])
+dnl A value that is neither `yes' nor `no' would fall down the `else' arm below
+dnl and be indistinguishable from a target that really has no shared libgcc --
+dnl the absence of an answer becoming an answer, silently, on that one target.
+dnl The default above is a decision; a misspelt --with-shared-libgcc= is not.
+case $spec_shared_libgcc in
+  yes | no ) ;;
+  * ) AC_MSG_ERROR([--with-shared-libgcc must be `yes' or `no', not `$spec_shared_libgcc'; it says whether ${target} has a shared libgcc, and any other value would silently select the static libgcc specs for that target alone]) ;;
+esac
 dnl The target's GNU C Library version.  gcc/configure used to grep __GLIBC__
 dnl out of the target sysroot's features.h; this step is the right place to ask,
 dnl because it runs per target after the build and whoever runs it knows what
