@@ -3364,10 +3364,42 @@ options-urls.cc: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
 	       -f $(srcdir)/options-urls-cc-gen.awk \
 	       -v header_name="config.h system.h coretypes.h tm.h" < $< > $@
 
+# THE SHARED `struct gcc_options' LAYOUT.  There is exactly one
+# `global_options' in the compiler and this header is what gives it a shape;
+# until the union it had the PRIMARY back end's, while every other back end was
+# compiled against its own options-<base>.h.  Measured in a two-target build
+# dir: 1709 members against 1861, with an identical leading run of ZERO, so
+# `aarch64_override_options' read `global_options+0x19e8' expecting
+# `x_aarch64_branch_protection_string' and got an i386 field -- in bounds, so
+# nothing trapped and there was no diagnostic to have.  See the long note at
+# the top of opth-gen.awk.
+#
+# MT_OPTIONS_UNION_LIST is set ONLY by multi-target-common.mk, so a
+# single-target build passes no -v union_file, opth-gen.awk takes its own
+# members exactly as before, and this file is byte-identical.  Check it is
+# wired up against the GENERATED fragment rather than against this comment:
+#
+#	grep -c ' -v union_file=gcc-options-union.list ' multi-target-common.mk
+OPTIONS_UNION_FLAGS = $(if $(MT_OPTIONS_UNION_LIST), \
+  -v union_file=$(MT_OPTIONS_UNION_LIST) -v union_base=$(multi_target_base))
+
+# An empty $(multi_target_base) with a non-empty union list would leave
+# opth-gen.awk with `-v union_base=', which it rejects rather than generating
+# a header for nobody -- but the message would be about awk, so say it here.
+check_options_union_base = \
+  test -z "$(MT_OPTIONS_UNION_LIST)" -o -n "$(multi_target_base)" || { \
+    echo "s-options-h: multi_target_base is empty; opth-gen.awk cannot be" >&2; \
+    echo "  told which back end the shared options.h is generated for." >&2; \
+    echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+    echo "  targetm_common_<base>_common" >&2; \
+    exit 1; }
+
 options.h: s-options-h ; @true
 s-options-h: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
-    $(srcdir)/opth-gen.awk
+    $(srcdir)/opth-gen.awk $(MT_OPTIONS_UNION_LIST)
+	@$(check_options_union_base)
 	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \
+	       $(OPTIONS_UNION_FLAGS) \
 	       -f $(srcdir)/opth-gen.awk \
 	       < $< > tmp-options.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-options.h options.h
@@ -4937,6 +4969,7 @@ clean: mostlyclean lang.clean
 	-rm -f etlist
 	-rm -f options.cc options.h optionlist optionlist-vocab optionlist-[a-z0-9]*
 	-rm -f options-[a-z0-9]*.h
+	-rm -f gcc-options-union.list gcc-options-*.part
 	-rm -f cs-*
 	-rm -f doc/*.dvi
 	-rm -f doc/*.pdf

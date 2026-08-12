@@ -433,14 +433,61 @@ ${AWK} '
       printf "\tLC_ALL=C; export LC_ALL; \\\n"
       printf "\tcat $@.own $@.stub | sort > $@\n"
       printf "\trm -f $@.own $@.stub\n\n"
-      printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
+      # This back end contribution to the SHARED `struct gcc_options layout.
+      # There is one global_options in the compiler and it had the PRIMARY
+      # back end layout, while every other back end was compiled against its
+      # own options-<base>.h: measured i386 1709 members against aarch64 1861,
+      # with an identical leading run of ZERO, so aarch64_override_options
+      # read an i386 field, in bounds and with no diagnostic.  See the long
+      # note at the top of opth-gen.awk.  Kept as a separate file per back end
+      # so the union rule is a concatenation and cannot half-succeed.
+      printf "gcc-options-%s.part: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
+      printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
+      printf "\t  -v list_mode=1 -v union_base=%s \\\n", b
+      printf "\t  -f $(srcdir)/opth-gen.awk < $< > tmp-gcc-options-%s.part\n", b
+      # Every quote below is written \047, not typed.  This whole awk program
+      # is inside a single-quoted shell word, so one literal apostrophe ends
+      # it and the rest of the program becomes shell -- which is exactly what
+      # happened here first time round: configure printed `unterminated
+      # string, appended NOTHING to multi-target-common.mk, and carried on to
+      # exit 0.  A build directory then quietly lost every options rule.
+      printf "\t@grep -q \047^base %s$$\047 tmp-gcc-options-%s.part || { \\\n", b, b
+      printf "\t  echo \047gcc-options-%s.part: no \"base %s\" line;\047 >&2; \\\n", b, b
+      printf "\t  echo \047  the union would then be taken over the OTHER back ends\047 >&2; \\\n"
+      printf "\t  echo \047  and the members of this one would be missing everywhere.\047 >&2; \\\n"
+      printf "\t  exit 1; }\n"
+      printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-gcc-options-%s.part $@\n\n", b
+      union_parts = union_parts " gcc-options-" b ".part"
+
+      printf "options-%s.h: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk gcc-options-union.list\n", b, b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       # A guard of its own. Sharing one guard across the shared options.h and
       # the other 44 made a second ...
       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2181".
       printf "\t  -v guard_name=OPTIONS_%s_H \\\n", toupper(b)
+      printf "\t  -v union_file=gcc-options-union.list -v union_base=%s \\\n", b
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
     }
+
+    # The union list itself, and the singular options.h flags that make
+    # gcc/Makefile.in use it.  Both are defined ONLY here, so a single-target
+    # build -- which never reads this file -- passes no -v union_file at all
+    # and every generated options header comes out byte-identical to before.
+    printf "MT_OPTIONS_UNION_LIST = gcc-options-union.list\n\n"
+    printf "gcc-options-union.list:%s\n", union_parts
+    printf "\tcat%s > tmp-gcc-options-union.list\n", union_parts
+    # A SHORT list is the failure that would otherwise be silent: opth-gen.awk
+    # -U refuses a list that does not name the back end being generated, which
+    # catches the case where the missing base is this one, but a list missing
+    # some OTHER back end still covers this one and would simply lay out fewer
+    # members -- in every header, consistently, and wrongly.
+    printf "\t@test `grep -c \047^base \047 tmp-gcc-options-union.list` -eq %d || { \\\n", nbase
+    printf "\t  echo \047gcc-options-union.list: expected %d base lines, got\047 \\\n", nbase
+    printf "\t       `grep -c \047^base \047 tmp-gcc-options-union.list`; \\\n"
+    printf "\t  echo \047  a short list lays out fewer members than some configured\047; \\\n"
+    printf "\t  echo \047  back end needs, in every options header, consistently.\047; \\\n"
+    printf "\t  exit 1; } >&2\n"
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-gcc-options-union.list $@\n\n"
   }
 ' ${gcc_target_manifest} >> ${gcc_common_mk}
 

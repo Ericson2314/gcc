@@ -25,9 +25,290 @@
 # Usage: awk -f opt-functions.awk -f opt-read.awk -f opth-gen.awk \
 #            < inputfile > options.h
 
+# ---------------------------------------------------------------------
+# THE SHARED `struct gcc_options' LAYOUT.
+#
+# There is exactly ONE `global_options' in the compiler, and until this it had
+# the PRIMARY back end's layout while every other back end was compiled against
+# its own options-<base>.h.  Measured in a two-target (i386 primary + aarch64)
+# build dir before this change:
+#
+#     struct gcc_options members        i386 1709      aarch64 1861
+#     identical leading run of names           0       (of 1709)
+#	i386[0]    = x_ix86_stack_protector_guard_offset
+#	aarch64[0] = x_selected_arch
+#     shared member names                   1593, type disagreements 0
+#     i386-only 116, aarch64-only 268, union 1977
+#
+# Not one field offset is shared -- the divergence starts at member ZERO -- so
+# `aarch64_override_options' read `global_options+0x19e8' expecting
+# `x_aarch64_branch_protection_string' and got an i386 field.  `sizeof' is
+# 0x1c48, so the read is IN BOUNDS: nothing traps, it just xstrdup()s an
+# integer.  There is no diagnostic available for that shape, which is why this
+# has to be prevented by construction rather than caught.
+#
+# Two halves of this problem; only the second is new here.
+#
+#   * The option-name VOCABULARY -- which names exist, hence which `enum
+#     opt_code' ordinal each gets -- was already unioned by optionlist-vocab
+#     and opt-stub.awk.  `cl_options[]' and `enum opt_code' therefore ALREADY
+#     agree between bases, and nothing below changes them.
+#   * The STORAGE -- which members `struct gcc_options' has and in what order
+#     -- did not agree, because a stub carries no Var() and so contributes an
+#     `x_VAR_<option>' where the owning back end contributes its real
+#     `x_aarch64_...'.  Both are real members of their own header; neither is
+#     wrong; they simply sit at different offsets.
+#
+# So the union taken here is the union of the two MEMBER SETS, keeping both
+# spellings.  It is emphatically NOT a union of the option DATA: no Mask() bit
+# is ever moved between back ends (opt-stub.awk explains why -- the union of
+# every back end's bare masks overflows a 32-bit `target_flags', and feeding
+# the global vocabulary straight through this script produces an UNGUARDED
+# `#error too many target masks').  A member costs storage and nothing else.
+#
+# Mechanics, the same three-flag shape as genconfig's insn-config.h union and
+# genmodes' shared numbering:
+#
+#   -v list_mode=1 -v union_base=B    write this back end's member list
+#   -v union_file=F -v union_base=B   read the union; emit ITS members, in ITS
+#				      order, for every back end
+#
+# The union file is a concatenation of the per-base lists, primary first, and
+# the order of first appearance is the layout.  That means the primary's own
+# members keep their order and offsets and the other back ends' exclusive
+# members are appended -- so this change costs the primary +268 members and
+# moves none of them.
+#
+# ABSENCE IS NEVER AN ANSWER.  With -v union_file, this script FAILS if the
+# union file does not name this back end, if it is empty, if it lacks a member
+# this back end's own records require, or if two back ends declare the same
+# member differently.  A `#ifndef'-style floor -- "emit my own member if the
+# union has not got one" -- would turn every one of those into a silently
+# divergent layout, which is precisely the bug being removed.
+#
+# In a single-target build no union file is passed, nothing below runs, and
+# options.h is byte-identical to what it was.
+
+# Record one member of `struct gcc_options'.  KIND is V (a Variable or
+# TargetVariable record), O (an option with Var()), S (a Target option with no
+# Var(), which gets an x_VAR_<option> slot) or F (a SetByCombined
+# frontend_set_ flag).  TEXT is the complete block of lines this member emits,
+# newline-separated, so that a member is compared and reproduced as the exact
+# thing it generates rather than as a description of it.
+function add_member(kind, name, text,    key)
+{
+	# V, O and S all name a field `x_<name>' and a macro; they share one
+	# namespace and a clash between them is a real conflict, not an
+	# artefact of the encoding.  F names `frontend_set_<name>' instead.
+	key = (kind == "F" ? "F" : "X") SUBSEP name
+	if (key in member_text) {
+		if (member_text[key] != text) {
+			print "opth-gen.awk: two declarations of member " \
+			      name ":" > "/dev/stderr"
+			print member_text[key] > "/dev/stderr"
+			print "and" > "/dev/stderr"
+			print text > "/dev/stderr"
+			exit 1
+		}
+		return
+	}
+	member_text[key] = text
+	member_kind[key] = kind
+	member_name[key] = name
+	member_order[n_members++] = key
+}
+
+# Encode a member as one line of the union list.  Newlines inside TEXT become
+# `\n' so that a member is one record; nothing else in the text is escaped
+# because these blocks are generated C and contain no backslashes.
+function member_line(key,    t)
+{
+	t = member_text[key]
+	gsub(/\\/, "\\\\", t)
+	gsub(/\n/, "\\n", t)
+	return member_kind[key] "\t" member_name[key] "\t" t
+}
+
+function decode_text(t)
+{
+	gsub(/\\n/, "\n", t)
+	gsub(/\\\\/, "\\", t)
+	return t
+}
+
+function union_fail(msg)
+{
+	print "opth-gen.awk: " (union_file == "" ? "<no union file>" : union_file) \
+	      ": " msg > "/dev/stderr"
+	exit 1
+}
+
+# Read the union file into u_* arrays, and check it names this back end.
+function read_union(   line, nf, f, key, n)
+{
+	if (union_base == "")
+		union_fail("-v union_file needs -v union_base=<back end>")
+	n_u_members = 0
+	n_u_includes = 0
+	n_bases = 0
+	while ((getline line < union_file) > 0) {
+		if (line ~ /^base /) {
+			sub(/^base /, "", line)
+			u_base[line] = 1
+			n_bases++
+			continue
+		}
+		nf = split(line, f, "\t")
+		if (nf == 0 || f[1] == "")
+			continue
+		if (f[1] == "I") {
+			if (!(f[2] in u_include_seen)) {
+				u_include_seen[f[2]] = 1
+				u_include[n_u_includes++] = f[2]
+			}
+			continue
+		}
+		if (f[1] != "V" && f[1] != "O" && f[1] != "S" && f[1] != "F")
+			union_fail("unknown record kind `" f[1] "'")
+		key = (f[1] == "F" ? "F" : "X") SUBSEP f[2]
+		if (key in u_text) {
+			if (u_text[key] != f[3])
+				union_fail("member " f[2] " declared twice," \
+					   " differently")
+			continue
+		}
+		u_text[key] = f[3]
+		u_order[n_u_members++] = key
+	}
+	close(union_file)
+	if (n_bases == 0)
+		union_fail("no `base' line at all -- this is not a union list")
+	if (!(union_base in u_base))
+		union_fail("does not name back end `" union_base "'; the" \
+			   " union would then be taken over the OTHER back" \
+			   " ends and this one's members would be missing")
+	if (n_u_members == 0)
+		union_fail("no member records")
+}
+
+# Every member this back end's own records require must be in the union, with
+# the same declaration.  This is the check that catches a stale union list --
+# the failure that would otherwise be silent, because the member would simply
+# not be there and every offset after it would shift.
+function check_union_covers_self(   i, key)
+{
+	for (i = 0; i < n_members; i++) {
+		key = member_order[i]
+		if (!(key in u_text))
+			union_fail("back end `" union_base "' declares member " \
+				   member_name[key] " and the union list does" \
+				   " not; the list is stale")
+		if (decode_text(u_text[key]) != member_text[key])
+			union_fail("back end `" union_base "' and the union" \
+				   " list disagree about member " \
+				   member_name[key])
+	}
+	for (i = 0; i < n_extra_h_includes; i++)
+		if (!(extra_h_includes[i] in u_include_seen))
+			union_fail("back end `" union_base "' includes " \
+				   extra_h_includes[i] " and the union list" \
+				   " does not; the union's members would not" \
+				   " compile")
+}
+
+# Build the member list this back end's own records describe.  The four loops
+# below are the ones that used to print directly into the struct, unchanged in
+# what they select and in what order; only the destination moved, so that the
+# same list can be written out (-v list_mode) as well as printed.
+function collect_members(   i, var, orig_var, name, type, type_after, txt)
+{
+	for (i = 0; i < n_extra_vars; i++) {
+		var = extra_vars[i]
+		sub(" *=.*", "", var)
+		orig_var = var
+		name = var
+		type = var
+		type_after = var
+		sub("^.*[ *]", "", name)
+		sub("\\[.*\\]$", "", name)
+		sub("\\[.*\\]$", "", type)
+		sub(" *" name "$", "", type)
+		sub("^.*" name, "", type_after)
+		var_seen[name] = 1
+		txt = "#ifdef GENERATOR_FILE\n" \
+		      "extern " orig_var ";\n" \
+		      "#else\n" \
+		      "  " type " x_" name type_after ";\n" \
+		      "#define " name " global_options.x_" name "\n" \
+		      "#endif"
+		add_member("V", name, txt)
+	}
+
+	for (i = 0; i < n_opts; i++) {
+		if (flag_set_p("Save", flags[i]))
+			have_save = 1;
+
+		name = var_name(flags[i]);
+		if (name == "")
+			continue;
+
+		if (name in var_seen)
+			continue;
+
+		var_seen[name] = 1;
+		txt = "#ifdef GENERATOR_FILE\n" \
+		      "extern " var_type(flags[i]) name ";\n" \
+		      "#else\n" \
+		      "  " var_type(flags[i]) "x_" name ";\n" \
+		      "#define " name " global_options.x_" name "\n" \
+		      "#endif"
+		add_member("O", name, txt)
+	}
+	for (i = 0; i < n_opts; i++) {
+		name = static_var(opts[i], flags[i]);
+		if (name != "") {
+			txt = "#ifndef GENERATOR_FILE\n" \
+			      "  " var_type(flags[i]) "x_" name ";\n" \
+			      "#define x_" name " do_not_use\n" \
+			      "#endif"
+			add_member("S", name, txt)
+		}
+	}
+	for (i = 0; i < n_opts; i++) {
+		if (flag_set_p("SetByCombined", flags[i])) {
+			name = var_name(flags[i])
+			txt = "#ifndef GENERATOR_FILE\n" \
+			      "  bool frontend_set_" name ";\n" \
+			      "#endif"
+			add_member("F", name, txt)
+		}
+	}
+}
+
 # Dump out an enumeration into a .h file.
 # Combine the flags of duplicate options.
 END {
+# Collect the members of `struct gcc_options' that THIS back end's records
+# describe.  Done before anything is printed, because list mode prints these
+# and nothing else.
+collect_members()
+
+if (list_mode != "") {
+	if (union_base == "")
+		union_fail("-v list_mode=1 needs -v union_base=<back end>")
+	print "base " union_base
+	for (i = 0; i < n_extra_h_includes; i++)
+		print "I\t" extra_h_includes[i]
+	for (i = 0; i < n_members; i++)
+		print member_line(member_order[i])
+	exit 0
+}
+
+if (union_file != "") {
+	read_union()
+	check_union_covers_self()
+}
+
 print "/* This file is auto-generated by opth-gen.awk.  */"
 print ""
 # The include guard is per OUTPUT FILE, not per family.  All 45
@@ -61,7 +342,19 @@ print ""
 print "#include \"flag-types.h\""
 print ""
 
-if (n_extra_h_includes > 0) {
+# With a union layout the members of the OTHER back ends are declared here
+# too, so their types have to be visible: `enum aarch64_arch x_selected_arch'
+# needs config/aarch64/aarch64-opts.h in a header i386 also reads.  The union
+# list carries the HeaderInclude records of every back end for exactly this
+# reason, and check_union_covers_self has already refused a list that is
+# missing one of ours.
+if (union_file != "") {
+	for (i = 0; i < n_u_includes; i++)
+		print "#include " quote u_include[i] quote
+	if (n_u_includes > 0)
+		print ""
+}
+else if (n_extra_h_includes > 0) {
 	for (i = 0; i < n_extra_h_includes; i++) {
 		print "#include " quote extra_h_includes[i] quote
 	}
@@ -78,61 +371,17 @@ print "#endif"
 print "{"
 print "#endif"
 
-for (i = 0; i < n_extra_vars; i++) {
-	var = extra_vars[i]
-	sub(" *=.*", "", var)
-	orig_var = var
-	name = var
-	type = var
-	type_after = var
-	sub("^.*[ *]", "", name)
-	sub("\\[.*\\]$", "", name)
-	sub("\\[.*\\]$", "", type)
-	sub(" *" name "$", "", type)
-	sub("^.*" name, "", type_after)
-	var_seen[name] = 1
-	print "#ifdef GENERATOR_FILE"
-	print "extern " orig_var ";"
-	print "#else"
-	print "  " type " x_" name type_after ";"
-	print "#define " name " global_options.x_" name
-	print "#endif"
+# Either this back end's own members, or -- when a union list was given -- the
+# union's, in the union's order, which is the same for every back end.  Note
+# there is no third case and no fallback: read_union has already stopped the
+# build if the list is unusable, so a missing answer cannot become a layout.
+if (union_file != "") {
+	for (i = 0; i < n_u_members; i++)
+		print decode_text(u_text[u_order[i]])
 }
-
-for (i = 0; i < n_opts; i++) {
-	if (flag_set_p("Save", flags[i]))
-		have_save = 1;
-
-	name = var_name(flags[i]);
-	if (name == "")
-		continue;
-
-	if (name in var_seen)
-		continue;
-
-	var_seen[name] = 1;
-	print "#ifdef GENERATOR_FILE"
-	print "extern " var_type(flags[i]) name ";"
-	print "#else"
-	print "  " var_type(flags[i]) "x_" name ";"
-	print "#define " name " global_options.x_" name
-	print "#endif"
-}
-for (i = 0; i < n_opts; i++) {
-	name = static_var(opts[i], flags[i]);
-	if (name != "") {
-		print "#ifndef GENERATOR_FILE"
-		print "  " var_type(flags[i]) "x_" name ";"
-		print "#define x_" name " do_not_use"
-		print "#endif"
-	}
-}
-for (i = 0; i < n_opts; i++) {
-	if (flag_set_p("SetByCombined", flags[i])) {
-		print "#ifndef GENERATOR_FILE"
-		print "  bool frontend_set_" var_name(flags[i]) ";"
-		print "#endif"
-	}
+else {
+	for (i = 0; i < n_members; i++)
+		print member_text[member_order[i]]
 }
 print "#ifndef GENERATOR_FILE"
 print "};"
