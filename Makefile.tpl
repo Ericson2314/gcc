@@ -24,13 +24,14 @@ in
 # <http://www.gnu.org/licenses/>.
 #
 
-# First, test for a proper version of make, but only where one is required.
+# First, test for a proper version of make.  This must NOT be wrapped in
+# `@if gcc': the makefile machinery that needs 3.80 lives in this file itself,
+# so a tree configured without gcc has to be diagnosed too.  Guarding it on gcc
+# meant a pre-3.80 make in a gcc-less tree got no diagnostic at all.
 
-@if gcc
 ifeq (,$(.VARIABLES)) # The variable .VARIABLES, new with 3.80, is never empty.
 $(error GNU make version 3.80 or newer is required.)
 endif
-@endif gcc
 
 # -------------------------------
 # Standard Autoconf-set variables
