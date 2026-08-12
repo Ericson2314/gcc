@@ -1583,10 +1583,53 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # two-axis.  The split count is a build-parallelism knob shared by every back
   # end (INSNEMIT_SPLITS_SEQ), not target data, so the rule list and the
   # generator's own -O list are the same list and cannot disagree.
-  printf "insn-emit-%s-%%.o: mt-%s/insn-emit-%s-%%.cc %s-inc/s-inc\n", cpu, cpu, cpu, cpu;
-  printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
-  printf "insn-recog-%s-%%.o: mt-%s/insn-recog-%s-%%.cc %s-inc/s-inc\n", cpu, cpu, cpu, cpu;
-  printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+  #
+  # *** WHY THESE ARE $(eval)ed EXPLICIT RULES AND NOT PATTERN RULES ***
+  #
+  # They WERE pattern rules -- `insn-emit-<cpu>-%.o: mt-<cpu>/insn-emit-<cpu>-%.cc'
+  # -- and that is a dependency-tracking bug, not a style question.  In a
+  # pattern rule `$*' is the STEM, and the stem here is the shard number alone.
+  # $(COMPILE)/$(POSTCOMPILE) name the depfile `$(@D)/$(DEPDIR)/$(*F).TPo', so
+  # every one of those objects wrote `./.deps/<N>.TPo':
+  #
+  #   insn-emit-i386-1.o     -> ./.deps/1.TPo      (stem "1")
+  #   insn-recog-i386-1.o    -> ./.deps/1.TPo
+  #   insn-emit-aarch64-1.o  -> ./.deps/1.TPo
+  #   insn-recog-aarch64-1.o -> ./.deps/1.TPo
+  #
+  # Two failures, and the SECOND is the serious one.
+  #
+  #   * Four objects race for one file under -j.  That is the intermittent
+  #     `mv: cannot stat ./.deps/<N>.TPo' -- one recipe's POSTCOMPILE moves the
+  #     file out from under another's.  Loud, but only sometimes.
+  #   * Makefile.in READS depfiles under a different name entirely.  DEPFILES
+  #     is built as $(dir obj)$(DEPDIR)/$(notdir obj:%.o=%.Po), i.e.
+  #     `./.deps/insn-emit-i386-1.Po' -- which nothing ever wrote.  So the
+  #     `-include $(DEPFILES)' matched NOTHING for every split object, for
+  #     every back end: they had no header dependencies at all and were not
+  #     rebuilt when their prerequisites changed.  Silent, and total, and it
+  #     survives every clean build.
+  #
+  # Upstream does not have this because upstream has no pattern rule for them:
+  # insn-emit-<N>.o is built by the `.cc.o' SUFFIX rule, where `$*' is the
+  # target minus the suffix (`insn-emit-1'), which is exactly what DEPFILES
+  # expects.  Every other rule this file emits is explicit and gets the same
+  # `$*' for the same reason -- `.o' is in .SUFFIXES -- so these two were the
+  # only rules in the generated makefile whose depfile name disagreed with
+  # Makefile.in's, and making them explicit puts them back with the others.
+  #
+  # The shard list is a make variable (@NUM_INSNEMIT_SPLITS@ reaches us only at
+  # make time), so the explicit rules are instantiated with $(foreach)/$(eval)
+  # rather than written out here.  Note `$$' throughout the define: the body is
+  # expanded once by $(eval) and must still contain `$(COMPILE)' and `$<' when
+  # make stores the recipe.
+  printf "define mt_insn_split_rule_%s\n", cpu;
+  printf "insn-$(1)-%s-$(2).o: mt-%s/insn-$(1)-%s-$(2).cc %s-inc/s-inc\n",
+	 cpu, cpu, cpu, cpu;
+  printf "\t$$(COMPILE)%s $$<\n\t$$(POSTCOMPILE)\n", poly;
+  printf "endef\n";
+  printf "$(foreach n,$(INSNEMIT_SPLITS_SEQ),$(eval $(call mt_insn_split_rule_%s,emit,$(n))))\n", cpu;
+  printf "$(foreach n,$(INSNRECOG_SPLITS_SEQ),$(eval $(call mt_insn_split_rule_%s,recog,$(n))))\n\n", cpu;
   objs = objs " $(patsubst %,insn-emit-" cpu "-%.o,$(INSNEMIT_SPLITS_SEQ))";
   objs = objs " $(patsubst %,insn-recog-" cpu "-%.o,$(INSNRECOG_SPLITS_SEQ))";
 

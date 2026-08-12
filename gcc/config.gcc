@@ -3697,6 +3697,17 @@ xstormy16-*-elf)
 xtensa*-*-elf*)
 	tm_file="${tm_file} elfos.h newlib-stdint.h xtensa/elf.h"
 	extra_options="${extra_options} xtensa/elf.opt"
+	# xtensa/t-xtensa is the CPU's own fragment, not an OS one, and it is
+	# what carries the rule for xtensa-dynconfig.o -- which the
+	# `xtensa*-*-*' block above puts in extra_objs for EVERY xtensa triple.
+	# Without it this triple names an object nothing claims a rule for.
+	# The `*-linux*' and `*-uclinux*' cases below already add it; only this
+	# one did not, and the omission is upstream's (present unchanged at the
+	# merge base).  It is not multi-target-specific: upstream's OBJS
+	# contains $(EXTRA_OBJS) and gcc/Makefile.in has VPATH=$(srcdir) with no
+	# `vpath %.cc', so the .cc.o suffix rule looks for
+	# $(srcdir)/xtensa-dynconfig.cc and does not find it either.
+	tmake_file="${tmake_file} xtensa/t-xtensa"
 	;;
 xtensa*-*-linux*)
 	tm_file="${tm_file} elfos.h gnu-user.h linux.h glibc-stdint.h xtensa/linux.h"
