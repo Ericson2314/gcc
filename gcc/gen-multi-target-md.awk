@@ -982,6 +982,34 @@ function emit_asm_ops_registry(	i, n, parts) {
   printf "target-asm-ops-select.o: multi-target-asm-ops.h\n\n";
 }
 
+# The same registry for the addressing tables.  Keyed on mt_bases -- the back
+# ends whose objects are in the archive -- rather than on asm_ops_bases, for
+# the reason given where target-addr-<cpu>.o is emitted: a table for a back end
+# whose <cpu>.cc is not linked would not link.
+#
+# So the two registries are deliberately over DIFFERENT sets, and that is worth
+# stating because the obvious tidy-up -- one shared list -- would be wrong in
+# whichever direction it was resolved: it would either drop the 43 asm-ops
+# tables that legitimately exist for unbuilt back ends, or invent addr tables
+# that cannot link.
+function emit_addr_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "multi-target-addr.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_addr targetm_addr_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_ADDR_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_ADDR_ENTRY (\"%s\", targetm_addr_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-addr.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-addr.h $@\n\n";
+  printf "target-addr-select.o: multi-target-addr.h\n\n";
+}
+
 # The registry multi-target-select.cc includes: every back end that has
 # objects, and the triple-to-back-end map.
 #
@@ -1092,7 +1120,8 @@ $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
-		    emit_asm_ops_registry(); emit_backend_registry();
+		    emit_asm_ops_registry(); emit_addr_registry();
+		    emit_backend_registry();
 		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
 		    emit_inc_dirs() }
@@ -1389,6 +1418,30 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
     printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
     objs = objs " mt-" cpu "/" obj ".o";
   }
+
+  # This back end's addressing register-class predicates -- the `addresses.h'
+  # funnels, compiled against ITS headers.  See target-addr.h.
+  #
+  # Emitted HERE, in the loop over back ends that have objects, and NOT in the
+  # loop that emits target-asm-ops-<base>.o for all 45.  The difference is not
+  # tidiness.  target-asm-ops.cc's initialisers are strings out of tm.h and
+  # link against nothing; target-addr.cc's expand to BACK-END FUNCTIONS --
+  # aarch64_regno_ok_for_base_p, riscv_index_reg_class, pru_regno_ok_for_base_p
+  # and so on -- which exist only if that back end's own .cc files are linked.
+  # For a base outside this loop the object would compile and then fail to
+  # link, which is exactly the trap target-asm-ops.cc records for mmix.
+  #
+  # No -DTM_H_FILE: this object is in MULTI_TARGET_OBJS_<cpu>, so it inherits
+  # the `-I<cpu>-inc' target-specific assignment two lines below and its plain
+  # `#include "tm.h"' already resolves to this back end's.  Naming the file
+  # twice would be a second authority for the same fact.
+  printf "target-addr-%s.o: $(srcdir)/target-addr.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) $(REGS_H) \\\n";
+  printf "  $(srcdir)/target-addr.h\n";
+  printf "\t$(COMPILE) -DTARGETM_ADDR_SYMBOL=targetm_addr_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-addr.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-addr-" cpu ".o";
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;

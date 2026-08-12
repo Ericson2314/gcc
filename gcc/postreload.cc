@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgbuild.h"
 #include "cfgcleanup.h"
 #include "reload.h"
+#include "addresses.h"
 #include "cselib.h"
 #include "tree-pass.h"
 #include "dbgcnt.h"
@@ -1225,8 +1226,8 @@ reload_combine_recognize_pattern (rtx_insn *insn)
 	 register+register that we want to use to substitute uses of REG
 	 (typically in MEMs) with.  First check REG and BASE for being
 	 index registers; we can use them even if they are not dead.  */
-      if (TEST_HARD_REG_BIT (reg_class_contents[INDEX_REG_CLASS], regno)
-	  || TEST_HARD_REG_BIT (reg_class_contents[INDEX_REG_CLASS],
+      if (TEST_HARD_REG_BIT (reg_class_contents[index_reg_class ()], regno)
+	  || TEST_HARD_REG_BIT (reg_class_contents[index_reg_class ()],
 				REGNO (base)))
 	{
 	  index_reg = reg;
@@ -1240,7 +1241,7 @@ reload_combine_recognize_pattern (rtx_insn *insn)
 	     two registers.  */
 	  for (i = first_index_reg; i <= last_index_reg; i++)
 	    {
-	      if (TEST_HARD_REG_BIT (reg_class_contents[INDEX_REG_CLASS], i)
+	      if (TEST_HARD_REG_BIT (reg_class_contents[index_reg_class ()], i)
 		  && reg_state[i].use_index == RELOAD_COMBINE_MAX_USES
 		  && reg_state[i].store_ruid <= reg_state[regno].use_ruid
 		  && (crtl->abi->clobbers_full_reg_p (i)
@@ -1334,13 +1335,13 @@ reload_combine (void)
 
   /* To avoid wasting too much time later searching for an index register,
      determine the minimum and maximum index register numbers.  */
-  if (INDEX_REG_CLASS == NO_REGS)
+  if (index_reg_class () == NO_REGS)
     last_index_reg = -1;
   else if (first_index_reg == -1 && last_index_reg == 0)
     {
       hard_reg_set_iterator hrsi1;
       EXECUTE_IF_SET_IN_HARD_REG_SET
-	(reg_class_contents[INDEX_REG_CLASS], 0, r, hrsi1)
+	(reg_class_contents[index_reg_class ()], 0, r, hrsi1)
 	{
 	  if (first_index_reg == -1)
 	    first_index_reg = r;

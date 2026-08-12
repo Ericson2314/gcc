@@ -2141,6 +2141,7 @@ OBJS = \
 	attr-callback.o \
 	target-asm-ops-select.o \
 	$(MULTI_TARGET_ASM_OPS_OBJS) \
+	target-addr-select.o \
 	$(ANALYZER_OBJS) \
 	$(host_hook_obj)
 
@@ -3564,6 +3565,24 @@ target-asm-ops-select.o: $(srcdir)/target-asm-ops-select.cc
 	  echo "  targetm_common_<base>_common" >&2; \
 	  exit 1; }
 	$(COMPILE) -DTARGETM_ASM_OPS_SYMBOL=targetm_asm_ops_$(multi_target_base) $<
+	$(POSTCOMPILE)
+
+# The addressing-predicate tables; see target-addr.h.  Same shape as the rule
+# above and the same guard, for the same reason: an empty $(multi_target_base)
+# leaves a bare `-DTARGETM_ADDR_SYMBOL=', whose effect is to DELETE the symbol
+# name, so target-addr-select.cc would read `const struct target_addr * = ...'
+# -- a syntax error naming neither this variable nor this rule.  Fail here.
+#
+# Note the per-back-end tables themselves need no rule here: they are
+# target-addr-<base>.o, emitted into multi-target-md.mk and carried in
+# $(MULTI_TARGET_OBJS), because only that file knows the per-base include
+# directory each of them must be compiled against.
+target-addr-select.o: $(srcdir)/target-addr-select.cc $(srcdir)/target-addr.h
+	@test -n "$(multi_target_base)" || { \
+	  echo "target-addr-select.o: multi_target_base is empty;" >&2; \
+	  echo "  so there is no primary target-addr table to point at" >&2; \
+	  exit 1; }
+	$(COMPILE) -DTARGETM_ADDR_SYMBOL=targetm_addr_$(multi_target_base) $<
 	$(POSTCOMPILE)
 #
 # Generate header and source files from the machine description,

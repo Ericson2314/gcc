@@ -5514,7 +5514,7 @@ find_reloads_address_1 (machine_mode mode, addr_space_t as,
 #define REG_OK_FOR_CONTEXT(CONTEXT, REGNO, MODE, AS, OUTER, INDEX)	\
   ((CONTEXT) == 0							\
    ? regno_ok_for_base_p (REGNO, MODE, AS, OUTER, INDEX)		\
-   : REGNO_OK_FOR_INDEX_P (REGNO))
+   : ok_for_index_p_1 (REGNO))
 
   enum reg_class context_reg_class;
   RTX_CODE code = GET_CODE (x);
@@ -5616,17 +5616,17 @@ find_reloads_address_1 (machine_mode mode, addr_space_t as,
 
 	else if (code0 == REG && code1 == REG)
 	  {
-	    if (REGNO_OK_FOR_INDEX_P (REGNO (op1))
+	    if (ok_for_index_p_1 (REGNO (op1))
 		&& regno_ok_for_base_p (REGNO (op0), mode, as, PLUS, REG))
 	      return 0;
-	    else if (REGNO_OK_FOR_INDEX_P (REGNO (op0))
+	    else if (ok_for_index_p_1 (REGNO (op0))
 		     && regno_ok_for_base_p (REGNO (op1), mode, as, PLUS, REG))
 	      return 0;
 	    else if (regno_ok_for_base_p (REGNO (op0), mode, as, PLUS, REG))
 	      find_reloads_address_1 (mode, as, orig_op1, 1, PLUS, SCRATCH,
 				      &XEXP (x, 1), opnum, type, ind_levels,
 				      insn);
-	    else if (REGNO_OK_FOR_INDEX_P (REGNO (op1)))
+	    else if (ok_for_index_p_1 (REGNO (op1)))
 	      find_reloads_address_1 (mode, as, orig_op0, 0, PLUS, REG,
 				      &XEXP (x, 0), opnum, type, ind_levels,
 				      insn);
@@ -5634,7 +5634,7 @@ find_reloads_address_1 (machine_mode mode, addr_space_t as,
 	      find_reloads_address_1 (mode, as, orig_op0, 1, PLUS, SCRATCH,
 				      &XEXP (x, 0), opnum, type, ind_levels,
 				      insn);
-	    else if (REGNO_OK_FOR_INDEX_P (REGNO (op0)))
+	    else if (ok_for_index_p_1 (REGNO (op0)))
 	      find_reloads_address_1 (mode, as, orig_op1, 0, PLUS, REG,
 				      &XEXP (x, 1), opnum, type, ind_levels,
 				      insn);
@@ -5704,7 +5704,7 @@ find_reloads_address_1 (machine_mode mode, addr_space_t as,
 	   need to live longer than a TYPE reload normally would, so be
 	   conservative and class it as RELOAD_OTHER.  */
 	if ((REG_P (XEXP (op1, 1))
-	     && !REGNO_OK_FOR_INDEX_P (REGNO (XEXP (op1, 1))))
+	     && !ok_for_index_p_1 (REGNO (XEXP (op1, 1))))
 	    || GET_CODE (XEXP (op1, 1)) == PLUS)
 	  find_reloads_address_1 (mode, as, XEXP (op1, 1), 1, code, SCRATCH,
 				  &XEXP (op1, 1), opnum, RELOAD_OTHER,

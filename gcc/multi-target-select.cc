@@ -78,6 +78,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h"
 #include "options.h"
 #include "tm-constrs.h"
+#include "target-asm-ops.h"
+#include "target-addr.h"
 
 /* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
    back end -- and MT_TARGET_BASES, which maps each configured triple to the
@@ -390,6 +392,51 @@ multi_target_select (const char *target)
     if (strcmp (b->name, base) == 0)
       {
 	b->install_tables ();
+
+	/* THE TWO SIDE TABLES THAT ARE *NOT* PART OF `targetm', AND WHICH
+	   NOTHING SELECTED UNTIL NOW.
+
+	   `targetm_asm_ops' and `targetm_addr' are per-base tables held
+	   outside `targetm' -- the first because `targetm.asm_out''s POD
+	   directive slots are filled by TARGET_INITIALIZER from `tm.h' macros,
+	   the second because `addresses.h''s funnels are not hooks at all.
+	   Both are constant-initialised with the PRIMARY's table so that they
+	   are valid before anything runs, and both must be re-pointed here,
+	   at the one place that knows which base was chosen.
+
+	   `targetm_asm_ops' was NOT re-pointed, and that was a live bug rather
+	   than an omission with no consequence.  `init_targetm_asm_ops'
+	   (toplev.cc) COPIES `*targetm_asm_ops' into `targetm.asm_out' during
+	   backend_init.  With the pointer stuck on the primary, that copy
+	   overwrote the selected back end's own correct directives -- which
+	   TARGET_INITIALIZER had already put in `targetm_<base>' from that
+	   base's headers -- with i386's.  So the mechanism did not merely fail
+	   to help; it actively undid a value that was already right.
+
+	   Measured before the fix, in the linked cc1 under `-ftarget-config=':
+	   `targetm_asm_ops == &targetm_asm_ops_i386' and
+	   `targetm.asm_out.global_op ()' returned "\t.globl\t", while
+	   `targetm_asm_ops_aarch64.global_op ()' returned "\t.global\t".
+
+	   The TAB probe passed GLOBAL_ASM_OP throughout, and correctly: it
+	   reads the per-base TABLES, which were always right.  It had no arm on
+	   the pointer that chooses between them.  Presence of a mechanism is
+	   not evidence anything invokes it, and `.globl' vs `.global'
+	   assembles identically, so nothing downstream would have said a word.
+	   scratchpad/select-arm.sh is the arm that now covers it.  */
+	targetm_addr = target_addr_for (base);
+	if (targetm_addr == NULL)
+	  internal_error ("back end %qs has no addressing-predicate table; "
+			  "gen-multi-target-md.awk emits one for every back "
+			  "end that has objects, so this is a build bug", base);
+
+	targetm_asm_ops = target_asm_ops_for (base);
+	if (targetm_asm_ops == NULL)
+	  internal_error ("back end %qs has no assembler-directive table; "
+			  "gen-multi-target-md.awk omits one for mmix and for "
+			  "the back ends sharing default-common.cc, and such a "
+			  "back end cannot be selected", base);
+
 	mt_current = b;
 	return true;
       }

@@ -6744,7 +6744,7 @@ baseness (rtx x, machine_mode mode, addr_space_t as,
 	 or index classes, choose that interpretation.  */
       int regno = REGNO (x);
       bool base_p = ok_for_base_p_1 (regno, mode, as, outer_code, index_code);
-      bool index_p = REGNO_OK_FOR_INDEX_P (regno);
+      bool index_p = ok_for_index_p_1 (regno);
       if (base_p != index_p)
 	return base_p ? 1 : -1;
     }

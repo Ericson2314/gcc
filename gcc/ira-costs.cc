@@ -1139,7 +1139,7 @@ ok_for_index_p_nonstrict (rtx reg)
 {
   unsigned regno = REGNO (reg);
 
-  return regno >= FIRST_PSEUDO_REGISTER || REGNO_OK_FOR_INDEX_P (regno);
+  return regno >= FIRST_PSEUDO_REGISTER || ok_for_index_p_1 (regno);
 }
 
 /* A version of regno_ok_for_base_p for use here, when all
@@ -1177,7 +1177,7 @@ record_address_regs (machine_mode mode, addr_space_t as, rtx x,
   enum reg_class rclass;
 
   if (context == 1)
-    rclass = INDEX_REG_CLASS;
+    rclass = index_reg_class ();
   else
     rclass = base_reg_class (mode, as, outer_code, index_code);
 
@@ -1219,7 +1219,7 @@ record_address_regs (machine_mode mode, addr_space_t as, rtx x,
 	   assume here, as well as in the tests below, that all
 	   addresses are in canonical form.  */
 	if (MAX_REGS_PER_ADDRESS == 1
-	    || INDEX_REG_CLASS == base_reg_class (VOIDmode, as, PLUS, SCRATCH))
+	    || index_reg_class () == base_reg_class (VOIDmode, as, PLUS, SCRATCH))
 	  {
 	    record_address_regs (mode, as, arg0, context, PLUS, code1, scale);
 	    if (! CONSTANT_P (arg1))

@@ -23,6 +23,7 @@
 #include "tm_p.h"
 #include "target.h"
 #include "target-asm-ops.h"
+#include "target-addr.h"
 #include "plugin-version.h"
 
 int plugin_is_GPL_compatible;
@@ -31,6 +32,8 @@ extern struct gcc_target targetm_i386;
 extern struct gcc_target targetm_aarch64;
 extern const struct target_asm_ops targetm_asm_ops_i386;
 extern const struct target_asm_ops targetm_asm_ops_aarch64;
+extern const struct target_addr targetm_addr_i386;
+extern const struct target_addr targetm_addr_aarch64;
 
 static void
 dump_ptr (FILE *o, const char *base, const char *macro, const char *slot,
@@ -54,8 +57,25 @@ dump_str (FILE *o, const char *base, const char *macro, const char *slot,
 
 static void
 one_base (FILE *o, const char *base, const struct gcc_target *t,
-	  const struct target_asm_ops *a)
+	  const struct target_asm_ops *a, const struct target_addr *d)
 {
+  /* Stage 1 -- the addresses.h family.  These four slots hold the addresses of
+     `static' functions in target-addr-<base>.o, so BOTH bases' copies carry
+     the SAME symbol name (gcc_taddr_base_reg_class and friends) at DIFFERENT
+     addresses.  The ownership-by-name test therefore cannot apply, and must
+     not be made to: tab-probe.sh's existing "per-base copy" branch is the
+     right verdict here, and it is strictly the stronger one -- it requires the
+     two bases to hold different addresses, which is precisely the property
+     that failed for LIBCALL_VALUE (one body, every base).  */
+  dump_ptr (o, base, "BASE_REG_CLASS",       "addr.base_reg_class",
+	    (const void *) d->base_reg_class);
+  dump_ptr (o, base, "INDEX_REG_CLASS",      "addr.index_reg_class",
+	    (const void *) d->index_reg_class);
+  dump_ptr (o, base, "REGNO_OK_FOR_BASE_P",  "addr.ok_for_base_p_1",
+	    (const void *) d->ok_for_base_p_1);
+  dump_ptr (o, base, "REGNO_OK_FOR_INDEX_P", "addr.ok_for_index_p_1",
+	    (const void *) d->ok_for_index_p_1);
+
   /* Stage 0's three macros. */
   dump_ptr (o, base, "LIBCALL_VALUE",       "calls.libcall_value",
 	    (const void *) t->calls.libcall_value);
@@ -84,8 +104,10 @@ run (void *, void *)
   const char *path = getenv ("TAB_OUT");
   FILE *o = path ? fopen (path, "w") : stderr;
   if (!o) { fprintf (stderr, "tab: cannot open TAB_OUT\n"); return; }
-  one_base (o, "i386", &targetm_i386, &targetm_asm_ops_i386);
-  one_base (o, "aarch64", &targetm_aarch64, &targetm_asm_ops_aarch64);
+  one_base (o, "i386", &targetm_i386, &targetm_asm_ops_i386,
+	    &targetm_addr_i386);
+  one_base (o, "aarch64", &targetm_aarch64, &targetm_asm_ops_aarch64,
+	    &targetm_addr_aarch64);
   fclose (o);
 }
 

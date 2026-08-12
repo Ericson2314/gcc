@@ -78,7 +78,20 @@ rm -f "$OUT"/slots.txt "$OUT"/nm.txt "$OUT"/results.txt "$OUT"/summary.txt
 BASES="i386 aarch64"
 # The macros this script covers.  macro-probe.sh cross-checks this list, so a
 # name cannot be dropped from the header probe without appearing here.
-TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP"
+# ONE LINE, deliberately, however long it gets.  macro-probe.sh's anti-floor
+# check reads this line with `sed -n 's/^TAB_MACROS="\(.*\)"$/\1/p'', and a
+# backslash continuation makes that read return nothing.  It fails loudly when
+# it does -- it did, on the first run after Stage 1 was added, which is the
+# check working -- but the failure names the parse, not the cause, so: keep it
+# on one line rather than teaching the reader about continuations.  A more
+# forgiving reader is a reader with more ways to return the empty set.
+TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P"
+
+# How many slot lines the plugin writes per base.  Named rather than spelled as
+# a literal, because getting it wrong in the direction of TOO FEW is a silent
+# pass: the length assertion below would accept a dump missing the very arms
+# this run was added to score.
+SLOTS_PER_BASE=10
 
 # Which symbol names count as belonging to which base.
 own_i386='^(ix86_|i386_|x86_)'
@@ -112,7 +125,7 @@ echo "ok: targetm_i386 and targetm_aarch64 are dynamically bindable"
 # The glue that is ALLOWED to spell a converted macro: the per-back-end
 # wrappers that SUPPLY the hook, and documentation.  Everything else in
 # gcc/*.cc and gcc/*.h is target-independent code and must not spell it.
-GLUE='^(target-def\.h|target-asm-ops\.h|target-asm-ops\.cc|targhooks\.cc|targhooks\.h|defaults\.h)$'
+GLUE='^(target-addr\.h|target-addr\.cc|target-def\.h|target-asm-ops\.h|target-asm-ops\.cc|targhooks\.cc|targhooks\.h|defaults\.h)$'
 
 # Comments are not uses.  varasm.cc explains in prose why GLOBAL_ASM_OP became
 # a hook, and a plain grep reads that as an unconverted macro -- a FAIL for a
@@ -174,7 +187,7 @@ printf 'int f (int x) { return x + 1; }\n' > "$OUT/tiny.c"
   || { cat "$OUT/cc1.err"; die "cc1 failed with the TAB plugin loaded"; }
 [ -s "$OUT/slots.txt" ] || die "the plugin wrote no slots; TAB_OUT never opened \
 or the callback never fired -- an empty table must not read as a clean run"
-want=$(( $(echo $BASES | wc -w) * 6 ))
+want=$(( $(echo $BASES | wc -w) * SLOTS_PER_BASE ))
 [ "$(wc -l < "$OUT/slots.txt")" = "$want" ] \
   || die "slot dump has $(wc -l < "$OUT/slots.txt") lines, expected $want"
 

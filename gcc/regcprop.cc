@@ -659,14 +659,14 @@ replace_oldest_value_addr (rtx *loc, enum reg_class cl,
 	    int index_op;
 	    unsigned regno0 = REGNO (op0), regno1 = REGNO (op1);
 
-	    if (REGNO_OK_FOR_INDEX_P (regno1)
+	    if (ok_for_index_p_1 (regno1)
 		&& regno_ok_for_base_p (regno0, mode, as, PLUS, REG))
 	      index_op = 1;
-	    else if (REGNO_OK_FOR_INDEX_P (regno0)
+	    else if (ok_for_index_p_1 (regno0)
 		     && regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
 	      index_op = 0;
 	    else if (regno_ok_for_base_p (regno0, mode, as, PLUS, REG)
-		     || REGNO_OK_FOR_INDEX_P (regno1))
+		     || ok_for_index_p_1 (regno1))
 	      index_op = 1;
 	    else if (regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
 	      index_op = 0;
@@ -691,7 +691,7 @@ replace_oldest_value_addr (rtx *loc, enum reg_class cl,
 	  }
 
 	if (locI)
-	  changed |= replace_oldest_value_addr (locI, INDEX_REG_CLASS,
+	  changed |= replace_oldest_value_addr (locI, index_reg_class (),
 						mode, as, insn, vd);
 	if (locB)
 	  changed |= replace_oldest_value_addr (locB,

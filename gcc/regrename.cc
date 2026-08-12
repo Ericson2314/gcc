@@ -1390,14 +1390,14 @@ scan_rtx_address (rtx_insn *insn, rtx *loc, enum reg_class cl,
 	    int index_op;
 	    unsigned regno0 = REGNO (op0), regno1 = REGNO (op1);
 
-	    if (REGNO_OK_FOR_INDEX_P (regno1)
+	    if (ok_for_index_p_1 (regno1)
 		&& regno_ok_for_base_p (regno0, mode, as, PLUS, REG))
 	      index_op = 1;
-	    else if (REGNO_OK_FOR_INDEX_P (regno0)
+	    else if (ok_for_index_p_1 (regno0)
 		     && regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
 	      index_op = 0;
 	    else if (regno_ok_for_base_p (regno0, mode, as, PLUS, REG)
-		     || REGNO_OK_FOR_INDEX_P (regno1))
+		     || ok_for_index_p_1 (regno1))
 	      index_op = 1;
 	    else if (regno_ok_for_base_p (regno1, mode, as, PLUS, REG))
 	      index_op = 0;
@@ -1423,7 +1423,7 @@ scan_rtx_address (rtx_insn *insn, rtx *loc, enum reg_class cl,
 
 	if (locI)
 	  {
-	    reg_class iclass = DEBUG_INSN_P (insn) ? ALL_REGS : INDEX_REG_CLASS;
+	    reg_class iclass = DEBUG_INSN_P (insn) ? ALL_REGS : index_reg_class ();
 	    scan_rtx_address (insn, locI, iclass, action, mode, as);
 	  }
 	if (locB)

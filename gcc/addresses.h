@@ -24,6 +24,23 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_ADDRESSES_H
 #define GCC_ADDRESSES_H
 
+#include "target-addr.h"
+
+/* THE `#ifdef' CHAINS THAT USED TO BE HERE HAVE MOVED TO target-addr.cc.
+
+   They have not been rewritten -- target-addr.cc holds them character for
+   character -- they have been moved somewhere they are preprocessed ONCE PER
+   BACK END rather than once, against the primary's `tm.h', for the whole
+   compiler.  That is the entire content of the change: this header is
+   included by target-independent code, so every `#ifdef BASE_REG_CLASS' here
+   asked the primary target's headers a question that was being posed on
+   behalf of some other target.
+
+   The four funnels below are still `inline' and still take the same
+   arguments; they now forward to the selected base's table.  See
+   target-addr.h for the cost, the reg-class numbering caveat, and why this
+   needs no new `target.def' hook and edits no back end.  */
+
 inline enum reg_class
 base_reg_class (machine_mode mode ATTRIBUTE_UNUSED,
 		addr_space_t as ATTRIBUTE_UNUSED,
@@ -31,34 +48,14 @@ base_reg_class (machine_mode mode ATTRIBUTE_UNUSED,
 		enum rtx_code index_code ATTRIBUTE_UNUSED,
 		rtx_insn *insn ATTRIBUTE_UNUSED = NULL)
 {
-#ifdef INSN_BASE_REG_CLASS
-  return INSN_BASE_REG_CLASS (insn);
-#else
-#ifdef MODE_CODE_BASE_REG_CLASS
-  return MODE_CODE_BASE_REG_CLASS (MACRO_MODE (mode), as, outer_code,
-				   index_code);
-#else
-#ifdef MODE_BASE_REG_REG_CLASS
-  if (index_code == REG)
-    return MODE_BASE_REG_REG_CLASS (MACRO_MODE (mode));
-#endif
-#ifdef MODE_BASE_REG_CLASS
-  return MODE_BASE_REG_CLASS (MACRO_MODE (mode));
-#else
-  return BASE_REG_CLASS;
-#endif
-#endif
-#endif
+  return (enum reg_class) targetm_addr->base_reg_class (mode, as, outer_code,
+						        index_code, insn);
 }
 
 inline enum reg_class
 index_reg_class (rtx_insn *insn ATTRIBUTE_UNUSED = NULL)
 {
-#ifdef INSN_INDEX_REG_CLASS
-  return INSN_INDEX_REG_CLASS (insn);
-#else
-  return INDEX_REG_CLASS;
-#endif
+  return (enum reg_class) targetm_addr->index_reg_class (insn);
 }
 
 /* Wrapper function to unify target macros REGNO_MODE_CODE_OK_FOR_BASE_P,
@@ -74,24 +71,30 @@ ok_for_base_p_1 (unsigned regno ATTRIBUTE_UNUSED,
 		 enum rtx_code index_code ATTRIBUTE_UNUSED,
 		 rtx_insn* insn ATTRIBUTE_UNUSED = NULL)
 {
-#ifdef REGNO_OK_FOR_INSN_BASE_P
-  return REGNO_OK_FOR_INSN_BASE_P (regno, insn);
-#else
-#ifdef REGNO_MODE_CODE_OK_FOR_BASE_P
-  return REGNO_MODE_CODE_OK_FOR_BASE_P (regno, MACRO_MODE (mode), as,
-					outer_code, index_code);
-#else
-#ifdef REGNO_MODE_OK_FOR_REG_BASE_P
-  if (index_code == REG)
-    return REGNO_MODE_OK_FOR_REG_BASE_P (regno, MACRO_MODE (mode));
-#endif
-#ifdef REGNO_MODE_OK_FOR_BASE_P
-  return REGNO_MODE_OK_FOR_BASE_P (regno, MACRO_MODE (mode));
-#else
-  return REGNO_OK_FOR_BASE_P (regno);
-#endif
-#endif
-#endif
+  return targetm_addr->ok_for_base_p_1 (regno, mode, as, outer_code,
+					index_code, insn);
+}
+
+/* The strict `REGNO_OK_FOR_INDEX_P' funnel.
+
+   This one is NEW, and its absence is why `REGNO_OK_FOR_INDEX_P' was the one
+   member of this family that target-independent code still spelled directly,
+   at fourteen sites in six files.  `addresses.h' funnelled the three other
+   corners of the base/index x class/predicate square and left this corner
+   open; the macro therefore reached `ira-costs.cc', `reload.cc',
+   `rtlanal.cc', `regcprop.cc' and `regrename.cc' from the PRIMARY's `tm.h'.
+
+   Recording that plainly because CLASS-C-DESIGN.md 6 sized Stage 1 as "the
+   addresses.h funnel, 9 macros -> 3 inline bodies, ~4 conversion sites".  The
+   funnel is real for `BASE_REG_CLASS' and `REGNO_OK_FOR_BASE_P'; it was NOT
+   real for `INDEX_REG_CLASS' (9 direct sites) or `REGNO_OK_FOR_INDEX_P' (14).
+   Those 23 sites are converted with this change, and the count is the
+   correction: Stage 1 is ~27 sites, not ~4.  */
+
+inline bool
+ok_for_index_p_1 (unsigned regno)
+{
+  return targetm_addr->ok_for_index_p_1 (regno);
 }
 
 /* Wrapper around ok_for_base_p_1, for use after register allocation is
