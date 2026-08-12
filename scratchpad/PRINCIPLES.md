@@ -318,9 +318,22 @@ answer is still wrong is worse than the failure.**
   reported "ok, differs" while comparing two nonexistent files) —
   **5/5 IDENTICAL** vs `/tmp/b-stock` (genuine upstream at merge-base
   `c31b7a09eea`), distinct md5s per side, negative control firing.
-- **Probe scoreboard** (verified, quote these): 230 header arms — i386 115 PASS
-  / 0 FAIL, aarch64 **5 PASS / 110 FAIL**; 58 TAB arms — i386 29 PASS / 0 FAIL,
-  aarch64 24 PASS / 5 FAIL. **Diff verdicts and probe shapes, never totals.**
+- **Probe scoreboard** (verified, quote these): **224 header arms — i386 112
+  PASS / 0 FAIL, aarch64 2 PASS / 110 FAIL; 64 TAB arms — i386 32 PASS / 0
+  FAIL, aarch64 27 PASS / 5 FAIL.** **Diff verdicts and probe shapes, never
+  totals.**
+
+  Changed 2026-08-12 by task #92, and the aarch64 header column went **DOWN**,
+  5 → 2. That is a **correction, not a regression**: `FIRST_PSEUDO_REGISTER`,
+  `N_REG_CLASSES` and `REGNO_REG_CLASS` had flipped green in `ecad6abf6ae`
+  because both bases' headers now expand them to the same target-neutral text
+  — the wrong-reason flip this file warns about, caught rather than banked.
+  They are `CONVERTED_REGS` and carry TAB arms that read the running `cc1`
+  against each base's own headers. The aarch64 FAIL count did not move (110
+  both sides): nothing was taken out of the red column.
+
+  Earlier figures, kept because each was quoted after it stopped being true.
+  230/58 with aarch64 5/110 and 24/5 is the pre-#92 state and is now stale.
   (An earlier version of this line said aarch64 2/113. That is stale and was
   arithmetically impossible at 230 arms — 113+2 = 115 macros; the 2/113 figure
   belonged to the 266-arm era before 18 macros were retired to TAB. Two agents

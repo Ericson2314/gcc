@@ -18,6 +18,28 @@
 #                      check as CONVERTED_GONE.  This status exists because the
 #                      original two covered arms that DISAPPEAR and not arms
 #                      that turn green.
+#   CONVERTED_REGS     the register-vocabulary form of CONVERTED_CDATA, and it
+#                      exists for the same reason: three aarch64 arms flipped
+#                      FAIL -> PASS when ecad6abf6ae landed, and every one of
+#                      those passes said only "both header contexts now agree
+#                      that this name is target-neutral".
+#                        FIRST_PSEUDO_REGISTER and N_REG_CLASSES became the
+#                      compile-time UNION width, which is DELIBERATELY the same
+#                      number in every consumer translation unit -- it is the
+#                      layout of target_hard_regs/target_regs/target_ira/
+#                      target_ira_int.  REGNO_REG_CLASS became a call through
+#                      targetm_regs.  In all three cases the per-base fact moved
+#                      to a RUN-TIME datum, so the header probe cannot see it
+#                      any more and its agreement is not evidence of anything.
+#                      Header arm RETIRED, TAB arm mandatory, by the same
+#                      mechanical check as CONVERTED_GONE.
+#                        The status is separate from CONVERTED_CDATA because the
+#                      two are checked differently: CONVERTED_CDATA's redirect
+#                      is `#define M (targetm_cdata.', this one's is a read of
+#                      MULTI_TARGET_UNION_* or of targetm_regs.  One status
+#                      covering both would need a completeness check that
+#                      accepted either, i.e. one that is satisfied by the wrong
+#                      redirect.
 #   CONVERTED_GONE     routed through a hook and the macro is deleted from the
 #                      back ends.  The header arm is retired and a TAB arm
 #                      MUST exist in tab-probe.sh, or macro-probe.sh aborts.
@@ -66,7 +88,7 @@ ELIMINABLE_REGS UNCONVERTED
 ENABLE_X86_64_MFENTRY UNCONVERTED
 EPILOGUE_USES UNCONVERTED
 EXIT_IGNORE_STACK UNCONVERTED
-FIRST_PSEUDO_REGISTER UNCONVERTED
+FIRST_PSEUDO_REGISTER CONVERTED_REGS
 FIXED_REGISTERS UNCONVERTED
 FLOAT_WORDS_BIG_ENDIAN CONVERTED_CDATA
 FRAME_POINTER_REGNUM UNCONVERTED
@@ -112,7 +134,7 @@ MIN_UNITS_PER_WORD UNCONVERTED
 MOVE_MAX UNCONVERTED
 MOVE_MAX_PIECES UNCONVERTED
 MOVE_RATIO UNCONVERTED
-N_REG_CLASSES UNCONVERTED
+N_REG_CLASSES CONVERTED_REGS
 NUM_MODES_FOR_MODE_SWITCHING UNCONVERTED
 NUM_UNSPEC_VALUES UNCONVERTED
 NUM_UNSPECV_VALUES UNCONVERTED
@@ -133,7 +155,7 @@ REGISTER_NAMES UNCONVERTED
 REGMODE_NATURAL_SIZE UNCONVERTED
 REGNO_OK_FOR_BASE_P CONVERTED_SUPPLY
 REGNO_OK_FOR_INDEX_P CONVERTED_SUPPLY
-REGNO_REG_CLASS UNCONVERTED
+REGNO_REG_CLASS CONVERTED_REGS
 REG_WORDS_BIG_ENDIAN CONVERTED_CDATA
 RETURN_ADDR_RTX UNCONVERTED
 REVERSE_CONDITION UNCONVERTED

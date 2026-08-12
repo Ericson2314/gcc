@@ -162,6 +162,21 @@ for n in $ALL; do
   awk -v m="$n" '$1 !~ /^#/ && $1==m{f=1} END{exit !f}' "$STATUS" \
     || die "$n is probed but has no status in $STATUS"
 done
+
+# EVERY STATUS WORD MUST BE ONE THIS SCRIPT KNOWS.  Without this, a typo or a
+# status invented in another file is treated as "not CONVERTED_*", i.e. the
+# macro silently keeps a header arm and never acquires a TAB one -- the
+# anti-floor gate passing because it did not recognise the name it was meant to
+# catch.  Adding CONVERTED_REGS is exactly the change that could have done it.
+for st in $(awk '$1 !~ /^#/ && NF{print $2}' "$STATUS" | sort -u); do
+  case $st in
+    UNCONVERTED|CONVERTED_SUPPLY|CONVERTED_CDATA|CONVERTED_REGS|CONVERTED_GONE) ;;
+    *) die "unknown status word [$st] in $STATUS.  An unrecognised status is \
+treated as UNCONVERTED by every test below, so the macro would keep a header \
+arm it can no longer measure and would never be required to have a TAB arm." ;;
+  esac
+done
+
 RETIRED=""
 # CONVERTED_CDATA -- A THIRD STATUS, AND THE REASON FOR IT IS A FALSE GREEN
 # THAT WAS CAUGHT RATHER THAN BANKED.
@@ -187,7 +202,32 @@ RETIRED=""
 # statuses now say three different things about one question -- does the header
 # probe still measure this macro's VALUE? -- and the answer for CONVERTED_CDATA
 # is no.
-for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_SUPPLY" || $2=="CONVERTED_CDATA") {print $1}' "$STATUS"); do
+#
+# CONVERTED_REGS -- A FOURTH STATUS, AND THE SAME LESSON A SECOND TIME.
+#
+# ecad6abf6ae moved the register vocabulary to per-configuration data and three
+# aarch64 arms went green in the same run: FIRST_PSEUDO_REGISTER,
+# N_REG_CLASSES and REGNO_REG_CLASS.  Its author flagged them and did not bank
+# them, which is why they are being retired here rather than discovered later.
+#
+# What actually happened, per macro:
+#
+#   FIRST_PSEUDO_REGISTER  92 (i386) / 95 (aarch64) -> 95 in ALL THREE contexts.
+#   N_REG_CLASSES          34 / 20             -> 34 in all three contexts.
+#     Both are now MULTI_TARGET_UNION_*, the compile-time maximum over the
+#     configured back ends.  Being the same number everywhere is the POINT --
+#     it is the layout of the four shared structures -- so the header probe is
+#     measuring a constant and calling it agreement.
+#   REGNO_REG_CLASS        `regclass_map[(x)]' / `aarch64_regno_regclass (x)'
+#                          -> `((enum reg_class) targetm_regs->regno_reg_class
+#                              ((int) (x)))' in all three contexts.
+#
+# In every case the per-base fact moved to a RUN-TIME datum reachable only
+# through `targetm_regs', which macro-probe.sh is structurally blind to.  A
+# green here is not weaker evidence than before; it is evidence about a
+# different proposition.  Retired, with mandatory TAB arms that read the
+# running cc1.
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_SUPPLY" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS") {print $1}' "$STATUS"); do
   case " $TAB_COVERED " in
     *" $n "*) ;;
     *) die "$n is marked CONVERTED in $STATUS but tab-probe.sh does not cover \
@@ -195,7 +235,7 @@ it.  A macro may only move UNCONVERTED -> CONVERTED together with its TAB arm; \
 without one it would simply disappear from the score." ;;
   esac
 done
-for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
 echo "status: $(awk '$1 !~ /^#/ && $2=="UNCONVERTED"' "$STATUS" | wc -l) unconverted, \
 $(awk '$1 !~ /^#/ && $2 ~ /^CONVERTED/' "$STATUS" | wc -l) converted (all covered by TAB); \
 retiring from the header probe:${RETIRED:- none}"
@@ -284,9 +324,38 @@ control
 #
 # So: one macro whose bytes are known and DIFFER (GLOBAL_ASM_OP, `.globl' vs
 # `.global' -- the pair that assembles identically), one macro whose expansion
-# is known and differs (STACK_POINTER_REGNUM; the previous witness, REGNO_REG_CLASS, was converted to a run-time dispatch on 2026-08-12 and now expands identically in all three contexts -- which is the fix working, not the probe breaking), and one SYNTHETIC macro defined by
+# is known and differs (SELECT_CC_MODE), and one SYNTHETIC macro defined by
 # this script identically in all three contexts, which EXP must report as
 # AGREEING.  The synthetic one is the only evidence that a PASS is reachable.
+#
+# RE-ANCHORED 2026-08-12 (second time), FROM `STACK_POINTER_REGNUM' TO
+# `SELECT_CC_MODE', AND THE REASON IS INDEPENDENCE, NOT A FAILING CONTROL.
+#
+# History: the EXP witness was REGNO_REG_CLASS until ecad6abf6ae converted it
+# to a run-time dispatch, at which point it expanded identically in all three
+# contexts and could no longer witness anything.  It was re-pointed at
+# STACK_POINTER_REGNUM -- which is correct on its own terms, and which arm 0's
+# INT control had ALREADY been re-pointed at in the same change.
+#
+# That left the INT control and the EXP control resting on ONE macro.  Two
+# controls that move together are one control with two names: any future change
+# to STACK_POINTER_REGNUM -- and it IS in the conversion programme, listed
+# UNCONVERTED in macro-status.txt and named in MACRO-LEAK.md as 7-vs-31 -- would
+# take out the INT and EXP controls in the same run, and the summary would still
+# print.  The whole point of arm 0b is that a phase can die invisibly.
+#
+# `SELECT_CC_MODE' is chosen for what it does NOT touch:
+#   * it is not a register macro, not a count, and not in the register
+#     vocabulary ecad6abf6ae moved, so no register work can flip it;
+#   * it expands to a DIFFERENT CALLEE per base -- `ix86_cc_mode ((OP),(X),(Y))'
+#     against `aarch64_select_cc_mode (OP, X, Y)' -- which is the one kind of
+#     difference EXP is strongest at seeing, rather than a bare integer that
+#     INT could have valued anyway;
+#   * it is function-like, so it also exercises the dummy-argument path that
+#     168 of the real EXP arms use and that arm 0 never touches.  The previous
+#     witness was object-like and left that path uncontrolled.
+# It stays a control only while it stays UNCONVERTED; when it is converted, the
+# right move is another independent differing witness, not this one weakened.
 ########################################################################
 CTLDEF='#define MTPCTL_AGREE(x) mtpctl_callee ((x), 42)'
 
@@ -313,7 +382,7 @@ str_exp_control () {
     #     through the SAME marker/normalise path as the real EXP phase.
     { echo "$PRE"; echo "$CTLDEF"
       echo 'MTPBEGIN 1 MTPMID MTPCTL_AGREE(zz) MTPEND'
-      echo 'MTPBEGIN 2 MTPMID STACK_POINTER_REGNUM MTPEND'
+      echo 'MTPBEGIN 2 MTPMID SELECT_CC_MODE (mtpop, mtpx, mtpy) MTPEND'
     } > "$OUT/ctlexp.cc"
     g++ -E "$OUT/ctlexp.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/ctlexp-$ctx.i" 2> "$OUT/err-ctlexp-$ctx.txt" \
@@ -331,7 +400,15 @@ str_exp_control () {
     # An expansion that is still the macro's own name is a non-expansion, and a
     # non-expansion compared with a non-expansion looks like agreement.
     case $agree in *MTPCTL_AGREE*) die "EXP control: MTPCTL_AGREE did not expand in $ctx";; esac
-    case $rrc in *STACK_POINTER_REGNUM*) die "EXP control: STACK_POINTER_REGNUM did not expand in $ctx";; esac
+    case $rrc in *SELECT_CC_MODE*) die "EXP control: SELECT_CC_MODE did not expand in $ctx";; esac
+    # The witness must still be a CALL, not a bare token: if a future change
+    # made SELECT_CC_MODE expand to a constant, the two bases could still
+    # differ and the control would pass while no longer exercising the
+    # differing-callee path it was chosen for.
+    case $rrc in *'('*')'*) ;; *) die "EXP control: SELECT_CC_MODE expanded to \
+[$rrc] in $ctx, which is not a call.  The witness was chosen because it names a \
+different FUNCTION per base; if it has stopped doing that it is no longer \
+controlling the case it claims to.";; esac
     [ -n "$agree" ] || die "EXP control: empty expansion in $ctx"
     echo "control-exp $ctx agree=[$agree] rrc=[$rrc]"
     eval "CTLA_$ctx=\$agree"; eval "CTLR_$ctx=\$rrc"
@@ -350,15 +427,40 @@ reported as differing (mt=[$CTLA_mt] i386=[$CTLA_i386] aarch64=[$CTLA_aarch64]).
 Every EXP FAIL in this run would be unattributable."
   # ... and to report DISAGREEMENT.
   [ "$CTLR_mt" != "$CTLR_aarch64" ] \
-    || die "EXP control: STACK_POINTER_REGNUM is known to differ between the bases and \
-EXP reported it identical; the phase cannot discriminate"
+    || die "EXP control: SELECT_CC_MODE is known to differ between the bases \
+(ix86_cc_mode vs aarch64_select_cc_mode) and EXP reported it identical; the \
+phase cannot discriminate"
   [ "$CTLR_mt" = "$CTLR_i386" ] \
-    || die "EXP control: mt and i386 disagree on STACK_POINTER_REGNUM, but mt IS the \
+    || die "EXP control: mt and i386 disagree on SELECT_CC_MODE, but mt IS the \
 i386 header set; the contexts are not what they claim to be"
   echo "control: OK -- STR discriminates (9 vs 10 bytes); EXP reports agreement \
 AND disagreement, so an EXP FAIL is a measurement and not a dead phase"
 }
 str_exp_control
+
+# INDEPENDENCE OF THE CONTROLS, CHECKED RATHER THAN ASSERTED IN A COMMENT.
+#
+# Read the witness names back out of the probe sources the controls actually
+# compiled -- not out of variables that could drift from them -- and require
+# the three phases to rest on three different macros.  Between 2026-08-12
+# morning and this run, INT and EXP both keyed on STACK_POINTER_REGNUM, and
+# nothing in the harness would have said so.
+ctl_int_macro=$(sed -n 's/^char cq\[\([A-Za-z_][A-Za-z0-9_]*\)\].*/\1/p' "$OUT/ctl.cc")
+ctl_str_macro=$(sed -n 's/^char ctl_len\[sizeof (\([A-Za-z_][A-Za-z0-9_]*\))\].*/\1/p' "$OUT/ctlstr.cc")
+ctl_exp_macro=$(sed -n 's/^MTPBEGIN 2 MTPMID \([A-Za-z_][A-Za-z0-9_]*\).*/\1/p' "$OUT/ctlexp.cc")
+for v in "$ctl_int_macro" "$ctl_str_macro" "$ctl_exp_macro"; do
+  [ -n "$v" ] || die "could not read a control's witness macro back out of its \
+own probe source (INT=[$ctl_int_macro] STR=[$ctl_str_macro] EXP=[$ctl_exp_macro]); \
+the independence check would pass vacuously"
+done
+{ [ "$ctl_int_macro" != "$ctl_exp_macro" ] && [ "$ctl_int_macro" != "$ctl_str_macro" ] \
+  && [ "$ctl_str_macro" != "$ctl_exp_macro" ] ; } \
+  || die "two controls key on the same macro (INT=$ctl_int_macro \
+STR=$ctl_str_macro EXP=$ctl_exp_macro).  They are then one control with two \
+names: a single change to that macro takes both out in the same run, and the \
+summary still prints."
+echo "control: OK -- the three phases rest on three DIFFERENT macros \
+(INT=$ctl_int_macro STR=$ctl_str_macro EXP=$ctl_exp_macro)"
 
 ########################################################################
 # PHASE INT -- batch compile with drop-and-retry.
