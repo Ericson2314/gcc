@@ -326,10 +326,12 @@ answer is still wrong is worse than the failure.**
   belonged to the 266-arm era before 18 macros were retired to TAB. Two agents
   measured 5/110 independently. **If a number in a brief cannot be reconciled
   with the arm count, say so rather than reporting against it.**)
-- **Stderr**: the **incremental** floor is **32 lines** — 8 `is unchanged` +
-  24 `'@' is redundant` from unmodified aarch64 `.md` files, because those rules
-  write through `move-if-change` with no stamp. That reproduces exactly, to the
-  line and the composition.
+- **Stderr**: the **incremental** floor is **at most 32 lines** — 8
+  `is unchanged` + 24 `'@' is redundant` from unmodified aarch64 `.md` files,
+  because those rules write through `move-if-change` with no stamp. **It varies
+  with what was last rebuilt**: a no-op `make` in a dir whose `.md` rules had
+  not re-run gave **8**, with the 24 absent entirely. Quote the composition you
+  measured, never a remembered number.
 
   **A cold build is NOT empty** — an earlier version of this file said so and it
   is false on this host. A cold `all-gcc` is ~870 lines, ~370 of them
