@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-common.h"
 #include "memmodel.h"
 #include "tm_p.h"		/* For TARGET_CPU_CPP_BUILTINS & friends.  */
+#include "target-c-ops.h"
 #include "stringpool.h"
 #include "stor-layout.h"
 #include "flags.h"
@@ -1721,7 +1722,17 @@ c_cpp_builtins (cpp_reader *pfile)
 # define preprocessing_trad_p() (cpp_get_options (pfile)->traditional)
 # define builtin_define(TXT) cpp_define (pfile, TXT)
 # define builtin_assert(TXT) cpp_assert (pfile, TXT)
-  TARGET_CPU_CPP_BUILTINS ();
+  /* NOT `TARGET_CPU_CPP_BUILTINS ()'.  This translation unit is compiled ONCE
+     for the whole compiler, so expanding that macro here bound it to whichever
+     back end the shared tm.h belongs to: c-cppbuiltin.o carried an undefined
+     reference to `ix86_target_macros' in a compiler that also served aarch64,
+     and cc1 -ftarget-config=aarch64-... died inside
+     `ix86_target_macros_internal' after the aarch64 back end had already
+     emitted `.arch armv8-a'.  The macro is still expanded -- in
+     target-c-ops.cc, compiled once per back end against that back end's own
+     tm.h -- and reached here through the table the selected target installs.
+     See target-c-ops.h.  */
+  target_c_cpu_cpp_builtins (pfile);
   TARGET_OS_CPP_BUILTINS ();
   TARGET_OBJFMT_CPP_BUILTINS ();
 

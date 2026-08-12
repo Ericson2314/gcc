@@ -1587,7 +1587,20 @@ ALL_OPT_FILES=$(lang_opt_files) $(extra_opt_files)
 ALL_OPT_URL_FILES=$(patsubst %, %.urls, $(ALL_OPT_FILES))
 
 # Target specific, C specific object file
-C_TARGET_OBJS=@c_target_objs@
+# The C-family target objects.  @c_target_objs@ is the PRIMARY target's list --
+# `i386-c.o glibc-c.o' for x86_64-linux -- and the back end's own half of it is
+# now built once per back end into mt-<base>/ by multi-target-md.mk, which also
+# sets $(MT_C_OBJS_MOVED) to exactly the names it took over.  Filtered rather
+# than rewritten, so that a back end whose <cpu>-c.o did NOT move (there is no
+# tmake rule naming its source, say) keeps its old shared object and does not
+# silently vanish from the link.
+#
+# RECURSIVE `=', not `:='.  multi-target-md.mk is included some way below this
+# line, so MT_C_OBJS_MOVED is still empty here and an immediate assignment
+# would filter nothing -- and the duplicate `ix86_target_macros' that leaves
+# behind is a link error only sometimes, depending on member order.
+C_TARGET_OBJS = $(filter-out $(MT_C_OBJS_MOVED),@c_target_objs@) \
+		$(MT_C_TARGET_OBJS)
 
 # Target specific, C++ specific object file
 CXX_TARGET_OBJS=@cxx_target_objs@
@@ -3710,6 +3723,15 @@ target-cdata-select.o: $(srcdir)/target-cdata-select.cc $(srcdir)/target-cdata.h
 # compiler which selected nothing cannot answer i386's register classes and
 # i386's register names for every target.  `init_reg_sets' says so by name.
 target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+# The C-family entry-point selector; see target-c-ops.h.  Same shape and the
+# same absence of a `-D': `targetm_c_ops' starts NULL, so a compiler that
+# selected nothing cannot run the primary's TARGET_CPU_CPP_BUILTINS -- which is
+# what it did, all the way into ix86_target_macros_internal, with the aarch64
+# back end otherwise in force.
+target-c-ops-select.o: $(srcdir)/target-c-ops-select.cc $(srcdir)/target-c-ops.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 #

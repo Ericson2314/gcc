@@ -31,4 +31,13 @@ along with GCC; see the file COPYING3.  If not see
    multi-target-select.cc for why there is not one.  */
 extern bool multi_target_select (const char *);
 
+/* The BASE in force -- "i386", "aarch64" -- or NULL if nothing is selected.
+   For the per-base tables that cannot be installed from multi_target_select
+   itself: target-c-ops-select.o is linked only into the C front end, while
+   multi-target-select.o is in libbackend.a and therefore also in lto1, so a
+   reference from there would drag the C-family tables into a link that has no
+   `c_register_pragma' to satisfy them.  Those tables resolve themselves on
+   first use instead, by asking this.  */
+extern const char *multi_target_current_base (void);
+
 #endif /* GCC_MULTI_TARGET_SELECT_H */

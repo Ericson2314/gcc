@@ -471,6 +471,20 @@ multi_target_select (const char *target)
 			  "gen-multi-target-md.awk emits one for every back "
 			  "end that has objects, so this is a build bug", base);
 
+	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
+	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
+	   a link-time one rather than a design preference.  Their tables call
+	   into c-family (`c_register_pragma', `builtin_define_with_value'),
+	   so they belong to the objects that only cc1 links; this file is in
+	   libbackend.a, which lto1 also links.  A `target_c_ops_for' call here
+	   pulls target-c-ops-select.o -- and through it every back end's
+	   <cpu>-c.o -- into lto1, where those c-family symbols do not exist.
+	   Measured: lto1 and lto-dump failed with undefined references to
+	   `builtin_define_with_value' and `c_register_pragma' from
+	   mt-aarch64/aarch64-c.o while cc1 linked fine.  So the C-family side
+	   resolves itself on first use, from multi_target_current_base below.
+	   See target-c-ops.h.  */
+
 	mt_current = b;
 	return true;
       }
@@ -480,6 +494,15 @@ multi_target_select (const char *target)
      `return false' that the caller would report as an unknown target.  */
   internal_error ("target %qs names back end %qs, which was not built into "
 		  "this compiler", target, base);
+}
+
+/* The base in force, for the per-base tables that cannot be installed from
+   multi_target_select itself; see multi-target-select.h.  */
+
+const char *
+multi_target_current_base (void)
+{
+  return mt_current != NULL ? mt_current->name : NULL;
 }
 
 /* The bare names.  Each is the declaration in recog.h / rtl.h / output.h /
