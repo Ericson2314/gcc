@@ -237,7 +237,13 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # one:
   # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1952".
   gcc_mt_md=`echo "${gcc_mt_data}" | sed -n 's/^md_file //p'`
-  gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|^options\.h|options-${gcc_mt_base}.h|" -e "s|insn-constants\.h|insn-constants-${gcc_mt_base}.h|"`
+  # cpu_type, not the -common.cc base.  options-<X>.h and insn-constants-<X>.h
+  # are per BACK END: they come from the .opt files and the .md, neither of
+  # which has anything to do with which common-hook file the target shares.
+  # The two names coincide for 45 of the 48 back ends and come apart for the
+  # three that share default-common.cc (ft32, moxie, rl78); keying on the
+  # common file dropped exactly those three.
+  gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|^options\.h|options-${gcc_mt_cpu}.h|" -e "s|insn-constants\.h|insn-constants-${gcc_mt_cpu}.h|"`
   # config.gcc sets this per target and some back ends' tm.h reads it (nds32
   # builds its default ISA out ...
   # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1959".
@@ -264,55 +270,69 @@ for gcc_mt in ${gcc_manifest_targets}; do
   gcc_mt_genh_files=
   for gcc_mt_h in ${gcc_mt_genh}; do
     gcc_mt_hb=`basename ${gcc_mt_h} .h`
-    gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|\\([ ]\\)${gcc_mt_hb}\\.h|\\1${gcc_mt_hb}-${gcc_mt_base}.h|g"`
-    gcc_mt_genh_files="${gcc_mt_genh_files} ${gcc_mt_hb}-${gcc_mt_base}.h"
+    gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|\\([ ]\\)${gcc_mt_hb}\\.h|\\1${gcc_mt_hb}-${gcc_mt_cpu}.h|g"`
+    gcc_mt_genh_files="${gcc_mt_genh_files} ${gcc_mt_hb}-${gcc_mt_cpu}.h"
   done
   # gcc_mt_eopts is deliberately NOT turned into a make rule here.  It is read
   # back out of the manifest by the union pass after this loop; see there.
-  case " ${gcc_all_common_objects} " in
-    *" ${gcc_mt_obj} "*) ;;
-    *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
-       gcc_all_common_symbols="${gcc_all_common_symbols} ${gcc_mt_sym}"
-       # One rule per object. A pattern rule cannot serve here:
-       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1980".
-       if test x"${gcc_mt_base}" != xdefault; then
-         # This back end's own options header is NOT emitted here.
-         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1989".
-         printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
-           "${gcc_mt_base}" "${gcc_mt_md}" "${gcc_mt_md}" >> ${gcc_common_mk}
-         #
-         # The build-directory headers this target's tm.h includes, holding
-         # multilib-derived spec macros -- ...
-         # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1997".
-         for gcc_mt_h in ${gcc_mt_genh_files}; do
-           case ${gcc_mt_h} in
-             *sysroot-suffix*)
-               printf '%s: multi-target.manifest multi-target.multilib $(srcdir)/gen-sysroot-suffix.sh\n\t$(SHELL) $(srcdir)/gen-sysroot-suffix.sh %s multi-target.manifest multi-target.multilib $(srcdir) > $@\n\n' \
-                 "${gcc_mt_h}" "${gcc_mt}" >> ${gcc_common_mk}
-               ;;
-             *)
-               # The rest are headers a config/<cpu>/t-<cpu>-headers fragment already
-               # generates under its plain ...
-               # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2015".
-               #
-               # *** The `cp' below is only correct while the PLAIN name has a
-               # real rule, and the only thing that gives it one in a
-               # multi-target build is config/<cpu>/t-<cpu>-headers, which
-               # gen-multi-target-md.awk includes unconditionally.  Without the
-               # fragment the plain name is whatever the last single-target
-               # build left in the directory, and `cp' propagates that stale
-               # file into tm-<base>.h without a word.  That is exactly how
-               # every arm spec file came to be generated against a stale
-               # arm-cpu.h: the rules lived in t-arm, which is included only
-               # when arm is PRIMARY, so no other build ever regenerated it.
-               #
-               # So refuse, loudly, rather than emit a rule that reads a file
-               # nothing writes.  A back end reaching here without a fragment
-               # is not misconfigured by the user; it means whoever added it
-               # has a t-<cpu>-headers split left to do.
-               gcc_mt_horig=`echo "${gcc_mt_h}" | sed "s/-${gcc_mt_base}\\.h\$/.h/"`
-               if test -f ${srcdir}/config/${gcc_mt_cpu}/t-${gcc_mt_cpu}-headers; then :; else
-                 gcc_mt_fatal="${gcc_mt} needs ${gcc_mt_h}, which is copied from\
+  #
+  # *** TWO DEDUPLICATIONS, ON TWO DIFFERENT KEYS, AND THAT IS THE POINT ***
+  #
+  # The block below is keyed on cpu_type, because what it emits -- this back
+  # end's insn-constants, its generated headers and its tm-<base>.h -- is per
+  # BACK END.  The block after it is keyed on the common-hook OBJECT, because
+  # what that emits is one <x>-common.o per common file.  These were a single
+  # dedup on the object, and 45 of the 48 back ends never noticed: cpu_type
+  # and the -common.cc base name are the same string for all of them.
+  #
+  # ft32, moxie and rl78 are the three where they are not.  All three say
+  # `common_out_file default-common.cc, so all three fell inside the
+  # `!= default guard and got NO insn-constants-<base>.h and NO tm-<base>.h
+  # -- while the manifest they were written from still lists them as back
+  # ends, gen-multi-target-md.awk still maps their five triples to bases
+  # ft32/moxie/rl78 in MT_OPTION_TARGET_BASES, and the options union pass
+  # after this loop still counts 48.  Sharing a common-hook file says nothing
+  # whatever about a back end's .md, its .opt files or its headers.
+  case " ${gcc_all_cpu_bases} " in
+    *" ${gcc_mt_cpu} "*) ;;
+    *) gcc_all_cpu_bases="${gcc_all_cpu_bases} ${gcc_mt_cpu}"
+       # This back end's own options header is NOT emitted here.
+       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1989".
+       printf 'insn-constants-%s.h: build/genconstants$(build_exeext) $(srcdir)/config/%s\n\t$(RUN_GEN) build/genconstants$(build_exeext) $(srcdir)/config/%s > $@\n\n' \
+         "${gcc_mt_cpu}" "${gcc_mt_md}" "${gcc_mt_md}" >> ${gcc_common_mk}
+       #
+       # The build-directory headers this target's tm.h includes, holding
+       # multilib-derived spec macros -- ...
+       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1997".
+       for gcc_mt_h in ${gcc_mt_genh_files}; do
+         case ${gcc_mt_h} in
+           *sysroot-suffix*)
+             printf '%s: multi-target.manifest multi-target.multilib $(srcdir)/gen-sysroot-suffix.sh\n\t$(SHELL) $(srcdir)/gen-sysroot-suffix.sh %s multi-target.manifest multi-target.multilib $(srcdir) > $@\n\n' \
+               "${gcc_mt_h}" "${gcc_mt}" >> ${gcc_common_mk}
+             ;;
+           *)
+             # The rest are headers a config/<cpu>/t-<cpu>-headers fragment already
+             # generates under its plain ...
+             # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2015".
+             #
+             # *** The `cp' below is only correct while the PLAIN name has a
+             # real rule, and the only thing that gives it one in a
+             # multi-target build is config/<cpu>/t-<cpu>-headers, which
+             # gen-multi-target-md.awk includes unconditionally.  Without the
+             # fragment the plain name is whatever the last single-target
+             # build left in the directory, and `cp' propagates that stale
+             # file into tm-<base>.h without a word.  That is exactly how
+             # every arm spec file came to be generated against a stale
+             # arm-cpu.h: the rules lived in t-arm, which is included only
+             # when arm is PRIMARY, so no other build ever regenerated it.
+             #
+             # So refuse, loudly, rather than emit a rule that reads a file
+             # nothing writes.  A back end reaching here without a fragment
+             # is not misconfigured by the user; it means whoever added it
+             # has a t-<cpu>-headers split left to do.
+             gcc_mt_horig=`echo "${gcc_mt_h}" | sed "s/-${gcc_mt_cpu}\\.h\$/.h/"`
+             if test -f ${srcdir}/config/${gcc_mt_cpu}/t-${gcc_mt_cpu}-headers; then :; else
+               gcc_mt_fatal="${gcc_mt} needs ${gcc_mt_h}, which is copied from\
  the generated ${gcc_mt_horig}, but config/${gcc_mt_cpu}/t-${gcc_mt_cpu}-headers\
  does not exist.  Only that fragment gives ${gcc_mt_horig} a rule in a\
  multi-target build; without it the copy would silently propagate whatever\
@@ -320,20 +340,29 @@ for gcc_mt in ${gcc_manifest_targets}; do
  that generate ${gcc_mt_horig} out of config/${gcc_mt_cpu}/t-${gcc_mt_cpu} into\
  config/${gcc_mt_cpu}/t-${gcc_mt_cpu}-headers, the way\
  config/arm/t-arm-headers and config/loongarch/t-loongarch-headers already do."
-                 return 1
-               fi
-               printf '%s: %s\n\tcp $< $@\n\n' \
-                 "${gcc_mt_h}" "${gcc_mt_horig}" >> ${gcc_common_mk}
-               ;;
-           esac
-         done
-         # INSN_BASE: mkconfig.sh needs the back end told to it rather than
-         # read off the output name.  Here the two coincide, but stating it
-         # keeps this call site and the per-triple one in
-         # gen-multi-target-md.awk the same shape, and mkconfig.sh now refuses
-         # a tm-*.h without it.
-         printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  INSN_BASE="%s" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
-           "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" "${gcc_mt_base}" >> ${gcc_common_mk}
+               return 1
+             fi
+             printf '%s: %s\n\tcp $< $@\n\n' \
+               "${gcc_mt_h}" "${gcc_mt_horig}" >> ${gcc_common_mk}
+             ;;
+         esac
+       done
+       # INSN_BASE: mkconfig.sh needs the back end told to it rather than
+       # read off the output name.  Here the two coincide, but stating it
+       # keeps this call site and the per-triple one in
+       # gen-multi-target-md.awk the same shape, and mkconfig.sh now refuses
+       # a tm-*.h without it.
+       printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  INSN_BASE="%s" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
+         "${gcc_mt_cpu}" "${gcc_mt_cpu}" "${gcc_mt_cpu}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_cpu}" "${gcc_mt_cpu}" >> ${gcc_common_mk}
+       ;;
+  esac
+  case " ${gcc_all_common_objects} " in
+    *" ${gcc_mt_obj} "*) ;;
+    *) gcc_all_common_objects="${gcc_all_common_objects} ${gcc_mt_obj}"
+       gcc_all_common_symbols="${gcc_all_common_symbols} ${gcc_mt_sym}"
+       # One rule per object. A pattern rule cannot serve here:
+       # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1980".
+       if test x"${gcc_mt_base}" != xdefault; then
          printf '%s: $(srcdir)/common/config/%s tm-%s.h\n\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
            "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_base}" "${gcc_mt_sym}" >> ${gcc_common_mk}
          # This back end's driver spec functions, from the same tm-<base>.h.
@@ -374,10 +403,24 @@ rm -f ${gcc_mt_err}
 # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2082".
 ${AWK} '
   # Manifest stanzas are blank-line separated `key value...` lines.
-  /^common_out_file / {
+  #
+  # KEYED ON cpu_type, NOT ON common_out_file.  Every other per-back-end
+  # artefact is named after cpu_type -- gen-multi-target-md.awk builds
+  # mt_bases and mt_base_of from it, so tm-<cpu>.h depends on
+  # options-<cpu>.h and multi-target-options.h declares cl_options_<cpu>
+  # for exactly that set.  Deriving the base from common_out_file agrees
+  # with cpu_type for 45 of the 48 back ends and disagrees for the three
+  # that have no per-back-end common file: ft32, moxie and rl78 all say
+  # `common_out_file default-common.cc.  Those were dropped here -- the
+  # loop below used to skip base "default", because the name collides
+  # across every back end that shares that file -- and they were dropped
+  # ONLY here, so multi-target-options.h still declared cl_options_ft32
+  # and still put it in MT_OPTION_TABLES.  All three have real .opt files
+  # (ft32/ft32.opt, moxie/moxie.opt, rl78/rl78.opt), so this is not a set
+  # of back ends without options; it is three back ends whose options were
+  # requested by one generator and never emitted by the other.
+  /^cpu_type / {
     base = $2
-    sub(/.*\//, "", base)
-    sub(/-common\.cc$/, "", base)
     next
   }
   /^extra_options / {
@@ -390,8 +433,9 @@ ${AWK} '
   END { flush() }
 
   function flush(   i, f) {
-    # default-common.cc back ends have no options-<base>.h at all.
-    if (base != "" && base != "default") {
+    # Every stanza has a cpu_type, so an empty base means the stanza was
+    # malformed rather than that this back end has no options.
+    if (base != "") {
       for (i = 2; i <= n; i++) {
 	f = opt[i]
 	# Order is preserved and duplicates dropped: opt-gather.awk is fed
@@ -596,13 +640,33 @@ ${AWK} '
 #
 # So check the output for the one line per back end that the block must
 # contain, and fail the configure rather than the build.
-gcc_mt_have=`grep -c '^MT_OPTIONS_INIT_OBJS += ' ${gcc_common_mk}`
-gcc_mt_bases=`awk '$1 == "cpu_type" { print $2 }' ${gcc_target_manifest} \
-	      | sort -u | wc -l`
-if test x"${gcc_mt_have}" != x"${gcc_mt_bases}"; then
+#
+# IT NAMES THE BACK ENDS, IT DOES NOT JUST COUNT THEM.  This check spent its
+# first life reporting "45 options blocks for 48 back ends" and nothing else,
+# and the three missing names -- ft32, moxie and rl78 -- had to be recovered by
+# hand from the artefact before anyone could tell whether the blocks or the
+# expectation were wrong.  A count says a set is the wrong size; a difference
+# says which members are gone, and only the second distinguishes "the awk died
+# partway" (a contiguous tail is missing) from "these particular back ends are
+# being filtered out" (scattered names, which is what it actually was).
+awk '$1 == "cpu_type" { print $2 }' ${gcc_target_manifest} | sort -u \
+  > ${gcc_common_mk}.want
+sed -n 's|^MT_OPTIONS_INIT_OBJS += mt-\(.*\)/options-init\.o$|\1|p' \
+  ${gcc_common_mk} | sort -u > ${gcc_common_mk}.have
+gcc_mt_bases=`wc -l < ${gcc_common_mk}.want`
+gcc_mt_have=`wc -l < ${gcc_common_mk}.have`
+gcc_mt_missing=`comm -23 ${gcc_common_mk}.want ${gcc_common_mk}.have | tr '\n' ' '`
+gcc_mt_extra=`comm -13 ${gcc_common_mk}.want ${gcc_common_mk}.have | tr '\n' ' '`
+rm -f ${gcc_common_mk}.want ${gcc_common_mk}.have
+if test x"${gcc_mt_missing}${gcc_mt_extra}" != x; then
   gcc_mt_fatal="multi-target-common.mk has ${gcc_mt_have} options blocks for\
- ${gcc_mt_bases} back ends; the awk program over ${gcc_target_manifest} did\
- not run to the end"
+ ${gcc_mt_bases} back ends.  No MT_OPTIONS_INIT_OBJS line for: ${gcc_mt_missing}\
+ -- and a back end with no options block does not fail the build, it takes the\
+ empty path: no options-<base>.h, no Init() values, and every one of its\
+ targets still registered in MT_OPTION_TARGET_BASES.  A line for a back end not\
+ in the manifest: ${gcc_mt_extra}.  Either the awk program over\
+ ${gcc_target_manifest} did not run to the end, or it is keyed on something\
+ other than cpu_type"
   return 1
 fi
 
@@ -614,11 +678,20 @@ fi
 # multi-target-options-select.cc fails to link on cl_options_<base>.  That is a
 # loud failure, but it names a symbol rather than the manifest, three steps
 # from the cause.
-gcc_mt_tables=`grep -c '^MT_OPTIONS_TABLES_OBJS += ' ${gcc_common_mk}`
-if test x"${gcc_mt_tables}" != x"${gcc_mt_bases}"; then
+awk '$1 == "cpu_type" { print $2 }' ${gcc_target_manifest} | sort -u \
+  > ${gcc_common_mk}.want
+sed -n 's|^MT_OPTIONS_TABLES_OBJS += mt-\(.*\)/options-tables\.o$|\1|p' \
+  ${gcc_common_mk} | sort -u > ${gcc_common_mk}.have
+gcc_mt_tables=`wc -l < ${gcc_common_mk}.have`
+gcc_mt_missing=`comm -23 ${gcc_common_mk}.want ${gcc_common_mk}.have | tr '\n' ' '`
+gcc_mt_extra=`comm -13 ${gcc_common_mk}.want ${gcc_common_mk}.have | tr '\n' ' '`
+rm -f ${gcc_common_mk}.want ${gcc_common_mk}.have
+if test x"${gcc_mt_missing}${gcc_mt_extra}" != x; then
   gcc_mt_fatal="multi-target-common.mk has ${gcc_mt_tables} option-table\
- blocks for ${gcc_mt_bases} back ends; the awk program over\
- ${gcc_target_manifest} did not run to the end"
+ blocks for ${gcc_mt_bases} back ends.  No MT_OPTIONS_TABLES_OBJS line for:\
+ ${gcc_mt_missing}.  A line for a back end not in the manifest:\
+ ${gcc_mt_extra}.  multi-target-options-select.cc will fail to link on\
+ cl_options_<base> for each of the first set, three steps from the cause"
   return 1
 fi
 

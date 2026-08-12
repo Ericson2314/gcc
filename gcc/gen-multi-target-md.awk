@@ -695,19 +695,18 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # This exclusion therefore ends when the per-back-end compiler objects go
   # into OBJS, not before, and it is one more consumer of that work.
   #
-  # Back ends that share default-common.cc are skipped as well, and for a
-  # duller reason: tm-<base>.h is generated per *common file* base, not per
-  # cpu_type, so ft32 and the four others in that group have no tm-ft32.h to
-  # compile against.  Every other rule in this file happens to be safe because
-  # cpu_type and the common-file base coincide for the 45 back ends that have
-  # their own; these five are where the two keys come apart.
+  # Back ends that share default-common.cc are NOT skipped any more.  They used
+  # to be, because tm-<base>.h was generated per *common file* base rather than
+  # per cpu_type, so ft32, moxie and rl78 -- the three back ends where those two
+  # keys come apart -- had no tm-ft32.h to compile against.  That was a property
+  # of gen-target-manifest.sh, not of the back ends: sharing default-common.cc
+  # means only that a back end has no common-hook overrides of its own.  The
+  # manifest loop now deduplicates the per-back-end headers on cpu_type, so all
+  # 48 have tm-<base>.h, options-<base>.h and insn-constants-<base>.h.
   if (cpu == "mmix") {
     printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP calls mmix_data_section_asm_op (),\n";
     printf "# which is defined in config/mmix/mmix.cc -- not linked unless mmix is the primary.\n\n";
   }
-  else if (cof == "default-common.cc")
-    printf "# target-asm-ops-%s.o omitted: no tm-%s.h (shares default-common.cc).\n\n",
-	   cpu, cpu;
   else {
   printf "target-asm-ops-%s.o: $(srcdir)/target-asm-ops.cc tm-%s.h \\\n", cpu, cpu;
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-asm-ops.h\n";
@@ -732,16 +731,11 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # Makefile.in is for -- and this back end's objects see their OWN generated
   # headers under the plain names their sources actually write.
   #
-  # Skipped for the back ends that share default-common.cc, for the same reason
-  # target-asm-ops-<base>.o is: tm-<base>.h, options-<base>.h and
-  # insn-constants-<base>.h are generated per COMMON FILE base, not per
-  # cpu_type, so those five have no tm-<base>.h for a forwarder to point at.
-  # Emitting the directory anyway would give them a `tm.h' whose target has no
-  # rule, i.e. a build that stops later and further from the cause.
-  if (cof == "default-common.cc")
-    printf "# %s-inc omitted: no tm-%s.h (shares default-common.cc).\n\n",
-	   cpu, cpu;
-  else {
+  # Emitted for every back end, including the three that share
+  # default-common.cc: their tm-<base>.h, options-<base>.h and
+  # insn-constants-<base>.h now have rules like everyone else's, so a
+  # forwarder here points at something that is built.
+  {
     printf "MULTI_TARGET_INC_HDRS_%s = \\\n", cpu;
     printf "  $(patsubst %%,%%-%s.h,$(MULTI_TARGET_INC_STEMS))\n", cpu;
     printf "MULTI_TARGET_INC_DIRS += %s-inc\n", cpu;
@@ -842,12 +836,17 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 # they agree on.  See intersect-conditions.awk for why that is the right
 # answer rather than picking one triple.
 #
-# Skipped for the back ends that share default-common.cc: they have no
-# options-<base>.h or insn-constants-<base>.h to build a tm.h against.
+# Run for EVERY triple.  This used to return early for the back ends sharing
+# default-common.cc, on the ground that they had no options-<base>.h or
+# insn-constants-<base>.h to build a tm.h against -- true at the time, and the
+# reason was a key confusion in gen-target-manifest.sh rather than anything
+# about those back ends.  While it stood, five triples (ft32-unknown-elf, the
+# three moxie ones and rl78-unknown-elf) got no tm-<triple>.h and no
+# generators, yet were still listed in the manifest and still mapped to their
+# bases in MT_OPTION_TARGET_BASES -- so multi_target_options_select would find
+# the triple, look up base `ft32, and find no tables, which the comment beside
+# that loop calls impossible.
 function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
-  if (cof == "default-common.cc")
-    return;
-
   key = trg;
   gsub(/[^A-Za-z0-9_]/, "_", key);
 
