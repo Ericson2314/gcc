@@ -384,9 +384,18 @@ is rule 1 of this section, committed by the person who wrote it. **Search the
 generated artefact, and check what your filter excluded before believing a
 zero.**
 
-**`nm -u` with a plain-name grep scores 0 on C++ symbols.** Measured: nine of
-`function.o`'s ten undefined `ix86_*` references are mangled, so a sweep built
-that way calls the file **clean**. Use `nm -uC`. This is the same shape as the
+**`nm -u` with a plain-name grep can score 0 on C++ symbols — but check which
+part failed.** Measured one way: nine of `function.o`'s ten undefined `ix86_*`
+references are mangled, so a sweep built that way called the file clean.
+Measured the other way, later: plain `nm -u | grep ix86_` scores the same as
+`nm -uC`, because `_Z13ix86_cfun_abiv` *contains* the substring — the 0 needs
+`grep -w` or `^`. **So the lesson is about the pattern, not the tool.** Use
+`nm -uC`, and know which of the two you are relying on.
+
+**One symbol can have several macro paths.** `ix86_cfun_abi` survived after
+`STACK_BOUNDARY` was converted, because `function.cc` also spells
+`ACCUMULATE_OUTGOING_ARGS`, which also expands `TARGET_64BIT_MS_ABI`. Closing
+the path you found does not close the symbol; re-measure rather than assuming. This is the same shape as the
 `T D B R` filter hiding COMDAT, and as `internal_dfa_insn_code` scoring 0
 because it is a function on one back end and a pointer on another: **a zero from
 a name-matching instrument is a claim about the instrument, not the code.**
