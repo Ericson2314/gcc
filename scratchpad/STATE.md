@@ -957,3 +957,134 @@ Do not write `nohup ... &` inside a tool call that is *already* backgrounded.
 The tool reports the launcher's exit 0 as the build's, and you will read
 "build succeeded" next to a build dir with no `cc1` in it.  Background the
 command itself and poll the artefact.
+
+# TASK #107 -- `CUMULATIVE_ARGS' STORAGE + WRITERS: LANDED (`2ef489d0984`)
+
+Branched from `cc9ef129b37` ("PRINCIPLES: correct the scoreboard...").  Build
+dir `/tmp/b107`, x86_64-pc-linux-gnu + aarch64-unknown-linux-gnu.
+
+## THE MEASUREMENT, TWICE, BY TWO INSTRUMENTS
+
+    sizeof (CUMULATIVE_ARGS)    i386  96   aarch64 184
+    alignof (CUMULATIVE_ARGS)   i386   8   aarch64   8
+
+`scratchpad/t107-size.sh` (hand probe, compile + `nm -S`) and the generated
+`multi-target-reg-widths.h` (184 / 8) agree.  So the shared allocation is 96
+and aarch64 writes 184: **an 88-byte stack overflow per function**, not the
+8 bytes `cl_optimization` had.  The brief's premise reproduced exactly.
+
+## DOES `cumulative_args_t` ALREADY ISOLATE THE LAYOUT?  PARTLY -- AND THAT IS
+## WHY THIS BUG SURVIVED `27760d3947c`
+
+**Yes at the hook boundary.**  `cumulative_args_t` is `{void *magic; void *p;}`
+-- no layout crosses it -- so all ~30 `targetm.calls.*` calls were already
+safe, and that is genuinely why nothing type-checked wrong.
+
+**No at the three places that are not the hook boundary**, and those are the
+whole bug:
+
+  1. the STORAGE (`function.cc`, `calls.cc` x2, `expr.cc`, `dse.cc`,
+     `var-tracking.cc`, and `incoming_args::info`) -- declared with the type;
+  2. `INIT_CUMULATIVE_ARGS` and friends, MACROS taking the struct by
+     reference, expanded in shared code against the primary's `tm.h`;
+  3. `function.cc`'s `crtl->args.info = all.args_so_far_v` -- a struct
+     assignment, i.e. the primary's `sizeof` deciding how much of the selected
+     back end's accumulator survived.  Now a `memcpy` of the SELECTED base's
+     own size.
+
+`calls.cc:1342`'s `get_cumulative_args` was the one remaining cast in shared
+code and turned out to be **an unpack/repack round trip** -- its only two uses
+repacked it immediately, no field was ever read.  Deleted.
+
+**Alignment does NOT differ today** (8 and 8).  It is asserted rather than
+assumed, at `8 <= 8` with no slack.
+
+## WHAT LANDED
+
+  * `gcc/mt-cumulative-args.h` -- `struct mt_cumulative_args` (opaque bytes,
+    union-bounded) + `MT_INCOMING_ARGS_PAD` + the shared-side alignment
+    assertion.  Reached from `emit-rtl.h`.
+  * `gcc/target-cumargs.{h,cc}` + `-select.cc` -- the `target-regs.cc` shape
+    for five macros (INIT_CUMULATIVE_ARGS, ..._INCOMING_ARGS, ..._LIBCALL_ARGS,
+    CALL_POPS_ARGS, OVERRIDE_ABI_FORMAT).
+  * probe + `gen-reg-widths.sh` extended with the two new maxima.
+  * `MULTI_TARGET_OBJS_<base>` for the per-base table, `OBJS` for the selector
+    -- the brief's placement note is right, and `lto1` links.
+
+`incoming_args::info` KEEPS its `CUMULATIVE_ARGS` type deliberately: 19 back
+ends spell `crtl->args.info.<field>` and each means its own struct.  The pad is
+`BOUND - sizeof + 1`, so `info + pad` is the same byte count in every TU
+(96+89, 184+1) and every later offset in `rtl_data` agrees.  **Zero `config/`
+files edited.**
+
+## WHERE aarch64 STOPS NOW -- IT MOVED, AND NO ARM IS CLAIMED
+
+    before  rc=4  30 bytes  crash in ix86_call_abi_override
+    after   rc=4  30 bytes  crash in aarch64_set_current_function,
+                            via invoke_set_current_function_hook
+
+Same verdict, **different frame**: it is now aarch64 code that runs and dies,
+one macro further on.  x86_64 is `rc=0`, 12369 bytes, md5 `378fc33c1e70`,
+**byte-identical before and after**.  Scoring is on `rc`; `[ -s out.s ]` is
+green for both of these.
+
+## THE GUARD, SEEN FIRING -- `scratchpad/t107-guards.sh`, 4/4
+
+    0 CONTROL     unperturbed aarch64 target-cumargs.cc     compiles rc=0
+    1 BOUND-SIZE  bound shrunk to 96                        static assertion
+    2 BASE-GROWS  aarch64 CUMULATIVE_ARGS +256 bytes        static assertion
+    3 ALIGN       bound align 16, in a SHARED TU            static assertion
+
+**The arms compile by hand, not through `make`, and that is required.**  The
+bound is DERIVED from the same probe as the thing it bounds, so under `make`
+growing a back end regenerates the bound and the assertion correctly stays
+quiet.  A `make`-based demonstration of this guard cannot work.
+
+## REGRESSION BARS, ALL MEASURED
+
+  * `make cc1` rc=0; **`lto1` links**.
+  * stock-compare, absolute `IN=/tmp/acc2/t.c`, `MT=/tmp/b107`: 5/5 IDENTICAL,
+    5 distinct md5 per side, negative control firing, `rc=0`.
+  * 230 header arms: i386 115 PASS / 0 FAIL, aarch64 5 PASS / 110 FAIL.
+    58 TAB arms: i386 29 / 0, aarch64 24 / 5.  Unchanged, verdict by verdict.
+  * TAB needs `MTP=/tmp/mtp-before` (it has the PROVENANCE.txt); pointing it at
+    a fresh macro-probe dir fails by name, correctly.
+
+## TWO TRAPS THIS TASK PAID FOR -- READ BEFORE EDITING `gcc/Makefile.in`
+
+  1. **`gcc/Makefile` has no dependency on `gcc/Makefile.in`.**  An edit there
+     is invisible to an incremental build.  It presented as `undefined
+     reference to target_cumargs_for` with `target-cumargs-select.cc` simply
+     never compiled -- reads like a missing source file.
+  2. **`$D/gcc/config.status` IS NOT GCC'S.**  `t10*-ts.sh` runs
+     `target-specs/configure` with cwd `$D/gcc`, which OVERWRITES it.  Running
+     it reports `invalid argument: Makefile`.  Use
+     `scratchpad/t107-reconf-gcc.sh` (removes `gcc/Makefile`, lets the TOP
+     LEVEL reconfigure gcc), and run `target-specs` LAST.
+
+## A FIGURE IN THE BRIEF THAT DID NOT REPRODUCE
+
+The **incremental stderr floor here is 8 lines, not 32**: the 8 `is unchanged`
+lines reproduce exactly, and the 24 `'@' is redundant` lines did **not appear
+at all** in a no-op `make` in `/tmp/b107`.  I did not chase why (they appear in
+the cold arm).  Cold `all-gcc` + `cc1 lto1` here was 721 lines / 345
+`warning:`, consistent with the recorded ~870/~370.  **Do not score a build in
+this dir against 32.**
+
+## FILES (scratchpad)
+
+    t107-build.sh      build harness, SRC/D repointed at this worktree
+    t107-go.sh         wrapper: logs to $LOG.log/$LOG.err, prints stderr counts
+    t107-size.sh       MEASURE sizeof/alignof CUMULATIVE_ARGS per base
+    t107-guards.sh     the four fail-by-name arms above
+    t107-reconf-gcc.sh reconfigure gcc/ after a Makefile.in edit (trap 2)
+    t107-run.sh        both targets through cc1; verdict = rc
+    t107-ts.sh         target-specs configure per target (run LAST)
+
+## WHAT I DID NOT DO
+
+`PUSH_ROUNDING` and `REG_PARM_STACK_SPACE` (#87 existence predicates) are
+untouched, as instructed.  Seven of #106's ten `ix86_*` references remain; this
+change removes `init_cumulative_args` and `ix86_call_abi_override` from
+`function.o` and adds none.  No aarch64 acceptance arm is claimed and no
+single-target aarch64 reference was built.
