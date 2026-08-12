@@ -367,6 +367,23 @@ commit it on your behalf, which is slower and puts an unreviewed change in
 someone else's hands. `git diff --cached` before committing (the index is
 shared), then `git log --oneline -1` to confirm the commit exists.
 
+**A count check passes when two errors cancel.** Measured: a generated
+`global_options_init` had **1674 elements for a 1669-member struct** — five
+invented and two missing. All the compiler said was `too many initializers for
+gcc_options`. It noticed the *count* and nothing about the **1656 misplaced
+values** — and had the five and the two been equal, it would have said nothing
+at all while every member after the first divergence held another member's
+value. Compare bodies, offsets and names; a count is the weakest evidence
+available and is silent in exactly the case that matters.
+
+**Your grep's `--include` list can exclude the answer.** Real case: a search for
+what invokes `gen-reg-widths.sh` used `--include='*.in' --include='*.ac'
+--include='*.sh' --include='Makefile*'` and concluded **nothing invoked it**.
+The invocation is in a `*.awk` file, emitted into the *generated* makefile. That
+is rule 1 of this section, committed by the person who wrote it. **Search the
+generated artefact, and check what your filter excluded before believing a
+zero.**
+
 **`nm -u` with a plain-name grep scores 0 on C++ symbols.** Measured: nine of
 `function.o`'s ten undefined `ix86_*` references are mangled, so a sweep built
 that way calls the file **clean**. Use `nm -uC`. This is the same shape as the
