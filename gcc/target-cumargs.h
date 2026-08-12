@@ -60,6 +60,7 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_TARGET_CUMARGS_H
 
 #include "mt-cumulative-args.h"
+#include "target-frame.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -134,6 +135,12 @@ struct target_cumargs_desc
      end defines it, and doing nothing is what `allocate_struct_function' has
      always done for the others.  */
   void (*override_abi_format) (tree fndecl);
+
+  /* THIS BASE'S FRAME AND ARGUMENT-REGISTER ANSWERS; see target-frame.h, which
+     also explains why they ride here instead of in a registry of their own.
+     Never null: the per-base translation unit that defines this table defines
+     that one immediately above it.  */
+  const struct target_frame_desc *frame;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

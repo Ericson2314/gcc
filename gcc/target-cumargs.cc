@@ -139,8 +139,85 @@ mt_base_override_abi_format (tree fndecl ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* ------------------------------------------------------------------------
+   THE FRAME AND ARGUMENT-REGISTER ANSWERS; see target-frame.h.
+
+   Each thunk is one macro expansion, in the translation unit whose `tm.h' is
+   this back end's.  That is the entire mechanism, and it is worth being blunt
+   about what it buys: in shared code `STACK_BOUNDARY' means
+   `(TARGET_64BIT_MS_ABI ? 128 : BITS_PER_WORD)' evaluated against i386's
+   headers, for aarch64 too.  Here it means aarch64's 128 when this file is
+   compiled with `-Iaarch64-inc' and i386's expression when it is compiled with
+   `-Ii386-inc'.
+
+   Nothing below has an `#else' arm or a default, because none of these six is
+   an existence predicate: `defaults.h' gives all but STACK_BOUNDARY and
+   FUNCTION_ARG_REGNO_P a generic definition, and a base that does not define
+   its own gets that generic one HERE, in its own translation unit, rather than
+   getting the primary's answer.  That is the difference the whole file exists
+   to make, and it is why these thunks look trivial.  */
+
+static int
+mt_base_stack_boundary (void)
+{
+  return STACK_BOUNDARY;
+}
+
+static int
+mt_base_preferred_stack_boundary (void)
+{
+  return PREFERRED_STACK_BOUNDARY;
+}
+
+/* ATTRIBUTE_UNUSED on the parameters below is not defensive: `defaults.h's
+   generic MINIMUM_ALIGNMENT is `(ALIGN)' and its generic STACK_SLOT_ALIGNMENT
+   ignores MODE, so for a base that defines neither -- aarch64 is one -- these
+   really do go unused, and this branch measures stderr.  It is a no-op for a
+   base that uses them.  */
+
+static unsigned int
+mt_base_stack_slot_alignment (tree type ATTRIBUTE_UNUSED,
+			      machine_mode mode ATTRIBUTE_UNUSED,
+			      unsigned int align ATTRIBUTE_UNUSED)
+{
+  return STACK_SLOT_ALIGNMENT (type, mode, align);
+}
+
+static unsigned int
+mt_base_minimum_alignment (tree exp ATTRIBUTE_UNUSED,
+			   machine_mode mode ATTRIBUTE_UNUSED,
+			   unsigned int align ATTRIBUTE_UNUSED)
+{
+  return MINIMUM_ALIGNMENT (exp, mode, align);
+}
+
+static int
+mt_base_outgoing_reg_parm_stack_space (tree fntype ATTRIBUTE_UNUSED)
+{
+  return OUTGOING_REG_PARM_STACK_SPACE (fntype);
+}
+
+static bool
+mt_base_function_arg_regno_p (int regno ATTRIBUTE_UNUSED)
+{
+  return FUNCTION_ARG_REGNO_P (regno);
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
+
+/* `static', unlike the cumargs table: this one is reached only through the
+   `frame' pointer in the table below, so it needs no name in the registry and
+   gen-multi-target-md.awk needs no change to declare one.  */
+static const struct target_frame_desc mt_base_frame = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  mt_base_stack_boundary,
+  mt_base_preferred_stack_boundary,
+  mt_base_stack_slot_alignment,
+  mt_base_minimum_alignment,
+  mt_base_outgoing_reg_parm_stack_space,
+  mt_base_function_arg_regno_p
+};
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL
    linkage in C++, so without it the table is built correctly and then cannot
@@ -159,5 +236,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   mt_base_init_incoming_args,
   mt_base_init_libcall_args,
   mt_base_call_pops_args,
-  mt_base_override_abi_format
+  mt_base_override_abi_format,
+  &mt_base_frame
 };

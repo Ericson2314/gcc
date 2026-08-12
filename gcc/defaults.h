@@ -2063,6 +2063,53 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define MAX_FIXED_MODE_SIZE (targetm_cdata.max_fixed_mode_size)
 #undef DWARF_FRAME_RETURN_COLUMN
 #define DWARF_FRAME_RETURN_COLUMN (targetm_cdata.dwarf_frame_return_column)
+
+/* ------------------------------------------------------------------------
+   THE FRAME AND ARGUMENT-REGISTER MACROS.  See target-frame.h for what each
+   one was answering with before, and why these are CALLS rather than
+   `targetm_cdata' fields -- the short version being that target-cdata.h's own
+   header comment already records `STACK_BOUNDARY' as measured NOT invariant,
+   and four of the six take arguments so there is no value to cache.
+
+   THESE ARE NOT `#undef'-THEN-DEFINE FOR TIDINESS.  Every one of the six
+   already has a definition by this point -- four of them from `defaults.h'
+   itself a thousand lines above, two from the primary's `config/<cpu>/<cpu>.h'
+   -- and it is the primary's, which is the bug.
+
+   A redirect here reaches every consumer at once, which is the point:
+   `function.cc' is the file this was chased into, but `calls.cc' spells
+   OUTGOING_REG_PARM_STACK_SPACE seven times, `cfgexpand.cc' spells
+   MINIMUM_ALIGNMENT four, and `alias.cc', `builtins.cc', `df-scan.cc',
+   `ifcvt.cc', `loop-invariant.cc' and `rtlanal.cc' each ask
+   FUNCTION_ARG_REGNO_P about the primary's argument registers.  Editing the
+   call sites in one file would have left all of those answering as i386.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING, because that is what
+   makes a redirect like this fail: a `#if', a case label, an array bound or a
+   static initialiser cannot hold a call.  Outside `config/', the six appear
+   only in ordinary run-time expressions.  Two `#ifdef STACK_BOUNDARY'
+   (reload1.cc:1293, emit-rtl.cc:6024) are unaffected -- the name stays
+   defined.  The one derived macro that follows them into run time is
+   `SUPPORTS_STACK_ALIGNMENT' (`MAX_STACK_ALIGNMENT > STACK_BOUNDARY', above);
+   all sixteen of its uses outside `config/' are `if' conditions, and it
+   becoming per-target is a fix rather than a cost.  */
+#include "target-frame.h"
+
+#undef STACK_BOUNDARY
+#define STACK_BOUNDARY (mt_stack_boundary ())
+#undef PREFERRED_STACK_BOUNDARY
+#define PREFERRED_STACK_BOUNDARY (mt_preferred_stack_boundary ())
+#undef STACK_SLOT_ALIGNMENT
+#define STACK_SLOT_ALIGNMENT(TYPE, MODE, ALIGN) \
+  (mt_stack_slot_alignment ((TYPE), (MODE), (ALIGN)))
+#undef MINIMUM_ALIGNMENT
+#define MINIMUM_ALIGNMENT(EXP, MODE, ALIGN) \
+  (mt_minimum_alignment ((EXP), (MODE), (ALIGN)))
+#undef OUTGOING_REG_PARM_STACK_SPACE
+#define OUTGOING_REG_PARM_STACK_SPACE(FNTYPE) \
+  (mt_outgoing_reg_parm_stack_space ((FNTYPE)))
+#undef FUNCTION_ARG_REGNO_P
+#define FUNCTION_ARG_REGNO_P(N) (mt_function_arg_regno_p ((int) (N)))
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

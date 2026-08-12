@@ -105,3 +105,59 @@ mt_override_abi_format (tree fndecl)
 {
   mt_cumargs ()->override_abi_format (fndecl);
 }
+
+/* ------------------------------------------------------------------------
+   THE FRAME AND ARGUMENT-REGISTER ANSWERS; see target-frame.h.
+
+   `targetm_frame' is set beside `targetm_cumargs' by whoever selects a base,
+   and is NOT derived from it here, so that a base selected for its argument
+   accumulator but never given a frame table fails by name rather than
+   answering with a stale pointer.  */
+const struct target_frame_desc *targetm_frame;
+
+static const struct target_frame_desc *
+mt_frame (void)
+{
+  if (targetm_frame == NULL)
+    internal_error ("no back end has been selected, so the frame layout of "
+		    "the function being compiled is unknown; a target must be "
+		    "chosen with %<-ftarget-config=%> before any function is "
+		    "compiled");
+  return targetm_frame;
+}
+
+int
+mt_stack_boundary (void)
+{
+  return mt_frame ()->stack_boundary ();
+}
+
+int
+mt_preferred_stack_boundary (void)
+{
+  return mt_frame ()->preferred_stack_boundary ();
+}
+
+unsigned int
+mt_stack_slot_alignment (tree type, machine_mode mode, unsigned int align)
+{
+  return mt_frame ()->stack_slot_alignment (type, mode, align);
+}
+
+unsigned int
+mt_minimum_alignment (tree exp, machine_mode mode, unsigned int align)
+{
+  return mt_frame ()->minimum_alignment (exp, mode, align);
+}
+
+int
+mt_outgoing_reg_parm_stack_space (tree fntype)
+{
+  return mt_frame ()->outgoing_reg_parm_stack_space (fntype);
+}
+
+bool
+mt_function_arg_regno_p (int regno)
+{
+  return mt_frame ()->function_arg_regno_p (regno);
+}

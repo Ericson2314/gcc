@@ -59,7 +59,45 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_MT_CUMULATIVE_ARGS_H
 #define GCC_MT_CUMULATIVE_ARGS_H
 
+/* A GENERATOR IS SINGLE-TARGET BY CONSTRUCTION AND MUST NOT REACH THE
+   GENERATED BOUND -- because requiring it is a dependency CYCLE, not merely
+   unnecessary work:
+
+     multi-target-reg-widths.h -> mt-<base>/reg-probe.o -> <base>-inc/s-inc
+       -> insn-*.h -> build/gencondmd-<triple> -> emit-rtl.h
+       -> mt-cumulative-args.h -> multi-target-reg-widths.h
+
+   The bound is measured from probe objects that are compiled against headers
+   the generators produce.  NO ORDERING EDGE CAN FIX THAT; the cycle has to be
+   cut, and this is the only arc in it that is wrong -- a generator has no
+   business knowing what OTHER back ends need.
+
+   This is #109.  Its symptom is that a FRESH build directory cannot build at
+   all (`multi-target-reg-widths.h: No such file or directory' out of
+   build/gencondmd-<triple>.cc), while every directory in which
+   gen-reg-widths.sh had once been run by hand builds fine -- which is why it
+   survived unnoticed since `ecad6abf6ae' and why it reads as a missing rule.
+   The rule is not missing: gen-multi-target-md.awk emits it and
+   multi-target-md.mk carries it.  It is unreachable.
+
+   THE VALUES BELOW ARE NOT A FALLBACK AND NOT A DEFAULT, which matters
+   because a fabricated bound here would be exactly the class of change that
+   undoes this branch.  A generator is compiled against exactly one base's
+   tm.h, so the union over "every back end this translation unit serves" is
+   that base's own `CUMULATIVE_ARGS' -- the same arithmetic the generated
+   header does, over a set of size one.  MT_INCOMING_ARGS_PAD accordingly
+   comes out as 1 and both assertions below hold with equality, which is
+   precisely what they do for the LARGEST base in a real multi-target build.
+
+   A generator also never instantiates `rtl_data'; all that is required of it
+   here is that `struct incoming_args' compile.  */
+#ifdef GENERATOR_FILE
+#define MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE ((int) sizeof (CUMULATIVE_ARGS))
+#define MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN \
+  ((int) alignof (CUMULATIVE_ARGS))
+#else
 #include "multi-target-reg-widths.h"
+#endif
 
 /* Storage for one `CUMULATIVE_ARGS', big enough and aligned enough for EVERY
    configured back end.
