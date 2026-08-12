@@ -820,3 +820,140 @@ one**: `macro-probe.sh` compiles probe sources against the build directory's
     instructed.  Visible in every arm of `h101-path.sh` as the second
     `/usr/include`.
   * The top-level per-target `mkheaders` invocation, above.
+
+# TASK #106 -- `function.o`'s TEN `ix86_*` REFERENCES: MEASURED, NOT CLEARED
+
+Branched from `972440fce48` (the merge carrying the `4caa7c2a4f1` c-ops work).
+**No source file was changed.** This entry is a measurement and a
+decomposition, and it contradicts the brief's premise.  Read the pushback.
+
+## THE TEN, NAMED, WITH THE MACRO THAT PULLS EACH IN
+
+Measured with `nm -uC` on `/tmp/b106/gcc/function.o`.  The plain-name sweep
+(`nm -u` + `grep -w`) scored **0 for nine of the ten** -- C++ mangling -- and
+only `ix86_preferred_stack_boundary` (a variable, C linkage) showed up.  That
+is PRINCIPLES rule 4 exactly: a 0 that is the instrument, not the tree.
+**Use `nm -C`.**
+
+| # | undefined symbol | macro in `function.cc` | sites |
+|---|---|---|---|
+| 1 | `ix86_call_abi_override` | `OVERRIDE_ABI_FORMAT` | 4860 |
+| 2 | `ix86_cfun_abi` | `STACK_BOUNDARY` (via `TARGET_64BIT_MS_ABI`) | 97 (`STACK_BYTES`), 2720-1 |
+| 3 | `ix86_preferred_stack_boundary` | `PREFERRED_STACK_BOUNDARY` | 314 |
+| 4 | `ix86_push_rounding` | `PUSH_ROUNDING` | 4145 |
+| 5 | `ix86_local_alignment` | `STACK_SLOT_ALIGNMENT` | 274, 294, 3366, 3516, 3601 |
+| 6 | `ix86_minimum_alignment` | `MINIMUM_ALIGNMENT` | 3682, 3684 |
+| 7 | `ix86_reg_parm_stack_space` | `REG_PARM_STACK_SPACE` -> `INCOMING_REG_PARM_STACK_SPACE` | 2325 |
+| 8 | `ix86_function_type_abi` | `OUTGOING_REG_PARM_STACK_SPACE` | 1421 |
+| 9 | `ix86_function_arg_regno_p` | `FUNCTION_ARG_REGNO_P` | 5970 |
+| 10 | `init_cumulative_args` | `INIT_CUMULATIVE_ARGS` | 2318 |
+
+Note #5: it is `STACK_SLOT_ALIGNMENT`, **not** `LOCAL_ALIGNMENT`.  Both expand
+to `ix86_local_alignment`; `function.cc` spells only the former.  Grepping for
+the symbol and converting the obvious macro would have converted the wrong one.
+
+## HOW WIDE EACH ONE ACTUALLY IS (627 shared objects, `nm -uC`)
+
+    ix86_push_rounding             27      ix86_function_arg_regno_p       7
+    ix86_cfun_abi                  17      ix86_preferred_stack_boundary   5
+    ix86_local_alignment            5      init_cumulative_args            5
+    ix86_minimum_alignment          4      ix86_reg_parm_stack_space       3
+    ix86_function_type_abi          3      ix86_call_abi_override          1
+
+**These disagree with the brief's figures** (it quoted `ix86_cfun_abi` 14 and
+`ix86_push_rounding` 7).  Mine are over `*.o c-family/*.o c/*.o` = 627 objects
+in `/tmp/b106`; the Arm C sweep in `4caa7c2a4f1` covered a different set.  I did
+not reconcile them.  **Diff the shapes, not the totals** -- and do not carry
+either number as settled until one sweep's object set is stated.
+
+## PUSHBACK: THREE OF THE TEN ARE NOT THE `4caa7c2a4f1` SHAPE
+
+The brief models all ten as the c-ops shape -- a statement/call routed through
+a per-base table.  **Seven are.  Three are not**, and each of the three is a
+design question under PRINCIPLES 2b, not debugging:
+
+* **`PUSH_ROUNDING` (19 `#if`/`#ifdef` lines) and `REG_PARM_STACK_SPACE` (12)**
+  in shared code outside `config/`.  These are **existence predicates**
+  answered by the shared `tm.h` -- "does the target define this at all" -- and
+  they select *different control flow*, not a different value.  Converting them
+  means turning 31 preprocessor branches into runtime ones, which changes the
+  shape of the code around them.  This is the `HAVE_*` existence-predicate
+  problem (#87) reappearing on macros the brief treats as ordinary.
+
+* **`INIT_CUMULATIVE_ARGS` is a TYPE problem, not a call.**  `CUMULATIVE_ARGS`
+  is a `typedef struct ix86_args {...}` in `i386.h`.  `function.cc:2280`
+  declares `CUMULATIVE_ARGS args_so_far_v;` -- **stack storage sized and laid
+  out by the primary** -- and `calls.cc:2760`, `calls.cc:4219` and
+  `expr.cc:2201` do the same.  Routing the initialiser through a table does not
+  fix this: the aarch64 back end would still be writing its own struct into
+  i386-shaped storage through `targetm.calls`.  This is "sized by one, written
+  by another" from the PRINCIPLES table, on the stack.
+
+  Sketch that fits the branch's method (union the vocabulary, keep the data per
+  config, fail by name): a shared `struct mt_cumulative_args { alignas(A)
+  unsigned char raw[N]; }` with `A`/`N` a declared union bound, plus a
+  `static_assert (sizeof (CUMULATIVE_ARGS) <= N && alignof (CUMULATIVE_ARGS)
+  <= A)` **in each per-base TU**, so a back end that outgrows the bound breaks
+  the build naming itself rather than corrupting a stack frame.  `target.h`'s
+  `pack_cumulative_args`/`get_cumulative_args` magic-pointer pair needs a
+  `void *` overload; the `CUMULATIVE_ARGS *` cast in `get_cumulative_args` is
+  only correct inside per-base TUs, and `calls.cc:1342` calls it from shared
+  code.  **Not attempted.**
+
+## PLACEMENT -- THE ANSWER TO CONSTRAINT 1, AND IT IS THE OPPOSITE OF c-ops
+
+`function.o` is in `OBJS` -> `libbackend.a` -> **both `cc1` and `lto1`**.  All
+ten symbols are ordinary back-end functions already in `libbackend.a`.  So for
+this table `MULTI_TARGET_OBJS_<base>` is the **correct** home -- the trap that
+bit `4caa7c2a4f1` (front-end-only symbols reaching `lto1`) does not apply,
+because nothing in this table calls into c-family.  Do not copy
+`MT_C_TARGET_OBJS` across by analogy: that would take the table out of `lto1`,
+which needs it.
+
+The right mechanism is the `defaults.h` redirect block (the `target-regs` /
+`target-cdata` shape, `defaults.h:1936` onward), not hand-edited call sites --
+it fixes `expr.o`, `calls.o` and `cfgexpand.o` in the same stroke.
+
+## BASELINE, MEASURED, SCORED ON rc
+
+    x86_64-pc-linux-gnu        rc=0 SUCCESS   .s = 12369 bytes / 804 lines
+    aarch64-unknown-linux-gnu  rc=4 ICE       .s =    30 bytes /   2 lines
+
+i.e. the brief's prediction reproduces exactly.  **aarch64 stops where it did:
+nothing was changed, so it gets no further.**  `scratchpad/t106-run.sh` scores
+the exit status and only *reports* the `.s` size, because `[ -s out.s ]` is
+green for a 30-byte file from a compiler that exited 4.
+
+## `scratchpad/rv-specs.sh` IS STALE AND FAILS SILENTLY
+
+`make target-specs` no longer exists -- `b850cb24ecf` took target-specs out of
+gcc's build.  `rv-specs.sh` now dies with `No rule to make target
+'target-specs'` and, piped, **still reported rc=0**.  Replacement:
+`scratchpad/t106-ts.sh` runs `target-specs/configure` once per target with
+`/tmp/mt-fakebin` on PATH and checks the ARTEFACT, not the exit status.
+Verified: 4 files written, `specs-<t>` 101/96 lines, `-config` 220 lines each.
+
+## FILES (scratchpad)
+
+    t106-conf.sh   configure /tmp/b106 (top level, x86_64 + aarch64)
+    t106-build.sh  build harness (derived from rv-build.sh; SRC/D repointed)
+    t106-ts.sh     target-specs configure per target -- REPLACES rv-specs.sh
+    t106-run.sh    both targets through cc1; verdict = rc, not file size
+
+## WHAT I DID NOT DO
+
+No implementation.  No `stock-compare` run, no scoreboard run, no `lto1` link
+check -- all four are regression bars *for a change*, and there is no change.
+`make cc1` rc=0 is the cold build only.  Budget went to establishing the
+mapping and the blast radius; landing seven of ten and running out mid-way
+would have risked the one outcome PRINCIPLES forbids, a non-linking `cc1`.
+
+Carry the scoreboard as **5 PASS / 110 FAIL** (settled above in this file).
+PRINCIPLES 6 still records the stale 2/113 -- that line should be corrected.
+
+## A HARNESS TRAP I HIT, FOR THE NEXT AGENT
+
+Do not write `nohup ... &` inside a tool call that is *already* backgrounded.
+The tool reports the launcher's exit 0 as the build's, and you will read
+"build succeeded" next to a build dir with no `cc1` in it.  Background the
+command itself and poll the artefact.
