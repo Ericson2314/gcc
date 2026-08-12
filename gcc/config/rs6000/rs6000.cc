@@ -1135,7 +1135,10 @@ static bool set_to_load_agen (rtx_insn *,rtx_insn *);
 static bool insn_terminates_group_p (rtx_insn *, enum group_termination);
 static bool insn_must_be_first_in_group (rtx_insn *);
 static bool insn_must_be_last_in_group (rtx_insn *);
-bool easy_vector_constant (rtx, machine_mode);
+/* `easy_vector_constant' is a define_predicate and is declared by tm-preds.h.
+   Repeating the declaration here re-declares it at file scope, OUTSIDE the
+   per-target namespace the multi-target build puts generated predicates in,
+   and every call site then sees two candidates.  Do not add it back.  */
 static rtx rs6000_debug_legitimize_address (rtx, rtx, machine_mode);
 static rtx rs6000_legitimize_tls_address (rtx, enum tls_model);
 #if TARGET_MACHO

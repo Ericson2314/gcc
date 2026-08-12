@@ -234,7 +234,7 @@
 	   && SYMBOL_REF_P (XEXP (XEXP (X, 0), 0)))			\
        || GET_CODE (X) == LABEL_REF					\
        || (CONST_INT_P (X)						\
-	   && GET_MODE_BITSIZE (MODE) <= GET_MODE_BITSIZE (Pmode))	\
+	   && known_le (GET_MODE_BITSIZE (MODE), GET_MODE_BITSIZE (Pmode)))	\
        || (CONST_DOUBLE_P (X)						\
 	   && ((TARGET_64BIT						\
 		&& (TARGET_MINIMAL_TOC					\

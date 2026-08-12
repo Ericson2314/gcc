@@ -57,8 +57,8 @@
 #undef RS6000_STARTING_FRAME_OFFSET
 #define RS6000_STARTING_FRAME_OFFSET					\
   (cfun->calls_alloca							\
-   ? RS6000_ALIGN (crtl->outgoing_args_size + RS6000_SAVE_AREA, 16)	\
-   : (RS6000_ALIGN (crtl->outgoing_args_size, 16) + RS6000_SAVE_AREA))
+   ? RS6000_ALIGN (crtl->outgoing_args_size.to_constant () + RS6000_SAVE_AREA, 16)	\
+   : (RS6000_ALIGN (crtl->outgoing_args_size.to_constant (), 16) + RS6000_SAVE_AREA))
 
 /* Offset from the stack pointer register to an item dynamically
    allocated on the stack, e.g., by `alloca'.

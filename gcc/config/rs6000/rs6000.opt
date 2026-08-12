@@ -697,3 +697,7 @@ default value is 4.
 Target Undocumented Joined UInteger Var(rs6000_vect_unroll_reduc_threshold) Init(1) Param
 When reduction factor computed for a loop exceeds the threshold specified by
 this parameter, prefer to unroll this loop.  The default value is 1.
+
+mgnu-attribute
+Target Var(rs6000_gnu_attr) Init(1) Save
+Emit .gnu_attribute tags.

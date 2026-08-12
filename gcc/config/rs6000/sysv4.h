@@ -385,7 +385,7 @@ do {									\
 	   && SYMBOL_REF_P (XEXP (XEXP (X, 0), 0)))			\
        || GET_CODE (X) == LABEL_REF					\
        || (CONST_INT_P (X)						\
-	   && GET_MODE_BITSIZE (MODE) <= GET_MODE_BITSIZE (Pmode))	\
+	   && known_le (GET_MODE_BITSIZE (MODE), GET_MODE_BITSIZE (Pmode)))	\
        || (!TARGET_NO_FP_IN_TOC						\
 	   && CONST_DOUBLE_P (X)					\
 	   && SCALAR_FLOAT_MODE_P (GET_MODE (X))			\

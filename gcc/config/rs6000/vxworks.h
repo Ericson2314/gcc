@@ -199,8 +199,8 @@ along with GCC; see the file COPYING3.  If not see
 #undef RS6000_STARTING_FRAME_OFFSET
 #define RS6000_STARTING_FRAME_OFFSET					\
   (cfun->calls_alloca							\
-   ? RS6000_ALIGN (crtl->outgoing_args_size + RS6000_SAVE_AREA, 16)	\
-   : (RS6000_ALIGN (crtl->outgoing_args_size, 16) + RS6000_SAVE_AREA))
+   ? RS6000_ALIGN (crtl->outgoing_args_size.to_constant () + RS6000_SAVE_AREA, 16)	\
+   : (RS6000_ALIGN (crtl->outgoing_args_size.to_constant (), 16) + RS6000_SAVE_AREA))
 
 #undef STACK_DYNAMIC_OFFSET
 #define STACK_DYNAMIC_OFFSET(FUNDECL)					\

@@ -166,6 +166,6 @@ mpltseq
 Target Var(rs6000_pltseq) Init(1) Save
 Use inline plt sequences to implement long calls and -fno-plt.
 
-mgnu-attribute
-Target Var(rs6000_gnu_attr) Init(1) Save
-Emit .gnu_attribute tags.
+; NOTE: `mgnu-attribute' used to live here.  It is consumed unconditionally by
+; rs6000.cc and rs6000-call.cc, which are built for every rs6000 config, so it
+; has moved to rs6000.opt -- see the comment there.
