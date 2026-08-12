@@ -8539,11 +8539,21 @@ early_fatal_error (const char *fmt, ...)
 
    Read only when nothing else answered, and its ABSENCE is not a failure here
    -- it returns NULL and the empty back end reports having no target, which is
-   what every installation without the file already gets.  */
+   what every installation without the file already gets.
+
+   TRIED comes back naming the path this function looked at, whether or not
+   anything was there, so that a driver which ends up with no target at all can
+   say which file would have supplied one.  It is diagnostic bookkeeping and
+   nothing else: NOTHING in this compiler's own build or installation writes
+   that file, by design -- an installation that has not been told which target
+   it prefers does not have one, and says so, rather than being handed a
+   default that would be the privileged target under another name.  */
 
 static const char *
-target_from_default_file (const char *argv0)
+target_from_default_file (const char *argv0, const char **tried)
 {
+  *tried = NULL;
+
   /* Beside the driver itself, found the way the driver finds everything else
      relative to its own location, so a relocated or unpacked-anywhere
      installation reads its own file and not another's.  Mapping bindir onto
@@ -8556,6 +8566,7 @@ target_from_default_file (const char *argv0)
 
   char *path = concat (dir, "default-target", NULL);
   free (dir);
+  *tried = path;
 
   FILE *f = fopen (path, "r");
   if (f == NULL)
@@ -8578,7 +8589,6 @@ target_from_default_file (const char *argv0)
     }
 
   fclose (f);
-  free (path);
   return result;
 }
 
@@ -8644,10 +8654,61 @@ driver::main (int argc, char **argv)
      silently redirect `aarch64-linux-gnu-gcc' would be the privileged target
      all over again, just written from a different place.  */
   const char *default_target = NULL;
+  const char *default_target_path = NULL;
   if (selected_target == NULL)
     {
-      default_target = target_from_default_file (argv[0]);
+      default_target = target_from_default_file (argv[0],
+						 &default_target_path);
       selected_target = default_target;
+    }
+
+  /* Nothing named a target: not the command line, not this program's name, and
+     no file to say otherwise.  SAY SO, HERE, NAMING WHAT WAS TRIED.
+
+     This is not a missing default.  A compiler serving several targets HAS no
+     target until it is told which one, and there is deliberately nothing to
+     fall back to -- not the first configured target, not the host, not the
+     build.  Any of those would be the privileged target this project removed,
+     reintroduced as a consolation prize for an under-specified command line.
+     Refusing is the correct behaviour.
+
+     What was NOT correct was refusing in silence.  Selection simply left the
+     empty back end in force and the first common hook to be asked anything
+     reported
+
+	 cc1: fatal error: common target hook `option_init_struct' was used
+	      before a target was selected
+
+     which is true, comes from a different program one stage later, and names
+     neither the compiler that failed, nor what it was invoked as, nor any of
+     the ways to tell it what it should have been told.  A user reading it
+     cannot get from it to a working command line.  This one lists the targets
+     that exist and the three things that select one, which is the whole of
+     what they need.  */
+  if (selected_target == NULL)
+    {
+      fprintf (stderr, "%s: fatal error: no target selected\n", progname);
+      fprintf (stderr, "  this compiler serves several targets and has no "
+	       "default among them; it must be told which one to be.  Any of:\n");
+      fprintf (stderr, "    -ftarget-config=FILE   name a target's "
+	       "configuration file explicitly\n");
+      fprintf (stderr, "    <triple>-%s            invoke it under a "
+	       "configured target's name\n", progname);
+      if (default_target_path != NULL)
+	fprintf (stderr, "    %s\n"
+		 "                           a `default-target' file here, "
+		 "one line, a triple\n", default_target_path);
+      else
+	fprintf (stderr, "                           (no directory could be "
+		 "determined from `%s', so no\n"
+		 "                           `default-target' file could be "
+		 "looked for)\n", argv[0]);
+      fprintf (stderr, "  configured targets:");
+      for (const struct targetm_common_entry *e = targetm_common_registry;
+	   e->target != NULL; e++)
+	fprintf (stderr, " %s", e->target);
+      fprintf (stderr, "\n");
+      exit (FATAL_EXIT_CODE);
     }
 
   /* THE COMMAND-LINE OPTION TABLES, and they are why this task existed.
