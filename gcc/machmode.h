@@ -750,6 +750,41 @@ GET_MODE_PRECISION (const T &mode)
 }
 #endif
 
+/* True when the back end IN FORCE actually defines MODE.
+
+   `HAVE_XFmode' and the rest of the `HAVE_<mode>mode' predicates come from
+   the SHARED mode enum, so what they answer is "SOME configured back end
+   has this mode" -- the union's answer, not this target's.  Target-
+   independent code that writes
+
+     #ifdef HAVE_XFmode
+       cand = XFmode;
+     #endif
+
+   is asking the second question and getting the first, and on a single-
+   target build those two questions had the same answer, which is why the
+   code has always been written this way.
+
+   A mode belonging to another back end is a HOLE in this one's tables:
+   the class comes from the shared numbering so it lands in the right run
+   of the enum, and size, precision, nunits and real format are all zero.
+   That zero format is what makes this more than a tidiness point --
+   `REAL_MODE_FORMAT (XFmode)->ieee_bits' on aarch64 is a null dereference,
+   not a wrong answer.
+
+   Only meaningful once a target is selected; before that, reading
+   `mode_precision' is itself a null dereference, deliberately.  */
+
+inline bool
+mode_exists_p (machine_mode mode)
+{
+  /* These two are vocabulary rather than machine description: every back
+     end has them and neither has a precision to test.  */
+  if (mode == E_VOIDmode || mode == E_BLKmode)
+    return true;
+  return maybe_ne (mode_precision[mode], (unsigned short) 0);
+}
+
 /* Get the number of integral bits of an object of mode MODE.  */
 extern GCC_TARGET_TABLE (CONST_MODE_IBIT unsigned char, mode_ibit,
 		       NUM_MACHINE_MODES);

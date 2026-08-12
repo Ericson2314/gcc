@@ -618,12 +618,21 @@ default_floatn_mode (int n, bool extended)
 	  /* Those are the only valid _FloatNx types.  */
 	  gcc_unreachable ();
 	}
+      /* `cand1.exists' asks whether a candidate was assigned above, and the
+	 `#ifdef HAVE_<mode>mode' that assigns it answers for the UNION of
+	 every configured back end's modes.  `mode_exists_p' is the question
+	 actually meant: does the back end IN FORCE have this mode.  Without
+	 it, aarch64 reaches `REAL_MODE_FORMAT (XFmode)', whose entry is the
+	 hole's null pointer, and dereferences it -- in the front end, before
+	 a line is emitted.  */
       if (cand1.exists (&mode)
+	  && mode_exists_p (mode)
 	  && REAL_MODE_FORMAT (mode)->ieee_bits > n
 	  && targetm.scalar_mode_supported_p (mode)
 	  && targetm.libgcc_floating_mode_supported_p (mode))
 	return cand1;
       if (cand2.exists (&mode)
+	  && mode_exists_p (mode)
 	  && REAL_MODE_FORMAT (mode)->ieee_bits > n
 	  && targetm.scalar_mode_supported_p (mode)
 	  && targetm.libgcc_floating_mode_supported_p (mode))
@@ -665,7 +674,9 @@ default_floatn_mode (int n, bool extended)
 	default:
 	  break;
 	}
+      /* Same as above: the candidate came from a union-wide `#ifdef'.  */
       if (cand.exists (&mode)
+	  && mode_exists_p (mode)
 	  && REAL_MODE_FORMAT (mode)->ieee_bits == n
 	  && targetm.scalar_mode_supported_p (mode)
 	  && targetm.libgcc_floating_mode_supported_p (mode))

@@ -2461,6 +2461,19 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
   tree t;
   int i;
 
+  /* The mode enum is the UNION of every configured back end's modes, so a
+     caller that walks it arithmetically -- `build_common_builtin_nodes'
+     steps MIN_MODE_COMPLEX_FLOAT..MAX_MODE_COMPLEX_FLOAT by one -- reaches
+     modes this back end does not have.  Answering for one of those is not
+     merely wrong, it does not terminate: a hole's `mode_inner' is the hole
+     itself, so the COMPLEX_MODE_P arm below calls back with the same mode.
+     Measured on aarch64: 838,000 frames and a stack overflow, with no
+     diagnostic at all because the crash handler needs the stack it has just
+     run out of.  NULL_TREE is what this function already returns for a mode
+     it cannot name, and every caller handles it.  */
+  if (!mode_exists_p (mode))
+    return NULL_TREE;
+
   if (mode == TYPE_MODE (integer_type_node))
     return unsignedp ? unsigned_type_node : integer_type_node;
 
