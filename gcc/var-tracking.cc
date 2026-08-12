@@ -110,6 +110,10 @@
 #include "ira.h"
 #include "lra.h"
 #include "calls.h"
+/* mt_cumulative_args: union-bounded storage, and mt_init_cumulative_args
+   and friends: the per-back-end writers.  See mt-cumulative-args.h.  */
+#include "mt-cumulative-args.h"
+#include "target-cumargs.h"
 #include "tree-dfa.h"
 #include "tree-ssa.h"
 #include "cselib.h"
@@ -6260,11 +6264,12 @@ prepare_call_arguments (basic_block bb, rtx_insn *insn)
   rtx this_arg = NULL_RTX;
   tree type = NULL_TREE, t, fndecl = NULL_TREE;
   tree obj_type_ref = NULL_TREE;
-  CUMULATIVE_ARGS args_so_far_v;
+  /* Union-bounded storage; see mt-cumulative-args.h.  */
+  struct mt_cumulative_args args_so_far_v;
   cumulative_args_t args_so_far;
 
   memset (&args_so_far_v, 0, sizeof (args_so_far_v));
-  args_so_far = pack_cumulative_args (&args_so_far_v);
+  args_so_far = mt_pack_cumulative_args (&args_so_far_v);
   call = get_call_rtx_from (insn);
   if (call)
     {
@@ -6309,8 +6314,8 @@ prepare_call_arguments (basic_block bb, rtx_insn *insn)
 		  tree struct_addr = build_pointer_type (TREE_TYPE (type));
 		  function_arg_info arg (struct_addr, /*named=*/true);
 		  rtx reg;
-		  INIT_CUMULATIVE_ARGS (args_so_far_v, type, NULL_RTX, fndecl,
-					nargs + 1);
+		  mt_init_cumulative_args (args_so_far, type, NULL_RTX, fndecl,
+					   nargs + 1);
 		  reg = targetm.calls.function_arg (args_so_far, arg);
 		  targetm.calls.function_arg_advance (args_so_far, arg);
 		  if (reg == NULL_RTX)
@@ -6326,8 +6331,8 @@ prepare_call_arguments (basic_block bb, rtx_insn *insn)
 		}
 	      else
 #endif
-		INIT_CUMULATIVE_ARGS (args_so_far_v, type, NULL_RTX, fndecl,
-				      nargs);
+		mt_init_cumulative_args (args_so_far, type, NULL_RTX, fndecl,
+					 nargs);
 	      if (obj_type_ref && TYPE_ARG_TYPES (type) != void_list_node)
 		{
 		  t = TYPE_ARG_TYPES (type);
@@ -6442,7 +6447,7 @@ prepare_call_arguments (basic_block bb, rtx_insn *insn)
 	  {
 	    rtx reg;
 	    function_arg_info arg (TREE_VALUE (t), /*named=*/true);
-	    apply_pass_by_reference_rules (&args_so_far_v, arg);
+	    apply_pass_by_reference_rules (args_so_far, arg);
 	    reg = targetm.calls.function_arg (args_so_far, arg);
 	    if (TREE_CODE (arg.type) == REFERENCE_TYPE
 		&& INTEGRAL_TYPE_P (TREE_TYPE (arg.type))

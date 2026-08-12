@@ -41,6 +41,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "dojump.h"
 #include "explow.h"
 #include "calls.h"
+/* mt_cumulative_args: union-bounded storage, and mt_init_cumulative_args
+   and friends: the per-back-end writers.  See mt-cumulative-args.h.  */
+#include "mt-cumulative-args.h"
+#include "target-cumargs.h"
 #include "expr.h"
 #include "output.h"
 #include "langhooks.h"
@@ -395,9 +399,11 @@ emit_call_1 (rtx funexp, tree fntree ATTRIBUTE_UNUSED, tree fndecl ATTRIBUTE_UNU
     {
       n_popped += targetm.calls.return_pops_args (fndecl, funtype, stack_size);
 
-#ifdef CALL_POPS_ARGS
-      n_popped += CALL_POPS_ARGS (*get_cumulative_args (args_so_far));
-#endif
+      /* Was `#ifdef CALL_POPS_ARGS' around a `*get_cumulative_args (...)',
+	 i.e. the primary's macro reading the primary's fields out of another
+	 back end's struct.  Both the predicate and the read are now in
+	 target-cumargs.cc, per base.  */
+      n_popped += mt_call_pops_args (args_so_far);
     }
 
   /* Ensure address is valid.  SYMBOL_REF is already valid, so no need,
@@ -1339,7 +1345,11 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 				 bool *must_preallocate, int *ecf_flags,
 				 bool *may_tailcall, bool call_from_thunk_p)
 {
-  CUMULATIVE_ARGS *args_so_far_pnt = get_cumulative_args (args_so_far);
+  /* `CUMULATIVE_ARGS *args_so_far_pnt = get_cumulative_args (args_so_far);'
+     used to live here.  Its only two uses re-packed it immediately, so it was
+     an unpack-and-repack round trip through the PRIMARY's type -- harmless
+     today because nothing read a field, and exactly the cast this file must
+     not contain.  */
   location_t loc = EXPR_LOCATION (exp);
 
   /* Count arg position in order args appear.  */
@@ -1423,10 +1433,10 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
       /* See if this argument should be passed by invisible reference.  */
       function_arg_info arg (type, argpos < n_named_args);
-      if (pass_by_reference (args_so_far_pnt, arg))
+      if (pass_by_reference (args_so_far, arg))
 	{
 	  const bool callee_copies
-	    = reference_callee_copied (args_so_far_pnt, arg);
+	    = reference_callee_copied (args_so_far, arg);
 	  tree base;
 
 	  /* If we're compiling a thunk, pass directly the address of an object
@@ -2757,7 +2767,8 @@ expand_call (tree exp, rtx target, int ignore)
   /* Size of arguments before any adjustments (such as rounding).  */
   poly_int64 unadjusted_args_size;
   /* Data on reg parms scanned so far.  */
-  CUMULATIVE_ARGS args_so_far_v;
+  /* Union-bounded storage; see mt-cumulative-args.h.  */
+  struct mt_cumulative_args args_so_far_v;
   cumulative_args_t args_so_far;
   /* Nonzero if a reg parm has been scanned.  */
   int reg_parm_seen;
@@ -3013,8 +3024,9 @@ expand_call (tree exp, rtx target, int ignore)
      calling convention than normal calls.  The fourth argument in
      INIT_CUMULATIVE_ARGS tells the backend if this is an indirect call
      or not.  */
-  INIT_CUMULATIVE_ARGS (args_so_far_v, funtype, NULL_RTX, fndecl, n_named_args);
-  args_so_far = pack_cumulative_args (&args_so_far_v);
+  args_so_far = mt_pack_cumulative_args (&args_so_far_v);
+  mt_init_cumulative_args (args_so_far, funtype, NULL_RTX, fndecl,
+			   n_named_args);
 
   /* Now possibly adjust the number of named args.
      Normally, don't include the last named arg if anonymous args follow.
@@ -4216,7 +4228,8 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
   tree fntype ATTRIBUTE_UNUSED = NULL_TREE; /* library calls default to host calling abi ? */
   int count;
   rtx argblock = 0;
-  CUMULATIVE_ARGS args_so_far_v;
+  /* Union-bounded storage; see mt-cumulative-args.h.  */
+  struct mt_cumulative_args args_so_far_v;
   cumulative_args_t args_so_far;
   struct arg
   {
@@ -4330,12 +4343,10 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
   argvec = XALLOCAVEC (struct arg, nargs + 1);
   memset (argvec, 0, (nargs + 1) * sizeof (struct arg));
 
-#ifdef INIT_CUMULATIVE_LIBCALL_ARGS
-  INIT_CUMULATIVE_LIBCALL_ARGS (args_so_far_v, outmode, fun);
-#else
-  INIT_CUMULATIVE_ARGS (args_so_far_v, NULL_TREE, fun, 0, nargs);
-#endif
-  args_so_far = pack_cumulative_args (&args_so_far_v);
+  /* The `#ifdef INIT_CUMULATIVE_LIBCALL_ARGS' that was here is now in
+     target-cumargs.cc, both arms unchanged, answered per back end.  */
+  args_so_far = mt_pack_cumulative_args (&args_so_far_v);
+  mt_init_cumulative_libcall_args (args_so_far, outmode, fun, nargs);
 
   args_size.constant = 0;
   args_size.var = 0;
@@ -4402,10 +4413,10 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 	       && targetm.legitimate_constant_p (arg.mode, val)))
 	val = force_operand (val, NULL_RTX);
 
-      if (pass_by_reference (&args_so_far_v, arg))
+      if (pass_by_reference (args_so_far, arg))
 	{
 	  rtx slot;
-	  int must_copy = !reference_callee_copied (&args_so_far_v, arg);
+	  int must_copy = !reference_callee_copied (args_so_far, arg);
 
 	  /* If this was a CONST function, it is now PURE since it now
 	     reads memory.  */

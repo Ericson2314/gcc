@@ -24,6 +24,8 @@ fi
 
 max_fpr=0
 max_nrc=0
+max_cas=0
+max_caa=0
 
 # One line per (object, symbol) so that a failure names both.  `nm -S' prints
 # `<value> <size> <type> <name>'; the size is field 2 and is hexadecimal.
@@ -42,7 +44,8 @@ for obj in "$@"; do
     echo "gen-reg-widths.sh: '$NM' -S $obj failed" >&2
     exit 1
   }
-  for sym in mt_probe_first_pseudo_register mt_probe_n_reg_classes; do
+  for sym in mt_probe_first_pseudo_register mt_probe_n_reg_classes \
+	     mt_probe_cumulative_args_size mt_probe_cumulative_args_align; do
     # Anchor on the END of the line: `nm' prints the name last, and an
     # unanchored match would also accept a longer name that contains this one.
     line=`echo "$syms" | grep " $sym\$"` || line=
@@ -75,12 +78,18 @@ for obj in "$@"; do
 	[ "$val" -gt "$max_fpr" ] && max_fpr=$val;;
       mt_probe_n_reg_classes)
 	[ "$val" -gt "$max_nrc" ] && max_nrc=$val;;
+      mt_probe_cumulative_args_size)
+	[ "$val" -gt "$max_cas" ] && max_cas=$val;;
+      mt_probe_cumulative_args_align)
+	[ "$val" -gt "$max_caa" ] && max_caa=$val;;
     esac
   done
 done
 
-if [ "$max_fpr" -le 0 ] || [ "$max_nrc" -le 0 ]; then
-  echo "gen-reg-widths.sh: ended with fpr=$max_fpr nrc=$max_nrc; refusing" >&2
+if [ "$max_fpr" -le 0 ] || [ "$max_nrc" -le 0 ] \
+   || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ]; then
+  echo "gen-reg-widths.sh: ended with fpr=$max_fpr nrc=$max_nrc" \
+       "cumargs_size=$max_cas cumargs_align=$max_caa; refusing" >&2
   exit 1
 fi
 
@@ -107,6 +116,16 @@ cat > "$OUT".tmp <<EOF
 
 #define MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER $max_fpr
 #define MULTI_TARGET_UNION_N_REG_CLASSES $max_nrc
+
+/* The bound on \`CUMULATIVE_ARGS', which is a TYPE and not a count, so these
+   are bytes.  Shared translation units allocate this much and align to this,
+   and never name \`CUMULATIVE_ARGS' for storage again; see
+   mt-cumulative-args.h.  target-cumargs.cc static_asserts each configured
+   base's own \`sizeof'/\`alignof' against these, so a base that outgrows the
+   bound is a compile error naming that base rather than a store past the end
+   of somebody's stack frame.  */
+#define MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE $max_cas
+#define MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN $max_caa
 
 #endif /* GCC_MULTI_TARGET_REG_WIDTHS_H */
 EOF

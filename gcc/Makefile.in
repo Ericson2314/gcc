@@ -2192,6 +2192,7 @@ OBJS = \
 	target-addr-select.o \
 	target-cdata-select.o \
 	target-regs-select.o \
+	target-cumargs-select.o \
 	$(ANALYZER_OBJS) \
 	$(host_hook_obj)
 
@@ -3723,6 +3724,15 @@ target-cdata-select.o: $(srcdir)/target-cdata-select.cc $(srcdir)/target-cdata.h
 # compiler which selected nothing cannot answer i386's register classes and
 # i386's register names for every target.  `init_reg_sets' says so by name.
 target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+# The argument-accumulator selector; see target-cumargs.h.  Same shape as the
+# register one, `targetm_cumargs' NULL until selection for the same reason,
+# and IN OBJS rather than in the c-family list: function.o, calls.o, expr.o,
+# dse.o and var-tracking.o are all in libbackend.a, so lto1 needs this too.
+target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
+  $(srcdir)/target-cumargs.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 

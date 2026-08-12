@@ -50,6 +50,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "cfgcleanup.h"
 #include "calls.h"
+/* mt_cumulative_args: union-bounded storage, and mt_init_cumulative_args
+   and friends: the per-back-end writers.  See mt-cumulative-args.h.  */
+#include "mt-cumulative-args.h"
+#include "target-cumargs.h"
 
 /* This file contains three techniques for performing Dead Store
    Elimination (dse).
@@ -2437,13 +2441,14 @@ check_mem_read_use (rtx *loc, void *data)
 static bool
 get_call_args (rtx call_insn, tree fn, rtx *args, int nargs)
 {
-  CUMULATIVE_ARGS args_so_far_v;
+  /* Union-bounded storage; see mt-cumulative-args.h.  */
+  struct mt_cumulative_args args_so_far_v;
   cumulative_args_t args_so_far;
   tree arg;
   int idx;
 
-  INIT_CUMULATIVE_ARGS (args_so_far_v, TREE_TYPE (fn), NULL_RTX, 0, 3);
-  args_so_far = pack_cumulative_args (&args_so_far_v);
+  args_so_far = mt_pack_cumulative_args (&args_so_far_v);
+  mt_init_cumulative_args (args_so_far, TREE_TYPE (fn), NULL_RTX, 0, 3);
 
   arg = TYPE_ARG_TYPES (TREE_TYPE (fn));
   for (idx = 0;

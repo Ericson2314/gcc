@@ -46,6 +46,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "dojump.h"
 #include "explow.h"
 #include "calls.h"
+/* mt_cumulative_args: union-bounded storage, and mt_init_cumulative_args
+   and friends: the per-back-end writers.  See mt-cumulative-args.h.  */
+#include "mt-cumulative-args.h"
+#include "target-cumargs.h"
 #include "stmt.h"
 /* Include expr.h after insn-config.h so we get HAVE_conditional_move.  */
 #include "expr.h"
@@ -2198,13 +2202,14 @@ block_move_libcall_safe_for_call_parm (void)
   /* If any argument goes in memory, then it might clobber an outgoing
      argument.  */
   {
-    CUMULATIVE_ARGS args_so_far_v;
+    /* Union-bounded storage; see mt-cumulative-args.h.  */
+    struct mt_cumulative_args args_so_far_v;
     cumulative_args_t args_so_far;
     tree arg;
 
     fn = builtin_decl_implicit (BUILT_IN_MEMCPY);
-    INIT_CUMULATIVE_ARGS (args_so_far_v, TREE_TYPE (fn), NULL_RTX, 0, 3);
-    args_so_far = pack_cumulative_args (&args_so_far_v);
+    args_so_far = mt_pack_cumulative_args (&args_so_far_v);
+    mt_init_cumulative_args (args_so_far, TREE_TYPE (fn), NULL_RTX, 0, 3);
 
     arg = TYPE_ARG_TYPES (TREE_TYPE (fn));
     for ( ; arg != void_list_node ; arg = TREE_CHAIN (arg))

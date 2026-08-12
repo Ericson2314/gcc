@@ -1141,6 +1141,32 @@ function emit_regs_registry(	i, n, parts) {
   printf "\t  $(MULTI_TARGET_REG_PROBES)\n\n";
 }
 
+# And the same for the argument accumulators; see target-cumargs.h.  A TABLE
+# per base, like the register vocabulary: INIT_CUMULATIVE_ARGS and its four
+# companions are plain macros in config/<cpu>/<cpu>.h, settled by that back
+# end's headers and by nothing else.
+#
+# The bound on `CUMULATIVE_ARGS' -- the SIZE of what these functions write --
+# rides along in multi-target-reg-widths.h above, because it comes from the
+# same probe object.  Two files would mean two authorities for one measurement.
+function emit_cumargs_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "multi-target-cumargs.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_cumargs_desc targetm_cumargs_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_CUMARGS_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_CUMARGS_ENTRY (\"%s\", targetm_cumargs_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-cumargs.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-cumargs.h $@\n\n";
+  printf "target-cumargs-select.o: multi-target-cumargs.h\n\n";
+}
+
 # The registry multi-target-select.cc includes: every back end that has
 # objects, and the triple-to-back-end map.
 #
@@ -1304,6 +1330,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_cdata_registry();
 		    emit_c_ops_registry();
 		    emit_regs_registry();
+		    emit_cumargs_registry();
 		    emit_backend_registry();
 		    emit_options_registry();
 		    emit_source_specs();
@@ -1749,6 +1776,33 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   printf "\t  $(srcdir)/target-regs.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-regs-" cpu ".o";
+
+  # This back end's argument-accumulator entry points; see target-cumargs.h.
+  # Same loop and the same reason a fourth time: INIT_CUMULATIVE_ARGS is
+  # `init_cumulative_args' for i386 and `aarch64_init_cumulative_args' for
+  # aarch64, and the only way to get THIS back end's is to compile against its
+  # headers.  It also measures this base's `sizeof (CUMULATIVE_ARGS)' against
+  # the union bound, which is the check that turns an 88-byte stack overflow
+  # into a compile error naming the base.
+  #
+  # It needs tm_p.h for the same reason target-c-ops-<cpu>.o does: the macros
+  # expand to CALLS, and the prototypes are in config/<cpu>/<cpu>-protos.h.
+  #
+  # MULTI_TARGET_OBJS_<cpu>, deliberately, and NOT the c-family list:
+  # function.o, calls.o, expr.o, dse.o and var-tracking.o are all in
+  # libbackend.a and therefore in lto1 as well as cc1, and everything this
+  # table calls (`aarch64_init_cumulative_args', `ix86_call_abi_override') is
+  # a back-end function already in that same archive.  The opposite placement
+  # was right for target-c-ops-<cpu>.o only because THAT table calls into
+  # c-family, which lto1 does not link.
+  printf "target-cumargs-%s.o: $(srcdir)/target-cumargs.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) $(TREE_H) \\\n";
+  printf "  $(TM_P_H) $(TARGET_H) $(srcdir)/target-cumargs.h \\\n";
+  printf "  multi-target-reg-widths.h\n";
+  printf "\t$(COMPILE) -DTARGETM_CUMARGS_SYMBOL=targetm_cumargs_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-cumargs.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-cumargs-" cpu ".o";
 
   # And this back end's WIDTH PROBE.  Deliberately NOT in
   # MULTI_TARGET_OBJS_<cpu>: it is never linked, it is compiled so that `nm -S'

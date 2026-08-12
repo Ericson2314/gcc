@@ -20,6 +20,11 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_EMIT_RTL_H
 #define GCC_EMIT_RTL_H
 
+/* For MT_INCOMING_ARGS_PAD, and for the alignment assertion that goes with
+   it.  `incoming_args' below embeds a `CUMULATIVE_ARGS' by value, which is a
+   different size in every back end while this struct must have one layout.  */
+#include "mt-cumulative-args.h"
+
 class temp_slot;
 typedef class temp_slot *temp_slot_p;
 class predefined_function_abi;
@@ -49,6 +54,20 @@ struct GTY(()) incoming_args {
   /* Quantities of various kinds of registers
      used for the current function's args.  */
   CUMULATIVE_ARGS info;
+
+  /* AND THE ROOM THE OTHER CONFIGURED BACK ENDS NEED FOR IT.
+
+     `info' keeps its `CUMULATIVE_ARGS' type because nineteen back ends spell
+     `crtl->args.info.<field>' and each one means its own struct -- which is
+     the right type in the translation unit that reads it.  But the OFFSETS of
+     this struct are fixed by whichever base compiled the middle end, and a
+     back end whose `CUMULATIVE_ARGS' is larger writes past `info' into
+     `internal_arg_pointer' and beyond.  Measured: i386 96 bytes, aarch64 184.
+
+     So the field is per-base and the FOOTPRINT is the union.  See
+     mt-cumulative-args.h, which derives the pad and asserts the alignment
+     half -- the half a pad cannot fix.  */
+  unsigned char mt_info_pad[MT_INCOMING_ARGS_PAD];
 
   /* The arg pointer hard register, or the pseudo into which it was copied.  */
   rtx internal_arg_pointer;

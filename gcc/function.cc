@@ -60,6 +60,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "dojump.h"
 #include "explow.h"
 #include "calls.h"
+/* mt_cumulative_args: union-bounded storage, and mt_init_cumulative_args
+   and friends: the per-back-end writers.  See mt-cumulative-args.h.  */
+#include "mt-cumulative-args.h"
+#include "target-cumargs.h"
 #include "expr.h"
 #include "optabs-tree.h"
 #include "output.h"
@@ -2275,9 +2279,11 @@ use_register_for_decl (const_tree decl)
 
 struct assign_parm_data_all
 {
-  /* When INIT_CUMULATIVE_ARGS gets revamped, allocating CUMULATIVE_ARGS
-     should become a job of the target or otherwise encapsulated.  */
-  CUMULATIVE_ARGS args_so_far_v;
+  /* Union-bounded storage, not a `CUMULATIVE_ARGS'.  This translation unit is
+     compiled once, so a `CUMULATIVE_ARGS' here is whichever base compiled the
+     middle end -- 96 bytes for i386 -- and the selected back end writes its
+     own, 184 for aarch64.  See mt-cumulative-args.h.  */
+  struct mt_cumulative_args args_so_far_v;
   cumulative_args_t args_so_far;
   struct args_size stack_args_size;
   tree function_result_decl;
@@ -2312,13 +2318,11 @@ assign_parms_initialize_all (struct assign_parm_data_all *all)
 
   fntype = TREE_TYPE (current_function_decl);
 
-#ifdef INIT_CUMULATIVE_INCOMING_ARGS
-  INIT_CUMULATIVE_INCOMING_ARGS (all->args_so_far_v, fntype, NULL_RTX);
-#else
-  INIT_CUMULATIVE_ARGS (all->args_so_far_v, fntype, NULL_RTX,
-			current_function_decl, -1);
-#endif
-  all->args_so_far = pack_cumulative_args (&all->args_so_far_v);
+  /* The `#ifdef INIT_CUMULATIVE_INCOMING_ARGS' that used to be here has moved
+     to target-cumargs.cc, unchanged, where it is answered once per configured
+     back end instead of once by the primary for all of them.  */
+  all->args_so_far = mt_pack_cumulative_args (&all->args_so_far_v);
+  mt_init_cumulative_incoming_args (all->args_so_far, fntype, NULL_RTX);
 
 #ifdef INCOMING_REG_PARM_STACK_SPACE
   all->reg_parm_stack_space
@@ -2476,7 +2480,7 @@ assign_parm_find_data_types (struct assign_parm_data_all *all, tree parm,
     data->arg.type = TREE_TYPE (first_field (data->arg.type));
 
   /* See if this arg was passed by invisible reference.  */
-  if (apply_pass_by_reference_rules (&all->args_so_far_v, data->arg))
+  if (apply_pass_by_reference_rules (all->args_so_far, data->arg))
     {
       data->nominal_type = data->arg.type;
       data->passed_mode = data->nominal_mode = data->arg.mode;
@@ -3834,7 +3838,16 @@ assign_parms (tree fndecl)
   /* For stdarg.h function, save info about
      regs and stack space used by the named args.  */
 
-  crtl->args.info = all.args_so_far_v;
+  /* THE COPY THAT USED TO BE A STRUCT ASSIGNMENT, i.e. the primary's `sizeof'
+     deciding how much of the selected back end's accumulator survives.  The
+     destination is `CUMULATIVE_ARGS' followed by MT_INCOMING_ARGS_PAD -- room
+     for any configured base -- and the length is the SELECTED base's own
+     size, reported by its own translation unit.  Both halves have to be right:
+     the primary's length here would copy 96 of aarch64's 184 bytes and leave
+     `crtl->args.info' half initialised, which is a wrong answer rather than a
+     crash.  */
+  memcpy (&crtl->args.info, all.args_so_far_v.mt_raw,
+	  targetm_cumargs->own_size);
 
   /* Set the rtx used for the function return value.  Put this in its
      own variable so any optimizers that need this information don't have
@@ -3924,7 +3937,7 @@ gimplify_parameters (gimple_seq *cleanup)
 	{
 	  tree type = TREE_TYPE (data.arg.type);
 	  function_arg_info orig_arg (type, data.arg.named);
-	  if (reference_callee_copied (&all.args_so_far_v, orig_arg))
+	  if (reference_callee_copied (all.args_so_far, orig_arg))
 	    {
 	      tree local, t;
 
@@ -4856,9 +4869,11 @@ allocate_struct_function (tree fndecl, bool abstract_p)
   if (init_machine_status)
     cfun->machine = (*init_machine_status) ();
 
-#ifdef OVERRIDE_ABI_FORMAT
-  OVERRIDE_ABI_FORMAT (fndecl);
-#endif
+  /* Was `#ifdef OVERRIDE_ABI_FORMAT'.  Answered by the primary, this expanded
+     to `ix86_call_abi_override (fndecl)' for EVERY function of every target,
+     and is where the aarch64 arm crashed: an i386 hook reading an aarch64
+     `cfun->machine'.  The `#ifdef' is now in target-cumargs.cc, per base.  */
+  mt_override_abi_format (fndecl);
 
   if (fndecl != NULL_TREE)
     {

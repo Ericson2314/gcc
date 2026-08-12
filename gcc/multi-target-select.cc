@@ -82,6 +82,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-addr.h"
 #include "target-cdata.h"
 #include "target-regs.h"
+#include "target-cumargs.h"
+#include "multi-target-reg-widths.h"
 
 /* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
    back end -- and MT_TARGET_BASES, which maps each configured triple to the
@@ -470,6 +472,37 @@ multi_target_select (const char *target)
 	  internal_error ("back end %qs has no register-vocabulary table; "
 			  "gen-multi-target-md.awk emits one for every back "
 			  "end that has objects, so this is a build bug", base);
+
+	/* Who WRITES a CUMULATIVE_ARGS.  A table for the same reason as the
+	   register vocabulary -- five macros settled by this back end's own
+	   headers, none of them option-dependent -- and NULL until here for
+	   the same reason: `init_cumulative_args' pre-pointed at the primary
+	   is exactly the failure this file exists to remove, and it is one
+	   the build machine cannot see.
+
+	   The bound is re-checked here, at run time, against the values this
+	   base measured in its OWN translation unit.  target-cumargs.cc
+	   already static_asserts it, so this can only fire if the table and
+	   `multi-target-reg-widths.h' came from different builds -- a stale
+	   object in a build directory, which is a thing that happens and
+	   which has no other symptom than a corrupted frame.  */
+	targetm_cumargs = target_cumargs_for (base);
+	if (targetm_cumargs == NULL)
+	  internal_error ("back end %qs has no %<CUMULATIVE_ARGS%> table; "
+			  "gen-multi-target-md.awk emits one for every back "
+			  "end that has objects, so this is a build bug", base);
+	if (targetm_cumargs->own_size
+	      > (unsigned long) MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE
+	    || targetm_cumargs->own_align
+		 > (unsigned long) MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN)
+	  internal_error ("back end %qs wants a %<CUMULATIVE_ARGS%> of %lu bytes "
+			  "aligned to %lu, but this compiler was built to "
+			  "hold %d aligned to %d; the objects of that back end and "
+			  "multi-target-reg-widths.h are from different builds",
+			  base, targetm_cumargs->own_size,
+			  targetm_cumargs->own_align,
+			  MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE,
+			  MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN);
 
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is

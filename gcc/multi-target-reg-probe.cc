@@ -60,4 +60,29 @@ and the union becomes the maximum of itself)
 extern "C" {
 char mt_probe_first_pseudo_register[FIRST_PSEUDO_REGISTER + 1];
 char mt_probe_n_reg_classes[N_REG_CLASSES + 1];
+
+/* CUMULATIVE_ARGS IS MEASURED THE SAME WAY AND FOR THE SAME REASON.
+
+   It is a TYPE -- `typedef struct ix86_args CUMULATIVE_ARGS' on i386, an
+   anonymous struct given the name by typedef on aarch64 -- and shared
+   translation units put one ON THE STACK (function.cc, calls.cc twice,
+   expr.cc, dse.cc, var-tracking.cc) and one in a GC-allocated struct
+   (`incoming_args::info', emit-rtl.h).  Compiled once against the primary's
+   tm.h, every one of those is the PRIMARY'S SIZE, while the selected back
+   end's `init_cumulative_args' writes ITS OWN.  Measured in a
+   x86_64 + aarch64 build dir at the parent of this commit:
+
+       sizeof (CUMULATIVE_ARGS)    i386  96   aarch64 184
+       alignof (CUMULATIVE_ARGS)   i386   8   aarch64   8
+
+   i.e. an 88-BYTE STACK OVERFLOW on every function aarch64 compiles -- the
+   `cl_optimization' shape (`52fa9e763c5', 8 bytes past a GC object) an order
+   of magnitude larger and on the frame.
+
+   The preprocessor cannot read a `sizeof', so this is the same host compile
+   plus `nm -S' as the two widths above, and for the same reason it executes
+   nothing and stays correct when cross-building.  +1 on both bounds, so that
+   "measured zero" and "nm printed nothing" remain different outcomes.  */
+char mt_probe_cumulative_args_size[sizeof (CUMULATIVE_ARGS) + 1];
+char mt_probe_cumulative_args_align[alignof (CUMULATIVE_ARGS) + 1];
 }
