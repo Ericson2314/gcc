@@ -236,7 +236,6 @@ AC_SUBST(GENINSRC)
 # -------------------
 
 
-# --with-demangler-in-ld is gone.
 demangler_in_ld=yes
 
 dsymutil_vers=
@@ -657,10 +656,6 @@ AC_ARG_ENABLE(backends,
 esac],
 [enable_backends=no])
 
-dnl --enable-targets is gone, with no deprecation stanza: `--enable-backends'
-dnl is new here and never shipped under the old name, and this configure is
-dnl not a user-facing interface -- the top level owns targets and hands this
-dnl one a back-end list.  There is nothing to migrate.
 
 dnl --enable-multiarch selected the Debian-style multiarch library layout.
 
@@ -672,7 +667,6 @@ AC_SUBST(with_multi_buildlist)
 
 # default stack clash protection guard size as power of twos in bytes.
 # Please keep these in sync with params.def.
-dnl --with-stack-clash-protection-guard-size is gone.
 AC_DEFINE(DEFAULT_STK_CLASH_GUARD_SIZE, 0,
 	[Define to larger than zero set the default stack clash protector size.])
 
@@ -707,13 +701,10 @@ AC_ARG_ENABLE(__cxa_atexit,
 [AS_HELP_STRING([--enable-__cxa_atexit], [enable __cxa_atexit for C++])],
 [], [])
 
-dnl --enable-decimal-float is gone, and with it GCC_AC_ENABLE_DECIMAL_FLOAT.
 
 
-dnl --enable-threads is gone.
 enable_threads=''
 
-dnl --enable-tls is gone.
 
 dnl --enable-vtable-verify selected whether libvtv is available to link
 dnl against.
@@ -730,7 +721,6 @@ analyzer=1)
 AC_DEFINE_UNQUOTED(ENABLE_ANALYZER, $analyzer,
 [Define 0/1 if static analyzer feature is enabled.])
 
-dnl --with-dwarf2 is gone.
 dwarf2=no
 
 #
@@ -738,13 +728,11 @@ dwarf2=no
 #
 #
 # --enable-shared/--disable-shared meaning "do (not) provide a shared
-# libgcc" is gone from here.
 
 dnl Whether to build libgcov and the related host tools.
 enable_gcov=yes
 AC_SUBST(enable_gcov)
 
-dnl --with-specs is gone.
 CONFIGURE_SPECS=
 AC_SUBST(CONFIGURE_SPECS)
 
@@ -820,12 +808,10 @@ else
 fi
 AC_SUBST(gnat_install_lib)
 
-dnl --enable-as-accelerator-for is gone.
 AC_SUBST(enable_as_accelerator)
 AC_SUBST(real_target_noncanonical)
 AC_SUBST(accel_dir_suffix)
 
-dnl --enable-offload-targets is gone with the same reasoning:
 AC_SUBST(omp_device_properties)
 AC_SUBST(omp_device_property_deps)
 
@@ -835,11 +821,9 @@ AC_DEFINE(ENABLE_OFFLOADING, 0,
   [Define this to enable support for offloading.])
 
 
-dnl --with-multilib-list and --with-multilib-generator are gone.
 with_multilib_list=default
 with_multilib_generator=default
 
-dnl --with-picolibc is gone.
 
 # -------------------------
 # Checks for other programs
@@ -1752,10 +1736,8 @@ if test "$host_xm_file" != "$build_xm_file"; then
 	fi
 fi
 
-dnl `--with-native-system-header-dir' is gone, so this is config.gcc's value
-dnl and nothing else.  It is the compile-time DEFAULT of the
-dnl targ_caps.native_system_header_dir capability, and separately it is
-dnl SYSTEM_HEADER_DIR, the headers fixincludes fixes during this build.
+dnl config.gcc's value, and nothing else: the compile-time default of the
+dnl targ_caps.native_system_header_dir capability.
 NATIVE_SYSTEM_HEADER_DIR="$native_system_header_dir"
 AC_SUBST(NATIVE_SYSTEM_HEADER_DIR)
 
@@ -2277,57 +2259,6 @@ AC_DEFINE_UNQUOTED(LTOPLUGINSONAME,"${host_lto_plugin_soname}",
 # invention where a convention already existed.
 #
 # CORRECTION to a note that used to stand at the old declaration site.  It
-# claimed "the blocker is now gone" because the hand-written second
-# AC_ARG_ENABLE(shared) in this file -- the one meaning "do not provide a
-# shared libgcc", a target question -- had been removed (see the note above
-# DRIVER_DEFINES and libgcc/configure.ac:52).  That much is true; the
-# conclusion was wrong.  LT_INIT below declares --enable-shared too, invisibly,
-# out of libtool's own m4.  "There is no AC_ARG_ENABLE(shared) in this
-# configure.ac" is never evidence that the name is free -- autoconf sets
-# enable_<name> for any --enable-<name> whether or not anything declares it.
-# Grep the *generated* configure.
-#
-# THIS BLOCK MUST STAY IMMEDIATELY ABOVE LT_INIT.  LT_INIT declares
-# --enable-shared itself, and in its action-if-not-given it assigns
-# enable_shared=yes.  From that point on ${enable_shared+set} no longer
-# distinguishes "the user gave the option" from "libtool supplied its own
-# default", so an AC_ARG_ENABLE(shared) placed after LT_INIT would take the
-# action-if-given arm on every build and gcc's host-shared default would flip
-# from no to yes with nothing on the console to say so.  Both arms are
-# therefore spelled out explicitly, and they are evaluated before libtool has
-# had a chance to touch the variable.
-#
-# Sharing the name with libtool is a merge, not a collision: the libtool
-# instantiated here runs in the host context, so "build shared libraries" and
-# "build gcc's host objects shared" are the same question asked twice.  (gcc
-# builds no libtool libraries at all -- the _LT_CONFIG_COMMANDS stub below
-# suppresses libtool's config commands; LT_INIT is here only for the
-# @objdir@/@enable_fast_install@ substitutions that gcc/exec-tool.in needs.)
-# We deliberately do not assign to $enable_shared, so libtool's own behaviour
-# is bit-for-bit what it was before this rename.
-#
-# The default is the EMPTY STRING, not `no'.  --enable-host-shared had no
-# action-if-not-given at all, so the flagless value was empty, and
-# gcc/Makefile.in:1290 tests
-#     ifneq ($(enable_host_shared)$(enable_host_pie),)
-# -- emptiness, not the value.  A default of `no' is non-empty and would
-# therefore select ../libiberty/pic/libiberty.a on every flagless build.  Note
-# that --disable-shared does set it to `no' and so does select the pic build;
-# that is not new, --disable-host-shared did exactly the same.
-#
-# KNOWN BREAKAGE, NOT FIXABLE FROM THIS FILE -- vxworks targets.  The top level
-# forwards every user --enable-*/--disable-* into host_configargs, which is
-# passed verbatim to this configure, and ../configure.ac:4022-4026 additionally
-# appends a bare --disable-shared to host_configargs for *vxworks* -- for a
-# purely target-library reason, with the comment "So gcc knows ...".  Before
-# this rename gcc ignored it.  Now it sets enable_host_shared=no, which is
-# non-empty, which selects ../libiberty/pic/libiberty.a -- while the same
-# --disable-shared reaches libiberty and empties its PICFLAG, so libiberty
-# never builds pic/ at all and the gcc link fails on a missing archive.  The
-# same forwarding also means a user's top-level --enable-shared, a target-
-# library request, now silently makes gcc's own host code PIC.  Both are
-# top-level bugs -- a target fact reaching a host knob -- and the fix belongs
-# in ../configure.ac, which is not renamed yet.
 AC_ARG_ENABLE(shared,
 [AS_HELP_STRING([--enable-shared],
 		[build host code as shared libraries])],
@@ -2390,7 +2321,6 @@ if $gcc_cv_as --help 2>&1 | grep -- --fatal-warnings > /dev/null; then
   fw_as_opt=--fatal-warnings
 fi
 
-# --enable-ld and --enable-gold are gone.
 
 # Identify the linker which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the linker
@@ -2424,7 +2354,6 @@ if test x$PLUGIN_LD_SUFFIX = xld-new \
    || test x$PLUGIN_LD_SUFFIX = xcollect-ld ; then
   PLUGIN_LD_SUFFIX=ld
 fi
-# --with-plugin-ld is gone:
 AC_SUBST(ORIGINAL_PLUGIN_LD_FOR_TARGET)
 AC_DEFINE_UNQUOTED(PLUGIN_LD_SUFFIX, "$PLUGIN_LD_SUFFIX", [Specify plugin linker])
 
@@ -2575,7 +2504,6 @@ case "$ORIGINAL_NM_FOR_TARGET" in
 esac
 
 
-dnl The objdump, readelf and otool searches are gone.
 
 # Figure out the dsymutil we will use.
 AS_VAR_SET_IF(gcc_cv_dsymutil,, [
@@ -2656,7 +2584,6 @@ AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
 	[Define if your assembler supports DTPREL relocation.])
 
 
-dnl --with-glibc-version is gone, and so is the probe that stood in for it:
 
 dnl --enable-gnu-unique-object and its probe lived here.
 
@@ -2675,8 +2602,6 @@ AC_MSG_RESULT($thin_archive_support)
 AC_SUBST(thin_archive_support)
 
 
-dnl The ld64 and dsymutil probe blocks that stood here are gone to
-dnl target-specs/configure.ac -- as a ...
 
 
 dnl --enable-libssp and the gcc_cv_libc_provides_ssp probe used to decide
@@ -2721,17 +2646,10 @@ elif echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
 fi
 AC_SUBST(libatomic_target)
 
-dnl The <sys/sdt.h> probe is gone.
 
-dnl --with-long-double-128 and the probe behind it are gone.
 
-dnl --with-long-double-format is gone.
 
-dnl TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and TARGET_LIBC_GNUSTACK are gone from
-dnl here.
 
-dnl The dl_iterate_phdr probe is gone, for the same reason and to the same
-dnl place:
 
 # We no longer support different GC mechanisms.  Emit an error if
 # the user configures with --with-gc.
@@ -3260,7 +3178,6 @@ if test "${ENABLE_LIBQUADMATH_SUPPORT}" != "no" ; then
 fi
 
 
-dnl --with-linker-hash-style is gone.
 
 # Specify what should be the default of -fdiagnostics-color option.
 AC_ARG_WITH([diagnostics-color],
@@ -3425,8 +3342,6 @@ esac
 AC_SUBST(CET_HOST_FLAGS)
 
 
-dnl --enable-s390-excess-float-precision is gone, and so is the probe behind
-dnl it.
 
 # On x86-64, when profiling is enabled with shrink wrapping, the mcount
 # call may not be placed at the function entry after

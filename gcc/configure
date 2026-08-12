@@ -3491,7 +3491,6 @@ fi
 # -------------------
 
 
-# --with-demangler-in-ld is gone.
 demangler_in_ld=yes
 
 dsymutil_vers=
@@ -7255,7 +7254,6 @@ dwarf2=no
 #
 #
 # --enable-shared/--disable-shared meaning "do (not) provide a shared
-# libgcc" is gone from here.
 
 enable_gcov=yes
 
@@ -14327,57 +14325,6 @@ _ACEOF
 # invention where a convention already existed.
 #
 # CORRECTION to a note that used to stand at the old declaration site.  It
-# claimed "the blocker is now gone" because the hand-written second
-# AC_ARG_ENABLE(shared) in this file -- the one meaning "do not provide a
-# shared libgcc", a target question -- had been removed (see the note above
-# DRIVER_DEFINES and libgcc/configure.ac:52).  That much is true; the
-# conclusion was wrong.  LT_INIT below declares --enable-shared too, invisibly,
-# out of libtool's own m4.  "There is no AC_ARG_ENABLE(shared) in this
-# configure.ac" is never evidence that the name is free -- autoconf sets
-# enable_<name> for any --enable-<name> whether or not anything declares it.
-# Grep the *generated* configure.
-#
-# THIS BLOCK MUST STAY IMMEDIATELY ABOVE LT_INIT.  LT_INIT declares
-# --enable-shared itself, and in its action-if-not-given it assigns
-# enable_shared=yes.  From that point on ${enable_shared+set} no longer
-# distinguishes "the user gave the option" from "libtool supplied its own
-# default", so an AC_ARG_ENABLE(shared) placed after LT_INIT would take the
-# action-if-given arm on every build and gcc's host-shared default would flip
-# from no to yes with nothing on the console to say so.  Both arms are
-# therefore spelled out explicitly, and they are evaluated before libtool has
-# had a chance to touch the variable.
-#
-# Sharing the name with libtool is a merge, not a collision: the libtool
-# instantiated here runs in the host context, so "build shared libraries" and
-# "build gcc's host objects shared" are the same question asked twice.  (gcc
-# builds no libtool libraries at all -- the _LT_CONFIG_COMMANDS stub below
-# suppresses libtool's config commands; LT_INIT is here only for the
-# @objdir@/@enable_fast_install@ substitutions that gcc/exec-tool.in needs.)
-# We deliberately do not assign to $enable_shared, so libtool's own behaviour
-# is bit-for-bit what it was before this rename.
-#
-# The default is the EMPTY STRING, not `no'.  --enable-host-shared had no
-# action-if-not-given at all, so the flagless value was empty, and
-# gcc/Makefile.in:1290 tests
-#     ifneq ($(enable_host_shared)$(enable_host_pie),)
-# -- emptiness, not the value.  A default of `no' is non-empty and would
-# therefore select ../libiberty/pic/libiberty.a on every flagless build.  Note
-# that --disable-shared does set it to `no' and so does select the pic build;
-# that is not new, --disable-host-shared did exactly the same.
-#
-# KNOWN BREAKAGE, NOT FIXABLE FROM THIS FILE -- vxworks targets.  The top level
-# forwards every user --enable-*/--disable-* into host_configargs, which is
-# passed verbatim to this configure, and ../configure.ac:4022-4026 additionally
-# appends a bare --disable-shared to host_configargs for *vxworks* -- for a
-# purely target-library reason, with the comment "So gcc knows ...".  Before
-# this rename gcc ignored it.  Now it sets enable_host_shared=no, which is
-# non-empty, which selects ../libiberty/pic/libiberty.a -- while the same
-# --disable-shared reaches libiberty and empties its PICFLAG, so libiberty
-# never builds pic/ at all and the gcc link fails on a missing archive.  The
-# same forwarding also means a user's top-level --enable-shared, a target-
-# library request, now silently makes gcc's own host code PIC.  Both are
-# top-level bugs -- a target fact reaching a host knob -- and the fix belongs
-# in ../configure.ac, which is not renamed yet.
 # Check whether --enable-shared was given.
 if test "${enable_shared+set}" = set; then :
   enableval=$enable_shared; enable_host_shared=$enableval
@@ -20955,7 +20902,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 20958 "configure"
+#line 20905 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21061,7 +21008,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21064 "configure"
+#line 21011 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -24481,7 +24428,6 @@ if $gcc_cv_as --help 2>&1 | grep -- --fatal-warnings > /dev/null; then
   fw_as_opt=--fatal-warnings
 fi
 
-# --enable-ld and --enable-gold are gone.
 
 # Identify the linker which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the linker
@@ -24558,7 +24504,6 @@ if test x$PLUGIN_LD_SUFFIX = xld-new \
    || test x$PLUGIN_LD_SUFFIX = xcollect-ld ; then
   PLUGIN_LD_SUFFIX=ld
 fi
-# --with-plugin-ld is gone:
 
 
 cat >>confdefs.h <<_ACEOF
