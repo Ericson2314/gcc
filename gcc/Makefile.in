@@ -525,8 +525,19 @@ BUILD_DRIVER_NAME = $(build_target_triple)-gcc$(exeext)
 # Don't use this as a dependency--use $(GCC_PASSES).
 GCC_FOR_TARGET = $(STAGE_CC_WRAPPER) ./$(BUILD_DRIVER_NAME) -B./ -B$(build_tooldir)/bin/ -isystem $(build_tooldir)/include -isystem $(build_tooldir)/sys-include -L$(objdir)/../ld $(TFLAGS)
 
-# The GCC to use when running selftests
-GCC_FOR_SELFTESTS = LC_ALL=C GCC_COLORS= $(GCC_FOR_TARGET)
+# The GCC to use when running selftests.
+#
+# Interposed by selftest-driver.sh, which decides whether the selftests can run
+# AT ALL in this build directory.  With no target baked in, cc1 needs a probed
+# per-target config file (specs-<target>-config) to know which target it is for;
+# that file is written by target-specs/configure, which the user runs after the
+# build and which gcc/ deliberately no longer runs for them.  When it is absent
+# the selftests must SKIP BY NAME -- not run with no target selected, which is
+# either a hard failure at the first common hook or, worse, a green that tested
+# nothing.  An empty TEST_TARGET is a hard error there for the same reason.
+GCC_FOR_SELFTESTS = $(SHELL) $(srcdir)/selftest-driver.sh \
+	"$(TEST_TARGET)" "specs-$(TEST_TARGET)-config" \
+	LC_ALL=C GCC_COLORS= $(GCC_FOR_TARGET)
 
 # Set if the compiler was configured with --with-build-sysroot.
 SYSROOT_CFLAGS_FOR_TARGET = @SYSROOT_CFLAGS_FOR_TARGET@
@@ -2333,10 +2344,20 @@ $(FULL_DRIVER_NAME): ./xgcc$(exeext)
 #
 # SELFTEST_DEPS need to be set before including language makefile fragments.
 # Otherwise $(SELFTEST_DEPS) is empty when used from <LANG>/Make-lang.in.
-# $(SPECS) is here for its ORDER, not its contents: it is the file target that
-# forces `target-specs' to have run, and therefore that the per-target config
-# file SELFTEST_FLAGS looks for exists before the recipe expands.
-SELFTEST_DEPS = $(GCC_PASSES) stmp-int-hdrs $(SPECS) \
+# $(SPECS) USED to be here for its ORDER, not its contents: it was the file
+# target that forced `target-specs' to have run, and therefore that the
+# per-target config file SELFTEST_FLAGS looks for existed before the recipe
+# expanded.  gcc/ no longer runs target-specs' configure (see $(SPECS) and
+# multi-target-specs below), so $(SPECS) forces nothing and that justification
+# is gone; $(GCC_PASSES) still names `specs' for its own reasons.
+#
+# The per-target config file is named as a real prerequisite instead, through
+# $(wildcard).  That is not a way of requiring it -- nothing here can make it
+# appear -- it is so that the s-selftest-<LANG> stamps go out of date the first
+# time the user DOES run target-specs/configure.  Without it a build whose
+# selftests skipped would keep skipping for ever behind an up-to-date stamp.
+SELFTEST_DEPS = $(GCC_PASSES) stmp-int-hdrs \
+	$(wildcard specs-$(TEST_TARGET)-config) \
 	$(srcdir)/testsuite/selftests
 
 DO_LINK_SERIALIZATION = @DO_LINK_SERIALIZATION@
@@ -2613,7 +2634,15 @@ all.internal: start.encap rest.encap doc selftest
 all.cross: native gcc-cross$(exeext) $(BUILD_DRIVER_NAME) cpp$(exeext) specs \
 	libgcc-support lang.all.cross doc selftest @GENINSRC@ srcextra
 # This is what must be made before installing GCC and converting libraries.
+#
+# `multi-target-specs' is here, and `target-specs' deliberately is NOT.  The
+# source-derived half of each target's spec file is a gcc BUILD product -- it
+# comes out of the target's own tm.h chain and its multilib tables, not out of
+# any toolchain probe -- so it belongs on the always-run path.  The probed half
+# is target-specs/configure's, which the user runs after the build; running it
+# from here overwrote the user's own --with options on every `make'.
 start.encap: native xgcc$(exeext) $(BUILD_DRIVER_NAME) cpp$(exeext) specs \
+	multi-target-specs check-multi-target-specs \
 	libgcc-support lang.start.encap @LIBGDIAGNOSTICS@ @GENINSRC@ srcextra
 # These can't be made until after GCC can run.
 rest.encap: lang.rest.encap
@@ -2647,12 +2676,15 @@ DEVNULL=$(if $(findstring mingw,$(build)),nul,/dev/null)
 # The selftest driver must name a target like any other invocation: with the
 # empty back end a compiler that has not been told which target it is for exits
 # at the first common hook rather than picking a default.  `$(wildcard)' is
-# evaluated when this recursively-expanded variable is USED, i.e. in the recipe,
-# by which time $(SPECS) has forced target-specs to run and the file exists.
+# evaluated when this recursively-expanded variable is USED, i.e. in the recipe.
 #
-# This step is newly REACHABLE, not newly broken: it depends on stmp-int-hdrs,
-# which the target-specs failure used to prevent ever being made, so the
-# selftests have not run in this tree for as long as that check has been red.
+# It is no longer the case that the file is guaranteed to exist by then -- the
+# ordering that guaranteed it was $(SPECS) forcing `target-specs' to run, which
+# is exactly the build-time probe invocation that had to go.  The `$(if)' below
+# is therefore load-bearing in a way it was not, and it is NOT the guard: an
+# invocation with no -ftarget-config= would run cc1 with no target selected.
+# $(GCC_FOR_SELFTESTS) interposes selftest-driver.sh, which skips by name in
+# precisely that case.  Do not "simplify" either of them away.
 SELFTEST_TARGET_CONFIG = $(wildcard specs-$(TEST_TARGET)-config)
 SELFTEST_FLAGS = -nostdinc $(DEVNULL) -S -o $(DEVNULL) \
 	$(if $(SELFTEST_TARGET_CONFIG),-ftarget-config=$(SELFTEST_TARGET_CONFIG)) \
@@ -2900,7 +2932,37 @@ sarif-replay: $(SARIF_REPLAY_OBJS) $(LIBGDIAGNOSTICS_FILENAME)
 # The lesson generalises past that one fix: an overlay is only correct if every
 # spec it does NOT name still gets the driver's own value.  Anything that
 # short-circuits the driver's defaults when a spec file is present breaks it.
-$(SPECS): xgcc$(exeext) target-specs
+#
+# THIS RULE MUST NOT DEPEND ON `target-specs'.  target-specs/ is a separate
+# configure that the USER runs after gcc is built, against the toolchain of the
+# target they care about, with whatever --with options that target needs (e.g.
+# --with-native-system-header-dir).  gcc/ used to force it to run from here,
+# with a fixed argument list assembled in the recipe below -- so every `make'
+# that touched $(SPECS) re-ran that configure and OVERWROTE the answers the user
+# had configured, with no way to carry them.  A configured answer that does not
+# survive a rebuild is not a configured answer.
+#
+# The consequence is that on a build where target-specs/ has not been run there
+# is no specs-<target>, and this falls back to the driver's own -dumpspecs.
+# That is a poor spec file (see above) but it is an HONEST one: it says only
+# what this driver knows, rather than what a probe that nobody asked for
+# guessed.  Run target-specs/configure to get the real thing.
+#
+# $(BUILD_DRIVER_NAME) is a prerequisite because the `else' branch below runs
+# $(GCC_FOR_TARGET), which invokes `./$(BUILD_DRIVER_NAME)', not ./xgcc.  That
+# branch was unreachable while `target-specs' was a prerequisite here -- the
+# probe always wrote specs-<target> first -- so the missing prerequisite was
+# invisible.  The first build after the probe was cut died with
+# `./x86_64-pc-linux-gnu-gcc: No such file or directory'.  Latent, not new.
+#
+# specs-$(TEST_TARGET) is named through $(wildcard) for the same reason
+# SELFTEST_DEPS names the config file that way: nothing here can make it appear
+# -- only target-specs/configure can -- but once it does appear, this file must
+# go out of date.  Without it a build directory that made `specs' from the
+# -dumpspecs fallback before the user ran target-specs/configure would keep
+# serving that fallback for ever, because `specs' is newer than xgcc.  Measured:
+# it did exactly that.
+$(SPECS): xgcc$(exeext) $(BUILD_DRIVER_NAME) $(wildcard specs-$(TEST_TARGET))
 	if test -f specs-$(TEST_TARGET); then \
 	  cp specs-$(TEST_TARGET) tmp-specs; \
 	else \
@@ -3119,12 +3181,7 @@ gcc.o: $(BASEVER)
 #
 # It defaults to this driver's own output, which is the right thing only while
 # the driver is still built against a single target's tm.h.
-# Multi-target: generate one spec file per target named in multi-target.manifest
-# (written by configure from --enable-backends).  Each target is probed with its
-# own assembler and linker, which is the whole point -- the answers describe that
-# toolchain, not this build.  A target whose tools are not installed is skipped
-# with a notice rather than silently omitted.
-.PHONY: target-specs
+.PHONY: multi-target-specs
 # Each target's multilib set.  A sibling of the manifest rather than more
 # stanzas inside it: m68k alone contributes a 100-entry multilib_matches line,
 # and 188 of those would swamp the file people actually read.
@@ -3173,61 +3230,34 @@ multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
 # (config.host).  A back end whose driver object is not linked publishes an
 # empty table, which is the honest answer rather than a resolution to some
 # other back end's function.  Re-measure this count before quoting it.
-target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
+# gcc/ produces ONLY the source-derived half here: `specs-src-<target>' (from
+# multi-target-md.mk) and `mlib-specs-<target>' (below).  It does NOT compose
+# `specs-<target>', and it does NOT run target-specs/configure.
+#
+# It used to do both, in one recipe, and that was the bug this rule was split to
+# fix.  The recipe assembled a FIXED argument list -- --with-target, --with-as,
+# --with-ld, --with-option-defaults, --with-cpu-type, --with-decimal-float,
+# --with-decimal-bid-format, --with-libatomic, --with-shared-libgcc -- and ran
+# target-specs/configure with it.  Every option target-specs/ has that is NOT in
+# that list (--with-native-system-header-dir is the one that surfaced it) could
+# be supplied by hand exactly once: the next `make' re-ran the recipe and
+# truncated the answer away.  target-specs/ is a configure script the user runs
+# after the build; a build step that re-runs it with different arguments is a
+# second, silent authority for the same file -- the shape in PRINCIPLES 3.
+#
+# Composition therefore moved to the one place that can own the file: pass the
+# files below to target-specs/configure with --with-source-specs, and it writes
+# them ahead of its own probed specs.  The ordering is unchanged and still
+# deliberate -- source-derived first, probed last, so read_specs applies the
+# probed value last and it wins, because the probe asked the actual toolchain
+# and a source-derived guess must not override an answer.  Doing it inside that
+# one configure also makes it idempotent, which a `cat specs-src >> specs-<t>'
+# in a stampless make rule was not.
+multi-target-specs: multi-target.manifest multi-target.multilib \
   $(MULTI_TARGET_SOURCE_SPECS)
 	@set -e; \
-	tsdir=$(srcdir)/../target-specs; \
-	if test ! -x $$tsdir/configure; then \
-	  echo "target-specs: $$tsdir/configure not generated; run autoconf there" >&2; \
-	  exit 1; \
-	fi; \
-	made=0; skipped=0; srcmade=0; unusable=0; mlibmade=0; \
+	mlibmade=0; \
 	for t in `awk '$$1=="target"{print $$2}' multi-target.manifest`; do \
-	  tas=$$t-as; tld=$$t-ld; \
-	  if ! command -v "$$tas" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
-	    tas=as; \
-	  fi; \
-	  if ! command -v "$$tld" > /dev/null 2>&1 && test "$$t" = "$(host)"; then \
-	    tld=ld; \
-	  fi; \
-	  if command -v "$$tas" > /dev/null 2>&1 && command -v "$$tld" > /dev/null 2>&1; then \
-	    rm -rf tmp-ts-$$t; mkdir tmp-ts-$$t; \
-	    tod=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="option_defaults"{$$1="";print;exit}' multi-target.manifest`; \
-	    tct=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="cpu_type"{print $$2;exit}' multi-target.manifest`; \
-	    tdf=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_float"{print $$2;exit}' multi-target.manifest`; \
-	    tdb=`awk -v t=$$t '$$1=="target"{s=($$2==t)} s&&$$1=="decimal_bid_format"{print $$2;exit}' multi-target.manifest`; \
-	    tla=no; \
-	    if test -n "$(libatomic_target)" \
-	       && test "$$t" = "$(libatomic_target)"; then tla=yes; fi; \
-	    tsl=`awk -v t=$$t '$$1=="target"{s=($$2==t)} \
-	           s&&$$1=="tmake_file_present"{r="no"; \
-	             for(i=2;i<=NF;i++) if($$i=="t-slibgcc") r="yes"; \
-	             print r; exit}' multi-target.manifest`; \
-	    if test x"$$tsl" = x; then \
-	      echo "target-specs: $$t has no tmake_file_present line in" \
-	           "multi-target.manifest; regenerate it.  Defaulting here would" \
-	           "hand this target whichever libgcc link specs another target" \
-	           "wanted, which is the bug this field exists to fix." >&2; \
-	      exit 1; \
-	    fi; \
-	    if (cd tmp-ts-$$t && $$tsdir/configure --with-target=$$t \
-	          --with-as="$$tas" --with-ld="$$tld" \
-	          --with-option-defaults="$$tod" --with-cpu-type="$$tct" \
-	          --with-decimal-float="$$tdf" --with-decimal-bid-format="$$tdb" \
-	          --with-libatomic="$$tla" --with-shared-libgcc="$$tsl" \
-	          --with-specs-file=../specs-$$t > probe.log 2>&1); then \
-	      echo "target-specs: wrote specs-$$t (as=$$tas ld=$$tld)"; \
-	      made=`expr $$made + 1`; \
-	    else \
-	      echo "target-specs: FAILED for $$t; see tmp-ts-$$t/probe.log" >&2; \
-	      exit 1; \
-	    fi; \
-	  else \
-	    echo "target-specs: SKIP probes for $$t -- $$tas or $$tld not found;" \
-	         "no target-config file, so no driver can select $$t"; \
-	    rm -f specs-$$t; \
-	    skipped=`expr $$skipped + 1`; \
-	  fi; \
 	  rm -f mlib-specs-$$t; \
 	  if $(SHELL) $(srcdir)/gen-multilib-specs.sh $(srcdir) \
 	       multi-target.multilib $$t > tmp-mlib-specs-$$t; then \
@@ -3235,43 +3265,81 @@ target-specs: multi-target.manifest multi-target.multilib xgcc$(exeext) \
 	    mlibmade=`expr $$mlibmade + 1`; \
 	  else \
 	    rm -f tmp-mlib-specs-$$t; \
-	    echo "target-specs: no multilib tables for $$t" >&2; \
-	  fi; \
-	  if test -f specs-src-$$t; then \
-	    cat specs-src-$$t > tmp-specs-$$t; \
-	    if test -f mlib-specs-$$t; then cat mlib-specs-$$t >> tmp-specs-$$t; fi; \
-	    if test -f specs-$$t; then cat specs-$$t >> tmp-specs-$$t; fi; \
-	    mv tmp-specs-$$t specs-$$t; \
-	    srcmade=`expr $$srcmade + 1`; \
-	  fi; \
-	  if test -f specs-$$t; then \
-	    tcfg=; \
-	    if test -f specs-$$t-config; then tcfg=-ftarget-config=specs-$$t-config; fi; \
-	    why=`./xgcc$(exeext) $$tcfg -specs=specs-$$t --version 2>&1 >/dev/null` || { \
-	      echo "target-specs: $$t NOT USABLE -- $$why"; \
-	      unusable=`expr $$unusable + 1`; }; \
+	    echo "multi-target-specs: no multilib tables for $$t" >&2; \
 	  fi; \
 	done; \
-	echo "target-specs: $$made probed, $$skipped skipped, $$srcmade with source-derived specs"; \
-	echo "target-specs: $$mlibmade with their own multilib tables"; \
-	echo "target-specs: $$unusable target(s) produced a spec file the driver rejects"; \
+	echo "multi-target-specs: $$mlibmade target(s) with their own multilib tables"; \
+	echo "multi-target-specs: source-derived halves are specs-src-<target> and" \
+	     "mlib-specs-<target>; hand them to target-specs/configure as" \
+	     "--with-source-specs=\"specs-src-<target> mlib-specs-<target>\""
+
+# Run the two "a value nobody consults" checks -- plus the driver's own
+# read_specs, which is the only checker that can fail the way a bad spec file
+# fails -- over whatever per-target spec files this build directory has.  All
+# three used to live at the end of the probing rule; they came here rather than
+# being deleted with it.  read_specs is reported and counted but not fatal,
+# exactly as it was there.
+#
+# These used to run at the end of the probing rule above, i.e. on the ONE path
+# that always ran, and that mattered: almost nobody types `make check-spec-refs'.
+# Now that gcc/ no longer probes, there is nothing on the always-run path for
+# them to check on a tree where target-specs/ has not been run -- so this says
+# so, BY NAME, rather than exiting 0 over an empty file list and looking like a
+# pass.  When files ARE present both checks run and both are FATAL, and both
+# statuses are collected rather than taking the first: under `set -e' a
+# check-spec-refs failure used to end the recipe, so anything appended after it
+# never executed in any build while looking wired up.
+.PHONY: check-multi-target-specs
+# Ordered after the producer rather than merely listed beside it: both are
+# .PHONY and under -j a bare sibling would be free to run first, checking the
+# previous build's files.
+check-multi-target-specs: multi-target-specs xgcc$(exeext)
+	@set -e; \
 	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
+	if test ! -s tmp-specfiles && test ! -s tmp-cfgfiles; then \
+	  rm -f tmp-specfiles tmp-cfgfiles; \
+	  echo "check-multi-target-specs: NOTHING CHECKED -- no specs-<target> and no" \
+	       "specs-<target>-config in this build directory.  target-specs/configure" \
+	       "has not been run for any target here, so both checks have an empty" \
+	       "corpus.  This is a SKIP, not a pass." >&2; \
+	  exit 0; \
+	fi; \
 	rc=0; \
-	$(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
-	  $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
-	  $(ALL_TARGET_HEADER_FILES) \
-	  -- `cat tmp-specfiles` || rc=1; \
+	if test -s tmp-specfiles; then \
+	  $(SHELL) $(srcdir)/check-spec-refs.sh $(srcdir)/gcc.cc \
+	    $(srcdir)/../target-specs/configure.ac $(ALL_LANG_SPECS_FILES) \
+	    $(ALL_TARGET_HEADER_FILES) \
+	    -- `cat tmp-specfiles` || rc=1; \
+	else \
+	  echo "check-multi-target-specs: no specs-<target> files; check-spec-refs" \
+	       "not run" >&2; \
+	fi; \
 	if test -s tmp-cfgfiles; then \
 	  $(SHELL) $(srcdir)/check-target-caps.sh $(srcdir) `cat tmp-cfgfiles` \
 	    || rc=1; \
+	else \
+	  echo "check-multi-target-specs: no specs-<target>-config files;" \
+	       "check-target-caps not run" >&2; \
 	fi; \
+	unusable=0; checked=0; \
+	for f in `cat tmp-specfiles`; do \
+	  t=`echo $$f | sed 's|^\./||; s|^specs-||'`; \
+	  tcfg=; \
+	  if test -f specs-$$t-config; then tcfg=-ftarget-config=specs-$$t-config; fi; \
+	  checked=`expr $$checked + 1`; \
+	  why=`./xgcc$(exeext) $$tcfg -specs=$$f --version 2>&1 >/dev/null` || { \
+	    echo "check-multi-target-specs: $$t NOT USABLE -- $$why"; \
+	    unusable=`expr $$unusable + 1`; }; \
+	done; \
+	echo "check-multi-target-specs: $$checked spec file(s) handed to read_specs," \
+	     "$$unusable rejected by the driver"; \
 	rm -f tmp-specfiles tmp-cfgfiles; \
 	if test $$rc -ne 0; then \
-	  echo "target-specs: the checks above found specs nothing consults." >&2; \
-	  echo "target-specs: this is FATAL here.  A spec file the driver cannot" \
-	       "consult is a value thrown away, and the only moment anyone will" \
-	       "look is the moment it is written." >&2; \
+	  echo "check-multi-target-specs: the checks above found specs nothing" \
+	       "consults.  This is FATAL.  A spec file the driver cannot consult is" \
+	       "a value thrown away, and the only moment anyone will look is the" \
+	       "moment it is written." >&2; \
 	fi; \
 	exit $$rc
 
@@ -3310,14 +3378,17 @@ check-spec-refs:
 # no translation unit consumed.  Nothing diagnosed it; the twelve LTO testsuite
 # failures did, months later, and only once the testsuite could link at all.
 #
-# The target-specs rule above runs BOTH checks and collects their statuses
+# The `check-multi-target-specs' rule above (which start.encap depends on, and
+# which is where these two used to run from the now-deleted probing rule) runs
+# BOTH checks and collects their statuses
 # rather than taking the first one.  check-spec-refs fails today on four specs
 # that nothing consults, and under `set -e' that failure ended the recipe -- so
 # a check appended after it never executed in any build, while looking wired up
 # because the build was already red for another reason.
 #
 # BOTH CHECKS ARE FATAL IN THAT RULE AGAIN.  They were made advisory while four
-# specs nothing consults were blocking `target-specs', which stops `gcc/specs',
+# specs nothing consults were blocking the old `target-specs', which stopped
+# `gcc/specs',
 # which stops `libgcc.a', which put the whole testsuite into an environmental
 # floor -- a check that blocks the work needed to fix what it found is worse
 # than no check, and that reasoning was right at the time.  It expired: the four
