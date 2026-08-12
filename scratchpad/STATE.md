@@ -368,3 +368,257 @@ Whoever wrote the next brief should carry 113.
     to them is a behaviour change, not a union fix.
   * Nothing about the `init_reg_sets_1` ICE.
   * No throughput measurement.
+
+---
+
+# #65 first half: gcc no longer runs `target-specs`' configure (commit `b850cb24ecf`)
+
+Branched from **`f3b73c511a7`** ("Merge branch 'worktree-agent-ac13bc388156472c2'
+into multi-target").  The worktree arrived at the stale bare-repo HEAD
+`7208eca60d0`; `git reset --hard multi-target` fixed it, `MULTI_TARGET` count in
+`gcc/Makefile.in` went 0 -> 27.  Build dir `/tmp/b65`, mine, nobody else wrote it.
+
+## EVERY PATH BY WHICH THE PROBE REACHED THE BUILD
+
+The brief said two (`start.encap` -> `specs`, and `selftest` -> `SELFTEST_DEPS`).
+There were **five**, and they all funnel through the ONE file target `specs`:
+
+    all.internal: start.encap ...        -> start.encap: ... specs ...
+    all.cross:    ... specs ...
+    rest.cross:   specs
+    GCC_PASSES = xgcc $(BUILD_DRIVER_NAME) specs     <- Makefile.in:997
+        -> s-macro_list, s-fixinc_list (i.e. stmp-int-hdrs), and SELFTEST_DEPS
+    libgcc.mvars: config.status Makefile specs xgcc
+
+`SELFTEST_DEPS` reached it TWICE: once through `$(GCC_PASSES)` and once through
+its own explicit `$(SPECS)`.  So "cutting :2903 alone is insufficient" turned out
+to be the opposite of the truth: **only `specs` ever named `target-specs`**, so
+cutting that one edge cut all five.  Verified by grepping every rule whose
+prerequisite list contains `specs` or `$(SPECS)`, not by grepping for the word.
+
+## WHAT WAS CUT
+
+  * `$(SPECS): xgcc$(exeext) target-specs` -> `$(SPECS): xgcc$(exeext)
+    $(BUILD_DRIVER_NAME) $(wildcard specs-$(TEST_TARGET))`.
+  * The whole `target-specs` make target, including its probe loop.
+
+Two prerequisites were ADDED, and both were bugs the probe had been hiding:
+
+  * `$(BUILD_DRIVER_NAME)`.  The `else` branch of the `specs` recipe runs
+    `$(GCC_FOR_TARGET)`, which is `./$(BUILD_DRIVER_NAME)`, NOT `./xgcc`.  That
+    branch was unreachable while the probe always wrote `specs-<target>` first.
+    The first `make all-gcc` after the cut died with
+    `./x86_64-pc-linux-gnu-gcc: No such file or directory`.  Latent, not new.
+  * `$(wildcard specs-$(TEST_TARGET))`.  Without it, a build dir that made
+    `specs` from the `-dumpspecs` fallback keeps serving that fallback for ever,
+    because `specs` is newer than `xgcc` and the PHONY `target-specs` that used
+    to force it is gone.  **Measured: it did exactly that** -- run 3 left
+    `gcc/specs` at 6044 bytes of `-dumpspecs` output with the real 8448-byte
+    probed file sitting next to it.  After the fix, `cmp specs
+    specs-x86_64-pc-linux-gnu` succeeds.
+
+## WHAT WAS *NOT* DELETED WITH IT (this is the part to check if you touch it)
+
+The old rule ended with three checks.  Deleting the rule would have deleted them
+from the only path that always runs -- the exact loss the comment at
+`check-target-caps` warns about at length.  They are now
+`check-multi-target-specs`, which `start.encap` depends on:
+
+    check-spec-refs.sh          FATAL
+    check-target-caps.sh        FATAL
+    ./xgcc -specs=<file> --version (read_specs)   reported + counted, NOT fatal
+                                                  -- same as it was there
+
+With no `specs-<target>` in the build dir it prints `NOTHING CHECKED ... This is
+a SKIP, not a pass` to stderr and exits 0.  It is ordered `check-... :
+multi-target-specs` rather than listed beside it, so `-j` cannot run the checker
+against the previous build's files.
+
+Measured with the sentinel build present:
+
+    check-spec-refs: 1 spec file(s), every name consulted by the driver
+    check-target-caps: 1 config file(s), every capability read by something
+    check-multi-target-specs: 1 spec file(s) handed to read_specs, 0 rejected
+
+## THE COMPOSITION QUESTION -- A DESIGN DECISION INSIDE A DEBUGGING TASK
+
+Cutting the probe alone would have SILENTLY dropped half of every spec file, and
+this is worth stating because the loss is invisible: the file still exists, still
+parses, and the driver just falls back to its generic defaults.
+
+A target's `specs-<t>` has two producers.  `specs-src-<t>` (tm.h chain) and
+`mlib-specs-<t>` (multilib tables) are gcc BUILD data -- there is no probe for
+them.  Everything else is probed.  `target-specs/configure` does
+`cat > "$specs_file"`, i.e. it TRUNCATES; gcc's rule then re-prepended the source
+half afterwards.  Remove gcc's rule and the source half is gone.
+
+Resolved by moving the join into `target-specs/configure`, the only writer of the
+file, as **`--with-source-specs=FILES`**.  Order unchanged and still deliberate:
+source-derived first, probed last, so `read_specs` applies the probed value last
+and it wins.  Doing it inside that one configure also makes it idempotent, which
+`cat specs-src >> specs-<t>` in a stampless make rule was not.  gcc's remaining
+build-time rule (`multi-target-specs`) produces the two source files and prints
+the exact `--with-source-specs=` string to hand over.
+
+I am flagging this as design rather than debugging (PRINCIPLES 2b).  The
+alternative -- gcc keeps composing, target-specs appends -- is not idempotent and
+gives the file two writers.  If #67 later makes `target-specs` a real
+`target_module`, this is the seam it will be instantiated on.
+
+**A REAL TRAP, PAID FOR HERE:** my first version put ONE BLANK LINE between the
+concatenated files.  It looks like tidying.  It produced
+
+    x86_64-pc-linux-gnu-gcc: fatal error: specs file malformed after 4092 characters
+
+at the join between the last `*multilib_defaults:` block of `specs-src` and the
+leading comment of `mlib-specs`.  `read_specs` is whitespace-sensitive at a block
+boundary.  Plain `cat`, no separator -- exactly as gcc's Makefile did it.  The
+`read_specs` check above is what catches this class, which is why it was kept.
+
+## SELFTESTS
+
+`$(SPECS)` was in `SELFTEST_DEPS` **for its ORDER**: it forced `target-specs` to
+have run, so `specs-$(TEST_TARGET)-config` existed before `SELFTEST_FLAGS`
+expanded its `$(wildcard)`.  With the probe cut that ordering is gone, and
+`SELFTEST_FLAGS` would have quietly emitted NO `-ftarget-config=` -- i.e. run cc1
+with no target selected.
+
+`$(SPECS)` removed from `SELFTEST_DEPS`; the config file named there through
+`$(wildcard)` instead, so the `s-selftest-<LANG>` stamps go out of date the first
+time the user runs `target-specs/configure` (otherwise a build that skipped would
+skip for ever behind an up-to-date stamp).  `GCC_FOR_SELFTESTS` now interposes
+**`gcc/selftest-driver.sh`**.  Three arms, all run:
+
+    ARM A  config present -> the selftests RUN (see below)         rc=1
+    ARM B  config absent  -> "selftest: SKIP x86_64-pc-linux-gnu -- no
+                             specs-NOSUCH-config ... NOTHING WAS TESTED; this
+                             is a skip, not a pass."                rc=0
+    ARM C  TEST_TARGET empty -> "FATAL -- no target selected"       rc=1
+
+No default was introduced and nothing silently passes with no target selected.
+
+### ARM A FOUND A REAL PRE-EXISTING BUG.  NOT MINE.  SOMEONE SHOULD OWN IT.
+
+With the target correctly selected the selftests get all the way into
+`selftest::run_tests` and then abort:
+
+    simplify-rtx.cc:9115: test_scalar_int_ops: FAIL:
+      ASSERT_RTX_EQ (op0, simplify_gen_binary (PLUS, mode, op0, const0_rtx))
+      expected: (reg:CI 113)
+      actual:   (plus:CI (reg:CI 113) (const_int 0 [0]))
+    cc1: internal compiler error: in assert_rtx_eq_at, at selftest-rtl.cc:57
+
+`CImode` is a mode that reaches `test_scalar_int_ops` and that `simplify_rtx`
+does not fold `+ 0` for.  This is the mode-union family (PRINCIPLES 3, "the
+union's answer leaking"): the walk is over the UNION of modes, and a mode only
+one back end has is being handed to a test written for the other's vocabulary.
+It could not be seen before because nothing in this tree had ever reached the
+selftests -- `stmp-int-hdrs` was blocked upstream of them.  My change makes the
+step REACHABLE, exactly as the Makefile comment predicted; it did not break it.
+`make selftest` still cannot complete on this host for the unrelated
+`stmp-fixinc` /usr/include reason, so ARM A was run by invoking the driver
+directly with the same arguments the recipe expands to.
+
+## THE ACCEPTANCE ARM: THE SENTINEL SURVIVES
+
+    sh /tmp/b65-ts.sh    # target-specs/configure by hand, x86_64-pc-linux-gnu,
+                         #   --with-native-system-header-dir=/ZZZ-sentinel
+                         #   --with-source-specs="../specs-src-<t> ../mlib-specs-<t>"
+    669b37e10fe12497e3199e5abd9b21d9  specs-x86_64-pc-linux-gnu
+    233a607ea8d2281054f03b302e79a15b  specs-x86_64-pc-linux-gnu-config
+
+    make -j8 all-gcc                  # rc=2, at stmp-fixinc (environmental)
+    669b37e10fe12497e3199e5abd9b21d9  specs-x86_64-pc-linux-gnu       OK
+    233a607ea8d2281054f03b302e79a15b  specs-x86_64-pc-linux-gnu-config OK
+    grep native_system_header_dir ...-config -> /ZZZ-sentinel   (still there)
+
+    grep -c '^checking ' on the make log -> 0     # no configure ran, at all
+
+NEGATIVE CONTROL, because "md5 unchanged" is worthless if the check cannot fail:
+`sed -i s|/ZZZ-sentinel|/usr/include|` the config file, `md5sum -c` -> **FAILED,
+rc=1**; restore -> OK.  The comparison discriminates.
+
+The `all-gcc` failure is `stmp-fixinc` / no `/usr/include` on NixOS -- known,
+environmental, unchanged, and it happens AFTER `specs` and `multi-target-specs`.
+
+## REGRESSION BARS -- all re-measured on `/tmp/b65`
+
+    make cc1               rc=0
+    make multi-target-objs rc=0
+    stock-compare.sh  IN=/tmp/acc2/t.c (ABSOLUTE) MT=/tmp/b65 ST=/tmp/b-stock
+        5/5 IDENTICAL, 5 distinct md5 per side, negative control fires, rc=0
+
+    TAB   58 arms: i386 29 PASS / 0 FAIL, aarch64 24 PASS / 5 FAIL
+          -- MATCHES the brief exactly.  The 5 aarch64 FAILs, by name:
+             BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN
+             REG_WORDS_BIG_ENDIAN SHIFT_COUNT_TRUNCATED
+          -- run with MTP=/tmp/mtp-before.  Pointing MTP at a fresh macro-probe
+             run of HEAD is WRONG and the script refuses it by name (no
+             PROVENANCE.txt); read that file before touching this.
+
+    HEADER 230 arms: i386 115 PASS / 0 FAIL, aarch64 **5 PASS / 110 FAIL**
+          -- the brief says aarch64 2 PASS / 113 FAIL.  I measure 5/110.
+             The 5, by name: FIRST_PSEUDO_REGISTER, MAX_BITSIZE_MODE_ANY_MODE,
+             MAX_BITS_PER_WORD, N_REG_CLASSES, REGNO_REG_CLASS.
+
+**On that 3-arm difference, stating the bound honestly:** I did NOT build an
+unmodified baseline, so I cannot prove by measurement that my diff did not cause
+it.  What I can say: `/tmp/mtp-before/PROVENANCE.txt` is dated 2026-08-12T08:51
+at commit `36ba31303e2` ("give each back end its own `addresses.h` predicates"),
+which IS an ancestor of my base -- so the brief's header figures predate register
+and address work that would plausibly flip exactly `N_REG_CLASSES` and
+`REGNO_REG_CLASS`; the TAB column, which shares the instrument, matches the brief
+to the arm; and my diff is four files (`gcc/Makefile.in`,
+`gcc/selftest-driver.sh`, `target-specs/configure{,.ac}`) whose Makefile hunks
+are at `GCC_FOR_SELFTESTS`, `SELFTEST_DEPS`, `start.encap`, `SELFTEST_FLAGS`,
+`$(SPECS)`, the `target-specs` rule and two comments -- none of them a rule that
+produces `tm.h`, `mt-i386/` or `mt-aarch64/`, which is all the probe reads.  I
+attribute it to branch drift and recommend the next brief carry **5/110**, but
+that is an inference, not a measurement.
+
+## STDERR -- RE-ESTABLISHED, NOT INHERITED
+
+The brief listed 0, 32, 664 and 698 as previously reported.  Measured here:
+
+    make cc1 (no-op, nothing to do)     32 lines = 8 `is unchanged`
+                                                + 24 `'@' is redundant`
+    make multi-target-objs (rc=0)       32 lines, same 8 + 24 composition
+    make all-gcc (COLD, from scratch)  867 lines, of which 370 are `warning:`
+                                       and the rest are the caret/continuation
+                                       lines those warnings print.
+                                       Top: 268 -Wmissing-field-initializers,
+                                       18 -Wunused-parameter, 16 -Wunused-result,
+                                       15 -Wformat-diag, 12 -Wsign-compare.
+
+So: the documented **32-line incremental floor is exactly right** and reproduces
+to the line and to the composition.  The large numbers (664/698/867) are the COLD
+arm and are entirely nixpkgs gcc 15.2 host-compiler warnings -- a different
+measurement, not a regression against the 32.  They are not comparable and should
+not be quoted as one bar.  PRINCIPLES 6 says "a full build is empty"; that is
+false on this host with this host compiler, and the composition above is why.
+
+## WHAT I DID NOT DO
+
+  * Did not make `target-specs` a `target_module` (needs #67 -- out of scope,
+    said so in the brief and I agree).
+  * Did not touch the `-dumpspecs` fallback in the `specs` recipe.  It is
+    pre-existing and it is now REACHABLE for the first time (a build where the
+    user has not run `target-specs/configure` takes it).  It is arguably a
+    default-by-another-name under PRINCIPLES 2a; I did not want to change
+    behaviour and cut the probe in the same commit.  **Someone should decide
+    whether `gcc/specs` should exist at all when nothing has been probed.**
+  * Did not fix the `simplify_rtx` / `CImode` selftest failure above.
+  * Did not build an unmodified baseline for the header scoreboard (see above).
+  * `make -n s-selftest-c` in this tree EXECUTES sub-makes and relinked `cc1`
+    against a bad `-lgmp` path, leaving no `cc1`.  Do not use `make -n` here to
+    inspect a recipe; `make cc1` afterwards recovered it (rc=0).
+
+## FILES
+
+    /tmp/b65            my build dir (x86_64-pc-linux-gnu + aarch64-unknown-linux-gnu)
+    /tmp/b65-cfg.sh     top-level configure for it
+    /tmp/b65-ts.sh      target-specs/configure by hand, WITH the /ZZZ-sentinel
+                        and WITH --with-source-specs -- this is the recipe for
+                        the acceptance arm
+    /tmp/b65-mk{1..5}.{out,err}, /tmp/b65-cc1*.err, /tmp/b65-mto.err
+    /tmp/b65-mtp/, /tmp/b65-tab.log     probe datasets for the numbers above
