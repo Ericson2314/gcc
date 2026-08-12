@@ -2884,6 +2884,150 @@ gxx_libcxx_include_dir ${ts_gxx_libcxx_include_dir}
 EOF
 fi
 
+dnl --- WHAT WAS ACTUALLY WRITTEN, CHECKED AGAINST WHAT SHOULD HAVE BEEN.
+dnl
+dnl This file has produced two of this project's worst silent failures, and both
+dnl were the same shape: a heredoc that did not finish.
+dnl
+dnl   1. A backtick inside a COMMENT in an unquoted heredoc.  The shell died with
+dnl      "unexpected EOF while looking for matching backtick", nothing at all was
+dnl      written, and configure still exited 0 -- so all 97 capabilities silently
+dnl      took their built-in default on every target.
+dnl   2. A single apostrophe in a comment truncated the options block out of a
+dnl      generated makefile, again with exit 0.
+dnl
+dnl Neither is visible to check-target-caps.sh, and that is not a gap in that
+dnl check -- it reads this file's TEXT to learn which keys the heredocs can emit,
+dnl so a heredoc that reads correctly and executes badly looks perfect to it.
+dnl Static analysis of the emitter cannot see the emitter failing to run.  Only
+dnl reading back the artefact can.
+dnl
+dnl So the list below is a DELIBERATE DUPLICATE of the heredoc contents, and the
+dnl duplication is the mechanism: two independent statements of the same fact,
+dnl where disagreement in EITHER direction is a hard error that names the keys.
+dnl A key added to a heredoc and not to this list fails as "written but not
+dnl expected"; one added here and not emitted fails as "expected but missing".
+dnl Keeping them in step is the cost, and it is the point -- the alternative is
+dnl the absence of an answer being read as an answer, which is exactly how a
+dnl truncated heredoc turned into 97 silent defaults.
+dnl
+dnl Use \047 for an apostrophe and NO BACKTICKS in the message text.
+ts_expected="target leb128 decimal_float decimal_bid_format
+  s390_excess_float_precision glibc_major glibc_minor libc_hwcap_in_tcb
+  libc_gnustack ld_broken_secrel32 as_ref xcoff_dwarf_extras
+  as_relax_option as_offsetable_lo10 as_gnu_attribute cfi_directive
+  cfi_personality cfi_sections gas_loc_stmt gas_discriminator
+  as_line_zero dwarf2_debug_line dwarf2_debug_view as_alpha_explicit_relocs
+  as_alpha_jsrdirect_relocs as_aarch64_mabi as_aarch64_small_pic_relocs
+  as_aarch64_aeabi_build_attributes
+  as_mips_nan as_mips_micromips as_mips_dspr1_mult as_mips_explicit_relocs
+  as_mips_explicit_relocs_pcrel as_ld_mips_jalr_reloc as_mips_dot_module
+  as_loongarch_relax
+  as_loongarch_cond_branch_relax as_loongarch_explicit_relocs as_riscv_attribute
+  as_riscv_misa_spec
+  as_riscv_march_zifencei as_riscv_march_zaamo_zalrsc as_riscv_march_b gas_hidden
+  ld_ro_rw_section_mixing ld_eh_gc_sections ld_ctf ld_sysroot
+  ld_at_file ld_pie ld_pie_copyreloc ld_personality_relaxation
+  ld_no_dot_syms ld_large_toc ld_toc_align ld_ppc_attr
+  ld_broken_pe_dwarf5 ld_avr_avrxmega3_rodata_in_flash ld_avr_avrxmega2_flmap
+  ld_avr_avrxmega4_flmap
+  ld_now ld_relro lto_plugin ld_demangle
+  ld_static_option ld_dynamic_option gas_balign_and_p2align gas_max_skip_p2align
+  gas_literal16 gas_subsection_ordering gas_weak gas_weakref
+  gas_nsubspa_comdat gas_base64 gas_cv_ucomp gas_lcomm_with_alignment
+  gas_section_exclude gas_shf_gnu_retain gas_section_link_order gas_shf_merge
+  use_as_traditional_format as_mmacosx_version_min as_macos_build_version as_mfcrf
+  as_power10_htm as_rel16 as_entry_markers as_pltseq
+  as_mspabi_attribute as_loongarch_support_call36
+  as_loongarch_eh_frame_pcrel_encoding as_loongarch_tls_le_relaxation
+  as_loongarch_16b_atomic as_s390_architecture_modifiers
+  as_s390_vector_loadstore_alignment_hints
+  as_s390_vector_loadstore_alignment_hints_on_z13
+  gas_arm_extended_arch as_ix86_filds as_ix86_fildq as_ix86_cmov_sun_syntax
+  as_ix86_ffreep as_ix86_sahf as_ix86_interunit_movq as_ix86_hle
+  as_ix86_rep_lock_prefix as_ix86_ud2 as_ix86_tlsgdplt as_ix86_tlsldmplt
+  as_ix86_tlsldm as_ix86_got32x as_r_x86_64_code_6_gottpoff as_gotoff_in_data
+  as_ix86_tls_get_addr_got solaris_ld vms_debug local_include_dir
+  native_system_header_dir native_system_header_component"
+
+dnl The two conditional blocks above.  Their keys are expected exactly when the
+dnl block that writes them ran, so a wrong condition shows up here rather than
+dnl as a key that quietly is not there.
+if test x"$ts_emit_gxx" = xyes; then
+  ts_expected="$ts_expected gxx_include_dir gxx_tool_include_dir gxx_backward_include_dir"
+fi
+if test x"$ts_emit_gxx_libcxx" = xyes; then
+  ts_expected="$ts_expected gxx_libcxx_include_dir"
+fi
+
+dnl Read the artefact back.  A key with an EMPTY value is written as its name
+dnl followed by a space, so match the name at the start of a line either way;
+dnl treating "name " as absent would report every empty-valued string key
+dnl missing, which is the false alarm that gets a check deleted.
+dnl Process substitution is bash-only and configure runs under /bin/sh, so the
+dnl two sides go through temporary files.
+dnl THE BRACKETS BELOW ARE M4 QUOTES UNLESS THEY ARE QUOTED THEMSELVES.  Written
+dnl without the outer [ ], autoconf strips one level from every character class
+dnl and ships `$1 ~ /^a-z_a-z_0-9*$/' into configure -- which matches nothing, so
+dnl the reader returns an empty key set and the check below reports all 118
+dnl capabilities missing from a file that in fact contains all 118.  That is
+dnl what happened on this code's first run.  A checker whose own reader silently
+dnl reads nothing is the failure mode this whole block exists to prevent, so it
+dnl gets the same treatment: the empty case is separated out below and named.
+dnl No character class in the sed: awk's $1 already ignores leading blanks, so
+dnl a leading-whitespace strip would be redundant AND would need bracket
+dnl protection of its own -- and when that protection does not take, the
+dnl brackets reach configure, sed is handed a script beginning with `[', it
+dnl fails, and the pipeline yields nothing.  Fewer character classes is the fix
+dnl that cannot regress.
+sed 's/#.*//' "$target_config_file" \
+  | awk ['$1 ~ /^[a-z_][a-z_0-9]*$/ { print $1 }'] | sort -u > conftest.tswritten
+for ts_k in $ts_expected; do echo "$ts_k"; done | sort -u > conftest.tsexpected
+
+ts_missing=`comm -23 conftest.tsexpected conftest.tswritten | tr '\n' ' '`
+ts_extra=`comm -13 conftest.tsexpected conftest.tswritten | tr '\n' ' '`
+
+ts_n_written=`grep -c . conftest.tswritten`
+ts_n_expected=`grep -c . conftest.tsexpected`
+ts_n_lines=`wc -l < "$target_config_file"`
+rm -f conftest.tswritten conftest.tsexpected
+
+dnl Reader-broken and everything-missing produce the same $ts_missing, and they
+dnl need opposite fixes, so they get separate messages.  Without this arm the
+dnl m4-quoting bug above reads as "the heredocs emitted nothing", which sends the
+dnl next person to look at the right file for the wrong reason.
+if test "$ts_n_expected" -eq 0; then
+  AC_MSG_ERROR([the expected-capability list in configure.ac came out empty, so
+this check would pass no matter what was written.])
+fi
+if test "$ts_n_written" -eq 0; then
+  AC_MSG_ERROR([no capability keys could be read back out of $target_config_file,
+which has $ts_n_lines lines.  Either nothing was written, or
+the reader in configure.ac is broken -- and an m4-quoted character class is the
+way that has already happened once.  Check the file before changing the list.])
+fi
+
+if test -n "$ts_missing"; then
+  AC_MSG_ERROR([$target_config_file is missing capabilit(ies) this script is supposed to write:$ts_missing
+A heredoc in configure.ac did not finish -- a backtick or an unbalanced quote in
+one of its comments is the usual cause, and it fails with exit 0.  Do NOT delete
+the name from the list above to make this pass: a capability that is not written
+is the built-in default on every target forever, and that is precisely the
+failure this check exists to make impossible to miss.])
+fi
+
+if test -n "$ts_extra"; then
+  AC_MSG_ERROR([$target_config_file carries capabilit(ies) that are not in the
+expected list in configure.ac:$ts_extra
+Add them to ts_expected beside the heredoc that emits them, so that the day that
+heredoc stops running, the omission is an error rather than a default.])
+fi
+
+if test "$ts_n_written" -ne "$ts_n_expected"; then
+  AC_MSG_ERROR([$target_config_file has $ts_n_written capability keys but $ts_n_expected were expected, and yet neither list names one the other does not.  The reader in configure.ac is wrong.])
+fi
+AC_MSG_NOTICE([$target_config_file: $ts_n_written capabilities, all expected])
+
 dnl The driver-side ones are spec fragments.  They are appended as their own
 dnl spec entries rather than folded into the ones written above.
 if test x"$gcc_cv_ld_as_needed" = xyes; then

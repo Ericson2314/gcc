@@ -46,7 +46,29 @@
 #      that nothing consumed the macro.  So a `#define' is an EDGE, not a use:
 #      the key is reachable only if the macro it defines is itself reached.
 #      Followed to a fixpoint, because macros are defined in terms of macros.
-#   3. `targ_caps_target_name' for the `target' line, which names the
+#   3. A read from a MACHINE DESCRIPTION.  `*.md' C fragments are compiled into
+#      insn-*.cc and are ordinary C++ readers, but the corpus find below took
+#      *.cc, *.h, *.c and *.def only, so every one of them was invisible.  That
+#      was not a hypothetical either: it is why HAVE_AS_IX86_SAHF,
+#      HAVE_AS_IX86_UD2, HAVE_AS_IX86_TLSGDPLT, HAVE_AS_IX86_TLS_GET_ADDR_GOT
+#      and HAVE_AS_R_X86_64_CODE_6_GOTTPOFF -- read from i386.md, constraints.md
+#      and predicates.md, and from nowhere else -- were reported dead and made
+#      this check FATAL on every build, for five keys that were entirely healthy.
+#
+#      TWO THINGS MAKE THIS DELICATE, and a plain `-o -name "*.md"' gets both
+#      wrong.  First, `.md' is not only a machine description: 479 files in this
+#      tree match, and most of them are MARKDOWN -- including CONFIGURE-HISTORY.md,
+#      which mentions targ_caps twenty-three times in prose.  Adding them all
+#      would make this check report those keys live on the strength of a document
+#      ABOUT the bug, which is the prose trap the whole check is built to avoid,
+#      landing at its sharpest.  So a `.md' joins the corpus only if it contains a
+#      line starting `(define' or `(include' -- a positive test on content, not on
+#      the name.  Every machine description has hundreds; no markdown has one.
+#      Second, `;' begins a comment in a machine description, and predicates.md
+#      names R_X86_64_CODE_6_GOTTPOFF in exactly such a comment.  So `.md' gets
+#      its own stripper, run before the C one, and both facts are calibrated
+#      two-sided below.
+#   4. `targ_caps_target_name' for the `target' line, which names the
 #      configuration rather than a capability and is read through its own
 #      variable (common/common-target-select.cc, toplev.cc).  One alias, in a
 #      table below, rather than a special case buried in the matcher.
@@ -183,6 +205,34 @@ strip_c_comments () {
        }'
 }
 
+# `;' to end of line is a machine-description comment -- but only OUTSIDE a
+# string.  Constraint and predicate bodies are C expressions written as string
+# literals, and an output template is a string full of semicolons
+# (`"movl\t%1, %0; ret"'), so a naive strip would delete real code.  Quote state
+# is tracked within the line only: a string that opens on one line and closes on
+# a later one leaves the following lines looking unquoted, so a `;' there strips.
+# That direction is deliberate.  Over-stripping can only ever call a live key
+# DEAD, which is loud and lands on whoever runs the check; under-stripping calls
+# a dead key LIVE, which is silent and is the failure this file exists to stop.
+strip_md_comments () {
+  awk '{
+	 line = ""; q = 0; n = length($0)
+	 for (i = 1; i <= n; i++) {
+	   c = substr($0, i, 1)
+	   if (q && c == "\\") { line = line c substr($0, i + 1, 1); i++; continue }
+	   if (c == "\"") { q = !q; line = line c; continue }
+	   if (c == ";" && !q) break
+	   line = line c
+	 }
+	 print line
+       }'
+}
+
+# Is this `.md' a machine description rather than markdown?  Content, not name.
+is_machine_desc () {
+  grep -qE '^\(define|^\(include' "$1"
+}
+
 # target-caps.cc is EXCLUDED, and it is the exclusion the check turns on.  That
 # file names every key twice -- once in the designated initialiser that gives it
 # a default, once in the strcmp ladder that parses it out of the config file --
@@ -199,6 +249,27 @@ mv "$work"/cfiles2 "$work"/cfiles
 while read -r f; do
   join_cont "$f" | strip_c_comments
 done < "$work"/cfiles >> "$work"/code
+
+# Machine descriptions, selected on content and stripped with their own comment
+# syntax first.  If the selection ever yields nothing, say so: an empty md corpus
+# and an md corpus with no readers look identical from here, and the first is a
+# broken selector while the second is a fact about the tree.
+find "$srcdir" \( -name autom4te.cache -o -name testsuite -o -name po \) -prune \
+  -o -type f -name '*.md' -print > "$work"/mdall
+: > "$work"/mdfiles
+while read -r f; do
+  test -n "$f" || continue
+  is_machine_desc "$f" && echo "$f" >> "$work"/mdfiles
+done < "$work"/mdall
+if test ! -s "$work"/mdfiles; then
+  echo "check-target-caps: no machine descriptions found under $srcdir, so any" \
+       "capability read only from a .md would report as dead.  The selector or" \
+       "the tree has changed." >&2
+  exit 1
+fi
+while read -r f; do
+  join_cont "$f" | strip_md_comments | strip_c_comments
+done < "$work"/mdfiles >> "$work"/code
 
 # Non-C corpora, each with its own comment syntax.  They contribute nothing
 # today; they are here so that the day one of them grows a real use, the check
@@ -307,7 +378,40 @@ sort -u "$work"/macronames -o "$work"/macronames
 printf 'ZZZ_LIVE_MACRO\nZZZ_MIDDLE\n' >> "$work"/live_macros
 sort -u "$work"/live_macros -o "$work"/live_macros
 
+# The machine-description arm.  Four stimuli, because the md path has four ways
+# of being quietly wrong and three of them fail towards "live", which is the
+# direction that does not announce itself.
+cat > "$work"/calib/zzz-insn.md <<'EOF'
+;; A comment naming targ_caps.zzz_md_comment_only, which must NOT count.
+(define_insn "zzz_calib"
+  [(const_int 0)]
+  "movl\t%1, %0; jmp targ_caps.zzz_md_in_string"
+  { return targ_caps.zzz_md_read ? "a" : "b"; })
+EOF
+cat > "$work"/calib/zzz-prose.md <<'EOF'
+# Notes
+
+This document explains targ_caps.zzz_md_prose_only at length.
+EOF
+join_cont "$work"/calib/zzz-insn.md | strip_md_comments | strip_c_comments \
+  > "$work"/calib/zzz-insn.stripped
+cat "$work"/calib/zzz-insn.stripped >> "$work"/code
+cat "$work"/calib/zzz-insn.stripped >> "$work"/uses
+
 calib_fail=0
+if is_machine_desc "$work"/calib/zzz-insn.md; then :; else
+  echo "check-target-caps: CALIBRATION FAILED -- a real machine description is" \
+       "not recognised as one, so every .md reader would be invisible and the" \
+       "check would report healthy keys dead." >&2
+  calib_fail=1
+fi
+if is_machine_desc "$work"/calib/zzz-prose.md; then
+  echo "check-target-caps: CALIBRATION FAILED -- a markdown document is treated" \
+       "as a machine description.  Prose about a capability would then count as" \
+       "a read, which is the trap this whole check is built around." >&2
+  calib_fail=1
+fi
+
 must_hit () {			# must be reachable
   if reachable "$1"; then :; else
     echo "check-target-caps: CALIBRATION FAILED -- $2" >&2
@@ -330,6 +434,12 @@ must_miss zzz_comment_only \
   "a key mentioned only in a comment is called live"
 must_miss zzz_absent_entirely \
   "a key nothing mentions at all is called live"
+must_hit  zzz_md_read \
+  "a key read from a machine description's C fragment is called dead.  That is the bug that made this check fatal on five healthy ix86 keys."
+must_hit  zzz_md_in_string \
+  "a key read from inside a machine-description string is called dead: the semicolon stripper is cutting inside a quoted output template or constraint body."
+must_miss zzz_md_comment_only \
+  "a key named only in a semicolon machine-description comment is called live; predicates.md contains exactly such a line."
 if test ! -s "$work"/uses; then
   echo "check-target-caps: the reader corpus is empty; every key would read" \
        "as dead for a reason that has nothing to do with the tree." >&2
@@ -531,9 +641,14 @@ target optout The configuration's own name, not a capability.  It is read throug
 #     gen-target-specs channel rather than to targ_caps.
 #   as_s390_machine_machinemode -- S390_USE_TARGET_ATTRIBUTE selects
 #     SWITCHABLE_TARGET with `#if', which cannot be a run-time answer.
-#   as_ltoffx_ldxmov_relocs -- reader is ia64.md, and the corpus find above
-#     takes *.cc, *.h, *.c and *.def only, so an .md reader is invisible here.
-#     Adding *.md to that find is the whole fix.
+#   as_ltoffx_ldxmov_relocs -- reader is ia64.md.  THE .md HALF OF THIS IS NOW
+#     DONE: machine descriptions are in the corpus (see 3. above), so the reader
+#     is visible and this key would pass the read arm the moment it exists.
+#     What is still missing is the other three quarters -- a field in
+#     target-caps.h, a strcmp arm in target-caps.cc, and an emission line in
+#     target-specs/configure.ac -- and all three must land together.  Emitting
+#     it alone makes this check fatal on "emitted, but target-caps.h has no
+#     field", which is correct and is why it has not been done piecemeal.
 #
 # They are not listed as exemptions because they are neither declared nor
 # emitted, so there is no gap for an exemption to excuse and the stale-entry
