@@ -15366,9 +15366,14 @@ const_ok_for_output_1 (rtx rtl)
 	inform (current_function_decl
 		? DECL_SOURCE_LOCATION (current_function_decl)
 		: UNKNOWN_LOCATION,
-#if NUM_UNSPEC_VALUES > 0
+		/* `defined (...)', not `> 0': the macro says only that an
+		   unspec enum exists.  unspec_strings_len is the length of
+		   the table actually installed -- NUM_UNSPEC_VALUES is the
+		   primary's count in a multi-target build and using it here
+		   read past a shorter back end's table.  */
+#if defined(NUM_UNSPEC_VALUES)
 		"non-delegitimized UNSPEC %s (%d) found in variable location",
-		((XINT (rtl, 1) >= 0 && XINT (rtl, 1) < NUM_UNSPEC_VALUES)
+		((XINT (rtl, 1) >= 0 && XINT (rtl, 1) < unspec_strings_len)
 		 ? unspec_strings[XINT (rtl, 1)] : "unknown"),
 #else
 		"non-delegitimized UNSPEC %d found in variable location",

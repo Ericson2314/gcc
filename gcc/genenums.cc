@@ -60,6 +60,28 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
   if (gen_target_ns ())
     printf ("const char *const *%s_strings = %s_strings_tab;\n",
 	    def->name, def->name);
+
+  /* The table's own length, next to the table.  ARRAY_SIZE of the array just
+     emitted rather than def->num_values: the middle end indexes the ARRAY,
+     so the bound has to be the array's, and writing it any other way is the
+     shared-numbering defect this file exists to avoid -- NUM_<enum>_VALUES
+     was exactly that, one name computed from the primary's md and used as a
+     bound on somebody else's table.  */
+  const char *tab = gen_target_ns () ? "_tab" : "";
+  printf ("int %s_strings_len = (int) ARRAY_SIZE (%s_strings%s);\n",
+	  def->name, def->name, tab);
+
+  /* And the cross-check against the header, which is written by a DIFFERENT
+     generator run (genconstants) over the same md.  It catches a stale
+     insn-constants-<base>.h against a fresh table, and it would catch an md
+     whose enum values are not dense -- in which case num_values exceeds the
+     table length and upstream's `< NUM_<enum>_VALUES' was already reading
+     off the end in a single-target build too.  */
+  char *value_name = ACONCAT (("num_", def->name, "_values", NULL));
+  upcase_string (value_name);
+  printf ("static_assert (ARRAY_SIZE (%s_strings%s) == %s,\n"
+	  "\t       \"%s_strings does not have %s entries\");\n",
+	  def->name, tab, value_name, def->name, value_name);
   return 1;
 }
 

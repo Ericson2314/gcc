@@ -1019,22 +1019,25 @@ function_reader::read_rtx_operand_inL (rtx x, int idx, char format_char)
     }
 
   /* Handle UNSPEC and UNSPEC_VOLATILE's operand 1.  */
-#if !defined(GENERATOR_FILE) && NUM_UNSPECV_VALUES > 0
+  /* `defined (...)' asks whether the enum exists; the COUNT handed to
+     parse_enum_value is the run-time length of the table in force, because
+     NUM_UNSPEC*_VALUES is the primary back end's in a multi-target build.  */
+#if !defined(GENERATOR_FILE) && defined(NUM_UNSPECV_VALUES)
   if (idx == 1
       && GET_CODE (x) == UNSPEC_VOLATILE)
     {
       XINT (x, 1)
-	= parse_enum_value (NUM_UNSPECV_VALUES, unspecv_strings);
+	= parse_enum_value (unspecv_strings_len, unspecv_strings);
       return;
     }
 #endif
-#if !defined(GENERATOR_FILE) && NUM_UNSPEC_VALUES > 0
+#if !defined(GENERATOR_FILE) && defined(NUM_UNSPEC_VALUES)
   if (idx == 1
       && (GET_CODE (x) == UNSPEC
 	  || GET_CODE (x) == UNSPEC_VOLATILE))
     {
       XINT (x, 1)
-	= parse_enum_value (NUM_UNSPEC_VALUES, unspec_strings);
+	= parse_enum_value (unspec_strings_len, unspec_strings);
       return;
     }
 #endif

@@ -199,7 +199,27 @@ tree ms_va_list_type_node;
 #define MT_OTHER_TABLES(F, NS)						\
   F (insn_data, NS) F (unspec_strings, NS) F (unspecv_strings, NS)
 
-#define MT_ALL_TABLES(F, NS) MT_MODE_TABLES (F, NS) MT_OTHER_TABLES (F, NS)
+/* THE SCALARS, kept apart from the tables above for one reason: they are not
+   pointers, so MT_INSTALL_TABLE's const_cast does not apply to them (a
+   const_cast to a non-reference scalar type is ill-formed, so putting one of
+   these in MT_OTHER_TABLES is caught at compile time rather than silently).
+   They are still selected exactly like the tables and by the same list, which
+   is what stops one being added without the other.
+
+   `unspec_strings_len' is the LENGTH OF THE TABLE ON THE LINE ABOVE IT, and
+   it exists because the compile-time NUM_UNSPEC*_VALUES cannot be: those come
+   from the singular genconstants run over the primary's md.  Measured in this
+   build dir, NUM_UNSPECV_VALUES is 114 while insn_aarch64::unspecv_strings_tab
+   holds 40 entries, and insn_aarch64::unspec_strings_tab is the very next
+   object in .rodata -- so print_exp's `unspec < NUM_UNSPECV_VALUES' let
+   indices 40..113 read the neighbouring table and print a plain UNSPEC's name
+   for an UNSPEC_VOLATILE.  An out-of-bounds read that never faults and never
+   diagnoses: one name, two authorities, again.  */
+#define MT_SCALAR_TABLES(F, NS)						\
+  F (unspec_strings_len, NS) F (unspecv_strings_len, NS)
+
+#define MT_ALL_TABLES(F, NS)						\
+  MT_MODE_TABLES (F, NS) MT_OTHER_TABLES (F, NS) MT_SCALAR_TABLES (F, NS)
 
 /* `decltype (::NAME)' rather than a spelled-out type: the qualifier on each of
    these (CONST_MODE_SIZE and friends) comes from tm.h and so differs between
@@ -259,10 +279,16 @@ struct mt_backend
 #define MT_INSTALL_TABLE(NAME, NS) \
   ::NAME = const_cast<decltype (::NAME)> (NS::NAME);
 
+/* Scalars: a plain copy, and deliberately NOT routed through the const_cast
+   above, which would not compile for them.  */
+#define MT_INSTALL_SCALAR(NAME, NS) ::NAME = NS::NAME;
+
 #define MT_BACKEND(BASE, NS)						\
   static void mt_install_ ## BASE (void)				\
   {									\
-    MT_ALL_TABLES (MT_INSTALL_TABLE, NS)				\
+    MT_MODE_TABLES (MT_INSTALL_TABLE, NS)				\
+    MT_OTHER_TABLES (MT_INSTALL_TABLE, NS)				\
+    MT_SCALAR_TABLES (MT_INSTALL_SCALAR, NS)				\
     /* POINT, do not copy.  The back end's own translation units are	\
        compiled with -Dtargetm=targetm_<base> (and the companion	\
        -DMULTI_TARGET_TARGETM_BASE, which target.h checks travels with	\

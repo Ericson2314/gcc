@@ -498,23 +498,28 @@ rtx_writer::print_rtx_operand_code_i (const_rtx in_rtx, int idx)
 	  || NOTE_KIND (in_rtx) == NOTE_INSN_DELETED_DEBUG_LABEL)
 	fprintf (m_outfile, " %d",  XINT (in_rtx, idx));
     }
-#if !defined(GENERATOR_FILE) && NUM_UNSPECV_VALUES > 0
+  /* `defined (NUM_UNSPECV_VALUES)' rather than `NUM_UNSPECV_VALUES > 0': the
+     macro answers only "does this compiler have an unspecv enum", and it is
+     the primary back end's count in a multi-target build.  The BOUND is
+     unspecv_strings_len, which travels with whichever table is in force --
+     see MT_SCALAR_TABLES in multi-target-select.cc.  */
+#if !defined(GENERATOR_FILE) && defined(NUM_UNSPECV_VALUES)
   else if (idx == 1
 	   && GET_CODE (in_rtx) == UNSPEC_VOLATILE
 	   && XINT (in_rtx, 1) >= 0
-	   && XINT (in_rtx, 1) < NUM_UNSPECV_VALUES)
+	   && XINT (in_rtx, 1) < unspecv_strings_len)
     fprintf (m_outfile, " %s", unspecv_strings[XINT (in_rtx, 1)]);
 #endif
-#if !defined(GENERATOR_FILE) && NUM_UNSPEC_VALUES > 0
+#if !defined(GENERATOR_FILE) && defined(NUM_UNSPEC_VALUES)
   else if (idx == 1
 	   && (GET_CODE (in_rtx) == UNSPEC
-#if !(NUM_UNSPECV_VALUES > 0)
+#if !defined(NUM_UNSPECV_VALUES)
 	       // Only accept unspec_volatiles, if there's no unspecv enum.
 	       || GET_CODE (in_rtx) == UNSPEC_VOLATILE
 #endif
 	       || false)
 	   && XINT (in_rtx, 1) >= 0
-	   && XINT (in_rtx, 1) < NUM_UNSPEC_VALUES)
+	   && XINT (in_rtx, 1) < unspec_strings_len)
     fprintf (m_outfile, " %s", unspec_strings[XINT (in_rtx, 1)]);
 #endif
   else
@@ -1621,18 +1626,20 @@ print_exp (pretty_printer *pp, const_rtx x, int verbose)
 	if (unspec < 0)
 	  {
 	  }
-#if NUM_UNSPECV_VALUES > 0
+	/* See print_rtx_operand_code_i: the #if asks only whether the enum
+	   exists, the run-time length is the bound.  */
+#if defined(NUM_UNSPECV_VALUES)
 	else if (GET_CODE (x) == UNSPEC_VOLATILE
-		 && unspec < NUM_UNSPECV_VALUES)
+		 && unspec < unspecv_strings_len)
 	  str = unspecv_strings[unspec];
 #endif
-#if NUM_UNSPEC_VALUES > 0
+#if defined(NUM_UNSPEC_VALUES)
 	else if (true
-#if NUM_UNSPECV_VALUES > 0
+#if defined(NUM_UNSPECV_VALUES)
 		 // Only accept unspec_volatiles, if there's no unspecv enum.
 		 && GET_CODE (x) == UNSPEC
 #endif
-		 && unspec < NUM_UNSPEC_VALUES)
+		 && unspec < unspec_strings_len)
 	  str = unspec_strings[unspec];
 #endif
 #endif
