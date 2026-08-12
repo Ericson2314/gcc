@@ -8592,6 +8592,112 @@ target_from_default_file (const char *argv0, const char **tried)
   return result;
 }
 
+/* The target-config file this driver found for the target it selected, and a
+   printable list of every path it looked at on the way.  Both NULL until
+   find_target_config has run; the list is kept even on success so that a later
+   failure can say where it looked.  */
+static const char *found_target_config = NULL;
+static char *target_config_tried = NULL;
+
+/* The basename target-specs gives a target's capability file.  It writes
+   `<specs-file>-config' beside the spec file it was told to write, and #96
+   fixes the spec file at $(libdir)/gcc/$(version)/<target>/specs, so this is
+   that name and not a second naming authority.  If an operator points
+   --with-specs-file= somewhere else, the file is not found and the diagnostic
+   below names every path that was tried -- which is the whole reason the list
+   is built.  */
+#define TARGET_CONFIG_BASENAME "specs-config"
+
+/* Find and read the configuration for TARGET: the capability file
+   target-specs wrote when it probed that target's assembler and linker.
+
+   THE DRIVER TELLS cc1 WHAT THE TARGET IS.  It did not used to.  The target
+   reached cc1 only through `*cc1_target_config' inside a spec file, and
+   set_up_specs looks for the fixed name `specs' -- one name, however many
+   targets -- so an installed `<triple>-gcc' invoked with no -B found no spec
+   file, carried no -ftarget-config=, and cc1 died in `option_init_struct'
+   having been told nothing.  The same binary printed the triple correctly
+   under -dumpmachine, because the driver had resolved the target and then had
+   no way to say so.  `-B./' in the build directory is the only reason that
+   ever looked healthy.
+
+   There is nothing a spec file can do here that the driver cannot do sooner.
+   The driver already resolves the target -- from -ftarget-config=, from its
+   own name, from a `default-target' file, in that order, with a diagnostic on
+   disagreement -- so by the time this runs the answer is known and validated.
+   All that is missing is the file, and the file is found by the target, which
+   is exactly the key the layout is organised under.
+
+   The driver needs it for itself, too, not merely as something to forward.
+   read_target_caps had one caller in this program, guarded by the presence of
+   -ftarget-config= in argv, so a driver that resolved its target by NAME ran
+   its whole self with the built-in capability defaults -- the silent-default
+   shape, in the one program that already knew better.
+
+   Searched, most specific first, and every directory is the same question
+   asked of a different authority: where is this installation's lib/gcc?
+
+     1. $GCC_EXEC_PREFIX, if the environment names one;
+     2. where this binary actually is, mapped bindir -> $(libdir)/gcc/ the way
+	make_relative_prefix does it, so a relocated or unpacked-anywhere
+	installation reads its own files and not another installation's;
+     3. the configured-in STANDARD_EXEC_PREFIX.
+
+   and under each, `<version>/<target>/specs-config'.
+
+   NOTHING HERE FALLS BACK.  Absence returns NULL with *TRIED naming every path
+   looked at; it never yields another target's file, never a built-in default,
+   and never the shared `specs'.  Note in particular that read_target_caps
+   treats a missing file as "the built-in defaults stand" and returns quietly
+   -- which is correct for its own contract and would be catastrophic here --
+   so it is called only on a path that has already been opened.  */
+
+static const char *
+find_target_config (const char *argv0, const char *target, char **tried)
+{
+  const char *dirs[3];
+  unsigned n = 0;
+
+  const char *ep = env.get ("GCC_EXEC_PREFIX");
+  if (ep != NULL && *ep != '\0')
+    dirs[n++] = ep;
+
+  char *rel = make_relative_prefix (argv0, standard_bindir_prefix,
+				    standard_exec_prefix);
+  if (rel != NULL)
+    dirs[n++] = rel;
+
+  dirs[n++] = standard_exec_prefix;
+
+  const char *found = NULL;
+  char *list = xstrdup ("");
+
+  for (unsigned i = 0; i < n; i++)
+    {
+      /* Skip an authority that answered the same as an earlier one; three
+	 identical lines in a diagnostic look like a bug in the diagnostic.  */
+      bool dup = false;
+      for (unsigned j = 0; j < i; j++)
+	if (strcmp (dirs[i], dirs[j]) == 0)
+	  dup = true;
+      if (dup)
+	continue;
+
+      char *path = concat (dirs[i], spec_version, accel_dir_suffix,
+			   dir_separator_str, target, dir_separator_str,
+			   TARGET_CONFIG_BASENAME, NULL);
+      char *next = concat (list, "\n    ", path, NULL);
+      free (list);
+      list = next;
+
+      if (found == NULL && access (path, R_OK) == 0)
+	found = path;
+    }
+
+  *tried = list;
+  return found;
+}
+
 int
 driver::main (int argc, char **argv)
 {
@@ -8709,6 +8815,41 @@ driver::main (int argc, char **argv)
 	fprintf (stderr, " %s", e->target);
       fprintf (stderr, "\n");
       exit (FATAL_EXIT_CODE);
+    }
+
+  /* THE TARGET'S CONFIGURATION, FOUND BY TARGET.  See find_target_config for
+     why the driver does this itself rather than receiving it from a spec file.
+
+     Only when nothing has already supplied one: a -ftarget-config= on the
+     command line is the user pointing at a file, and it wins.
+
+     ABSENCE IS NOT REPORTED HERE.  A driver that has only to answer
+     -dumpmachine or --version reads no capability and must not be made to fail
+     for want of a file it will never open.  The report happens where the value
+     is actually needed -- carry_target_config_as_switch, just before cc1 would
+     have been run without one.  */
+  if (targ_caps_target_name == NULL)
+    {
+      found_target_config = find_target_config (argv[0], selected_target,
+						&target_config_tried);
+      if (found_target_config != NULL)
+	{
+	  read_target_caps (found_target_config);
+
+	  /* The file found must be the file for the target that was asked
+	     for.  Checked rather than assumed, because this is exactly the
+	     "one name, several authorities, no diagnostic" shape: a per-target
+	     directory that somehow held another target's configuration would
+	     otherwise select that other target's back end inside cc1, silently
+	     and with the right triple still printed by -dumpmachine.  */
+	  if (targ_caps_target_name == NULL)
+	    early_fatal_error ("%s names no target, so it is not a target "
+			       "configuration file", found_target_config);
+	  if (strcmp (targ_caps_target_name, selected_target) != 0)
+	    early_fatal_error ("looked for target `%s' and read `%s', which "
+			       "says it configures `%s'", selected_target,
+			       found_target_config, targ_caps_target_name);
+	}
     }
 
   /* THE COMMAND-LINE OPTION TABLES, and they are why this task existed.
@@ -9000,10 +9141,53 @@ driver::carry_target_config_as_switch () const
 	&& startswith (switches[i].part1, "ftarget-config="))
       return;
 
+  /* Otherwise the file the driver found for itself, keyed by the target it
+     selected.  THIS IS THE ORDINARY ROUTE FOR AN INSTALLED COMPILER, and it is
+     preferred over the spec file because it does not depend on a spec file
+     existing, on it being found under a name that carries no target, or on it
+     surviving a user's -specs=.  */
+  if (found_target_config != NULL)
+    {
+      save_switch (concat ("-ftarget-config=", found_target_config, NULL),
+		   0, NULL, /*validated=*/true, /*known=*/true);
+      return;
+    }
+
   /* Otherwise take what the spec file supplied.  target-specs writes the whole
-     switch, `-ftarget-config=<path>', so it is used verbatim.  */
+     switch, `-ftarget-config=<path>', so it is used verbatim.
+
+     Last, and now only reachable when a spec file was read from somewhere the
+     target-keyed search does not look -- a -B directory, or a user's -specs=.
+     It is kept because that is still how an in-tree `-B./' build is driven,
+     not because it is the design; see the note on plain `specs' in the commit
+     message.  */
   if (cc1_target_config == NULL || *cc1_target_config == '\0')
-    return;
+    {
+      /* NOTHING supplies the target: not the command line, not a file found by
+	 target, not a spec file.  cc1 would be run having been told nothing and
+	 would die in `option_init_struct' -- or, further in, in `init_reg_sets'
+	 -- naming a hook and nothing the user could act on.  That is the filed
+	 symptom, and it is reported HERE instead, naming the target and every
+	 path that was looked at.
+
+	 Only when there is something to compile.  A driver answering
+	 -dumpmachine, --version or -print-prog-name= runs cc1 not at all and
+	 needs no configuration; failing those would be inventing a
+	 requirement, not enforcing one.  */
+      if (n_infiles > 0)
+	early_fatal_error ("no configuration file for target `%s'.  Looked "
+			   "in:%s\n  A target's configuration is written by "
+			   "target-specs' configure, which is run after this "
+			   "compiler is built and installed; without it there "
+			   "is nothing to tell the compiler proper which "
+			   "target it is for.",
+			   spec_machine != NULL && *spec_machine != '\0'
+			   ? spec_machine : "(none)",
+			   target_config_tried != NULL
+			   ? target_config_tried
+			   : "\n    (nowhere -- the search was not run)");
+      return;
+    }
 
   const char *p = cc1_target_config;
   while (ISSPACE ((unsigned char) *p))
