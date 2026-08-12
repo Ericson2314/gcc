@@ -72,6 +72,7 @@ function read_save_union(   line, nf, f, n)
 	if (union_base == "")
 		save_union_fail("-v union_file needs -v union_base=<back end>")
 	n_u_R = 0
+	n_u_C = 0
 	n_u_D = 0
 	n_u_X = 0
 	n_bases = 0
@@ -88,6 +89,17 @@ function read_save_union(   line, nf, f, n)
 		if (f[1] == "R") {
 			u_R[n_u_R++] = f[3]
 			u_R_name[f[2]] = 1
+			continue
+		}
+		if (f[1] == "C") {
+			# Every option that names a `gcc_options' member, which
+			# is a strict SUPERSET of `R'.  `cl_optimization_compare'
+			# is the only consumer; it dereferences global_options
+			# members rather than cl_optimization ones, so it is not
+			# tied to the explicit_mask ordinal and takes this list
+			# instead.
+			u_C[n_u_C++] = f[3]
+			u_C_name[f[2]] = 1
 			continue
 		}
 		if (f[1] == "D") {
@@ -156,6 +168,16 @@ function read_save_union(   line, nf, f, n)
 		save_union_fail("does not name back end `" union_base "'; the" \
 				" union would then be taken over the OTHER" \
 				" back ends and this one's members missing")
+	# `C' is a superset of `R', so an empty `C' with a non-empty `R' can
+	# only mean a list written by an opth-gen.awk that does not emit them
+	# -- and the natural fallback would be the primary's own option set,
+	# which is the bug.  Fail by name instead.
+	if (n_u_C == 0)
+		save_union_fail("no `C' records at all;" \
+				" `cl_optimization_compare' would be built" \
+				" from back end `" union_base "' alone and" \
+				" would never look at any other base's" \
+				" `gcc_options' members")
 	if (n_u_R == 0 && n_u_D == 0 && n_u_X == 0)
 		save_union_fail("no `R', `D' or `X' records at all;" \
 				" options-save.cc would be built from this" \
@@ -173,6 +195,15 @@ function read_save_union(   line, nf, f, n)
 					" option `" opts[i] "' and the union" \
 					" list has no `R' record for it; the" \
 					" list is stale")
+	}
+	for (i = 0; i < n_opts; i++) {
+		if (var_name(flags[i]) == "")
+			continue
+		if (!(opts[i] in u_C_name))
+			save_union_fail("back end `" union_base "' gives" \
+					" option `" opts[i] "' a `gcc_options'" \
+					" member and the union list has no" \
+					" `C' record for it; the list is stale")
 	}
 	for (i = 0; i < n_target_save; i++)
 		if (!(target_save_decl[i] in u_D_seen))
@@ -203,9 +234,12 @@ else if (union_base != "")
 # deduplicated by first appearance, so the primary's records keep their order
 # and lead.
 n_sv = 0
+n_cmp = 0
 if (union_file != "") {
 	for (i = 0; i < n_u_R; i++)
 		sv_flags[n_sv++] = u_R[i]
+	for (i = 0; i < n_u_C; i++)
+		cmp_flags[n_cmp++] = u_C[i]
 	n_target_save = 0
 	for (i = 0; i < n_u_D; i++)
 		target_save_decl[n_target_save++] = u_D[i]
@@ -215,8 +249,10 @@ if (union_file != "") {
 		extra_target_vars[n_extra_target_vars++] = u_X[i]
 	}
 } else {
-	for (i = 0; i < n_opts; i++)
+	for (i = 0; i < n_opts; i++) {
 		sv_flags[n_sv++] = flags[i]
+		cmp_flags[n_cmp++] = flags[i]
+	}
 }
 
 # The same guard opth-gen.awk carries: a missing `E' record makes
@@ -1720,17 +1756,25 @@ checked_options["arc_size_opt_level"]++
 checked_options["arm_fp16_format"]++
 
 
-for (i = 0; i < n_opts; i++) {
-	name = var_name(flags[i]);
+# `cmp_flags' and not `flags[]': this walk dereferences `gcc_options' members,
+# and `gcc_options' has the UNION's members (opth-gen.awk built it from the
+# same list).  On the primary's list alone every other base's members are
+# present in the struct and simply never looked at -- the quiet half of the
+# same defect, and the last walk in this file that was still the primary's.
+# It takes `C' rather than `R' because it wants every option with a member,
+# not the savable subset; with no union list cmp_flags == flags and the output
+# is unchanged.
+for (i = 0; i < n_cmp; i++) {
+	name = var_name(cmp_flags[i]);
 	if (name == "")
 		continue;
 
 	# We do not want to compare warning-related options, since they
 	# might have been modified by a #pragma GCC diagnostic.
-	if (flag_set_p("Warning", flags[i]))
+	if (flag_set_p("Warning", cmp_flags[i]))
 		continue;
 
-	if (flag_set_p("NoOffload", flags[i]))
+	if (flag_set_p("NoOffload", cmp_flags[i]))
 		continue;
 
 	if (name in checked_options)
