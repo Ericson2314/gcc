@@ -59,6 +59,13 @@ along with GCC; see the file COPYING3.  If not see
    the utilities are not correct for a cross-compiler; we have to hope that
    cross-versions are in the proper directories.  */
 
+/* FIXME (multi-target): CROSS_DIRECTORY_STRUCTURE is never defined any more,
+   so this entire block is dead.  Two consequences, one handled and one not:
+   OBJECT_FORMAT_COFF now survives into a Linux-hosted AIX build (handled --
+   see the CROSS_AIX_SUPPORT guard below), and MD_EXEC_PREFIX /
+   REAL_{LD,NM,STRIP}_FILE_NAME are no longer suppressed, so collect2 can reach
+   for a target's native tool paths on a host that has no such tools.  The
+   latter needs a runtime answer, not a preprocessor one.  */
 #ifdef CROSS_DIRECTORY_STRUCTURE
 #ifndef CROSS_AIX_SUPPORT
 #undef OBJECT_FORMAT_COFF
@@ -80,7 +87,14 @@ along with GCC; see the file COPYING3.  If not see
 
 #ifdef OBJECT_FORMAT_COFF
 
-#ifndef CROSS_DIRECTORY_STRUCTURE
+/* These are HOST headers.  The condition used to be
+   `#ifndef CROSS_DIRECTORY_STRUCTURE', which was an indirect way of asking
+   "is collect2-aix.h supplying the XCOFF reader instead?" -- the two guards
+   were complementary by construction.  Ask that question directly: with
+   CROSS_DIRECTORY_STRUCTURE gone the old spelling was simply always true, so
+   every build that got OBJECT_FORMAT_COFF from tm.h tried to include the
+   host's <ldfcn.h>, which no Linux host has.  */
+#ifndef CROSS_AIX_SUPPORT
 #include <a.out.h>
 #include <ar.h>
 
@@ -1011,8 +1025,8 @@ main (int argc, char **argv)
     obstack_begin (&temporary_obstack, 0);
     temporary_firstobj = (char *) obstack_alloc (&temporary_obstack, 0);
 
-  if (!HAVE_LD_DEMANGLE)
-    current_demangling_style = auto_demangling;
+    if (!HAVE_LD_DEMANGLE)
+      current_demangling_style = auto_demangling;
 
     /* Now pick up any flags we want early from COLLECT_GCC_OPTIONS
        The LTO options are passed here as are other options that might

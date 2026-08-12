@@ -20,9 +20,18 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_COLLECT2_AIX_H
 #define GCC_COLLECT2_AIX_H
 /* collect2-aix.cc requires mmap support.  It should otherwise be
-   fairly portable.  */
-#if defined(CROSS_DIRECTORY_STRUCTURE) \
-    && defined(TARGET_AIX_VERSION) \
+   fairly portable.
+
+   This used to also require CROSS_DIRECTORY_STRUCTURE: a native AIX build
+   read XCOFF through the host's own <ldfcn.h>, and only a cross build needed
+   the portable reimplementation below.  CROSS_DIRECTORY_STRUCTURE no longer
+   exists -- a multi-target compiler has no single target to be "cross" to, so
+   configure cannot answer the question any more -- and with the conjunct left
+   in place this whole file became unreachable while collect2.cc went on
+   including <ldfcn.h> unconditionally.  The portable path is correct for a
+   native AIX host too (every cross build has used it for years), so use it
+   always.  */
+#if defined(TARGET_AIX_VERSION) \
     && HAVE_MMAP
 
 #define CROSS_AIX_SUPPORT 1

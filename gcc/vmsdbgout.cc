@@ -35,6 +35,14 @@ along with GCC; see the file COPYING3.  If not see
    (VMS_UNALIGNED_*_ASM_OP, ASM_OUTPUT_DEBUG_*) are all defined in this file
    with `#ifndef' defaults, and the file compiles clean for x86_64-linux.  */
 
+/* The gate removal above means this file's body is now compiled for EVERY
+   target, and it expands target macros -- ASM_GENERATE_INTERNAL_LABEL among
+   them -- that call back-end functions.  Those are declared in
+   <cpu>-protos.h, which reaches a TU only via tm_p.h; dwarf2out.cc, final.cc
+   and dwarf2asm.cc all include it for exactly this reason.  Without it,
+   rs6000/xcoff.h's ASM_GENERATE_INTERNAL_LABEL fails with eight
+   "rs6000_xcoff_strip_dollar was not declared" errors.  */
+#include "tm_p.h"
 #include "alias.h"
 #include "tree.h"
 #include "varasm.h"
