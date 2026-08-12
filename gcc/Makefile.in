@@ -2166,6 +2166,7 @@ OBJS = \
 	$(MULTI_TARGET_ASM_OPS_OBJS) \
 	target-addr-select.o \
 	target-cdata-select.o \
+	target-regs-select.o \
 	$(ANALYZER_OBJS) \
 	$(host_hook_obj)
 
@@ -3630,6 +3631,15 @@ target-addr-select.o: $(srcdir)/target-addr-select.cc $(srcdir)/target-addr.h
 target-cdata-select.o: $(srcdir)/target-cdata-select.cc $(srcdir)/target-cdata.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+
+# The register-vocabulary selector; see target-regs.h.  Like the (c-DATA) one
+# and unlike the two above it, there is no `-D' naming a primary table:
+# `targetm_regs' starts NULL rather than pointing at the primary, so that a
+# compiler which selected nothing cannot answer i386's register classes and
+# i386's register names for every target.  `init_reg_sets' says so by name.
+target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 #
 # Generate header and source files from the machine description,
 # and compile them.
@@ -4232,7 +4242,8 @@ generated_files = config.h tm.h $(TM_P_H) $(TM_D_H) $(TM_JIT_H) $(TM_H) \
        $(TM_RUST_H) rust/rust-target-hooks-def.h \
        case-cfn-macros.h \
        jit/jit-target-hooks-def.h case-cfn-macros.h \
-       cfn-operators.pd omp-device-properties.h
+       cfn-operators.pd omp-device-properties.h \
+       multi-target-reg-widths.h
 
 #
 # How to compile object files to run on the build machine.

@@ -215,27 +215,51 @@ cd "$BUILD/gcc" || die "cd $BUILD/gcc"
 #
 # Probe a macro whose value is known and DIFFERS between the two bases, and one
 # that is known to be identical, before probing anything unknown.  If the
-# harness cannot reproduce FIRST_PSEUDO_REGISTER = 92/95 it is not measuring
-# the two bases and every later number is worthless.
+# harness cannot reproduce the control it is not measuring the two bases and
+# every later number is worthless.
+#
+# RE-ANCHORED 2026-08-12, FROM `FIRST_PSEUDO_REGISTER' TO `STACK_POINTER_REGNUM'.
+#
+# The control WAS 92/95/92 and it FIRED, correctly, the first time it was run
+# after the register-vocabulary change: all three contexts answered 95.  That
+# is not the harness breaking.  `FIRST_PSEUDO_REGISTER' is now a compile-time
+# UNION -- deliberately the same number in every consumer translation unit,
+# because it is the layout of `target_hard_regs' -- so it has stopped being a
+# thing the header probe can discriminate bases with.  The per-base fact moved
+# to `targetm_regs->first_pseudo_register', which is a RUN-TIME datum and
+# therefore TAB's business, not this probe's.
+#
+# THIS IS THE `wrong-reason flip' THE BRIEF WARNS ABOUT, SEEN FROM THE OTHER
+# SIDE, so it is worth being exact about what is and is not being claimed:
+#   * `FIRST_PSEUDO_REGISTER' and `N_REG_CLASSES' agreeing across the three
+#     contexts is NOT evidence that anything was fixed.  It is evidence that
+#     they became target-neutral.  They must be RETIRED from this probe, and
+#     the runtime counts covered by an arm that reads the running `cc1'.
+#   * Re-anchoring the control is a different act from retiring an arm.  The
+#     control exists to prove the harness can tell the bases apart at all, and
+#     `STACK_POINTER_REGNUM' (i386 7, aarch64 31) is untouched by this change
+#     and still proves exactly that.  Changing the control to something that
+#     agreed would have been green-washing; changing it to something that still
+#     differs is keeping it alive.
 ########################################################################
 control () {
   local ctx inc v
   for ctx in $CTXS; do
     inc=$(ctx_inc $ctx)
     { echo "$PRE"
-      echo "char cq[FIRST_PSEUDO_REGISTER];"
+      echo "char cq[STACK_POINTER_REGNUM];"
     } > "$OUT/ctl.cc"
     g++ -c -o "$OUT/ctl.o" "$OUT/ctl.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/err-ctl-$ctx.txt" 2>&1 \
       || { cat "$OUT/err-ctl-$ctx.txt"; die "control probe did not compile in $ctx"; }
     v=$(nm -S --defined-only "$OUT/ctl.o" | awk '$4=="cq"{print strtonum("0x" $2)}')
     [ -n "$v" ] || die "control: nm produced nothing for $ctx (tool present but silent)"
-    echo "control $ctx FIRST_PSEUDO_REGISTER=$v"
+    echo "control $ctx STACK_POINTER_REGNUM=$v"
     eval "CTL_$ctx=$v"
   done
-  [ "$CTL_i386" = 92 ] || die "control: i386 FIRST_PSEUDO_REGISTER=$CTL_i386, expected 92"
-  [ "$CTL_aarch64" = 95 ] || die "control: aarch64 FIRST_PSEUDO_REGISTER=$CTL_aarch64, expected 95"
-  [ "$CTL_mt" = 92 ] || die "control: mt FIRST_PSEUDO_REGISTER=$CTL_mt, expected 92 (mt == primary)"
+  [ "$CTL_i386" = 7 ] || die "control: i386 STACK_POINTER_REGNUM=$CTL_i386, expected 7"
+  [ "$CTL_aarch64" = 31 ] || die "control: aarch64 STACK_POINTER_REGNUM=$CTL_aarch64, expected 31"
+  [ "$CTL_mt" = 7 ] || die "control: mt STACK_POINTER_REGNUM=$CTL_mt, expected 7 (mt == primary)"
   echo "control: OK -- the three contexts are distinguishable and mt == i386"
 }
 control
@@ -260,7 +284,7 @@ control
 #
 # So: one macro whose bytes are known and DIFFER (GLOBAL_ASM_OP, `.globl' vs
 # `.global' -- the pair that assembles identically), one macro whose expansion
-# is known and differs (REGNO_REG_CLASS), and one SYNTHETIC macro defined by
+# is known and differs (STACK_POINTER_REGNUM; the previous witness, REGNO_REG_CLASS, was converted to a run-time dispatch on 2026-08-12 and now expands identically in all three contexts -- which is the fix working, not the probe breaking), and one SYNTHETIC macro defined by
 # this script identically in all three contexts, which EXP must report as
 # AGREEING.  The synthetic one is the only evidence that a PASS is reachable.
 ########################################################################
@@ -289,7 +313,7 @@ str_exp_control () {
     #     through the SAME marker/normalise path as the real EXP phase.
     { echo "$PRE"; echo "$CTLDEF"
       echo 'MTPBEGIN 1 MTPMID MTPCTL_AGREE(zz) MTPEND'
-      echo 'MTPBEGIN 2 MTPMID REGNO_REG_CLASS(zz) MTPEND'
+      echo 'MTPBEGIN 2 MTPMID STACK_POINTER_REGNUM MTPEND'
     } > "$OUT/ctlexp.cc"
     g++ -E "$OUT/ctlexp.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/ctlexp-$ctx.i" 2> "$OUT/err-ctlexp-$ctx.txt" \
@@ -307,7 +331,7 @@ str_exp_control () {
     # An expansion that is still the macro's own name is a non-expansion, and a
     # non-expansion compared with a non-expansion looks like agreement.
     case $agree in *MTPCTL_AGREE*) die "EXP control: MTPCTL_AGREE did not expand in $ctx";; esac
-    case $rrc in *REGNO_REG_CLASS*) die "EXP control: REGNO_REG_CLASS did not expand in $ctx";; esac
+    case $rrc in *STACK_POINTER_REGNUM*) die "EXP control: STACK_POINTER_REGNUM did not expand in $ctx";; esac
     [ -n "$agree" ] || die "EXP control: empty expansion in $ctx"
     echo "control-exp $ctx agree=[$agree] rrc=[$rrc]"
     eval "CTLA_$ctx=\$agree"; eval "CTLR_$ctx=\$rrc"
@@ -326,10 +350,10 @@ reported as differing (mt=[$CTLA_mt] i386=[$CTLA_i386] aarch64=[$CTLA_aarch64]).
 Every EXP FAIL in this run would be unattributable."
   # ... and to report DISAGREEMENT.
   [ "$CTLR_mt" != "$CTLR_aarch64" ] \
-    || die "EXP control: REGNO_REG_CLASS is known to differ between the bases and \
+    || die "EXP control: STACK_POINTER_REGNUM is known to differ between the bases and \
 EXP reported it identical; the phase cannot discriminate"
   [ "$CTLR_mt" = "$CTLR_i386" ] \
-    || die "EXP control: mt and i386 disagree on REGNO_REG_CLASS, but mt IS the \
+    || die "EXP control: mt and i386 disagree on STACK_POINTER_REGNUM, but mt IS the \
 i386 header set; the contexts are not what they claim to be"
   echo "control: OK -- STR discriminates (9 vs 10 bytes); EXP reports agreement \
 AND disagreement, so an EXP FAIL is a measurement and not a dead phase"

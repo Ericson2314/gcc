@@ -22,6 +22,39 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "array-traits.h"
 
+/* THE ONE LAYOUT.  `struct target_hard_regs' below, `struct target_regs'
+   (regs.h), `struct target_ira' (ira.h) and `struct target_ira_int'
+   (ira-int.h) are allocated by TARGET-INDEPENDENT code -- XCNEW'd in
+   target-globals.cc:71-89 -- and their fields are read by EVERY back end's own
+   translation unit.  One authority for the size and several for the contents
+   is the `cl_optimization' shape this branch exists to remove, so the bounds
+   below are the compile-time MAXIMA over the configured back ends and are the
+   same number in every translation unit.
+
+   They are spelled MULTI_TARGET_UNION_* rather than reached through a
+   redefinition of the unqualified names, because a back end's own translation
+   unit CANNOT have those redefined: config/i386/i386.h declares
+   `regclass_map' with the unqualified name before defaults.h is reached and
+   config/i386/i386.cc defines the same array after, so the two would disagree
+   by three.
+
+   Which means a bound below left spelled with the UNQUALIFIED name is SILENT
+   -- it simply gives back-end objects a smaller struct than the middle end
+   allocates.  `init_reg_sets' therefore checks all four sizes at start-up
+   against the values target-regs.cc computed in a back end's own context, and
+   names the struct that disagrees.  Do not add a field here using the
+   unqualified name.
+
+   Generators keep their own widths: they are single-target programs by
+   construction, they are compiled once per base against that base's
+   tm-<base>.h, and multi-target-reg-widths.h is downstream of them.  */
+#ifdef GENERATOR_FILE
+#define MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER FIRST_PSEUDO_REGISTER
+#define MULTI_TARGET_UNION_N_REG_CLASSES N_REG_CLASSES
+#else
+#include "multi-target-reg-widths.h"
+#endif
+
 /* Define the type of a set of hard registers.  */
 
 /* HARD_REG_ELT_TYPE is a typedef of the unsigned integral type which
@@ -42,7 +75,7 @@ along with GCC; see the file COPYING3.  If not see
 
 typedef unsigned HOST_WIDEST_FAST_INT HARD_REG_ELT_TYPE;
 
-#if FIRST_PSEUDO_REGISTER <= HOST_BITS_PER_WIDEST_FAST_INT
+#if MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER <= HOST_BITS_PER_WIDEST_FAST_INT
 
 typedef HARD_REG_ELT_TYPE HARD_REG_SET;
 typedef const HARD_REG_SET const_hard_reg_set;
@@ -50,7 +83,7 @@ typedef const HARD_REG_SET const_hard_reg_set;
 #else
 
 #define HARD_REG_SET_LONGS \
- ((FIRST_PSEUDO_REGISTER + HOST_BITS_PER_WIDEST_FAST_INT - 1)	\
+ ((MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER + HOST_BITS_PER_WIDEST_FAST_INT - 1)	\
   / HOST_BITS_PER_WIDEST_FAST_INT)
 
 struct HARD_REG_SET
@@ -161,7 +194,7 @@ struct hard_reg_set_container
 
 #define UHOST_BITS_PER_WIDE_INT ((unsigned) HOST_BITS_PER_WIDEST_FAST_INT)
 
-#if FIRST_PSEUDO_REGISTER <= HOST_BITS_PER_WIDEST_FAST_INT
+#if MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER <= HOST_BITS_PER_WIDEST_FAST_INT
 
 #define SET_HARD_REG_BIT(SET, BIT)  \
  ((SET) |= HARD_CONST (1) << (BIT))
@@ -378,7 +411,7 @@ hard_reg_set_iter_set (hard_reg_set_iterator *iter, unsigned *regno)
 	  unsigned skip = ctz_hwi (iter->bits);
 	  iter->bits >>= skip;
 	  *regno += skip;
-          return (*regno < FIRST_PSEUDO_REGISTER);
+          return (*regno < MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER);
         }
 
       /* Find the next non-zero word.  */
@@ -426,7 +459,7 @@ build_error_on_rvalue (T &&)
    These must be exempt from ordinary flow analysis
    and are also considered fixed.  */
 
-extern char global_regs[FIRST_PSEUDO_REGISTER];
+extern char global_regs[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
 extern HARD_REG_SET global_reg_set;
 
@@ -455,7 +488,7 @@ struct target_hard_regs {
      that are fixed use (stack pointer, pc, frame pointer, etc.;.
      These are the registers that cannot be used to allocate
      a pseudo reg whose life does not cross calls.  */
-  char x_fixed_regs[FIRST_PSEUDO_REGISTER];
+  char x_fixed_regs[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* The same info as a HARD_REG_SET.  */
   HARD_REG_SET x_fixed_reg_set;
@@ -464,7 +497,7 @@ struct target_hard_regs {
      that are fixed use or are clobbered by function calls.
      These are the registers that cannot be used to allocate
      a pseudo reg whose life crosses calls.  */
-  char x_call_used_regs[FIRST_PSEUDO_REGISTER];
+  char x_call_used_regs[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* For targets that use reload rather than LRA, this is the set
      of registers that we are able to save and restore around calls
@@ -494,34 +527,34 @@ struct target_hard_regs {
   HARD_REG_SET x_eh_return_data_regs;
 
   /* Table of register numbers in the order in which to try to use them.  */
-  int x_reg_alloc_order[FIRST_PSEUDO_REGISTER];
+  int x_reg_alloc_order[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* The inverse of reg_alloc_order.  */
-  int x_inv_reg_alloc_order[FIRST_PSEUDO_REGISTER];
+  int x_inv_reg_alloc_order[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* For each reg class, a HARD_REG_SET saying which registers are in it.  */
-  HARD_REG_SET x_reg_class_contents[N_REG_CLASSES];
+  HARD_REG_SET x_reg_class_contents[MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* For each reg class, a boolean saying whether the class contains only
      fixed registers.  */
-  bool x_class_only_fixed_regs[N_REG_CLASSES];
+  bool x_class_only_fixed_regs[MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* For each reg class, number of regs it contains.  */
-  unsigned int x_reg_class_size[N_REG_CLASSES];
+  unsigned int x_reg_class_size[MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* For each reg class, table listing all the classes contained in it.  */
-  enum reg_class x_reg_class_subclasses[N_REG_CLASSES][N_REG_CLASSES];
+  enum reg_class x_reg_class_subclasses[MULTI_TARGET_UNION_N_REG_CLASSES][MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* For each pair of reg classes,
      a largest reg class contained in their union.  */
-  enum reg_class x_reg_class_subunion[N_REG_CLASSES][N_REG_CLASSES];
+  enum reg_class x_reg_class_subunion[MULTI_TARGET_UNION_N_REG_CLASSES][MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* For each pair of reg classes,
      the smallest reg class that contains their union.  */
-  enum reg_class x_reg_class_superunion[N_REG_CLASSES][N_REG_CLASSES];
+  enum reg_class x_reg_class_superunion[MULTI_TARGET_UNION_N_REG_CLASSES][MULTI_TARGET_UNION_N_REG_CLASSES];
 
   /* Vector indexed by hardware reg giving its name.  */
-  const char *x_reg_names[FIRST_PSEUDO_REGISTER];
+  const char *x_reg_names[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* Records which registers can form a particular subreg, with the subreg
      being identified by its outer mode, inner mode and offset.  */
