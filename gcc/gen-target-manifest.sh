@@ -507,6 +507,55 @@ ${AWK} '
       printf "\t$(COMPILE) $<\n"
       printf "\t$(POSTCOMPILE)\n\n"
       printf "MT_OPTIONS_INIT_OBJS += mt-%s/options-init.o\n\n", b
+
+      # THE OPTION TABLES THEMSELVES, per back end.
+      #
+      # NO APOSTROPHES ANYWHERE IN THIS BLOCK.  The whole awk program is one
+      # single-quoted shell word, so a lone apostrophe in a comment ends it,
+      # and what follows is read as shell.  The damage is not a syntax error
+      # at the point of the typo: it terminated the enclosing shell FUNCTION
+      # early, so the two completeness checks below moved to top level and
+      # stopped guarding anything -- configure then exited 0 having written a
+      # multi-target-common.mk with no options rules in it at all.
+      #
+      # cl_options[] and cl_enums[] were generated once, from the PRIMARY back
+      # end optionlist, and thirteen option names are declared by both back
+      # ends of a two-target build with different records -- so an aarch64
+      # driver validated -mabi= against the i386 calling_abi and answered
+      # "valid arguments to -mabi= are: ms sysv".  The vocabulary is unioned
+      # so the INDICES agree; the CONTENT cannot be, because merging the
+      # argument lists would make lp64 a valid x86 ABI.
+      #
+      # -I<base>-inc for the same reason options-init.cc has it: an
+      # EnumValue(... Value(AARCH64_ABI_LP64)) is a back-end macro and has to
+      # resolve in its own back end tm.h.  A name that resolves to some OTHER
+      # configuration definition compiles clean and is wrong.
+      printf "mt-%s/options-tables.cc: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/optc-gen.awk\n", b, b
+      printf "\t@$(mkinstalldirs) mt-%s\n", b
+      printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
+      printf "\t  -f $(srcdir)/optc-gen.awk -v tables_base=%s \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      printf "\t  < $< > tmp-options-tables-%s.cc\n", b
+      # Both tables, by name.  optc-gen.awk emits an #error when the record
+      # set is empty, but an awk that dies partway writes a TRUNCATED file
+      # with no #error in it -- and a file holding cl_enums but not
+      # cl_options links only because some other base supplied the symbol,
+      # which is the privileged-primary bug wearing the clothes of a link error.
+      printf "\t@for s in cl_options_%s cl_enums_%s cl_enums_%s_count; do \\\n", b, b, b
+      printf "\t  grep -q \"^const .*$$s\" tmp-options-tables-%s.cc || { \\\n", b
+      printf "\t    echo \"mt-%s/options-tables.cc: $$s was not generated;\" >&2; \\\n", b
+      printf "\t    echo \047  the optionlist for this back end did not reach optc-gen.awk.\047 >&2; \\\n"
+      printf "\t    exit 1; }; \\\n"
+      printf "\tdone\n"
+      printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-tables-%s.cc $@\n\n", b
+      printf "mt-%s/options-tables.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
+      printf "mt-%s/options-tables.o: mt-%s/options-tables.cc\n", b, b
+      printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
+      printf "\t$(COMPILE) $<\n"
+      printf "\t$(POSTCOMPILE)\n\n"
+      # libcommon-target.a, NOT libbackend.a: the driver is the caller that
+      # needed this and it links only the former.
+      printf "MT_OPTIONS_TABLES_OBJS += mt-%s/options-tables.o\n\n", b
     }
 
     # The union list itself, and the singular options.h flags that make
@@ -549,6 +598,22 @@ if test x"${gcc_mt_have}" != x"${gcc_mt_bases}"; then
   gcc_mt_fatal="multi-target-common.mk has ${gcc_mt_have} options blocks for\
  ${gcc_mt_bases} back ends; the awk program over ${gcc_target_manifest} did\
  not run to the end"
+  return 1
+fi
+
+# The same check for the option TABLES, and it is a separate one on purpose.
+# The two blocks are emitted by the same awk program but the tables block comes
+# second, so an awk that dies between them leaves a file that passes the check
+# above -- and a build with no MT_OPTIONS_TABLES_OBJS at all does not fail
+# either: libcommon-target.a is then short of every per-base table and
+# multi-target-options-select.cc fails to link on cl_options_<base>.  That is a
+# loud failure, but it names a symbol rather than the manifest, three steps
+# from the cause.
+gcc_mt_tables=`grep -c '^MT_OPTIONS_TABLES_OBJS += ' ${gcc_common_mk}`
+if test x"${gcc_mt_tables}" != x"${gcc_mt_bases}"; then
+  gcc_mt_fatal="multi-target-common.mk has ${gcc_mt_tables} option-table\
+ blocks for ${gcc_mt_bases} back ends; the awk program over\
+ ${gcc_target_manifest} did not run to the end"
   return 1
 fi
 

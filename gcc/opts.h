@@ -152,7 +152,33 @@ struct cl_option_state {
   char ch;
 };
 
+/* THE OPTION TABLE IS PER CONFIGURATION, NOT PER COMPILER.
+
+   `enum opt_code' ordinals -- and hence every index into these tables -- are
+   unioned across the configured back ends (opt-stub.awk), so entry N describes
+   the same option NAME whichever table is in force.  What each entry SAYS is
+   not shared and cannot be: thirteen option names are declared by both i386
+   and aarch64 with different records, six with a different `Enum()'.  With one
+   shared table built from the primary's optionlist, an aarch64 driver
+   validated `-mabi=' against i386's `calling_abi' and said
+
+       xgcc: error: unrecognized argument in option '-mabi=lp64'
+       xgcc: note: valid arguments to '-mabi=' are: ms sysv
+
+   Merging the two argument lists is not the fix -- it would make `lp64' a
+   valid x86 ABI.  So in a multi-target build these are POINTERS at per-base
+   tables, and multi-target-options-select.cc chooses one.  They start NULL,
+   never at the primary's table: the natural fallback is the primary's answer,
+   which is the bug.  opts-common.cc fails by name on the NULL.
+
+   MULTI_TARGET_OPTION_TABLES is defined for every host object of a
+   multi-target build and for none of a single-target one (gcc/Makefile.in), so
+   the two spellings cannot meet in one link.  */
+#ifdef MULTI_TARGET_OPTION_TABLES
+extern const struct cl_option *cl_options;
+#else
 extern const struct cl_option cl_options[];
+#endif
 extern const unsigned int cl_options_count;
 
 extern const char *
@@ -229,8 +255,38 @@ struct cl_enum
   int (*get) (const void *var);
 };
 
+/* Per configuration for the same reason cl_options is; see the note there.
+   `cl_enums_count' is not const in a multi-target build because it is written
+   by the selector alongside the table it counts -- the two must move together
+   or a valid index runs off the end of the other back end's shorter table
+   (i386 has 86 enums, aarch64 81).  */
+#ifdef MULTI_TARGET_OPTION_TABLES
+extern const struct cl_enum *cl_enums;
+extern unsigned int cl_enums_count;
+
+/* Install the option tables of the back end serving TARGET, a configured
+   target triple.  Returns false and changes nothing if TARGET is not one this
+   compiler was built for; in particular it does NOT fall back on any table.
+   Must run before any option is decoded -- both driver::main and toplev::main
+   scan argv for -ftarget-config= before decoding for exactly this reason.  */
+extern bool multi_target_options_select (const char *);
+#else
 extern const struct cl_enum cl_enums[];
 extern const unsigned int cl_enums_count;
+
+/* A single-target build has one option table, compiled in, and there is
+   nothing to select.  Defined rather than #ifdef-ed at the two call sites so
+   that they read identically in both builds -- an ordering rule expressed as
+   a call is a rule the next reader can see, and this one (select before the
+   first option is decoded) is easy to lose.
+
+   Returning true for ANY name is right here and is not a floor: it says "the
+   table this compiler has serves that target", which for a compiler with one
+   target is either true or about to be reported by targetm_common_select on
+   the very next line.  It cannot mask a wrong table, because there is no
+   other table for it to be masking.  */
+inline bool multi_target_options_select (const char *) { return true; }
+#endif
 
 /* Possible ways in which a command-line option may be erroneous.
    These do not include not being known at all; an option index of

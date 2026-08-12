@@ -1069,6 +1069,54 @@ function emit_backend_registry(	i, n, parts, m, tp, seenb) {
   printf "multi-target-select.o: multi-target-backends.h\n\n";
 }
 
+# The registry multi-target-options-select.cc includes: every back end's
+# command-line option TABLES, and the same many-to-one triple map.
+#
+# A SEPARATE HEADER FROM multi-target-backends.h, and that is not tidiness.
+# multi-target-backends.h names `insn_<base>::recog' and `targetm_<base>' --
+# symbols that live in libbackend.a, which the DRIVER does not link.  The
+# option tables are exactly the thing the driver needs (it is where `-mabi='
+# is validated), so they are declared where a driver object can include them
+# and defined in objects that go into libcommon-target.a.  Merging the two
+# headers would make xgcc fail to link on `targetm_aarch64'.
+function emit_options_registry(	i, n, parts, m, tp, seenb, nu, uniq) {
+  n = split(mt_bases, parts, " ");
+  m = split(mt_targets, tp, " ");
+
+  # Dedup ONCE, into a list, and use that list for both blocks below.  Two
+  # independently-deduplicated loops over the same input is how a declaration
+  # and its table entry come to disagree about which back ends exist.
+  nu = 0;
+  for (i = 1; i <= n; i++)
+    if (!(parts[i] in seenb)) {
+      seenb[parts[i]] = 1;
+      uniq[++nu] = parts[i];
+    }
+
+  printf "multi-target-options.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= nu; i++) {
+    printf "\t  echo 'extern const struct cl_option cl_options_%s[];'; \\\n",
+	   uniq[i];
+    printf "\t  echo 'extern const struct cl_enum cl_enums_%s[];'; \\\n",
+	   uniq[i];
+    printf "\t  echo 'extern const unsigned int cl_enums_%s_count;'; \\\n",
+	   uniq[i];
+  }
+  printf "\t  echo '#define MT_OPTION_TABLES \\'; \\\n";
+  for (i = 1; i <= nu; i++)
+    printf "\t  echo '  MT_OPTION_TABLE (%s) \\'; \\\n", uniq[i];
+  printf "\t  echo '  /* end */'; \\\n";
+  printf "\t  echo '#define MT_OPTION_TARGET_BASES \\'; \\\n";
+  for (i = 1; i <= m; i++)
+    printf "\t  echo '  MT_OPTION_TARGET_BASE (\"%s\", %s) \\'; \\\n",
+	   tp[i], mt_base_of[tp[i]];
+  printf "\t  echo '  /* end */'; \\\n";
+  printf "\t} > tmp-multi-target-options.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-options.h $@\n\n";
+  printf "multi-target-options-select.o: multi-target-options.h\n\n";
+}
+
 BEGIN {
   # Each target's MULTILIB_* set, written by gen-multilib-data.sh.  Only the
   # handful of triples whose tm_file names a generated sysroot-suffix header
@@ -1144,6 +1192,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_addr_registry();
 		    emit_cdata_registry();
 		    emit_backend_registry();
+		    emit_options_registry();
 		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
 		    emit_inc_dirs() }

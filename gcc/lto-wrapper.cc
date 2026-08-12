@@ -56,6 +56,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "opt-suggestions.h"
 #include "opts-jobserver.h"
 #include "lto-ltrans-cache.h"
+#include "target-caps.h"
 
 /* Environment variable, used for passing the names of offload targets from GCC
    driver to lto-wrapper.  */
@@ -2346,6 +2347,30 @@ main (int argc, char *argv[])
   /* We may be called with all the arguments stored in some file and
      passed with @file.  Expand them into argv before processing.  */
   expandargv (&argc, &argv);
+
+  /* THE OPTION TABLES, before run_gcc decodes anything.  lto-wrapper reads
+     `cl_options[...].flags & CL_TARGET' out of the LTO option sections, and
+     that table used to be the PRIMARY back end's in every build -- so an
+     aarch64 LTO link classified its own target options against x86's answer,
+     silently.  Same scan and same order as collect2 and driver::main.
+
+     WHAT IS AND IS NOT ESTABLISHED HERE.  When -ftarget-config= is on the
+     command line this selects the right tables.  When it is NOT, the tables
+     stay NULL and opts-common.cc reports it by name at the first option
+     decoded.  That is a louder failure than today's silent wrong answer and it
+     is NOT a claim that LTO now works: whether the driver passes
+     -ftarget-config= down to lto-wrapper on every path has not been measured,
+     and if it does not, this turns a silent miscompile into a visible one.
+     Deliberate -- a diagnostic naming the cause is what this branch trades
+     for, and an untested LTO path answering as x86 is the bug.  */
+  for (int i = 1; i < argc; i++)
+    if (startswith (argv[i], "-ftarget-config="))
+      read_target_caps (argv[i] + strlen ("-ftarget-config="));
+  if (targ_caps_target_name != NULL
+      && !multi_target_options_select (targ_caps_target_name))
+    fatal_error (input_location,
+		 "target %qs is not one of the targets this compiler was "
+		 "configured for", targ_caps_target_name);
 
   run_gcc (argc, argv);
 

@@ -2363,6 +2363,25 @@ toplev::main (int argc, char **argv)
   /* Initialization of GCC's environment, and diagnostics.  */
   general_init (argv[0], m_init_signals, std::move (original_argv));
 
+  /* The command-line option TABLES for that target, and this one has to come
+     first because it is what makes an option decodable at all.  `cl_options[]'
+     was generated from the primary back end's optionlist and thirteen option
+     names differ between the two back ends of a two-target build, so `-mabi='
+     was validated against i386's argument list whatever target was selected.
+     Until this runs the tables in force are NULL and opts-common.cc says so by
+     name; there is no fallback to the primary's, which is the bug.
+
+     Nothing between general_init and here decodes an option -- general_init
+     sets up diagnostics precisely so that option parsing can report -- so this
+     is early enough, and it is placed after general_init for the same reason
+     targetm_common_select is: reporting an unconfigured target needs a
+     diagnostic context.  */
+  if (targ_caps_target_name != NULL
+      && !multi_target_options_select (targ_caps_target_name))
+    fatal_error (UNKNOWN_LOCATION,
+		 "target %qs is not one of the targets this compiler was "
+		 "configured for", targ_caps_target_name);
+
   /* Install the common hook table for the target we were told we are for.
      Until this runs the table in force is the EMPTY back end, whose hooks
      report themselves by name -- there is no privileged default table, so a
