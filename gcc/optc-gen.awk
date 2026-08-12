@@ -27,8 +27,29 @@
 # Usage: awk -f opt-functions.awk -f opt-read.awk -f optc-gen.awk \
 #            [-v header_name=header.h] < inputfile > options.cc
 
+# Record one element of the `global_options_init' brace initializer, keyed the
+# way opth-gen.awk keys `struct gcc_options' members so that the two can be
+# matched up: the `SetByCombined' booleans live in their own namespace because
+# a `bool frontend_set_flag_associative_math' and the `flag_associative_math'
+# it shadows are two members with one name.
+#
+# Recording rather than printing is what lets the SAME four loops feed either
+# the historical own-order output (single target -- byte-identical) or the
+# union order (multi target).  Deriving both from one place is deliberate: an
+# initializer emitted by a second copy of this logic is exactly how the two
+# halves come to disagree in the first place.
+function gi_add(kind, name, text,   key)
+{
+	key = kind SUBSEP name
+	if (key in gi_text)
+		return
+	gi_text[key] = text
+	gi_order[n_gi++] = key
+}
+
 # Dump that array of options into a C file.
 END {
+n_gi = 0
 
 
 # Combine the flags of identical switches.  Switches
@@ -462,7 +483,7 @@ for (i = 0; i < n_extra_vars; i++) {
 	sub("^.*[ *]", "", name)
 	sub("\\[.*\\]$", "", name)
 	var_seen[name] = 1
-	print "  " init ", /* " name " */"
+	gi_add("X", name, "  " init ", /* " name " */")
 }
 for (i = 0; i < n_opts; i++) {
 	name = var_name(flags[i]);
@@ -493,20 +514,118 @@ for (i = 0; i < n_opts; i++) {
 	else
 		init = "0"
 
-	print "  " init ", /* " name " */"
+	gi_add("X", name, "  " init ", /* " name " */")
 
 	var_seen[name] = 1;
 }
 for (i = 0; i < n_opts; i++) {
 	name = static_var(opts[i], flags[i]);
-	if (name != "") {
-		print "  0, /* " name " (private state) */"
-		print "#undef x_" name
-	}
+	if (name != "")
+		gi_add("X", name, "  0, /* " name " (private state) */\n" \
+				  "#undef x_" name)
 }
 for (i = 0; i < n_opts; i++) {
 	if (flag_set_p("SetByCombined", flags[i]))
-		print "  false, /* frontend_set_" var_name(flags[i]) " */"
+		gi_add("F", var_name(flags[i]),
+		       "  false, /* frontend_set_" var_name(flags[i]) " */")
+}
+
+# THE INITIALIZER IS POSITIONAL, SO ITS ELEMENT SEQUENCE *IS* A CLAIM ABOUT
+# `struct gcc_options'.  Nothing in the build compares the two files, so when
+# the claim is wrong the compiler does not say so: a value lands on the member
+# after the one it was written for, and it only becomes visible if the types
+# happen to be incompatible.  Measured, x86_64 + x86_64-wrs-vxworks7, before
+# this change: 1674 elements for a 1669-member struct, and the disagreement
+# ran in BOTH directions at once -- five members the initializer invented (the
+# `Target Undocumented' placeholders, see opt-stub.awk) and two it was missing
+# (`vxworks_flags', the struct 13th member, and `VAR_mvthreads').  From
+# element 13 onward every value was on the wrong member.  What the compiler
+# said about that was `options.cc:1713:1: error: too many initializers for
+# gcc_options' -- i.e. it noticed the count and nothing at all about the
+# 1656 misplaced values, which is what it would have been left with had the
+# two errors cancelled.
+#
+# Single target: `union_file' is empty, the four loops above are the four
+# loops that were always here, and this prints them in the order they ran --
+# byte-identical output.
+#
+# Multi target: `struct gcc_options' takes its layout from the union list, and
+# a positional initializer built from anything else is guessing.  The two
+# option sets are NOT the same and neither contains the other by construction:
+#
+#   * this file is generated from the SHARED optionlist, whose target records
+#     are `extra_opt_files' -- the .opt files of the PRIMARY TRIPLE;
+#   * the layout comes from gcc-options-<base>.part, generated from
+#     `optionlist-<base>', whose target records are the .opt files of EVERY
+#     TRIPLE mapping to that back end.
+#
+# `x86_64-wrs-vxworks7' and `x86_64-pc-linux-gnu' are two triples of the one
+# i386 back end, so vxworks.opt is in the second set and not the first, and
+# `vxworks_flags' and `VAR_mvthreads' are members of the struct that this file
+# had no record for.  The stub padding cannot supply them either -- a stub
+# carries no Var() and no Init(), by design -- so the sequence has to be taken
+# from the union itself.
+#
+# Members this back end has no record for are `{}': value-initialisation,
+# which is what the tail was already getting, spelled so that it is correct
+# for an enum or a pointer as well as for an int.  (`0' is not: `enum E e = 0'
+# is ill-formed C++, which is how the shifted initializer above announced
+# itself.)  Init() values are NOT unioned here and that is settled -- see the
+# long note above -- they are applied per base by the selector.
+if (union_file == "") {
+	for (i = 0; i < n_gi; i++)
+		print gi_text[gi_order[i]]
+} else {
+	n_um = 0
+	while ((getline uline < union_file) > 0) {
+		if (uline ~ /^base /)
+			continue
+		nuf = split(uline, uf, "\t")
+		if (nuf == 0 || uf[1] == "")
+			continue
+		# Only the four member kinds.  Everything else in the list
+		# (I/R/D/X/E/H/C) describes something other than a
+		# `struct gcc_options' member and must not take a slot.
+		if (uf[1] != "V" && uf[1] != "O" && uf[1] != "S" && uf[1] != "F")
+			continue
+		ukey = (uf[1] == "F" ? "F" : "X") SUBSEP uf[2]
+		if (ukey in um_seen)
+			continue
+		um_seen[ukey] = 1
+		um_kind[n_um] = uf[1]
+		um_name[n_um] = uf[2]
+		um_key[n_um] = ukey
+		n_um++
+	}
+	close(union_file)
+	# A union list that yielded no members would silently turn this
+	# initializer into `{}' for everything -- every Init() in the compiler
+	# reading zero, with no diagnostic anywhere.  Fail by name instead.
+	if (n_um == 0)
+		print "#error optc-gen.awk: " union_file " yielded no `struct gcc_options' member records; `global_options_init' would initialise nothing"
+	for (i = 0; i < n_um; i++) {
+		if (um_key[i] in gi_text) {
+			print gi_text[um_key[i]]
+			gi_used[um_key[i]] = 1
+			continue
+		}
+		if (um_kind[i] == "F")
+			print "  {}, /* frontend_set_" um_name[i] " (another back end) */"
+		else if (um_kind[i] == "S")
+			print "  {}, /* " um_name[i] " (private state, another back end) */\n" \
+			      "#undef x_" um_name[i]
+		else
+			print "  {}, /* " um_name[i] " (another back end) */"
+	}
+	# The other direction, and the one a prefix check cannot see: an
+	# element this file has that the struct does not.  It cannot be
+	# absorbed -- there is no slot for it -- so it is a hard error rather
+	# than a dropped line, which would shift everything after it.
+	for (i = 0; i < n_gi; i++)
+		if (!(gi_order[i] in gi_used)) {
+			gname = substr(gi_order[i], index(gi_order[i], SUBSEP) + 1)
+			print "#error optc-gen.awk: `global_options_init' has an element for `" gname "' and " union_file " has no such member; the shared optionlist and the union list disagree"
+		}
 }
 print "};"
 print ""

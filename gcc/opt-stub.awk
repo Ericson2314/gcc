@@ -42,16 +42,87 @@
 # the data per configuration.  Every consumer is padded up to the union of all
 # names, so one option name has one code everywhere.
 #
-# The padding carries NO data.  A stub gets `Target Undocumented' and nothing
-# else: no Var(), no Mask(), no Init(), no Alias().  That is deliberate --
-# Mask() bits are the half of the option container that must NOT be unioned
-# (the union of every back end's masks overflows the 32-bit target_flags and
-# opth-gen.awk says so with `#error too many target masks'), and Alias() or
-# Ignore() would comment the enumerator out in one header and not the other,
-# reintroducing an asymmetry at the level this is meant to remove it.
+# The padding carries NO data.  A stub gets `Undocumented' and nothing else: no
+# Var(), no Mask(), no Init(), no Alias().  That is deliberate -- Mask() bits
+# are the half of the option container that must NOT be unioned (the union of
+# every back end's masks overflows the 32-bit target_flags and opth-gen.awk
+# says so with `#error too many target masks'), and Alias() or Ignore() would
+# comment the enumerator out in one header and not the other, reintroducing an
+# asymmetry at the level this is meant to remove it.
 #
 # A stub is thus a name and a code with no behaviour, which is exactly what a
 # back end that is not the selected one should offer.
+#
+# AND A STUB DECLARES NO `struct gcc_options' MEMBER.  That is what the absence
+# of `Target' above is for, and it is the whole of this file's second bug fix;
+# the flag word used to read `Target Undocumented'.
+#
+# opt-functions.awk's needs_state_p() is `Target && !Alias && !Ignore', and
+# static_var() gives every option that needs state without a Var() or a Mask()
+# a private member named VAR_<sanitized name>.  A stub therefore used to
+# fabricate a member -- a member DERIVED FROM THE STUB'S OWN FLAG WORD rather
+# than from the real option's.  Both halves of the options machinery then read
+# the same name off two different authorities, which is this branch's standing
+# bug wearing an options-generator costume, and it surfaced from both sides:
+#
+#   * TYPE.  var_type() answers `const char *' for a Joined option with no
+#     Var() and `int ' for a bare one.  rs6000 spells `mdebug=' as `Target
+#     RejectNegative Joined', so its own part of gcc-options-union.list
+#     declares VAR_mdebug_ as `const char *' while every other back end's stub
+#     declared the same member as `int ' -- caught, by name, as
+#       opth-gen.awk: gcc-options-union.list: member VAR_mdebug_ declared
+#       twice, differently
+#     Measured, both by configuring the pair and by re-running the pipeline
+#     with this file at its previous revision: VAR_mdebug_ (x86_64 +
+#     powerpc64le) and VAR_msilicon_errata_warn_ (x86_64 + msp430).  Any
+#     Joined-without-Var option shared by two configured back ends reaches it,
+#     so it spreads as more pairs configure.
+#
+#     NOT every "declared twice, differently" is this bug, and the difference
+#     matters because the other kind is not fixable here.  x86_64 +
+#     loongarch64 fails on `recip_mask', which is a `Variable' record in BOTH
+#     i386.opt (`int recip_mask = RECIP_MASK_DEFAULT') and loongarch.opt
+#     (`unsigned int recip_mask = 0') -- two real declarations by two real
+#     back ends of one name with two types, with no placeholder involved at
+#     all (this file reserves `Variable' and never emits one).  That is the
+#     same family -- one name, several authorities -- but the authorities are
+#     the .opt files, so the fix is to qualify the name there, and that is a
+#     decision about which back end gets renamed rather than a generator bug.
+#     The guard reporting it is working.
+#
+#   * EXISTENCE.  vxworks.opt spells `Bdynamic' as `Driver' -- no Target, so
+#     no member at all -- and `mrtp' as `Target ... Mask(VXWORKS_RTP)
+#     Var(vxworks_flags)', whose state is the Var, again no VAR_ member.  A
+#     stub gave both of them one.  The shared options.cc is a POSITIONAL brace
+#     initializer built from the shared optionlist, which is stubbed, while
+#     options.h takes its layout from the union list; the stub-only members
+#     VAR_Bdynamic and VAR_mrtp were in the initializer and not in the struct,
+#     the initializer shifted, and an enum landed on a `const char *'.  That
+#     one does not fail by name -- the two lists are compared by nobody --
+#     which is why it had already happened in another build directory and gone
+#     unremarked.
+#
+# Reproducing the real option's flag word instead is not the fix: the flags
+# that determine a member's type are exactly the flags that carry data.
+# Enum(x) resolves through enum_type[], which a stub's back end does not have
+# -- that is how a stub once emitted a typeless `x_aarch64_early_ra;', a legal
+# `int' -- and Mask()/Var() are the data this file exists not to copy.
+#
+# The member is not needed anyway, and that is the point.  `struct gcc_options'
+# gets its layout from gcc-options-union.list, which already carries the real
+# member from the one back end that really declares it; options-<base>.h emits
+# every union member regardless of base.  A stub-declared member was therefore
+# never anything but a duplicate of a member the union already had, differing
+# from it in type or existing where the union had none.  Dropping `Target'
+# removes the duplicate and changes no ordinal: liveness of the enumerator is
+# decided by Ignore/Alias alone (see suppressed() below), not by Target.
+#
+# What a stub does lose with `Target' gone is its CL_TARGET bit, so find_opt()
+# no longer matches it and `-mrtp' on an i386-selected compiler is diagnosed as
+# unrecognised rather than silently accepted and dropped.  That is the better
+# of the two behaviours and it is the one a back end that is not selected
+# should offer.  An option with no Var, no Mask and no state is not a new shape
+# for the consumers: every `Driver'-only option upstream already has it.
 
 BEGIN {
 	FS = SUBSEP
@@ -185,7 +256,11 @@ END {
 			# up live in exactly the header whose back end declares
 			# the option.
 			e = opt_sanitized_name(name)
-			flags = "Target Undocumented"
+			# No `Target': see the long note at the top.  With it,
+			# needs_state_p() is true and static_var() fabricates a
+			# VAR_<name> member whose type comes from the STUB's
+			# flags rather than the real option's.
+			flags = "Undocumented"
 			if (suppressed(vflags[name]) || (e in claimed) || want[e] > 1)
 				flags = flags " Ignore"
 			print name SUBSEP flags
