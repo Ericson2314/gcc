@@ -175,6 +175,102 @@ control () {
 control
 
 ########################################################################
+# ARM 0b -- POSITIVE CONTROLS FOR THE STR AND EXP PHASES.
+#
+# Added 2026-08-11 after an audit.  Arm 0 controlled the INT phase only, and
+# INT is the phase least likely to degrade silently.  The two weaker phases had
+# NO control at all, and the gap was asymmetric in the dangerous direction:
+#
+#   * STR: 4 of 138 arms.  If the byte probe silently produced nothing, those
+#     macros fall through to EXP or to KIND and still score FAIL, i.e. the
+#     scoreboard is unchanged and the phase's death is invisible.
+#   * EXP: 168 of the 276 arms -- the majority of the instrument -- and in the
+#     recorded run it has ZERO passes.  A phase that never once reports
+#     agreement has never demonstrated that it CAN.  If normalisation, marker
+#     handling or the -dM parse degraded so that every expansion came out empty
+#     or garbled, every EXP arm would still be red and the summary would look
+#     exactly as it looks when the phase is healthy.  Red for the right reason
+#     and red for no reason are indistinguishable without this control.
+#
+# So: one macro whose bytes are known and DIFFER (GLOBAL_ASM_OP, `.globl' vs
+# `.global' -- the pair that assembles identically), one macro whose expansion
+# is known and differs (REGNO_REG_CLASS), and one SYNTHETIC macro defined by
+# this script identically in all three contexts, which EXP must report as
+# AGREEING.  The synthetic one is the only evidence that a PASS is reachable.
+########################################################################
+CTLDEF='#define MTPCTL_AGREE(x) mtpctl_callee ((x), 42)'
+
+str_exp_control () {
+  local ctx inc agree rrc gao
+  for ctx in $CTXS; do
+    inc=$(ctx_inc $ctx)
+
+    # --- STR control: GLOBAL_ASM_OP, byte exact, via the same sizeof/index
+    #     shape the STR phase uses.  If this cannot be valued, STR is dead.
+    { echo "$PRE"
+      echo 'char ctl_len[sizeof (GLOBAL_ASM_OP)];'
+      echo 'char ctl_b0[(GLOBAL_ASM_OP)[1] + 129];'
+    } > "$OUT/ctlstr.cc"
+    g++ -c -o "$OUT/ctlstr.o" "$OUT/ctlstr.cc" $inc $CPPFLAGS -std=c++14 -w \
+        > "$OUT/err-ctlstr-$ctx.txt" 2>&1 \
+      || { cat "$OUT/err-ctlstr-$ctx.txt"; die "STR control: GLOBAL_ASM_OP did not compile in $ctx -- the STR phase cannot work"; }
+    gao=$(nm -S --defined-only "$OUT/ctlstr.o" | awk '$4=="ctl_len"{print strtonum("0x" $2)}')
+    [ -n "$gao" ] || die "STR control: nm produced nothing for $ctx"
+    echo "control-str $ctx sizeof(GLOBAL_ASM_OP)=$gao"
+    eval "CTLS_$ctx=$gao"
+
+    # --- EXP control: the synthetic agreeing macro and a known-differing one,
+    #     through the SAME marker/normalise path as the real EXP phase.
+    { echo "$PRE"; echo "$CTLDEF"
+      echo 'MTPBEGIN 1 MTPMID MTPCTL_AGREE(zz) MTPEND'
+      echo 'MTPBEGIN 2 MTPMID REGNO_REG_CLASS(zz) MTPEND'
+    } > "$OUT/ctlexp.cc"
+    g++ -E "$OUT/ctlexp.cc" $inc $CPPFLAGS -std=c++14 -w \
+        > "$OUT/ctlexp-$ctx.i" 2> "$OUT/err-ctlexp-$ctx.txt" \
+      || { cat "$OUT/err-ctlexp-$ctx.txt"; die "EXP control: preprocessing failed in $ctx"; }
+    tr '\n' ' ' < "$OUT/ctlexp-$ctx.i" | sed 's/MTPBEGIN/\n/g' | grep MTPEND \
+      | sed 's/MTPEND.*$//' \
+      | awk -F'MTPMID' 'NF==2 { k=$1; b=$2;
+            gsub(/[ \t]+/," ",k); gsub(/^ +| +$/,"",k);
+            gsub(/[ \t]+/," ",b); gsub(/^ +| +$/,"",b); print k "|" b }' \
+      > "$OUT/ctlexp-$ctx.txt"
+    [ "$(wc -l < "$OUT/ctlexp-$ctx.txt")" = 2 ] \
+      || die "EXP control: captured $(wc -l < "$OUT/ctlexp-$ctx.txt") of 2 expansions in $ctx"
+    agree=$(awk -F'|' '$1==1{print $2}' "$OUT/ctlexp-$ctx.txt")
+    rrc=$(awk -F'|' '$1==2{print $2}' "$OUT/ctlexp-$ctx.txt")
+    # An expansion that is still the macro's own name is a non-expansion, and a
+    # non-expansion compared with a non-expansion looks like agreement.
+    case $agree in *MTPCTL_AGREE*) die "EXP control: MTPCTL_AGREE did not expand in $ctx";; esac
+    case $rrc in *REGNO_REG_CLASS*) die "EXP control: REGNO_REG_CLASS did not expand in $ctx";; esac
+    [ -n "$agree" ] || die "EXP control: empty expansion in $ctx"
+    echo "control-exp $ctx agree=[$agree] rrc=[$rrc]"
+    eval "CTLA_$ctx=\$agree"; eval "CTLR_$ctx=\$rrc"
+  done
+
+  # STR must be able to SEE a difference: .globl (8 chars + NUL) vs .global (9).
+  [ "$CTLS_i386" = 9 ] || die "STR control: i386 sizeof(GLOBAL_ASM_OP)=$CTLS_i386, expected 9 (\\t.globl\\t)"
+  [ "$CTLS_aarch64" = 10 ] || die "STR control: aarch64 sizeof(GLOBAL_ASM_OP)=$CTLS_aarch64, expected 10 (\\t.global\\t)"
+  [ "$CTLS_i386" != "$CTLS_aarch64" ] || die "STR control: the two bases measured the same; STR cannot discriminate"
+
+  # EXP must be able to report AGREEMENT (the direction never exercised by the
+  # real macro set, which is 100% red under EXP) ...
+  [ "$CTLA_mt" = "$CTLA_i386" ] && [ "$CTLA_mt" = "$CTLA_aarch64" ] \
+    || die "EXP control: a macro defined IDENTICALLY in all three contexts was \
+reported as differing (mt=[$CTLA_mt] i386=[$CTLA_i386] aarch64=[$CTLA_aarch64]). \
+Every EXP FAIL in this run would be unattributable."
+  # ... and to report DISAGREEMENT.
+  [ "$CTLR_mt" != "$CTLR_aarch64" ] \
+    || die "EXP control: REGNO_REG_CLASS is known to differ between the bases and \
+EXP reported it identical; the phase cannot discriminate"
+  [ "$CTLR_mt" = "$CTLR_i386" ] \
+    || die "EXP control: mt and i386 disagree on REGNO_REG_CLASS, but mt IS the \
+i386 header set; the contexts are not what they claim to be"
+  echo "control: OK -- STR discriminates (9 vs 10 bytes); EXP reports agreement \
+AND disagreement, so an EXP FAIL is a measurement and not a dead phase"
+}
+str_exp_control
+
+########################################################################
 # PHASE INT -- batch compile with drop-and-retry.
 #
 # One TU holding eight arrays per macro.  Macros that are not integral constant

@@ -39,7 +39,18 @@ nix-shell -I "nixpkgs=$NP" \
       --with-native-system-header-dir='"$SYSHDR"'
   fi
   if grep -n "define rlim_t" gcc/auto-host.h; then echo "FATAL auto-host.h corrupted"; exit 9; fi
-  make -j32 all-gcc
+  make -j8 all-gcc
 ' > /tmp/b-stock.log 2>/tmp/b-stock.err
-echo "exit=$?"
-ls -la "$B/gcc/cc1" 2>&1
+rc=$?
+# -j8, not -j32: a -j16 build on this host once failed with NO diagnostic at all
+# under memory pressure, and a silent build failure here would leave a stale or
+# absent cc1 that the comparison arm must not mistake for a reference.
+echo "exit=$rc  (log /tmp/b-stock.log, err /tmp/b-stock.err)"
+# The script previously printed the status and returned 0 regardless, so a
+# failed build was reported only in a line a caller could ignore.
+if [ ! -x "$B/gcc/cc1" ]; then
+  echo "FATAL: no stock cc1 was produced; last stderr:"; tail -20 /tmp/b-stock.err
+  exit 9
+fi
+ls -la "$B/gcc/cc1"
+exit $rc
