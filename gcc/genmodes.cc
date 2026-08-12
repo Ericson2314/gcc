@@ -1083,6 +1083,51 @@ create_modes (void)
 #endif
 }
 
+/* MAX_BITSIZE_MODE_ANY_INT / _ANY_MODE, IN BITS, AS THIS RUN'S MODES SAY.
+
+   Either the back end stated the number outright (`max_bitsize_mode_any_*'
+   is then non-zero and already in bits), or it is computed as the widest
+   mode this run knows about.  Split out of `emit_max_int' because the union
+   run has to write the same numbers into the shared numbering, and computing
+   them twice is how one name acquires two authorities.  */
+static int
+resolve_max_any_int (void)
+{
+  unsigned int max, mmax;
+  struct mode_data *i;
+
+  if (max_bitsize_mode_any_int)
+    return max_bitsize_mode_any_int;
+
+  for (max = 1, i = modes[MODE_INT]; i; i = i->next)
+    if (max < i->bytesize)
+      max = i->bytesize;
+  mmax = max;
+  for (max = 1, i = modes[MODE_PARTIAL_INT]; i; i = i->next)
+    if (max < i->bytesize)
+      max = i->bytesize;
+  if (max > mmax)
+    mmax = max;
+  return (int) mmax * bits_per_unit;
+}
+
+static int
+resolve_max_any_mode (void)
+{
+  unsigned int mmax = 0;
+  struct mode_data *i;
+  int j;
+
+  if (max_bitsize_mode_any_mode)
+    return max_bitsize_mode_any_mode;
+
+  for (j = 0; j < MAX_MODE_CLASS; j++)
+    for (i = modes[j]; i; i = i->next)
+      if (mmax < i->bytesize)
+	mmax = i->bytesize;
+  return (int) mmax * bits_per_unit;
+}
+
 #ifndef NUM_POLY_INT_COEFFS
 #define NUM_POLY_INT_COEFFS 1
 #endif
@@ -1354,6 +1399,40 @@ static unsigned int n_union_slots;
    file and the last `#define NUM_POLY_INT_COEFFS 2' wins over the default.  */
 static int union_poly_int_coeffs;
 
+/* MAX_BITSIZE_MODE_ANY_INT / MAX_BITSIZE_MODE_ANY_MODE AS THE SHARED
+   NUMBERING SAYS THEY ARE, in bits, or 0 before the list has been read.
+
+   These are not modes either, and they are here for the same reason and with
+   a sharper failure.  MAX_BITSIZE_MODE_ANY_MODE sizes STACK BUFFERS in
+   target-independent code:
+
+     fold-const.cc:13090   unsigned char b[MAX_BITSIZE_MODE_ANY_MODE / BITS_PER_UNIT];
+     gimple-fold.cc:10106  unsigned char buf[...];
+     expr.cc:13458         unsigned char charbuf[...];
+     simplify-rtx.cc:8146  long el32[MAX_BITSIZE_MODE_ANY_MODE / 32];
+
+   and the bounds check that is supposed to protect each of them -- e.g.
+   fold-const.cc:13088 `bitsize <= MAX_BITSIZE_MODE_ANY_MODE' -- is written in
+   terms of THE SAME CONSTANT.  So when the middle end holds the primary's
+   answer (i386: 1024) and the mode being encoded is the selected back end's
+   (aarch64 SVE: 8192), the guard admits the value and the buffer is 128 bytes
+   where 1024 are written.  That is a stack smash, not a wrong number, and no
+   diagnostic precedes it.
+
+   Widths of this kind must therefore be compile-time AND IDENTICAL IN EVERY
+   TRANSLATION UNIT.  There is no runtime selection available and none is
+   wanted: the union answer is the maximum over every configured back end, a
+   back end that needs less is merely given a buffer larger than it can fill,
+   and the guards stay correct because they are the same constant again.
+
+   The union run computes the maximum correctly already -- it reads every
+   configured back end's modes file and `union_note_max_bitsize' keeps the
+   largest -- but until now that answer stayed inside the union run, whose
+   only output is this list.  Each per-back-end run, insn-modes.h included,
+   recomputed the number from its own modes and got its own answer.  */
+static int union_max_bitsize_any_int;
+static int union_max_bitsize_any_mode;
+
 /* Write the shared numbering: one line per ordinal, in enum order.  This
    is the union run's output; `read_union_list' is its reader.  */
 static void
@@ -1366,6 +1445,8 @@ emit_union_list (void)
      these back instead of computing its own answer; see
      union_poly_int_coeffs.  */
   printf ("#poly_int_coeffs %d\n", NUM_POLY_INT_COEFFS);
+  printf ("#max_bitsize_any_int %d\n", resolve_max_any_int ());
+  printf ("#max_bitsize_any_mode %d\n", resolve_max_any_mode ());
 
   for_all_modes (c, m)
     if (strcmp (m->name, m->bare))
@@ -1398,6 +1479,10 @@ read_union_list (void)
 	  int v;
 	  if (sscanf (line, "#poly_int_coeffs %d", &v) == 1)
 	    union_poly_int_coeffs = v;
+	  else if (sscanf (line, "#max_bitsize_any_int %d", &v) == 1)
+	    union_max_bitsize_any_int = v;
+	  else if (sscanf (line, "#max_bitsize_any_mode %d", &v) == 1)
+	    union_max_bitsize_any_mode = v;
 	  else
 	    error ("%s: unknown setting \"%s\"", union_list_file, line);
 	  continue;
@@ -1449,6 +1534,17 @@ read_union_list (void)
      it would restore the bug and report success.  */
   if (union_poly_int_coeffs <= 0)
     error ("%s: no #poly_int_coeffs line; regenerate the shared numbering",
+	   union_list_file);
+
+  /* Same rule, and here the silent-default trap is a buffer overflow rather
+     than a link error: falling back to this run's own maximum is exactly the
+     per-back-end answer the shared one replaces, and it would be the SMALLER
+     one on the primary.  Refuse by name instead.  */
+  if (union_max_bitsize_any_int <= 0)
+    error ("%s: no #max_bitsize_any_int line; regenerate the shared numbering",
+	   union_list_file);
+  if (union_max_bitsize_any_mode <= 0)
+    error ("%s: no #max_bitsize_any_mode line; regenerate the shared numbering",
 	   union_list_file);
 }
 
@@ -1628,42 +1724,17 @@ print_table_closer (void)
 static void
 emit_max_int (void)
 {
-  unsigned int max, mmax;
-  struct mode_data *i;
-  int j;
-
   puts ("");
 
   printf ("#define BITS_PER_UNIT (%d)\n", bits_per_unit);
 
-  if (max_bitsize_mode_any_int == 0)
-    {
-      for (max = 1, i = modes[MODE_INT]; i; i = i->next)
-	if (max < i->bytesize)
-	  max = i->bytesize;
-      mmax = max;
-      for (max = 1, i = modes[MODE_PARTIAL_INT]; i; i = i->next)
-	if (max < i->bytesize)
-	  max = i->bytesize;
-      if (max > mmax)
-	mmax = max;
-      printf ("#define MAX_BITSIZE_MODE_ANY_INT (%d*BITS_PER_UNIT)\n", mmax);
-    }
-  else
-    printf ("#define MAX_BITSIZE_MODE_ANY_INT %d\n", max_bitsize_mode_any_int);
-
-  if (max_bitsize_mode_any_mode == 0)
-    {
-      mmax = 0;
-      for (j = 0; j < MAX_MODE_CLASS; j++)
-	for (i = modes[j]; i; i = i->next)
-	  if (mmax < i->bytesize)
-	    mmax = i->bytesize;
-      printf ("#define MAX_BITSIZE_MODE_ANY_MODE (%d*BITS_PER_UNIT)\n", mmax);
-    }
-  else
-    printf ("#define MAX_BITSIZE_MODE_ANY_MODE %d\n",
-	    max_bitsize_mode_any_mode);
+  /* On a multi-target build these two are the SHARED answer, not this back
+     end's; see `resolve_max_any_mode'.  */
+  printf ("#define MAX_BITSIZE_MODE_ANY_INT %d\n",
+	  union_list_file ? union_max_bitsize_any_int : resolve_max_any_int ());
+  printf ("#define MAX_BITSIZE_MODE_ANY_MODE %d\n",
+	  union_list_file ? union_max_bitsize_any_mode
+			  : resolve_max_any_mode ());
 }
 
 /* Emit, inside a mode_*_inline body, the declaration of the table that body
