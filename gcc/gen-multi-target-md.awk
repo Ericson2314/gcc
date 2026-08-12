@@ -1063,6 +1063,43 @@ function emit_cdata_registry(	i, n, parts) {
   printf "target-cdata-select.o: multi-target-cdata.h\n\n";
 }
 
+# And the same for the C-family entry points.  See target-c-ops.h.
+#
+# Keyed on mt_bases -- the back ends whose objects are in the archive -- and
+# NOT on every back end in the manifest, for the same reason target-addr
+# records: the table's members are calls INTO the back end (i386's expansion is
+# `ix86_target_macros ()', defined in this back end's own <cpu>-c.o), so a
+# table for a back end whose sources are not linked would compile and then fail
+# to link.
+function emit_c_ops_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "MT_C_OBJS_MOVED = %s\n", c_moved_objs;
+  printf "MT_C_TARGET_OBJS =%s target-c-ops-select.o\n", c_target_objs_list;
+  # A non-vacuity check, in the generated fragment rather than here: an empty
+  # MT_C_TARGET_OBJS would take TARGET_CPU_CPP_BUILTINS out of cc1 altogether
+  # and the only symptom would be a link error three steps away.
+  if (c_target_objs_list == "") {
+    print "gen-multi-target-md.awk: no back end contributed a C-family object;" \
+	  " TARGET_CPU_CPP_BUILTINS would have no implementation" \
+	  > "/dev/stderr";
+    exit 1;
+  }
+  printf "multi-target-c-ops.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_c_ops targetm_c_ops_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_C_OPS_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_C_OPS_ENTRY (\"%s\", targetm_c_ops_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-c-ops.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-c-ops.h $@\n\n";
+  printf "target-c-ops-select.o: multi-target-c-ops.h\n\n";
+}
+
 # And the same for the register vocabularies -- a TABLE per base, like the
 # addressing one and unlike the (c-DATA) refresh functions, because none of
 # these values depends on option state: FIXED_REGISTERS and REG_CLASS_CONTENTS
@@ -1256,6 +1293,7 @@ $1 == "common_out_file" { cof = $2 }
 $1 == "md_file"   { md = $2 }
 $1 == "out_file"  { outf = $2 }
 $1 == "extra_objs" { xobjs = ""; for (i = 2; i <= NF; i++) xobjs = xobjs $i " " }
+$1 == "c_target_objs" { cobjs = ""; for (i = 2; i <= NF; i++) cobjs = cobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
@@ -1264,6 +1302,7 @@ NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_addr_registry();
 		    emit_cdata_registry();
+		    emit_c_ops_registry();
 		    emit_regs_registry();
 		    emit_backend_registry();
 		    emit_options_registry();
@@ -1533,7 +1572,46 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # first, so the recipe can compile the STAMP instead of the source -- and it
   # does so for some objects and not others, which reads as a broken source
   # file.
-  n = split(outf " " xobjs, parts, " ");
+  # ... and this back end's OWN C-family object.  `c_target_objs' for
+  # x86_64-linux is `i386-c.o glibc-c.o': the first is the back end's
+  # (config/i386/i386-c.cc, where `ix86_target_macros' lives), the second is
+  # the OS's and is shared by every glibc target.  Only the back end's own is
+  # moved per base here, and it is selected by asking the tmake fragments where
+  # the source lives rather than by matching the name -- `i386-c.o' would match
+  # a prefix test, `winnt-c.o' and `msformat-c.o' would not, and both of those
+  # belong to the OS side too.
+  #
+  # glibc-c.o STAYS SHARED, and that is a remaining leak, not a decision that
+  # it is fine: it defines `targetcm', whose TARGETCM_INITIALIZER is filled
+  # from the primary's tm.h.  Making it per base needs `targetcm' to become a
+  # pointer the way `targetm' already has, which is a separate change.
+  cobjs_own = ""; cobjs_this = "";
+  n = split(cobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    obj = parts[i];
+    sub(/\.o$/, "", obj);
+    src = frag_source_for(obj, tmkp);
+    if (src ~ ("^\\$\\(srcdir\\)/config/" cpu "/")) {
+      cobjs_own = cobjs_own parts[i] " ";
+      # ... and record it so gcc/Makefile.in can take it OUT of C_TARGET_OBJS.
+      # C_TARGET_OBJS is @c_target_objs@, the PRIMARY target's list, and the
+      # primary's <cpu>-c.o is now built per base in mt-<cpu>/.  Leaving it in
+      # both places is not a harmless duplicate: the two objects define the
+      # same `ix86_target_macros' and the link would keep one of them by
+      # accident of order, which is the COMDAT-body disguise of this bug.
+      if (index(" " c_moved_objs " ", " " parts[i] " ") == 0)
+	c_moved_objs = c_moved_objs parts[i] " ";
+    }
+  }
+
+  # Objects at index > nback are the C-family ones.  They are built by the same
+  # rules -- same include directory, same renames -- but they must NOT join
+  # MULTI_TARGET_OBJS_<cpu>, which goes into libbackend.a and therefore into
+  # lto1: <cpu>-c.cc calls `c_register_pragma' and `builtin_define_with_value',
+  # which exist only in cc1.  They go to MT_C_TARGET_OBJS instead, which
+  # gcc/Makefile.in appends to C_TARGET_OBJS.
+  nback = split(outf " " xobjs, parts, " ");
+  n = split(outf " " xobjs " " cobjs_own, parts, " ");
   for (i = 1; i <= n; i++) {
     if (i == 1) {
       # out_file is a PATH under config/, not an object name.
@@ -1597,7 +1675,10 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
     printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", cpu, obj, src, cpu;
     printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
     printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
-    objs = objs " mt-" cpu "/" obj ".o";
+    if (i > nback)
+      cobjs_this = cobjs_this " mt-" cpu "/" obj ".o";
+    else
+      objs = objs " mt-" cpu "/" obj ".o";
   }
 
   # This back end's addressing register-class predicates -- the `addresses.h'
@@ -1636,6 +1717,23 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   printf "\t  $(srcdir)/target-cdata.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-cdata-" cpu ".o";
+
+  # This back end's C-family entry points; see target-c-ops.h.  Same loop and
+  # the same reason once more, and here the link argument is not hypothetical:
+  # the table's members expand to `ix86_target_macros ()' and
+  # `ix86_register_pragmas ()', which live in mt-<cpu>/<cpu>-c.o -- an object
+  # that exists only for the back ends this loop runs over.
+  #
+  # It needs tm_p.h, not just tm.h: the expansion is a call, and the prototype
+  # for it is in config/<cpu>/<cpu>-protos.h, which tm_p.h is what includes.
+  printf "target-c-ops-%s.o: $(srcdir)/target-c-ops.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-c-ops.h\n";
+  printf "\t$(COMPILE) -DTARGET_C_OPS_SYMBOL=targetm_c_ops_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-c-ops.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  # Same reasoning as mt-<cpu>/<cpu>-c.o above: this table calls into that
+  # object, so it belongs to cc1 and not to libbackend.a.
+  cobjs_this = cobjs_this " target-c-ops-" cpu ".o";
 
   # This back end's register vocabulary; see target-regs.h.  Same loop and the
   # same reason again -- the six data macros are plain macros in
@@ -1686,6 +1784,24 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # back end's own", which is a thing no rule can infer from the name alone.
   printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n", cpu;
   printf "MULTI_TARGET_OBJS += $(MULTI_TARGET_OBJS_%s)\n", cpu;
+
+  # This back end's C-family objects.  A SECOND list with the SAME two
+  # target-specific assignments, because they need the identical treatment --
+  # their own include directory and their own renames -- and differ only in
+  # which link they belong to.  Folding them into MULTI_TARGET_OBJS_<cpu> to
+  # get the assignments for free is the obvious tidy-up and it breaks lto1;
+  # leaving them OUT of the assignments is the other obvious shortcut and it
+  # compiles config/aarch64/aarch64-c.cc against i386-inc, which fails with 40
+  # `TARGET_SIMD was not declared in this scope' -- loudly here, but only
+  # because the two back ends happen to spell their feature macros
+  # differently.
+  printf "MT_C_OBJS_%s =%s\n", cpu, cobjs_this;
+  printf "$(MT_C_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  printf "$(MT_C_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", cpu;
+  printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
+  printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", cpu;
+  c_target_objs_list = c_target_objs_list " $(MT_C_OBJS_" cpu ")";
+
   mt_bases = mt_bases " " cpu;
   # One back end at a time, by name.  Needed for more than convenience: the
   # control that shows these objects read THEIR OWN headers rather than the

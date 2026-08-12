@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-common.h"
 #include "memmodel.h"
 #include "tm_p.h"		/* For REGISTER_TARGET_PRAGMAS.  */
+#include "target-c-ops.h"
 #include "stringpool.h"
 #include "cgraph.h"
 #include "diagnostic.h"
@@ -1873,9 +1874,13 @@ init_pragma (void)
 
   c_register_pragma_with_expansion (0, "message", handle_pragma_message);
 
-#ifdef REGISTER_TARGET_PRAGMAS
-  REGISTER_TARGET_PRAGMAS ();
-#endif
+  /* The `#ifdef' that used to guard this is gone from here on purpose: in a
+     shared translation unit it was answered by ONE back end's tm.h and then
+     applied to all of them -- a guard hiding a declaration, which is one of
+     the disguises this branch is hunting.  Whether a back end has the macro is
+     now decided in target-c-ops.cc, where that back end's tm.h is the one in
+     scope, and a back end without it gets an entry that does nothing.  */
+  target_c_register_pragmas ();
 
   global_sso = default_sso;
   c_register_pragma (0, "scalar_storage_order",

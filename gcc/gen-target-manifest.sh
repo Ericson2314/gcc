@@ -118,7 +118,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     target=${gcc_mt}
     tm_defines= cpu_type= target_cpu_default=
     tm_file= tm_p_file= tmake_file=
-    extra_objs= extra_options= extra_headers=
+    extra_objs= extra_options= extra_headers= c_target_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
     TM_MULTILIB_CONFIG=
@@ -153,6 +153,19 @@ for gcc_mt in ${gcc_manifest_targets}; do
     done
     echo "tmake_file_present ${mt_tmake_present}"
     echo "extra_objs ${extra_objs}"
+    # The C-family target objects.  NOTE FOR ANYONE EDITING THIS BLOCK: it is
+    # inside a command substitution, so an apostrophe here truncates the whole
+    # stanza and the manifest comes out EMPTY, with configure still exiting 0.
+    # That is not hypothetical; it happened while this line was being added.
+    #
+    # The c_target_objs configure sets is the PRIMARY target alone, and
+    # gcc/Makefile.in builds C_TARGET_OBJS from it.  That is why
+    # ix86_target_macros is the only TARGET_CPU_CPP_BUILTINS implementation a
+    # multi-target cc1 contains, and why c-cppbuiltin.o -- a SHARED translation
+    # unit -- carries an undefined reference to it whatever target is selected.
+    # Recorded per target here so the build can compile each back end own
+    # <cpu>-c.cc against that back end headers.
+    echo "c_target_objs ${c_target_objs}"
     echo "extra_options ${extra_options}"
     echo "out_file ${out_file}"
     echo "md_file ${md_file}"
