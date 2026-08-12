@@ -236,3 +236,135 @@ the Makefile into genemit; it is not a one-line change in gensupport.cc.
   * gcc/config/rs6000/* were modified in the worktree by someone else
     throughout this session and were never staged.  `git diff --cached' was
     checked immediately before the commit; it listed 13 files, all mine.
+
+---
+
+# TASK #77 HANDOVER -- `options-save.cc' and the primary's optionlist
+
+Branched from `cda9e1c19b2`; landed as `d36637e175f`.
+
+**Read this before doing anything else with #77: the defect as filed was
+already fixed.** `52fa9e763c5` did not only union the two structs -- it also
+drove `optc-save-gen.awk`'s save, restore, hash, eq, print and stream walks
+from the union list, and the Makefile already passed
+`$(OPTIONS_UNION_FLAGS)` to it. The ticket's premise ("the walk is still the
+primary's") was stale. I confirmed this by measurement, not by reading:
+`scratchpad/t77-harness.sh` round-trips nine aarch64-only members and 24
+checks pass.
+
+## The one thing that WAS still the primary's, and the trap in fixing it
+
+`cl_optimization_compare` walked `flags[]`. In a two-target build: 1116
+comparisons, **zero** naming an aarch64 member.
+
+**The obvious fix is a regression, and it looks like a fix.** Switching that
+walk to `sv_flags[]` -- the same variable every other walk in the file uses
+-- compiles, produces a plausible diff, and adds 17 aarch64 members. It also
+takes the comparison count from **1116 to 585**. The `R` records are the
+*save* set (`Optimization|PerFunction|Save`); `cl_optimization_compare`
+wants every option with a `gcc_options` member. So 531 common options
+silently stop being checked, and the artefact still shows "more aarch64
+members than before". *A non-vacuity check that only asks "did aarch64
+appear?" scores this as a pass.* The count is what caught it -- add a `C`
+record kind (every option with a member) and it goes 1116 -> 1169 with none
+lost.
+
+Generalised: **when a walk is moved onto the union list, check the count in
+BOTH directions.** "More of the thing I was looking for" is compatible with
+"less of everything else".
+
+## The aarch64 codegen route is closed, and it is not ours
+
+`cc1 -ftarget-config=specs-aarch64-unknown-linux-gnu-config` ICEs in
+`aarch64_class_max_nregs` from `init_reg_sets_1` on any input -- the
+hard-register union (Application 2) has not landed. **It reproduces
+identically on `/tmp/b-objs`**, which has no change of mine, so it is
+pre-existing; I checked before building anything around it.
+
+Consequence for anyone with an acceptance criterion of the form "show a
+non-primary target actually doing X": you cannot do it through the parser
+today. What does work, and is what `scratchpad/t77main.cc` does, is to link
+**cc1's own object set with `main.o` replaced** and call the entry points
+directly. `targetm_common_select` + `multi_target_select` (the same pair
+`toplev.cc:2396` makes) succeed long before `init_regs`, so `targetm` is
+genuinely aarch64's. This is reusable for any option/attribute-level
+question about a non-primary base.
+
+Two things that route needs and that cost me two rebuilds:
+
+  * `aarch64_option_restore` calls `aarch64_get_tune_cpu`, which asserts the
+    tune is not `aarch64_no_cpu`. A harness that sets option fields by hand
+    must set `x_selected_tune`/`x_selected_arch` or it aborts in the back
+    end, which reads exactly like the generated code being wrong.
+  * `aarch64_option_restore` also **recomputes** `x_aarch64_isa_flags` from
+    the arch and tune, so asserting it round-trips bit-for-bit is asserting
+    the back end does not do its job. `x_aarch64_isa_flags_1` is left alone
+    and is the one to use for exact equality.
+
+## The negative control that made this worth anything
+
+`scratchpad/t77-harness.sh` builds a SECOND binary whose `options-save.o`
+was generated with no union list -- the primary's optionlist alone -- and
+compiled against the same unioned `options.h`. That is the defect, exactly:
+members laid out, never walked. It fails 21 of the same 24 checks, and its
+`cl_optimization_compare` does not report the aarch64 member that the real
+one reports. Without that arm, 24 green checks would not have distinguished
+"the union list is doing the work" from "these members happened to be
+zero".
+
+`cl_optimization_compare` reports via `internal_error`, which does not
+return, so it is exercised in a child process scored by exit status, with a
+"two identical copies" arm so that a compare which always fired could not
+score.
+
+## Numbers, so the next diff has something to diff against
+
+  * `gcc-options-union.list`, 2 bases: **3432** `C` records.
+  * `options-save.cc`: 17817 lines before, **17919** after; the 103-line
+    diff is entirely inside `cl_optimization_compare`.
+  * With no union list the output is **byte-identical**, 17181 lines.
+  * `options.h` byte-identical to a build without this change; `explicit_mask`
+    still `[9]` and `[1]`, `static_assert` still exactly at the limit.
+  * Both bases generate the same 17919-line `options-save.cc` -- the list's
+    order, not each base's own.
+
+## Regression bar
+
+  * `stock-compare.sh`, `IN=$(readlink -f scratchpad/big.c)`, `MT=/tmp/b-77t`:
+    **5/5 IDENTICAL** vs `/tmp/b-stock`, 5 distinct md5 per side, negative
+    control firing.
+  * `make cc1` rc=0, `make multi-target-objs` rc=0, `make target-specs` rc=0.
+    Stderr 310 lines, **0 containing "error"**, 275 `warning:`; no
+    `is newer than target` lines at all (this was effectively a full rebuild
+    of the affected TUs, so the 32-line incremental floor did not apply).
+  * Header probe, `macro-probe-run.sh /tmp/b-77t` against a baseline run on
+    `/tmp/b-objs`: 115 macros x 2 bases = **230 arms**, i386 **0 FAIL**,
+    aarch64 **113 FAIL**, and `diff` of the two `results.txt` is **4 lines**
+    -- one arm whose text embeds the probe output directory in a
+    `fancy_abort` string. Zero verdict changes, zero probe-shape changes.
+
+**Scoreboard correction:** the task brief said aarch64 **131** FAIL. The
+measured figure is **113**, and it is 113 on the UNMODIFIED baseline too, so
+this is a stale or transposed number in the brief and not a regression.
+Whoever wrote the next brief should carry 113.
+
+## Build dir
+
+`/tmp/b-77t` is mine and nobody else wrote it. Recipe:
+`scratchpad/t77-conf.sh` (top-level configure, x86_64 + aarch64) then
+`scratchpad/t77-make2.sh`. Note two things the recipe encodes:
+
+  * `make all-gcc` fails at `stmp-fixinc` in this environment; `make cc1` in
+    the gcc subdir is what to run, and it is unrelated.
+  * `t77-make2.sh` puts `/tmp/mt-fakebin` on PATH. Without it `target-specs`
+    SKIPs aarch64, writes no `specs-aarch64-...-config`, and no driver or
+    `-ftarget-config=` can select aarch64 at all -- see DEVSHELL.md.
+
+## What I did not do
+
+  * The `V` records (`Variable`-declared extra vars) are still not compared
+    by `cl_optimization_compare`, exactly as before this change -- upstream
+    never walked them either. Left alone deliberately; widening the compare
+    to them is a behaviour change, not a union fix.
+  * Nothing about the `init_reg_sets_1` ICE.
+  * No throughput measurement.
