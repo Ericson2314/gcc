@@ -51,7 +51,6 @@ libdir = $(exec_prefix)/lib
 libsubdir = $(libdir)/gcc/$(target_noncanonical)/$(gcc_version)
 
 # Multilib support variables.
-MULTISRCTOP =
 MULTIBUILDTOP =
 MULTIDIRS =
 MULTISUBDIR =
@@ -97,12 +96,12 @@ OBJC_BOEHM_GC=@OBJC_BOEHM_GC@
 OBJC_BOEHM_GC_INCLUDES=@OBJC_BOEHM_GC_INCLUDES@
 OBJC_BOEHM_GC_LIBS=@OBJC_BOEHM_GC_LIBS@
 
-INCLUDES = -I$(srcdir)/$(MULTISRCTOP)../gcc \
-  -I$(srcdir)/$(MULTISRCTOP)../gcc/config \
+INCLUDES = -I$(srcdir)/../gcc \
+  -I$(srcdir)/../gcc/config \
   -I$(MULTIBUILDTOP)../../$(host_subdir)/gcc \
-  -I$(srcdir)/$(MULTISRCTOP)../libgcc \
+  -I$(srcdir)/../libgcc \
   -I$(MULTIBUILDTOP)../libgcc \
-  -I$(srcdir)/$(MULTISRCTOP)../include \
+  -I$(srcdir)/../include \
   $(OBJC_BOEHM_GC_INCLUDES)
 
 ##

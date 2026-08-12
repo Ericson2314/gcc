@@ -1278,7 +1278,6 @@ CLEANFILES = \
 # even though that is part of GCC, because where to find it depends on
 # whether we are being built as a host library or a target library.
 INCDIR = $(top_srcdir)/../include
-MULTISRCTOP = 
 MULTIBUILDTOP = 
 MULTIDIRS = 
 MULTISUBDIR = 

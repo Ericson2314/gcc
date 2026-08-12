@@ -487,7 +487,6 @@ libatomic_convenience_la_LIBADD = $(libatomic_la_LIBADD)
 # built after libatomic, which makes RPATH insecure. Removing libatomic.la
 # from $gcc_objdir seems to fix the issue.
 gcc_objdir = `pwd`/$(MULTIBUILDTOP)../../gcc/
-MULTISRCTOP = 
 MULTIBUILDTOP = 
 MULTIDIRS = 
 MULTISUBDIR = 

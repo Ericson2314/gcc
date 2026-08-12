@@ -30,28 +30,19 @@
 # It is advisable to support a few --enable/--disable options to let the
 # user select which libraries s/he really wants.
 #
-# Subdirectories wishing to use multilib should put the following lines
+# Subdirectories wishing to use multilib should put the following line
 # in the "post-target" section of configure.ac.
 #
-# if [ "${srcdir}" = "." ] ; then
-#   if [ "${with_target_subdir}" != "." ] ; then
-#     . ${with_multisrctop}../../config-ml.in
-#   else
-#     . ${with_multisrctop}../config-ml.in
-#   fi
-# else
-#   . ${srcdir}/../config-ml.in
-# fi
-#
+# . ${srcdir}/../config-ml.in
 #
 # Things are complicated because 6 separate cases must be handled:
 # 2 (native, cross) x 3 (absolute-path, relative-not-dot, dot) = 6.
 #
-# srcdir=. is special.  It must handle make programs that don't handle VPATH.
-# To implement this, a symlink tree is built for each library and for each
-# multilib subdir.
+# srcdir=. was formerly special.  We used to want to handle make
+# programs that don't handle VPATH.  To implement this, a symlink tree
+# was built for each library and for each multilib subdir.
 #
-# The build tree is layed out as
+# The build tree was laid out as
 #
 # ./
 #   newlib
@@ -59,6 +50,24 @@
 #          newlib
 #          m68881/
 #                 newlib
+#
+# In such a symlink tree, the source code *files* of newlib were linked
+# into each location, but the "newlib" directories themselves were
+# actual separate directories, to hold different different build
+# artifacts in each case. Accordingly ${srcdir}/.. would not work as
+# intended, because instead of pointing to the top-level source
+# directory, it would point to one of the parent build directories (e.g.
+# "m68881" or "m68020") in the example above.
+#
+# Now, however, GNU Make is required, and GNU Make always supports
+# VPATH. We therefore dropped support for these symlink trees.  And
+# accordingly, we can know that ${srcdir}/.. always does what we expect
+# in all supported configurations.
+#
+# This will open the door to many many further simplifications of the
+# multilib infrastructure. These simplifications are not yet
+# implemented, however. Until they are, and the dead code removed, this
+# historical information should stay in this file.
 #
 # The nice feature about this arrangement is that inter-library references
 # in the build tree work without having to care where you are.  Note that
@@ -72,14 +81,9 @@
 # Configure variables:
 # ${with_target_subdir} = "." for native, or ${target_alias} for cross.
 # Set by top level Makefile.
-# ${with_multisrctop} = how many levels of multilibs there are in the source
-# tree.  It exists to handle the case of configuring in the source tree:
-# ${srcdir} is not constant.
 # ${with_multisubdir} = name of multilib subdirectory (eg: m68020/m68881).
 #
 # Makefile variables:
-# MULTISRCTOP = number of multilib levels in source tree (+1 if cross)
-# (FIXME: note that this is different than ${with_multisrctop}.  Check out.).
 # MULTIBUILDTOP = number of multilib levels in build tree
 # MULTIDIRS = list of multilib subdirs (eg: m68000 m68020 ...)
 # (only defined in each library's main Makefile).
@@ -101,7 +105,6 @@
 
 Makefile=${ac_file-Makefile}
 ml_config_shell=${CONFIG_SHELL-/bin/sh}
-ml_realsrcdir=${srcdir}
 
 # Scan all the arguments and set all the ones we need.
 
@@ -188,23 +191,8 @@ if [ "${enable_multilib}" = yes ]; then
 # into one file, but it does leave us with having to perform this test.
 ml_toplevel_p=no
 if [ -z "${with_multisubdir}" ]; then
-  if [ "${srcdir}" = "." ]; then
-    # Use ${ml_realsrcdir} instead of ${srcdir} here to account for ${subdir}.
-    # ${with_target_subdir} = "." for native, otherwise target alias.
-    if [ "${with_target_subdir}" = "." ]; then
-      if [ -f ${ml_realsrcdir}/../config-ml.in ]; then
-	ml_toplevel_p=yes
-      fi
-    else
-      if [ -f ${ml_realsrcdir}/../../config-ml.in ]; then
-	ml_toplevel_p=yes
-      fi
-    fi
-  else
-    # Use ${ml_realsrcdir} instead of ${srcdir} here to account for ${subdir}.
-    if [ -f ${ml_realsrcdir}/../config-ml.in ]; then
-      ml_toplevel_p=yes
-    fi
+  if [ -f ${srcdir}/../config-ml.in ]; then
+    ml_toplevel_p=yes
   fi
 fi
 
@@ -596,21 +584,11 @@ mv Makefile.tem ${Makefile}
 fi # ${ml_toplevel_p} = yes
 
 if [ "${ml_verbose}" = --verbose ]; then
-  echo "Adding multilib support to ${Makefile} in ${ml_realsrcdir}"
+  echo "Adding multilib support to ${Makefile} in ${srcdir}"
   if [ "${ml_toplevel_p}" = yes ]; then
     echo "multidirs=${multidirs}"
   fi
   echo "with_multisubdir=${with_multisubdir}"
-fi
-
-if [ "${srcdir}" = "." ]; then
-  if [ "${with_target_subdir}" != "." ]; then
-    ml_srcdotdot="../"
-  else
-    ml_srcdotdot=""
-  fi
-else
-  ml_srcdotdot=""
 fi
 
 if [ -z "${with_multisubdir}" ]; then
@@ -621,16 +599,10 @@ if [ -z "${with_multisubdir}" ]; then
     ml_subdir=/$ml_top_subdir
   fi
   ml_builddotdot=
-  : # ml_srcdotdot= # already set
 else
   ml_subdir="/${with_multisubdir}"
   # The '[^/][^/]*' appears that way to work around a SunOS sed bug.
   ml_builddotdot=`echo ${with_multisubdir} | sed -e 's:[^/][^/]*:..:g'`/
-  if [ "$srcdir" = "." ]; then
-    ml_srcdotdot=${ml_srcdotdot}${ml_builddotdot}
-  else
-    : # ml_srcdotdot= # already set
-  fi
 fi
 
 if [ "${ml_toplevel_p}" = yes ]; then
@@ -642,8 +614,8 @@ else
 fi
 
 # TOP is used by newlib and should not be used elsewhere for this purpose.
-# MULTI{SRC,BUILD}TOP are the proper ones to use.  MULTISRCTOP is empty
-# when srcdir != builddir.  MULTIBUILDTOP is always some number of ../'s.
+# MULTIBUILDTOP are the proper ones to use.
+# MULTIBUILDTOP is always some number of ../'s.
 # FIXME: newlib needs to be updated to use MULTI{SRC,BUILD}TOP so we can
 # delete TOP.  Newlib may wish to continue to use TOP for its own purposes
 # of course.
@@ -664,7 +636,6 @@ fi
 # options).
 
 sed -e "s:^TOP[ 	]*=[ 	]*\([./]*\)[ 	]*$:TOP = ${ml_builddotdot}\1:" \
-    -e "s:^MULTISRCTOP[ 	]*=.*$:MULTISRCTOP = ${ml_srcdotdot}:" \
     -e "s:^MULTIBUILDTOP[ 	]*=.*$:MULTIBUILDTOP = ${ml_builddotdot}:" \
     -e "s:^MULTIDIRS[ 	]*=.*$:MULTIDIRS = ${multidirs}:" \
     -e "s:^MULTISUBDIR[ 	]*=.*$:MULTISUBDIR = ${ml_subdir}:" \
@@ -733,24 +704,8 @@ if [ -n "${multidirs}" ] && [ -z "${ml_norecursion}" ]; then
 
     case ${srcdir} in
     ".")
-      echo "Building symlink tree in `${PWDCMD-pwd}`/${ml_dir}/${ml_libdir}"
-      if [ "${with_target_subdir}" != "." ]; then
-	ml_unsubdir="../"
-      else
-	ml_unsubdir=""
-      fi
-      (cd ${ml_dir}/${ml_libdir};
-       ../${dotdot}${ml_unsubdir}symlink-tree ../${dotdot}${ml_unsubdir}${ml_libdir} "")
-      if [ -f ${ml_dir}/${ml_libdir}/${Makefile} ]; then
-	if [ x"${MAKE}" = x ]; then
-	  (cd ${ml_dir}/${ml_libdir}; make distclean)
-	else
-	  (cd ${ml_dir}/${ml_libdir}; ${MAKE} distclean)
-	fi
-      fi
-      ml_newsrcdir="."
-      ml_srcdiroption=
-      multisrctop=${dotdot}
+      echo "Multilib builds with srcdir = objdir are no longer supported. Please use a separate objdir."
+      exit 1
       ;;
     *)
       case "${srcdir}" in
@@ -762,7 +717,6 @@ if [ -n "${multidirs}" ] && [ -z "${ml_norecursion}" ]; then
         ;;
       esac
       ml_srcdiroption="-srcdir=${ml_newsrcdir}"
-      multisrctop=
       ;;
     esac
 
@@ -936,7 +890,7 @@ if [ -n "${multidirs}" ] && [ -z "${ml_norecursion}" ]; then
     fi
 
     if eval ${ml_config_env} ${ml_config_shell} ${ml_recprog} \
-	--with-multisubdir=${ml_dir} --with-multisrctop=${multisrctop} \
+	--with-multisubdir=${ml_dir} \
 	"${ac_configure_args}" ${ml_config_env} ${ml_srcdiroption} ; then
       true
     else

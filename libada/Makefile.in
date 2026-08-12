@@ -22,7 +22,6 @@ all: libada
 .PHONY: all
 
 ## Multilib support variables.
-MULTISRCTOP =
 MULTIBUILDTOP =
 MULTIDIRS =
 MULTISUBDIR =
