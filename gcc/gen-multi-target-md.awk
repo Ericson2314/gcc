@@ -88,6 +88,15 @@ function scan_hdr_frag(path,	line, i, n, parts) {
 #   * Rules are written `foo.o: \' with the source on a continuation line, so
 #     matching only the target's own physical line under-read by 12% (18 of 153
 #     objects) and reported "no rule found" for the wrong reason.  Follow `\'.
+#   * A prerequisite need not live under $(srcdir)/config.  rs6000-builtins.o's
+#     rule is `rs6000-builtins.o: rs6000-builtins.cc' -- a source GENERATED into
+#     the build root by config/rs6000/t-rs6000-headers.  That shape scored 0
+#     here, and the "refuse rather than guess" path it fell into is what blocked
+#     every rs6000 build.  A bare name is accepted only when some fragment this
+#     target includes DECLARED it in `generated_files +=' (scan_hdr_frag has
+#     already run for this cpu by the time this is called), so the claim is
+#     still the tree's and not this file's.  The caller can tell the two apart
+#     by the `/': a returned name with no slash is a build-directory file.
 #   * The RECIPES are not reusable and are deliberately ignored.  The 195 `.o'
 #     rules across config/**/t-* reduce to two families, `$(COMPILE) $<' and an
 #     older `$(COMPILER) -c ... <src>' with no `-o' at all, and the second
@@ -110,6 +119,14 @@ function frag_source_for(obj, frags,	i, n, parts, path, line, cont, tok, j, m, t
       m = split(line, toks, "[ \t]+");
       for (j = 1; j <= m; j++)
 	if (toks[j] ~ /^\$\(srcdir\)\/config\/.*\.(cc|c)$/) {
+	  close(path);
+	  return toks[j];
+	}
+      # ... and the generated-source shape, second so that a rule naming both
+      # still prefers the checked-in file.
+      for (j = 1; j <= m; j++)
+	if (toks[j] ~ /^[A-Za-z0-9_.+-]+\.(cc|c)$/ &&
+	    ((cpu SUBSEP toks[j]) in seen_hdrgen)) {
 	  close(path);
 	  return toks[j];
 	}
@@ -1399,7 +1416,7 @@ function emit_modes_union(   i, c, m, deps, seen_modes) {
 # selector that chooses between them is a separate piece of work.  Emitting the
 # rules first is deliberate -- it is the half that can be verified on its own,
 # by `make multi-target-objs'.
-function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
+function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   objs = "";
 
   # The ONE flag a fragment's recipe carries that the uniform recipe cannot do
@@ -1492,13 +1509,49 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
 	# happens to exist would compile the wrong file without a word; a
 	# guessed one that does not exist would fail three steps away, at a
 	# missing prerequisite whose name nothing in the tree explains.
-	printf "$(error multi-target: nothing in %s's tmake_file claims a rule for %s.o,\n",
-	       cpu, obj;
-	printf "  so gen-multi-target-md.awk cannot tell which source builds it.\n";
-	printf "  Add the rule to the fragment that puts %s.o in extra_objs.)\n\n",
-	       obj;
+	#
+	# ON ONE LINE, and with no comma in the text.  `$(error ...)' is a make
+	# FUNCTION call: a newline inside it ends the logical line before the
+	# closing paren and make reports `unterminated call to function error'
+	# at the opening line -- so the parse dies and THE MESSAGE IS NEVER
+	# PRINTED.  A generator whose refusal path produces an unparseable
+	# makefile has refused nothing; it has only changed which diagnostic
+	# lies to you.  (Commas would be split into further arguments, which
+	# $(error) drops.)
+	printf "$(error multi-target: nothing in %s's tmake_file claims a rule for %s.o" \
+	       " -- gen-multi-target-md.awk cannot tell which source builds it;" \
+	       " add the rule to the fragment that puts %s.o in extra_objs)\n\n",
+	       cpu, obj, obj;
 	continue;
       }
+    }
+    # A build-directory source -- one a t-<...>-headers fragment generates --
+    # is copied into mt-<cpu>/ before it is compiled, exactly as the generated
+    # insn-*.cc are, and for the identical reason: `#include "insn-codes.h"'
+    # from a file sitting in the build root finds the build ROOT's copy, which
+    # is the PRIMARY target's, before -I<cpu>-inc is ever consulted.
+    # rs6000-builtins.cc includes insn-codes.h by plain name, so compiling it
+    # in place would bind rs6000's builtin table to another target's insn codes.
+    #
+    # MEASURED, both directions, in an x86_64-primary + powerpc64le build.  The
+    # copy in mt-rs6000/ compiles clean and its .deps names
+    # `rs6000-inc/insn-codes.h'; the SAME command line pointed at
+    # `./rs6000-builtins.cc' opens `./insn-codes.h' (i386's) and stops with 1039
+    # `CODE_FOR_altivec_abss_v16qi was not declared' errors.  That it is loud
+    # here is luck -- the two targets' CODE_FOR_ sets barely overlap -- and not
+    # a reason to rely on it: what the include path decides is which machine the
+    # object describes, and a pair of back ends with more names in common would
+    # get a quiet wrong answer instead.
+    if (src !~ /\//) {
+      gen = src;
+      printf "mt-%s/%s: %s\n", cpu, gen, gen;
+      printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
+      # cp to a temporary and then move-if-change: move-if-change RENAMES its
+      # first argument, so handing it $< directly would delete the build root's
+      # copy that every other consumer of the fragment still depends on.
+      printf "\tcp $< tmp-mt-%s-%s\n", cpu, gen;
+      printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-mt-%s-%s $@\n\n", cpu, gen;
+      src = "mt-" cpu "/" gen;
     }
     printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", cpu, obj, src, cpu;
     printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
