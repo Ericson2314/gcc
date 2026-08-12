@@ -25,6 +25,7 @@
 #include "target-asm-ops.h"
 #include "target-addr.h"
 #include "target-cdata.h"
+#include "target-regs.h"
 #include "plugin-version.h"
 
 int plugin_is_GPL_compatible;
@@ -124,6 +125,48 @@ one_base (FILE *o, const char *base, const struct gcc_target *t,
 	    (const void *) t->asm_out.output_external);
   dump_str (o, base, "GLOBAL_ASM_OP",       "asm_ops.global_op",
 	    a->global_op ? a->global_op () : NULL);
+
+  /* THE REGISTER VOCABULARY (ecad6abf6ae).  FIRST_PSEUDO_REGISTER,
+     N_REG_CLASSES and REGNO_REG_CLASS stopped being things the HEADER probe
+     can discriminate bases with -- the first two became the compile-time union
+     width, which is deliberately one number in every consumer translation
+     unit, and the third became a call through `targetm_regs'.  Their aarch64
+     arms went green in that change for exactly that reason and not because
+     aarch64 got aarch64's answer.  These four lines per base are where the
+     per-base fact actually lives now, read out of the LINKED cc1's registry.
+
+     `target_regs_for' is asked rather than `targetm_regs' read, for the same
+     reason the cdata refresh functions are CALLED: `targetm_regs' holds the
+     SELECTED base's table, and one run has one selection.  Asking the registry
+     by name gets both columns out of one run and also exercises the lookup
+     that `multi_target_select' uses.  */
+  {
+    const struct target_regs_desc *rg = target_regs_for (base);
+    if (rg == NULL)
+      /* Not silence and not a zero: an absent table must arrive as a line the
+	 script can see and refuse on.  */
+      fprintf (o, "NUM|%s|MT_REGS_FOUND|regs.registry|0\n", base);
+    else
+      {
+	fprintf (o, "NUM|%s|MT_REGS_FOUND|regs.registry|1\n", base);
+	fprintf (o, "NUM|%s|FIRST_PSEUDO_REGISTER|regs.first_pseudo_register|%d\n",
+		 base, rg->first_pseudo_register);
+	fprintf (o, "NUM|%s|N_REG_CLASSES|regs.n_reg_classes|%d\n",
+		 base, rg->n_reg_classes);
+	dump_ptr (o, base, "REGNO_REG_CLASS", "regs.regno_reg_class",
+		  (const void *) rg->regno_reg_class);
+	/* The whole answer vector, over the range GENERIC CODE walks -- the
+	   UNION width, not this base's own.  That is the range in which the
+	   fence has to hold: reginfo.cc asks about register numbers a base
+	   does not have, and i386's REGNO_REG_CLASS was the bare subscript
+	   `regclass_map[REGNO]'.  Using FIRST_PSEUDO_REGISTER here IS the
+	   union width, because this plugin is a consumer translation unit.  */
+	fprintf (o, "REGV|%s|REGNO_REG_CLASS|regs.regno_reg_class|", base);
+	for (int i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+	  fprintf (o, "%s%d", i ? "," : "", rg->regno_reg_class (i));
+	fputc ('\n', o);
+      }
+  }
 
   /* Discrimination controls, emitted for every base so the script can assert
      the instrument reports BOTH agreement and disagreement.  Without the

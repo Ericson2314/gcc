@@ -85,13 +85,13 @@ BASES="i386 aarch64"
 # check working -- but the failure names the parse, not the cause, so: keep it
 # on one line rather than teaching the reader about continuations.  A more
 # forgiving reader is a reader with more ways to return the empty set.
-TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN REG_WORDS_BIG_ENDIAN STRICT_ALIGNMENT SHIFT_COUNT_TRUNCATED JUMP_TABLES_IN_TEXT_SECTION BITS_PER_WORD LONG_TYPE_SIZE PARM_BOUNDARY ATTRIBUTE_ALIGNED_VALUE MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_CIE_DATA_ALIGNMENT STACK_CHECK_FIXED_FRAME_SIZE STACK_CHECK_MAX_FRAME_SIZE MAX_FIXED_MODE_SIZE DWARF_FRAME_RETURN_COLUMN"
+TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN REG_WORDS_BIG_ENDIAN STRICT_ALIGNMENT SHIFT_COUNT_TRUNCATED JUMP_TABLES_IN_TEXT_SECTION BITS_PER_WORD LONG_TYPE_SIZE PARM_BOUNDARY ATTRIBUTE_ALIGNED_VALUE MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_CIE_DATA_ALIGNMENT STACK_CHECK_FIXED_FRAME_SIZE STACK_CHECK_MAX_FRAME_SIZE MAX_FIXED_MODE_SIZE DWARF_FRAME_RETURN_COLUMN FIRST_PSEUDO_REGISTER N_REG_CLASSES REGNO_REG_CLASS"
 
 # How many slot lines the plugin writes per base.  Named rather than spelled as
 # a literal, because getting it wrong in the direction of TOO FEW is a silent
 # pass: the length assertion below would accept a dump missing the very arms
 # this run was added to score.
-SLOTS_PER_BASE=32
+SLOTS_PER_BASE=37
 
 # Which symbol names count as belonging to which base.
 own_i386='^(ix86_|i386_|x86_)'
@@ -214,6 +214,38 @@ CDATA_NUM_DISCRIM="MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_FRAME_RETURN_COLUM
 CDATA_NUM_OPTSTATE="BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN \
 REG_WORDS_BIG_ENDIAN SHIFT_COUNT_TRUNCATED STRICT_ALIGNMENT"
 
+# THE REGISTER-VOCABULARY MACROS (macro-status.txt: CONVERTED_REGS).
+#
+# Retired from the header probe on 2026-08-12 because their aarch64 arms went
+# green in ecad6abf6ae for the wrong reason: FIRST_PSEUDO_REGISTER and
+# N_REG_CLASSES became the compile-time UNION width -- one number in every
+# consumer translation unit, by design, because it is the layout of the four
+# shared structures -- and REGNO_REG_CLASS became a call through targetm_regs.
+# All three agree across the three header contexts now, and that agreement is
+# a fact about the redirect, not about aarch64 getting aarch64's answer.
+#
+# The per-base answer moved to the registry inside the linked cc1, which is
+# what the plugin reads.  Scored against an INDEPENDENT measurement of each
+# base's own headers (section 4c), never against the registry's own numbers.
+REGS_MACROS="FIRST_PSEUDO_REGISTER N_REG_CLASSES REGNO_REG_CLASS"
+is_regs () { case " $REGS_MACROS " in *" $1 "*) return 0;; esac; return 1; }
+
+# Is macro $1 redirected by defaults.h to the register vocabulary?  Two
+# different redirects, matched separately and exactly, because they mean
+# different things and a check that accepted either would be satisfied by the
+# wrong one: the two COUNTS become the compile-time union width, and
+# REGNO_REG_CLASS becomes a run-time call.
+reg_redirected () {
+  case $1 in
+    FIRST_PSEUDO_REGISTER|N_REG_CLASSES)
+      grep -qE "^#define $1 MULTI_TARGET_UNION_$1\$" "$SRC/defaults.h" ;;
+    REGNO_REG_CLASS)
+      grep -qE '^#define REGNO_REG_CLASS\(REGNO\)' "$SRC/defaults.h" \
+        && grep -qE 'targetm_regs->regno_reg_class' "$SRC/defaults.h" ;;
+    *) return 1 ;;
+  esac
+}
+
 is_cdata_num () { case " $CDATA_NUM " in *" $1:"*) return 0;; esac; return 1; }
 cdata_num_want () {                    # cdata_num_want <macro> <base>
   local e f
@@ -313,6 +345,7 @@ resolve () {                           # resolve <hexaddr> -> symbol name
 getptr () { awk -F'|' -v b="$2" -v m="$3" '$1=="PTR"&&$2==b&&$3==m{print $5}' "$1"; }
 getstr () { awk -F'|' -v b="$2" -v m="$3" '$1=="STR"&&$2==b&&$3==m{print $5}' "$1"; }
 getnum () { awk -F'|' -v b="$2" -v m="$3" '$1=="NUM"&&$2==b&&$3==m{print $5}' "$1"; }
+getregv () { awk -F'|' -v b="$2" -v m="$3" '$1=="REGV"&&$2==b&&$3==m{print $5}' "$1"; }
 
 ########################################################################
 # 3.  DISCRIMINATION CONTROLS -- run BEFORE any verdict is issued.
@@ -497,10 +530,164 @@ and the check says it is.  The check answers yes to everything."
 echo "control: OK -- the defaults.h redirect check reports both answers"
 
 ########################################################################
+# 4c. AN INDEPENDENT VALUE FOR THE REGISTER COUNTS.
+#
+# The registry inside cc1 says i386 has 92 registers and 34 classes and aarch64
+# has 95 and 20.  Scoring that against a table written in this file would be a
+# tautology of the same shape PREREGISTER-cdata-num.md exists to avoid, and
+# scoring it against the header probe is no longer possible: the header probe
+# now reads the UNION for both names in every context -- that is precisely why
+# these three arms were retired.
+#
+# So ask each back end's own headers directly, by the route the widths
+# themselves are measured (gcc/multi-target-reg-probe.cc + gen-reg-widths.sh):
+# compile a declaration whose array bound is the value, in that base's own
+# include context, with -DMULTI_TARGET_REG_PROBE so defaults.h's union block is
+# skipped, and read the size back with `nm -S'.  Nothing is executed.  This is
+# a different authority from the registry -- headers versus a constexpr table
+# built and linked into cc1 -- so a disagreement is a real finding, and a
+# registry pinned to one base cannot agree with both.
+#
+# +1 on every bound, and every way of learning nothing is fatal: a zero-sized
+# object and an object `nm' did not report are indistinguishable, and a missing
+# answer must never be able to act as an answer.
+########################################################################
+cat > "$OUT/reghdr.cc" <<'EOF'
+#include "config.h"
+#include "system.h"
+#include "coretypes.h"
+#include "tm.h"
+#ifndef MULTI_TARGET_REG_PROBE
+#error this probe must be compiled with -DMULTI_TARGET_REG_PROBE
+#endif
+extern "C" {
+char mt_hdr_first_pseudo_register[FIRST_PSEUDO_REGISTER + 1];
+char mt_hdr_n_reg_classes[N_REG_CLASSES + 1];
+}
+EOF
+declare -A HDR_FPR HDR_NRC
+for b in $BASES; do
+  [ -d "$BUILD/gcc/$b-inc" ] \
+    || die "no $BUILD/gcc/$b-inc; the header oracle would fall back to the \
+primary's tm.h and report i386's counts for both bases"
+  ( cd "$BUILD/gcc" && g++ -c -o "$OUT/reghdr-$b.o" "$OUT/reghdr.cc" \
+      "-I$b-inc" -DMULTI_TARGET_REG_PROBE $CPPI -std=c++14 -w ) \
+      > "$OUT/reghdr-$b.out" 2> "$OUT/reghdr-$b.err" \
+    || { cat "$OUT/reghdr-$b.err"; die "header oracle did not compile for $b"; }
+  for pair in "mt_hdr_first_pseudo_register:FPR" "mt_hdr_n_reg_classes:NRC"; do
+    sym=${pair%%:*}; key=${pair##*:}
+    sz=$(nm -S --defined-only "$OUT/reghdr-$b.o" \
+         | awk -v s="$sym" '$4==s{print strtonum("0x" $2)}')
+    [ -n "$sz" ] || die "header oracle: nm reported no size for $sym in $b's \
+object.  A symbol nm did not print must not read as a value."
+    [ "$sz" -gt 1 ] || die "header oracle: $sym came back size $sz for $b; the \
+bound is VALUE+1, so anything <= 1 means the value was 0 or absent"
+    eval "HDR_$key[$b]=\$(( sz - 1 ))"
+  done
+  echo "oracle: $b's OWN headers say FIRST_PSEUDO_REGISTER=${HDR_FPR[$b]} \
+N_REG_CLASSES=${HDR_NRC[$b]}"
+done
+
+# DISCRIMINATION, ASSERTED BEFORE ANY VERDICT.  If the two bases' headers gave
+# the same counts, every PASS below would be equally consistent with a registry
+# that answers one base's numbers for everyone -- the targetm_asm_ops failure.
+# In THIS configuration they differ in both, so the arms can tell those two
+# worlds apart; in a configuration where they did not, this would (correctly)
+# refuse rather than print a scoreboard that cannot mean anything.
+[ "${HDR_FPR[i386]}" != "${HDR_FPR[aarch64]}" ] \
+  || die "oracle: both bases' headers give FIRST_PSEUDO_REGISTER=${HDR_FPR[i386]}; \
+the arm cannot discriminate and its PASS would prove nothing"
+[ "${HDR_NRC[i386]}" != "${HDR_NRC[aarch64]}" ] \
+  || die "oracle: both bases' headers give N_REG_CLASSES=${HDR_NRC[i386]}; \
+the arm cannot discriminate"
+echo "control: OK -- the two bases' own headers DIFFER in both counts \
+(${HDR_FPR[i386]}/${HDR_NRC[i386]} vs ${HDR_FPR[aarch64]}/${HDR_NRC[aarch64]}), \
+so the registry cannot satisfy both by answering one"
+
+# The registry must have been found at all.  A NULL lookup would otherwise
+# arrive as three missing slots and read as "no slot in the dump", which is a
+# FAIL rendered exactly like a wrong value.
+for b in $BASES; do
+  [ "$(getnum "$OUT/slots.txt" "$b" MT_REGS_FOUND)" = 1 ] \
+    || die "target_regs_for(\"$b\") returned NULL inside the running cc1: the \
+registry does not carry that base at all.  Every register verdict would be \
+'no slot in the dump', which is indistinguishable from a wrong answer."
+done
+
+# The control for `reg_redirected', both directions -- a checker stuck on one
+# answer would pass or fail all three arms alike.
+reg_redirected FIRST_PSEUDO_REGISTER \
+  || die "control: defaults.h redirects FIRST_PSEUDO_REGISTER to the union and \
+the check says it does not"
+reg_redirected UNITS_PER_WORD \
+  && die "control: UNITS_PER_WORD is not a register-vocabulary macro and the \
+check says it is redirected; it answers yes to everything"
+echo "control: OK -- the register redirect check reports both answers"
+
+########################################################################
 # 5.  VERDICTS
 ########################################################################
 : > "$OUT/results.txt"
 for m in $TAB_MACROS; do
+  if is_regs "$m"; then
+    for b in $BASES; do
+      why=""; v=PASS
+      if ! reg_redirected "$m"; then
+        v=FAIL; why="COMPLETENESS: defaults.h no longer redirects $m, so every \
+target-independent use reads the primary's tm.h again"
+      elif [ "$m" = REGNO_REG_CLASS ]; then
+        p=$(getptr "$OUT/slots.txt" "$b" "$m")
+        o_other=$(for o in $BASES; do [ "$o" = "$b" ] || getptr "$OUT/slots.txt" "$o" "$m"; done)
+        vec=$(getregv "$OUT/slots.txt" "$b" "$m")
+        v_other=$(for o in $BASES; do [ "$o" = "$b" ] || getregv "$OUT/slots.txt" "$o" "$m"; done)
+        own=${HDR_FPR[$b]}
+        # Everything at or past this base's own register count must answer 0
+        # (NO_REGS).  Generic code walks to the union width, so this fence is
+        # the only thing between i386's `regclass_map[REGNO]' and three reads
+        # past the end of a real array -- in bounds of the struct, silent.
+        tail_ok=$(echo "$vec" | awk -F, -v n="$own" \
+          '{ for (i = n + 1; i <= NF; i++) if ($i != 0) { print "no:" i-1 ":" $i; exit } print "yes" }')
+        if [ -z "$p" ] || [ -z "$vec" ]; then
+          v=FAIL; why="no slot in the dump"
+        elif [ "$p" = "$o_other" ]; then
+          v=FAIL; why="DISPATCH: $b and the other base hold the SAME \
+regno_reg_class address ($p).  One body answers for every base."
+        elif [ "$vec" = "$v_other" ]; then
+          v=FAIL; why="DISPATCH: the two bases return the SAME class for every \
+register number; the dispatch is not per-base"
+        elif [ "$tail_ok" != yes ]; then
+          v=FAIL; why="FENCE: $b answers ${tail_ok##*:} for register \
+$(t=${tail_ok#no:}; echo "${t%%:*}"), which is past its own \
+first_pseudo_register ($own).  Generic code walks to the union width, so this \
+is the read that would have gone off the end of regclass_map."
+        else
+          why="DISPATCH: per-base regno_reg_class at $p (the other base holds \
+$o_other), answers differ between the bases, and every register at or past \
+$b's own count ($own) comes back NO_REGS"
+        fi
+      else
+        g=$(getnum "$OUT/slots.txt" "$b" "$m")
+        case $m in
+          FIRST_PSEUDO_REGISTER) w=${HDR_FPR[$b]} ;;
+          N_REG_CLASSES)         w=${HDR_NRC[$b]} ;;
+        esac
+        if [ -z "$g" ]; then
+          v=FAIL; why="no slot in the dump"
+        elif [ -z "$w" ]; then
+          v=FAIL; why="DISPATCH: the header oracle produced no value for $m on $b"
+        elif [ "$g" = "$w" ]; then
+          why="DISPATCH: the registry in the linked cc1 holds $g for $b, \
+matching $b's OWN headers measured independently (and the other base's value \
+differs, so this arm discriminates)"
+        else
+          v=FAIL; why="DISPATCH: the registry holds [$g] for $b but $b's own \
+headers say [$w]"
+        fi
+      fi
+      echo "$b $m TAB $v $why" >> "$OUT/results.txt"
+    done
+    continue
+  fi
   if is_cdata_num "$m"; then
     # (c-DATA), numeric.  Same two questions as the string case: does
     # defaults.h still redirect the name, and did this base's refresh write

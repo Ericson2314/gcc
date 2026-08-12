@@ -1088,3 +1088,170 @@ untouched, as instructed.  Seven of #106's ten `ix86_*` references remain; this
 change removes `init_cumulative_args` and `ix86_call_abi_override` from
 `function.o` and adds none.  No aarch64 acceptance arm is claimed and no
 single-target aarch64 reference was built.
+
+---
+
+# TASK #92 -- three wrong-reason greens retired, one control re-anchored, the
+# 60-site layout guard made to fire
+
+Branched from `cc9ef129b37` ("PRINCIPLES: correct the scoreboard, record two
+instrument traps").  Build dir `/tmp/b-92`, my own, cold (`scratchpad/t92-build.sh`).
+Specs via `t106-ts.sh` repointed -- `rv-specs.sh` is still stale.
+
+## 1. THE THREE RETIREMENTS
+
+`ecad6abf6ae` flipped three aarch64 header arms FAIL -> PASS.  Measured on my
+own build with the HEAD scripts, before any change of mine (`/tmp/mtp-92-before`),
+they are exactly three of the five aarch64 PASSes:
+
+    FIRST_PSEUDO_REGISTER  INT   92 / 95   -> 95 in all three contexts
+    N_REG_CLASSES          INT   34 / 20   -> 34 in all three contexts
+    REGNO_REG_CLASS        EXP   regclass_map[..] / aarch64_regno_regclass (..)
+                                 -> ((enum reg_class) targetm_regs->regno_reg_class (..))
+
+The first two are now `MULTI_TARGET_UNION_*`: being one number in every consumer
+TU is the POINT, because it is the layout of the four shared structures.  The
+third is a run-time dispatch.  In all three the per-base fact left the headers,
+so a green here is a fact about the redirect.
+
+New status **`CONVERTED_REGS`** in `macro-status.txt`, retired by the same
+mechanical gate as `CONVERTED_CDATA`/`CONVERTED_GONE`.  It is separate from
+`CONVERTED_CDATA` because the completeness check differs: cdata's redirect is
+`#define M (targetm_cdata.`, this one's is `MULTI_TARGET_UNION_*` or
+`targetm_regs->`.  One status covering both would accept the wrong redirect.
+`macro-probe.sh` also now REJECTS any status word it does not know -- an
+unrecognised status was silently read as UNCONVERTED, i.e. keeps a header arm
+and is never required to have a TAB arm, which is the gate failing to catch the
+thing it exists for.
+
+## 2. THE RE-ANCHORED CONTROL
+
+Re-anchored the **EXP** control from `STACK_POINTER_REGNUM` to
+**`SELECT_CC_MODE`**.  Arm 0 (INT) keeps `STACK_POINTER_REGNUM`; STR keeps
+`GLOBAL_ASM_OP`.
+
+Why EXP and not INT: `STACK_POINTER_REGNUM` is itself UNCONVERTED and is named
+in MACRO-LEAK.md as 7-vs-31, i.e. it is scheduled to be converted.  Two controls
+on one macro are one control with two names, and its conversion would have taken
+INT and EXP out in the same run with the summary still printing.
+`SELECT_CC_MODE` is not a register macro, is untouched by the register work, and
+expands to a DIFFERENT CALLEE per base (`ix86_cc_mode` vs
+`aarch64_select_cc_mode`) -- the difference EXP is strongest at, rather than a
+bare integer INT could have valued.  It is also function-like, so it exercises
+the dummy-argument path 168 real EXP arms use and that no control touched before.
+
+The independence is now CHECKED, not asserted: the three witness names are read
+back out of the probe sources the controls actually compiled and required to be
+distinct.  Prints
+`control: OK -- the three phases rest on three DIFFERENT macros (INT=STACK_POINTER_REGNUM STR=GLOBAL_ASM_OP EXP=SELECT_CC_MODE)`.
+
+## 3. THE 60-SITE GUARD -- IT FIRES, AND ITS REACH IS MUCH NARROWER THAN IT LOOKS
+
+Perturbed sites in `gcc/hard-reg-set.h` one at a time (build, run cc1, restore).
+`gcc/` is byte-identical to HEAD now; `git diff --stat gcc/` is empty.
+
+    ATTEMPT 1  x_fixed_regs[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER]
+               -> FIRST_PSEUDO_REGISTER          DID NOT FIRE.  cc1 rc=0.
+    ATTEMPT 2  x_reg_class_size[MULTI_TARGET_UNION_N_REG_CLASSES]
+               -> N_REG_CLASSES                  DID NOT FIRE.  cc1 rc=0.
+    ATTEMPT 3  x_reg_names[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER]
+               -> FIRST_PSEUDO_REGISTER          FIRED:
+
+    cc1: internal compiler error: back end 'i386' computes
+      'sizeof (struct target_hard_regs)' as 16400, but target-independent code
+      allocates 16424; a bound in its header is not spelled MULTI_TARGET_UNION_*
+
+So the guard CAN report the outcome it was built for, and names the struct, the
+base and both numbers.  **The two misses are the finding, and they are not
+flukes.**
+
+  * ATTEMPT 1 is PADDING.  `char x_fixed_regs[92]` and `[95]` are both followed
+    by a `HARD_REG_SET` aligned to 8, so both round to 96 and `sizeof` is
+    unchanged.  Measured directly, not inferred: the same TU compiled `mt` and
+    `-Ii386-inc -DMULTI_TARGET_REG_PROBE` gave `sizeof (struct
+    target_hard_regs)` = 0x4028 on BOTH sides with the perturbation in place.
+    A `sizeof` comparison cannot see a shrink that lands in padding, and the
+    `char` arrays are exactly the fields where a 3-byte shrink usually will.
+  * ATTEMPT 2 is the CONFIGURATION.  `N_REG_CLASSES` is 34 for i386 and 20 for
+    aarch64, and the union is 34 -- i386's own.  So for an i386 selection a
+    class-bounded bound spelled the unqualified way is the SAME number, and
+    nothing can differ.  The guard only ever checks the SELECTED base, and
+    aarch64 still ICEs earlier (REAL_MODE_FORMAT), so today the guard's live
+    reach is: i386-selected, FIRST_PSEUDO_REGISTER-bounded, and only where
+    3 * sizeof(element) survives padding.
+
+    That is a small fraction of the ~71 `MULTI_TARGET_UNION_*` occurrences over
+    57 lines in the four headers.  The guard is not weakened by saying so -- it
+    is the difference between "passes" and "passes and here is what it can see".
+    When aarch64 gets past its ICE, half of this scope limit lifts by itself.
+
+  * Unrelated, for whoever owns `reginfo.cc`: rebuilding it emits 8 copies of
+    `reginfo.cc:195: warning: unquoted identifier or keyword 'MULTI_TARGET_UNION_'
+    in format [-Wformat-diag]` and a matching `spurious trailing punctuation '*'`.
+    Pre-existing, from the guard's own message.  Quote the name.
+
+## 4. TAB ARMS THAT READ THE RUNNING cc1
+
+`tab-plugin.cc` now asks `target_regs_for (base)` inside the linked cc1 -- asked
+by name rather than reading `targetm_regs`, so both columns come out of one run
+and the lookup `multi_target_select` uses is exercised -- and dumps
+`first_pseudo_register`, `n_reg_classes`, the `regno_reg_class` pointer, and the
+whole answer vector over the union width.  `SLOTS_PER_BASE` 32 -> 37.
+
+Scored against an INDEPENDENT authority, never against the registry itself:
+tab-probe.sh section 4c compiles `char x[VALUE + 1]` in each base's own include
+context with `-DMULTI_TARGET_REG_PROBE` and reads the size back with `nm -S` --
+the same route `gen-reg-widths.sh` uses, but per base.  The header probe can no
+longer serve as that oracle, which is the whole reason these arms moved.
+Oracle: i386 92/34, aarch64 95/20, asserted to DIFFER before any verdict.
+
+Six new TAB arms, all PASS.  `REGNO_REG_CLASS` additionally requires distinct
+per-base function addresses, differing answer vectors, and the FENCE: every
+regno at or past that base's own count must come back NO_REGS.
+
+NEGATIVE CONTROLS, both run, because an arm that has only ever said PASS has not
+been shown able to say FAIL:
+
+  * plugin pinned to `target_regs_for ("i386")` for every base -> aarch64
+    FIRST_PSEUDO_REGISTER and N_REG_CLASSES FAIL naming 92-vs-95 and 34-vs-20,
+    and BOTH REGNO_REG_CLASS arms FAIL with "one body answers for every base".
+    That is the `targetm_asm_ops` failure, reproduced deliberately.
+  * one poisoned tail entry -> `FENCE: i386 answers 7 for register 94, which is
+    past its own first_pseudo_register (92)`.  aarch64 correctly stays PASS,
+    because 94 is inside ITS 95.
+
+## 5. SCOREBOARD, BEFORE AND AFTER, ON /tmp/b-92
+
+    BEFORE (HEAD scripts, my build)   230 header arms  i386 115/0   aarch64  5 PASS / 110 FAIL
+                                       58 TAB arms     i386  29/0   aarch64 24 PASS /   5 FAIL
+    AFTER                             224 header arms  i386 112/0   aarch64  2 PASS / 110 FAIL
+                                       64 TAB arms     i386  32/0   aarch64 27 PASS /   5 FAIL
+
+**The aarch64 header number goes DOWN, 5 -> 2, and that is a CORRECTION.**  The
+three arms removed were never measuring what they were counted as measuring.
+aarch64's remaining two header PASSes are `MAX_BITSIZE_MODE_ANY_MODE` and
+`MAX_BITS_PER_WORD`, both INT, both genuinely equal between the bases.  The
+aarch64 FAIL count is unchanged at 110 in both runs -- nothing was moved out of
+the red column.  The six TAB arms added are the replacement, and they are green
+against an oracle that differs between the bases.
+
+Quote **224 header arms: i386 112 PASS / 0 FAIL, aarch64 2 PASS / 110 FAIL;
+64 TAB arms: i386 32 PASS / 0 FAIL, aarch64 27 PASS / 5 FAIL.**  The five TAB
+reds are the unchanged `CDATA_NUM_OPTSTATE` arms.
+
+## 6. NO REGRESSION
+
+  * `make cc1` and `make multi-target-objs` rc=0 after restoring `gcc/`.
+  * cc1 on a trivial input: rc=0, stderr 0 bytes.
+  * `stock-compare.sh` with an ABSOLUTE `IN`, `MT=/tmp/b-92`: 5/5 scored, 5/5
+    IDENTICAL, 5 distinct md5s per side, negative control fired.  rc=0.
+  * `gcc/` is untouched by this change.  Everything landed is under `scratchpad/`.
+
+## WHAT I DID NOT MEASURE
+
+The aarch64 side of the register data is still only reachable through the
+plugin's single i386-selected run, because aarch64 cc1 still ICEs before plugin
+callbacks fire.  The new arms read aarch64's TABLE, which is constexpr and
+therefore complete without a selection -- but nothing here shows aarch64's
+register world being USED, and no aarch64 `.s` exists.  That distinction is the
+`targetm_asm_ops` lesson and I am not claiming past it.
