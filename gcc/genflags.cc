@@ -256,12 +256,31 @@ main (int argc, const char **argv)
 
   for (insn_ptr = insns; *insn_ptr; insn_ptr++)
     {
-      bool global_p = gen_name_is_global_p (XSTR (*insn_ptr, 0));
-      if (global_p)
-	print_ns_close (stdout);
+      /* A name the middle end already declares is SKIPPED here, not moved out
+	 of the namespace.  `gen_blockage' is the case: emit-rtl.h declares it
+	 unconditionally, so a second declaration -- in the namespace, brought
+	 into scope by the using-directive above -- makes every hand-written
+	 `gen_blockage ()' in config/i386/i386.cc and config/aarch64/aarch64.cc
+	 an ambiguous overload.  Emitting it at global scope instead is worse:
+	 that is what used to happen, and it is why two back ends both defined
+	 `::gen_blockage' and the archive silently kept one.
+
+	 Omitting the declaration is the least wrong of three options and not
+	 a good one.  The one declaration left in force is emit-rtl.h's, and
+	 the definition behind it is the SINGULAR insn-emit.cc's -- the
+	 primary's -- so a back end calling gen_blockage from its own
+	 hand-written source reaches the primary's expansion.  That is wrong
+	 for every back end but the primary, and it is wrong the way this
+	 whole branch is about: quietly.  It cannot be fixed here, because
+	 fixing it means the middle end guarding on `HAVE_blockage' unioned
+	 over every configured back end rather than on the primary's, i.e.
+	 unioning the singular insn-flags.h the way insn-config.h has already
+	 been unioned.  Written down rather than papered over; the back end's
+	 own insn-emit file is unaffected either way, since unqualified lookup
+	 inside namespace insn_<base> finds the member first.  */
+      if (gen_name_is_global_p (XSTR (*insn_ptr, 0)))
+	continue;
       gen_proto (*insn_ptr);
-      if (global_p)
-	print_ns_open (stdout);
     }
 
   print_ns_close (stdout);

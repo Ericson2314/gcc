@@ -22,15 +22,32 @@ along with GCC; see the file COPYING3.  If not see
 
 typedef opt_mode<machine_mode> opt_machine_mode;
 
-extern CONST_MODE_SIZE poly_uint16 mode_size[NUM_MACHINE_MODES];
-extern CONST_MODE_PRECISION poly_uint16 mode_precision[NUM_MACHINE_MODES];
-extern const unsigned short mode_inner[NUM_MACHINE_MODES];
-extern CONST_MODE_NUNITS poly_uint16 mode_nunits[NUM_MACHINE_MODES];
-extern CONST_MODE_UNIT_SIZE unsigned char mode_unit_size[NUM_MACHINE_MODES];
-extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];
-extern const unsigned short mode_next[NUM_MACHINE_MODES];
-extern const unsigned short mode_wider[NUM_MACHINE_MODES];
-extern const unsigned short mode_2xwider[NUM_MACHINE_MODES];
+/* Every mode table below is declared through GCC_TARGET_TABLE, which
+   insn-modes.h defines.  On a single-target build it expands to the array
+   these have always been.  On a multi-target build it expands to a POINTER:
+   each configured back end has its own table, in its own namespace, and
+   multi-target-select.cc aims these names at the back end in force.
+
+   Indexing is written the same way either way, which is the point -- not one
+   of the several thousand `mode_size[m]' call sites has to know.  What DOES
+   change is that `sizeof mode_size' and any use of one of these in a constant
+   expression stop compiling, and that is wanted: both are answers about one
+   particular back end being given to code that serves all of them.  */
+
+extern GCC_TARGET_TABLE (CONST_MODE_SIZE poly_uint16, mode_size,
+		       NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (CONST_MODE_PRECISION poly_uint16, mode_precision,
+		       NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (const unsigned short, mode_inner, NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (CONST_MODE_NUNITS poly_uint16, mode_nunits,
+		       NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (CONST_MODE_UNIT_SIZE unsigned char, mode_unit_size,
+		       NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (const unsigned short, mode_unit_precision,
+		       NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (const unsigned short, mode_next, NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (const unsigned short, mode_wider, NUM_MACHINE_MODES);
+extern GCC_TARGET_TABLE (const unsigned short, mode_2xwider, NUM_MACHINE_MODES);
 
 template<typename T>
 struct mode_traits
@@ -93,7 +110,7 @@ struct mode_traits<machine_mode>
 
 /* Get the name of mode MODE as a string.  */
 
-extern const char * const mode_name[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (const char *const, mode_name, NUM_MACHINE_MODES);
 #define GET_MODE_NAME(MODE)  mode_name[MODE]
 
 /* Mode classes.  */
@@ -107,7 +124,7 @@ enum mode_class { MODE_CLASSES, MAX_MODE_CLASS };
 /* Get the general kind of object that mode MODE represents
    (integer, floating, complex, etc.)  */
 
-extern const unsigned char mode_class[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (const unsigned char, mode_class, NUM_MACHINE_MODES);
 #define GET_MODE_CLASS(MODE)  ((enum mode_class) mode_class[MODE])
 
 /* Nonzero if MODE is an integral mode.  */
@@ -734,18 +751,20 @@ GET_MODE_PRECISION (const T &mode)
 #endif
 
 /* Get the number of integral bits of an object of mode MODE.  */
-extern CONST_MODE_IBIT unsigned char mode_ibit[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (CONST_MODE_IBIT unsigned char, mode_ibit,
+		       NUM_MACHINE_MODES);
 #define GET_MODE_IBIT(MODE) mode_ibit[MODE]
 
 /* Get the number of fractional bits of an object of mode MODE.  */
-extern CONST_MODE_FBIT unsigned char mode_fbit[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (CONST_MODE_FBIT unsigned char, mode_fbit,
+		       NUM_MACHINE_MODES);
 #define GET_MODE_FBIT(MODE) mode_fbit[MODE]
 
 /* Get a bitmask containing 1 for all bits in a word
    that fit within mode MODE.  */
 
-extern CONST_MODE_MASK unsigned HOST_WIDE_INT
-  mode_mask_array[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (CONST_MODE_MASK unsigned HOST_WIDE_INT,
+		       mode_mask_array, NUM_MACHINE_MODES);
 
 #define GET_MODE_MASK(MODE) mode_mask_array[MODE]
 
@@ -828,7 +847,8 @@ GET_MODE_2XWIDER_MODE (const T &m)
 }
 
 /* Get the complex mode from the component mode.  */
-extern const unsigned short mode_complex[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (const unsigned short, mode_complex,
+		       NUM_MACHINE_MODES);
 #define GET_MODE_COMPLEX_MODE(MODE) ((machine_mode) mode_complex[MODE])
 
 /* Represents a machine mode that must have a fixed size.  The main
@@ -970,7 +990,8 @@ extern bool get_best_mode (HOST_WIDE_INT, HOST_WIDE_INT,
 
 /* Determine alignment, 1<=result<=BIGGEST_ALIGNMENT.  */
 
-extern CONST_MODE_BASE_ALIGN unsigned short mode_base_align[NUM_MACHINE_MODES];
+extern GCC_TARGET_TABLE (CONST_MODE_BASE_ALIGN unsigned short, mode_base_align,
+		       NUM_MACHINE_MODES);
 
 extern unsigned get_mode_alignment (machine_mode);
 
@@ -978,7 +999,8 @@ extern unsigned get_mode_alignment (machine_mode);
 
 /* For each class, get the narrowest mode in that class.  */
 
-extern const unsigned short class_narrowest_mode[MAX_MODE_CLASS];
+extern GCC_TARGET_TABLE (const unsigned short, class_narrowest_mode,
+		       MAX_MODE_CLASS);
 #define GET_CLASS_NARROWEST_MODE(CLASS) \
   ((machine_mode) class_narrowest_mode[CLASS])
 
@@ -1039,7 +1061,7 @@ struct int_n_data_t {
 /* This is also in tree.h.  genmodes.cc guarantees the're sorted from
    smallest bitsize to largest bitsize. */
 extern bool int_n_enabled_p[NUM_INT_N_ENTS];
-extern const int_n_data_t int_n_data[NUM_INT_N_ENTS];
+extern GCC_TARGET_TABLE (const int_n_data_t, int_n_data, NUM_INT_N_ENTS);
 
 /* Return true if MODE has class MODE_INT, storing it as a scalar_int_mode
    in *INT_MODE if so.  */

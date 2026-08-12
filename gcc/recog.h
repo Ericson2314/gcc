@@ -549,7 +549,15 @@ struct insn_data_d
   const char output_format;
 };
 
-extern const struct insn_data_d insn_data[];
+/* Declared through GCC_TARGET_TABLE (insn-modes.h defines it) for the same
+   reason the mode tables in machmode.h are: on a multi-target build each
+   configured back end has its own insn_data, in namespace insn_<base>, and
+   this bare name is a POINTER that multi-target-select.cc aims at the one in
+   force.  A single-target build gets the array it always had.
+
+   The array bound is deliberately empty here, as it always was -- the size is
+   the back end's insn count and no caller knows it.  */
+extern GCC_TARGET_TABLE (const struct insn_data_d, insn_data, );
 extern int peep2_current_count;
 
 #ifndef GENERATOR_FILE

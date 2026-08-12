@@ -142,7 +142,14 @@ static int override_discriminator;
 /* Whether to force emission of a line note before the next insn.  */
 static bool force_source_line = false;
 
-extern const int length_unit_log; /* This is defined in insn-attrtab.cc.  */
+/* Not `const' any more, and the reason is worth a line.  Each configured back
+   end computes its own value into insn_<base>::length_unit_log, and
+   multi-target-select.cc copies the selected one here.  A const object cannot
+   be assigned after selection, so the alternative to dropping const is a
+   privileged default -- the primary's alignment used for every target -- which
+   is silently wrong rather than loud.  A single-target build is unaffected:
+   its insn-attrtab.cc still defines this, still as a constant.  */
+extern int length_unit_log;
 
 /* Nonzero while outputting an `asm' with operands.
    This means that inconsistencies are the user's fault, so don't die.

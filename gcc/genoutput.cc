@@ -303,7 +303,12 @@ output_insn_data (void)
       }
 
   printf ("#if GCC_VERSION >= 2007\n__extension__\n#endif\n");
-  printf ("\nconst struct insn_data_d insn_data[] = \n{\n");
+  /* Two names on a multi-target build, matching genmodes' mode tables and
+     recog.h's GCC_TARGET_TABLE declaration: the array is insn_data_tab and
+     insn_data is a pointer to it, both inside namespace insn_<base>.  The
+     selector copies the pointer.  A single-target build is unchanged.  */
+  printf ("\nconst struct insn_data_d insn_data%s[] = \n{\n",
+	  gen_target_ns () ? "_tab" : "");
 
   for (d = idata; d; d = d->next)
     {
@@ -411,7 +416,10 @@ output_insn_data (void)
 
       printf ("  },\n");
     }
-  printf ("};\n\n\n");
+  printf ("};\n");
+  if (gen_target_ns ())
+    printf ("const struct insn_data_d *insn_data = insn_data_tab;\n");
+  printf ("\n\n");
 }
 
 static void
@@ -1160,8 +1168,14 @@ main (int argc, const char **argv)
 
   printf ("\n\n");
   output_operand_data ();
+  /* `insn_data' and `get_insn_name' are declared bare in the hand-written
+     recog.h and rtl.h and read all over the middle end, so two back ends
+     defining them bare is the silent-collision case.  Namespaced here; the
+     bare names come from multi-target-select.cc.  */
+  print_ns_open (stdout);
   output_insn_data ();
   output_get_insn_name ();
+  print_ns_close (stdout);
 
   /* Since genoutput has no information about hard register names we cannot
      statically verify hard register names in constraints of the machine
@@ -1169,6 +1183,7 @@ main (int argc, const char **argv)
      verification shouldn't be too expensive, restrict it to checking builds.
    */
   printf ("\n\n#if CHECKING_P\n");
+  print_ns_open (stdout);
   if (used_reg_names.is_empty ())
     printf ("void verify_reg_names_in_constraints () { }\n");
   else
@@ -1202,6 +1217,7 @@ main (int argc, const char **argv)
 	      "constraint of machine description\", hregnames[i]);\n");
       printf ("}\n");
     }
+  print_ns_close (stdout);
   printf ("#endif\n");
 
   fflush (stdout);

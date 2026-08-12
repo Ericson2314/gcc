@@ -1,0 +1,455 @@
+/* Which back end's generated machine description is in force.
+   Copyright (C) 2026 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
+/* THE FORTY NAMES.
+
+   Every configured back end's generated code now lives in `namespace
+   insn_<base>' -- see print_ns_open in gensupport.cc -- and every one of its
+   hand-written sources is compiled with -D<name>=<name>_<base> for the short
+   list in MULTI_TARGET_RENAME_NAMES.  What is left is this file: the forty
+   bare names the middle end reaches for directly, defined once, each
+   forwarding to the back end in force.
+
+   The set was not guessed.  It is `nm --defined-only' over i386's 42 object
+   files intersected with aarch64's 52, filtered to strong symbols
+   (scratchpad/sweep.sh), and it must be re-run rather than reasoned about:
+   libbackend.a is an ARCHIVE, so a duplicate definition is diagnosed only
+   when both members happen to be pulled in for other reasons.  `ld' once
+   reported 7 of 40.  Never size this set with the linker.
+
+   THREE TRAPS, ALL PAID FOR ALREADY IN common/common-target-select.cc AND
+   target-asm-ops-select.cc, AND THEY APPLY HERE UNCHANGED:
+
+     * NO PRIVILEGED DEFAULT.  Nothing here starts out pointing at the build
+       triple's back end.  A compiler that has selected nothing has null
+       tables and no recog, and says so by name at the first use.  Starting at
+       the primary's tables is what makes a missed dependency behave correctly
+       on the build machine and wrongly everywhere else -- the whole bug class
+       this branch exists to remove.
+
+     * NAME EVERY TABLE.  These objects come out of an archive and an archive
+       member that nothing refers to is not pulled in at all.  mt_backends[]
+       below refers to all of them; without it only whichever back end
+       something else happened to mention would reach the compiler, however
+       many were compiled.
+
+     * INITIALISE WITH AN ADDRESS, NOT A STRUCT COPY.  mt_current is a pointer
+       to a constant-initialised table, so there is no dynamic initialisation
+       and no ordering question between translation units.  `targetm' used to
+       be the one exception -- a copy -- and that was a bug, not a cost; see
+       mt_install_* below.  Nothing here is a copy now.  */
+
+/* The include order is recog.cc's, not a minimal set.  emit-rtl.h needs
+   backend.h's forward declarations, tm-preds.h needs hard-reg-set.h before it
+   will define `struct target_constraints' at all, and tm-constrs.h needs
+   tm_p.h for the predicate prototypes its inline wrappers call.  Trimming
+   this list produces a page of `incomplete type' and `not declared in this
+   scope' inside those headers, which reads as a bug in them.  */
+#include "config.h"
+#include "system.h"
+#include "coretypes.h"
+#include "backend.h"
+#include "target.h"
+#include "rtl.h"
+#include "tree.h"
+#include "memmodel.h"
+#include "tm_p.h"
+#include "insn-config.h"
+#include "emit-rtl.h"
+#include "recog.h"
+#include "output.h"
+#include "real.h"
+#include "diagnostic-core.h"
+#include "options.h"
+#include "tm-constrs.h"
+
+/* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
+   back end -- and MT_TARGET_BASES, which maps each configured triple to the
+   back end serving it.  Written by gen-multi-target-md.awk from
+   multi-target.manifest.  */
+#include "multi-target-backends.h"
+
+/* THE SHARED CONSTRAINT STORAGE.
+
+   genpreds used to emit these two into every back end's insn-preds-<base>.cc,
+   so a compiler with two back ends had two of each under the bare names
+   target-globals.h declares.  They are not per-back-end constants: `struct
+   target_constraints' is runtime storage that the selected back end's
+   init_reg_class_start_regs () fills in and the middle end reads through one
+   pointer, so the right number of them is one.  Its LAYOUT is uniform because
+   genpreds now sizes register_filters[] by NUM_REGISTER_FILTERS, which
+   genconfig unions over every configured back end.  */
+struct target_constraints default_target_constraints;
+#if SWITCHABLE_TARGET
+struct target_constraints *this_target_constraints = &default_target_constraints;
+#endif
+
+/* THE HOOK TABLE, AND IT IS A POINTER, NOT A COPY.
+
+   target.h now spells `targetm' as `(*targetm_ptr)', so this file supplies
+   the pointer and mt_install_<base> aims it at the selected back end's own
+   `targetm_<base>'.  What that buys is the only thing that makes a
+   multi-target compiler correct here: back ends WRITE through targetm long
+   after startup -- twelve sites in the two configured back ends alone
+   (i386.cc's seven `targetm.sched.* = NULL', i386-options.cc's
+   `expand_builtin_va_start = NULL', i386-c.cc's and aarch64-c.cc's
+   pragma_parse and friends) -- all of them from option-override or
+   pragma-registration code that runs AFTER selection.  A copy taken here
+   would be taken before those stores and the middle end would never see
+   them: no link error, no diagnostic, it simply keeps calling the hook the
+   back end just disabled.
+
+   This file previously did copy, and said in a comment that no configured
+   back end wrote through targetm, naming the grep that would check it.  The
+   grep was run.  Both configured back ends do it.  A written invariant that
+   nobody executed is how that survived, so the invariant is now enforced by
+   construction rather than asserted: there is no second object to go stale.
+
+   It starts NULL rather than at some default back end.  Reading a hook
+   before selection is then a null dereference: loud, immediate, and at the
+   point of use.  (common/common-target-select.cc can do better -- it
+   generates a complete diagnosing table from common-target.def -- but
+   target.def cannot be walked the same way, because TARGET_INITIALIZER's
+   nesting is not expressible with a flat DEFHOOK sweep.  The ordering that
+   makes this survivable is unchanged: nothing reaches `targetm' before
+   option decoding, and option decoding needs targetm_common, which toplev.cc
+   installs immediately before this and which DOES name itself when no target
+   was selected.  The loud failure happens first, every time.)  */
+struct gcc_target *targetm_ptr;
+
+/* NOT USED, AND HERE ON PURPOSE.  Each back end's own ms_va_list_type_node is
+   renamed to ms_va_list_type_node_<base> (MULTI_TARGET_RENAME_NAMES), and its
+   gt-<file>.h GC root is compiled in the same translation unit, so it sees the
+   rename and roots the right object.  gtype-desc.cc does not: gengtype scanned
+   the declaration out of both config/i386/i386.h and config/aarch64/aarch64.h,
+   which spell one name for two different objects, and emitted a root under the
+   bare name.  That conflation is older than this file and belongs to the
+   target headers; what this definition does is give the stale root something
+   to point at, so the conflict is a permanently-null tree rather than a link
+   failure.  It is a placeholder for a bug, not a fix for one.  */
+tree ms_va_list_type_node;
+
+/* Every back end's entry points, declared here rather than in a generated
+   header because the shapes are fixed by the hand-written declarations in
+   recog.h, rtl.h, output.h, emit-rtl.h and machmode.h -- if one of these ever
+   disagrees with the header it declares against, the compiler says so at the
+   forwarder below, which is the point.  */
+
+/* verify_reg_names_in_constraints exists only under a condition; the
+   alternative to these three macros is an #if inside three different macro
+   bodies, where a `#' is not allowed at all.  */
+#if CHECKING_P
+# define MT_DECLARE_VERIFY extern void verify_reg_names_in_constraints (void);
+# define MT_ENTRY_VERIFY(NS) NS::verify_reg_names_in_constraints,
+# define MT_ENTRY_VERIFY_NULL NULL,
+#else
+# define MT_DECLARE_VERIFY
+# define MT_ENTRY_VERIFY(NS)
+# define MT_ENTRY_VERIFY_NULL
+#endif
+
+#define MT_DECLARE_FUNCS(NS)						\
+  extern int recog (rtx, rtx_insn *, int *);				\
+  extern rtx_insn *split_insns (rtx, rtx_insn *);			\
+  extern rtx_insn *peephole2_insns (rtx, rtx_insn *, int *);		\
+  extern void insn_extract (rtx_insn *);				\
+  extern const char *get_insn_name (int);				\
+  extern rtx_insn *peephole (rtx_insn *);				\
+  extern void init_adjust_machine_modes (void);				\
+  MT_DECLARE_VERIFY
+
+/* The data tables.  One list, used three times: to declare them per back end,
+   to name them in the installer, and -- because it is one list -- to make it
+   impossible to add a table to two of those places and forget the third.
+
+   `mode_name' is here like the rest.  Selecting WHICH mode_name is in force
+   is not the same thing as renaming its entries: GET_MODE_NAME still returns
+   "PSI" for PSImode, the strings are untouched, and no libgcc symbol moves.
+   That distinction is the whole reason this is a table selection and not a
+   symbol rename.  */
+#define MT_MODE_TABLES(F, NS)						\
+  F (mode_size, NS) F (mode_precision, NS) F (mode_inner, NS)		\
+  F (mode_nunits, NS) F (mode_unit_size, NS) F (mode_unit_precision, NS) \
+  F (mode_next, NS) F (mode_wider, NS) F (mode_2xwider, NS)		\
+  F (mode_name, NS) F (mode_class, NS) F (mode_ibit, NS)		\
+  F (mode_fbit, NS) F (mode_complex, NS) F (mode_base_align, NS)	\
+  F (mode_mask_array, NS) F (class_narrowest_mode, NS)			\
+  F (int_n_data, NS) F (real_format_for_mode, NS)
+
+/* NS is threaded through because a macro parameter of MT_BACKEND is NOT
+   substituted inside the body of another macro it expands to.  Without it
+   MT_INSTALL_TABLE says `NS::mode_size' with NS undeclared, and the
+   diagnostic names this line rather than the back end.  */
+#define MT_OTHER_TABLES(F, NS)						\
+  F (insn_data, NS) F (unspec_strings, NS) F (unspecv_strings, NS)
+
+#define MT_ALL_TABLES(F, NS) MT_MODE_TABLES (F, NS) MT_OTHER_TABLES (F, NS)
+
+/* `decltype (::NAME)' rather than a spelled-out type: the qualifier on each of
+   these (CONST_MODE_SIZE and friends) comes from tm.h and so differs between
+   back ends -- aarch64's mode_size is writable because SVE adjusts it at
+   startup, i386's is not.  Taking the type from the declaration the middle end
+   actually uses means the two cannot drift apart silently.  */
+#define MT_DECLARE_TABLE(NAME, NS) extern decltype (::NAME) NAME;
+
+/* THE BARE TABLES THEMSELVES, and they start NULL.  Static storage, so this
+   is zero-initialisation and not dynamic initialisation -- valid before
+   anything runs, with no ordering question.  Reading one before a target is
+   selected is a null dereference: loud, immediate, and at the point of use.
+   That is the intended behaviour and it is why there is no `= i386's table'
+   here.  */
+#define MT_DEFINE_TABLE(NAME, NS) decltype (::NAME) NAME;
+MT_ALL_TABLES (MT_DEFINE_TABLE, )
+
+/* global_options_init_<base> is NOT in the back end's namespace: it is a
+   hand-named function in options-init-<base>.cc, one per back end, and the
+   name already carries the base.  What it does is apply that back end's own
+   Init() values -- see optc-gen.awk -- which cannot be compiled into
+   options.cc because an Init() argument is a macro from that back end's
+   tm.h.  */
+#define MT_BACKEND(BASE, NS)						\
+  namespace NS {							\
+    MT_DECLARE_FUNCS (NS)						\
+    MT_ALL_TABLES (MT_DECLARE_TABLE, NS)				\
+  }									\
+  extern struct gcc_target targetm_ ## BASE;				\
+  extern void global_options_init_ ## BASE (struct gcc_options *);
+MT_BACKENDS
+#undef MT_BACKEND
+
+/* What a back end is, from this file's point of view.  */
+
+struct mt_backend
+{
+  const char *name;
+  int (*recog) (rtx, rtx_insn *, int *);
+  rtx_insn *(*split_insns) (rtx, rtx_insn *);
+  rtx_insn *(*peephole2_insns) (rtx, rtx_insn *, int *);
+  void (*insn_extract) (rtx_insn *);
+  const char *(*get_insn_name) (int);
+  rtx_insn *(*peephole) (rtx_insn *);
+  void (*init_adjust_machine_modes) (void);
+#if CHECKING_P
+  void (*verify_reg_names_in_constraints) (void);
+#endif
+  void (*install_tables) (void);
+};
+
+/* const_cast, not a plain assignment: see MT_DECLARE_TABLE.  The pointee's
+   constness is the back end's business and the middle end's declaration is
+   whatever the PRIMARY's tm.h says, so the two legitimately differ in either
+   direction.  const_cast can only add or remove `const' -- it cannot paper
+   over a genuinely different type, so a real mismatch is still an error.  */
+#define MT_INSTALL_TABLE(NAME, NS) \
+  ::NAME = const_cast<decltype (::NAME)> (NS::NAME);
+
+#define MT_BACKEND(BASE, NS)						\
+  static void mt_install_ ## BASE (void)				\
+  {									\
+    MT_ALL_TABLES (MT_INSTALL_TABLE, NS)				\
+    /* POINT, do not copy.  The back end's own translation units are	\
+       compiled with -Dtargetm=targetm_<base> (and the companion	\
+       -DMULTI_TARGET_TARGETM_BASE, which target.h checks travels with	\
+       it), so `targetm' THERE is this very object; the middle end	\
+       reaches the same object through targetm_ptr.  One object, so a	\
+       back end's TARGET_OPTION_OVERRIDE or pragma registration writing	\
+       `targetm.foo = ...' after this line is a store the middle end	\
+       reads.  A struct copy here would silently lose exactly those	\
+       twelve stores.  */						\
+    ::targetm_ptr = &targetm_ ## BASE;					\
+    /* And the Init() values that only this back end can spell.  Written	\
+       into global_options_init itself rather than handed to some later	\
+       caller, because there are three callers of init_options_struct and	\
+       one of them is the DRIVER, which never selects a target: a		\
+       forwarder would have had to answer "no target selected" by doing	\
+       nothing, which is the floor this file refuses everywhere else.	\
+       One object, written once, before the one read that matters --	\
+       toplev::main runs multi_target_select above				\
+       init_options_struct.  */						\
+    global_options_init_ ## BASE (&global_options_init);		\
+  }
+MT_BACKENDS
+#undef MT_BACKEND
+
+#define MT_BACKEND(BASE, NS)						\
+  { #BASE, NS::recog, NS::split_insns, NS::peephole2_insns,		\
+    NS::insn_extract,							\
+    NS::get_insn_name, NS::peephole, NS::init_adjust_machine_modes,	\
+    MT_ENTRY_VERIFY (NS)						\
+    mt_install_ ## BASE },
+static const struct mt_backend mt_backends[] = {
+  MT_BACKENDS
+  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    MT_ENTRY_VERIFY_NULL NULL }
+};
+#undef MT_BACKEND
+
+/* Triple to back end.  Many-to-one: every aarch64-* triple this compiler was
+   configured for is served by `aarch64'.  */
+
+struct mt_target_base
+{
+  const char *target;
+  const char *base;
+};
+
+#define MT_TARGET_BASE(TRIPLE, BASE) { TRIPLE, #BASE },
+static const struct mt_target_base mt_target_bases[] = {
+  MT_TARGET_BASES
+  { NULL, NULL }
+};
+#undef MT_TARGET_BASE
+
+/* THE BACK END IN FORCE, and it starts as none.  */
+static const struct mt_backend *mt_current;
+
+static ATTRIBUTE_NORETURN void
+no_target_selected (const char *what)
+{
+  fprintf (stderr,
+	   "%s: fatal error: `%s' was used before a target was selected\n"
+	   "no back end has been installed: nothing called "
+	   "multi_target_select, so there is no machine description in "
+	   "force.  A target is named by the `target' line of the file passed "
+	   "as -ftarget-config=; a compiler given none has no target and "
+	   "deliberately has no default.\n",
+	   progname != NULL ? progname : "cc1", what);
+  exit (FATAL_EXIT_CODE);
+}
+
+static inline const struct mt_backend *
+mt_in_force (const char *what)
+{
+  if (mt_current == NULL)
+    no_target_selected (what);
+  return mt_current;
+}
+
+/* Install the back end serving TARGET.  Returns false and changes nothing if
+   TARGET was not configured -- in particular it does NOT fall back on any back
+   end, so a caller that ignores the result gets a diagnostic at the first use
+   rather than code for whatever machine happened to be first.  */
+
+bool
+multi_target_select (const char *target)
+{
+  const char *base = NULL;
+
+  for (const struct mt_target_base *t = mt_target_bases; t->target; t++)
+    if (strcmp (t->target, target) == 0)
+      {
+	base = t->base;
+	break;
+      }
+  if (base == NULL)
+    return false;
+
+  for (const struct mt_backend *b = mt_backends; b->name; b++)
+    if (strcmp (b->name, base) == 0)
+      {
+	b->install_tables ();
+	mt_current = b;
+	return true;
+      }
+
+  /* The manifest said this triple's back end is BASE and BASE has no objects.
+     That is a build-configuration bug, not a user error, so it is not a
+     `return false' that the caller would report as an unknown target.  */
+  internal_error ("target %qs names back end %qs, which was not built into "
+		  "this compiler", target, base);
+}
+
+/* The bare names.  Each is the declaration in recog.h / rtl.h / output.h /
+   emit-rtl.h / machmode.h, defined once, forwarding to the back end in
+   force.  */
+
+int
+recog (rtx pattern, rtx_insn *insn, int *pnum_clobbers)
+{
+  return mt_in_force ("recog")->recog (pattern, insn, pnum_clobbers);
+}
+
+rtx_insn *
+split_insns (rtx pattern, rtx_insn *insn)
+{
+  return mt_in_force ("split_insns")->split_insns (pattern, insn);
+}
+
+rtx_insn *
+peephole2_insns (rtx pattern, rtx_insn *insn, int *pmatch_len)
+{
+  return mt_in_force ("peephole2_insns")->peephole2_insns (pattern, insn,
+							   pmatch_len);
+}
+
+void
+insn_extract (rtx_insn *insn)
+{
+  mt_in_force ("insn_extract")->insn_extract (insn);
+}
+
+const char *
+get_insn_name (int code)
+{
+  return mt_in_force ("get_insn_name")->get_insn_name (code);
+}
+
+rtx_insn *
+peephole (rtx_insn *ins1)
+{
+  return mt_in_force ("peephole")->peephole (ins1);
+}
+
+/* THIS ONE HAS NO FALLBACK ANYWHERE IN THE TREE and that is deliberate.
+   A back end with no ADJUST_* in its modes file still gets an
+   init_adjust_machine_modes from genmodes, so every configured back end has
+   one; if that ever stops being true the forwarder below fails to compile,
+   naming the back end.  It is not floored with an #ifndef, because the
+   absence of an answer must not be allowed to read as an answer.  */
+
+void
+init_adjust_machine_modes (void)
+{
+  mt_in_force ("init_adjust_machine_modes")->init_adjust_machine_modes ();
+}
+
+
+/* THE TWO CONDITIONAL ONES.  Both guards are the exact complement of the
+   guard under which something ELSE in the tree defines the same name, so a
+   mistake in either is a duplicate-definition link error rather than a wrong
+   answer.  Neither guard is a floor: they do not supply a default, they
+   decide who owns the name.
+
+   gen_blockage: emit-rtl.cc defines it under `#if !HAVE_blockage'.
+   HAVE_blockage comes from the SINGULAR insn-flags.h, still the primary's --
+   see gen_name_is_global_p in gensupport.cc for what that means for a primary
+   with no `blockage' pattern.  That is an insn-flags.h union job, written down
+   and not papered over.
+
+   verify_reg_names_in_constraints: genoutput emits it only under
+   `#if CHECKING_P'.  */
+
+#if CHECKING_P
+void
+verify_reg_names_in_constraints (void)
+{
+  mt_in_force ("verify_reg_names_in_constraints")
+    ->verify_reg_names_in_constraints ();
+}
+#endif

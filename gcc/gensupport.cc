@@ -4004,21 +4004,40 @@ gen_target_ns (void)
   return ns;
 }
 
-/* True if the md pattern NAME's gen_NAME must stay at GLOBAL scope.
+/* True if the md pattern NAME's gen_NAME is a name the MIDDLE END already
+   declares, so that insn-flags-<base>.h must not declare it a second time.
 
-   `blockage' is the case that exists: emit-rtl.h declares `gen_blockage'
-   unconditionally and emit-rtl.cc DEFINES it under `#if !HAVE_blockage', so
-   the middle end (builtins.cc, explow.cc, function.cc) calls one name that
-   is supplied either by the middle end or by the back end's insn-emit.  Put
-   the back end's copy in a namespace and every one of those calls becomes
-   `call of overloaded gen_blockage() is ambiguous' -- two entities where the
-   tree intends one.
+   THE MEANING OF THIS LIST HAS CHANGED and the old meaning is worth keeping,
+   because the reasoning behind it was half right.  It used to mean "keep
+   gen_NAME at global scope", and genemit and genflags both stepped out of the
+   namespace for it.  `blockage' is the only case either way: emit-rtl.h
+   declares `gen_blockage' unconditionally and emit-rtl.cc DEFINES it under
+   `#if !HAVE_blockage', so the middle end (builtins.cc, explow.cc,
+   function.cc) calls one name supplied either by the middle end or by a back
+   end's insn-emit.  Keeping the back end's copy global did make those calls
+   unambiguous -- and it also meant that two configured back ends both defined
+   `::gen_blockage', which an archive resolves by picking one and saying
+   nothing.  The ambiguity was being bought at the price of the very thing
+   this branch exists to fix.
 
-   So it stays global, which means it JOINS the small set that the target
-   selector has to arbitrate (recog, split_insns, peephole2_insns,
-   add_clobbers, added_clobbers_hard_reg_p).  That is the right place for it:
-   it is a name the middle end calls directly and therefore needs SELECTING,
-   not merely disambiguating.
+   The DEFINITION is namespaced now, like everything else, and the bare
+   `::gen_blockage' comes from multi-target-select.cc, which forwards to the
+   back end in force.  What survives is the declaration problem: a namespaced
+   declaration in insn-flags-<base>.h, pulled into scope by that header's
+   using-directive, makes every hand-written `gen_blockage ()' in
+   config/i386/i386.cc and config/aarch64/aarch64.cc an ambiguous overload
+   against emit-rtl.h's.  So genflags SKIPS the names on this list; see the
+   note at its call site.
+
+   THE EDGE, STATED RATHER THAN FLOORED: multi-target-select.cc defines
+   `::gen_blockage' under `#if HAVE_blockage', which is the exact complement of
+   emit-rtl.cc's guard, and HAVE_blockage comes from the SINGULAR
+   insn-flags.h -- still the primary target's.  Configure a primary with no
+   `blockage' pattern alongside a base that has one and the middle end calls
+   emit-rtl.cc's generic expansion for both.  That is a wrong answer, not a
+   link failure, and the fix is to union the singular insn-flags.h -- the same
+   job insn-config.h has already had done to it.  Until then it is written
+   down, here and in multi-target-select.cc, rather than papered over.
 
    The failure mode if this list is ever short is a compile error at the call
    site naming the function, not silent misbehaviour.  */

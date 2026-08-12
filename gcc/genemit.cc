@@ -955,14 +955,12 @@ main (int argc, const char **argv)
 
       fprintf (file, "/* %s:%d */\n", info.loc.filename, info.loc.lineno);
 
-      /* A handful of gen_* are named by the middle end and must not be
-	 namespaced.  See gen_name_is_global_p.  */
-      bool global_p = ((GET_CODE (info.def) == DEFINE_INSN
-			|| GET_CODE (info.def) == DEFINE_EXPAND)
-		       && gen_name_is_global_p (XSTR (info.def, 0)));
-      if (global_p)
-	print_ns_close (file);
-
+      /* EVERY gen_* is namespaced, including the ones the middle end names.
+	 Those used to step out to global scope here -- see
+	 gen_name_is_global_p, which still exists but now answers a different
+	 question, about DECLARATIONS in insn-flags-<base>.h.  A definition at
+	 global scope is exactly the collision being removed: two back ends,
+	 one `::gen_blockage', an archive that keeps one of them quietly.  */
       switch (GET_CODE (info.def))
 	{
 	case DEFINE_INSN:
@@ -981,23 +979,25 @@ main (int argc, const char **argv)
 	default:
 	  break;
 	}
-
-      if (global_p)
-	print_ns_open (file);
     }
 
-  /* Everything from here on stays at GLOBAL scope: add_clobbers and
-     added_clobbers_hard_reg_p are declared in the hand-written recog.h, so
-     they are the selector's problem, not the namespace's.  */
   for (auto f : output_files)
     print_ns_close (f);
 
   file = choose_output (output_files, file_idx);
 
-  /* Write out the routines to add CLOBBERs to a pattern and say whether they
-     clobber a hard reg.  */
+  /* Namespaced, like everything else genemit writes.  add_clobbers and
+     added_clobbers_hard_reg_p are declared bare in recog.h, so the bare names
+     the middle end calls come from whichever insn-emit.cc is linked -- today
+     still the singular one, i.e. the primary's.  Namespacing the per-back-end
+     copies is what stops two back ends defining `::add_clobbers'; SELECTING
+     between them is the emit family's share of the residual recorded at the
+     head of multi-target-select.cc, and it is blocked on the same thing
+     gen_blockage is: the singular insn-flags.h.  */
+  print_ns_open (file);
   output_add_clobbers (file);
   output_added_clobbers_hard_reg_p (file);
+  print_ns_close (file);
 
   /* maybe_code_for_* / maybe_gen_* ARE namespaced, unlike the two above:
      their only declarations are in the generated insn-opinit.h, which

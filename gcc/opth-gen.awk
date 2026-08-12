@@ -650,7 +650,17 @@ else {
 print "#ifndef GENERATOR_FILE"
 print "};"
 print "extern struct gcc_options global_options;"
-print "extern const struct gcc_options global_options_init;"
+# NOT const in a multi-target build.  There is one of these and it is the
+# union layout, so a member belonging to a back end that is not the primary is
+# value-initialised in optc-gen.awk's static initialiser -- an Init()
+# argument is a macro from that back end's tm.h and cannot be spelled there.
+# multi-target-select.cc calls global_options_init_<base> on this object at
+# target selection, before toplev.cc calls init_options_struct, which is the
+# only read that matters.  See the long note in optc-gen.awk.
+if (union_file != "")
+	print "extern struct gcc_options global_options_init;"
+else
+	print "extern const struct gcc_options global_options_init;"
 print "extern struct gcc_options global_options_set;"
 print "#define target_flags_explicit global_options_set.x_target_flags"
 print "#endif"

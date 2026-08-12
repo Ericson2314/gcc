@@ -1270,7 +1270,12 @@ ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) \
 # Likewise.  Put INCLUDES at the beginning: this way, if some autoconf macro
 # puts -I options in CPPFLAGS, our include files in the srcdir will always
 # win against random include files in /usr/include.
-ALL_CPPFLAGS = $(INCLUDES) $(CPPFLAGS)
+# $(MULTI_TARGET_RENAMES) is empty for every object that is not compiled for a
+# particular back end, and is set by a target-specific assignment for those
+# that are.  It has to be here rather than in INCLUDES only because INCLUDES
+# reads as a list of -I; the ordering that matters for -I does not matter for
+# -D.
+ALL_CPPFLAGS = $(INCLUDES) $(MULTI_TARGET_RENAMES) $(CPPFLAGS)
 
 # This is the variable to use when using $(COMPILER).
 ALL_COMPILERFLAGS = $(ALL_CXXFLAGS) $(PICFLAG)
@@ -1372,11 +1377,14 @@ multi-target-md.mk: multi-target.manifest multi-target.multilib \
 # 2500 lines further down, and the reason scan_hdr_frag in
 # gen-multi-target-md.awk reads those fragments itself instead.
 #
-# Deliberately NOT in OBJS yet.  These objects compile, but linking all of them
-# into one compiler needs a selector first: `targetm' alone has 47 definitions
-# under that one name.  `make multi-target-objs' is what verifies them until
-# then.
-MULTI_TARGET_OBJS =
+# $(MT_OPTIONS_INIT_OBJS) is the one part of a back end's object set that
+# multi-target-common.mk contributes rather than multi-target-md.mk: it is
+# generated from that back end's OPTIONLIST, not from its machine description
+# (options-init-<base>.o -- see optc-gen.awk on Init()).  It is named here,
+# with `=' and not `+=', because multi-target-common.mk is included some 700
+# lines ABOVE this line and a `+=' there would be discarded by this assignment
+# -- the trap the paragraph above describes, from the other side.
+MULTI_TARGET_OBJS = $(MT_OPTIONS_INIT_OBJS)
 -include multi-target-md.mk
 
 # Specify the directories to be searched for header files.
@@ -1400,6 +1408,47 @@ MULTI_TARGET_OBJS =
 # build root and would do so silently: the wrong header compiles perfectly
 # well, it just describes another target.
 MULTI_TARGET_INC =
+
+# Names that a back end's HAND-WRITTEN sources define bare and that therefore
+# collide when two back ends are linked into one compiler.  Everything the
+# GENERATORS emit is dealt with by putting it in namespace insn_<base>; these
+# are the residue, and they cannot be namespaced because the sources are
+# config/i386/i386.cc and friends, which this project does not edit.
+#
+# So each back end's objects are compiled with -D<name>=<name>_<base>, which
+# renames the definition AND every reference inside that back end's own
+# translation units at once -- consistently, because the declaration in the
+# back end's own header goes through the same -D.
+#
+# THE LIST IS ONE AUTHORITY AND IT IS NOT SELF-MAINTAINING.  A name added to
+# some back end later collides silently: libbackend.a is an archive, so a
+# duplicate is diagnosed only when both members happen to be pulled in for
+# other reasons -- `ld' once reported 7 of 40.  The check is an `nm' sweep over
+# the two object SETS (scratchpad/sweep.sh), never the linker.
+#
+#   targetm                 the hook table.  Renaming it is not enough on its
+#			    own: the middle end reads the bare name, so
+#			    multi-target-select.cc defines it and copies the
+#			    selected back end's table into it.
+#   ms_va_list_type_node    declared in i386.h and aarch64.h, used only by
+#			    that back end and by its gt-<file>.h roots, which
+#			    are compiled in the same TU and so see the -D too.
+#			    No selector entry: nothing outside names it.
+#   linux_*                 config/linux.cc, compiled once per back end because
+#			    it is in each one's extra_objs.  Reached only
+#			    through that back end's targetm, so distinct names
+#			    are the whole fix.  (Deduplicating to a single
+#			    linux.o would be better and wants a proof that the
+#			    object really is target-independent; renaming is
+#			    correct either way.)
+MULTI_TARGET_RENAME_NAMES = \
+  targetm \
+  ms_va_list_type_node \
+  linux_libc_has_function \
+  linux_libm_function_max_error \
+  linux_fortify_source_default_level
+
+MULTI_TARGET_RENAMES =
 
 INCLUDES = $(MULTI_TARGET_INC) -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 	   -I$(srcdir)/../include $(INCINTL) \
@@ -1631,19 +1680,15 @@ OBJS = \
 	$(GIMPLE_MATCH_PD_SEQ_O) \
 	gimple-match-exports.o \
 	$(GENERIC_MATCH_PD_SEQ_O) \
+	$(MULTI_TARGET_OBJS) \
+	multi-target-select.o \
 	insn-attrtab.o \
 	insn-automata.o \
 	insn-dfatab.o \
 	$(INSNEMIT_SEQ_O) \
-	insn-extract.o \
 	insn-latencytab.o \
-	insn-modes.o \
 	insn-opinit.o \
-	insn-output.o \
-	insn-peep.o \
 	insn-preds.o \
-	$(INSNRECOG_SEQ_O) \
-	insn-enums.o \
 	ggc-page.o \
 	adjust-alignment.o \
 	alias.o \
@@ -2096,9 +2141,7 @@ OBJS = \
 	attr-callback.o \
 	target-asm-ops-select.o \
 	$(MULTI_TARGET_ASM_OPS_OBJS) \
-	$(out_object_file) \
 	$(ANALYZER_OBJS) \
-	$(EXTRA_OBJS) \
 	$(host_hook_obj)
 
 # Objects in libcommon.a, potentially used by all host binaries and with
@@ -2594,7 +2637,21 @@ selftest: $(SELFTEST_TARGETS)
 compilations: $(BACKEND)
 
 # This archive is strictly for the host.
+# OBJS names $(MULTI_TARGET_OBJS) rather than the primary's insn-*.o and
+# $(out_object_file)/$(EXTRA_OBJS), so an empty MULTI_TARGET_OBJS does not
+# produce a stopped build: it produces an archive with no back end in it at
+# all, and the failure surfaces 24k undefined references later with nothing
+# naming the cause.  Say it here instead.  The list is `+='d by
+# multi-target-md.mk, which is `-include'd, so its absence is exactly this.
+check_multi_target_objs = \
+  test -n "$(strip $(MULTI_TARGET_OBJS))" || { \
+    echo "libbackend.a: MULTI_TARGET_OBJS is empty." >&2; \
+    echo "  multi-target-md.mk was not included or accumulated nothing," >&2; \
+    echo "  so no back end's objects would be archived at all." >&2; \
+    exit 1; }
+
 libbackend.a: $(OBJS)
+	@$(check_multi_target_objs)
 	-rm -rf libbackend.a
 	@# Build libbackend.a as a thin archive if possible, as doing so
 	@# significantly reduces build times.
@@ -3346,9 +3403,15 @@ s-options: $(ALL_OPT_FILES) $(ALL_OPT_URL_FILES) optionlist-vocab Makefile \
 	rm -f tmp-optionlist-own tmp-optionlist-stub
 	$(STAMP) s-options
 
+# $(OPTIONS_UNION_FLAGS) is passed for ONE reason: it tells optc-gen.awk
+# whether this is a multi-target build, and hence whether `global_options_init'
+# is const.  It has to match opth-gen.awk, which decides the same thing from
+# the same flag -- a definition and a declaration that disagree about `const'
+# is a hard error, so this pair cannot drift silently.
 options.cc: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
-    $(srcdir)/optc-gen.awk
+    $(srcdir)/optc-gen.awk $(MT_OPTIONS_UNION_LIST)
 	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \
+	       $(OPTIONS_UNION_FLAGS) \
 	       -f $(srcdir)/optc-gen.awk \
 	       -v header_name="config.h system.h coretypes.h options.h tm.h" < $< > $@
 
@@ -3481,6 +3544,19 @@ multi_target_base = \
 # and inscrutable together, which is dearer for everyone than a stopped build.
 # This has already happened once, when the name was taken from a cpu_type
 # variable this Makefile does not have.
+# The machine-description selector.  Its only generated prerequisite,
+# multi-target-backends.h, is named by a rule multi-target-md.mk emits, so a
+# build with no manifest gets `No rule to make target multi-target-backends.h'
+# -- which is the right failure: there is nothing to select between, and a
+# selector compiled against an empty registry would link and select nothing.
+multi-target-select.o: $(srcdir)/multi-target-select.cc \
+  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(TM_H) $(RTL_H) $(TREE_H) \
+  $(REAL_H) $(HARD_REG_SET_H) insn-config.h $(RECOG_H) output.h \
+  $(EMIT_RTL_H) $(DIAGNOSTIC_CORE_H) $(TARGET_H) tm-constrs.h \
+  $(srcdir)/multi-target-select.h
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
 target-asm-ops-select.o: $(srcdir)/target-asm-ops-select.cc
 	@test -n "$(multi_target_base)" || { \
 	  echo "target-asm-ops-select.o: multi_target_base is empty;" >&2; \
@@ -3971,7 +4047,7 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/omp-general.h \
   $(srcdir)/omp-general.cc \
   $(srcdir)/omp-low.cc \
-  $(srcdir)/targhooks.cc $(out_file) $(srcdir)/passes.cc \
+  $(srcdir)/targhooks.cc $(srcdir)/passes.cc \
   $(srcdir)/cgraphclones.cc \
   $(srcdir)/tree-phinodes.cc \
   $(srcdir)/tree-ssa-alias.h \
@@ -4146,8 +4222,30 @@ build/genconditions.o : genconditions.cc $(RTL_BASE_H) $(BCONFIG_H)	\
   $(READ_MD_H) $(GENSUPPORT_H)
 build/genconfig.o : genconfig.cc $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(GENSUPPORT_H)
+# The SINGULAR genconstants writes the insn-constants.h the middle end reads.
+# It has no back end of its own, so gen_target_ns () is null in it, and it
+# would declare unspec_strings as an array while the definitions behind it --
+# now one per back end, in namespace insn_<base> -- are pointers.  That
+# disagreement is between two translation units and produces no diagnostic at
+# all, only `storage size of unspec_strings isn't known' somewhere unrelated.
+# $(multi_target_base) is the same variable the modes and insn-config unions
+# key on; see gen_multi_target_p in gensupport.h.
+build/genconstants.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# The SINGULAR genpreds writes the tm-preds.h the middle end reads, and two of
+# the things in it -- TEST_REGISTER_FILTER_BIT and test_register_filters --
+# are OUTSIDE the per-back-end namespace, so there is one of each for the
+# whole compiler.  Written from the primary's own register filters they were
+# a wrong answer at every other target: i386 has none, so the shared header
+# said `return true' -- any register is allowed -- while insn-config.h, which
+# IS unioned, said NUM_REGISTER_FILTERS 4 for aarch64's sake.  ira-color.cc
+# has four call sites and no diagnostic was possible.  Same reason as
+# genconstants above: gen_target_ns () is null in the singular run, so this
+# is the only way it can know.
+build/genpreds.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 build/genconstants.o : genconstants.cc $(BCONFIG_H) $(SYSTEM_H)		\
-  $(CORETYPES_H) errors.h $(READ_MD_H)
+  $(CORETYPES_H) $(GTM_H) $(RTL_BASE_H) errors.h $(READ_MD_H) $(GENSUPPORT_H)
 build/genemit.o : genemit.cc $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H) internal-fn.def
 build/genenums.o : genenums.cc $(BCONFIG_H) $(SYSTEM_H)			\
@@ -4241,11 +4339,11 @@ build/gencfn-macros.o : gencfn-macros.cc $(BCONFIG_H) $(SYSTEM_H)	\
 # authorities, which is the failure this suffix exists to prevent.
 genprogrtl += attr attr-common attrtab automata codes conditions config emit \
 	     enums extract flags mddump opinit output peep preds recog \
-	     target-def
+	     target-def constants
 $(genprogrtl:%=build/gen%$(build_exeext)): $(BUILD_RTL)
 
 # All these programs use the MD reader ($(BUILD_MD)).
-genprogmd += $(genprogrtl) mddeps constants
+genprogmd += $(genprogrtl) mddeps
 $(genprogmd:%=build/gen%$(build_exeext)): $(BUILD_MD)
 
 # All these programs need to report errors.

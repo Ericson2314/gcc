@@ -1593,7 +1593,19 @@ write_length_unit_log (FILE *outf)
   else
     length_unit_log = 0;
 
-  fprintf (outf, "EXPORTED_CONST int length_unit_log = %u;\n", length_unit_log);
+  /* Not EXPORTED_CONST on a multi-target build: final.cc declares this
+     non-const so that multi-target-select.cc can copy the selected back end's
+     value into it, and a const definition would not match that declaration.
+     Inside namespace insn_<base> it is still a compile-time constant of that
+     back end's; only the shared copy is writable.  */
+  /* `extern' is load-bearing, not decoration: a namespace-scope `const int'
+     has INTERNAL linkage in C++, so `const int length_unit_log = 2;' inside
+     namespace insn_<base> is invisible to multi-target-select.cc and the link
+     fails with `undefined reference to insn_aarch64::length_unit_log' -- a
+     message that points at the selector and not at this line.  */
+  fprintf (outf, "%s int length_unit_log = %u;\n",
+	   gen_target_ns () ? "extern const" : "EXPORTED_CONST",
+	   length_unit_log);
 }
 
 /* Compute approximate cost of the expression.  Used to decide whether

@@ -1263,6 +1263,61 @@ static const char *union_list_file;
 static const char *union_arch;
 static bool gen_union_list;
 
+/* True when this run belongs to one back end of a multi-target compiler,
+   i.e. `-A<arch>' was given.  Every run in such a build has it -- the
+   singular one announces itself as the primary -- so it is also the test for
+   "more than one back end may be linked into the compiler that will read
+   this output", which is what the callers below actually care about.  */
+
+static inline bool
+multi_target_p (void)
+{
+  return union_arch != NULL;
+}
+
+/* The per-back-end namespace, or NULL.  Same shape as gensupport.cc's
+   gen_target_ns, deliberately not shared with it: genmodes is in genprogerr
+   and does not link build/gensupport.o, and adding it there to reach one
+   three-line function would drag the whole md reader into a program that
+   does not use it.  The two must agree on the SPELLING, which is why the
+   prefix is written here rather than derived.  */
+
+static const char *
+mode_target_ns (void)
+{
+  static char *ns;
+  static bool computed;
+
+  if (!computed)
+    {
+      computed = true;
+      if (union_arch && union_arch[0])
+	{
+	  ns = concat ("insn_", union_arch, NULL);
+	  for (char *p = ns; *p; p++)
+	    if (!ISALNUM ((unsigned char) *p) && *p != '_')
+	      *p = '_';
+	}
+    }
+  return ns;
+}
+
+static void
+print_mode_ns_open (void)
+{
+  const char *ns = mode_target_ns ();
+  if (ns)
+    printf ("\nnamespace %s {\n", ns);
+}
+
+static void
+print_mode_ns_close (void)
+{
+  const char *ns = mode_target_ns ();
+  if (ns)
+    printf ("\n} /* namespace %s */\n", ns);
+}
+
 struct union_slot
 {
   const char *name;		/* the numbering key, unique */
@@ -1502,14 +1557,70 @@ apply_union_order (void)
   printf ("%*s/* %s */\n", 27 - count_, "", TAG);	\
 } while (0)
 
+/* Open a mode table.  TYPE is the complete element type including any
+   qualifier, NAME the table's name, ASIZE the array bound (possibly empty).
+
+   ON A MULTI-TARGET BUILD THE TABLE GETS TWO NAMES.  The array itself becomes
+   <NAME>_tab and <NAME> becomes a POINTER to it, because machmode.h declares
+   every one of these as a pointer so that multi-target-select.cc can aim it
+   at whichever back end is in force.  Emitting the pointer alongside the
+   array, rather than only in the selector, is what lets the SAME output serve
+   three consumers that need three different things:
+
+     * insn-modes-<base>.cc -- inside namespace insn_<base>, so the pair is
+       insn_<base>::mode_size_tab and insn_<base>::mode_size.  The selector
+       copies the pointer; init_adjust_machine_modes, which is in the same
+       namespace, writes through it into its own array.
+     * min-insn-modes-<base>.cc -- global, linked into the build/gen*
+       programs, which include the same machmode.h and therefore need the
+       pointer and not the array.
+     * a single-target build -- multi_target_p() is false, nothing changes,
+       and the output is byte-identical to what it always was.
+
+   print_table_closer () must follow each opener; it needs the name and type,
+   which is why they are remembered rather than passed twice.  */
+
+static const char *cur_table_name;
+static const char *cur_table_type;
+
+static void
+print_table_decl (const char *type, const char *name, const char *asize)
+{
+  cur_table_name = name;
+  cur_table_type = type;
+  printf ("\n%s %s%s[%s] =\n{\n", type, name,
+	  multi_target_p () ? "_tab" : "", asize);
+}
+
+static void
+print_table_closer (void)
+{
+  puts ("};");
+  if (multi_target_p ())
+    {
+      /* The ARRAY keeps this back end's own constness -- it is writable
+	 exactly when this modes file adjusts it -- but the POINTER the rest
+	 of the compiler shares is const-qualified whatever the back end, to
+	 match the CONST_MODE_* that the multi-target headers now emit
+	 unconditionally.  See emit_insn_modes_h.  A table whose type is
+	 already const stays as it is; `const const' is not a spelling.  */
+      const char *add_const =
+	strncmp (cur_table_type, "const", 5) == 0 ? "" : "const ";
+      printf ("%s%s *%s = %s_tab;\n",
+	      add_const, cur_table_type, cur_table_name, cur_table_name);
+    }
+}
+
 #define print_decl(TYPE, NAME, ASIZE) \
-  puts ("\nconst " TYPE " " NAME "[" ASIZE "] =\n{");
+  print_table_decl ("const " TYPE, NAME, ASIZE)
 
-#define print_maybe_const_decl(TYPE, NAME, ASIZE, NEEDS_ADJ)	\
-  printf ("\n" TYPE " " NAME "[" ASIZE "] = \n{\n",		\
-	  NEEDS_ADJ ? "" : "const ")
+#define print_maybe_const_decl(TYPE, NAME, ASIZE, NEEDS_ADJ)		\
+  do {									\
+    char *type_ = xasprintf (TYPE, NEEDS_ADJ ? "" : "const ");		\
+    print_table_decl (type_, NAME, ASIZE);				\
+  } while (0)
 
-#define print_closer() puts ("};")
+#define print_closer() print_table_closer ()
 
 /* Compute the max bitsize of some of the classes of integers.  It may
    be that there are needs for the other integer classes, and this
@@ -1555,6 +1666,40 @@ emit_max_int (void)
 	    max_bitsize_mode_any_mode);
 }
 
+/* Emit, inside a mode_*_inline body, the declaration of the table that body
+   falls back on.  QUALS is any leading qualifier ("const " or ""), TYPE the
+   element type, NAME the table.
+
+   ON A MULTI-TARGET BUILD THE TABLE IS A POINTER, AND THE CALLERS BELOW EMIT
+   NO `switch' CASES AT ALL.  That switch is a constant-folding fast path: it
+   answers every mode whose value cannot be adjusted at runtime with a literal
+   taken from THIS run's back end.  With one back end that is the same answer
+   the table would give.  With several it is not.  The singular
+   insn-modes-inline.h is the PRIMARY's, so `GET_MODE_SIZE (VNx16QImode)'
+   folded to the i386 run's value for that ordinal -- 0, because a mode no
+   i386 pattern names is a hole -- for every caller whose argument was a
+   compile-time constant, while the identical call with a variable argument
+   went through the table and got aarch64's real answer.  It bypassed the
+   selector silently and only sometimes, which is the hardest possible thing
+   to see.  So the fast path goes when there is more than one back end; it
+   stays, byte for byte, when there is one.  */
+
+static void
+print_inline_table_decl (const char *quals, const char *type,
+			 const char *name)
+{
+  if (multi_target_p ())
+    /* QUALS is ignored: it is this back end's own answer to "may this table
+       be written", and in a multi-target build these names are the shared
+       const pointers -- see emit_insn_modes_h.  Redeclaring one here with
+       the back end's qualifier is the same divergence one scope down, and
+       it is a hard error rather than a silent one only because this
+       declaration sits in the same translation unit as machmode.h's.  */
+    printf ("  extern const %s *%s;\n", type, name);
+  else
+    printf ("  extern %s%s %s[NUM_MACHINE_MODES];\n", quals, type, name);
+}
+
 /* Emit mode_size_inline routine into insn-modes.h header.  */
 static void
 emit_mode_size_inline (void)
@@ -1584,15 +1729,18 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 #endif\n\
 poly_uint16\n\
 mode_size_inline (machine_mode mode)\n\
-{\n\
-  extern %spoly_uint16 mode_size[NUM_MACHINE_MODES];\n\
+{\n");
+  print_inline_table_decl (adj_nunits || adj_bytesize ? "" : "const ",
+			   "poly_uint16", "mode_size");
+  printf ("\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
-    {\n", adj_nunits || adj_bytesize ? "" : "const ");
+    {\n");
 
-  for_all_modes (c, m)
-    if (!m->need_bytesize_adj)
-      printf ("    case E_%smode: return %u;\n", m->name, m->bytesize);
+  if (!multi_target_p ())
+    for_all_modes (c, m)
+      if (!m->need_bytesize_adj)
+	printf ("    case E_%smode: return %u;\n", m->name, m->bytesize);
 
   puts ("\
     default: return mode_size[mode];\n\
@@ -1618,14 +1766,17 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 #endif\n\
 poly_uint16\n\
 mode_nunits_inline (machine_mode mode)\n\
-{\n\
-  extern %spoly_uint16 mode_nunits[NUM_MACHINE_MODES];\n\
+{\n");
+  print_inline_table_decl (adj_nunits ? "" : "const ",
+			   "poly_uint16", "mode_nunits");
+  printf ("\
   switch (mode)\n\
-    {\n", adj_nunits ? "" : "const ");
+    {\n");
 
-  for_all_modes (c, m)
-    if (!m->need_nunits_adj)
-      printf ("    case E_%smode: return %u;\n", m->name, m->ncomponents);
+  if (!multi_target_p ())
+    for_all_modes (c, m)
+      if (!m->need_nunits_adj)
+	printf ("    case E_%smode: return %u;\n", m->name, m->ncomponents);
 
   puts ("\
     default: return mode_nunits[mode];\n\
@@ -1648,16 +1799,18 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 #endif\n\
 unsigned short\n\
 mode_inner_inline (machine_mode mode)\n\
-{\n\
-  extern const unsigned short mode_inner[NUM_MACHINE_MODES];\n\
+{");
+  print_inline_table_decl ("const ", "unsigned short", "mode_inner");
+  puts ("\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
 
-  for_all_modes (c, m)
-    printf ("    case E_%smode: return E_%smode;\n", m->name,
-	    c != MODE_PARTIAL_INT && m->component
-	    ? m->component->name : m->name);
+  if (!multi_target_p ())
+    for_all_modes (c, m)
+      printf ("    case E_%smode: return E_%smode;\n", m->name,
+	      c != MODE_PARTIAL_INT && m->component
+	      ? m->component->name : m->name);
 
   puts ("\
     default: return mode_inner[mode];\n\
@@ -1680,22 +1833,24 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 #endif\n\
 unsigned char\n\
 mode_unit_size_inline (machine_mode mode)\n\
-{\n\
-  extern CONST_MODE_UNIT_SIZE unsigned char mode_unit_size[NUM_MACHINE_MODES];\
-\n\
+{");
+  print_inline_table_decl ("CONST_MODE_UNIT_SIZE ", "unsigned char",
+			   "mode_unit_size");
+  puts ("\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
 
-  for_all_modes (c, m)
-    {
-      const char *name = m->name;
-      struct mode_data *m2 = m;
-      if (c != MODE_PARTIAL_INT && m2->component)
-	m2 = m2->component;
-      if (!m2->need_bytesize_adj)
-	printf ("    case E_%smode: return %u;\n", name, m2->bytesize);
-    }
+  if (!multi_target_p ())
+    for_all_modes (c, m)
+      {
+	const char *name = m->name;
+	struct mode_data *m2 = m;
+	if (c != MODE_PARTIAL_INT && m2->component)
+	  m2 = m2->component;
+	if (!m2->need_bytesize_adj)
+	  printf ("    case E_%smode: return %u;\n", name, m2->bytesize);
+      }
 
   puts ("\
     default: return mode_unit_size[mode];\n\
@@ -1718,22 +1873,25 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 #endif\n\
 unsigned short\n\
 mode_unit_precision_inline (machine_mode mode)\n\
-{\n\
-  extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];\n\
+{");
+  print_inline_table_decl ("const ", "unsigned short",
+			   "mode_unit_precision");
+  puts ("\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
 
-  for_all_modes (c, m)
-    {
-      struct mode_data *m2
-	= (c != MODE_PARTIAL_INT && m->component) ? m->component : m;
-      if (m2->precision != (unsigned int)-1)
-	printf ("    case E_%smode: return %u;\n", m->name, m2->precision);
-      else
-	printf ("    case E_%smode: return %u*BITS_PER_UNIT;\n",
-		m->name, m2->bytesize);
-    }
+  if (!multi_target_p ())
+    for_all_modes (c, m)
+      {
+	struct mode_data *m2
+	  = (c != MODE_PARTIAL_INT && m->component) ? m->component : m;
+	if (m2->precision != (unsigned int)-1)
+	  printf ("    case E_%smode: return %u;\n", m->name, m2->precision);
+	else
+	  printf ("    case E_%smode: return %u*BITS_PER_UNIT;\n",
+		  m->name, m2->bytesize);
+      }
 
   puts ("\
     default: return mode_unit_precision[mode];\n\
@@ -1787,8 +1945,28 @@ emit_insn_modes_h (void)
    by genmodes.  */\n\
 \n\
 #ifndef GCC_INSN_MODES_H\n\
-#define GCC_INSN_MODES_H\n\
-\n\
+#define GCC_INSN_MODES_H\n");
+
+  /* How machmode.h declares the mode tables.  It cannot decide this for
+     itself: whether a table is an array or a pointer to the selected back
+     end's array is a property of how this compiler was CONFIGURED, and
+     genmodes is the only thing that knows.  Putting the choice in a macro
+     rather than an #if in machmode.h keeps the fifteen declarations there
+     readable and, more usefully, makes it impossible for one of them to be
+     converted and another forgotten -- which would compile in every
+     translation unit and differ only in what the linker resolved.  */
+  if (multi_target_p ())
+    puts ("\
+\n/* Multi-target: each back end has its own tables, in its own namespace,\n\
+   and these bare names are pointers that multi-target-select.cc aims at\n\
+   the back end in force.  Reading one before a target is selected is a\n\
+   null dereference, deliberately: there is no default back end.  */\n\
+#define GCC_TARGET_TABLE(TYPE, NAME, SIZE) TYPE *NAME\n");
+  else
+    puts ("\
+\n#define GCC_TARGET_TABLE(TYPE, NAME, SIZE) TYPE NAME[SIZE]\n");
+
+  puts ("\
 enum machine_mode\n{");
 
   for (c = 0; c < MAX_MODE_CLASS; c++)
@@ -1883,19 +2061,63 @@ enum machine_mode\n{");
     }
   printf ("\n");
 
-  /* I can't think of a better idea, can you?  */
-  printf ("#define CONST_MODE_NUNITS%s\n", adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_PRECISION%s\n", adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_SIZE%s\n",
-	  adj_bytesize || adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_UNIT_SIZE%s\n", adj_bytesize ? "" : " const");
-  printf ("#define CONST_MODE_BASE_ALIGN%s\n", adj_alignment ? "" : " const");
+  /* WHO MAY WRITE A MODE TABLE, AND WHEN.
+
+     Single target: unchanged.  A table is `const' exactly when this modes
+     file has no ADJUST_* for it, because the one thing that writes it --
+     init_adjust_machine_modes, below -- is in the same program.
+
+     Multi target: ALWAYS `const', in every one of these headers, shared and
+     per back end alike.  These macros qualify a name that crosses between
+     back ends, and it used to be answered per back end: i386 says `const
+     poly_uint16 mode_precision[]' (it adjusts nothing) while aarch64 says
+     `poly_uint16 mode_precision[]' (SVE adjusts mode sizes at startup).
+     The middle end reads the shared header, so it held a declaration that
+     every aarch64 object contradicted -- one object, two types, and no
+     diagnostic anywhere.
+
+     `const' is the answer rather than "not const" because it is the true
+     one for everybody who reads through these names.  The middle end never
+     writes a mode table -- there is not one assignment to one of them
+     outside this generator -- and neither does any hand-written back-end
+     source.  The sole writer is the generated adjustment code, it runs in
+     its own back end's translation unit, and it now writes the ARRAY
+     (`mode_size_tab') rather than the pointer the rest of the compiler
+     shares.  See emit_mode_adjustments.
+
+     Dropping `const' from the shared declaration instead would also have
+     made the types agree, and would have agreed on the weaker claim: it
+     would have left the middle end able to write a table belonging to a
+     back end that may not even be selected, with nothing left to say so.  */
+  if (multi_target_p ())
+    {
+      puts ("#define CONST_MODE_NUNITS const");
+      puts ("#define CONST_MODE_PRECISION const");
+      puts ("#define CONST_MODE_SIZE const");
+      puts ("#define CONST_MODE_UNIT_SIZE const");
+      puts ("#define CONST_MODE_BASE_ALIGN const");
+      puts ("#define CONST_MODE_IBIT const");
+      puts ("#define CONST_MODE_FBIT const");
+      puts ("#define CONST_MODE_MASK const");
+    }
+  else
+    {
+      /* I can't think of a better idea, can you?  */
+      printf ("#define CONST_MODE_NUNITS%s\n", adj_nunits ? "" : " const");
+      printf ("#define CONST_MODE_PRECISION%s\n", adj_nunits ? "" : " const");
+      printf ("#define CONST_MODE_SIZE%s\n",
+	      adj_bytesize || adj_nunits ? "" : " const");
+      printf ("#define CONST_MODE_UNIT_SIZE%s\n", adj_bytesize ? "" : " const");
+      printf ("#define CONST_MODE_BASE_ALIGN%s\n",
+	      adj_alignment ? "" : " const");
 #if 0 /* disabled for backward compatibility, temporary */
-  printf ("#define CONST_REAL_FORMAT_FOR_MODE%s\n", adj_format ? "" :" const");
+      printf ("#define CONST_REAL_FORMAT_FOR_MODE%s\n",
+	      adj_format ? "" :" const");
 #endif
-  printf ("#define CONST_MODE_IBIT%s\n", adj_ibit ? "" : " const");
-  printf ("#define CONST_MODE_FBIT%s\n", adj_fbit ? "" : " const");
-  printf ("#define CONST_MODE_MASK%s\n", adj_nunits ? "" : " const");
+      printf ("#define CONST_MODE_IBIT%s\n", adj_ibit ? "" : " const");
+      printf ("#define CONST_MODE_FBIT%s\n", adj_fbit ? "" : " const");
+      printf ("#define CONST_MODE_MASK%s\n", adj_nunits ? "" : " const");
+    }
   emit_max_int ();
 
   for_all_modes (c, m)
@@ -2361,6 +2583,31 @@ emit_mode_adjustments (void)
   struct mode_adjust *a;
   struct mode_data *m;
 
+  /* THE ONLY WRITER OF A MODE TABLE IN THE WHOLE COMPILER.
+
+     In a multi-target build the bare names are const pointers shared with
+     every other back end (see emit_insn_modes_h), so this code writes the
+     underlying array instead.  Same storage, and it is this back end's own:
+     the array is defined a few lines above in this same file, and it is
+     non-const precisely when this modes file adjusts it.
+
+     Spelled as macros rather than by rewriting each printf below because
+     there are forty-odd of them and a rewrite that missed one would fail in
+     the one place the diagnostic is least useful -- a const violation deep
+     in generated code -- while this cannot miss one.  Undefined again at the
+     end of the function, so nothing else in the file sees them.  */
+  if (multi_target_p ())
+    puts ("\n\
+/* The adjustment code below writes the tables; see emit_mode_adjustments.  */\n\
+#define mode_mask_array mode_mask_array_tab\n\
+#define mode_precision mode_precision_tab\n\
+#define mode_size mode_size_tab\n\
+#define mode_nunits mode_nunits_tab\n\
+#define mode_unit_size mode_unit_size_tab\n\
+#define mode_base_align mode_base_align_tab\n\
+#define mode_ibit mode_ibit_tab\n\
+#define mode_fbit mode_fbit_tab");
+
   if (adj_nunits)
     printf ("\n"
 	    "void\n"
@@ -2549,6 +2796,17 @@ emit_mode_adjustments (void)
 	    m->name);
 
   puts ("}");
+
+  if (multi_target_p ())
+    puts ("\n\
+#undef mode_mask_array\n\
+#undef mode_precision\n\
+#undef mode_size\n\
+#undef mode_nunits\n\
+#undef mode_unit_size\n\
+#undef mode_base_align\n\
+#undef mode_ibit\n\
+#undef mode_fbit");
 }
 
 /* Emit ibit for all modes.  */
@@ -2635,6 +2893,13 @@ static void
 emit_insn_modes_c (void)
 {
   emit_insn_modes_c_header ();
+  /* Every table below, and init_adjust_machine_modes with them, is declared
+     bare in machmode.h and read by the whole middle end.  Two back ends
+     defining `mode_size' bare is the silent-collision case in its purest
+     form -- an archive keeps one and every foreign mode then answers with
+     another machine's size.  Namespaced; machmode.h's bare names are
+     POINTERS supplied by multi-target-select.cc.  */
+  print_mode_ns_open ();
   emit_mode_name ();
   emit_mode_class ();
   emit_mode_precision ();
@@ -2653,6 +2918,7 @@ emit_insn_modes_c (void)
   emit_mode_ibit ();
   emit_mode_fbit ();
   emit_mode_int_n ();
+  print_mode_ns_close ();
 }
 
 static void

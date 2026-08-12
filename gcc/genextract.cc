@@ -380,6 +380,11 @@ print_header (void)
    whose numbers are skipped by a given pattern.  */\n\
 static rtx junk ATTRIBUTE_UNUSED;\n");
 
+  /* `insn_extract' is declared bare in the hand-written recog.h and called
+     from recog.cc, so two back ends defining it bare is a silent collision.
+     Namespaced here; multi-target-select.cc supplies the bare name.  */
+  print_ns_open (stdout);
+
   puts ("\
 void\n\
 insn_extract (rtx_insn *insn)\n{\n\
@@ -507,6 +512,7 @@ main (int argc, const char **argv)
     }
 
   puts ("    }\n}");
+  print_ns_close (stdout);
   fflush (stdout);
   return (ferror (stdout) != 0 ? FATAL_EXIT_CODE : SUCCESS_EXIT_CODE);
 }

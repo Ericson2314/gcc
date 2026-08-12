@@ -467,6 +467,46 @@ ${AWK} '
       printf "\t  -v guard_name=OPTIONS_%s_H \\\n", toupper(b)
       printf "\t  -v union_file=gcc-options-union.list -v union_base=%s \\\n", b
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > $@\n\n"
+      # THE Init() VALUES BELONGING TO THIS BACK END.  See the long note in
+      # optc-gen.awk: an Init() argument is a back-end MACRO, so it can only
+      # be compiled where the tm.h of that back end is in scope.  options.cc
+      # is compiled with the tm.h of the PRIMARY, which is why every member a
+      # non-primary back end has and the primary does not was reading zero.
+      #
+      # THE SOURCE GOES IN mt-<base>/, NOT THE BUILD ROOT, AND THAT IS NOT
+      # TIDINESS.  -I%s-inc is what puts the right tm.h in scope, but a
+      # quoted #include searches the directory of the INCLUDER first, ahead
+      # of every -I.  Generated into the build root, this file included the
+      # build root tm.h -- the PRIMARY one -- with -Iaarch64-inc sitting
+      # first in the -I list and doing nothing.  The compile did not fail on
+      # it either: config/i386/i386.h was read for the aarch64 object and the
+      # only complaint was about a macro it never reached.  mt-<base>/ holds
+      # no headers, so the -I list is consulted and wins.  This is the same
+      # trap MULTI_TARGET_INC in gcc/Makefile.in describes, reached from the
+      # one direction that comment does not cover: the hand-written back-end
+      # sources live in $(srcdir)/config/<cpu>/, so they never see it.
+      printf "mt-%s/options-init.cc: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/optc-gen.awk\n", b, b
+      printf "\t@$(mkinstalldirs) mt-%s\n", b
+      printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
+      printf "\t  -f $(srcdir)/optc-gen.awk -v init_base=%s \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      printf "\t  < $< > tmp-options-init-%s.cc\n", b
+      # A generator that fails and exits 0 has happened on this branch; an
+      # empty or headers-only file would compile, link, and leave the bug in
+      # place with a selector calling a function that does nothing.  The
+      # #error that optc-gen.awk emits covers the no-records case; this covers
+      # the case where awk wrote nothing at all.
+      printf "\t@test `grep -c \047^  opts->x_\047 tmp-options-init-%s.cc` -gt 0 || { \\\n", b
+      printf "\t  echo \047mt-%s/options-init.cc: no assignments were generated;\047 >&2; \\\n", b
+      printf "\t  echo \047  every Init() value belonging to %s would stay zero.\047 >&2; \\\n", b
+      printf "\t  exit 1; }\n"
+      printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-init-%s.cc $@\n\n", b
+      printf "mt-%s/options-init.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
+      printf "mt-%s/options-init.o: mt-%s/options-init.cc\n", b, b
+      printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
+      printf "\t$(COMPILE) $<\n"
+      printf "\t$(POSTCOMPILE)\n\n"
+      printf "MT_OPTIONS_INIT_OBJS += mt-%s/options-init.o\n\n", b
     }
 
     # The union list itself, and the singular options.h flags that make
@@ -490,6 +530,27 @@ ${AWK} '
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-gcc-options-union.list $@\n\n"
   }
 ' ${gcc_target_manifest} >> ${gcc_common_mk}
+
+# AN AWK PROGRAM THAT DIES HALFWAY STILL EXITS 0 HERE, because it is the left
+# side of a `>>' and awk reports a run-time error on stderr that configure has
+# already redirected.  What comes out is a multi-target-common.mk with the
+# per-target rules and none of the options block -- which is not a build
+# failure either: MT_OPTIONS_UNION_LIST is then simply empty, gcc/Makefile.in
+# passes no -v union_file, and every options header is generated for the
+# PRIMARY alone.  That is the exact divergence the union exists to remove,
+# reinstated silently, by a syntax error in a comment.  It has happened.
+#
+# So check the output for the one line per back end that the block must
+# contain, and fail the configure rather than the build.
+gcc_mt_have=`grep -c '^MT_OPTIONS_INIT_OBJS += ' ${gcc_common_mk}`
+gcc_mt_bases=`awk '$1 == "cpu_type" { print $2 }' ${gcc_target_manifest} \
+	      | sort -u | wc -l`
+if test x"${gcc_mt_have}" != x"${gcc_mt_bases}"; then
+  gcc_mt_fatal="multi-target-common.mk has ${gcc_mt_have} options blocks for\
+ ${gcc_mt_bases} back ends; the awk program over ${gcc_target_manifest} did\
+ not run to the end"
+  return 1
+fi
 
 # Assemble the registry header from the two pieces.
 {

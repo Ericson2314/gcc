@@ -5240,13 +5240,15 @@ static void
 print_subroutine (FILE *f, output_state *os, state *s, int proc_id,
 		  bool in_header = false)
 {
-  /* The main routines are the four names the middle end calls by hand, so
-     they must NOT be namespaced: recog.h declares them at global scope.
-     Step out of the namespace for the definition and step back in.  */
-  bool global_p = (proc_id == 0 && !in_header);
-  if (global_p)
-    print_ns_close (f);
-
+  /* The main routines -- recog, split_insns, peephole2_insns -- used to step
+     OUT of the namespace here, so that each back end defined the bare name
+     recog.h declares.  That is exactly why they collided: with two back ends
+     linked into one compiler there were two `::recog', and the archive picked
+     one silently.  They are now namespaced like everything else, and the bare
+     names recog.h declares are supplied by multi-target-select.cc, which
+     forwards to whichever back end is in force.  The declarations emitted into
+     insn-recog-<base>.h were ALREADY namespaced (in_header never stepped out),
+     so this makes the definitions agree with them rather than the reverse.  */
   fprintf (f, "\n");
   const char *specifier_ext = "extern";
   const char *specifier_default = "";
@@ -5309,9 +5311,6 @@ print_subroutine (FILE *f, output_state *os, state *s, int proc_id,
     }
   print_state (f, os, s, 2, true);
   fprintf (f, "}\n");
-
-  if (global_p)
-    print_ns_open (f);
 }
 
 /* Print out a routine of type TYPE that performs ROOT.  */

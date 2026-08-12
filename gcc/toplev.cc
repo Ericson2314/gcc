@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dwarf2asm.h"
 #include "debug.h"
 #include "common/common-target.h"
+#include "multi-target-select.h"
 #include "langhooks.h"
 #include "cfgloop.h" /* for init_set_costs */
 #include "hosthooks.h"
@@ -2359,6 +2360,24 @@ toplev::main (int argc, char **argv)
      targetm_common user is init_options_struct, below.  */
   if (targ_caps_target_name != NULL
       && !targetm_common_select (targ_caps_target_name))
+    fatal_error (UNKNOWN_LOCATION,
+		 "target %qs is not one of the targets this compiler was "
+		 "configured for", targ_caps_target_name);
+
+  /* ... and the machine description that goes with it: recog, the mode
+     tables, insn_data, targetm itself.  Until this runs there is no back end
+     in force at all and the first use of any of them says so by name.
+
+     It is a second call rather than something targetm_common_select does,
+     because the two tables are needed at different times and merging them
+     would bury that: the common table has to be installed before option
+     decoding (init_options_struct, immediately below, reads it), while
+     nothing touches the machine description until after decode_options.
+     Failing them together here is still right -- a target whose common table
+     exists but whose back end was not built is a build bug, and
+     multi_target_select reports it as one.  */
+  if (targ_caps_target_name != NULL
+      && !multi_target_select (targ_caps_target_name))
     fatal_error (UNKNOWN_LOCATION,
 		 "target %qs is not one of the targets this compiler was "
 		 "configured for", targ_caps_target_name);

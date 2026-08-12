@@ -46,7 +46,10 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
   struct enum_value *value;
 
   def = (struct enum_type *) *slot;
-  printf ("\nconst char *const %s_strings[] = {", def->name);
+  /* Array plus pointer on a multi-target build, matching the declaration
+     genconstants writes into insn-constants-<base>.h.  */
+  printf ("\nconst char *const %s_strings%s[] = {", def->name,
+	  gen_target_ns () ? "_tab" : "");
   for (value = def->values; value; value = value->next)
     {
       printf ("\n  \"%s\"", value->def->name);
@@ -54,6 +57,9 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
 	putc (',', stdout);
     }
   printf ("\n};\n");
+  if (gen_target_ns ())
+    printf ("const char *const *%s_strings = %s_strings_tab;\n",
+	    def->name, def->name);
   return 1;
 }
 
@@ -79,7 +85,12 @@ main (int argc, const char **argv)
   print_gen_include (stdout, "insn-constants");
   putc ('\n', stdout);
 
+  /* unspec_strings / unspecv_strings are named bare by the middle end
+     (rtl.h, print-rtl.cc), so two back ends defining them bare collide
+     silently.  Namespaced; multi-target-select.cc supplies the bare names.  */
+  print_ns_open (stdout);
   reader.traverse_enum_types (print_enum_type, 0);
+  print_ns_close (stdout);
 
   if (ferror (stdout) || fflush (stdout) || fclose (stdout))
     return FATAL_EXIT_CODE;

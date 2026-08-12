@@ -25102,7 +25102,7 @@ all_lang_makefrags=
 # (aarch64_sls_shared_thunks, aarch64_previous_fndecl, ...), which only
 # mt-aarch64/aarch64.o defines.  So the union and OBJS membership are not two
 # steps but one, and this line flips in the same change as OBJS + the selector.
-all_gtfiles="$target_gtfiles"
+all_gtfiles="$gcc_all_target_gtfiles"
 
 # These are the languages that are set in --enable-languages,
 # and are available in the GCC tree.

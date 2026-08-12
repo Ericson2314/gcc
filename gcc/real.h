@@ -177,8 +177,8 @@ struct real_format
    float modes indexed by (MODE - first float mode), and entries for
    decimal float modes indexed by (MODE - first decimal float mode) +
    the number of float modes.  */
-extern const struct real_format *
-  real_format_for_mode[NUM_MODE_FLOAT + NUM_MODE_DECIMAL_FLOAT];
+extern GCC_TARGET_TABLE (const struct real_format *, real_format_for_mode,
+		       NUM_MODE_FLOAT + NUM_MODE_DECIMAL_FLOAT);
 
 #define REAL_MODE_FORMAT(MODE)						\
   (real_format_for_mode[DECIMAL_FLOAT_MODE_P (MODE)			\

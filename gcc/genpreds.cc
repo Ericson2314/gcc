@@ -1714,10 +1714,31 @@ write_tm_preds_h (void)
   puts ("#endif /* HAVE_MACHINE_MODES */\n");
 
   /* Print the definition of the target_constraints structure.  */
+  /* Sized by NUM_REGISTER_FILTERS -- the value genconfig computes and, on a
+     multi-target build, UNIONS over every configured back end -- and not by
+     this back end's own register_filters.length ().  The two are the same
+     quantity counted twice, and counting it here made `struct
+     target_constraints' a different SIZE in every back end's tm-preds-<base>.h:
+     the singular tm-preds.h said register_filters[1] (the primary has none)
+     while tm-preds-aarch64.h said [4], so the middle end and aarch64's own
+     generated code disagreed about the layout of an object they share.  That
+     is a silently wrong answer, not a link error.  One authority instead.
+
+     `MAX (..., 1)' is kept because a zero-length array is not portable C++;
+     it is spelled in the emitted text so the header, not genpreds, does the
+     arithmetic on whatever NUM_REGISTER_FILTERS is in force where it is
+     included.  */
+  /* NUM_REGISTER_FILTERS comes from insn-config.h, which tm-preds.h has never
+     included and which several of its includers do not have in scope.  Named
+     through print_gen_include so that a per-back-end tm-preds-<base>.h reaches
+     insn-config-<base>.h and not the build root's copy -- which is the
+     primary's, and answering with the primary's would reinstate exactly the
+     divergence this is fixing.  */
+  print_gen_include (stdout, "insn-config");
   printf ("#ifdef GCC_HARD_REG_SET_H\n"
 	  "struct target_constraints {\n"
-	  "  HARD_REG_SET register_filters[%d];\n",
-	  MAX (register_filters.length (), 1));
+	  "  HARD_REG_SET register_filters"
+	  "[NUM_REGISTER_FILTERS > 0 ? NUM_REGISTER_FILTERS : 1];\n");
   printf ("};\n"
 	  "\n"
 	  "extern struct target_constraints default_target_constraints;\n"
@@ -1728,33 +1749,74 @@ write_tm_preds_h (void)
 	  "#endif\n");
 
   /* Print TEST_REGISTER_FILTER_BIT, which tests whether register REGNO
-     is a valid start register for register filter ID.  */
-  printf ("\n"
-	  "#define TEST_REGISTER_FILTER_BIT(ID, REGNO) \\\n");
-  if (register_filters.is_empty ())
-    printf ("  ((void) (ID), (void) (REGNO), false)\n");
-  else
-    printf ("  TEST_HARD_REG_BIT ("
-	    "this_target_constraints->register_filters[ID], REGNO)\n");
+     is a valid start register for register filter ID; and
+     test_register_filters, which does the same for a mask of filters.
 
-  /* Print test_register_filters, which tests whether register REGNO
-     is a valid start register for the mask of register filters in MASK.  */
-  printf ("\n"
-	  "inline bool\n"
-	  "test_register_filters (unsigned int%s, unsigned int%s)\n",
-	  register_filters.is_empty () ? "" : " mask",
-	  register_filters.is_empty () ? "" : " regno");
-  printf ("{\n");
-  if (register_filters.is_empty ())
-    printf ("  return true;\n");
-  else
+     THESE TWO ARE OUTSIDE THE NAMESPACE, so on a multi-target build there is
+     exactly one of each and the middle end gets it.  ira-color.cc has four
+     call sites.  Written from this back end's own register_filters they were
+     a live wrong answer: the primary (i386) has none, so the shared
+     tm-preds.h said `return true' -- any register is allowed, for every
+     target -- while tm-preds-aarch64.h looped over aarch64's four and the
+     unioned insn-config.h said NUM_REGISTER_FILTERS 4.  Two targets, one
+     name, and the middle end compiled to the answer of the one that does not
+     use the feature.
+
+     The fix is not a selector entry.  Sized and bounded by
+     NUM_REGISTER_FILTERS -- the same unioned quantity that already sizes
+     `struct target_constraints' above -- the body is IDENTICAL text in every
+     back end's header, so there is nothing left to select between.  It stays
+     correct because the storage it reads is already shared and already
+     runtime: this_target_constraints->register_filters[] is filled in by
+     whichever back end's init_reg_class_start_regs () ran.  A back end with
+     no filters has no constraint carrying a filter id, so every MASK it can
+     produce is 0 and the loop decides nothing -- the same answer `return
+     true' gave, arrived at without asserting it for everybody else.
+
+     Single-target output is unchanged, byte for byte.  */
+  if (gen_multi_target_p ())
     {
-      printf ("  for (unsigned int id = 0; id < %d; ++id)\n",
-	      register_filters.length ());
-      printf ("    if ((mask & (1U << id))\n"
+      printf ("\n"
+	      "#define TEST_REGISTER_FILTER_BIT(ID, REGNO) \\\n"
+	      "  TEST_HARD_REG_BIT ("
+	      "this_target_constraints->register_filters[ID], REGNO)\n");
+      printf ("\n"
+	      "inline bool\n"
+	      "test_register_filters (unsigned int mask, unsigned int regno)\n"
+	      "{\n"
+	      "  for (unsigned int id = 0; id < NUM_REGISTER_FILTERS; ++id)\n"
+	      "    if ((mask & (1U << id))\n"
 	      "\t&& !TEST_REGISTER_FILTER_BIT (id, regno))\n"
 	      "      return false;\n"
 	      "  return true;\n");
+    }
+  else
+    {
+      printf ("\n"
+	      "#define TEST_REGISTER_FILTER_BIT(ID, REGNO) \\\n");
+      if (register_filters.is_empty ())
+	printf ("  ((void) (ID), (void) (REGNO), false)\n");
+      else
+	printf ("  TEST_HARD_REG_BIT ("
+		"this_target_constraints->register_filters[ID], REGNO)\n");
+
+      printf ("\n"
+	      "inline bool\n"
+	      "test_register_filters (unsigned int%s, unsigned int%s)\n",
+	      register_filters.is_empty () ? "" : " mask",
+	      register_filters.is_empty () ? "" : " regno");
+      printf ("{\n");
+      if (register_filters.is_empty ())
+	printf ("  return true;\n");
+      else
+	{
+	  printf ("  for (unsigned int id = 0; id < %d; ++id)\n",
+		  register_filters.length ());
+	  printf ("    if ((mask & (1U << id))\n"
+		  "\t&& !TEST_REGISTER_FILTER_BIT (id, regno))\n"
+		  "      return false;\n"
+		  "  return true;\n");
+	}
     }
   printf ("}\n"
 	  "#endif\n"
@@ -1946,15 +2008,20 @@ write_insn_preds_c (void)
   print_gen_include (stdout, "tm-constrs");
   puts ("#include \"target.h\"\n");
 
-  printf ("\n"
-	  "struct target_constraints default_target_constraints;\n"
-	  "#if SWITCHABLE_TARGET\n"
-	  "struct target_constraints *this_target_constraints"
-	  " = &default_target_constraints;\n"
-	  "#endif\n");
+  /* default_target_constraints / this_target_constraints are NOT defined
+     here any more.  They used to be, once per back end, under the bare names
+     target-globals.h declares -- so a compiler with two back ends linked in
+     had two of each and the archive kept whichever it happened to pull first.
 
-  /* The two definitions above stay GLOBAL -- see write_tm_preds_h.  From
-     here on everything is this back end's own.  */
+     They are not per-back-end constants: `struct target_constraints' is
+     runtime storage that each back end's own init_reg_class_start_regs ()
+     fills in, and the middle end reaches it through one pointer.  So the
+     right number of them is ONE, shared, and it lives in
+     multi-target-select.cc next to the selector that decides which back end
+     fills it.  Only the extern declarations remain, from tm-preds-<base>.h.
+
+     This is why the struct's layout had to stop being per back end; see the
+     NUM_REGISTER_FILTERS note in write_tm_preds_h.  */
   print_ns_open (stdout);
 
   FOR_ALL_PREDICATES (p)

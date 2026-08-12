@@ -234,6 +234,16 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   if (cpu == "")
     { reset(); return }
 
+  # Which back end serves this triple.  Recorded for EVERY record, not just the
+  # first for a cpu_type: several triples share a back end, and the selector is
+  # asked for a triple -- the name in the target-config file -- while the
+  # objects, the namespace and the mode tables are per back end.  Nothing else
+  # in the tree holds that map.  See emit_backend_registry.
+  if (!(trg in mt_base_of)) {
+    mt_base_of[trg] = cpu;
+    mt_targets = mt_targets " " trg;
+  }
+
   # Every record gets its per-triple conditions rules; only the first record
   # for a back end gets the per-back-end ones.  The per-triple rules name
   # $(MULTI_TARGET_GEN_OBJS_<base>) as a prerequisite, and make expands
@@ -972,6 +982,44 @@ function emit_asm_ops_registry(	i, n, parts) {
   printf "target-asm-ops-select.o: multi-target-asm-ops.h\n\n";
 }
 
+# The registry multi-target-select.cc includes: every back end that has
+# objects, and the triple-to-back-end map.
+#
+# Two lists rather than one, because they answer two different questions and
+# conflating them is what made the earlier selector wrong.  MT_BACKENDS is the
+# set of back ends whose objects are in the archive -- what may be selected.
+# MT_TARGET_BASES maps the NAME a target-config file uses (a triple) to the
+# back end serving it; several triples share one back end, so it is many-to-one
+# and cannot be derived from MT_BACKENDS.
+#
+# Emitted only when MULTI_TARGET_OBJS is non-empty, i.e. when there is anything
+# to select between; a build with no back ends gets a header with no entries
+# and multi-target-select.cc refuses to compile against it, rather than one
+# that quietly selects nothing.
+function emit_backend_registry(	i, n, parts, m, tp, seenb) {
+  n = split(mt_bases, parts, " ");
+  m = split(mt_targets, tp, " ");
+
+  printf "multi-target-backends.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  printf "\t  echo '#define MT_BACKENDS \\'; \\\n";
+  for (i = 1; i <= n; i++) {
+    if (parts[i] in seenb)
+      continue;
+    seenb[parts[i]] = 1;
+    printf "\t  echo '  MT_BACKEND (%s, insn_%s) \\'; \\\n", parts[i], parts[i];
+  }
+  printf "\t  echo '  /* end */'; \\\n";
+  printf "\t  echo '#define MT_TARGET_BASES \\'; \\\n";
+  for (i = 1; i <= m; i++)
+    printf "\t  echo '  MT_TARGET_BASE (\"%s\", %s) \\'; \\\n",
+	   tp[i], mt_base_of[tp[i]];
+  printf "\t  echo '  /* end */'; \\\n";
+  printf "\t} > tmp-multi-target-backends.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-backends.h $@\n\n";
+  printf "multi-target-select.o: multi-target-backends.h\n\n";
+}
+
 BEGIN {
   # Each target's MULTILIB_* set, written by gen-multilib-data.sh.  Only the
   # handful of triples whose tm_file names a generated sysroot-suffix header
@@ -1044,7 +1092,8 @@ $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
-		    emit_asm_ops_registry(); emit_source_specs();
+		    emit_asm_ops_registry(); emit_backend_registry();
+		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
 		    emit_inc_dirs() }
 
@@ -1343,7 +1392,25 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  # The bare names this back end's HAND-WRITTEN sources define; see
+  # MULTI_TARGET_RENAME_NAMES in Makefile.in for the list and why it exists.
+  # The list lives there, not here, so that the names have one authority.
+  printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", cpu;
+  # $(foreach), not $(patsubst): make substitutes only the FIRST `%%' in a
+  # patsubst replacement, so `-D%%=%%_i386' expands to `-Dtargetm=%%_i386' and
+  # the compiler is handed a literal per cent.  Which it reports as
+  # `<command-line>: expected primary-expression before %% token', naming
+  # neither the variable nor this file.
+  printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
+  # The companion to -Dtargetm=.  target.h #errors by name if either of the
+  # two appears without the other, because the half that is easy to lose is
+  # the -D: a middle-end object built with the rename would silently bind to
+  # ONE back end's hook table in a compiler holding several, and nothing
+  # about that is a link error.  The marker says "this translation unit is a
+  # back end's own", which is a thing no rule can infer from the name alone.
+  printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n", cpu;
   printf "MULTI_TARGET_OBJS += $(MULTI_TARGET_OBJS_%s)\n", cpu;
+  mt_bases = mt_bases " " cpu;
   # One back end at a time, by name.  Needed for more than convenience: the
   # control that shows these objects read THEIR OWN headers rather than the
   # primary's poisons one base's tm.h and requires the other base still to

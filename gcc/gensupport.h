@@ -59,11 +59,38 @@ extern void print_gen_include (FILE *outf, const char *name);
    symbol and changes no call site.  (The same reasoning as the machine-mode
    fix f7c4d1aed68: qualify what collides, leave the spelling alone.)
 
-   Deliberately NOT namespaced, because the middle end declares them in the
-   hand-written recog.h and calls them by name across the whole compiler:
-   recog, split_insns, peephole2_insns, add_clobbers,
-   added_clobbers_hard_reg_p.  Those are for the selector.  */
+   Namespaced too, since the selector landed: recog, split_insns,
+   peephole2_insns, add_clobbers, added_clobbers_hard_reg_p, insn_extract,
+   get_insn_name, peephole and the mode and insn_data tables all have
+   per-back-end definitions here and one bare forwarding definition in
+   multi-target-select.cc.  */
 extern const char *gen_target_ns (void);
+
+/* True when the compiler being built holds more than one back end.
+
+   gen_target_ns () answers a narrower question -- "am I generating FOR one
+   particular back end" -- and for the per-back-end runs the two coincide.
+   They come apart for the SINGULAR runs of a generator on a multi-target
+   build: build/genconstants writes the insn-constants.h the middle end reads,
+   has no back end of its own, and still has to declare unspec_strings as a
+   pointer, because the definitions behind it are per back end.  Getting that
+   wrong is not a link error -- the declaration and the definition disagree
+   about array-versus-pointer in different translation units -- so it is worth
+   a name of its own rather than an ad-hoc test at each site.
+
+   GEN_MULTI_TARGET is passed by Makefile.in to exactly those singular
+   generator objects, from $(multi_target_base), which is the same variable the
+   modes and insn-config unions key on.  */
+
+inline bool
+gen_multi_target_p (void)
+{
+#ifdef GEN_MULTI_TARGET
+  return true;
+#else
+  return gen_target_ns () != NULL;
+#endif
+}
 extern bool gen_name_is_global_p (const char *name);
 extern void print_ns_open (FILE *outf);
 extern void print_ns_close (FILE *outf);
