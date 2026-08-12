@@ -4512,7 +4512,7 @@ case "${target}" in
 						;;
 					esac
 
-					# If ARCH is unspecified for this multilib variant, use ${with_multllib_default}.
+					# If ARCH is unspecified for this multilib variant, use ${with_multilib_default}.
 					loongarch_multilib_list_make="${loongarch_multilib_list_make}${with_multilib_default}"
 					parse_state="opts"
 				fi
@@ -4539,7 +4539,7 @@ case "${target}" in
 					loongarch_multilib_list_make="${loongarch_multilib_list_make}${with_multilib_default}"
 					;;
 			    "arch")
-					# If ARCH is unspecified for this multilib variant, use ${with_multllib_default}.
+					# If ARCH is unspecified for this multilib variant, use ${with_multilib_default}.
 					loongarch_multilib_list_make="${loongarch_multilib_list_make}${with_multilib_default}"
 					;;
 			    "opts")
