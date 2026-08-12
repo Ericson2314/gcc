@@ -373,6 +373,74 @@ guess, which asserts nothing."
 done
 
 ########################################################################
+# 4a. IS `$MTP' THE PRE-CONVERSION DATASET, AND CAN IT BE DATED AND ATTRIBUTED?
+#
+# THE FAILURE THIS PREVENTS.  A (c-DATA) macro's HEADER arm is retired the
+# moment it becomes CONVERTED_CDATA -- that is the design.  So a macro-probe
+# run over HEAD does not measure ASM_COMMENT_START/WCHAR_TYPE/SIZE_TYPE/
+# PTRDIFF_TYPE at all, and a dataset produced by one carries no value for them.
+# Point this script at such a dataset and every one of those arms scored
+# "DISPATCH: no independent value" -- a FAIL, rendered exactly like a WRONG
+# MEASURED VALUE.  That is this project's own standing rule broken inside its
+# own harness: a MISSING EXPECTED value must never be spelled the same way as a
+# disagreeing one.  It happened -- /tmp/mtp-before was overwritten by a
+# post-Stage-2 run -- and it cost two agents a session, one of whom reported
+# 17/22 and could not prove the five reds were not his own work.
+#
+# So: refuse, by name, before scoring anything.  A run that cannot get an
+# independent value must not produce a scoreboard at all.
+########################################################################
+# (i)  It must be datable and attributable.  An undated directory in /tmp is
+#      not a reference; it is whatever the last person to run a probe left
+#      behind.
+if [ ! -s "$MTP/PROVENANCE.txt" ]; then
+  die "$MTP has no PROVENANCE.txt, so this dataset cannot be dated or \
+attributed and there is no way to tell a pre-conversion reference from \
+whatever the last macro-probe run left in /tmp.  Regenerate it with \
+scratchpad/mtp-before-regen.sh, or point MTP at a dataset that carries one."
+fi
+head -1 "$MTP/PROVENANCE.txt" | grep -q '^MTP-PROVENANCE ' \
+  || die "$MTP/PROVENANCE.txt does not start with an MTP-PROVENANCE line; it is \
+not a provenance record this script knows how to read"
+mtp_commit=$(sed -n 's/^commit  *//p' "$MTP/PROVENANCE.txt")
+[ -n "$mtp_commit" ] \
+  || die "$MTP/PROVENANCE.txt names no commit, so the dataset cannot be \
+attributed to a tree"
+
+# (ii) It must actually CARRY the retired arms.  This is the check that would
+#      have caught the overwrite immediately.  Only macros the current tree has
+#      really converted are demanded -- before the conversion the header probe
+#      supplied them anyway, and after it, it never will.
+#
+#      aarch64 is the base asked, deliberately: on i386 the three *_TYPE macros
+#      are not constant expressions and the header probe cannot value them on
+#      that base even BEFORE the conversion (section 4b supplies i386 from
+#      genuine upstream cc1 instead).  Demanding them on i386 would reject a
+#      perfectly good reference.
+for m in $CDATA_MACROS; do
+  redirected "$m" || continue
+  awk -v m="$m" '$1==m{f=1} END{exit !f}' "$MTP/str-aarch64.txt" && continue
+  die "POST-CONVERSION REFERENCE DATASET.
+
+  $MTP/str-aarch64.txt has no value for $m, and defaults.h redirects $m to a
+  target-cdata slot -- so this dataset was produced by a macro-probe run over a
+  tree where $m's header arm was ALREADY RETIRED.  Such a run can never supply
+  the value; the arm is gone by design, not missing by accident.
+
+  Scoring against it would print FAIL for every (c-DATA) string arm with the
+  reason \"no independent value\", which is indistinguishable from the compiler
+  producing the WRONG bytes.  Refusing instead.
+
+  What is needed: a macro-probe run over the last tree that PREDATES the
+  conversion -- commit 36ba31303e2, the parent of b063704e8a9 (\"per-config
+  slots for four (c-DATA) macros\").
+  Rebuild it with:  scratchpad/mtp-before-regen.sh
+  This dataset says it came from: $mtp_commit"
+done
+echo "ok: $MTP is a pre-conversion reference (commit $mtp_commit) and carries \
+all $(echo $CDATA_MACROS | wc -w) retired macros"
+
+########################################################################
 # 4b. AN INDEPENDENT VALUE FOR THE i386 SIDE OF THE TYPE MACROS.
 #
 # The header probe values `WCHAR_TYPE'/`SIZE_TYPE'/`PTRDIFF_TYPE' for aarch64
