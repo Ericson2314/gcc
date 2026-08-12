@@ -21,32 +21,36 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 /* This program does not use gensupport.cc to look at insn patterns -- it
-   needs only (define_constants) -- but it does link it, for gen_target_ns.
-   Whether `unspec_strings' is an array or a pointer has to be decided the
-   same way in the header this program writes and in the file genenums.cc
-   writes, and gen_target_ns is where that decision lives.  The alternative is
-   a second copy of it here, i.e. one name with two authorities, which is the
-   failure the whole per-back-end suffix exists to prevent.  genenums.cc made
-   the same trade for print_gen_include; see the note by genprogrtl in
-   Makefile.in.
+   needs only (define_constants).  It does need ONE thing from the gen*
+   common code: whether `unspec_strings' is an array or a pointer has to be
+   decided the same way in the header this program writes and in the file
+   genenums.cc writes, and gen_multi_target_p () is where that decision
+   lives.  The alternative is a second copy of it here, i.e. one name with two
+   authorities, which is the failure the whole per-back-end suffix exists to
+   prevent.
 
-   Like genenums.cc it reads no target macro; tm.h and rtl.h are here only
-   because gensupport.h needs rtl.h and rtl.h wants FIRST_PSEUDO_REGISTER,
-   which reaches a structure size and not this program's output.  */
+   THAT DEPENDENCY IS ON gen-target-ns.cc, NOT ON gensupport.cc, AND THE
+   DIFFERENCE IS WHAT MAKES A COLD BUILD POSSIBLE.  This file used to include
+   gensupport.h, which needs rtl.h, which wants FIRST_PSEUDO_REGISTER, which
+   on aarch64 is (LAST_FAKE_REGNUM + 1) out of insn-constants.h -- the very
+   file this program exists to write.  make saw the loop and dropped it:
+
+       make[1]: Circular build/genconstants.o <- insn-constants.h dependency
+                dropped.
+       ./tm.h:41:11: fatal error: insn-constants.h: No such file or directory
+
+   so the branch could only be built in a directory that already had the
+   header from some earlier state.  gen-target-ns.h reads no target macro and
+   includes no target header, by rule; keep it that way.  */
 
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
-#ifndef TM_H_FILE
-#define TM_H_FILE "tm.h"
-#endif
-#include TM_H_FILE
-#include "rtl.h"
 #include "errors.h"
 #include "statistics.h"
 #include "vec.h"
 #include "read-md.h"
-#include "gensupport.h"
+#include "gen-target-ns.h"
 
 /* Called via traverse_md_constants; emit a #define for
    the current constant definition.  */

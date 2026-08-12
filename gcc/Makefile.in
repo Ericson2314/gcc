@@ -1239,7 +1239,7 @@ GCC_PLUGIN_H = gcc-plugin.h highlev-plugin-common.h plugin.def \
 PLUGIN_H = plugin.h $(GCC_PLUGIN_H)
 PLUGIN_VERSION_H = plugin-version.h configargs.h
 CONTEXT_H = context.h
-GENSUPPORT_H = gensupport.h read-md.h optabs.def
+GENSUPPORT_H = gensupport.h gen-target-ns.h read-md.h optabs.def
 RTL_SSA_H = $(PRETTY_PRINT_H) insn-config.h splay-tree-utils.h \
 	    $(RECOG_H) $(REGS_H) function-abi.h obstack-utils.h \
 	    mux-utils.h rtlanal.h memmodel.h $(EMIT_RTL_H) \
@@ -1336,9 +1336,16 @@ ZSTD_LIB = @ZSTD_LDFLAGS@ @ZSTD_LIB@
 # even if we are cross-building GCC.
 BUILD_LIBS = $(BUILD_LIBIBERTY)
 
+# The per-back-end namespace and GEN_HDR_SUFFIX, in a translation unit that
+# reaches NO target header.  Kept out of $(BUILD_RTL) on purpose: it is the
+# only part of the gen* common code that build/genconstants may link, because
+# build/genconstants is what writes insn-constants.h.  See genprogns below.
+BUILD_GEN_TARGET_NS = build/gen-target-ns.o
+
 BUILD_RTL = build/rtl.o build/read-rtl.o build/ggc-none.o \
 	    build/vec.o build/min-insn-modes.o build/gensupport.o \
-	    build/print-rtl.o build/hash-table.o build/sort.o
+	    build/print-rtl.o build/hash-table.o build/sort.o \
+	    $(BUILD_GEN_TARGET_NS)
 BUILD_MD = build/read-md.o
 BUILD_ERRORS = build/errors.o
 
@@ -3628,6 +3635,19 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
 # contents must be the same for every configured back end, so its rule passes
 # genconfig `-Uinsn-config-union.list -A$(multi_target_base)'.  See the
 # s-config rule below.
+#
+# TAKING IT OUT OF THIS LIST TOOK IT OUT OF $(generated_files) TOO, and that
+# is not a detail: $(generated_files) is the order-only barrier that every
+# host object waits behind ($(ALL_HOST_OBJS) : | $(generated_files)).  With
+# insn-config.h off it, insn-preds.o -- which reaches it through tm-preds.h --
+# raced the rule that writes it and a cold build failed with
+#
+#     tm-preds.h:224:10: fatal error: insn-config.h: No such file or directory
+#
+# while an existing build directory, and a SECOND `make' in the failed one,
+# both succeeded.  insn-config.h is therefore named explicitly in
+# generated_files; do not assume membership of a `simple_' list is the only
+# thing that put a header there.
 simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
 			  insn-flags.h insn-target-def.h
 
@@ -4171,7 +4191,7 @@ s-gtype: $(EXTRA_GTYPE_DEPS) build/gengtype$(build_exeext) \
 	$(STAMP) s-gtype
 
 generated_files = config.h tm.h $(TM_P_H) $(TM_D_H) $(TM_JIT_H) $(TM_H) \
-       multilib.h $(simple_generated_h) specs.h \
+       multilib.h $(simple_generated_h) insn-config.h specs.h \
        tree-check.h genrtl.h insn-modes.h insn-modes-inline.h \
        tm-preds.h tm-constrs.h \
        $(ALL_GTFILES_H) gtype-desc.cc gtype-desc.h version.h \
@@ -4195,6 +4215,10 @@ build/%.o :  # dependencies provided by explicit rule later
 # Header dependencies for the programs that generate source code.
 # These are library modules...
 build/errors.o : errors.cc $(BCONFIG_H) $(SYSTEM_H) errors.h
+# Deliberately no $(GTM_H) and no $(RTL_BASE_H): this object is linked into
+# build/genconstants, which writes insn-constants.h.  See genprogns below.
+build/gen-target-ns.o : gen-target-ns.cc $(BCONFIG_H) $(SYSTEM_H)	\
+  $(CORETYPES_H) gen-target-ns.h
 build/gensupport.o: gensupport.cc $(BCONFIG_H) $(SYSTEM_H) 		\
   $(CORETYPES_H) $(GTM_H) $(RTL_BASE_H) $(OBSTACK_H) errors.h		\
   $(HASHTAB_H) $(READ_MD_H) $(GENSUPPORT_H) $(HASH_TABLE_H)
@@ -4273,13 +4297,19 @@ build/genconstants.o : BUILD_CPPFLAGS += \
 # is the only way it can know.
 build/genpreds.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# NO $(GTM_H) HERE, and none in gen-target-ns.o either: this is the program
+# that writes insn-constants.h, which $(GTM_H) contains.  Adding a target
+# header back to either line reinstates the circular dependency that made a
+# from-scratch build of this branch impossible; a build directory that already
+# has the header will not tell you.
 build/genconstants.o : genconstants.cc $(BCONFIG_H) $(SYSTEM_H)		\
-  $(CORETYPES_H) $(GTM_H) $(RTL_BASE_H) errors.h $(READ_MD_H) $(GENSUPPORT_H)
+  $(CORETYPES_H) errors.h $(READ_MD_H) gen-target-ns.h
 build/genemit.o : genemit.cc $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H) internal-fn.def
+# No $(GTM_H): see build/genconstants.o below.  genenums is held to the same
+# rule so the two programs cannot drift apart about GEN_HDR_SUFFIX.
 build/genenums.o : genenums.cc $(BCONFIG_H) $(SYSTEM_H)			\
-  $(CORETYPES_H) $(GTM_H) $(RTL_BASE_H) errors.h $(READ_MD_H)		\
-  $(GENSUPPORT_H)
+  $(CORETYPES_H) errors.h $(READ_MD_H) gen-target-ns.h
 build/genextract.o : genextract.cc $(RTL_BASE_H) $(BCONFIG_H)		\
   $(SYSTEM_H) $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H)
 build/genflags.o : genflags.cc $(RTL_BASE_H) $(OBSTACK_H) $(BCONFIG_H)	\
@@ -4360,19 +4390,35 @@ build/gencfn-macros.o : gencfn-macros.cc $(BCONFIG_H) $(SYSTEM_H)	\
 # Example: riscv/t-riscv
 
 # All these programs use the RTL reader ($(BUILD_RTL)).
-# `enums' is here for its LINK, not its reader: genenums.cc uses only the md
-# reader, but it now calls print_gen_include (gensupport.cc) so that the
-# insn-constants.h its output names carries GEN_HDR_SUFFIX.  build/gensupport.o
-# is in $(BUILD_RTL) and nowhere smaller, so the alternative to this line is a
-# second copy of the GEN_HDR_SUFFIX default in genenums.cc -- one name, two
-# authorities, which is the failure this suffix exists to prevent.
 genprogrtl += attr attr-common attrtab automata codes conditions config emit \
-	     enums extract flags mddump opinit output peep preds recog \
-	     target-def constants
+	     extract flags mddump opinit output peep preds recog \
+	     target-def
+
+# THE BOOTSTRAP EDGE.  `constants' and `enums' are NOT on the list above, and
+# that is load-bearing rather than tidy.  Both need one thing from the gen*
+# common code -- print_gen_include / gen_multi_target_p, so that the header
+# names they emit carry GEN_HDR_SUFFIX and so that `unspec_strings' is
+# declared array-or-pointer the same way in both -- and neither reads an insn
+# pattern.  Those functions used to live in gensupport.cc, which is in
+# $(BUILD_RTL) and nowhere smaller, so getting them meant linking the RTL
+# reader, and build/gensupport.o is compiled against tm.h, hence
+# insn-constants.h.  build/genconstants is what WRITES insn-constants.h:
+#
+#     make[1]: Circular build/genconstants.o <- insn-constants.h dependency
+#              dropped.
+#     ./tm.h:41:11: fatal error: insn-constants.h: No such file or directory
+#
+# A build directory that already held the header from an earlier state never
+# showed it; an empty one failed every time.  $(BUILD_GEN_TARGET_NS) is the
+# same single authority in a translation unit that reaches no target header,
+# so these two link it directly and the cycle is gone -- not broken by a seed.
 $(genprogrtl:%=build/gen%$(build_exeext)): $(BUILD_RTL)
 
+genprogns += constants enums
+$(genprogns:%=build/gen%$(build_exeext)): $(BUILD_GEN_TARGET_NS)
+
 # All these programs use the MD reader ($(BUILD_MD)).
-genprogmd += $(genprogrtl) mddeps
+genprogmd += $(genprogrtl) $(genprogns) mddeps
 $(genprogmd:%=build/gen%$(build_exeext)): $(BUILD_MD)
 
 # All these programs need to report errors.

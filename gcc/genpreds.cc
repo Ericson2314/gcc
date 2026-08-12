@@ -1509,8 +1509,13 @@ write_get_register_filter ()
 {
   constraint_data *c;
 
+  /* Same guard as `struct target_constraints' itself -- this function
+     dereferences `this_target_constraints', so it must appear exactly where
+     that declaration does.  See the long note at the target_constraints
+     block for why GENERATOR_FILE is part of it; a generator that calls
+     get_register_filter now fails naming it.  */
   printf ("\n"
-	  "#ifdef GCC_HARD_REG_SET_H\n"
+	  "#if defined GCC_HARD_REG_SET_H && !defined GENERATOR_FILE\n"
 	  "static inline const HARD_REG_SET *\n"
 	  "get_register_filter (constraint_num%s)\n",
 	  register_filters.is_empty () ? "" : " c");
@@ -1733,10 +1738,41 @@ write_tm_preds_h (void)
      through print_gen_include so that a per-back-end tm-preds-<base>.h reaches
      insn-config-<base>.h and not the build root's copy -- which is the
      primary's, and answering with the primary's would reinstate exactly the
-     divergence this is fixing.  */
+     divergence this is fixing.
+
+     WITHHELD FROM GENERATOR FILES, and that is what makes a from-scratch
+     build possible.  insn-config-<base>.h is written by
+     build/genconfig-<base>, which is fed insn-conditions-<base>.md, which is
+     written by build/gencondmd-<base>, which includes tm_p-<base>.h, which
+     includes this header.  Emitted for generators too, the include closed
+     that loop and a cold build stopped dead:
+
+         ./tm-preds-aarch64.h:247:10: fatal error: insn-config-aarch64.h:
+             No such file or directory
+
+     Upstream has always known this header cannot be reached from gencondmd:
+     genconditions.cc fakes MAX_RECOG_OPERANDS, MAX_DUP_OPERANDS and
+     MAX_INSNS_PER_SPLIT under the comment `insn-config.h doesn't exist yet',
+     and upstream genpreds never named insn-config.h here at all -- it wrote
+     the array bound as a LITERAL it computed itself.  Keying the bound on
+     the unioned NUM_REGISTER_FILTERS instead is the right answer for the
+     middle end (see below) and is unaffected by this; what changes is only
+     that a GENERATOR does not get the block at all.
+
+     GENERATOR_FILE and not GCC_HARD_REG_SET_H, because rtl.h includes
+     hard-reg-set.h, so every includer of tm-preds.h has that macro defined by
+     the time it gets here -- guarding on it looks right and does nothing.
+     Measured: the cold build failed identically with the include moved
+     inside it.
+
+     Nothing is faked in its place.  A generator that reaches for
+     `target_constraints', TEST_REGISTER_FILTER_BIT or test_register_filters
+     now fails to compile naming the identifier, rather than compiling against
+     an invented NUM_REGISTER_FILTERS -- which, being the primary's, is the
+     wrong-answer-without-a-diagnostic this whole block exists to remove.  */
+  printf ("#if defined GCC_HARD_REG_SET_H && !defined GENERATOR_FILE\n");
   print_gen_include (stdout, "insn-config");
-  printf ("#ifdef GCC_HARD_REG_SET_H\n"
-	  "struct target_constraints {\n"
+  printf ("struct target_constraints {\n"
 	  "  HARD_REG_SET register_filters"
 	  "[NUM_REGISTER_FILTERS > 0 ? NUM_REGISTER_FILTERS : 1];\n");
   printf ("};\n"

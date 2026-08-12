@@ -361,7 +361,15 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # target, so a per-back-end program cannot take an extra object without a
   # rule of its own.  Linking it into every generator costs an unused object
   # and keeps one list.
-  n = split("rtl read-rtl ggc-none vec gensupport print-rtl " \
+  # gen-target-ns is separate from gensupport for the reason set out at the
+  # top of gen-target-ns.cc -- it is the half that reaches no target header,
+  # so build/genconstants can link it -- but the PER-BACK-END generators need
+  # both halves exactly as before, and they need this one compiled with THIS
+  # back end's GEN_HDR_SUFFIX, which is what putting it on this list does.
+  # Leaving it off would not fail here: build/gensupport-<cpu>.o no longer
+  # defines gen_target_ns, so every per-back-end generator would fail to link
+  # by name, which is the correct way for this to go wrong.
+  n = split("rtl read-rtl ggc-none vec gensupport gen-target-ns print-rtl " \
 	    "hash-table inchash sort read-md errors", parts, " ");
   objs = "build/min-insn-modes-" cpu ".o";
   for (i = 1; i <= n; i++)
