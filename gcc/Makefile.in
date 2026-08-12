@@ -1275,7 +1275,23 @@ ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) \
 # that are.  It has to be here rather than in INCLUDES only because INCLUDES
 # reads as a list of -I; the ordering that matters for -I does not matter for
 # -D.
-ALL_CPPFLAGS = $(INCLUDES) $(MULTI_TARGET_RENAMES) $(CPPFLAGS)
+
+# THE OPTION TABLES ARE POINTERS IN A MULTI-TARGET BUILD.  Non-empty exactly
+# when there is more than one back end to choose between; opts.h switches the
+# declaration of `cl_options'/`cl_enums' on it, and opts-common.cc uses it to
+# decide whether "no target selected" is a state that can be reached.
+#
+# It is in ALL_CPPFLAGS -- i.e. on EVERY host object -- rather than on the few
+# that spell the names, because a declaration mismatch between two objects in
+# one link is an array read against a pointer definition: no diagnostic, and
+# the first `-m' option decoded reads a garbage table.  There is nothing to
+# gain by being selective and the failure from getting it wrong is silent.
+# $(multi_target_base) is assigned further down; make variables are lazy.
+MULTI_TARGET_OPT_TABLES = \
+  $(if $(multi_target_base),-DMULTI_TARGET_OPTION_TABLES)
+
+ALL_CPPFLAGS = $(INCLUDES) $(MULTI_TARGET_RENAMES) $(MULTI_TARGET_OPT_TABLES) \
+  $(CPPFLAGS)
 
 # This is the variable to use when using $(COMPILER).
 ALL_COMPILERFLAGS = $(ALL_CXXFLAGS) $(PICFLAG)
@@ -2214,7 +2230,20 @@ OBJS-libcommon-target = $(gcc_all_common_objects) common/common-target-select.o 
 	opts.o opts-common.o opts-diagnostic.o options.o \
 	vec.o hooks.o common/common-targhooks.o \
 	hash-table.o file-find.o spellcheck.o selftest.o opt-suggestions.o \
-	options-urls.o
+	options-urls.o $(MULTI_TARGET_OPTION_TABLE_OBJS)
+
+# The per-back-end `cl_options[]'/`cl_enums[]' and the selector that chooses
+# between them, in libcommon-target.a and NOT libbackend.a.  The driver is the
+# caller that needed this -- it is where `-mabi=lp64' met i386's option table
+# -- and xgcc links only libcommon-target.a.
+#
+# Empty in a single-target build, where $(MT_OPTIONS_TABLES_OBJS) is unset and
+# options.cc still emits both tables as arrays exactly as it always did.  The
+# two halves are named together because they are useless apart: the tables with
+# no selector are objects nothing points at, and the selector with no tables
+# does not link.
+MULTI_TARGET_OPTION_TABLE_OBJS = $(if $(MT_OPTIONS_TABLES_OBJS), \
+  $(MT_OPTIONS_TABLES_OBJS) multi-target-options-select.o)
 
 # This lists all host objects for the front ends.
 ALL_HOST_FRONTEND_OBJS = $(foreach v,$(CONFIG_LANGUAGES),$($(v)_OBJS))

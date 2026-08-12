@@ -30,6 +30,50 @@ along with GCC; see the file COPYING3.  If not see
 #include "spellcheck.h"
 #include "opts-jobserver.h"
 
+/* THE DOOR ONTO THE OPTION TABLES, and the diagnostic for arriving at it too
+   early.
+
+   In a multi-target build `cl_options' and `cl_enums' are pointers that start
+   NULL, because the alternative -- starting them at the primary back end's
+   tables -- is the bug this removes: it answers correctly on the build's own
+   triple and wrongly on every other one, silently.  See opts.h.
+
+   Every route into the tables passes through find_opt, decode_cmdline_option
+   or read_cmdline_option, so checking those three costs one predictable branch
+   per option and leaves nothing indexing a null pointer.  Reported the way
+   common/common-target-select.cc reports its own version of this, and for the
+   same measured reason: the driver reaches its first option decode inside
+   driver::decode_argv, which runs BEFORE diagnostic_initialize, so
+   internal_error there segfaults inside diagnostic_impl and prints no message
+   at all.  */
+
+#ifdef MULTI_TARGET_OPTION_TABLES
+static ATTRIBUTE_NORETURN void
+no_option_tables_selected (const char *what)
+{
+  fprintf (stderr,
+	   "%s: fatal error: `%s' was reached before a target was selected\n"
+	   "there is no command-line option table in force: nothing called "
+	   "multi_target_options_select, so no back end's `-m' options can be "
+	   "decoded.  A target is named by the `target' line of the file "
+	   "passed as -ftarget-config=, or by the <triple>- prefix of the "
+	   "program name; a compiler given neither has no target and "
+	   "deliberately has no default.\n",
+	   progname != NULL ? progname : "gcc", what);
+  exit (FATAL_EXIT_CODE);
+}
+
+#define CHECK_OPTION_TABLES(WHAT)		\
+  do						\
+    {						\
+      if (cl_options == NULL)			\
+	no_option_tables_selected (WHAT);	\
+    }						\
+  while (0)
+#else
+#define CHECK_OPTION_TABLES(WHAT) ((void) 0)
+#endif
+
 static void prune_options (struct cl_decoded_option **, unsigned int *);
 
 /* An option that is undocumented, that takes a joined argument, and
@@ -80,6 +124,8 @@ find_opt (const char *input, unsigned int lang_mask)
   size_t mn, mn_orig, mx, md, opt_len;
   size_t match_wrong_lang;
   int comp;
+
+  CHECK_OPTION_TABLES ("find_opt");
 
   mn = 0;
   mx = cl_options_count;
@@ -570,6 +616,8 @@ decode_cmdline_option (const char *const *argv, unsigned int lang_mask,
   int adjust_len = 0;
   size_t total_len;
   char *p;
+
+  CHECK_OPTION_TABLES ("decode_cmdline_option");
   const struct cl_option *option;
   int errors = 0;
   const char *warn_message = NULL;
@@ -1610,6 +1658,8 @@ read_cmdline_option (struct gcc_options *opts,
 {
   const struct cl_option *option;
   const char *opt = decoded->orig_option_with_args_text;
+
+  CHECK_OPTION_TABLES ("read_cmdline_option");
 
   if (decoded->warn_message)
     warning_at (loc, 0, decoded->warn_message, opt);

@@ -8650,6 +8650,29 @@ driver::main (int argc, char **argv)
       selected_target = default_target;
     }
 
+  /* THE COMMAND-LINE OPTION TABLES, and they are why this task existed.
+     `cl_options[]' and `cl_enums[]' were generated from the PRIMARY back end's
+     optionlist, so the driver validated every `-m' option against i386's
+     answer whatever target had been selected:
+
+	 xgcc: error: unrecognized argument in option '-mabi=lp64'
+	 xgcc: note: valid arguments to '-mabi=' are: ms sysv
+
+     from an aarch64 target-config, whose own spec file's option_defaults say
+     `-mabi=lp64'.  Every asm acceptance on this branch has invoked cc1
+     directly and side-stepped the driver; a native install and `make check'
+     cannot.
+
+     Before decode_argv, necessarily: that is where the first option is
+     decoded.  Until this runs the tables are NULL rather than the primary's,
+     and opts-common.cc reports it by name -- a driver invoked with no target
+     at all has no option table and says so, instead of quietly using x86's.  */
+  if (selected_target != NULL
+      && !multi_target_options_select (selected_target))
+    early_fatal_error ("no command-line option table for target `%s', which "
+		       "the target registry accepted: the registries disagree "
+		       "about the configured targets", selected_target);
+
   /* The common hook table, scanned here for the same reason: the driver reads
      targetm_common (compute_multilib, among others) from build_multilib_strings
      onwards, which is before any spec file has been read.  Until this runs the
