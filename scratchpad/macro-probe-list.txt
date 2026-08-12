@@ -1,0 +1,173 @@
+# The per-macro probe set for gcc.target/multi-target/macro-probe.exp.
+#
+# WHERE THIS LIST COMES FROM, and what it is NOT.
+#
+# 143 macros are defined with DIFFERING TEXT by the i386 and aarch64 bases and
+# are spelled by target-independent code.  From those, five groups are removed
+# and the removals are listed here rather than left implicit:
+#
+#   12 driver-only spec strings (ASM_SPEC CC1_SPEC CPP_SPEC DRIVER_SELF_SPECS
+#      ENDFILE_SPEC LIB_SPEC LINK_SPEC STARTFILE_SPEC MULTILIB_DEFAULTS
+#      OPTION_DEFAULT_SPECS EXTRA_SPECS EXTRA_SPEC_FUNCTIONS) -- referenced
+#      only from gcc.cc and friends, never from cc1, and already owned by this
+#      branch target-specs mechanism.
+#    1 TYPE_OPERAND_FMT -- appears in no .cc at all.
+#    2 targetm hook initialisers (TARGET_ASM_FILE_END TARGET_ASM_SELECT_SECTION)
+#      -- already solved at run time by f82b65386d0.  A header probe cannot see
+#      a runtime pointer, so scoring them here would be a false red.
+#
+# leaving 128, of which exactly ONE (MAX_BITS_PER_WORD) is expected to pass for
+# both bases: its text differs and its value does not (64 = 64).  It is kept in
+# the set deliberately, as the one probe that proves a PASS is possible.
+# 127 actionable.
+#
+# Then 10 more are ADDED that no text diff can find, because their definition
+# text is byte-identical on both bases:
+#   N_REG_CLASSES        34 vs 20 -- the macro behind the aarch64.cc:14322 ICE
+#   BITS_PER_WORD        runtime (TARGET_64BIT) on i386, constant 64 on aarch64
+#   and 8 more asymmetric constant/runtime pairs.
+#
+# TOTAL 138.  THIS IS A LOWER BOUND, NOT A CEILING.  ~1049 identical-text
+# non-integer macros have never been classified; the honest statement about the
+# population is ">= 137 actionable, no established upper bound".
+#
+# Columns: NAME  CLASS   (class per MACRO-LEAK.md; informational, not used for
+# scoring -- the harness picks its probe shape by measurement, not by this)
+ACCUMULATE_OUTGOING_ARGS           text-diverging
+ADDITIONAL_REGISTER_NAMES          text-diverging
+ADJUST_REG_ALLOC_ORDER             text-diverging
+ARG_POINTER_REGNUM                 text-diverging
+ASM_COMMENT_START                  text-diverging
+ASM_DECLARE_FUNCTION_NAME          text-diverging
+ASM_OUTPUT_ADDR_DIFF_ELT           text-diverging
+ASM_OUTPUT_ALIGN                   text-diverging
+ASM_OUTPUT_EXTERNAL                text-diverging
+ASM_OUTPUT_FUNCTION_LABEL          text-diverging
+ASM_OUTPUT_LABELREF                text-diverging
+ASM_OUTPUT_MAX_SKIP_ALIGN          text-diverging
+ASM_PREFERRED_EH_DATA_FORMAT       text-diverging
+ATTRIBUTE_ALIGNED_VALUE            text-diverging
+BASE_REG_CLASS                     text-diverging
+BIGGEST_ALIGNMENT                  text-diverging
+BITS_PER_WORD                      identical-text-blind-spot
+BRANCH_COST                        text-diverging
+BYTES_BIG_ENDIAN                   text-diverging
+CASE_VECTOR_MODE                   text-diverging
+CASE_VECTOR_PC_RELATIVE            text-diverging
+CLEAR_RATIO                        text-diverging
+CLZ_DEFINED_VALUE_AT_ZERO          text-diverging
+COMPARE_MAX_PIECES                 identical-text-blind-spot
+CONSTANT_ADDRESS_P                 text-diverging
+CTZ_DEFINED_VALUE_AT_ZERO          text-diverging
+DATA_ALIGNMENT                     text-diverging
+DEBUGGER_REGNO                     text-diverging
+DEFAULT_PCC_STRUCT_RETURN          text-diverging
+DEFAULT_SIGNED_CHAR                text-diverging
+DWARF_CIE_DATA_ALIGNMENT           identical-text-blind-spot
+DWARF_FRAME_REGISTERS              text-diverging
+DWARF_FRAME_REGNUM                 text-diverging
+DWARF_FRAME_RETURN_COLUMN          text-diverging
+EH_RETURN_DATA_REGNO               text-diverging
+EH_RETURN_HANDLER_RTX              text-diverging
+EH_RETURN_STACKADJ_RTX             text-diverging
+ELIMINABLE_REGS                    text-diverging
+ENABLE_X86_64_MFENTRY              text-diverging
+EPILOGUE_USES                      text-diverging
+EXIT_IGNORE_STACK                  text-diverging
+FIRST_PSEUDO_REGISTER              text-diverging
+FIXED_REGISTERS                    text-diverging
+FLOAT_WORDS_BIG_ENDIAN             identical-text-blind-spot
+FRAME_POINTER_REGNUM               text-diverging
+FUNCTION_ARG_REGNO_P               text-diverging
+FUNCTION_BOUNDARY                  text-diverging
+FUNCTION_MODE                      text-diverging
+FUNCTION_PROFILER                  text-diverging
+GLOBAL_ASM_OP                      text-diverging
+HARD_FRAME_POINTER_REGNUM          text-diverging
+HARD_REGNO_CALLER_SAVE_MODE        text-diverging
+HARD_REGNO_NREGS_HAS_PADDING       text-diverging
+HARD_REGNO_NREGS_WITH_PADDING      text-diverging
+HARD_REGNO_RENAME_OK               text-diverging
+HAS_LONG_COND_BRANCH               text-diverging
+HAS_LONG_UNCOND_BRANCH             text-diverging
+HAVE_adddf3                        text-diverging
+HAVE_atomic_compare_and_swapdi     text-diverging
+HAVE_atomic_compare_and_swapsi     text-diverging
+HAVE_cpymemdi                      text-diverging
+HAVE_setmemdi                      text-diverging
+INCOMING_FRAME_SP_OFFSET           text-diverging
+INCOMING_RETURN_ADDR_RTX           text-diverging
+INCOMING_STACK_BOUNDARY            text-diverging
+INDEX_REG_CLASS                    text-diverging
+INIT_CUMULATIVE_ARGS               text-diverging
+INITIAL_ELIMINATION_OFFSET         text-diverging
+JUMP_TABLES_IN_TEXT_SECTION        text-diverging
+LEGITIMATE_PIC_OPERAND_P           text-diverging
+LIBCALL_VALUE                      text-diverging
+LOAD_EXTEND_OP                     text-diverging
+LOCAL_ALIGNMENT                    text-diverging
+LOCAL_DECL_ALIGNMENT               text-diverging
+LONG_TYPE_SIZE                     text-diverging
+MALLOC_ABI_ALIGNMENT               text-diverging
+MAX_BITSIZE_MODE_ANY_MODE          text-diverging
+MAX_BITS_PER_WORD                  same-value-control
+MAX_FIXED_MODE_SIZE                text-diverging
+MAX_MOVE_MAX                       text-diverging
+MAX_STACK_ALIGNMENT                text-diverging
+MAX_SUPPORTED_STACK_ALIGNMENT      text-diverging
+MINIMUM_ALIGNMENT                  text-diverging
+MIN_UNITS_PER_WORD                 text-diverging
+MOVE_MAX                           text-diverging
+MOVE_MAX_PIECES                    identical-text-blind-spot
+MOVE_RATIO                         text-diverging
+N_REG_CLASSES                      identical-text-blind-spot
+NUM_MODES_FOR_MODE_SWITCHING       text-diverging
+NUM_UNSPEC_VALUES                  text-diverging
+NUM_UNSPECV_VALUES                 text-diverging
+OPTIMIZE_MODE_SWITCHING            text-diverging
+OUTGOING_REG_PARM_STACK_SPACE      text-diverging
+PARM_BOUNDARY                      text-diverging
+PIC_OFFSET_TABLE_REGNUM            text-diverging
+Pmode                              text-diverging
+POINTER_SIZE                       text-diverging
+PREFERRED_STACK_BOUNDARY           text-diverging
+PROMOTE_MODE                       text-diverging
+PTRDIFF_TYPE                       text-diverging
+PUSH_ARGS_REVERSED                 text-diverging
+REG_ALLOC_ORDER                    text-diverging
+REG_CLASS_CONTENTS                 text-diverging
+REG_CLASS_NAMES                    text-diverging
+REGISTER_NAMES                     text-diverging
+REGMODE_NATURAL_SIZE               text-diverging
+REGNO_OK_FOR_BASE_P                text-diverging
+REGNO_OK_FOR_INDEX_P               text-diverging
+REGNO_REG_CLASS                    text-diverging
+REG_WORDS_BIG_ENDIAN               identical-text-blind-spot
+RETURN_ADDR_RTX                    text-diverging
+REVERSE_CONDITION                  text-diverging
+REVERSIBLE_CC_MODE                 text-diverging
+SELECT_CC_MODE                     text-diverging
+SET_RATIO                          text-diverging
+SETUP_FRAME_ADDRESSES              text-diverging
+SHIFT_COUNT_TRUNCATED              text-diverging
+SIZE_TYPE                          text-diverging
+SLOW_BYTE_ACCESS                   text-diverging
+STACK_BOUNDARY                     text-diverging
+STACK_CHECK_FIXED_FRAME_SIZE       identical-text-blind-spot
+STACK_CHECK_MAX_FRAME_SIZE         identical-text-blind-spot
+STACK_CHECK_MOVING_SP              text-diverging
+STACK_POINTER_REGNUM               text-diverging
+STACK_SAVEAREA_MODE                text-diverging
+STACK_SIZE_MODE                    text-diverging
+STACK_SLOT_ALIGNMENT               text-diverging
+STORE_MAX_PIECES                   text-diverging
+STRICT_ALIGNMENT                   text-diverging
+SUPPORTS_STACK_ALIGNMENT           identical-text-blind-spot
+TARGET_HAS_FMV_TARGET_ATTRIBUTE    text-diverging
+TARGET_PTRMEMFUNC_VBIT_LOCATION    text-diverging
+TRAMPOLINE_ALIGNMENT               text-diverging
+TRAMPOLINE_SIZE                    text-diverging
+UNITS_PER_WORD                     text-diverging
+VECTOR_STORE_FLAG_VALUE            text-diverging
+WCHAR_TYPE                         text-diverging
+WORDS_BIG_ENDIAN                   text-diverging

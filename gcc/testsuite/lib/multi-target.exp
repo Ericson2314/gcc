@@ -122,3 +122,81 @@ if { [info exists env(MT_TARGET_NAME)] && $env(MT_TARGET_NAME) ne "" } {
     # explicitly and prints the count it subtracted, so the tolerance is
     # visible instead of built in.
 }
+
+# 4. THE PER-MACRO ARM.
+#
+# scratchpad/macro-probe.sh measures whether each leaked target macro, as seen
+# by a middle-end translation unit, carries the SELECTED base's value or the
+# primary's.  It writes one line per (base, macro):
+#
+#     <base> <MACRO> <SHAPE> <PASS|FAIL> mt=[<value>] ref=[<value>]
+#
+# with SHAPE one of
+#
+#     INT   integer constant, compared as a 64-bit value via `nm -S'
+#     STR   string literal, compared byte by byte -- this is what catches
+#           GLOBAL_ASM_OP, `\t.globl\t' vs `\t.global\t', which ASSEMBLES
+#           IDENTICALLY and so survives every check weaker than a byte diff
+#     EXP   fully preprocessed expansion, for macros that are not constant
+#           expressions at all because they expand to back-end code
+#     KIND  the two contexts do not even agree on what kind of thing the macro
+#           is -- a constant on one base and a run-time expression on the
+#           other.  BITS_PER_WORD is the important member: it is
+#           (TARGET_64BIT ? 64 : 32) on i386 and a plain 64 on aarch64, so a
+#           middle-end TU evaluates the PRIMARY's option variable under a
+#           target-neutral name.
+#
+# This proc turns those lines into named PASS/FAIL results.  It does no
+# measuring of its own; everything it can say is only as good as the harness,
+# whose blind spots are written out at the top of macro-probe.sh and must be
+# read before quoting any number from here.
+
+proc mt_macro_probe_score { results } {
+    if { ![file exists $results] } {
+	fail "multi-target macro probe: no results file $results"
+	return
+    }
+    set fh [open $results r]
+    set lines [split [string trim [read $fh]] "\n"]
+    close $fh
+
+    # Guard against an empty or truncated results file.  A file that scores
+    # zero tests is not a clean run; it is a run that did not happen, and
+    # nothing downstream can tell the two apart unless this does.
+    if { [llength $lines] < 100 } {
+	fail "multi-target macro probe: $results holds only [llength $lines]\
+	      lines; refusing to report a result from a truncated measurement"
+	return
+    }
+
+    array set npass {}
+    array set nfail {}
+    foreach line $lines {
+	if { ![regexp {^(\S+)\s+(\S+)\s+(\S+)\s+(PASS|FAIL)\s+(.*)$} \
+		  $line -> base macro shape verdict detail] } {
+	    fail "multi-target macro probe: unparsable line: $line"
+	    continue
+	}
+	set name "multi-target macro $macro ($shape) resolves to $base"
+	if { $verdict eq "PASS" } {
+	    incr npass($base)
+	    pass $name
+	} else {
+	    incr nfail($base)
+	    # The values go in the failure text, not just the log: a red arm
+	    # that does not say which macro and what both values were is the
+	    # unreachable gate this replaced.
+	    fail "$name -- $detail"
+	}
+    }
+    foreach base [lsort [array names npass]] {
+	set f 0
+	if { [info exists nfail($base)] } { set f $nfail($base) }
+	verbose -log "=== multi-target macro probe: $base PASS $npass($base) FAIL $f ==="
+    }
+    foreach base [lsort [array names nfail]] {
+	if { ![info exists npass($base)] } {
+	    verbose -log "=== multi-target macro probe: $base PASS 0 FAIL $nfail($base) ==="
+	}
+    }
+}

@@ -1,0 +1,62 @@
+# Per-macro acceptance for the multi-target compiler.
+#   Copyright (C) 2026 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# WHAT THIS REPLACES.
+#
+# The fourth acceptance arm used to be "aarch64 assembly is byte-identical to
+# a single-target reference".  That arm is unreachable: it stays red until all
+# 127 actionable leaked macros are fixed, so it can never say what fraction of
+# the work is done.  Worse, it becomes PRODUCIBLE BUT WRONG the moment the
+# register vocabulary alone is fixed -- cc1 would emit a .s file and the arm
+# would read PASS while WCHAR_TYPE, DEFAULT_SIGNED_CHAR, BITS_PER_WORD,
+# ASM_COMMENT_START and all 91 class-(c) macros still carried the primary's
+# values.
+#
+# This file replaces it with 138 arms, one per macro per base, each of which
+# names the macro and prints both values when it fails.  Partial progress is
+# bankable: fixing the register vocabulary turns ~23 arms green and leaves the
+# rest visibly red, which is the truth.
+#
+# The measurement itself is scratchpad/macro-probe.sh -- it needs a host
+# compiler, binutils and the real build directory, none of which are things a
+# DejaGnu board can be assumed to have.  So the harness measures and this file
+# scores.  Run:
+#
+#     scratchpad/macro-probe-run.sh                 # writes /tmp/mtp-out
+#     MT_MACRO_PROBE_RESULTS=/tmp/mtp-out/results.txt \
+#       make check-gcc RUNTESTFLAGS="multi-target/macro-probe.exp"
+#
+# IT IS NOT A CEILING.  138 = 127 actionable text-diverging macros + 1 that
+# differs in text but not in value (MAX_BITS_PER_WORD, kept as the proof that a
+# PASS is reachable) + 10 whose definition text is byte-identical on both bases
+# and whose values differ anyway.  About 1049 identical-text non-integer macros
+# have never been classified.  Green here means "none of the 138 known ones",
+# never "no leak".
+
+load_lib multi-target.exp
+
+if { ![info exists env(MT_MACRO_PROBE_RESULTS)]
+     || $env(MT_MACRO_PROBE_RESULTS) eq "" } {
+    # Deliberately not a silent skip and deliberately not a PASS.  An arm that
+    # reports success when it was never run is the failure mode this whole
+    # project keeps hitting.
+    untested "multi-target macro probe: MT_MACRO_PROBE_RESULTS unset;\
+	      run scratchpad/macro-probe-run.sh first"
+    return
+}
+
+mt_macro_probe_score $env(MT_MACRO_PROBE_RESULTS)
