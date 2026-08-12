@@ -20,21 +20,19 @@ along with GCC; see the file COPYING3.  If not see
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
-/* genenums reads no target macro -- it includes tm.h only because rtl.h,
-   which gensupport.h needs, wants FIRST_PSEUDO_REGISTER.  That reaches a
-   structure size, not this program's output, which depends on the md files
-   alone.  gensupport.h is here for print_gen_include, so that the
-   insn-constants.h named below carries GEN_HDR_SUFFIX.  */
-#ifndef TM_H_FILE
-#define TM_H_FILE "tm.h"
-#endif
-#include TM_H_FILE
-#include "rtl.h"
+/* genenums reads no target macro and no insn pattern; its output depends on
+   the md files alone.  It needs print_gen_include / gen_target_ns, so that
+   the insn-constants.h named below carries GEN_HDR_SUFFIX and so that the
+   tables here agree with the declarations genconstants writes.  Those come
+   from gen-target-ns.h, which reaches no target header -- NOT from
+   gensupport.h, which needs rtl.h, which wants FIRST_PSEUDO_REGISTER, which
+   comes out of insn-constants.h.  genconstants.cc explains why that matters;
+   genenums is kept on the same footing so the two cannot drift apart.  */
 #include "errors.h"
 #include "statistics.h"
 #include "vec.h"
 #include "read-md.h"
-#include "gensupport.h"
+#include "gen-target-ns.h"
 
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
