@@ -328,6 +328,15 @@ function read_union(   line, nf, f, key, n)
 				host_wide_int[f[2]] = "yes"
 			continue
 		}
+		if (f[1] == "C") {
+			# The compare half of the list, consumed by
+			# optc-save-gen.awk alone.  Skipped here explicitly
+			# rather than by falling through: below, an unknown
+			# kind is a member record, and a `C' record reaching
+			# that code would add a member to this header that no
+			# other base has.
+			continue
+		}
 		if (f[1] != "V" && f[1] != "O" && f[1] != "S" && f[1] != "F")
 			union_fail("unknown record kind `" f[1] "'")
 		key = (f[1] == "F" ? "F" : "X") SUBSEP f[2]
@@ -492,6 +501,16 @@ if (list_mode != "") {
 		if (flag_set_p("(Optimization|PerFunction)", flags[i]) \
 		    || flag_set_p("Save", flags[i]))
 			print "R\t" opts[i] "\t" flags[i]
+	# The COMPARE half.  `cl_optimization_compare' walks every option that
+	# names a `struct gcc_options' member, not just the savable ones, so
+	# the `R' records above are the wrong set for it -- driving that walk
+	# from `R' silently DROPS the 531 common options that are neither
+	# Optimization nor Save, which is a weaker check wearing a union's
+	# name.  These records are raw, for the same reason `R' is: the
+	# consumer tests `Warning' and `NoOffload' itself.
+	for (i = 0; i < n_opts; i++)
+		if (var_name(flags[i]) != "")
+			print "C\t" opts[i] "\t" flags[i]
 	for (i = 0; i < n_target_save; i++)
 		print "D\t" target_save_decl[i]
 	for (i = 0; i < n_extra_target_vars; i++)
