@@ -1,0 +1,87 @@
+diff --git a/gcc/Makefile.in b/gcc/Makefile.in
+index 75a0f4f881b..9a9e93ba174 100644
+--- a/gcc/Makefile.in
++++ b/gcc/Makefile.in
+@@ -1685,7 +1685,6 @@ OBJS = \
+ 	insn-attrtab.o \
+ 	insn-automata.o \
+ 	insn-dfatab.o \
+-	$(INSNEMIT_SEQ_O) \
+ 	insn-latencytab.o \
+ 	insn-opinit.o \
+ 	insn-preds.o \
+diff --git a/gcc/multi-target-select.cc b/gcc/multi-target-select.cc
+index 7d8876fd25e..ec26e58330c 100644
+--- a/gcc/multi-target-select.cc
++++ b/gcc/multi-target-select.cc
+@@ -175,6 +175,18 @@ tree ms_va_list_type_node;
+   extern const char *get_insn_name (int);				\
+   extern rtx_insn *peephole (rtx_insn *);				\
+   extern void init_adjust_machine_modes (void);				\
++  /* NOT declared by insn-flags-<base>.h: genflags SKIPS the names	\
++     gen_name_is_global_p returns true for, so that a namespaced	\
++     declaration pulled into scope by that header's using-directive	\
++     does not make every hand-written `gen_blockage ()' in a back end	\
++     an ambiguous overload against emit-rtl.h's.  The declaration has	\
++     to be made here instead.				 		\
++									\
++     A base with no `blockage' pattern has no NS::gen_blockage and	\
++     fails to LINK, naming the base.  That is deliberate, and it is	\
++     the same choice as init_adjust_machine_modes below: the absence	\
++     of an answer must not be allowed to read as an answer.  */		\
++  extern rtx gen_blockage (void);					\
+   MT_DECLARE_VERIFY
+ 
+ /* The data tables.  One list, used three times: to declare them per back end,
+@@ -268,6 +280,7 @@ struct mt_backend
+   const char *(*get_insn_name) (int);
+   rtx_insn *(*peephole) (rtx_insn *);
+   void (*init_adjust_machine_modes) (void);
++  rtx (*gen_blockage) (void);
+ #if CHECKING_P
+   void (*verify_reg_names_in_constraints) (void);
+ #endif
+@@ -320,11 +333,12 @@ MT_BACKENDS
+   { #BASE, NS::recog, NS::split_insns, NS::peephole2_insns,		\
+     NS::insn_extract,							\
+     NS::get_insn_name, NS::peephole, NS::init_adjust_machine_modes,	\
++    NS::gen_blockage,							\
+     MT_ENTRY_VERIFY (NS)						\
+     mt_install_ ## BASE },
+ static const struct mt_backend mt_backends[] = {
+   MT_BACKENDS
+-  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+     MT_ENTRY_VERIFY_NULL NULL }
+ };
+ #undef MT_BACKEND
+@@ -532,6 +546,29 @@ init_adjust_machine_modes (void)
+    verify_reg_names_in_constraints: genoutput emits it only under
+    `#if CHECKING_P'.  */
+ 
++/* THIS FORWARDER WAS DESCRIBED IN THIS COMMENT AND IN gensupport.cc FOR A
++   WHILE BEFORE IT EXISTED, AND ITS ABSENCE WAS LIVE WRONG CODE.
++
++   `emit-rtl.h' declares `gen_blockage' unconditionally; `emit-rtl.cc' defines
++   it under `#if !HAVE_blockage'; the middle end (builtins.cc, explow.cc,
++   function.cc) calls the bare name.  With no forwarder here, the bare name was
++   supplied by the PRIMARY's un-namespaced `insn-emit-1.o' -- i386's expander
++   -- and `explow.o' bound to it for every target.
++
++   That is not a naming problem.  `UNSPECV_BLOCKAGE' is 1 in
++   insn-constants-i386.h and 5 in insn-constants-aarch64.h, so an aarch64
++   compilation emitted an `unspec_volatile' numbered 1 while aarch64's own
++   recog matches blockage at 5.  No link error and no diagnostic: the two
++   patterns have the same shape and differ only in a number that means
++   different things in the two vocabularies.  Shared numbering, two
++   authorities, later one wins -- this branch's signature failure, reached
++   through a function nobody had checked was chosen.  */
++rtx
++gen_blockage (void)
++{
++  return mt_in_force ("gen_blockage")->gen_blockage ();
++}
++
+ #if CHECKING_P
+ void
+ verify_reg_names_in_constraints (void)
