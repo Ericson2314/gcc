@@ -650,14 +650,30 @@ fi
 # Additional target machines this compiler should be able to serve, beyond
 # the one named by --target.
 # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:718".
-AC_ARG_ENABLE(targets,
-[AS_HELP_STRING([--enable-targets=all|LIST],
-		[additional target machines to support])],
+AC_ARG_ENABLE(backends,
+[AS_HELP_STRING([--enable-backends=all|LIST],
+		[additional target machines whose back ends to compile in])],
 [case "${enableval}" in
-  yes) AC_MSG_ERROR([--enable-targets needs "all" or a list of targets]) ;;
+  yes) AC_MSG_ERROR([--enable-backends needs "all" or a list of targets]) ;;
   *)   ;;
 esac],
-[enable_targets=no])
+[enable_backends=no])
+
+# `--enable-targets' was the old spelling of the option above.  It reads as
+# "configure these targets", but what it selects is which back ends are
+# compiled into the compiler binary -- a property of the artefact being
+# built, i.e. host-side, like every other `--enable' on this configure.
+#
+# Refused by name rather than accepted as a silent alias.  A silent alias
+# would leave two spellings for one variable, and the failure mode of a
+# missed reader here is "the compiler quietly contains only the primary back
+# end", which no build log distinguishes from a deliberate single-target
+# build.  An error is the only reading that cannot be mistaken for success.
+AC_ARG_ENABLE(targets,
+[AS_HELP_STRING([--enable-targets],
+		[removed; renamed to --enable-backends])],
+[AC_MSG_ERROR([--enable-targets has been renamed to --enable-backends])],
+[])
 
 dnl --enable-multiarch selected the Debian-style multiarch library layout.
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:737".
@@ -1599,10 +1615,10 @@ fi
 
 #
 # Multi-target: collect the same information for each additional target
-# named by --enable-targets.
+# named by --enable-backends.
 # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1697".
 gcc_extra_targets=
-case ${enable_targets} in
+case ${enable_backends} in
   no | "")
     ;;
   all)
@@ -1618,19 +1634,19 @@ case ${enable_targets} in
       | sort -u \
       | tr '\012' ' '`
     if test x"${gcc_extra_targets}" = x; then
-      AC_MSG_ERROR([--enable-targets=all: could not read contrib/config-list.mk])
+      AC_MSG_ERROR([--enable-backends=all: could not read contrib/config-list.mk])
     fi
     ;;
   *)
-    gcc_extra_targets=`echo "${enable_targets}" | sed 's/,/ /g'`
+    gcc_extra_targets=`echo "${enable_backends}" | sed 's/,/ /g'`
     ;;
 esac
 
-dnl --enable-targets names every target, and there is no other source for
+dnl --enable-backends names every target, and there is no other source for
 dnl the list:
 dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1821".
 if test x"${gcc_extra_targets}" = x; then
-  AC_MSG_ERROR([--enable-targets=LIST is required])
+  AC_MSG_ERROR([--enable-backends=LIST is required])
 fi
 
 dnl `${target}' IS added to the manifest, and that is not the fallback
@@ -1645,7 +1661,7 @@ gcc_manifest_targets="${gcc_extra_targets} ${target}"
 # the script says why it is sourced rather than run.
 . ${srcdir}/gen-target-manifest.sh
 if gcc_gen_target_manifest; then :; else
-  AC_MSG_ERROR([--enable-targets: ${gcc_mt_fatal}])
+  AC_MSG_ERROR([--enable-backends: ${gcc_mt_fatal}])
 fi
 
 AC_SUBST(gcc_manifest_targets)
