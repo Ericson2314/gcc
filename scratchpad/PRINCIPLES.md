@@ -319,8 +319,13 @@ answer is still wrong is worse than the failure.**
   **5/5 IDENTICAL** vs `/tmp/b-stock` (genuine upstream at merge-base
   `c31b7a09eea`), distinct md5s per side, negative control firing.
 - **Probe scoreboard** (verified, quote these): 230 header arms — i386 115 PASS
-  / 0 FAIL, aarch64 2 PASS / 113 FAIL; 58 TAB arms — i386 29 PASS / 0 FAIL,
+  / 0 FAIL, aarch64 **5 PASS / 110 FAIL**; 58 TAB arms — i386 29 PASS / 0 FAIL,
   aarch64 24 PASS / 5 FAIL. **Diff verdicts and probe shapes, never totals.**
+  (An earlier version of this line said aarch64 2/113. That is stale and was
+  arithmetically impossible at 230 arms — 113+2 = 115 macros; the 2/113 figure
+  belonged to the 266-arm era before 18 macros were retired to TAB. Two agents
+  measured 5/110 independently. **If a number in a brief cannot be reconciled
+  with the arm count, say so rather than reporting against it.**)
 - **Stderr**: the **incremental** floor is **32 lines** — 8 `is unchanged` +
   24 `'@' is redundant` from unmodified aarch64 `.md` files, because those rules
   write through `move-if-change` with no stamp. That reproduces exactly, to the
@@ -346,6 +351,18 @@ once 15 files and +881/−332. The coordinator then has to read the diff and
 commit it on your behalf, which is slower and puts an unreviewed change in
 someone else's hands. `git diff --cached` before committing (the index is
 shared), then `git log --oneline -1` to confirm the commit exists.
+
+**`nm -u` with a plain-name grep scores 0 on C++ symbols.** Measured: nine of
+`function.o`'s ten undefined `ix86_*` references are mangled, so a sweep built
+that way calls the file **clean**. Use `nm -uC`. This is the same shape as the
+`T D B R` filter hiding COMDAT, and as `internal_dfa_insn_code` scoring 0
+because it is a function on one back end and a pointer on another: **a zero from
+a name-matching instrument is a claim about the instrument, not the code.**
+
+**A symbol's name does not tell you which macro pulled it in.** `function.cc`
+references `ix86_local_alignment`, which comes from `STACK_SLOT_ALIGNMENT` — not
+from `LOCAL_ALIGNMENT`, which the name suggests and which that file never
+spells. Converting the macro the symbol implies converts one nothing uses.
 
 **An exit status of 0 is not evidence a pipeline succeeded.** Real case found
 this session: `s-macro_list` ICEd and exited 0, because the ICE was the *head*
