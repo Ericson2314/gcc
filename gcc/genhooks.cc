@@ -288,7 +288,32 @@ emit_init_macros (const char *docname)
 		  if (nest > MAX_NEST)
 		    fatal ("Unexpected nesting of %s\n", name);
 		  if (nest == print_nest)
-		    printf ("\n#define %s \\\n  { \\\n", name);
+		    {
+		      /* The OUTERMOST initializer macro (nest 1) is emitted
+			 under two names: the braced body as <NAME>_BODY, and
+			 <NAME> as a one-token alias for it.
+
+			 This exists so that target-def.h can REDEFINE
+			 TARGET_INITIALIZER in terms of the body without the
+			 redefinition eating itself.  A macro cannot capture
+			 its own former value: writing
+			   #define SAVED TARGET_INITIALIZER
+			   #undef  TARGET_INITIALIZER
+			   #define TARGET_INITIALIZER ... SAVED
+			 expands SAVED back to TARGET_INITIALIZER, which is
+			 painted blue mid-expansion and left as a bare
+			 identifier -- a silent wrong expansion, not an error.
+			 Emitting the body under a name that is never
+			 redefined removes the cycle rather than working
+			 around it.  Nested macros (nest 2) are unchanged;
+			 nothing redefines those.  */
+		      if (nest == 1)
+			printf ("\n#define %s %s_BODY\n"
+				"#define %s_BODY \\\n  { \\\n",
+				name, name, name);
+		      else
+			printf ("\n#define %s \\\n  { \\\n", name);
+		    }
 		}
 	      else
 		{

@@ -38,6 +38,10 @@
 
    struct gcc_target targetm = TARGET_INITIALIZER;
 
+   That line is unchanged, but what it defines is not: `targetm' is a macro
+   here (see below and target-def.h), so the line defines the table under a
+   fixed name and the pointer the rest of the compiler reaches it through.
+
    Doing things this way allows us to bring together everything that
    defines a GCC target.  By supplying a default that is appropriate
    to most targets, we can easily add new items without needing to
@@ -335,7 +339,92 @@ extern bool verify_type_context (location_t, type_context_kind, const_tree,
 
 #include "target.def"
 
+/* THE HOOK TABLE, AND WHY IT IS REACHED THROUGH A POINTER.
+
+   Back ends do not only read this table, they WRITE it, from code that runs
+   long after startup:
+
+     config/i386/i386.cc:18466-18472  targetm.sched.* = NULL           (7)
+     config/i386/i386-options.cc      targetm.expand_builtin_va_start = NULL
+     config/i386/i386-c.cc            targetm.target_option.pragma_parse = ...
+     config/aarch64/aarch64-c.cc      pragma_parse, resolve_overloaded_builtin,
+				      check_builtin_call
+     and sixty-odd more across arm, rs6000, mips, pa, mmix, riscv, s390, ...
+
+   Every one of those runs at option-override or pragma-registration time.
+   So the object the middle end reads has to be the very object the back end
+   wrote -- there can be exactly one, and it cannot be established by copying
+   at any earlier moment.  A compiler holding several back ends that COPIES
+   the selected gcc_target into a singular one takes the copy before those
+   writes happen and the middle end never sees them: no link error, no
+   diagnostic, it simply keeps calling the hook the back end just disabled.
+   `targetm.expand_builtin_va_start = NULL' is a 32-bit x86 wrong-code path,
+   not a cosmetic one.
+
+   `extern struct gcc_target &targetm;' would not serve: a reference binds
+   once, at static-initialisation time, and which back end is in force is a
+   run-time decision.  A pointer plus this macro does serve, and keeps every
+   existing `targetm.foo' spelling -- reads and writes both go through it, so
+   a write lands where the reads look.  The cost is one indirection per hook
+   access.
+
+   The definition of the table itself still comes from
+   `struct gcc_target targetm = TARGET_INITIALIZER;' in config/<cpu>/<cpu>.cc;
+   see target-def.h for how that one line now defines both the table and the
+   pointer at it.  */
+
+/* A back end's own translation units are compiled with
+   `-Dtargetm=targetm_<base>' when more than one back end is linked into one
+   compiler, because config/<cpu>/<cpu>.cc defines the name bare and two of
+   them collide.  There `targetm' names that back end's own table, an OBJECT,
+   and this header must not redefine it.
+
+   That is not a second authority for the table: the selector points
+   targetm_ptr AT the very object the rename names, so a back end's write
+   through targetm_<base> and the middle end's read through (*targetm_ptr)
+   are the same store and the same load.
+
+   Both halves of the rename are asserted rather than assumed.  The build
+   passes -DMULTI_TARGET_TARGETM_BASE alongside -Dtargetm=, and one without
+   the other is a build rule that lost half of itself -- which would
+   otherwise mean a middle-end object silently bound to one back end's table
+   in a compiler that holds several.  */
+#if defined (targetm) && !defined (MULTI_TARGET_TARGETM_BASE)
+# error "-Dtargetm= without -DMULTI_TARGET_TARGETM_BASE: this looks like a \
+back-end translation unit, but the multi-target rename is only half applied"
+#endif
+#if !defined (targetm) && defined (MULTI_TARGET_TARGETM_BASE)
+# error "-DMULTI_TARGET_TARGETM_BASE without -Dtargetm=: the multi-target \
+rename is only half applied"
+#endif
+
+#ifdef targetm
+
 extern struct gcc_target targetm;
+
+#else
+
+/* Defined here rather than at the definition site so that the expansion of
+   TARGET_INITIALIZER in config/<cpu>/<cpu>.cc, which names it, has a
+   declaration in scope.  */
+extern struct gcc_target targetm_table;
+
+extern struct gcc_target *targetm_ptr;
+
+/* Read target-def.h before changing this spelling: the definition line in
+   every config/<cpu>/<cpu>.cc is `struct gcc_target targetm = ...', so
+   whatever this expands to has to be a valid declarator there as well as a
+   valid expression everywhere else.  */
+#define targetm (*targetm_ptr)
+
+/* Tells target-def.h that `targetm' is this macro and not an object, so that
+   the canonical definition line has to define the pointer too.  Positive
+   marker rather than a `#ifndef' probe on `targetm': a back-end TU that
+   reached target-def.h without either is then a compile error at the
+   definition line, not a quietly duplicated table.  */
+#define TARGETM_IS_INDIRECT 1
+
+#endif
 
 /* Return an estimate of the runtime value of X, for use in things
    like cost calculations or profiling frequencies.  Note that this

@@ -301,3 +301,39 @@ target_def_pointers_extend_kind (void)
 #include "hooks.h"
 #include "targhooks.h"
 #include "insn-target-def.h"
+
+#ifdef TARGETM_IS_INDIRECT
+
+/* target.h has made `targetm' the macro `(*targetm_ptr)' -- see the long
+   comment there for why the middle end must reach the hook table through a
+   pointer rather than hold a copy of it.
+
+   The consequence lands here.  Every config/<cpu>/<cpu>.cc ends with
+
+     struct gcc_target targetm = TARGET_INITIALIZER;
+
+   which now reads
+
+     struct gcc_target (*targetm_ptr) = TARGET_INITIALIZER;
+
+   so that one line has to define the pointer AND the table it points at.
+   TARGET_INITIALIZER is redefined to supply both.  It must stay at the
+   original site and cannot be hoisted into this header: the initializer
+   names hundreds of static hook functions that are defined between the
+   #include of this file and the end of the back end's source.
+
+   TARGET_INITIALIZER_BODY is the braced initializer under a name genhooks
+   emits for exactly this purpose and that nothing redefines; using it
+   instead of trying to save TARGET_INITIALIZER's own former value is what
+   keeps the redefinition from expanding into a blue-painted bare
+   identifier.
+
+   The table is initialised STATICALLY and the pointer with its address, a
+   constant expression -- so both are correct before anything runs, and
+   there is no window in which a hook read returns null.  */
+#undef TARGET_INITIALIZER
+#define TARGET_INITIALIZER					\
+  &targetm_table;						\
+  struct gcc_target targetm_table = TARGET_INITIALIZER_BODY
+
+#endif
