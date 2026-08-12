@@ -37,10 +37,35 @@ FIXINC_CFLAGS = -DHAVE_CONFIG_H $(INCLUDES)
 srcdir = @srcdir@
 VPATH = $(srcdir)
 
+# PREFIX AND THE INSTALL PROGRAMS, none of which this makefile defined before.
+#
+# `libdir = @libdir@' expands to `${exec_prefix}/lib' and nothing here set
+# exec_prefix, so every install path began at the filesystem root:
+# /libexec/gcc/<ver>/install-tools rather than <prefix>/libexec/...  And
+# INSTALL_DATA, INSTALL_SCRIPT and INSTALL_PROGRAM were used four times in the
+# `install' rule while being defined nowhere, so `$(INSTALL_DATA) README-fixinc
+# DEST' ran README-fixinc AS A COMMAND:
+#
+#   .../fixincludes/README-fixinc: Permission denied
+#   make: *** [Makefile:200: install] Error 126
+#
+# on the FIRST line of the rule, so nothing after it -- fixinc.sh, fixincl,
+# mkheaders -- was ever installed.  Both faults predate this branch (`git show
+# multi-target:fixincludes/Makefile.in' has the same gap) and were harmless
+# only for as long as gcc's own build ran fixincludes and installed the result
+# itself.  It does not any more: mkheaders IS the mechanism now, and a
+# mechanism whose install rule cannot run is not one.
+prefix = @prefix@
+exec_prefix = @exec_prefix@
 # Directory in which to put the directories used by the compiler.
 libdir = @libdir@
 # Directory in which GCC puts its executables.
 libexecdir = @libexecdir@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
 
 # End of variables for you to override.
 
@@ -52,9 +77,21 @@ target_noncanonical:=@target_noncanonical@
 gcc_version := $(shell @get_gcc_base_ver@ $(srcdir)/../gcc/BASE-VER)
 
 # Directory in which the compiler finds libraries etc.
-libsubdir = $(libdir)/gcc/$(target_noncanonical)/$(gcc_version)
+#
+# NO $(target_noncanonical) HERE -- it must match gcc/Makefile.in's
+# `libsubdir = $(libdir)/gcc/$(version)' exactly.  It did not: this file put
+# install-tools/ under .../gcc/<triple>/<ver>/ while gcc/'s `install-mkheaders'
+# put fixinc_list, gsyslimits.h and the per-multilib limits.h under
+# .../gcc/<ver>/.  Two halves of one mechanism installed to two directories, so
+# `mkheaders' looked for its data where nothing had written any -- the split
+# was invisible because each half installed successfully.
+#
+# One compiler serves every back end, so there is no triple to put in the path.
+# The target reappears one level DOWN, in the directory mkheaders writes:
+# $(libsubdir)/<target>/include-fixed.
+libsubdir = $(libdir)/gcc/$(gcc_version)
 # Directory in which the compiler finds executables
-libexecsubdir = $(libexecdir)/gcc/$(target_noncanonical)/$(gcc_version)
+libexecsubdir = $(libexecdir)/gcc/$(gcc_version)
 # Where our executable files go
 itoolsdir = $(libexecsubdir)/install-tools
 # Where our data files go
@@ -182,11 +219,20 @@ check : all
 	@rm -f ./check.sh
 
 install : all
-	-rm -rf $(DESTDIR)$(itoolsdir)
+# NO `rm -rf $(DESTDIR)$(itoolsdir)' here.  TWO components install into that
+# directory -- this one puts fixincl, fixinc.sh and mkheaders in it, gcc's
+# `install-mkheaders' puts mkinstalldirs in it -- so wiping it made the result
+# depend on which ran last.  Measured: with the wipe, installing gcc and then
+# fixincludes left NO mkinstalldirs, and mkheaders fails on it.  Both orders
+# "succeeded" with exit 0.
 	$(mkinstalldirs) $(DESTDIR)$(itoolsdir)
 	$(mkinstalldirs) $(DESTDIR)$(itoolsdatadir)/include
 	$(INSTALL_DATA) $(srcdir)/README-fixinc \
 	  $(DESTDIR)$(itoolsdatadir)/include/README
+# mkheaders copies this into each target's include-fixed as its README.  gcc's
+# build used to do that, from its own srcdir; it has no include-fixed now.
+	$(INSTALL_DATA) $(srcdir)/README-fixinc \
+	  $(DESTDIR)$(itoolsdir)/README-fixinc
 	$(INSTALL_SCRIPT) fixinc.sh $(DESTDIR)$(itoolsdir)/fixinc.sh
 	$(INSTALL_PROGRAM) $(FI) $(DESTDIR)$(itoolsdir)/$(FI)
 	$(INSTALL_SCRIPT) mkheaders $(DESTDIR)$(itoolsdir)/mkheaders

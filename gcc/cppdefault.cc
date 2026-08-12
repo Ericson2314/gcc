@@ -160,21 +160,37 @@ cpp_include_defaults_table (void)
 #ifdef PREFIX_INCLUDE_DIR
     { PREFIX_INCLUDE_DIR, 0, 0, 1, 0, 0 },
 #endif
-#ifdef FIXED_INCLUDE_DIR
-    /* This is the dir for fixincludes.  */
-#ifndef SYSROOT_HEADERS_SUFFIX_SPEC
-    { FIXED_INCLUDE_DIR, "GCC", 0, 0, 0, 2 },
-#endif
-    { FIXED_INCLUDE_DIR, "GCC", 0, 0, 0,
-      /* A multilib suffix needs adding if different multilibs use
-	 different headers.  */
-#ifdef SYSROOT_HEADERS_SUFFIX_SPEC
-      1
-#else
-      0
-#endif
-    },
-#endif
+    /* This is the dir for fixincludes.  FORMERLY the compile-time
+       -DFIXED_INCLUDE_DIR="$(libsubdir)/include-fixed", written by gcc's own
+       build.  It is neither any more, and both halves of that changed for the
+       same reason.
+
+       fixincludes patches the ACTUAL SYSTEM HEADERS OF ONE MACHINE.  A
+       compiler serving N targets has N sets of fixed headers and no single
+       answer to compile in -- and $(libsubdir) is $(libdir)/gcc/$(version),
+       with no target component, so the one directory that macro named was one
+       directory for all of them.  The headers now live per target, under
+       $(libsubdir)/<target>/include-fixed, written by fixincludes/mkheaders on
+       the deployed machine, and the path arrives here in the per-target config
+       file like every other post-install fact.
+
+       THE DEFAULT IS "" AND THAT IS THE POINT.  gcc's build no longer creates
+       include-fixed, so a compile-time path here would be a system include
+       directory that NOTHING CREATES -- the entry would sit in every search
+       path and be silently skipped, which is precisely the failure this
+       project has already paid for once with `-I<base>-inc'.  "" is compacted
+       out below, so a compiler nobody has told about fixed headers does not
+       claim to have any.  Say `fixed_include_dir <path>' in the target config
+       to get the entry back, and it names a directory mkheaders made.
+
+       ONE ENTRY, multilib = 1, not the old two.  Upstream emitted a second
+       multiarch (2) copy when SYSROOT_HEADERS_SUFFIX_SPEC was undefined and
+       otherwise a multilib (1) copy; that macro is a tm.h macro, i.e. the
+       privileged target answering for everyone.  mkheaders creates
+       include-fixed<multi_dir> for every entry of fixinc_list -- multilib,
+       unconditionally, for all targets -- so multilib = 1 is what actually
+       exists on disk.  */
+    { targ_caps.fixed_include_dir, "GCC", 0, 0, 0, 1 },
 #ifdef CROSS_INCLUDE_DIR
     /* One place the target system's headers might be.  */
     { CROSS_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },

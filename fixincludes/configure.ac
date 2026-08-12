@@ -7,6 +7,10 @@ AC_CANONICAL_TARGET
 AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_SED
+dnl Never called before, while Makefile.in's `install' rule used
+dnl INSTALL_DATA/INSTALL_SCRIPT/INSTALL_PROGRAM four times.  They substituted
+dnl to nothing and the rule executed its own data file.  See Makefile.in.
+AC_PROG_INSTALL
 
 # Figure out what compiler warnings we can enable.
 # See config/warnings.m4 for details.

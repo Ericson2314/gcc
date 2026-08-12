@@ -736,6 +736,34 @@ struct target_caps
   const char *gxx_backward_include_dir;
   const char *gxx_libcxx_include_dir;
 
+  /* WHERE THIS TARGET'S FIXINCLUDES-FIXED SYSTEM HEADERS LIVE.  Formerly the
+     compile-time -DFIXED_INCLUDE_DIR="$(libsubdir)/include-fixed", written by
+     gcc's own build, which also ran fixincludes once and put the result there.
+
+     Both were wrong for the same reason.  fixincludes patches the actual
+     system headers of ONE machine -- `fixincl' fnmatches TARGET_MACHINE
+     against each hack's `mach' glob at run time, and 137 of 252 hacks carry
+     one -- so it has to be run once per target; and $(libsubdir) is
+     $(libdir)/gcc/$(version), with NO target component, so one include-fixed
+     under it is one directory N targets would overwrite in turn.  It is
+     post-install, per-target environment adaptation, exactly like the probed
+     spec files: the answer can change without rebuilding the compiler (fix the
+     headers in place, point at a different sysroot) which is the test for that
+     whole category.
+
+     UNLIKE gxx_* ABOVE, THE BUILT-IN DEFAULT IS "" AND MUST STAY "".  There is
+     no compile-time answer to fall back to, because there is no longer a
+     compile-time directory: gcc's build does not create include-fixed.  A
+     non-empty default would put a system include directory that nothing
+     creates into every target's search path, silently skipped -- the
+     `-I<base>-inc' failure again.  "" is a real answer meaning "this target
+     has no fixed headers", and cppdefault.cc compacts the entry away.
+
+     Written by fixincludes/mkheaders, which is the one thing that creates the
+     directory, so the path in the config file and the path on disk are the
+     same statement.  */
+  const char *fixed_include_dir;
+
   /* WHERE THIS TARGET'S SITE-LOCAL AND SYSTEM HEADERS LIVE -- /usr/local/include
      and /usr/include on a typical GNU system.  Formerly the configure options
      --with-local-prefix and --with-native-system-header-dir, plus config.gcc's

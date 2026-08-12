@@ -141,8 +141,9 @@ dnl exists and a capability that does.
 dnl
 dnl NOTE `NATIVE_SYSTEM_HEADER_DIR' is still AC_SUBSTed further down.  That is
 dnl not a leftover: it is the compile-time default above, and it is also
-dnl SYSTEM_HEADER_DIR, i.e. which headers *fixincludes* fixes during this build.
-dnl That second use really is about the machine being built on.
+dnl SYSTEM_HEADER_DIR, whose one remaining reader is LIMITS_H_TEST -- does a
+dnl <limits.h> exist to be #include_next'd.  It no longer says which headers
+dnl fixincludes fixes, because gcc/ does not run fixincludes; see below.
 dnl
 dnl `local_prefix' is likewise still a gcc/Makefile.in variable, now a literal
 dnl /usr/local rather than a substitution, because it is handed to the target
@@ -151,14 +152,18 @@ dnl
 dnl fixincludes/configure.ac keeps its own `--with-local-prefix'.  That one is
 dnl a host question -- whose headers this build fixes -- and stays.
 
-AC_ARG_WITH(build-sysroot, 
-  [AS_HELP_STRING([--with-build-sysroot=sysroot],
-                  [use sysroot as the system root during the build])],
-  [if test x"$withval" != x ; then
-     SYSROOT_CFLAGS_FOR_TARGET="--sysroot=$withval"
-   fi],
-  [SYSROOT_CFLAGS_FOR_TARGET=])
-AC_SUBST(SYSROOT_CFLAGS_FOR_TARGET)
+dnl `--with-build-sysroot' is GONE from here.  A sysroot is a per-target fact
+dnl about the machine being compiled for, and this file is about the host and
+dnl the build.  It had exactly two effects and both were target-side: it set
+dnl SYSROOT_CFLAGS_FOR_TARGET, and it redirected BUILD_SYSTEM_HEADER_DIR, i.e.
+dnl which headers fixincludes fixed during this build -- and gcc/ does not run
+dnl fixincludes any more.
+dnl
+dnl The TOP-LEVEL configure keeps its own --with-build-sysroot (configure.ac
+dnl :3002), which is where XGCC_FLAGS_FOR_TARGET is assembled.  The top level
+dnl is the dispatcher and is the one component that legitimately deals in
+dnl targets, so nothing was lost -- the flag simply stopped being asked twice,
+dnl once by a component that has no target.
 
 if test "x$prefix" = xNONE; then
  test_prefix=/usr/local
@@ -2153,26 +2158,22 @@ done
 CROSS=						AC_SUBST(CROSS)
 ALL=all.internal				AC_SUBST(ALL)
 SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
-BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
 dnl target_header_dir is GONE.
-if test "x$with_build_sysroot" != x; then
-  BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
-fi
-
-dnl The machine whose system headers fixincludes is fixing.
-AC_ARG_WITH(fixincludes-machine,
-[AS_HELP_STRING([--with-fixincludes-machine=MACHINE],
-                [machine name whose system headers fixincludes should fix;
-                 needed only with --with-build-sysroot, where the headers are
-                 not the host's])],
-[fixincludes_machine="$withval"],
-[if test "x$with_build_sysroot" != x; then
-   fixincludes_machine=
- else
-   fixincludes_machine=$host
- fi])
-AC_SUBST(fixincludes_machine)
+dnl
+dnl BUILD_SYSTEM_HEADER_DIR is GONE too, with --with-build-sysroot above.  Its
+dnl only remaining reader was the `stmp-fixinc' rule, and gcc/ does not run
+dnl fixincludes.  SYSTEM_HEADER_DIR stays for one reader, LIMITS_H_TEST; see
+dnl the FIXME on it in gcc/Makefile.in.
+dnl
+dnl `--with-fixincludes-machine' is GONE.  It was a MACHINE NAME in a file that
+dnl is not allowed to know a machine other than its host, and it existed only
+dnl to feed TARGET_MACHINE to the build-time fixincludes run.  fixincl matches
+dnl that name against each hack's `mach' glob at RUN time, so the tool takes it
+dnl per invocation and needs no configure answer at all; mkheaders supplies the
+dnl target's own name after install.  Do not reintroduce it as a default of
+dnl $host: applying the host's fixes to a cross target's headers is the silent
+dnl wrong answer this whole branch exists to remove.
 
 # If this is using newlib, without having the headers available now,
 # then define inhibit_libc in LIBGCC2_CFLAGS.
@@ -2188,7 +2189,6 @@ AC_SUBST(inhibit_libc)
 
 # When building gcc with a cross-compiler, we need to adjust things so
 # that the generator programs are still built with the native compiler.
-# Also, we cannot run fixincludes.
 
 # These are the normal (build=host) settings:
 CC_FOR_BUILD='$(CC)'		AC_SUBST(CC_FOR_BUILD)
@@ -2196,7 +2196,6 @@ CXX_FOR_BUILD='$(CXX)'		AC_SUBST(CXX_FOR_BUILD)
 BUILD_CFLAGS='$(ALL_CFLAGS)'	AC_SUBST(BUILD_CFLAGS)
 BUILD_CXXFLAGS='$(ALL_CXXFLAGS)' AC_SUBST(BUILD_CXXFLAGS)
 BUILD_LDFLAGS='$(LDFLAGS)'	AC_SUBST(BUILD_LDFLAGS)
-STMP_FIXINC=stmp-fixinc		AC_SUBST(STMP_FIXINC)
 
 # And these apply if build != host, or we are generating coverage data
 if test x$build != x$host || test "x$coverage_flags" != x
@@ -2207,10 +2206,13 @@ then
 fi
 
 
-if test x$enable_fixincludes = xno;
-then
-    STMP_FIXINC=''
-fi
+dnl STMP_FIXINC is GONE, with the `stmp-fixinc' rule it named.  So is the
+dnl `test x$enable_fixincludes = xno' that cleared it: nothing in this tree
+dnl ever set `enable_fixincludes' -- there is no AC_ARG_ENABLE for it here, in
+dnl the top-level configure.ac, or in Makefile.tpl -- so that branch was
+dnl unreachable and the switch it appeared to offer did not exist.  Whether a
+dnl target gets fixed headers is now decided by whether the operator runs
+dnl mkheaders for that target.
 
 # Expand extra_headers to include complete path.
 # This substitutes for lots of t-* files.

@@ -281,6 +281,12 @@ struct target_caps targ_caps =
   .gxx_backward_include_dir = GPLUSPLUS_BACKWARD_INCLUDE_DIR,
   .gxx_libcxx_include_dir = GPLUSPLUS_LIBCXX_INCLUDE_DIR,
 
+  /* "" and NOT a path, deliberately: gcc's build no longer runs fixincludes
+     and creates no include-fixed, so there is no compile-time directory to
+     name here.  A default would be a search-path entry pointing at nothing.
+     See target-caps.h.  */
+  .fixed_include_dir = "",
+
   /* The site-local and system header directories, and the component of the
      latter.  NULL rather than a string, and that is deliberate: see
      target-caps.h.  The compile-time answer for these three is not a plain
@@ -345,6 +351,7 @@ read_target_caps (const char *file)
 	  { "gxx_tool_include_dir", &targ_caps.gxx_tool_include_dir },
 	  { "gxx_backward_include_dir", &targ_caps.gxx_backward_include_dir },
 	  { "gxx_libcxx_include_dir", &targ_caps.gxx_libcxx_include_dir },
+	  { "fixed_include_dir", &targ_caps.fixed_include_dir },
 	  { "local_include_dir", &targ_caps.local_include_dir },
 	  { "native_system_header_dir", &targ_caps.native_system_header_dir },
 	  { "native_system_header_component",

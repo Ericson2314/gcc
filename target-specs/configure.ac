@@ -396,6 +396,31 @@ AC_ARG_WITH([gxx-libcxx-include-dir],
      *)     ts_gxx_libcxx_include_dir=$withval ;;
    esac], [])
 
+dnl Where this target's FIXINCLUDES-FIXED system headers live.
+dnl
+dnl There is no derivation and no default here on purpose.  This directory is
+dnl not a naming convention, it is a directory that either exists or does not:
+dnl fixincludes/mkheaders creates it, per target, on the deployed machine, and
+dnl until it has run there is nothing to search.  gcc used to compile the path
+dnl in as -DFIXED_INCLUDE_DIR=$(libsubdir)/include-fixed and create it during
+dnl its own build; it does neither now -- see gcc/cppdefault.cc -- so the
+dnl built-in value is "" and the entry is dropped from the search path.
+dnl
+dnl Emitting a guess would put a nonexistent system include directory into
+dnl every compilation, silently skipped.  Pass what mkheaders printed.
+ts_emit_fixed_include_dir=no
+ts_fixed_include_dir=
+AC_ARG_WITH([fixed-include-dir],
+  [AS_HELP_STRING([--with-fixed-include-dir=DIR],
+     [where fixincludes/mkheaders put this target's fixed system headers;
+      "no" for none])],
+  [ts_emit_fixed_include_dir=yes
+   case $withval in
+     no|"") ts_fixed_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-fixed-include-dir needs a directory or "no"]) ;;
+     *)     ts_fixed_include_dir=$withval ;;
+   esac], [])
+
 dnl Where this target's site-local and system headers live.  These were
 dnl --with-local-prefix and --with-native-system-header-dir in gcc/configure.ac
 dnl -- again ONE answer for the whole compiler -- plus the `native_system_header_dir'
@@ -2949,6 +2974,16 @@ cat >> "$target_config_file" <<EOF
 gxx_libcxx_include_dir ${ts_gxx_libcxx_include_dir}
 EOF
 fi
+if test x"$ts_emit_fixed_include_dir" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# Where mkheaders put this target's fixincludes-fixed system headers.  Absent
+# means this compiler has none for this target and searches none; the built-in
+# default is "" precisely so that no search-path entry can name a directory
+# nothing created.
+fixed_include_dir ${ts_fixed_include_dir}
+EOF
+fi
 
 dnl --- WHAT WAS ACTUALLY WRITTEN, CHECKED AGAINST WHAT SHOULD HAVE BEEN.
 dnl
@@ -3024,6 +3059,9 @@ if test x"$ts_emit_gxx" = xyes; then
 fi
 if test x"$ts_emit_gxx_libcxx" = xyes; then
   ts_expected="$ts_expected gxx_libcxx_include_dir"
+fi
+if test x"$ts_emit_fixed_include_dir" = xyes; then
+  ts_expected="$ts_expected fixed_include_dir"
 fi
 
 dnl Read the artefact back.  A key with an EMPTY value is written as its name

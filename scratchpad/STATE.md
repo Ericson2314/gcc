@@ -622,3 +622,201 @@ false on this host with this host compiler, and the composition above is why.
                         the acceptance arm
     /tmp/b65-mk{1..5}.{out,err}, /tmp/b65-cc1*.err, /tmp/b65-mto.err
     /tmp/b65-mtp/, /tmp/b65-tab.log     probe datasets for the numbers above
+
+---
+
+# #101 -- fixincludes is out of `gcc/`'s build.  Branched from `7f6a64a4d70`.
+
+Template followed: `b850cb24ecf` (`target-specs`).  Same shape, same reason.
+
+**WORKTREE TRAP HIT AGAIN.**  Created at `7208eca60d0`, 39,111 behind;
+`grep -c MULTI_TARGET gcc/Makefile.in` -> 0.  `git reset --hard multi-target`
+from the clean tree recovered it.  That is every worktree agent this session.
+
+## `all-gcc`, BEFORE AND AFTER, SAME BUILD DIR (`/tmp/b101`)
+
+BEFORE (unmodified tree, cold):
+
+    The directory (BUILD_SYSTEM_HEADER_DIR) that should contain system headers
+    does not exist:
+      /usr/include
+    make[1]: *** [Makefile:4920: stmp-fixinc] Error 1
+    make: *** [Makefile:5051: all-gcc] Error 2
+
+AFTER: `make all-gcc` **rc=0**, stderr **33 lines = the 32-line incremental
+floor (8 `is unchanged` + 24 `'@' is redundant`, exact composition) + 1 named
+`check-multi-target-specs: NOTHING CHECKED ... This is a SKIP, not a pass`**.
+No `stmp-fixinc`, no `include-fixed/`, no `macro_list` in the build dir after
+deleting the stale ones and rebuilding.
+
+**One caveat, and it is NOT this change**: once `target-specs/configure` has
+been run in the build dir the selftests stop skipping and `all-gcc` then stops
+at the KNOWN `test_scalar_int_ops` / `PLUS x, 0` CImode failure (#95), and at
+nothing else.  Moving the config aside -> rc=0 again.  Both states reproduced.
+
+## WHAT WAS CUT, AND EVERY PATH IT REACHED THE BUILD BY
+
+`stmp-fixinc` reached the build by ONE path and cutting it cut all of them:
+
+    stmp-int-hdrs: $(STMP_FIXINC) ...        <- the only reference
+      <- SELFTEST_DEPS, libgcc-support, install-headers-{tar,cpio,cp},
+         install-mkheaders
+
+Gone from `gcc/`: `stmp-fixinc`; `STMP_FIXINC`; `FIXINCLUDES_MACHINE`;
+`BUILD_SYSTEM_HEADER_DIR`; `OTHER_FIXINCLUDES_DIRS`; `--with-build-sysroot` and
+`SYSROOT_CFLAGS_FOR_TARGET`; `--with-fixincludes-machine`;
+`-DFIXED_INCLUDE_DIR`; the `include-fixed` halves of `install-include-dir`,
+`install-headers`, `install-headers-{tar,cpio,cp}`; `real-install-headers-*`
+(zero callers remained -- checked against `Makefile.tpl` and the generated
+top-level `Makefile.in`); `macro_list`/`s-macro_list`; `t-sdemtk`'s
+`stmp-sdefixinc`.  `install-no-fixedincludes` is KEPT as a synonym for
+`install` because `Makefile.tpl:1705` calls it.
+
+`--with-build-sysroot` DID go with it: its only two effects were
+`SYSROOT_CFLAGS_FOR_TARGET` and `BUILD_SYSTEM_HEADER_DIR`, both target-side.
+**The top-level configure keeps its own**, which is where it belongs.
+`enable_fixincludes` was checked but **never set anywhere in the tree** -- a
+switch that did not exist.
+
+## TWO GENERATORS THAT FAILED AND EXITED 0 (found, not chased into scope creep)
+
+  * `s-macro_list` ran `echo | $(GCC_FOR_TARGET) -E -dM -`, cc1 **ICEd** ("no
+    target configuration was selected"), and the build **continued** -- the ICE
+    is the head of a pipeline whose status is `sort`'s.  `move-if-change` then
+    installed an **empty** `macro_list`, which `fixinc.sh` reads as "the
+    compiler predefines nothing".  macro_list is per-target; it is now built by
+    `mkheaders`, which asserts it is non-empty and fails by name otherwise.
+  * `fixincludes/Makefile.in` **never defined `INSTALL_DATA`, `INSTALL_SCRIPT`,
+    `INSTALL_PROGRAM`, `prefix` or `exec_prefix`** (`AC_PROG_INSTALL` was never
+    called).  `make install` therefore ran `README-fixinc` as a command
+    (`Permission denied`, `Error 126`) on the FIRST line of the rule, so
+    `fixinc.sh`, `fixincl` and `mkheaders` were **never installed**, and paths
+    began at `/libexec/...`.  Pre-existing (`git show
+    multi-target:fixincludes/Makefile.in` has the same gap) and harmless only
+    while gcc's build did the work itself.  Fixed -- mkheaders IS the mechanism
+    now.
+
+## THE SPLIT NOBODY HAD MEASURED
+
+`fixincludes/Makefile.in` had `libsubdir = $(libdir)/gcc/$(target_noncanonical)/$(ver)`
+while `gcc/Makefile.in` has `$(libdir)/gcc/$(ver)`.  The two halves of one
+mechanism installed to **two different directories** -- `mkheaders` looked for
+`fixinc_list`/`gsyslimits.h` where nothing had written them -- and each half
+installed with exit 0.  Aligned.  Also removed fixincludes' `rm -rf $(itoolsdir)`:
+two components populate that directory and one wiping it made the result
+order-dependent (measured: gcc-then-fixincludes left no `mkinstalldirs`).
+
+## INCLUDE SEARCH PATH -- EVERY LINE ACCOUNTED FOR
+
+`scratchpad/h101-path.sh`, three arms through one `cc1`, differing only in the
+target config.  Exactly ONE line changes:
+
+    A  nothing said            (none)
+    B  fixed_include_dir = <libsubdir>/include-fixed   <- the deleted macro's
+                                                          own expansion
+       + ignoring nonexistent directory ".../17.0.0/include-fixed"
+    C  fixed_include_dir = a directory that EXISTS
+       -> ` /tmp/h101-path/real-include-fixed` under "search starts here"
+
+`diff a b` is one added line; three distinct md5s.  So the entry was **moved
+into the per-target config, not deleted**, and it is **searched** when it names
+something real.  `/usr/include` still appears twice (the recorded "key absent"
+signature) -- unchanged.
+
+End to end through the REAL writer:
+`target-specs/configure --with-fixed-include-dir=DIR` -> `fixed_include_dir DIR`
+in `specs-<t>-config` -> cc1 searches it.  Without the flag the key is **absent**
+and the built-in default `""` compacts the entry away.  `118 capabilities, all
+expected` from target-specs' own check, both ways.
+
+**Never a dangling entry**: `targ_caps.fixed_include_dir` defaults to `""`, NOT
+to a path, because gcc's build no longer creates `include-fixed`.
+`cppdefault.cc` now emits ONE entry (`multilib = 1`) instead of upstream's two,
+which were keyed on `SYSROOT_HEADERS_SUFFIX_SPEC` -- a tm.h macro, i.e. the
+privileged target answering for everyone.
+
+## `install-mkheaders` AND `mkheaders.conf`
+
+`install-mkheaders` **survives** and is the point.  It installs only what is
+target-INDEPENDENT: `gsyslimits.h`, `fixinc_list`, per-multilib
+`include*/limits.h`, `mkinstalldirs`.
+
+**`mkheaders.conf` is gone entirely.**  It carried `SYSTEM_HEADER_DIR` (one
+target's system headers recorded as everyone's), `STMP_FIXINC` (a build-time
+on/off decided once for all targets) and `OTHER_FIXINCLUDES_DIRS`.  All three
+are now `mkheaders` ARGUMENTS.  `macro_list` is no longer installed either.
+
+`fixincludes/mkheaders.in` no longer reads `@target@`.  `--target` and
+`--headers` are required and **fail by name**; so does "no `--gcc=`/
+`--macro-list=`"; all four refusals demonstrated.  Output:
+`$(libdir)/gcc/$(version)/<target>/include-fixed<multi_dir>` -- the multilib
+loop over `fixinc_list` is preserved, one fixincludes run per entry.
+
+Demonstrated: ONE installed `mkheaders`, run for `x86_64-pc-linux-gnu` and
+`aarch64-unknown-linux-gnu`, produced **two separate trees**, and
+`$(libsubdir)/include-fixed` (the old shared path) does not exist.  Their
+contents are identical **because I gave both runs the same `--headers` and the
+same `--gcc`** -- that is separation of location, and is NOT evidence about
+machine gating; gating was pre-measured (`fixincl.c:356`) per the brief.
+
+**There is now exactly ONE caller**, so "both callers must write the same
+place" is satisfied by there being one.  The build-time-per-target invocation
+the user described is NOT implemented: it belongs to the top level, which is
+the only component that knows the target list.  It is a small job now --
+`mkheaders` already takes everything per invocation, which is precisely why the
+target is an argument.  **Handed over, not faked.**
+
+## REGRESSION BARS
+
+    make all-gcc            rc=0   (33 lines = 32-line floor + 1 named SKIP)
+    make cc1                rc=0   (32 lines, exact floor)
+    make multi-target-objs  rc=0   (32 lines)
+    stock-compare.sh (absolute IN, MT=/tmp/b101 vs /tmp/b-stock)
+                            5/5 scored, 5/5 IDENTICAL,
+                            5 distinct md5s per side,
+                            negative control: "ok: two real, non-empty,
+                            distinct artefacts (1158 and 804 lines) that differ"
+    grep 'define rlim_t' auto-host.h -> empty (full shell throughout)
+
+## SCOREBOARD -- THE aarch64 DISAGREEMENT IS SETTLED: **5 PASS / 110 FAIL**
+
+    230 header arms:  i386 115 PASS / 0 FAIL
+                      aarch64 5 PASS / 110 FAIL
+    58 TAB arms:      i386 29 PASS / 0 FAIL
+                      aarch64 24 PASS / 5 FAIL
+
+The five aarch64 PASSes are `FIRST_PSEUDO_REGISTER`, `MAX_BITSIZE_MODE_ANY_MODE`
+and **`MAX_BITS_PER_WORD`, `N_REG_CLASSES`, `REGNO_REG_CLASS`** -- exactly the
+three the previous agent named as the difference between 2/113 and 5/110.  That
+was an inference; this is an independent measurement that agrees with it.
+
+**Why this counts as settled against an unmodified baseline without building
+one**: `macro-probe.sh` compiles probe sources against the build directory's
+`tm.h` and `<base>-inc/` header sets.  This diff touches
+`fixincludes/*`, `gcc/Makefile.in`, `gcc/configure{,.ac}`, `gcc/cppdefault.cc`,
+`gcc/target-caps.{cc,h}`, `gcc/config/mips/t-sdemtk` and `target-specs/*` --
+**not one file the probe reads, and no back-end header at all**.  None of the
+115 probed macros can have changed.  **Recorded 2/113 is stale; carry 5/110.**
+
+## FILES (scratchpad, absolute)
+
+    h101-conf.sh      configure /tmp/b101 (top level, 2 back ends)
+    h101-mk.sh        make + stderr line count; D= picks /tmp/b101 or .../gcc
+    h101-recheck.sh   config.status --recheck for gcc/ in the FULL shell
+    h101-fi-recheck.sh   same for fixincludes/
+    h101-ts.sh        target-specs/configure; FIXED= adds --with-fixed-include-dir
+    h101-path.sh      THE INCLUDE-PATH ACCOUNTING, three arms + diff + md5s
+    h101-stock.sh     stock-compare wrapper with an absolute IN
+    h101-mkh.sh       mkheaders end to end: 4 fail-by-name arms + 2 targets
+
+## STILL OPEN, TOUCHED OR ADJACENT
+
+  * `LIMITS_H_TEST` still asks the BUILD machine whether a `limits.h` exists,
+    now via `SYSTEM_HEADER_DIR` (identical to the old `BUILD_SYSTEM_HEADER_DIR`
+    whenever `--with-build-sysroot` was absent -- and that flag is gone).  It is
+    a target fact deciding gcc's own `include/limits.h`.  **FIXME left in
+    `Makefile.in`.  #24/#100, needs a limits.h design; not fixincludes.**
+  * `TOOL_INCLUDE_DIR` collapsing to `/usr/include` (#24): **not touched**, as
+    instructed.  Visible in every arm of `h101-path.sh` as the second
+    `/usr/include`.
+  * The top-level per-target `mkheaders` invocation, above.

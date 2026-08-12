@@ -30,12 +30,13 @@ USER_H = $(srcdir)/ginclude/float.h \
          $(srcdir)/ginclude/varargs.h \
          $(EXTRA_HEADERS)
 
-# Don't run fixinclude
-STMP_FIXINC = stmp-sdefixinc
-stmp-sdefixinc: gsyslimits.h
-	rm -rf include; mkdir include
-	chmod a+rx include
-	rm -f include/syslimits.h
-	cp $(srcdir)/gsyslimits.h include/syslimits.h
-	chmod a+r include/syslimits.h
-	$(STAMP) stmp-sdefixinc
+# "Don't run fixinclude" -- this used to override STMP_FIXINC with a rule of
+# its own so that gcc's build skipped fixincludes for SDE.  Both the variable
+# and the rule it replaced are gone: gcc's build does not run fixincludes for
+# ANY target now, so there is nothing here to opt out of.  A target that wants
+# fixed headers gets them from fixincludes/mkheaders after install; one that
+# does not, like this one, simply is not given that command.
+#
+# Deleted rather than left defining a variable nobody reads.  A tmake fragment
+# that appears to switch something off while nothing consults it is the shape
+# this branch keeps finding: the setting looks respected and is inert.

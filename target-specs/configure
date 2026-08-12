@@ -658,6 +658,7 @@ with_gxx_include_dir
 with_gxx_tool_include_dir
 with_gxx_backward_include_dir
 with_gxx_libcxx_include_dir
+with_fixed_include_dir
 with_local_prefix
 with_native_system_header_dir
 enable_linker_build_id
@@ -1329,6 +1330,9 @@ Optional Packages:
   --with-gxx-libcxx-include-dir=DIR
                           where this target's libc++ header files are; "no"
                           for none at all
+  --with-fixed-include-dir=DIR
+                          where fixincludes/mkheaders put this target's fixed
+                          system headers; "no" for none
   --with-local-prefix=DIR where this target's site-local headers are installed
   --with-native-system-header-dir=DIR
                           where this target's system headers are; "no" for
@@ -2210,6 +2214,20 @@ if test "${with_gxx_libcxx_include_dir+set}" = set; then :
      no|"") ts_gxx_libcxx_include_dir= ;;
      yes)   as_fn_error $? "--with-gxx-libcxx-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
      *)     ts_gxx_libcxx_include_dir=$withval ;;
+   esac
+fi
+
+
+ts_emit_fixed_include_dir=no
+ts_fixed_include_dir=
+
+# Check whether --with-fixed-include-dir was given.
+if test "${with_fixed_include_dir+set}" = set; then :
+  withval=$with_fixed_include_dir; ts_emit_fixed_include_dir=yes
+   case $withval in
+     no|"") ts_fixed_include_dir= ;;
+     yes)   as_fn_error $? "--with-fixed-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_fixed_include_dir=$withval ;;
    esac
 fi
 
@@ -4999,6 +5017,16 @@ cat >> "$target_config_file" <<EOF
 gxx_libcxx_include_dir ${ts_gxx_libcxx_include_dir}
 EOF
 fi
+if test x"$ts_emit_fixed_include_dir" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# Where mkheaders put this target's fixincludes-fixed system headers.  Absent
+# means this compiler has none for this target and searches none; the built-in
+# default is "" precisely so that no search-path entry can name a directory
+# nothing created.
+fixed_include_dir ${ts_fixed_include_dir}
+EOF
+fi
 
 ts_expected="target leb128 decimal_float decimal_bid_format
   s390_excess_float_precision glibc_major glibc_minor libc_hwcap_in_tcb
@@ -5043,6 +5071,9 @@ if test x"$ts_emit_gxx" = xyes; then
 fi
 if test x"$ts_emit_gxx_libcxx" = xyes; then
   ts_expected="$ts_expected gxx_libcxx_include_dir"
+fi
+if test x"$ts_emit_fixed_include_dir" = xyes; then
+  ts_expected="$ts_expected fixed_include_dir"
 fi
 
 sed 's/#.*//' "$target_config_file" \

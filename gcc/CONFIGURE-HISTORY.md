@@ -2091,3 +2091,51 @@ The unprefixed name is now the correct one, not merely a workaround: the
 driver serves every target in the build, so there is no triple to name it
 after.  The <triple>-gcc spellings are per-target INSTALL ALIASES and belong
 with the manifest, not baked into a compiled-once header.
+
+---
+
+## SUPERSEDED 2026-08-12 (#101): fixincludes leaves gcc/'s build entirely
+
+Three entries above are now history rather than description.  They are left in
+place because they record why the answers looked right at the time, and the
+reason they were wrong is more useful than a silent edit:
+
+  * **`### configure.ac:2860`** ends "BUILD_SYSTEM_HEADER_DIR stays:
+    fixincludes genuinely does have a directory of headers to fix, and it is
+    named, not guessed at."  Both halves were true and the conclusion still did
+    not follow.  fixincludes has a directory of headers to fix **per target**,
+    and `gcc/` has no target -- so "the" directory was one target's answer
+    written down as everyone's.  `--with-build-sysroot` and
+    `BUILD_SYSTEM_HEADER_DIR` are **gone** from this file.  The top-level
+    configure keeps its own `--with-build-sysroot`; that is the dispatcher and
+    is entitled to it.  `SYSTEM_HEADER_DIR` survives for exactly one reader,
+    `LIMITS_H_TEST`, which is a separate and still-open target leak (#24/#100)
+    carrying a FIXME in `Makefile.in`.
+
+  * **`### configure.ac:2879`**, `--with-fixincludes-machine`, is **gone**.
+    Its analysis of the empty-`TARGET_MACHINE` hazard is exactly right and is
+    why the flag existed; what it missed is that the hazard is an argument for
+    passing the machine name **per invocation**, not for configuring one.
+    `fixincl.c:356` fnmatches `TARGET_MACHINE` against each hack's `mach` glob
+    at RUN time -- 137 of 252 hacks carry one -- so the tool was already
+    multi-target and it was only ever the caller that was not.  The refusal to
+    run without a name did not go away; it moved, verbatim in substance, into
+    `fixincludes/mkheaders`, which fails by name and has no default.
+
+  * **`### configure.ac` on `build_target_triple`** tells the reader to "read
+    the FIXINCLUDES_MACHINE comment in Makefile.in before reaching for it".
+    That comment is gone with the variable.  The advice it carried is not: do
+    not reintroduce a privileged target to give fixincludes a machine name.
+
+`STMP_FIXINC` is gone too, along with the `test x$enable_fixincludes = xno`
+that cleared it -- **nothing in this tree has ever set `enable_fixincludes`**;
+there is no `AC_ARG_ENABLE` for it here, in the top-level `configure.ac`, or in
+`Makefile.tpl`, so that branch was unreachable and the switch it appeared to
+offer did not exist.
+
+What replaces all of it: `fixincludes/mkheaders`, run once per target after
+install, writing `$(libdir)/gcc/$(version)/<target>/include-fixed`.  The
+compiler learns that path from the target config file's `fixed_include_dir`
+key, whose built-in default is `""` -- so a target nobody has run mkheaders for
+has **no** fixed-include entry in its search path, rather than one naming a
+directory nothing creates.

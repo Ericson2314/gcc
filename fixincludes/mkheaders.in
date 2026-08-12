@@ -18,34 +18,111 @@
 #along with GCC; see the file COPYING3.  If not see
 #<http://www.gnu.org/licenses/>.
 
-# Basic information
-target=@target@
-target_noncanonical=@target_noncanonical@
+# THIS IS NOW THE ONLY THING THAT RUNS fixincludes.
+#
+# It used to be the second of two: gcc/Makefile.in's `stmp-fixinc' rule fixed
+# one machine's headers during gcc's own build and installed the result, and
+# this script re-did it after install.  gcc/ has no target -- one binary serves
+# every back end -- so it had no headers of its own to fix, and the directory
+# it wrote them to, $(libdir)/gcc/$(version)/include-fixed, has no target
+# component: N targets would have overwritten each other there in turn, with no
+# diagnostic.  That rule is gone.  What is left is this, run once per target,
+# which is what fixincludes always was underneath -- `fixincl' fnmatches
+# TARGET_MACHINE against each hack's `mach' glob at RUN time, and 137 of its
+# 252 hacks carry one.  The tool needed no change; only its caller did.
+#
+# Consequently THE TARGET IS AN ARGUMENT, not an @target@ substitution.  It has
+# to be: this script is installed once, under a directory with no target in its
+# path, and the top-level build (which does know the targets, being the
+# dispatcher) will invoke it once per configured target from that one copy.
+# `--headers' likewise: it was `SYSTEM_HEADER_DIR' baked into mkheaders.conf at
+# gcc-build time, i.e. one target's system headers written down as everyone's.
+#
+# @target@ is deliberately NOT read here.  Do not put it back.
+
 version=@gcc_version@
 
+me=`basename "$0"`
+
+usage () {
+    cat <<EOF
+Usage: $me [options] --target=TRIPLE --headers=DIR [prefix [isysroot]]
+
+Fix TRIPLE's system headers, in DIR, into
+  <libdir>/gcc/<version>/TRIPLE/include-fixed[<multilib>]
+
+Required:
+  --target=TRIPLE   the machine whose headers these are.  Passed to fixincl as
+                    TARGET_MACHINE; it selects which hacks apply.
+  --headers=DIR     that machine's system header directory (was
+                    SYSTEM_HEADER_DIR in mkheaders.conf).
+
+One of:
+  --gcc=CMD         a compiler invocation for TRIPLE, used to build macro_list
+                    (the macros the preprocessor predefines, which fixinc.sh
+                    consults so it does not rename one of them).
+  --macro-list=FILE a macro_list built earlier.
+
+Options:
+  --other-dirs="D..."  extra header directories to fix (was
+                       OTHER_FIXINCLUDES_DIRS).
+  -v                Print more output (may be repeated for even more output)
+  --help            This help
+  --version         Print version information
+EOF
+}
+
 VERBOSE=0
-while [ x$1 = x-v ] ; do
+target=
+sysheaders=
+gcc_cmd=
+macro_list_in=
+other_dirs=
+
+while [ $# -gt 0 ] ; do
+    case $1 in
+	-v)              VERBOSE=`expr $VERBOSE + 1` ;;
+	--target=*)      target=`expr "x$1" : 'x--target=\(.*\)'` ;;
+	--headers=*)     sysheaders=`expr "x$1" : 'x--headers=\(.*\)'` ;;
+	--gcc=*)         gcc_cmd=`expr "x$1" : 'x--gcc=\(.*\)'` ;;
+	--macro-list=*)  macro_list_in=`expr "x$1" : 'x--macro-list=\(.*\)'` ;;
+	--other-dirs=*)  other_dirs=`expr "x$1" : 'x--other-dirs=\(.*\)'` ;;
+	--help)          usage; exit 0 ;;
+	--version)
+	    echo "mkheaders (GCC) version $version"
+	    echo "Copyright 2002, 2007, 2009 Free Software Foundation, Inc."
+	    echo "This program is free software; you may redistribute it under the"
+	    echo "terms of the GNU General Public License.  This program has"
+	    echo "absolutely no warranty."
+	    exit 0 ;;
+	--*) echo "$me: unknown option $1" >&2; usage >&2; exit 1 ;;
+	*)   break ;;
+    esac
     shift
-    VERBOSE=`expr $VERBOSE + 1`
 done
 export VERBOSE
 
-if [ x$1 = x--help ] ; then
-    echo "Usage: mkheaders [options] [prefix [isysroot]]"
-    echo "Options:"
-    echo "  -v        Print more output (may be repeated for even more output)"
-    echo "  --help    This help"
-    echo "  --version Print version information"
-    exit 0
+# EVERY MISSING ANSWER BELOW IS A HARD ERROR NAMING ITSELF.  None of them gets
+# a default, and in particular `target' does not fall back to the machine this
+# runs on: an empty TARGET_MACHINE puts fixincl in its self-test mode, where
+# per-machine gating is switched off and EVERY machine's fixes are applied --
+# which is how the VxWorks unistd.h wrapper once made libgcc unbuildable.  A
+# wrong-but-plausible default here is a silently mis-fixed header tree.
+
+if [ -z "$target" ] ; then
+    echo "$me: no --target=TRIPLE." >&2
+    echo "  fixincludes fixes ONE machine's headers and must be told which;" >&2
+    echo "  its hacks are gated on that name at run time.  There is no" >&2
+    echo "  default, deliberately -- see the comment at the top of this file." >&2
+    exit 1
 fi
 
-if [ x$1 = x--version ] ; then
-    echo "mkheaders (GCC) version $version"
-    echo "Copyright 2002, 2007, 2009 Free Software Foundation, Inc."
-    echo "This program is free software; you may redistribute it under the"
-    echo "terms of the GNU General Public License.  This program has"
-    echo "absolutely no warranty."
-    exit 0
+if [ -z "$sysheaders" ] ; then
+    echo "$me: no --headers=DIR for $target." >&2
+    echo "  This is the directory holding $target's system headers.  It was" >&2
+    echo "  SYSTEM_HEADER_DIR in mkheaders.conf, baked in when gcc was built," >&2
+    echo "  i.e. one target's answer recorded as everyone's.  State it here." >&2
+    exit 1
 fi
 
 # Common prefix for installation directories.
@@ -69,15 +146,32 @@ exec_prefix=@exec_prefix@
 # Directory in which to put the directories used by the compiler.
 libdir=@libdir@
 libexecdir=@libexecdir@
-# Directory in which the compiler finds libraries, etc.
-libsubdir=${libdir}/gcc/${target_noncanonical}/${version}
+# Directory in which the compiler finds libraries, etc.  NO TARGET COMPONENT:
+# one compiler serves every back end, so this must be the same path gcc's own
+# Makefile computes ($(libdir)/gcc/$(version)) or the data gcc installed under
+# install-tools/ is not where this script looks for it.
+libsubdir=${libdir}/gcc/${version}
 # Directory in which the compiler finds executables
-libexecsubdir=${libexecdir}/gcc/${target_noncanonical}/${version}
+libexecsubdir=${libexecdir}/gcc/${version}
 
 itoolsdir=${libexecsubdir}/install-tools
 itoolsdatadir=${libsubdir}/install-tools
-incdir=${libsubdir}/include-fixed
+# THE PER-TARGET OUTPUT DIRECTORY, and the one thing this script exists to
+# write.  It has to carry ${target}: it is $(libdir)/gcc/$(version)/<target>/,
+# the per-target directory this branch puts every per-target fact in.  Running
+# mkheaders again for the same target REPLACES this target's fixed headers and
+# touches no other target's.
+incdir=${libsubdir}/${target}/include-fixed
 mkinstalldirs="${itoolsdir}/mkinstalldirs"
+
+if [ ! -f ${itoolsdatadir}/fixinc_list ] ; then
+    echo "$me: ${itoolsdatadir}/fixinc_list does not exist." >&2
+    echo "  That file is installed by gcc's \`install-mkheaders'.  Without it" >&2
+    echo "  there is no multilib list to loop over, and fixing only the" >&2
+    echo "  top-level directory would leave every non-default multilib with" >&2
+    echo "  unfixed headers -- silently." >&2
+    exit 1
+fi
 
 cd ${itoolsdir}
 rm -rf ${incdir}/*
@@ -100,24 +194,77 @@ for shell in $CONFIG_SHELL $SHELL @SHELL@ /bin/sh ""; do
   fi
 done
 
+# macro_list: the macros the preprocessor predefines for THIS target.  gcc's
+# build used to make it, with `$(GCC_FOR_TARGET) -E -dM', and on a compiler
+# with no target selected that died with an ICE inside a pipeline -- so the
+# build carried on and shipped an EMPTY list, which fixinc.sh reads as "the
+# compiler predefines nothing".  It is a per-target set and belongs here, next
+# to its only consumer, where a target has actually been named.
+macro_list=${macro_list_in}
+if [ -z "$macro_list" ] ; then
+    if [ -z "$gcc_cmd" ] ; then
+	echo "$me: neither --gcc=CMD nor --macro-list=FILE given." >&2
+	echo "  fixinc.sh needs the set of macros the preprocessor predefines" >&2
+	echo "  for $target, so that it does not rename one of them.  An empty" >&2
+	echo "  or absent list is not a safe default: it reads as \"nothing is" >&2
+	echo "  predefined\" and changes which fixes fire." >&2
+	exit 1
+    fi
+    macro_list=`pwd`/macro_list.${target}
+    echo | $gcc_cmd -nostdinc -E -dM - | \
+      sed -n -e 's/^#define \([^_][a-zA-Z0-9_]*\).*/\1/p' \
+	     -e 's/^#define \(_[^_A-Z][a-zA-Z0-9_]*\).*/\1/p' | \
+      sort -u > ${macro_list}.tmp
+    # NOT a pipeline whose status is `sort''s.  That is exactly how the old
+    # rule shipped an empty list with exit 0.
+    if [ ! -s ${macro_list}.tmp ] ; then
+	echo "$me: '$gcc_cmd -E -dM' produced no predefined macros for $target." >&2
+	echo "  Refusing to fix headers against an empty macro_list." >&2
+	rm -f ${macro_list}.tmp
+	exit 1
+    fi
+    mv ${macro_list}.tmp ${macro_list}
+fi
+
 for ml in `cat ${itoolsdatadir}/fixinc_list`; do
   sysroot_headers_suffix=`echo ${ml} | sed -e 's/;.*$//'`
   multi_dir=`echo ${ml} | sed -e 's/^[^;]*;//'`
   subincdir=${incdir}${multi_dir}
   ${mkinstalldirs} ${subincdir}
-  . ${itoolsdatadir}/mkheaders.conf
-  if [ x${STMP_FIXINC} != x ] ; then
-	TARGET_MACHINE="${target}" target_canonical="${target}" \
-	    MACRO_LIST="${itoolsdatadir}/macro_list" \
-	    $shell ./fixinc.sh ${subincdir} \
-	    ${isysroot}${SYSTEM_HEADER_DIR} ${OTHER_FIXINCLUDES_DIRS}
-	rm -f ${subincdir}/syslimits.h
-	if [ -f ${subincdir}/limits.h ]; then
-	  mv ${subincdir}/limits.h ${subincdir}/syslimits.h
-	else
-	  cp ${itoolsdatadir}/gsyslimits.h ${subincdir}/syslimits.h
-	fi
+
+  TARGET_MACHINE="${target}" target_canonical="${target}" \
+      MACRO_LIST="${macro_list}" \
+      $shell ./fixinc.sh ${subincdir} \
+      ${isysroot}${sysheaders} ${other_dirs}
+  rm -f ${subincdir}/syslimits.h
+  if [ -f ${subincdir}/limits.h ]; then
+    mv ${subincdir}/limits.h ${subincdir}/syslimits.h
+  else
+    cp ${itoolsdatadir}/gsyslimits.h ${subincdir}/syslimits.h
   fi
 
   cp ${itoolsdatadir}/include${multi_dir}/limits.h ${subincdir}/limits.h
 done
+
+if [ -f ${itoolsdir}/README-fixinc ] ; then
+  cp ${itoolsdir}/README-fixinc ${incdir}/README
+  chmod a+r ${incdir}/README
+fi
+
+# THE DIRECTORY EXISTS NOW, AND ONLY NOW MAY ANYTHING POINT AT IT.
+#
+# cc1 finds it through the `fixed_include_dir' key of ${target}'s config file,
+# not through a path compiled into cppdefault.cc -- the compiled-in default is
+# "" and the entry is dropped from the include search path, so a compiler that
+# has not had mkheaders run for a target does not advertise fixed headers it
+# has not got.  Emitting the key is target-specs' job, because target-specs is
+# the single writer of that file and two writers is how a target comes to read
+# a stale answer.
+cat <<EOF
+mkheaders: wrote ${target}'s fixed headers to
+  ${incdir}
+Nothing searches them yet.  Give ${target}'s config file the key, via the one
+program that writes it:
+  target-specs/configure --with-target=${target} \\
+      --with-fixed-include-dir=${incdir} ...
+EOF
