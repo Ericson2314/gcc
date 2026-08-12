@@ -50,8 +50,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-cdata.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE
+/* No apostrophe in the message below: cpp lexes the text of a skipped
+   conditional group, so one would warn "missing terminating ' character"
+   on every compilation that defines MULTI_TARGET_TARGETM_BASE -- i.e. on
+   every good build.  */
 #error target-cdata.cc must be compiled for a particular back end (it needs \
-that base's real tm.h macros, not the redirected ones)
+the real tm.h macros of that base, not the redirected ones)
 #endif
 
 /* Every field, from the one list in target-cdata.h.  Written this way rather
