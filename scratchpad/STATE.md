@@ -957,3 +957,208 @@ Do not write `nohup ... &` inside a tool call that is *already* backgrounded.
 The tool reports the launcher's exit 0 as the build's, and you will read
 "build succeeded" next to a build dir with no `cc1` in it.  Background the
 command itself and poll the artefact.
+
+================================================================================
+SESSION: #88 and #104 -- the two generated halves of the options machinery
+disagreed about the member set.  ONE cause for both, plus a THIRD failure in
+the same family that is NOT a generator bug and must not be "fixed" here.
+Branched from: cc9ef129b37 ("PRINCIPLES: correct the scoreboard, record two
+instrument traps").  Files touched: gcc/opt-stub.awk, gcc/optc-gen.awk.
+================================================================================
+
+## ONE CAUSE, TWO SYMPTOMS
+
+`opt-stub.awk` gave every placeholder the fixed flag word `Target
+Undocumented`.  `needs_state_p()` is `Target && !Alias && !Ignore` and
+`static_var()` then names a private `VAR_<option>` member -- so a stub
+FABRICATED a `struct gcc_options` member, and the member's TYPE came from the
+stub's own flag word rather than the real option's.  One name, two
+authorities, exactly as PRINCIPLES 3 describes it.
+
+  * #88 is the type direction.  rs6000 `mdebug=` is `Target RejectNegative
+    Joined` with no `Var`, so `var_type()` answers `const char *`; the stub
+    dropped `Joined`, so its member was `int`.  Reproduced by configuring:
+    x86_64 + msp430 -> `member VAR_msilicon_errata_warn_ declared twice,
+    differently`; x86_64 + powerpc64le -> the same for `VAR_mdebug_`.
+
+  * #104 is the existence direction.  vxworks.opt spells `Bdynamic` `Driver`
+    (no member) and `mrtp` `Target Mask(VXWORKS_RTP) Var(vxworks_flags)`
+    (the state is the Var, so again no `VAR_` member).  Stubs gave both one.
+
+**Fix: drop `Target` from the stub flag word.**  A stub then declares no
+member at all, which is right rather than merely convenient -- the layout
+comes from `gcc-options-union.list`, which already carries the real member
+from the back end that really declares it, and `options-<base>.h` emits every
+union member regardless of base.  A stub member was only ever a duplicate.
+The ordinal is untouched (liveness is decided by `Ignore`/`Alias`, not by
+`Target`), and the stub loses its `CL_TARGET` bit, so `-mrtp` on an
+i386-selected compiler is now diagnosed rather than silently accepted.
+
+## #104 HAD A SECOND HALF THAT THE STUB FIX DOES NOT REACH
+
+With the stubs inert, the vxworks pair still failed -- in the opposite
+direction.  `options.cc` is generated from the SHARED optionlist, whose target
+records are `extra_opt_files`, i.e. the .opt files of the PRIMARY TRIPLE.  The
+layout comes from `gcc-options-<base>.part`, generated from
+`optionlist-<base>`, whose target records are the .opt files of EVERY TRIPLE
+mapping to that back end.  `x86_64-wrs-vxworks7` and `x86_64-pc-linux-gnu` are
+two triples of ONE back end, so vxworks.opt is in the second set and not the
+first, and `vxworks_flags` (the struct's 13th member) and `VAR_mvthreads` were
+members `global_options_init` had no record for.
+
+So the disagreement ran BOTH WAYS AT ONCE: 1674 elements for a 1669-member
+struct, five invented and two missing.  Measured before the change:
+
+    options.cc:1713:1: error: too many initializers for 'gcc_options'
+
+-- the compiler noticed the COUNT and said nothing at all about the 1656
+values that were on the wrong member, which is what it would have been left
+with had the two errors cancelled.  **That is the version of this bug to fear,
+and it is why the fix is not just "make the counts agree".**
+
+`optc-gen.awk` now walks the UNION member list when `-v union_file` is given.
+The four loops that built the initializer record into an array instead of
+printing; the single-target path prints them in the order they ran (byte
+identical, asserted below), the multi-target path prints them in union order
+and emits `{}` for a member this back end has no record for.  `{}` and not
+`0`: `enum E e = 0` is ill-formed C++, which is how a shifted initializer
+announces itself.  Init() is still NOT unioned -- that is settled, the
+selector applies it per base.
+
+## THE THIRD ONE IS NOT A GENERATOR BUG.  DO NOT "FIX" IT HERE.
+
+x86_64 + loongarch64 still fails, and the brief lists `recip_mask` as an
+instance of #88.  It is not.  Both back ends declare it FOR REAL:
+
+    config/i386/i386.opt:44            int recip_mask = RECIP_MASK_DEFAULT
+    config/loongarch/loongarch.opt:35  unsigned int recip_mask = 0
+
+Two `Variable` records, two real authorities, no placeholder involved --
+`opt-stub.awk` reserves `Variable` and has never emitted one.  Same family
+(one name, several authorities), different authority: the .opt files.  The fix
+is to qualify the name there, which is a decision about which back end gets
+renamed, i.e. design (PRINCIPLES 2b), not debugging.  Both guards report it by
+name (`opth-gen.awk` and `optc-save-gen.awk` independently).  They are working.
+
+## WHAT BUILDS NOW, AND WHAT STOPS WHERE
+
+    x86_64-pc-linux-gnu,x86_64-wrs-vxworks7   make all-gcc rc=0, cc1 + lto1
+    x86_64-pc-linux-gnu,aarch64-...-gnu       make all-gcc rc=0, cc1 + lto1
+    x86_64-pc-linux-gnu,msp430-unknown-elf    options machinery now clean;
+        stops later at genconfig `1 of 2 back ends define HAVE_rotate` (#87)
+    x86_64-pc-linux-gnu,powerpc64le-...-gnu   options machinery now clean;
+        stops later at the same check on `HAVE_rotatert` (#87)
+    x86_64-pc-linux-gnu,loongarch64-...-gnu   still fails, `recip_mask`, above
+
+**Every cross-back-end pair I tried is now gated by #87, not by the options
+machinery.**  The vxworks pair builds end to end because both triples map to
+the one i386 back end, so there is no second `insn-config` to reconcile.
+
+## EVIDENCE, AND THE THREE TIMES MY OWN INSTRUMENT WAS THE THING THAT FAILED
+
+`scratchpad/t88-prefix.sh` compares the `global_options_init` element sequence
+with the `struct gcc_options` member sequence -- the comparison nothing in the
+build was making.  It reported FAIL three times before it reported anything
+true, each time because the EXTRACTION missed a member shape, not because the
+build was wrong:
+
+  * `/* NAME (private state) */` -- the static members carry a suffix, and a
+    pattern anchored on `/* NAME */` dropped all of them;
+  * `bool frontend_set_<var>;` -- the 11 `SetByCombined` members have no `x_`
+    prefix, and a pattern anchored on `x_` dropped all of them;
+  * `{}, /* NAME (another back end) */` -- the new foreign-member spelling.
+
+Each looked exactly like a layout bug at a plausible offset.  **If this script
+says FAIL, check that the count on both sides is what you expect before
+believing it.**  Counts are asserted (>= 500 a side) for that reason.
+
+    t88-prefix.sh    /tmp/b88vx/gcc   1669 == 1669, exact, in order
+                     /tmp/b88msp/gcc  1680 == 1680
+                     /tmp/b88a64/gcc  1727 == 1727
+    t88-vx-before.sh reconstructs the pre-change options.cc from the artefacts
+                     of a working build dir (strip the records whose whole flag
+                     word is `Undocumented` or `Undocumented Ignore`, re-pad
+                     with opt-stub.awk at HEAD) and requires the check to FAIL
+                     on it and PASS after.  It does.
+    t88-repro.sh     x86_64+powerpc64le: BEFORE fails by name on VAR_mdebug_,
+                     AFTER both headers generate and their struct BODIES are
+                     byte-identical (10561 lines), not merely the same size.
+    t88-bothsided.sh msp430/i386 on `-msilicon-errata-warn=`: owner keeps
+                     `CL_TARGET | CL_JOINED` + `offsetof (..., x_VAR_msilicon_
+                     errata_warn_)` + CLVC_STRING; the other base's stub is
+                     `CL_UNDOCUMENTED` alone with `(unsigned short) -1`.
+                     Same, both directions, on the a64 pair: aarch64
+                     `-moverride=` and i386 `-mfpmath=`.
+    t88-guards.sh    perturbs a COPY of the union list and requires the named
+                     error.  GUARD 1 (opth-gen `member X declared twice,
+                     differently`) FIRES; GUARD 2 (the new optc-gen `has an
+                     element for X and ... has no such member`) FIRES; control
+                     clean before, options.h byte-identical after.
+    t88-ident.sh     old vs new optc-gen.awk over the same optionlist with NO
+                     -v union_file: BYTE-IDENTICAL, 30198 lines, md5
+                     87c335bad394.  That is the single-target no-regression
+                     bar, and it is stronger than a line count because the new
+                     code DEDUPLICATES where the old `static_var` /
+                     `SetByCombined` loops did not.
+
+## REGRESSION BARS (all on /tmp/b88a64, x86_64 + aarch64, my own build dir)
+
+    make all-gcc           rc=0, cc1 87 MB and lto1 85 MB linked
+    make cc1               rc=0
+    make multi-target-objs rc=0
+    stock-compare.sh       5/5 IDENTICAL vs /tmp/b-stock, 5 distinct md5s each
+                           side, negative control fired (IN absolute:
+                           scratchpad/big.c)
+    header scoreboard      115 macros / 230 arms: i386 115 PASS 0 FAIL,
+                           aarch64 5 PASS 110 FAIL.  The five aarch64 PASSes
+                           are FIRST_PSEUDO_REGISTER, MAX_BITSIZE_MODE_ANY_MODE,
+                           MAX_BITS_PER_WORD, N_REG_CLASSES (INT) and
+                           REGNO_REG_CLASS (EXP) -- unchanged.
+    TAB scoreboard         58 arms: i386 29 PASS 0 FAIL, aarch64 24 PASS 5 FAIL.
+    static_asserts         9 <= 9 and 1 <= 1 in the a64/vx/msp430 dirs, 9 <= 9
+                           and 2 <= 2 in the ppc dir.  optc-save-gen.awk was
+                           not touched.
+
+Note for whoever runs the TAB probe next: it aborts with `no PROVENANCE.txt`
+if MTP points at a fresh macro-probe output.  MTP must be `/tmp/mtp-before`.
+
+## NUMBERS IN THE BRIEF THAT DID NOT REPRODUCE HERE.  SAY WHICH ARM.
+
+  * **Incremental stderr floor is not 32 lines in this build dir.**  Measured,
+    steady state: `make cc1` -> 4 lines, all `tm-<x>.h is unchanged`;
+    `make all-gcc` -> 6 lines, those four plus two `check-multi-target-specs:
+    NOTHING CHECKED` / `specs: nothing probed` notices.  **Zero
+    `'@' is redundant`** -- the 24 the brief attributes to unmodified aarch64
+    `.md` files did not appear at all.  Either that changed under another
+    agent's `.md` work or the 32 belongs to a different build dir; I did not
+    chase it, but do not carry 32 forward unexamined.
+  * **Cold `all-gcc` was 593 lines / 102 `warning:`** for the a64 pair, not
+    ~870 / ~370.  My CFLAGS are `-O1 -g0`.  Cold numbers on this host have
+    already been recorded at 664 / 698 / 867; add 593 to that list and keep
+    treating the cold arm as a range, not a figure.
+
+## A DIAGNOSTIC IN SOMEONE ELSE'S TRACKED FILE, TWICE PER BUILD
+
+    gcc/target-regs.cc:65:14: warning: missing terminating ' character
+       65 | this back end's table
+
+An apostrophe inside a continued `#error` message.  Harmless in C++ (it is a
+warning about a character constant the preprocessor never has to complete),
+but it is two of the lines in every stderr count above, and PRINCIPLES has an
+entry about apostrophes for a reason.  Not mine; not fixed.
+
+## FILES (scratchpad)
+
+    t88-shell.sh     the DEVSHELL build shell, -p set byte-identical to the
+                     known-cached one
+    t88-conf.sh      configure <builddir> <backend-list> from this worktree
+    t88-build.sh     make wrapper; records rc to <log>.rc because the wrapper
+                     itself always exits 0
+    t88-prefix.sh    options.cc initializer sequence vs options.h member
+                     sequence -- the comparison the build was not making
+    t88-guards.sh    both guards, perturbed and restored
+    t88-ident.sh     single-target byte-identity + opt-stub non-vacuity
+    t88-repro.sh     before/after on one configured pair
+    t88-vx-before.sh #104 reconstructed from a working build dir
+    t88-bothsided.sh one option, owner and stub, from the per-base tables
+    t88-ts.sh        target-specs/configure per target (t106-ts.sh repointed)
