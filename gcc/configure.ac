@@ -42,7 +42,6 @@ ACX_NONCANONICAL_HOST
 accel_dir_suffix=
 
 # Determine the build- and host-specific subdirectories.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:44".
 build_subdir="build-${build_noncanonical}"
 if ( test $srcdir = . && test -d ../gcc ) \
    || test -d $srcdir/../host-${host_noncanonical}; then
@@ -139,7 +138,6 @@ dnl The two moved together because they are one decision: cppdefault.cc
 dnl `#undef's BOTH under CROSS_DIRECTORY_STRUCTURE && !TARGET_SYSTEM_ROOT, and
 dnl converting one would have left that `#undef' covering a macro that no longer
 dnl exists and a capability that does.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:121".
 dnl
 dnl NOTE `NATIVE_SYSTEM_HEADER_DIR' is still AC_SUBSTed further down.  That is
 dnl not a leftover: it is the compile-time default above, and it is also
@@ -182,7 +180,6 @@ dnl `gxx_libcxx_include_dir' keys of the per-target config file, read by cc1
 dnl into targ_caps and applied in cppdefault.cc; the installation-relative
 dnl fallbacks stay in gcc/Makefile.in, which is where they were computed
 dnl already and where --prefix and --libdir legitimately live.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:171".
 dnl
 dnl -stdlib= is enabled unconditionally, and that is why it does NOT move with
 dnl the directory even though one option used to control both.  c-family/c.opt
@@ -191,7 +188,6 @@ dnl resolves when options.cc is COMPILED, so it decides whether the option
 dnl EXISTS rather than what it defaults to.  A target with no libc++ then has
 dnl nothing to select, which is a rejected argument rather than a silently
 dnl wrong default.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:227".
 AC_DEFINE(ENABLE_STDLIB_OPTION, 1,
           [Define if the -stdlib= option should be enabled.])
 
@@ -236,7 +232,6 @@ AC_SUBST(GENINSRC)
 
 
 # --with-demangler-in-ld is gone.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:292".
 demangler_in_ld=yes
 
 dsymutil_vers=
@@ -522,7 +517,6 @@ dnl HAVE_GAS_WEAK left in exactly this way, and libgcc/configure.ac:276 now
 dnl probes .weak itself -- with a better probe, since it runs the assembler that
 dnl will assemble libgcc.  This one needs the same treatment: a linker probe in
 dnl libgcc/configure.ac, after which these two lines go.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:571".
 GCC_TARGET_TEMPLATE([HAVE_LD_RO_RW_SECTION_MIXING])
 AC_DEFINE(HAVE_LD_RO_RW_SECTION_MIXING, 1,
   [Define if your linker links a mix of read-only
@@ -649,7 +643,6 @@ fi
 #
 # Additional target machines this compiler should be able to serve, beyond
 # the one named by --target.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:718".
 AC_ARG_ENABLE(backends,
 [AS_HELP_STRING([--enable-backends=all|LIST],
 		[additional target machines whose back ends to compile in])],
@@ -659,28 +652,15 @@ AC_ARG_ENABLE(backends,
 esac],
 [enable_backends=no])
 
-# `--enable-targets' was the old spelling of the option above.  It reads as
-# "configure these targets", but what it selects is which back ends are
-# compiled into the compiler binary -- a property of the artefact being
-# built, i.e. host-side, like every other `--enable' on this configure.
-#
-# Refused by name rather than accepted as a silent alias.  A silent alias
-# would leave two spellings for one variable, and the failure mode of a
-# missed reader here is "the compiler quietly contains only the primary back
-# end", which no build log distinguishes from a deliberate single-target
-# build.  An error is the only reading that cannot be mistaken for success.
-AC_ARG_ENABLE(targets,
-[AS_HELP_STRING([--enable-targets],
-		[removed; renamed to --enable-backends])],
-[AC_MSG_ERROR([--enable-targets has been renamed to --enable-backends])],
-[])
+dnl --enable-targets is gone, with no deprecation stanza: `--enable-backends'
+dnl is new here and never shipped under the old name, and this configure is
+dnl not a user-facing interface -- the top level owns targets and hands this
+dnl one a back-end list.  There is nothing to migrate.
 
 dnl --enable-multiarch selected the Debian-style multiarch library layout.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:737".
 
 dnl with_cpu/with_float were AC_SUBSTed only to build the multiarch name for
 dnl soft-float/hard-float ABIs.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:749".
 
 # needed for restricting the fixedincludes multilibs that we install
 AC_SUBST(with_multi_buildlist)
@@ -688,7 +668,6 @@ AC_SUBST(with_multi_buildlist)
 # default stack clash protection guard size as power of twos in bytes.
 # Please keep these in sync with params.def.
 dnl --with-stack-clash-protection-guard-size is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:758".
 AC_DEFINE(DEFAULT_STK_CLASH_GUARD_SIZE, 0,
 	[Define to larger than zero set the default stack clash protector size.])
 
@@ -724,19 +703,15 @@ AC_ARG_ENABLE(__cxa_atexit,
 [], [])
 
 dnl --enable-decimal-float is gone, and with it GCC_AC_ENABLE_DECIMAL_FLOAT.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:799".
 
 
 dnl --enable-threads is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:814".
 enable_threads=''
 
 dnl --enable-tls is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:822".
 
 dnl --enable-vtable-verify selected whether libvtv is available to link
 dnl against.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:827".
 
 AC_ARG_ENABLE(analyzer,
 [AS_HELP_STRING([--disable-analyzer],
@@ -751,7 +726,6 @@ AC_DEFINE_UNQUOTED(ENABLE_ANALYZER, $analyzer,
 [Define 0/1 if static analyzer feature is enabled.])
 
 dnl --with-dwarf2 is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:844".
 dwarf2=no
 
 #
@@ -760,15 +734,12 @@ dwarf2=no
 #
 # --enable-shared/--disable-shared meaning "do (not) provide a shared
 # libgcc" is gone from here.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:813".
 
 dnl Whether to build libgcov and the related host tools.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:871".
 enable_gcov=yes
 AC_SUBST(enable_gcov)
 
 dnl --with-specs is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:878".
 CONFIGURE_SPECS=
 AC_SUBST(CONFIGURE_SPECS)
 
@@ -845,13 +816,11 @@ fi
 AC_SUBST(gnat_install_lib)
 
 dnl --enable-as-accelerator-for is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:958".
 AC_SUBST(enable_as_accelerator)
 AC_SUBST(real_target_noncanonical)
 AC_SUBST(accel_dir_suffix)
 
 dnl --enable-offload-targets is gone with the same reasoning:
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:971".
 AC_SUBST(omp_device_properties)
 AC_SUBST(omp_device_property_deps)
 
@@ -862,12 +831,10 @@ AC_DEFINE(ENABLE_OFFLOADING, 0,
 
 
 dnl --with-multilib-list and --with-multilib-generator are gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:988".
 with_multilib_list=default
 with_multilib_generator=default
 
 dnl --with-picolibc is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:999".
 
 # -------------------------
 # Checks for other programs
@@ -1305,7 +1272,6 @@ CXXFLAGS="$CXXFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 
 dnl Every probe from here to the end of this block compiles a program that
 dnl includes "system.h", which ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1439".
 AC_MSG_CHECKING([for gmp.h, which system.h needs and every probe below depends on])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]], [[]])],
   [AC_MSG_RESULT([yes])],
@@ -1601,7 +1567,6 @@ fi
 target_gtfiles=
 
 # Canonicalise ${target} before config.gcc dispatches on it.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1675".
 if test x"${target}" != x; then
   target_canon=`${srcdir}/../config.sub ${target} 2>/dev/null`
   if test x"${target_canon}" = x; then
@@ -1616,7 +1581,6 @@ fi
 #
 # Multi-target: collect the same information for each additional target
 # named by --enable-backends.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1697".
 gcc_extra_targets=
 case ${enable_backends} in
   no | "")
@@ -1624,7 +1588,6 @@ case ${enable_backends} in
   all)
     #
     # config.gcc matches targets with shell globs, so it cannot be enumerated.
-    # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1711".
     gcc_extra_targets=`sed -n '/^LIST = /,/^ *$/p' ${srcdir}/../contrib/config-list.mk \
       | sed -e 's/^LIST = //' \
       | tr -d '\134' \
@@ -1644,14 +1607,12 @@ esac
 
 dnl --enable-backends names every target, and there is no other source for
 dnl the list:
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1821".
 if test x"${gcc_extra_targets}" = x; then
   AC_MSG_ERROR([--enable-backends=LIST is required])
 fi
 
 dnl `${target}' IS added to the manifest, and that is not the fallback
 dnl refused above.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1829".
 gcc_manifest_targets="${gcc_extra_targets} ${target}"
 
 # Everything derived from that list -- the manifest, the per-target make
@@ -1694,7 +1655,6 @@ then tmake_file=$cpu_type/t-$cpu_type
 fi
 
 # initfini-array.h is self-guarding:
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2246".
 tm_file="${tm_file} initfini-array.h"
 
 if test x"$dwarf2" = xyes
@@ -1791,7 +1751,6 @@ dnl `--with-native-system-header-dir' is gone, so this is config.gcc's value
 dnl and nothing else.  It is the compile-time DEFAULT of the
 dnl targ_caps.native_system_header_dir capability, and separately it is
 dnl SYSTEM_HEADER_DIR, the headers fixincludes fixes during this build.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:121".
 NATIVE_SYSTEM_HEADER_DIR="$native_system_header_dir"
 AC_SUBST(NATIVE_SYSTEM_HEADER_DIR)
 
@@ -2062,7 +2021,6 @@ out_object_file=`basename $out_file .cc`.o
 common_out_object_file=`basename $common_out_file .cc`.o
 
 # Name this target's common hook table is defined under.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2613".
 common_out_symbol=targetm_common_`basename $common_out_file .cc | sed 's/-/_/g'`
 AC_SUBST(common_out_symbol)
 
@@ -2198,13 +2156,11 @@ SYSTEM_HEADER_DIR='$(NATIVE_SYSTEM_HEADER_DIR)'	AC_SUBST(SYSTEM_HEADER_DIR)
 BUILD_SYSTEM_HEADER_DIR=$SYSTEM_HEADER_DIR	AC_SUBST(BUILD_SYSTEM_HEADER_DIR)
 
 dnl target_header_dir is GONE.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2860".
 if test "x$with_build_sysroot" != x; then
   BUILD_SYSTEM_HEADER_DIR=$with_build_sysroot'$${sysroot_headers_suffix}$(NATIVE_SYSTEM_HEADER_DIR)'
 fi
 
 dnl The machine whose system headers fixincludes is fixing.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2879".
 AC_ARG_WITH(fixincludes-machine,
 [AS_HELP_STRING([--with-fixincludes-machine=MACHINE],
                 [machine name whose system headers fixincludes should fix;
@@ -2224,7 +2180,6 @@ AC_SUBST(fixincludes_machine)
 # support.
 dnl The second half of the old test -- "--with-headers was given but the
 dnl headers are not actually ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2911".
 : ${inhibit_libc=false}
 if test x$with_newlib = xyes && test "x$with_headers" = xno; then
        inhibit_libc=true
@@ -2371,28 +2326,6 @@ AC_DEFINE_UNQUOTED(LTOPLUGINSONAME,"${host_lto_plugin_soname}",
 # library request, now silently makes gcc's own host code PIC.  Both are
 # top-level bugs -- a target fact reaching a host knob -- and the fix belongs
 # in ../configure.ac, which is not renamed yet.
-# The old spelling is rejected by name rather than quietly aliased.  This check
-# MUST come before the option below, which assigns enable_host_shared on every
-# build and would otherwise make ${enable_host_shared+set} true always -- the
-# very same "set does not mean given" trap as libtool's, one screen further on.
-#
-# Rejected rather than aliased because the failure mode of an ignored option
-# here is silent: host built non-shared, surfacing much later as a libgccjit
-# link error and never as a configure diagnostic.  The top level also passes
-# --disable-option-checking down to us, so an unrecognised option would not
-# even draw autoconf's warning.  The top level has not been renamed yet, so a
-# top-level --enable-host-shared does reach this error; that is intended.
-AC_ARG_ENABLE(host-shared,
-[AS_HELP_STRING([--enable-host-shared],
-		[obsolete spelling of --enable-shared; rejected])],
-[AC_MSG_ERROR([--enable-host-shared has been renamed to --enable-shared.
-
-An --enable-shared given to gcc means gcc's own host, the same way an
---enable-shared given to libgcc means libgcc's host; the `host-' prefix was a
-local invention where a convention already existed.  Note that the top level's
-option of this name is not renamed yet, so if this came from a top-level
-configure line, that line needs updating too.])])
-
 AC_ARG_ENABLE(shared,
 [AS_HELP_STRING([--enable-shared],
 		[build host code as shared libraries])],
@@ -2456,7 +2389,6 @@ if $gcc_cv_as --help 2>&1 | grep -- --fatal-warnings > /dev/null; then
 fi
 
 # --enable-ld and --enable-gold are gone.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2924".
 
 # Identify the linker which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the linker
@@ -2491,7 +2423,6 @@ if test x$PLUGIN_LD_SUFFIX = xld-new \
   PLUGIN_LD_SUFFIX=ld
 fi
 # --with-plugin-ld is gone:
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2963".
 AC_SUBST(ORIGINAL_PLUGIN_LD_FOR_TARGET)
 AC_DEFINE_UNQUOTED(PLUGIN_LD_SUFFIX, "$PLUGIN_LD_SUFFIX", [Specify plugin linker])
 
@@ -2531,10 +2462,8 @@ AC_MSG_RESULT($ld_is_wild)
 
 dnl The "is gold available as a non-default linker, and does its split-stack
 dnl support cover this target" ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3141".
 
 dnl How to give a HOST shared library a version script and an soname.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3164".
 AC_MSG_CHECKING(linker version script option)
 gcc_cv_ld_version_script=no
 ld_version_script_option=''
@@ -2549,7 +2478,6 @@ elif test x$gcc_cv_ld != x; then
 fi
 case "$host" in
   dnl Solaris 2 ld always supports -M.
-  dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3197".
   *-*-solaris2*)
     gcc_cv_ld_version_script=yes
     ld_version_script_option='-M'
@@ -2646,7 +2574,6 @@ esac
 
 
 dnl The objdump, readelf and otool searches are gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3295".
 
 # Figure out the dsymutil we will use.
 AS_VAR_SET_IF(gcc_cv_dsymutil,, [
@@ -2675,15 +2602,12 @@ gcc_CHECK_ATTRIBUTE_ALIAS
 
 dnl The CFI probe cluster (.cfi_startproc/.cfi_offset/.cfi_escape, working
 dnl cfi advance, ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3331".
 
 
 dnl --enable-newlib-nano-formatted-io mirrored a newlib configure flag so
 dnl GCC could gate features on it.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3343".
 
 dnl Thread-local storage.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3349".
 AC_DEFINE(HAVE_AS_TLS, 1,
 	  [Define if your assembler and linker support thread-local storage.])
 
@@ -2731,10 +2655,8 @@ AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
 
 
 dnl --with-glibc-version is gone, and so is the probe that stood in for it:
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3420".
 
 dnl --enable-gnu-unique-object and its probe lived here.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3432".
 
 
 AC_MSG_CHECKING(support for thin archives)
@@ -2753,16 +2675,13 @@ AC_SUBST(thin_archive_support)
 
 dnl The ld64 and dsymutil probe blocks that stood here are gone to
 dnl target-specs/configure.ac -- as a ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3455".
 
 
 dnl --enable-libssp and the gcc_cv_libc_provides_ssp probe used to decide
 dnl TARGET_LIBC_PROVIDES_SSP by ...
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3478".
 
 dnl --enable-default-ssp used to AC_DEFINE(ENABLE_DEFAULT_SSP), gated on a
 dnl `case "$target"' that excluded ia64.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3486".
 
 dnl libatomic_target names the ONE triple this build will have a libatomic for,
 dnl and is empty when there is none.  LINK_LIBATOMIC_SPEC needs it: -latomic is
@@ -2801,21 +2720,16 @@ fi
 AC_SUBST(libatomic_target)
 
 dnl The <sys/sdt.h> probe is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3527".
 
 dnl --with-long-double-128 and the probe behind it are gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3535".
 
 dnl --with-long-double-format is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3545".
 
 dnl TARGET_LIBC_PROVIDES_HWCAP_IN_TCB and TARGET_LIBC_GNUSTACK are gone from
 dnl here.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3553".
 
 dnl The dl_iterate_phdr probe is gone, for the same reason and to the same
 dnl place:
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3560".
 
 # We no longer support different GC mechanisms.  Emit an error if
 # the user configures with --with-gc.
@@ -3308,13 +3222,10 @@ if test x"$enable_plugin" = x"yes"; then
 fi
 
 
-# --enable-host-pie is not renamed yet.  --enable-host-shared was: the merged
-# option, and the rejection of the old spelling, now live immediately above
-# LT_INIT.  See the long note there -- the placement is load-bearing.
-
-AC_ARG_ENABLE(host-pie,
-[AS_HELP_STRING([--enable-host-pie],
-		[build host code as PIE])])
+AC_ARG_ENABLE(pie,
+[AS_HELP_STRING([--enable-pie],
+		[build host code as PIE])],
+[enable_host_pie=$enableval])
 AC_SUBST(enable_host_pie)
 
 AC_ARG_ENABLE(libgdiagnostics,
@@ -3330,10 +3241,10 @@ fi
 AC_SUBST(LIBGDIAGNOSTICS)
 
 
-# See the note above --enable-host-pie for why the prefix is still here.
-AC_ARG_ENABLE(host-bind-now,
-[AS_HELP_STRING([--enable-host-bind-now],
-		[link host code as BIND_NOW])])
+AC_ARG_ENABLE(bind-now,
+[AS_HELP_STRING([--enable-bind-now],
+		[link host code as BIND_NOW])],
+[enable_host_bind_now=$enableval])
 AC_SUBST(enable_host_bind_now)
 
 AC_ARG_ENABLE(libquadmath-support,
@@ -3348,7 +3259,6 @@ fi
 
 
 dnl --with-linker-hash-style is gone.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:4095".
 
 # Specify what should be the default of -fdiagnostics-color option.
 AC_ARG_WITH([diagnostics-color],
@@ -3410,7 +3320,6 @@ AC_DEFINE_UNQUOTED(DIAGNOSTICS_URLS_DEFAULT, $DIAGNOSTICS_URLS_DEFAULT,
 #
 #
 # The triple the target libraries in THIS BUILD TREE are being built for.
-# Why: gcc/CONFIGURE-HISTORY.md "configure.ac:3865".
 build_target_triple=${target}
 AC_SUBST(build_target_triple)
 
@@ -3516,7 +3425,6 @@ AC_SUBST(CET_HOST_FLAGS)
 
 dnl --enable-s390-excess-float-precision is gone, and so is the probe behind
 dnl it.
-dnl Why: gcc/CONFIGURE-HISTORY.md "configure.ac:4260".
 
 # On x86-64, when profiling is enabled with shrink wrapping, the mcount
 # call may not be placed at the function entry after
