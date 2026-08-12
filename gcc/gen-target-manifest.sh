@@ -334,12 +334,12 @@ for gcc_mt in ${gcc_manifest_targets}; do
          # a tm-*.h without it.
          printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  INSN_BASE="%s" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
            "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_base}" "${gcc_mt_base}" >> ${gcc_common_mk}
-         printf '%s: $(srcdir)/common/config/%s tm-%s.h\n\t$(COMPILE) -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
+         printf '%s: $(srcdir)/common/config/%s tm-%s.h\n\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 -DTARGETM_COMMON_SYMBOL=%s $<\n\t$(POSTCOMPILE)\n\n' \
            "${gcc_mt_obj}" "${gcc_mt_cof}" "${gcc_mt_base}" "${gcc_mt_sym}" >> ${gcc_common_mk}
          # This back end's driver spec functions, from the same tm-<base>.h.
          # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:2034".
          gcc_mt_tmflag="-DTM_H_FILE='\"tm-${gcc_mt_base}.h\"'"
-         printf 'spec-functions-%s.o: $(srcdir)/spec-functions.cc tm-%s.h $(GCC_H)\n\t$(COMPILE) %s -DSPEC_FUNCTIONS_SYMBOL=extra_spec_functions_%s $(srcdir)/spec-functions.cc\n\t$(POSTCOMPILE)\n\n' \
+         printf 'spec-functions-%s.o: $(srcdir)/spec-functions.cc tm-%s.h $(GCC_H)\n\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 %s -DSPEC_FUNCTIONS_SYMBOL=extra_spec_functions_%s $(srcdir)/spec-functions.cc\n\t$(POSTCOMPILE)\n\n' \
            "${gcc_mt_base}" "${gcc_mt_base}" "${gcc_mt_tmflag}" "${gcc_mt_base}" >> ${gcc_common_mk}
          gcc_all_spec_fn_objects="${gcc_all_spec_fn_objects} spec-functions-${gcc_mt_base}.o"
          printf 'extern const struct spec_function extra_spec_functions_%s[];\n' \
@@ -504,7 +504,12 @@ ${AWK} '
       printf "mt-%s/options-init.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
       printf "mt-%s/options-init.o: mt-%s/options-init.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
-      printf "\t$(COMPILE) $<\n"
+      # -I<base>-inc means this TU sees that base'\''s tm.h, so it is on the
+      # supply side of defaults.h'\''s (c-DATA) redirection and must keep the
+      # real macros.  It is not `targetm'\''-renamed, so it cannot carry
+      # MULTI_TARGET_TARGETM_BASE (target.h:392 requires that name to be
+      # paired with -Dtargetm=).  See the guard at the end of defaults.h.
+      printf "\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 $<\n"
       printf "\t$(POSTCOMPILE)\n\n"
       printf "MT_OPTIONS_INIT_OBJS += mt-%s/options-init.o\n\n", b
     }

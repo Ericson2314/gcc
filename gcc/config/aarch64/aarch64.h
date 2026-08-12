@@ -74,6 +74,16 @@
 
 #define UNITS_PER_WORD		8
 
+/* The compile-time MAXIMUM word width over every configuration of this back
+   end, as distinct from the width in force.  aarch64 relied on defaults.h
+   deriving it from BITS_PER_WORD; that is fine while BITS_PER_WORD is a
+   constant expression and breaks as soon as it is not -- MAX_BITS_PER_WORD is
+   an array bound in expmed.h, expmed.cc and lower-subreg.h.  i386, rs6000,
+   riscv, pa and a dozen others already state it explicitly for their own
+   reasons; aarch64 is 64 unconditionally, ILP32 included, since -mabi=ilp32
+   narrows pointers and not the general registers.  */
+#define MAX_BITS_PER_WORD	64
+
 #define UNITS_PER_VREG		16
 
 #define PARM_BOUNDARY		64

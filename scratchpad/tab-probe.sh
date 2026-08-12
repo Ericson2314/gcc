@@ -85,13 +85,13 @@ BASES="i386 aarch64"
 # check working -- but the failure names the parse, not the cause, so: keep it
 # on one line rather than teaching the reader about continuations.  A more
 # forgiving reader is a reader with more ways to return the empty set.
-TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE"
+TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN REG_WORDS_BIG_ENDIAN STRICT_ALIGNMENT SHIFT_COUNT_TRUNCATED JUMP_TABLES_IN_TEXT_SECTION BITS_PER_WORD LONG_TYPE_SIZE PARM_BOUNDARY ATTRIBUTE_ALIGNED_VALUE MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_CIE_DATA_ALIGNMENT STACK_CHECK_FIXED_FRAME_SIZE STACK_CHECK_MAX_FRAME_SIZE MAX_FIXED_MODE_SIZE DWARF_FRAME_RETURN_COLUMN"
 
 # How many slot lines the plugin writes per base.  Named rather than spelled as
 # a literal, because getting it wrong in the direction of TOO FEW is a silent
 # pass: the length assertion below would accept a dump missing the very arms
 # this run was added to score.
-SLOTS_PER_BASE=14
+SLOTS_PER_BASE=32
 
 # Which symbol names count as belonging to which base.
 own_i386='^(ix86_|i386_|x86_)'
@@ -145,6 +145,84 @@ GLUE='^(target-addr\.h|target-addr\.cc|target-cdata\.h|target-cdata\.cc|target-d
 CDATA_MACROS="ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE"
 
 is_cdata () { case " $CDATA_MACROS " in *" $1 "*) return 0;; esac; return 1; }
+
+# The NUMERIC (c-DATA) macros, and the value each base must produce.
+#
+# THESE ARE NOT READ BACK OUT OF THE MECHANISM.  They are a hand derivation
+# from i386.h and aarch64.h, written down in scratchpad/PREREGISTER-cdata-num.md
+# BEFORE the plugin was taught to dump these slots and before any of them had
+# been observed -- because unlike the four string macros there is no outside
+# oracle for them.  The header probe cannot see them (they are class (c)
+# exactly because they are not constant expressions in their own base's header
+# context), and upstream cc1 does not expose PARM_BOUNDARY the way it exposes
+# __SIZE_TYPE__.
+#
+# If a verdict below disagrees with this table, the fix is to re-read the back
+# end's header, NOT to edit this line.  Editing it to match the measurement
+# would convert eighteen independent checks into eighteen restatements of what
+# the mechanism already said.
+#
+# Format: <macro>:<i386 value>:<aarch64 value>
+CDATA_NUM="\
+BYTES_BIG_ENDIAN:0:0 \
+WORDS_BIG_ENDIAN:0:0 \
+FLOAT_WORDS_BIG_ENDIAN:0:0 \
+REG_WORDS_BIG_ENDIAN:0:0 \
+STRICT_ALIGNMENT:0:0 \
+SHIFT_COUNT_TRUNCATED:0:0 \
+JUMP_TABLES_IN_TEXT_SECTION:0:0 \
+BITS_PER_WORD:64:64 \
+LONG_TYPE_SIZE:64:64 \
+PARM_BOUNDARY:64:64 \
+ATTRIBUTE_ALIGNED_VALUE:128:128 \
+MALLOC_ABI_ALIGNMENT:64:128 \
+TRAMPOLINE_SIZE:28:40 \
+DWARF_CIE_DATA_ALIGNMENT:-8:-8 \
+STACK_CHECK_FIXED_FRAME_SIZE:32:32 \
+STACK_CHECK_MAX_FRAME_SIZE:4088:4088 \
+MAX_FIXED_MODE_SIZE:128:128 \
+DWARF_FRAME_RETURN_COLUMN:16:30"
+
+# The three whose two bases must DISAGREE.  Fifteen of the eighteen agree
+# between i386 and aarch64 in this configuration, and an agreeing slot is
+# equally consistent with a working mechanism and with one pinned to the
+# primary -- which is precisely how `targetm_asm_ops' stayed green while
+# choosing nothing.  These three are the only lines that can tell those two
+# worlds apart, so they are asserted separately and by name, before the
+# per-macro verdicts are issued.
+CDATA_NUM_DISCRIM="MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_FRAME_RETURN_COLUMN"
+
+# Macros whose value is a read of the BASE'S OWN OPTION VARIABLES rather than
+# arithmetic on literals: aarch64's `BYTES_BIG_ENDIAN' is `(TARGET_BIG_END !=
+# 0)' and its `SHIFT_COUNT_TRUNCATED' is `(!TARGET_SIMD)'.
+#
+# THE PLUGIN CANNOT MEASURE THESE FOR THE UNSELECTED BASE, and this is not a
+# defect that a category should be invented to hide.  It calls both bases'
+# refresh functions inside ONE cc1 run so that both columns come out of one
+# measurement; only the selected base has been through its own
+# `target_option_override', so the other base's option variables hold the
+# selected base's bits.  Measured here: aarch64's four endianness slots come
+# back 1 and `SHIFT_COUNT_TRUNCATED' comes back 1, under an i386 selection,
+# because aarch64's flag words are being read out of storage i386 filled.
+#
+# So these arms stay FAIL.  They are genuinely unverified, and a FAIL is the
+# correct verdict for unverified -- the alternative, a third status that
+# excuses them, is the test-harness floor with a plausible name.  The real fix
+# is a second plugin run under `-ftarget-config=<aarch64>', which is blocked
+# today because aarch64 cc1 ICEs before any plugin callback fires (STATE.md).
+# The FAIL message says so, so that nobody spends a second afternoon on it.
+CDATA_NUM_OPTSTATE="BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN \
+REG_WORDS_BIG_ENDIAN SHIFT_COUNT_TRUNCATED STRICT_ALIGNMENT"
+
+is_cdata_num () { case " $CDATA_NUM " in *" $1:"*) return 0;; esac; return 1; }
+cdata_num_want () {                    # cdata_num_want <macro> <base>
+  local e f
+  for e in $CDATA_NUM; do
+    case $e in "$1":*) f=${e#*:}
+      case $2 in i386) echo "${f%%:*}";; *) echo "${f#*:}";; esac; return;;
+    esac
+  done
+}
 
 # Is macro $1 redirected to a target-cdata slot by defaults.h?  Matched on the
 # `#define <M> (targetm_cdata.' form specifically, not on the name appearing
@@ -234,6 +312,7 @@ resolve () {                           # resolve <hexaddr> -> symbol name
 }
 getptr () { awk -F'|' -v b="$2" -v m="$3" '$1=="PTR"&&$2==b&&$3==m{print $5}' "$1"; }
 getstr () { awk -F'|' -v b="$2" -v m="$3" '$1=="STR"&&$2==b&&$3==m{print $5}' "$1"; }
+getnum () { awk -F'|' -v b="$2" -v m="$3" '$1=="NUM"&&$2==b&&$3==m{print $5}' "$1"; }
 
 ########################################################################
 # 3.  DISCRIMINATION CONTROLS -- run BEFORE any verdict is issued.
@@ -258,6 +337,27 @@ i386 symbol; the ownership test itself is broken"
 echo "$n_a" | grep -qE "$own_aarch64" \
   || die "control: aarch64's CTL_DIFFER slot resolved to [$n_a], not an aarch64 \
 symbol"
+
+# The (c-DATA) numeric discrimination control.  Fifteen of the eighteen numeric
+# slots hold the same value for both bases in this configuration, so their
+# agreement cannot distinguish a per-base mechanism from one pinned to the
+# primary.  These three must differ.  Asserted here, ahead of every verdict,
+# because if the mechanism is pinned then all eighteen PASSes below are
+# restating i386's answer twice and none of them means anything.
+for m in $CDATA_NUM_DISCRIM; do
+  gi=$(getnum "$OUT/slots.txt" i386 "$m")
+  ga=$(getnum "$OUT/slots.txt" aarch64 "$m")
+  [ -n "$gi" ] && [ -n "$ga" ] \
+    || die "control: $m is not in the numeric dump; the discrimination control \
+cannot run and the eighteen (c-DATA) numeric verdicts would be unattributable"
+  [ "$gi" != "$ga" ] \
+    || die "control: $m reads $gi for BOTH bases, but i386.h and aarch64.h give \
+different values for it (see PREREGISTER-cdata-num.md).  The per-config slots \
+are not per-config: something is answering with one base's data for every base, \
+which is the targetm_asm_ops failure again.  No verdict below is meaningful."
+done
+echo "control: OK -- $(echo $CDATA_NUM_DISCRIM | wc -w) numeric (c-DATA) slots \
+that MUST differ between the bases do differ"
 echo "control: OK -- TAB reports AGREEMENT (CTL_SHARED -> $(resolve "$cs_i")) \
 AND DISAGREEMENT (CTL_DIFFER -> $n_i vs $n_a), and attributes each to its base"
 
@@ -333,6 +433,47 @@ echo "control: OK -- the defaults.h redirect check reports both answers"
 ########################################################################
 : > "$OUT/results.txt"
 for m in $TAB_MACROS; do
+  if is_cdata_num "$m"; then
+    # (c-DATA), numeric.  Same two questions as the string case: does
+    # defaults.h still redirect the name, and did this base's refresh write
+    # THIS base's value -- checked against the hand derivation in
+    # PREREGISTER-cdata-num.md, never against the other base's slot.
+    for b in $BASES; do
+      why=""; v=PASS
+      if ! redirected "$m"; then
+        v=FAIL; why="COMPLETENESS: defaults.h does not redirect $m to a \
+target-cdata slot, so every use still reads the primary's tm.h"
+      else
+        g=$(getnum "$OUT/slots.txt" "$b" "$m")
+        w=$(cdata_num_want "$m" "$b")
+        if [ -z "$g" ]; then
+          v=FAIL; why="no slot in the dump"
+        elif [ -z "$w" ]; then
+          v=FAIL; why="DISPATCH: no pre-registered value for $m on $b"
+        elif [ "$g" = "$w" ]; then
+          why="DISPATCH: $b's refresh wrote $g, matching the derivation from \
+$b's own header"
+          case " $CDATA_NUM_DISCRIM " in
+            *" $m "*) why="$why (and this is one of the three that DIFFER \
+between the bases, so it discriminates)";;
+            *) why="$why (both bases give $g here, so this arm does NOT \
+discriminate -- see the control above)";;
+          esac
+        else
+          v=FAIL; why="DISPATCH: $b's refresh wrote [$g] but $b's header \
+derives [$w]"
+          case " $CDATA_NUM_OPTSTATE " in
+            *" $m "*) why="$why -- and $m is a read of $b's OWN OPTION \
+VARIABLES, which this single-run plugin cannot set up for the base it did not \
+select.  UNVERIFIED, not known-wrong; needs a second run under $b's target \
+config, blocked while aarch64 cc1 ICEs before plugin callbacks fire.";;
+          esac
+        fi
+      fi
+      echo "$b $m TAB $v $why" >> "$OUT/results.txt"
+    done
+    continue
+  fi
   if is_cdata "$m"; then
     # (c-DATA): the name survives; what must hold is that defaults.h redirects
     # it, and that each base's refresh writes THAT base's own bytes.

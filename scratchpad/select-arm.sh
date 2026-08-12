@@ -107,5 +107,87 @@ was initialised with answers for every base."
   fi
 done
 
+
+# ---- (c-DATA) HAS THREE STEPS AND THE ABOVE WATCHES ONLY THE FIRST ---------
+#
+# `target_cdata_refresh_for' being referenced proves the SELECTOR looks the
+# base up.  It does not prove:
+#
+#   step 2  that anything CALLS `init_targetm_cdata ()' to run the refresh
+#           function the selector stored.  If nothing does, every slot keeps
+#           the poison -- loud -- but a future change that seeded the slots
+#           with the primary's values instead would be exactly the
+#           `targetm_asm_ops' bug again, and silent.
+#   step 3  that the REDIRECT in defaults.h actually reaches the middle end.
+#           The redirect is guarded on three -D flags now.  If a fourth
+#           category of TU appeared, or the guard were inverted, the macros
+#           would quietly go back to expanding to the primary's expressions in
+#           libbackend and every per-base slot would be written, correct, and
+#           read by nobody.  `targetm_cdata' appearing as an UNDEFINED symbol
+#           in a target-independent object is the evidence that some middle-end
+#           code really does load it.
+#
+# This is the `targetm_asm_ops' lesson applied to our own new mechanism: a
+# green arm on per-base DATA proves nothing about whether the data is selected,
+# and a green arm on SELECTION proves nothing about whether anyone reads it.
+echo
+for spec in "toplev.o:init_targetm_cdata:calls the refresh"; do
+  o=${spec%%:*}; rest=${spec#*:}; sym=${rest%%:*}; what=${rest#*:}
+  f="$BUILD/gcc/$o"
+  if [ ! -f "$f" ]; then
+    echo "$o: FAIL -- not built; an absent object is not a passing arm"; fail=1
+    continue
+  fi
+  nm -u "$f" > "$OUT/undef-$o.txt" 2> "$OUT/nm-$o.err" \
+    || { cat "$OUT/nm-$o.err"; die "nm -u failed on $f"; }
+  if grep -q "$sym" "$OUT/undef-$o.txt"; then
+    echo "$o -> $sym: PASS -- $what"
+  else
+    echo "$o -> $sym: FAIL -- $o does not reference $sym, so the refresh \
+never runs and every (c-DATA) slot keeps whatever it was initialised with"
+    fail=1
+  fi
+done
+
+# Step 3.  Read a real middle-end object -- one that spells a redirected macro
+# -- and require it to load `targetm_cdata'.  varasm.o uses BITS_PER_WORD and
+# ASM_COMMENT_START; expmed.o uses BITS_PER_WORD.  Two objects, because one
+# could stop using its macro for an unrelated reason and that must not read as
+# a broken redirect.
+#
+# THE CONTROL FOR THIS ARM is a target-independent object that spells NO
+# redirected macro and must therefore NOT reference targetm_cdata.  Without it,
+# "the symbol is undefined here" could be true of every object for reasons
+# having nothing to do with the redirect.
+for o in varasm.o expmed.o; do
+  f="$BUILD/gcc/$o"
+  [ -f "$f" ] || { echo "$o: FAIL -- not built"; fail=1; continue; }
+  nm -u "$f" > "$OUT/undef-$o.txt" 2> /dev/null
+  if grep -q 'targetm_cdata' "$OUT/undef-$o.txt"; then
+    echo "$o -> targetm_cdata: PASS -- the defaults.h redirect is live in \
+libbackend, so a middle-end read really does go through the per-config slot"
+  else
+    echo "$o -> targetm_cdata: FAIL -- $o spells a redirected macro but does \
+not load targetm_cdata.  The redirect did not reach this TU: the macros are \
+still expanding to the PRIMARY's expressions here."
+    fail=1
+  fi
+done
+f="$BUILD/gcc/bitmap.o"
+if [ -f "$f" ]; then
+  nm -u "$f" > "$OUT/undef-bitmap.txt" 2> /dev/null
+  if grep -q 'targetm_cdata' "$OUT/undef-bitmap.txt"; then
+    echo "control REDIRECT: FAILED -- bitmap.o spells no redirected macro yet \
+references targetm_cdata.  The two PASSes above prove nothing."
+    fail=1
+  else
+    echo "control REDIRECT: OK -- an object with no redirected macro does not \
+reference targetm_cdata"
+  fi
+else
+  echo "control REDIRECT: FAILED -- bitmap.o absent, so the arm above is \
+unchecked"; fail=1
+fi
+
 echo "OVERALL rc=$fail"
 exit $fail

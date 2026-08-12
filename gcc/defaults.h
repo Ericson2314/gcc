@@ -1122,6 +1122,20 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #ifndef MAX_BITS_PER_WORD
 #define MAX_BITS_PER_WORD BITS_PER_WORD
+/* Remember that this fallback fired, so the redirection block at the end of
+   this file can refuse to make `BITS_PER_WORD' a run-time load underneath it.
+   MAX_BITS_PER_WORD is an ARRAY BOUND -- `expmed.h:105-171',
+   `lower-subreg.h:35-37', `expmed.cc:128-129' and the gengtype output for
+   `ada/utils.cc' -- eleven of them, all requiring a constant expression.
+
+   This is the one real compile-time blocker in class (c), and it is invisible
+   to a sweep of the class-(c) names themselves: nothing spells BITS_PER_WORD
+   in a constant context, it is reached one level down through this line.  It
+   is invisible a second way as well -- i386, the current primary, defines
+   MAX_BITS_PER_WORD as a literal 64, so the fallback does not fire today and
+   the redirection appears harmless.  Change the primary to a back end that
+   omits it (aarch64 omits it) and eleven array bounds stop compiling.  */
+#define MAX_BITS_PER_WORD_FROM_BITS_PER_WORD 1
 #endif
 
 #ifndef STACK_POINTER_OFFSET
@@ -1897,11 +1911,48 @@ typedef TARGET_UNIT target_unit;
    ONLY MEASURED-INVARIANT MACROS MAY BE ADDED HERE.  See target-cdata.h: six
    of the thirty-five candidates vary with `__attribute__((target))', and one
    of those placed here would freeze at its command-line value with no
-   diagnostic.  */
-#ifdef MULTI_TARGET_TARGETM_BASE
-/* A back end's own translation unit: keep the real macros.  */
+   diagnostic.
+
+   `GENERATOR_FILE' IS THE SECOND EXEMPTION, AND IT WAS NOT OBVIOUS.  The
+   build-time generators (`genconfig', `genmodes', ... ) are compiled once per
+   base against that base's `tm-<base>.h', and they do NOT get
+   MULTI_TARGET_TARGETM_BASE.  They also do not link `target-cdata-select.o'
+   and never will: they run on the build machine, before the compiler exists,
+   and a generator IS a single-target program by construction.  Redirecting
+   their macros would point them at a `targetm_cdata' that has no definition
+   to link against.  The first four (c-DATA) macros did not reveal this
+   because no generator spells `SIZE_TYPE' or `ASM_COMMENT_START';
+   `BITS_PER_WORD' and the endianness macros are a different matter, and the
+   MAX_BITS_PER_WORD guard below fired in `genconfig-aarch64.o' before any of
+   them did.
+
+   `MULTI_TARGET_SUPPLY_TU' IS THE THIRD, and it is a third category rather
+   than an oversight.  `target-asm-ops-<base>.o' is compiled against one
+   base's tm.h precisely to capture that base's macro values, so it is supply
+   side -- but it is built for all 45 configured bases, not only the
+   MULTI_TARGET_OBJS ones, and it is not `targetm'-renamed, so it cannot carry
+   MULTI_TARGET_TARGETM_BASE: `target.h:392' rejects that name without a
+   matching `-Dtargetm='.  gen-multi-target-md.awk defines this one instead.  */
+#if defined (MULTI_TARGET_TARGETM_BASE) || defined (GENERATOR_FILE)	\
+    || defined (MULTI_TARGET_SUPPLY_TU)
+/* A back end's own translation unit, a build-time generator, or another
+   supply-side TU: keep the real macros.  */
 #else
 #include "target-cdata.h"
+
+/* `MAX_BITS_PER_WORD' is an array bound in eleven places.  If this back end
+   did not supply its own, the fallback above derived it from BITS_PER_WORD,
+   and BITS_PER_WORD is about to stop being a constant expression.  Refuse,
+   by name, rather than emit eleven confusing errors in expmed.h.  The name
+   means "the compile-time MAXIMUM over configurations", so a literal is the
+   right answer for it, not a per-config slot.  */
+#ifdef MAX_BITS_PER_WORD_FROM_BITS_PER_WORD
+#error the primary back end does not define MAX_BITS_PER_WORD, so defaults.h \
+derived it from BITS_PER_WORD -- which the (c-DATA) redirection below turns \
+into a run-time load, breaking the eleven array bounds in expmed.h, \
+expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
+(a compile-time maximum over configurations, which is what the name means).
+#endif
 
 #undef ASM_COMMENT_START
 #define ASM_COMMENT_START (targetm_cdata.asm_comment_start)
@@ -1911,6 +1962,47 @@ typedef TARGET_UNIT target_unit;
 #define SIZE_TYPE (targetm_cdata.size_type)
 #undef PTRDIFF_TYPE
 #define PTRDIFF_TYPE (targetm_cdata.ptrdiff_type)
+
+#undef BYTES_BIG_ENDIAN
+#define BYTES_BIG_ENDIAN (targetm_cdata.bytes_big_endian)
+#undef WORDS_BIG_ENDIAN
+#define WORDS_BIG_ENDIAN (targetm_cdata.words_big_endian)
+#undef FLOAT_WORDS_BIG_ENDIAN
+#define FLOAT_WORDS_BIG_ENDIAN (targetm_cdata.float_words_big_endian)
+#undef REG_WORDS_BIG_ENDIAN
+#define REG_WORDS_BIG_ENDIAN (targetm_cdata.reg_words_big_endian)
+#undef STRICT_ALIGNMENT
+#define STRICT_ALIGNMENT (targetm_cdata.strict_alignment)
+#undef SHIFT_COUNT_TRUNCATED
+#define SHIFT_COUNT_TRUNCATED (targetm_cdata.shift_count_truncated)
+#undef JUMP_TABLES_IN_TEXT_SECTION
+#define JUMP_TABLES_IN_TEXT_SECTION (targetm_cdata.jump_tables_in_text_section)
+#undef BITS_PER_WORD
+#define BITS_PER_WORD (targetm_cdata.bits_per_word)
+#undef LONG_TYPE_SIZE
+#define LONG_TYPE_SIZE (targetm_cdata.long_type_size)
+#undef PARM_BOUNDARY
+#define PARM_BOUNDARY (targetm_cdata.parm_boundary)
+#undef ATTRIBUTE_ALIGNED_VALUE
+#define ATTRIBUTE_ALIGNED_VALUE (targetm_cdata.attribute_aligned_value)
+#undef MALLOC_ABI_ALIGNMENT
+#define MALLOC_ABI_ALIGNMENT (targetm_cdata.malloc_abi_alignment)
+#undef TRAMPOLINE_SIZE
+#define TRAMPOLINE_SIZE (targetm_cdata.trampoline_size)
+#undef DWARF_CIE_DATA_ALIGNMENT
+#define DWARF_CIE_DATA_ALIGNMENT (targetm_cdata.dwarf_cie_data_alignment)
+#undef STACK_CHECK_FIXED_FRAME_SIZE
+/* Kept on ONE line, past the usual column limit, on purpose: tab-probe.sh's
+   completeness check matches `^#define <M> (targetm_cdata.' and a continuation
+   makes it report the macro unredirected.  It did, and that is the check
+   working -- but the honest fix is the line, not a more forgiving matcher.  */
+#define STACK_CHECK_FIXED_FRAME_SIZE (targetm_cdata.stack_check_fixed_frame_size)
+#undef STACK_CHECK_MAX_FRAME_SIZE
+#define STACK_CHECK_MAX_FRAME_SIZE (targetm_cdata.stack_check_max_frame_size)
+#undef MAX_FIXED_MODE_SIZE
+#define MAX_FIXED_MODE_SIZE (targetm_cdata.max_fixed_mode_size)
+#undef DWARF_FRAME_RETURN_COLUMN
+#define DWARF_FRAME_RETURN_COLUMN (targetm_cdata.dwarf_frame_return_column)
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

@@ -688,6 +688,14 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-asm-ops.h\n";
   printf "\t$(COMPILE) -DTM_H_FILE='\"tm-%s.h\"' \\\n", cpu;
   printf "\t  -DTARGETM_ASM_OPS_SYMBOL=targetm_asm_ops_%s \\\n", cpu;
+  # This TU is on the SUPPLY side of defaults.h's (c-DATA) redirection: it is
+  # compiled against one base's tm.h in order to capture that base's own macro
+  # values, so it must see the real macros and not the per-config slots.
+  # MULTI_TARGET_TARGETM_BASE cannot be used to say so -- target.h:392 requires
+  # it to be paired with -Dtargetm=, and this TU is not renamed -- and it is
+  # built for all 45 bases rather than only the MULTI_TARGET_OBJS ones, so it
+  # is genuinely a third category and needs its own name.
+  printf "\t  -DMULTI_TARGET_SUPPLY_TU=1 \\\n";
   printf "\t  $(srcdir)/target-asm-ops.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
     asm_ops_objs = asm_ops_objs " target-asm-ops-" cpu ".o";

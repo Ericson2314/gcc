@@ -44,10 +44,11 @@ const struct target_cdata_entry targetm_cdata_registry[] = {
    or a comment character was expected, which is unmistakable and names
    itself.  */
 struct target_cdata targetm_cdata = {
-  TARGET_CDATA_POISON_STR,
-  TARGET_CDATA_POISON_STR,
-  TARGET_CDATA_POISON_STR,
-  TARGET_CDATA_POISON_STR
+#define TARGET_CDATA_STR(F, M) TARGET_CDATA_POISON_STR,
+#define TARGET_CDATA_NUM(T, F, M) (T) TARGET_CDATA_POISON_NUM,
+  TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+#undef TARGET_CDATA_STR
+#undef TARGET_CDATA_NUM
 };
 
 /* NULL until a target is selected; see `init_targetm_cdata'.  */
@@ -79,11 +80,26 @@ init_targetm_cdata (void)
      was generated empty -- or one whose macros were the REDIRECTED ones, so
      that it copied the poison back into place -- would otherwise leave the
      compiler running on sentinels and only fail much later, in the assembler
-     or in a front end, with no mention of this file.  */
-  if (targetm_cdata.asm_comment_start == NULL
-      || strcmp (targetm_cdata.asm_comment_start,
-		 TARGET_CDATA_POISON_STR) == 0)
-    internal_error ("the selected back end%'s target-cdata refresh left the "
-		    "data unwritten; it was compiled against the redirected "
-		    "macros rather than its own tm.h");
+     or in a front end, with no mention of this file.
+
+     EVERY field is checked, from the same list the struct and the refresh
+     function are generated from, and the failure NAMES THE FIELD.  Checking
+     one representative would be the cheaper thing to write and would report
+     success for a struct whose other twenty-two slots were still sentinels --
+     a check that can only ever observe the field it was written for is the
+     shape this project has been caught by repeatedly.  */
+#define TARGET_CDATA_STR(F, M)						\
+  if (targetm_cdata.F == NULL						\
+      || strcmp (targetm_cdata.F, TARGET_CDATA_POISON_STR) == 0)	\
+    internal_error ("the selected back end%'s target-cdata refresh left "	\
+		    "%<%s%> unwritten; it was compiled against the "	\
+		    "redirected macros rather than its own tm.h", #F);
+#define TARGET_CDATA_NUM(T, F, M)					\
+  if (targetm_cdata.F == (T) TARGET_CDATA_POISON_NUM)			\
+    internal_error ("the selected back end%'s target-cdata refresh left "	\
+		    "%<%s%> unwritten; it was compiled against the "	\
+		    "redirected macros rather than its own tm.h", #F);
+  TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+#undef TARGET_CDATA_STR
+#undef TARGET_CDATA_NUM
 }

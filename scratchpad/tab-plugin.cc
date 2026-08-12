@@ -88,6 +88,18 @@ one_base (FILE *o, const char *base, const struct gcc_target *t,
   dump_str (o, base, "SIZE_TYPE",         "cdata.size_type",    cd.size_type);
   dump_str (o, base, "PTRDIFF_TYPE",      "cdata.ptrdiff_type", cd.ptrdiff_type);
 
+  /* And every NUMERIC slot, driven by the same TARGET_CDATA_FIELDS list the
+     struct is generated from -- so a field added to target-cdata.h appears
+     here automatically and cannot be converted without being measured.  Naming
+     them one by one is what let the string four be added and the check for
+     them be forgotten in the same file; this cannot drift.  */
+#define TARGET_CDATA_STR(F, M) /* dumped above, by name */
+#define TARGET_CDATA_NUM(T, F, M) \
+  fprintf (o, "NUM|%s|%s|cdata." #F "|%ld\n", base, #M, (long) cd.F);
+  TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+#undef TARGET_CDATA_STR
+#undef TARGET_CDATA_NUM
+
   /* Stage 1 -- the addresses.h family.  These four slots hold the addresses of
      `static' functions in target-addr-<base>.o, so BOTH bases' copies carry
      the SAME symbol name (gcc_taddr_base_reg_class and friends) at DIFFERENT

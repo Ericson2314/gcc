@@ -34,6 +34,19 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+/* Some of these macros are not self-contained arithmetic on option variables:
+   aarch64's `DWARF_FRAME_RETURN_COLUMN' is `DWARF_FRAME_REGNUM (LR_REGNUM)',
+   which calls `aarch64_debugger_regno ()'.  tm_p.h is this base's own
+   <cpu>-protos.h, so the declarations come from the same back end the macros
+   do.  (`rtl.h' is needed before it, exactly as target-addr.cc has it.)
+
+   Note what this does NOT license.  A macro that needs a declaration is fine;
+   a macro that needs per-function STATE is not, however easy the include
+   makes it to compile -- see the `SUPPORTS_STACK_ALIGNMENT' and
+   `PIC_OFFSET_TABLE_REGNUM' notes in target-cdata.h.  This file runs once,
+   with `cfun' null.  */
+#include "rtl.h"
+#include "tm_p.h"
 #include "target-cdata.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE
@@ -41,11 +54,16 @@ along with GCC; see the file COPYING3.  If not see
 that base's real tm.h macros, not the redirected ones)
 #endif
 
+/* Every field, from the one list in target-cdata.h.  Written this way rather
+   than as a run of assignments so that a field cannot be added to the struct
+   and forgotten here -- which would leave it holding the poison in a build
+   that otherwise looks complete.  */
 void
 TARGETM_CDATA_SYMBOL (struct target_cdata *d)
 {
-  d->asm_comment_start = ASM_COMMENT_START;
-  d->wchar_type        = WCHAR_TYPE;
-  d->size_type         = SIZE_TYPE;
-  d->ptrdiff_type      = PTRDIFF_TYPE;
+#define TARGET_CDATA_STR(F, M) d->F = (M);
+#define TARGET_CDATA_NUM(T, F, M) d->F = (T) (M);
+  TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+#undef TARGET_CDATA_STR
+#undef TARGET_CDATA_NUM
 }
