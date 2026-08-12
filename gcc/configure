@@ -953,6 +953,7 @@ enable_checking
 enable_coverage
 enable_gather_detailed_mem_stats
 enable_valgrind_annotations
+enable_backends
 enable_targets
 with_matchpd_partitions
 with_insnemit_partitions
@@ -1657,8 +1658,10 @@ Optional Features:
                           enable detailed memory allocation stats gathering
   --enable-valgrind-annotations
                           enable valgrind runtime interaction
-  --enable-targets=all|LIST
-                          additional target machines to support
+  --enable-backends=all|LIST
+                          additional target machines whose back ends to
+                          compile in
+  --enable-targets        removed; renamed to --enable-backends
   --enable-__cxa_atexit   enable __cxa_atexit for C++
   --disable-analyzer      disable -fanalyzer static analyzer
   --enable-languages=LIST specify which front-ends to build
@@ -7192,14 +7195,30 @@ fi
 # Additional target machines this compiler should be able to serve, beyond
 # the one named by --target.
 # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:718".
-# Check whether --enable-targets was given.
-if test "${enable_targets+set}" = set; then :
-  enableval=$enable_targets; case "${enableval}" in
-  yes) as_fn_error $? "--enable-targets needs \"all\" or a list of targets" "$LINENO" 5 ;;
+# Check whether --enable-backends was given.
+if test "${enable_backends+set}" = set; then :
+  enableval=$enable_backends; case "${enableval}" in
+  yes) as_fn_error $? "--enable-backends needs \"all\" or a list of targets" "$LINENO" 5 ;;
   *)   ;;
 esac
 else
-  enable_targets=no
+  enable_backends=no
+fi
+
+
+# `--enable-targets' was the old spelling of the option above.  It reads as
+# "configure these targets", but what it selects is which back ends are
+# compiled into the compiler binary -- a property of the artefact being
+# built, i.e. host-side, like every other `--enable' on this configure.
+#
+# Refused by name rather than accepted as a silent alias.  A silent alias
+# would leave two spellings for one variable, and the failure mode of a
+# missed reader here is "the compiler quietly contains only the primary back
+# end", which no build log distinguishes from a deliberate single-target
+# build.  An error is the only reading that cannot be mistaken for success.
+# Check whether --enable-targets was given.
+if test "${enable_targets+set}" = set; then :
+  enableval=$enable_targets; as_fn_error $? "--enable-targets has been renamed to --enable-backends" "$LINENO" 5
 fi
 
 
@@ -12091,10 +12110,10 @@ fi
 
 #
 # Multi-target: collect the same information for each additional target
-# named by --enable-targets.
+# named by --enable-backends.
 # Why: gcc/CONFIGURE-HISTORY.md "configure.ac:1697".
 gcc_extra_targets=
-case ${enable_targets} in
+case ${enable_backends} in
   no | "")
     ;;
   all)
@@ -12110,16 +12129,16 @@ case ${enable_targets} in
       | sort -u \
       | tr '\012' ' '`
     if test x"${gcc_extra_targets}" = x; then
-      as_fn_error $? "--enable-targets=all: could not read contrib/config-list.mk" "$LINENO" 5
+      as_fn_error $? "--enable-backends=all: could not read contrib/config-list.mk" "$LINENO" 5
     fi
     ;;
   *)
-    gcc_extra_targets=`echo "${enable_targets}" | sed 's/,/ /g'`
+    gcc_extra_targets=`echo "${enable_backends}" | sed 's/,/ /g'`
     ;;
 esac
 
 if test x"${gcc_extra_targets}" = x; then
-  as_fn_error $? "--enable-targets=LIST is required" "$LINENO" 5
+  as_fn_error $? "--enable-backends=LIST is required" "$LINENO" 5
 fi
 
 gcc_manifest_targets="${gcc_extra_targets} ${target}"
@@ -12131,7 +12150,7 @@ gcc_manifest_targets="${gcc_extra_targets} ${target}"
 # the script says why it is sourced rather than run.
 . ${srcdir}/gen-target-manifest.sh
 if gcc_gen_target_manifest; then :; else
-  as_fn_error $? "--enable-targets: ${gcc_mt_fatal}" "$LINENO" 5
+  as_fn_error $? "--enable-backends: ${gcc_mt_fatal}" "$LINENO" 5
 fi
 
 
@@ -21034,7 +21053,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21037 "configure"
+#line 21056 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21140,7 +21159,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21143 "configure"
+#line 21162 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H

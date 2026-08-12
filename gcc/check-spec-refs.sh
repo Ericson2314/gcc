@@ -95,7 +95,7 @@
 #     kind of report that gets a checker demoted to advisory.
 #
 #   every target header, `config/*.h' and `config/*/*.h' -- THE SAME DEFECT ON
-#     THE --enable-targets AXIS.  target-specs writes a spec such as
+#     THE --enable-backends AXIS.  target-specs writes a spec such as
 #     `*asm_mrelax' or `*asm_fp_module' into EVERY per-target file, and the only
 #     %(name) reference to it is in ONE back end's header (loongarch-driver.h,
 #     mips.h).  That reference reaches the corpus only through the generated

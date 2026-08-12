@@ -2235,8 +2235,15 @@ provided by the Linux distribution.  In general, this option is
 intended for the developers of GCC, and it is not intended for general
 use.
 
-@item --enable-targets=all
-@itemx --enable-targets=@var{target_list}
+@item --enable-backends=all
+@itemx --enable-backends=@var{target_list}
+Select which target back ends are compiled into the compiler binary, in
+addition to the one named by @option{--target}.  This is a property of the
+compiler being built, not of any target being configured.
+
+This option was formerly spelled @option{--enable-targets}.  That spelling is
+no longer accepted; configure rejects it and names the replacement.
+
 Some GCC targets, e.g.@: powerpc64-linux, build bi-arch compilers.
 These are compilers that are able to generate either 64-bit or 32-bit
 code.  Typically, the corresponding 32-bit target, e.g.@:

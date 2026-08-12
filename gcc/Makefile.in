@@ -724,7 +724,7 @@ ALL_LANG_SPECS_FILES = $(wildcard $(srcdir)/*/lang-specs.h)
 
 # Every target header in the SOURCE TREE, for exactly the same reason, on the
 # other axis.  The languages case above is about --enable-languages; this one is
-# about --enable-targets, and it is the same defect.
+# about --enable-backends, and it is the same defect.
 #
 # A spec that target-specs writes into every per-target file may be referred to
 # from ONE back end's header -- `*asm_mrelax' from loongarch-driver.h's
@@ -3083,7 +3083,7 @@ gcc.o: $(BASEVER)
 # It defaults to this driver's own output, which is the right thing only while
 # the driver is still built against a single target's tm.h.
 # Multi-target: generate one spec file per target named in multi-target.manifest
-# (written by configure from --enable-targets).  Each target is probed with its
+# (written by configure from --enable-backends).  Each target is probed with its
 # own assembler and linker, which is the whole point -- the answers describe that
 # toolchain, not this build.  A target whose tools are not installed is skipped
 # with a notice rather than silently omitted.
@@ -3121,7 +3121,7 @@ multi-target.multilib: multi-target.manifest $(srcdir)/gen-multilib-data.sh
 #
 # Each finished file is then handed to the driver's own read_specs, which is
 # the only checker that can fail the way a bad spec file fails.  Measured on
-# --enable-targets=all: 170 of 183 accepted, and all 13 rejections are one
+# --enable-backends=all: 170 of 183 accepted, and all 13 rejections are one
 # cause -- EXTRA_SPEC_FUNCTIONS.  arm's `target_mode_check', loongarch's
 # `driver_init' and avr's `double-lib' live in config/<cpu>/driver-<cpu>.cc,
 # which a single-target driver linked in through extra_gcc_objs and a
@@ -3514,7 +3514,7 @@ $(out_object_file): $(out_file)
 # until something selects one.  Deliberately NO -DTARGETM_COMMON_SYMBOL: this
 # file used to be compiled against the build triple's symbol so that it could
 # start `targetm_common' at that target's table, which both privileged one
-# target and made the selector fail to link whenever --enable-targets did not
+# target and made the selector fail to link whenever --enable-backends did not
 # name the build's own triple.  It now names no target at all.
 common/common-target-select.o: $(srcdir)/common/common-target-select.cc
 	$(COMPILE) $<

@@ -30,7 +30,7 @@ along with GCC; see the file COPYING3.  If not see
    removes: a missed target dependency behaves correctly on the build's own
    triple and wrongly everywhere else, which is precisely the bug class that
    cannot be found by testing.  And it made the SELECTOR depend on a symbol
-   only the build triple's back end defines, so `--enable-targets=LIST' that
+   only the build triple's back end defines, so `--enable-backends=LIST' that
    did not name the build's own triple failed to link -- `undefined reference
    to targetm_common_i386_common' -- for a target nobody had asked for.
 
