@@ -88,6 +88,83 @@
 #
 # In a single-target build no union file is passed, nothing below runs, and
 # options.h is byte-identical to what it was.
+#
+# ----------------------------------------------------------------------------
+# THE SAME DEFECT ONE LEVEL DOWN: `cl_optimization' AND `cl_target_option'
+# ----------------------------------------------------------------------------
+#
+# Measured in the same two-target build dir, after `struct gcc_options' was
+# unioned and while these two still were not:
+#
+#     cl_optimization    members   i386 544   aarch64 548
+#     cl_target_option   members   i386  57   aarch64  26
+#
+# `cl_optimization' is the worse of the two: aarch64's is LARGER than the one
+# the middle end allocates, so `cl_optimization_save' called from an aarch64
+# translation unit writes PAST the end of the object.  `cl_target_option' is
+# the in-bounds-but-wrong shape again, and it has a second edge the parent
+# commit did not: `cl_target_option_save' calls `targetm.target_option.save',
+# i.e. the back end writes into `ptr' through ITS header while options-save.cc
+# reads it back through the primary's.
+#
+# THE INDEXING RELATION, because it is what makes this not the same one-move
+# change as `struct gcc_options'.  Both structs end in
+#
+#     unsigned HOST_WIDE_INT explicit_mask[N];
+#
+# and NOTHING names a bit of it.  optc-save-gen.awk assigns bit (k,j) by
+# WALKING its own category arrays -- var_opt_other, var_opt_int, var_opt_enum,
+# var_opt_short, var_opt_char, var_opt_string, in that order, one bit per
+# member, j wrapping into k every 64 -- in `cl_optimization_save', and repeats
+# the identical walk in `cl_optimization_restore'.  So:
+#
+#   * the encoding is PRIVATE to options-save.cc.  Both ends of it are
+#     generated from one optionlist in one file, so a change of walk order is
+#     invisible as long as both ends change together.  It is not an ABI and
+#     nothing outside that file may index it.
+#   * what the two generators must agree on is the member SET, not the order:
+#     this script sizes N from ITS list and optc-save-gen.awk fills k from ITS
+#     list.  Sized here from the primary's list and filled there from a larger
+#     one is an out-of-bounds write with no diagnostic.
+#
+# So positional indexing does not make the union unsafe -- it makes the union
+# of the STRUCT ALONE insufficient.  Unioning the members here while
+# options-save.cc still walks the primary's list would give every base one
+# layout and then never save, restore, hash, compare or stream any other
+# base's members: silently dropped state, which is a worse failure than the
+# one being removed because it looks like it works.
+#
+# The fix is therefore in both scripts at once, off ONE list:
+#
+#   * the union list carries, in addition to the `struct gcc_options' member
+#     records, the RAW option records (kind `R') of every option any base
+#     flags Optimization, PerFunction or Save, the raw TargetSave declarations
+#     (kind `D') and the TargetVariable names (kind `X').
+#   * each consumer applies its OWN classification to those raw records, so
+#     the two scripts cannot drift apart in how a type is bucketed -- which
+#     they would if the list carried a category computed by one of them.
+#   * extras append to the END of the category they fall in, so within a
+#     category the primary's members keep their order.  Unlike `struct
+#     gcc_options', the primary's OFFSETS in these two structs do move: the
+#     members are printed category by category, so a category that grows
+#     shifts every later one.  That is sound precisely because of the indexing
+#     relation above -- nothing outside options-save.cc indexes these structs
+#     positionally, and options-save.cc is regenerated from the same list in
+#     the same build.  It is stated rather than hidden because it is the one
+#     property this change does NOT inherit from `struct gcc_options'.
+#   * optc-save-gen.awk emits a static assertion that its final k fits the N
+#     sized here, so a divergence between the two is a compile error rather
+#     than a stray write.
+#
+# `Init()' IS NOT CARRIED, DELIBERATELY.  A non-primary back end's members are
+# zero in `global_options_init' because `optc-gen.awk' builds that initialiser
+# from the primary's optionlist, where the other base's option is a stub with
+# no Init().  That is a defect, it is the next one aarch64 hits, and it does
+# NOT belong here: an Init() is DATA, not layout.  Carrying every base's
+# Init() into the one `global_options_init' would give the primary compiler
+# aarch64's defaults in aarch64's fields and i386's in i386's -- which is
+# right only if the initialiser is per-base, i.e. only once there is a
+# selector to choose one.  See the note in optc-gen.awk.
 
 # Record one member of `struct gcc_options'.  KIND is V (a Variable or
 # TargetVariable record), O (an option with Var()), S (a Target option with no
@@ -151,6 +228,10 @@ function read_union(   line, nf, f, key, n)
 	n_u_members = 0
 	n_u_includes = 0
 	n_bases = 0
+	n_u_R = 0
+	n_u_D = 0
+	n_u_X = 0
+	n_u_X_extra = 0
 	while ((getline line < union_file) > 0) {
 		if (line ~ /^base /) {
 			sub(/^base /, "", line)
@@ -166,6 +247,85 @@ function read_union(   line, nf, f, key, n)
 				u_include_seen[f[2]] = 1
 				u_include[n_u_includes++] = f[2]
 			}
+			continue
+		}
+		if (f[1] == "R") {
+			# Kept in file order, duplicates included: the
+			# consumers already refuse a second declaration of a
+			# variable they have seen (var_opt_seen /
+			# var_save_seen), and that is the same rule within a
+			# base and across bases.  A type disagreement between
+			# two bases for one variable cannot hide here -- an
+			# Optimization or Save variable is also a `struct
+			# gcc_options' member, so the V/O check above compares
+			# its full declaration first.
+			u_R[n_u_R++] = f[3]
+			u_R_name[f[2]] = 1
+			continue
+		}
+		if (f[1] == "D") {
+			# `TargetSave' and `TargetVariable' declarations, kept
+			# verbatim.  Two bases naming one field differently is
+			# the shared-numbering failure again, so it is refused
+			# rather than resolved: `arch' and `tune' are exactly
+			# the sort of name two back ends both want.
+			n = f[2]
+			sub(/^.*[ *]/, "", n)
+			sub(/\[.*\]$/, "", n)
+			if (n in u_D_by_name) {
+				if (u_D_by_name[n] != f[2])
+					union_fail("two back ends declare" \
+						   " cl_target_option field `" \
+						   n "' differently:\n  " \
+						   u_D_by_name[n] "\n  " f[2])
+				continue
+			}
+			u_D_by_name[n] = f[2]
+			u_D_seen[f[2]] = 1
+			u_D[n_u_D++] = f[2]
+			continue
+		}
+		if (f[1] == "X") {
+			if (f[2] in u_X_type) {
+				if (u_X_type[f[2]] != f[3])
+					union_fail("two back ends declare" \
+						   " target variable `" f[2] \
+						   "' as `" u_X_type[f[2]] \
+						   "' and `" f[3] "'")
+				continue
+			}
+			u_X_type[f[2]] = f[3]
+			u_X[n_u_X++] = f[2]
+			continue
+		}
+		if (f[1] == "E") {
+			# Merged into the global enum_type[] so that
+			# var_type_struct() answers the same for a record no
+			# matter which base is reading it.  enum_names[] is NOT
+			# extended: that drives what this header DECLARES, and
+			# another base's enum is declared by its own
+			# <cpu>-opts.h, which the `I' records already pull in.
+			if (f[2] in u_E_type) {
+				if (u_E_type[f[2]] != f[3])
+					union_fail("two back ends declare" \
+						   " Enum `" f[2] "' with type" \
+						   " `" u_E_type[f[2]] "' and `" \
+						   f[3] "'")
+				continue
+			}
+			u_E_type[f[2]] = f[3]
+			if (!(f[2] in enum_type))
+				enum_type[f[2]] = f[3]
+			else if (enum_type[f[2]] != f[3])
+				union_fail("Enum `" f[2] "' is `" \
+					   enum_type[f[2]] "' here and `" f[3] \
+					   "' in the union list")
+			continue
+		}
+		if (f[1] == "H") {
+			u_H_seen[f[2]] = 1
+			if (host_wide_int[f[2]] == "")
+				host_wide_int[f[2]] = "yes"
 			continue
 		}
 		if (f[1] != "V" && f[1] != "O" && f[1] != "S" && f[1] != "F")
@@ -214,6 +374,30 @@ function check_union_covers_self(   i, key)
 				   extra_h_includes[i] " and the union list" \
 				   " does not; the union's members would not" \
 				   " compile")
+	# The same stale-list check for the save/restore half.  Without it a
+	# list written before an option gained `Save' would silently produce a
+	# cl_target_option missing that member in every OTHER back end's
+	# header, which is the divergence this file exists to remove.
+	for (i = 0; i < n_opts; i++) {
+		if (!flag_set_p("(Optimization|PerFunction)", flags[i]) \
+		    && !flag_set_p("Save", flags[i]))
+			continue
+		if (!(opts[i] in u_R_name))
+			union_fail("back end `" union_base "' saves option `" \
+				   opts[i] "' and the union list has no `R'" \
+				   " record for it; the list is stale")
+	}
+	for (i = 0; i < n_target_save; i++)
+		if (!(target_save_decl[i] in u_D_seen))
+			union_fail("back end `" union_base "' declares" \
+				   " cl_target_option field `" \
+				   target_save_decl[i] "' and the union list" \
+				   " does not; the list is stale")
+	for (i = 0; i < n_extra_target_vars; i++)
+		if (!(extra_target_vars[i] in u_X_type))
+			union_fail("back end `" union_base "' declares target" \
+				   " variable `" extra_target_vars[i] "' and" \
+				   " the union list does not; the list is stale")
 }
 
 # Build the member list this back end's own records describe.  The four loops
@@ -301,6 +485,29 @@ if (list_mode != "") {
 		print "I\t" extra_h_includes[i]
 	for (i = 0; i < n_members; i++)
 		print member_line(member_order[i])
+	# The save/restore half of the list: RAW records, not derived members.
+	# See the header note -- a category computed here and consumed there is
+	# exactly the drift this avoids.
+	for (i = 0; i < n_opts; i++)
+		if (flag_set_p("(Optimization|PerFunction)", flags[i]) \
+		    || flag_set_p("Save", flags[i]))
+			print "R\t" opts[i] "\t" flags[i]
+	for (i = 0; i < n_target_save; i++)
+		print "D\t" target_save_decl[i]
+	for (i = 0; i < n_extra_target_vars; i++)
+		print "X\t" extra_target_vars[i] "\t" extra_target_var_types[i]
+	# An `R' record is not self-contained: var_type_struct() resolves
+	# Enum(name=X) through enum_type[] and UInteger through
+	# host_wide_int[], both built from THIS back end's Enum and Variable
+	# records.  Another base reading the raw record without them typed
+	# `Enum(aarch64_early_ra_scope)' as the empty string and produced a
+	# member with no type at all -- which is what made the first two
+	# unioned headers differ, and it compiled as far as the diff.
+	for (i = 0; i < n_enums; i++)
+		print "E\t" enum_names[i] "\t" enum_type[enum_names[i]]
+	for (i in host_wide_int)
+		if (host_wide_int[i] == "yes")
+			print "H\t" i
 	exit 0
 }
 
@@ -308,6 +515,63 @@ if (union_file != "") {
 	read_union()
 	check_union_covers_self()
 }
+
+# The record sets the two save/restore structs are built from.  With a union
+# list this is the LIST's order, for every back end alike -- not this back
+# end's records followed by the others'.  That distinction is the whole
+# property: "own first, extras appended" gives each base a different order
+# (its own members early, everyone else's late), which is a per-base layout
+# again wearing a union's member count.  Measured that way before it was
+# fixed: 551 members in both headers, `x_ix86_vect_compare_costs' at different
+# offsets in each.  The list is primary-first and deduplicated by first
+# appearance, so the primary's records still come first and keep their order.
+n_sv = 0
+if (union_file != "") {
+	for (i = 0; i < n_u_R; i++)
+		sv_flags[n_sv++] = u_R[i]
+} else {
+	for (i = 0; i < n_opts; i++)
+		sv_flags[n_sv++] = flags[i]
+}
+
+# ABSENCE IS NEVER AN ANSWER, and this is the one place it could still get in.
+# var_type_struct() returns `enum_type[en] " "' for an Enum option, i.e. the
+# single space " " when the Enum record is missing -- and a missing Enum record
+# is exactly what a union list without the `E' kind produces for every base but
+# the owning one.  The member then reads `  x_aarch64_early_ra;', which is a
+# legal C declaration of an int, in a header that otherwise looks right.
+for (i = 0; i < n_sv; i++) {
+	if (!flag_set_p("(Optimization|PerFunction)", sv_flags[i]) \
+	    && !flag_set_p("Save", sv_flags[i]))
+		continue
+	if (var_name(sv_flags[i]) == "")
+		continue
+	if (var_type_struct(sv_flags[i]) ~ /^ *$/)
+		union_fail("no type for `x_" var_name(sv_flags[i]) "': its" \
+			   " Enum() has no `E' record in the union list, so" \
+			   " the member would be declared with no type at all")
+}
+
+n_sd = 0
+if (union_file != "") {
+	for (i = 0; i < n_u_D; i++)
+		sd_decl[n_sd++] = u_D[i]
+} else {
+	for (i = 0; i < n_target_save; i++)
+		sd_decl[n_sd++] = target_save_decl[i]
+}
+
+# Only the COUNT of these is wanted here (it sizes cl_target_option's
+# explicit_mask); `extra_target_vars' itself is left alone because
+# `find_index' searches it when handing out target-variable mask bits, and
+# lengthening that search would let another base's name answer for this one.
+n_sx = (union_file != "" ? n_u_X : n_extra_target_vars)
+
+# `have_save' was set by collect_members() from this back end's records alone;
+# another base may be the one with Save options.
+for (i = 0; i < n_sv; i++)
+	if (flag_set_p("Save", sv_flags[i]))
+		have_save = 1
 
 print "/* This file is auto-generated by opth-gen.awk.  */"
 print ""
@@ -417,9 +681,9 @@ var_opt_char[1] = "unsigned char x_optimize_size";
 var_opt_char[2] = "unsigned char x_optimize_debug";
 var_opt_char[3] = "unsigned char x_optimize_fast";
 
-for (i = 0; i < n_opts; i++) {
-	if (flag_set_p("(Optimization|PerFunction)", flags[i])) {
-		name = var_name(flags[i])
+for (i = 0; i < n_sv; i++) {
+	if (flag_set_p("(Optimization|PerFunction)", sv_flags[i])) {
+		name = var_name(sv_flags[i])
 		if(name == "")
 			continue;
 
@@ -428,7 +692,7 @@ for (i = 0; i < n_opts; i++) {
 
 		var_opt_seen[name]++;
 		n_opt_explicit++;
-		otype = var_type_struct(flags[i]);
+		otype = var_type_struct(sv_flags[i]);
 		if (otype ~ "^((un)?signed +)?int *$")
 			var_opt_int[n_opt_int++] = otype "x_" name;
 
@@ -482,30 +746,30 @@ n_target_short = 0;
 n_target_int = 0;
 n_target_enum = 0;
 n_target_other = 0;
-n_target_explicit = n_extra_target_vars;
+n_target_explicit = n_sx;
 n_target_explicit_mask = 0;
 
-for (i = 0; i < n_target_save; i++) {
-	if (target_save_decl[i] ~ "^((un)?signed +)?int +[_" alnum "]+$")
-		var_target_int[n_target_int++] = target_save_decl[i];
+for (i = 0; i < n_sd; i++) {
+	if (sd_decl[i] ~ "^((un)?signed +)?int +[_" alnum "]+$")
+		var_target_int[n_target_int++] = sd_decl[i];
 
-	else if (target_save_decl[i] ~ "^((un)?signed +)?short +[_" alnum "]+$")
-		var_target_short[n_target_short++] = target_save_decl[i];
+	else if (sd_decl[i] ~ "^((un)?signed +)?short +[_" alnum "]+$")
+		var_target_short[n_target_short++] = sd_decl[i];
 
-	else if (target_save_decl[i] ~ "^((un)?signed +)?char +[_ " alnum "]+$")
-		var_target_char[n_target_char++] = target_save_decl[i];
+	else if (sd_decl[i] ~ "^((un)?signed +)?char +[_ " alnum "]+$")
+		var_target_char[n_target_char++] = sd_decl[i];
 
-	else if (target_save_decl[i] ~ ("^enum +[_" alnum "]+ +[_" alnum "]+$")) {
-		var_target_enum[n_target_enum++] = target_save_decl[i];
+	else if (sd_decl[i] ~ ("^enum +[_" alnum "]+ +[_" alnum "]+$")) {
+		var_target_enum[n_target_enum++] = sd_decl[i];
 	}
 	else
-		var_target_other[n_target_other++] = target_save_decl[i];
+		var_target_other[n_target_other++] = sd_decl[i];
 }
 
 if (have_save) {
-	for (i = 0; i < n_opts; i++) {
-		if (flag_set_p("Save", flags[i])) {
-			name = var_name(flags[i])
+	for (i = 0; i < n_sv; i++) {
+		if (flag_set_p("Save", sv_flags[i])) {
+			name = var_name(sv_flags[i])
 			if(name == "")
 				name = "target_flags";
 
@@ -514,10 +778,10 @@ if (have_save) {
 
 			var_save_seen[name]++;
 			n_target_explicit++;
-			otype = var_type_struct(flags[i])
+			otype = var_type_struct(sv_flags[i])
 
-			if (opt_args("Mask", flags[i]) != "" \
-			    || opt_args("InverseMask", flags[i]))
+			if (opt_args("Mask", sv_flags[i]) != "" \
+			    || opt_args("InverseMask", sv_flags[i]))
 				var_target_explicit_mask[n_target_explicit_mask++] \
 				    = otype "explicit_mask_" name;
 

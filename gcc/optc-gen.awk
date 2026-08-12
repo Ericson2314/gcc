@@ -231,6 +231,36 @@ print ""
 # everybody's, and nothing here can diagnose that.  Put the floor in Init() and
 # set the real default from TARGET_OPTION_INIT_STRUCT.  See "Init(value)" in
 # doc/options.texi, and mips_option_init_struct for the worked example.
+#
+# MULTI-TARGET, AND WHY Init() IS NOT UNIONED HERE.
+#
+# This is a POSITIONAL brace initializer.  `struct gcc_options' now has the
+# union layout (opth-gen.awk), and this list is still built from the primary
+# back end's optionlist, so it initialises the union's leading run and leaves
+# the tail value-initialised.  That is well defined only because the union is
+# first-appearance order with the primary FIRST -- the leading run IS the
+# primary's member list, in order.  Anything that reorders the union breaks
+# this silently, with a type-compatible value landing in the wrong member; the
+# check is that `head -<n primary members>' of the union list still equals the
+# primary's own list.
+#
+# The tail being zero is a real defect: a non-primary back end sees 0 where its
+# .opt file said Init(...).  It is NOT fixed by carrying Init() into this list,
+# and the reason is not tidiness:
+#
+#   * an Init() argument is a back-end MACRO, not a value.  aarch64.opt says
+#     Init(AARCH64_ABI_DEFAULT), which config/aarch64/aarch64.h defines -- i.e.
+#     that base's tm.h.  This file is compiled with the PRIMARY's tm.h, where
+#     the name does not exist.
+#   * worse than not existing: DEFAULT_LARGE_SECTION_THRESHOLD is defined by
+#     config/i386/i386.h as 65536 and by config/i386/rdos64.h as 16.  A name
+#     that resolves to some other configuration's definition compiles clean and
+#     is wrong, which is the failure shape this whole branch is removing.
+#
+# So Init() is DATA and belongs where that base's tm.h is in scope: a per-base
+# `global_options_init_<base>' emitted into the back end's own translation
+# unit, with the selector choosing one at startup.  That is the selector's
+# commit, not this one.  Layout is what is settled here.
 print "const struct gcc_options global_options_init =\n{"
 for (i = 0; i < n_extra_vars; i++) {
 	var = extra_vars[i]

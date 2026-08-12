@@ -3352,9 +3352,16 @@ options.cc: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
 	       -f $(srcdir)/optc-gen.awk \
 	       -v header_name="config.h system.h coretypes.h options.h tm.h" < $< > $@
 
+# `cl_optimization' and `cl_target_option' get their layout from options.h and
+# their save/restore/hash/stream code from here, so BOTH have to be built from
+# the same option set: see the explicit_mask note at the top of
+# optc-save-gen.awk.  $(OPTIONS_UNION_FLAGS) is defined below with the
+# s-options-h rule and is empty in a single-target build.
 options-save.cc: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
-    $(srcdir)/optc-save-gen.awk
+    $(srcdir)/optc-save-gen.awk $(MT_OPTIONS_UNION_LIST)
+	@$(check_options_union_base)
 	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \
+	       $(OPTIONS_UNION_FLAGS) \
 	       -f $(srcdir)/optc-save-gen.awk \
 	       -v header_name="config.h system.h coretypes.h tm.h" < $< > $@
 
