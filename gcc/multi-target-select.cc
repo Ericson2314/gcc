@@ -504,6 +504,18 @@ multi_target_select (const char *target)
 			  MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE,
 			  MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN);
 
+	/* The frame and argument-register answers ride on the same table; see
+	   target-frame.h.  Checked rather than assumed: the pointer is filled
+	   in by the same per-base translation unit that defines the table, so
+	   a null one means an object built before that field existed is being
+	   linked, which is the stale-object failure described above wearing a
+	   different symptom.  */
+	targetm_frame = targetm_cumargs->frame;
+	if (targetm_frame == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no frame table attached; its objects predate "
+			  "target-frame.h and are from a different build", base);
+
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
 	   a link-time one rather than a design preference.  Their tables call

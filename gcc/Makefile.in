@@ -1186,7 +1186,18 @@ GIMPLE_H = gimple.h gimple.def gsstruct.def $(VEC_H) \
 	tree-ssa-alias.h $(INTERNAL_FN_H) $(HASH_TABLE_H) is-a.h
 GCOV_IO_H = gcov-io.h version.h auto-host.h gcov-counter.def
 RECOG_H = recog.h $(TREE_H)
-EMIT_RTL_H = emit-rtl.h
+# `emit-rtl.h' includes `mt-cumulative-args.h', which includes the GENERATED
+# `multi-target-reg-widths.h'.  Both must be named here or make has no reason
+# to build the generated one first, and no reason to rebuild anything when it
+# changes.  #109: the only ordering that existed was
+# `$(ALL_HOST_OBJS) : | $(generated_files)', which is order-only (so a STALE
+# widths header never triggered a rebuild) and covers HOST objects only (so
+# `build/gencondmd.o', which reaches emit-rtl.h, raced it and lost).  The two
+# symptoms are `multi-target-reg-widths.h: No such file or directory' in a
+# fresh build dir and `MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE was not
+# declared in this scope' in a dir whose widths header predates 2ef489d0984.
+# Same missing edge, read from two different starting states.
+EMIT_RTL_H = emit-rtl.h mt-cumulative-args.h multi-target-reg-widths.h
 FLAGS_H = flags.h flag-types.h $(OPTIONS_H)
 OPTIONS_H = options.h flag-types.h $(OPTIONS_H_EXTRA)
 FUNCTION_H = function.h $(HASHTAB_H) $(TM_H) hard-reg-set.h \
@@ -3732,7 +3743,7 @@ target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
 # and IN OBJS rather than in the c-family list: function.o, calls.o, expr.o,
 # dse.o and var-tracking.o are all in libbackend.a, so lto1 needs this too.
 target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
-  $(srcdir)/target-cumargs.h
+  $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
@@ -4386,6 +4397,9 @@ build/hash-table.o : hash-table.cc $(BCONFIG_H) $(SYSTEM_H)		\
 build/sort.o : sort.cc $(BCONFIG_H) $(SYSTEM_H)
 build/inchash.o : inchash.cc $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H)	\
   $(HASHTAB_H) inchash.h
+# DELIBERATELY NOT a prerequisite of multi-target-reg-widths.h, although
+# gencondmd.cc does include emit-rtl.h: that edge is one arc of the #109 cycle
+# (see mt-cumulative-args.h).  Generators are cut out of the bound instead.
 build/gencondmd.o : build/gencondmd.cc $(BCONFIG_H) $(SYSTEM_H)		\
   $(CORETYPES_H) $(GTM_H) insn-constants.h				\
   $(filter-out insn-flags.h, $(RTL_H) $(TM_P_H) $(FUNCTION_H) $(REGS_H) \

@@ -1641,3 +1641,224 @@ entry about apostrophes for a reason.  Not mine; not fixed.
     t88-vx-before.sh #104 reconstructed from a working build dir
     t88-bothsided.sh one option, owner and stub, from the per-base tables
     t88-ts.sh        target-specs/configure per target (t106-ts.sh repointed)
+
+# TASK #108 -- SIX FRAME/ARG MACROS + WALL B DIAGNOSED: LANDED (`e0f16c96cbd`)
+
+Branched from `02ede30de42` ("PRINCIPLES: the stderr floor varies...").  Build
+dirs `/tmp/b108` (main) and `/tmp/b108f` (fresh-dir acceptance for #109),
+x86_64-pc-linux-gnu + aarch64-unknown-linux-gnu.
+
+## THE SIX, WITH DISPOSITIONS -- ALL SIX CONVERTED
+
+    STACK_BOUNDARY                 -> mt_stack_boundary ()
+    PREFERRED_STACK_BOUNDARY       -> mt_preferred_stack_boundary ()
+    STACK_SLOT_ALIGNMENT           -> mt_stack_slot_alignment ()
+    MINIMUM_ALIGNMENT              -> mt_minimum_alignment ()
+    OUTGOING_REG_PARM_STACK_SPACE  -> mt_outgoing_reg_parm_stack_space ()
+    FUNCTION_ARG_REGNO_P           -> mt_function_arg_regno_p ()
+
+New `gcc/target-frame.h` (struct + shared entry points); supply side in
+`target-cumargs.cc` (per base, `-I<base>-inc`); selector in
+`target-cumargs-select.cc`; redirect in `defaults.h`'s existing guard block.
+The frame table hangs off `target_cumargs_desc` rather than getting its own
+registry, because the registry is emitted by `gen-multi-target-md.awk` and
+that file was under concurrent edit.  ZERO `config/` files edited.
+
+`nm -uC function.o`:  **8 -> 3** undefined `ix86_*`.
+
+None of the six is an existence predicate; all six are values or functions the
+selected back end computes at run time, which is what made them tractable.
+They are calls and NOT `target-cdata` fields for a reason already in the tree:
+target-cdata.h records `STACK_BOUNDARY` as one of six macros out of thirty-five
+MEASURED not invariant under `__attribute__((target))`, because i386's reaches
+`ix86_cfun_abi ()`, which reads `cfun`.  Four of the other five take arguments.
+
+## A CORRECTION TO THE BRIEF: `ix86_cfun_abi` IS NOT FROM `STACK_BOUNDARY`
+
+The brief mapped `ix86_cfun_abi` -> `STACK_BOUNDARY` via `TARGET_64BIT_MS_ABI`.
+That path is real, and converting STACK_BOUNDARY closed it -- and the symbol
+is STILL THERE, because `function.cc` also spells `ACCUMULATE_OUTGOING_ARGS`
+(three times, in `STACK_DYNAMIC_OFFSET`), and i386.h:1647 defines that to an
+expression containing `TARGET_64BIT_MS_ABI`.
+
+So PRINCIPLES 7's "a symbol's name does not tell you which macro pulled it in"
+has a stronger form: **ONE SYMBOL CAN HAVE SEVERAL MACRO PATHS, and converting
+the one you were told about leaves the symbol in place.**  Only `nm -uC` after
+the change tells you.
+
+Worse, `ACCUMULATE_OUTGOING_ARGS` also dereferences `cfun->machine->func_type`
+-- i386's `machine_function` layout applied to whatever back end is selected.
+It is a value macro, so it is tractable, and it is not on anyone's list yet.
+
+## THE THREE REMAINING `ix86_*` IN `function.o`
+
+    ix86_cfun_abi              ACCUMULATE_OUTGOING_ARGS   (new, tractable)
+    ix86_push_rounding         PUSH_ROUNDING              (#87, not mine)
+    ix86_reg_parm_stack_space  REG_PARM_STACK_SPACE       (#87, not mine)
+
+## AN INSTRUMENT NOTE THAT CORRECTS PRINCIPLES 7
+
+PRINCIPLES 7 says plain `nm -u` "scores 0 on nine of ten" of these.  Measured
+here: `nm -u function.o | grep ix86_` scores **3**, the same as `nm -uC`,
+because the MANGLED name `_Z13ix86_cfun_abiv` still CONTAINS the substring
+`ix86_`.  The 0 is real only for a grep that anchors or word-matches
+(`grep -w`, `^ix86_`).  Use `nm -uC` regardless -- it is the readable one --
+but the failure mode is the PATTERN, not `nm -u` itself.
+
+## WALL B: IT IS A LEAK, BUT OF A KIND NOT YET ON THE LIST -- AN *ABSENCE*
+
+aarch64 still stops at `aarch64_set_current_function`, rc=4, 30 bytes.  It did
+not move, and the six had nothing to do with it.  DIAGNOSED FROM THE FAULTING
+INSTRUCTION, not inferred:
+
+    1009c53:  mov  0xa0(%r12),%rax   ; fn = DECL_STRUCT_FUNCTION (fndecl)
+    1009c5b:  test %rax,%rax
+    1009c5e:  je   ...               ; the `if (fn)' guard that IS there
+    1009c64:  mov  0x70(%rax),%rax   ; rax = fn->machine
+    1009c68:  movl $0x6,0x7b0(%rax)  ; fn->machine->pcs = ARM_PCS_UNKNOWN
+
+`fn` is checked, `fn->machine` is not, and `fn->machine` is NULL.  Cause:
+
+    aarch64.h:1052   #define INIT_EXPANDERS aarch64_init_expanders ()
+    aarch64.cc:20604 aarch64_init_expanders sets init_machine_status
+    emit-rtl.cc:6038 #ifdef INIT_EXPANDERS ... INIT_EXPANDERS;
+
+`emit-rtl.cc` is SHARED, compiled against the primary's tm.h, and **i386
+defines no `INIT_EXPANDERS` at all**.  So the `#ifdef` is false, aarch64's
+`init_machine_status` is never installed, `cfun->machine` is never allocated,
+and aarch64's own code writes to `NULL + 0x7b0`.
+
+**This runs OPPOSITE to every previous wall.**  Those were "the primary's
+ANSWER leaking to everyone".  This is "the primary's SILENCE suppressing a
+back end's own initialisation" -- the primary defines nothing, so a feature 13
+back ends have is switched off for all of them.  Same root as `HAVE_V8HFmode`
+(one authority answering for many) but in a third direction.
+
+    13 back ends define INIT_EXPANDERS: aarch64 arc arm avr cris csky
+    epiphany ia64 m32r mmix nds32 sparc visium.  i386 is not among them.
+
+So aarch64's next wall is an EXISTENCE PREDICATE -- `#ifdef` in shared code --
+i.e. the #87 family the brief fenced off.  **aarch64 cannot get further until
+#87 is addressed**; no amount of value-macro conversion reaches it.  That is
+also why #107 and #108 both moved the frame without moving the verdict.
+
+## SCOREBOARD -- AND WHY I AM NOT BANKING THE SIX GREEN ARMS
+
+    230 header arms: i386 115 PASS / 0 FAIL      (unchanged)
+                     aarch64 11 PASS / 104 FAIL  (was 5 / 110)
+    58 TAB arms:     i386 29 / 0, aarch64 24 / 5 (unchanged, verdict by verdict)
+
+The six new aarch64 PASSes are exactly my six macros, and **all six are
+VACUOUS**.  From `/tmp/mtp108/results.txt`:
+
+    aarch64 STACK_BOUNDARY EXP PASS
+      mt=[(mt_stack_boundary ())]  ref=[(mt_stack_boundary ())]
+
+The probe's "base B" context is `-Iaarch64-inc -I.` and does NOT define
+`MULTI_TARGET_TARGETM_BASE`, so defaults.h redirects there too and the arm
+compares the redirect with itself.  This is precisely the wrong-reason flip
+PRINCIPLES 4 names: "an arm turning green because both bases now expand to the
+same target-neutral text ... retire it as CONVERTED_CDATA with a TAB arm,
+never bank it."  **Read the honest aarch64 figure as 5 PASS / 104 FAIL + 6
+retired-pending.**  The six need TAB arms from the probe-harness owner; I did
+not edit the harness.
+
+The real both-sided evidence for the six is at the object level instead
+(`scratchpad/t108-evidence.sh`):
+
+    target-cumargs-i386.o     8 ix86_* refs, 0 aarch64_*
+    target-cumargs-aarch64.o  0 ix86_* refs, 3 aarch64_*
+    target-cumargs-select.o   defines all 6 mt_* entry points
+    function.o                references all 6, and no longer the i386 ones
+
+`INCOMING_STACK_BOUNDARY` is now a genuine RED arm that used to be masked:
+`mt=[ix86_incoming_stack_boundary] ref=[(mt_preferred_stack_boundary ())]`.
+i386 defines it to a VARIABLE; aarch64 inherits defaults.h's
+PREFERRED_STACK_BOUNDARY.  It is the obvious seventh macro and it is tractable.
+
+## #109 -- THE FILED CAUSE IS WRONG, AND THE REAL ONE IS A CYCLE
+
+The brief-time claim was "nothing invokes gen-reg-widths.sh; there is no rule".
+**There is a rule.**  `gen-multi-target-md.awk:1138` emits it and
+`multi-target-md.mk:1550` carries it; `grep -rln gen-reg-widths` finds the awk.
+(Both the coordinator's grep and my first one missed it to `| head`
+truncation -- a genuine instrument false negative, PRINCIPLES 4 rule 4.)
+
+The rule is UNREACHABLE, because the prerequisite chain closes a cycle:
+
+    multi-target-reg-widths.h -> mt-<base>/reg-probe.o -> <base>-inc/s-inc
+      -> insn-*.h -> build/gencondmd-<triple> -> emit-rtl.h
+      -> mt-cumulative-args.h -> multi-target-reg-widths.h
+
+No ordering edge can fix a cycle, and I tried one first (adding the header to
+`build/gencondmd.o`) -- it moved the failure to the per-base gencondmd objects.
+**That edit is reverted, with a comment saying why, so nobody re-adds it.**
+
+Cut at the only wrong arc: a GENERATOR is single-target by construction (which
+defaults.h already says in its GENERATOR_FILE exemption), so under
+`GENERATOR_FILE` the union bound is that one base's own `CUMULATIVE_ARGS`.
+That is the same arithmetic over a set of size one -- not a fabricated default
+-- and `MT_INCOMING_ARGS_PAD` comes out as 1 with both assertions holding at
+equality, exactly as they do for the largest base in a real build.
+
+Second half: `EMIT_RTL_H` now names `mt-cumulative-args.h` and
+`multi-target-reg-widths.h`.  The only ordering that existed was
+`$(ALL_HOST_OBJS) : | $(generated_files)`, which is ORDER-ONLY -- so a stale
+widths header never triggered a rebuild, which is the coordinator's observed
+symptom (`MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE was not declared`).  Two
+symptoms, one missing edge, read from two different starting states.
+
+ACCEPTANCE: `/tmp/b108f`, a genuinely fresh directory, generated
+`multi-target-reg-widths.h` by itself with no hand-run of the script, and
+built `cc1` and `lto1`, rc=0.
+
+## GUARDS, 4/4 SEEN FIRING -- `scratchpad/t108-guards.sh`
+
+    0 CONTROL      aarch64 target-cumargs.cc compiles          rc=0
+    1 SHARED-CALL  static_assert(STACK_BOUNDARY==128) in a     FAILS naming
+                   MIDDLE-END TU                               mt_stack_boundary
+    2 BASE-EXEMPT  the same assertion in aarch64's OWN TU      rc=0
+    3 NON-VACUITY  the same assertion against 64, aarch64 TU   FAILS by name
+
+Arms 1 and 2 are the two sides of the defaults.h fence; if both passed, the
+redirect would be reaching back ends too.  Arm 3 exists because an assertion
+that is never evaluated also does not fail.  Compiled BY HAND, as #107's were.
+
+## REGRESSION BARS, ALL MEASURED
+
+  * `make multi-target-objs cc1 lto1` rc=0; **`lto1` links**.
+  * x86_64: rc=0, 12369 bytes, md5 `378fc33c1e70` -- BYTE-IDENTICAL to baseline.
+  * aarch64: rc=4, 30 bytes -- unchanged, and now explained (see Wall B).
+  * stock-compare, `IN=/tmp/acc2/t.c` absolute, `MT=/tmp/b108`: **5/5
+    IDENTICAL**, 5 distinct md5 per side, negative control firing, rc=0.
+  * Incremental no-op stderr: **32 lines, 0 warnings** -- 8 `is unchanged` +
+    24 `'@' is redundant` from aarch64 `.md`.  This dir DOES show the 24 that
+    /tmp/b107 did not, confirming the PRINCIPLES 6 note from the other side.
+
+## FILES (scratchpad)
+
+    t108-build.sh      build harness (SRC/D repointed at this worktree)
+    t108-go.sh         wrapper: logs to $LOG.log/$LOG.err
+    t108-run.sh        both targets through cc1; verdict = rc
+    t108-ts.sh         target-specs configure per target (run LAST)
+    t108-reconf-gcc.sh reconfigure gcc/ after a Makefile.in edit
+    t108-evidence.sh   the both-sided nm -uC object-level evidence
+    t108-guards.sh     the four fail-by-name arms above
+
+## TRAPS PAID FOR THIS TASK
+
+  1. **`pgrep -f` matched my own poller**, so `until ! pgrep -f X` never
+     exits.  PRINCIPLES 5 warns of this and I still paid it twice.  Poll a PID.
+  2. `t10*-build.sh` defaults to `SUB=gcc`, so `all-gcc` gives
+     `No rule to make target` -- it is a TOP-LEVEL target.  Use `cc1 lto1`.
+  3. A `| head` on a `grep -rn` produced a confident false "no rule exists".
+     Use `grep -rln` when the question is "does this appear anywhere".
+
+## WHAT I DID NOT DO
+
+`PUSH_ROUNDING` and `REG_PARM_STACK_SPACE` untouched, as instructed.  I did
+NOT edit the probe harness, `gen-multi-target-md.awk` or `opt*-gen.awk`.  The
+per-base `build/gencondmd-<triple>.o` objects still have no dependency on
+`multi-target-reg-widths.h` -- harmless now the cycle is cut, but if anyone
+re-introduces that edge it must go in the awk, since no triple-id list
+variable is visible from `Makefile.in`.
