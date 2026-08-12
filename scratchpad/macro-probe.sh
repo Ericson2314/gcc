@@ -163,7 +163,31 @@ for n in $ALL; do
     || die "$n is probed but has no status in $STATUS"
 done
 RETIRED=""
-for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_SUPPLY") {print $1}' "$STATUS"); do
+# CONVERTED_CDATA -- A THIRD STATUS, AND THE REASON FOR IT IS A FALSE GREEN
+# THAT WAS CAUGHT RATHER THAN BANKED.
+#
+# The rule above was written for arms that DISAPPEAR.  A (c-DATA) conversion
+# does something the rule did not anticipate: it turns a failing arm GREEN, for
+# entirely the wrong reason.  `defaults.h' redirects the macro to a per-config
+# slot, so in BOTH bases' header contexts the name now expands to the same
+# target-neutral text, and the EXP probe -- correctly, on its own terms --
+# reports agreement.  Measured, on the first run after Stage 2:
+#
+#   before   aarch64 ASM_COMMENT_START STR  FAIL  mt=[23] ref=[2f2f]
+#   after    aarch64 ASM_COMMENT_START EXP  PASS  mt=[(targetm_cdata.asm_...)]
+#                                                 ref=[(targetm_cdata.asm_...)]
+#
+# Four aarch64 arms flipped FAIL -> PASS that way, taking the aarch64 column
+# from 2 to 6.  Every one of those four passes says only "both headers agree
+# that this macro is now a redirect" -- which is true, and is not what the arm
+# was measuring.  Banking them would have been a floor built out of progress.
+#
+# So a (c-DATA) macro's header arm is RETIRED, exactly as a hook conversion's
+# is, and its TAB arm is mandatory by the same mechanical check.  The three
+# statuses now say three different things about one question -- does the header
+# probe still measure this macro's VALUE? -- and the answer for CONVERTED_CDATA
+# is no.
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_SUPPLY" || $2=="CONVERTED_CDATA") {print $1}' "$STATUS"); do
   case " $TAB_COVERED " in
     *" $n "*) ;;
     *) die "$n is marked CONVERTED in $STATUS but tab-probe.sh does not cover \
@@ -171,7 +195,7 @@ it.  A macro may only move UNCONVERTED -> CONVERTED together with its TAB arm; \
 without one it would simply disappear from the score." ;;
   esac
 done
-for n in $(awk '$1 !~ /^#/ && $2=="CONVERTED_GONE" {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
 echo "status: $(awk '$1 !~ /^#/ && $2=="UNCONVERTED"' "$STATUS" | wc -l) unconverted, \
 $(awk '$1 !~ /^#/ && $2 ~ /^CONVERTED/' "$STATUS" | wc -l) converted (all covered by TAB); \
 retiring from the header probe:${RETIRED:- none}"

@@ -2142,6 +2142,7 @@ OBJS = \
 	target-asm-ops-select.o \
 	$(MULTI_TARGET_ASM_OPS_OBJS) \
 	target-addr-select.o \
+	target-cdata-select.o \
 	$(ANALYZER_OBJS) \
 	$(host_hook_obj)
 
@@ -3583,6 +3584,15 @@ target-addr-select.o: $(srcdir)/target-addr-select.cc $(srcdir)/target-addr.h
 	  echo "  so there is no primary target-addr table to point at" >&2; \
 	  exit 1; }
 	$(COMPILE) -DTARGETM_ADDR_SYMBOL=targetm_addr_$(multi_target_base) $<
+	$(POSTCOMPILE)
+
+# The (c-DATA) selector; see target-cdata.h.  No -D and so no guard: unlike the
+# two rules above there is no primary table to name here.  `targetm_cdata'
+# starts as a self-naming POISON rather than as the primary's values, precisely
+# so that a missed refresh cannot be correct on the build machine and wrong
+# everywhere else.
+target-cdata-select.o: $(srcdir)/target-cdata-select.cc $(srcdir)/target-cdata.h
+	$(COMPILE) $<
 	$(POSTCOMPILE)
 #
 # Generate header and source files from the machine description,

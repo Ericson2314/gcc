@@ -1870,4 +1870,47 @@ typedef TARGET_UNIT target_unit;
 #define COLLECT2_OPTIONS_MAX_LENGTH 1024
 #endif
 
+/* ------------------------------------------------------------------------
+   (c-DATA): REDIRECT THE CONFIG-INVARIANT TARGET MACROS TO PER-CONFIG SLOTS.
+
+   This block is LAST in defaults.h on purpose, and defaults.h is included at
+   the end of every tm header, so by here every back end's definition and every
+   fallback above has been made.  What is redirected is therefore the final
+   answer for the primary base -- which is exactly the answer that must stop
+   being used by target-independent code.
+
+   WHY A `#undef' RATHER THAN A HOOK.  These macros denote a VALUE that is
+   settled once options are processed, not code.  One slot per configuration,
+   written once, read as a single load, is cheaper than what is here today --
+   i386's `SIZE_TYPE' is a load, a test and a select -- and it needs no
+   `target.def' entry, which is what keeps Stage 2 off the ~86-hook bill.
+
+   THE GUARD IS THE WHOLE DESIGN.  `MULTI_TARGET_TARGETM_BASE' is defined by
+   the build for exactly those objects compiled FOR a particular back end (see
+   MULTI_TARGET_RENAME_NAMES in Makefile.in and gen-multi-target-md.awk).
+   Those translation units must keep the real macros: they are how the values
+   are supplied in the first place, and a back end reading a redirected macro
+   would be reading its own answer back through a global.  Everything else --
+   the middle end, the front ends, `libbackend' -- is compiled once, against
+   the PRIMARY's tm.h, and is precisely the code that must not be.
+
+   ONLY MEASURED-INVARIANT MACROS MAY BE ADDED HERE.  See target-cdata.h: six
+   of the thirty-five candidates vary with `__attribute__((target))', and one
+   of those placed here would freeze at its command-line value with no
+   diagnostic.  */
+#ifdef MULTI_TARGET_TARGETM_BASE
+/* A back end's own translation unit: keep the real macros.  */
+#else
+#include "target-cdata.h"
+
+#undef ASM_COMMENT_START
+#define ASM_COMMENT_START (targetm_cdata.asm_comment_start)
+#undef WCHAR_TYPE
+#define WCHAR_TYPE (targetm_cdata.wchar_type)
+#undef SIZE_TYPE
+#define SIZE_TYPE (targetm_cdata.size_type)
+#undef PTRDIFF_TYPE
+#define PTRDIFF_TYPE (targetm_cdata.ptrdiff_type)
+#endif
+
 #endif  /* ! GCC_DEFAULTS_H */

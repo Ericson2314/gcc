@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "opts.h"
 #include "target-caps.h"
 #include "target-asm-ops.h"
+#include "target-cdata.h"
 #include "opts-diagnostic.h"
 #include "stringpool.h"
 #include "attribs.h"
@@ -1301,6 +1302,20 @@ process_options ()
   input_location = UNKNOWN_LOCATION;
   targetm.target_option.override ();
   input_location = saved_location;
+
+  /* The (c-DATA) slots, filled from the SELECTED back end's own macros.  See
+     target-cdata.h.
+
+     HERE, and the position is the whole of the correctness argument.  These
+     values read option state -- i386's SIZE_TYPE is `(TARGET_LP64 ? ... )' --
+     so they cannot be read before `targetm.target_option.override ()' has run,
+     which is the line above.  And nothing may read a redirected macro before
+     this point: `init_asm_output' prints ASM_COMMENT_START into the assembly
+     file, and it runs in `lang_dependent_init', later.  Until this line the
+     slots hold a self-naming poison rather than the primary's values, so a use
+     that crept in earlier would appear in the output naming itself instead of
+     quietly emitting i386's answer for every target.  */
+  init_targetm_cdata ();
 
   if (flag_diagnostics_generate_patch)
     global_dc->initialize_fixits_change_set ();

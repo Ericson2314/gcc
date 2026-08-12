@@ -452,7 +452,7 @@ a68_asm_output_moif (MOIF_T *moif)
 
   if (flag_debug_asm)
     {
-      fputs (ASM_COMMENT_START " MODIF START ", asm_out_file);
+      fprintf (asm_out_file, "%s MODIF START ", ASM_COMMENT_START);
       fputs (NAME (moif), asm_out_file);
       fputc ('\n', asm_out_file);
     }
@@ -472,7 +472,7 @@ a68_asm_output_moif (MOIF_T *moif)
   ASM_GENERATE_INTERNAL_LABEL (modes_end_label, "LMTL", modescnt++);
 
   if (flag_debug_asm)
-    fputs ("\t" ASM_COMMENT_START " modes table\n", asm_out_file);
+    fprintf (asm_out_file, "\t%s modes table\n", ASM_COMMENT_START);
   dw2_asm_output_delta (PTR_SIZE, modes_end_label, modes_begin_label,
 			"modes size");
   ASM_OUTPUT_LABEL (asm_out_file, modes_begin_label);
@@ -488,7 +488,7 @@ a68_asm_output_moif (MOIF_T *moif)
   ASM_GENERATE_INTERNAL_LABEL (extracts_end_label, "LETL", extractscnt++);
 
   if (flag_debug_asm)
-    fputs ("\t" ASM_COMMENT_START " extracts table\n", asm_out_file);
+    fprintf (asm_out_file, "\t%s extracts table\n", ASM_COMMENT_START);
   dw2_asm_output_delta (PTR_SIZE, extracts_end_label, extracts_begin_label,
 			"extracts size");
   ASM_OUTPUT_LABEL (asm_out_file, extracts_begin_label);
@@ -516,7 +516,7 @@ a68_asm_output_moif (MOIF_T *moif)
 
   if (flag_debug_asm)
     {
-      fputs (ASM_COMMENT_START " MODIF END ", asm_out_file);
+      fprintf (asm_out_file, "%s MODIF END ", ASM_COMMENT_START);
       fputs (NAME (moif), asm_out_file);
       fputc ('\n', asm_out_file);
     }

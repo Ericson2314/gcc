@@ -85,13 +85,13 @@ BASES="i386 aarch64"
 # check working -- but the failure names the parse, not the cause, so: keep it
 # on one line rather than teaching the reader about continuations.  A more
 # forgiving reader is a reader with more ways to return the empty set.
-TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P"
+TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE"
 
 # How many slot lines the plugin writes per base.  Named rather than spelled as
 # a literal, because getting it wrong in the direction of TOO FEW is a silent
 # pass: the length assertion below would accept a dump missing the very arms
 # this run was added to score.
-SLOTS_PER_BASE=10
+SLOTS_PER_BASE=14
 
 # Which symbol names count as belonging to which base.
 own_i386='^(ix86_|i386_|x86_)'
@@ -125,7 +125,35 @@ echo "ok: targetm_i386 and targetm_aarch64 are dynamically bindable"
 # The glue that is ALLOWED to spell a converted macro: the per-back-end
 # wrappers that SUPPLY the hook, and documentation.  Everything else in
 # gcc/*.cc and gcc/*.h is target-independent code and must not spell it.
-GLUE='^(target-addr\.h|target-addr\.cc|target-def\.h|target-asm-ops\.h|target-asm-ops\.cc|targhooks\.cc|targhooks\.h|defaults\.h)$'
+GLUE='^(target-addr\.h|target-addr\.cc|target-cdata\.h|target-cdata\.cc|target-def\.h|target-asm-ops\.h|target-asm-ops\.cc|targhooks\.cc|targhooks\.h|defaults\.h)$'
+
+# THE (c-DATA) MACROS NEED A DIFFERENT COMPLETENESS CRITERION, AND SAYING SO IS
+# NOT A WEAKENING.
+#
+# For a macro converted to a HOOK, "target-independent code must not spell it"
+# is the right question: the name is supposed to disappear.  For a (c-DATA)
+# macro it is the WRONG question and would be red forever, because the whole
+# design is that the NAME SURVIVES and its EXPANSION changes -- `UNITS_PER_WORD'
+# stays spelled at 1494 sites and becomes a load from a per-config slot.  1494
+# permanent FAILs is a scoreboard that has stopped measuring, which is the
+# floor by another route.
+#
+# So for these the completeness question becomes: IS THE REDIRECT ACTUALLY IN
+# defaults.h?  That is the thing that can silently regress -- delete the
+# `#undef'/`#define' pair and every use goes straight back to the primary's
+# tm.h with no diagnostic anywhere.  It carries its own control below.
+CDATA_MACROS="ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE"
+
+is_cdata () { case " $CDATA_MACROS " in *" $1 "*) return 0;; esac; return 1; }
+
+# Is macro $1 redirected to a target-cdata slot by defaults.h?  Matched on the
+# `#define <M> (targetm_cdata.' form specifically, not on the name appearing
+# somewhere in the file -- defaults.h also carries each macro's ORIGINAL
+# fallback definition, and a looser match would report every one of them
+# redirected whether or not the block below them still existed.
+redirected () {
+  grep -qE "^#define $1 \(targetm_cdata\." "$SRC/defaults.h"
+}
 
 # Comments are not uses.  varasm.cc explains in prose why GLOBAL_ASM_OP became
 # a hook, and a plain grep reads that as an unconverted macro -- a FAIL for a
@@ -245,10 +273,96 @@ guess, which asserts nothing."
 done
 
 ########################################################################
+# 4b. AN INDEPENDENT VALUE FOR THE i386 SIDE OF THE TYPE MACROS.
+#
+# The header probe values `WCHAR_TYPE'/`SIZE_TYPE'/`PTRDIFF_TYPE' for aarch64
+# only.  On i386 they are `(TARGET_LP64 ? "long unsigned int" : "unsigned int")'
+# -- not constant expressions, so the STR probe cannot value them at all, and
+# `$MTP/str-i386.txt' has no entry.  Scoring those three arms against this
+# script's own expectation would be a tautology, and skipping them would be a
+# floor.
+#
+# So ask a THIRD compiler that has nothing to do with this branch: the genuine
+# upstream x86_64 `cc1' at the merge-base, via its own predefined macros.
+# `__SIZE_TYPE__' and friends ARE `SIZE_TYPE' as that compiler resolved it, and
+# they are produced by a binary this tree did not build.  It is the same
+# authority `stock-compare.sh' uses, asked a different question.
+########################################################################
+STOCK=${STOCK:-/tmp/b-stock}
+declare -A STOCKVAL
+if [ -x "$STOCK/gcc/cc1" ]; then
+  : > "$OUT/empty.c"
+  ( cd "$STOCK/gcc" && ./cc1 -E -dM -quiet -nostdinc "$OUT/empty.c" ) \
+    > "$OUT/stock-predef.txt" 2> "$OUT/stock-predef.err" \
+    || { cat "$OUT/stock-predef.err"; die "stock cc1 could not be asked for its \
+predefined macros"; }
+  n=$(wc -l < "$OUT/stock-predef.txt")
+  [ "$n" -gt 100 ] || die "stock cc1 printed only $n predefined macros; that is \
+not a real -dM run and an absent __SIZE_TYPE__ below would be uninformative"
+  tohex () { printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n'; }
+  for pair in "WCHAR_TYPE:__WCHAR_TYPE__" "SIZE_TYPE:__SIZE_TYPE__" \
+              "PTRDIFF_TYPE:__PTRDIFF_TYPE__"; do
+    m=${pair%%:*}; p=${pair##*:}
+    v=$(sed -n "s/^#define $p //p" "$OUT/stock-predef.txt")
+    [ -n "$v" ] || die "stock cc1 did not define $p; without it the i386 side \
+of $m has no independent value and its arm would assert nothing"
+    STOCKVAL[$m]=$(tohex "$v")
+  done
+  echo "control: OK -- genuine upstream cc1 supplies the i386 side independently\
+ (__SIZE_TYPE__=[$(sed -n 's/^#define __SIZE_TYPE__ //p' "$OUT/stock-predef.txt")])"
+else
+  die "no $STOCK/gcc/cc1 -- the i386 side of the type macros would have no \
+independent value, and an arm scored against this script's own guess is not an \
+arm.  Build it with scratchpad/stock-build.sh."
+fi
+
+# CONTROL for `redirected'.  It must say YES for a macro the tree demonstrably
+# redirects and NO for one it demonstrably does not -- otherwise a checker
+# stuck on one answer would pass or fail everything alike.
+redirected ASM_COMMENT_START \
+  || die "control: ASM_COMMENT_START is redirected in defaults.h and the check \
+says it is not.  Every (c-DATA) completeness verdict below would be red for no \
+reason."
+redirected UNITS_PER_WORD \
+  && die "control: UNITS_PER_WORD is NOT redirected (it is still Stage 2 work) \
+and the check says it is.  The check answers yes to everything."
+echo "control: OK -- the defaults.h redirect check reports both answers"
+
+########################################################################
 # 5.  VERDICTS
 ########################################################################
 : > "$OUT/results.txt"
 for m in $TAB_MACROS; do
+  if is_cdata "$m"; then
+    # (c-DATA): the name survives; what must hold is that defaults.h redirects
+    # it, and that each base's refresh writes THAT base's own bytes.
+    for b in $BASES; do
+      why=""; v=PASS
+      if ! redirected "$m"; then
+        v=FAIL; why="COMPLETENESS: defaults.h does not redirect $m to a \
+target-cdata slot, so every use still reads the primary's tm.h"
+      else
+        s=$(getstr "$OUT/slots.txt" "$b" "$m")
+        exp=$(awk -v m="$m" '$1==m{print $2}' "$MTP/str-$b.txt")
+        src="the header probe"
+        if [ -z "$exp" ] && [ "$b" = i386 ]; then
+          exp=${STOCKVAL[$m]}; src="genuine upstream cc1's __${m%_TYPE}_TYPE__"
+        fi
+        if [ -z "$s" ]; then
+          v=FAIL; why="no slot in the dump"
+        elif [ -z "$exp" ]; then
+          v=FAIL; why="DISPATCH: no independent value for $m on $b"
+        elif [ "$s" = "$exp" ]; then
+          why="DISPATCH: $b's refresh wrote $b's own bytes ($s), agreeing with \
+$src"
+        else
+          v=FAIL; why="DISPATCH: $b's refresh wrote [$s] but $src says [$exp]"
+        fi
+      fi
+      echo "$b $m TAB $v $why" >> "$OUT/results.txt"
+    done
+    continue
+  fi
   sites=$(completeness "$m")
   for b in $BASES; do
     why=""; v=PASS

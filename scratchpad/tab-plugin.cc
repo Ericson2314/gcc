@@ -24,6 +24,7 @@
 #include "target.h"
 #include "target-asm-ops.h"
 #include "target-addr.h"
+#include "target-cdata.h"
 #include "plugin-version.h"
 
 int plugin_is_GPL_compatible;
@@ -34,6 +35,8 @@ extern const struct target_asm_ops targetm_asm_ops_i386;
 extern const struct target_asm_ops targetm_asm_ops_aarch64;
 extern const struct target_addr targetm_addr_i386;
 extern const struct target_addr targetm_addr_aarch64;
+extern void targetm_cdata_refresh_i386 (struct target_cdata *);
+extern void targetm_cdata_refresh_aarch64 (struct target_cdata *);
 
 static void
 dump_ptr (FILE *o, const char *base, const char *macro, const char *slot,
@@ -57,8 +60,34 @@ dump_str (FILE *o, const char *base, const char *macro, const char *slot,
 
 static void
 one_base (FILE *o, const char *base, const struct gcc_target *t,
-	  const struct target_asm_ops *a, const struct target_addr *d)
+	  const struct target_asm_ops *a, const struct target_addr *d,
+	  void (*cdata_refresh) (struct target_cdata *))
 {
+  /* Stage 2 -- the (c-DATA) slots.  Each base's refresh function is CALLED
+     here, into a local struct, and what it writes is printed.
+
+     Calling it rather than reading `targetm_cdata' is the only way to get both
+     bases out of one run: `targetm_cdata' holds the SELECTED base's values,
+     and this plugin runs under one selection at a time.  It is also the
+     stronger read -- it exercises the same function `init_targetm_cdata ()'
+     calls, so a refresh that writes nothing shows up here.
+
+     ONE CAVEAT, AND IT IS REAL.  These values may depend on option state, and
+     the option state in force during this run is the SELECTED base's.  For the
+     four macros dumped below that does not bite: aarch64's are plain constants
+     in aarch64.h, and i386's depend on TARGET_LP64, which is correct here
+     because i386 is the base this run selects.  A field added later whose
+     value depends on the OTHER base's options would be measured wrong by this
+     plugin, and would need a second run under that base's config.  */
+  struct target_cdata cd;
+  memset (&cd, 0, sizeof cd);
+  cdata_refresh (&cd);
+  dump_str (o, base, "ASM_COMMENT_START", "cdata.asm_comment_start",
+	    cd.asm_comment_start);
+  dump_str (o, base, "WCHAR_TYPE",        "cdata.wchar_type",   cd.wchar_type);
+  dump_str (o, base, "SIZE_TYPE",         "cdata.size_type",    cd.size_type);
+  dump_str (o, base, "PTRDIFF_TYPE",      "cdata.ptrdiff_type", cd.ptrdiff_type);
+
   /* Stage 1 -- the addresses.h family.  These four slots hold the addresses of
      `static' functions in target-addr-<base>.o, so BOTH bases' copies carry
      the SAME symbol name (gcc_taddr_base_reg_class and friends) at DIFFERENT
@@ -105,9 +134,9 @@ run (void *, void *)
   FILE *o = path ? fopen (path, "w") : stderr;
   if (!o) { fprintf (stderr, "tab: cannot open TAB_OUT\n"); return; }
   one_base (o, "i386", &targetm_i386, &targetm_asm_ops_i386,
-	    &targetm_addr_i386);
+	    &targetm_addr_i386, targetm_cdata_refresh_i386);
   one_base (o, "aarch64", &targetm_aarch64, &targetm_asm_ops_aarch64,
-	    &targetm_addr_aarch64);
+	    &targetm_addr_aarch64, targetm_cdata_refresh_aarch64);
   fclose (o);
 }
 

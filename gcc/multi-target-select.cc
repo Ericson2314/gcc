@@ -80,6 +80,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm-constrs.h"
 #include "target-asm-ops.h"
 #include "target-addr.h"
+#include "target-cdata.h"
 
 /* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
    back end -- and MT_TARGET_BASES, which maps each configured triple to the
@@ -436,6 +437,19 @@ multi_target_select (const char *target)
 			  "gen-multi-target-md.awk omits one for mmix and for "
 			  "the back ends sharing default-common.cc, and such a "
 			  "back end cannot be selected", base);
+
+	/* The (c-DATA) refresh function.  Only the POINTER is chosen here:
+	   the values it writes depend on option state, which has not been
+	   decoded yet at this point, so `init_targetm_cdata ()' does the
+	   actual fill much later, from toplev.cc's `process_options' and only
+	   once `targetm.target_option.override ()' has run.  Splitting it that
+	   way is not tidiness -- selecting and refreshing at the same moment
+	   would capture the option defaults and freeze them.  */
+	targetm_cdata_refresh = target_cdata_refresh_for (base);
+	if (targetm_cdata_refresh == NULL)
+	  internal_error ("back end %qs has no target-cdata refresh function; "
+			  "one is emitted for every back end that has "
+			  "objects, so this is a build bug", base);
 
 	mt_current = b;
 	return true;

@@ -95,7 +95,7 @@ fi
 [ "$fail" = 0 ] || { echo "OVERALL rc=9 (controls)"; exit 9; }
 
 # ---- the verdicts ---------------------------------------------------------
-for s in target_asm_ops_for target_addr_for; do
+for s in target_asm_ops_for target_addr_for target_cdata_refresh_for; do
   if grep -q "$s" "$OUT/undef.txt"; then
     echo "$s: PASS -- multi-target-select.o references it, so the selection \
 runs"

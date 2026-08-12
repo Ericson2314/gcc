@@ -6,6 +6,18 @@
 #   CONVERTED_SUPPLY   routed through a targetm hook, but the back end still
 #                      spells the macro -- that IS how it supplies the hook.
 #                      Keeps its header arm AND gains a TAB arm; both scored.
+#   CONVERTED_CDATA    a (c-DATA) macro: the NAME survives and is still spelled
+#                      everywhere, but defaults.h redirects it to a per-config
+#                      slot, so in BOTH bases' header contexts it now expands to
+#                      the same target-neutral text.  The header arm therefore
+#                      stops measuring the macro's VALUE and starts reporting
+#                      agreement about the redirect -- which flipped four
+#                      aarch64 arms FAIL -> PASS for entirely the wrong reason
+#                      on the first Stage 2 run.  So the header arm is RETIRED
+#                      and the TAB arm is mandatory, by the same mechanical
+#                      check as CONVERTED_GONE.  This status exists because the
+#                      original two covered arms that DISAPPEAR and not arms
+#                      that turn green.
 #   CONVERTED_GONE     routed through a hook and the macro is deleted from the
 #                      back ends.  The header arm is retired and a TAB arm
 #                      MUST exist in tab-probe.sh, or macro-probe.sh aborts.
@@ -17,7 +29,7 @@ ACCUMULATE_OUTGOING_ARGS UNCONVERTED
 ADDITIONAL_REGISTER_NAMES UNCONVERTED
 ADJUST_REG_ALLOC_ORDER UNCONVERTED
 ARG_POINTER_REGNUM UNCONVERTED
-ASM_COMMENT_START UNCONVERTED
+ASM_COMMENT_START CONVERTED_CDATA
 ASM_DECLARE_FUNCTION_NAME UNCONVERTED
 ASM_OUTPUT_ADDR_DIFF_ELT UNCONVERTED
 ASM_OUTPUT_ALIGN UNCONVERTED
@@ -112,7 +124,7 @@ Pmode UNCONVERTED
 POINTER_SIZE UNCONVERTED
 PREFERRED_STACK_BOUNDARY UNCONVERTED
 PROMOTE_MODE UNCONVERTED
-PTRDIFF_TYPE UNCONVERTED
+PTRDIFF_TYPE CONVERTED_CDATA
 PUSH_ARGS_REVERSED UNCONVERTED
 REG_ALLOC_ORDER UNCONVERTED
 REG_CLASS_CONTENTS UNCONVERTED
@@ -130,7 +142,7 @@ SELECT_CC_MODE UNCONVERTED
 SET_RATIO UNCONVERTED
 SETUP_FRAME_ADDRESSES UNCONVERTED
 SHIFT_COUNT_TRUNCATED UNCONVERTED
-SIZE_TYPE UNCONVERTED
+SIZE_TYPE CONVERTED_CDATA
 SLOW_BYTE_ACCESS UNCONVERTED
 STACK_BOUNDARY UNCONVERTED
 STACK_CHECK_FIXED_FRAME_SIZE UNCONVERTED
@@ -149,5 +161,5 @@ TRAMPOLINE_ALIGNMENT UNCONVERTED
 TRAMPOLINE_SIZE UNCONVERTED
 UNITS_PER_WORD UNCONVERTED
 VECTOR_STORE_FLAG_VALUE UNCONVERTED
-WCHAR_TYPE UNCONVERTED
+WCHAR_TYPE CONVERTED_CDATA
 WORDS_BIG_ENDIAN UNCONVERTED

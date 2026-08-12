@@ -159,7 +159,7 @@ dw2_asm_output_data (int size, unsigned HOST_WIDE_INT value,
 
   if (flag_debug_asm && comment)
     {
-      fputs ("\t" ASM_COMMENT_START " ", asm_out_file);
+      fprintf (asm_out_file, "\t%s ", ASM_COMMENT_START);
       vfprintf (asm_out_file, comment, ap);
     }
   putc ('\n', asm_out_file);

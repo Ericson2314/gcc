@@ -1010,6 +1010,27 @@ function emit_addr_registry(	i, n, parts) {
   printf "target-addr-select.o: multi-target-addr.h\n\n";
 }
 
+# And the same for the (c-DATA) refresh functions.  A FUNCTION per base, not a
+# table: these values depend on option state, so there is nothing to
+# constant-initialise.  See target-cdata.h.
+function emit_cdata_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "multi-target-cdata.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern void targetm_cdata_refresh_%s (struct target_cdata *);'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_CDATA_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_CDATA_ENTRY (\"%s\", targetm_cdata_refresh_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-cdata.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-cdata.h $@\n\n";
+  printf "target-cdata-select.o: multi-target-cdata.h\n\n";
+}
+
 # The registry multi-target-select.cc includes: every back end that has
 # objects, and the triple-to-back-end map.
 #
@@ -1121,6 +1142,7 @@ $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_addr_registry();
+		    emit_cdata_registry();
 		    emit_backend_registry();
 		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
@@ -1442,6 +1464,19 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
   printf "\t  $(srcdir)/target-addr.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-addr-" cpu ".o";
+
+  # This back end's (c-DATA) refresh function; see target-cdata.h.  Same loop
+  # and the same reason as target-addr-<cpu>.o above -- it must be compiled
+  # against this back end's headers, and it must carry
+  # -DMULTI_TARGET_TARGETM_BASE (which the target-specific assignment below
+  # supplies) so that defaults.h leaves it the REAL macros rather than the
+  # redirected ones it exists to fill.
+  printf "target-cdata-%s.o: $(srcdir)/target-cdata.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-cdata.h\n";
+  printf "\t$(COMPILE) -DTARGETM_CDATA_SYMBOL=targetm_cdata_refresh_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-cdata.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-cdata-" cpu ".o";
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
