@@ -31,6 +31,30 @@ convert_optab_p (optab op)
   return op > unknown_optab && op <= LAST_CONV_OPTAB;
 }
 
+/* Look SCODE up in the selected target's optab table.  Defined in
+   optabs-query.cc.
+
+   The header inlines below go through this rather than calling the
+   generated raw_optab_handler directly, and that indirection is
+   load-bearing rather than stylistic.  raw_optab_handler is emitted per
+   back end (genopinit.cc puts it in namespace insn_<base>), so an inline
+   whose body calls it unqualified has a DIFFERENT body in a back-end
+   translation unit than in a middle-end one -- while keeping the same
+   mangled name.  The linker then keeps one of the N bodies, arbitrarily,
+   and every call site in the program that did not supply the survivor is
+   silently reading another target's optab table.  There is no link error
+   and no diagnostic; measured in a two-back-end cc1, `ld -r' keeps exactly
+   one optab_handler and its callee flips with the link order.
+
+   Routing through one out-of-line function in one middle-end translation
+   unit makes all the bodies identical again, so COMDAT dedup is harmless,
+   and leaves exactly one place for a multi-target compiler to select in.
+   Namespacing these inlines instead is the wrong shape: the middle end
+   calls them by name from thousands of sites, and there a namespace turns
+   a link error into a wrong answer.  */
+
+extern enum insn_code selected_raw_optab_handler (unsigned);
+
 /* Return the insn used to implement mode MODE of OP, or CODE_FOR_nothing
    if the target does not have such an insn.  */
 
@@ -39,7 +63,7 @@ optab_handler (optab op, machine_mode mode)
 {
   unsigned scode = (op << 20) | mode;
   gcc_assert (op > LAST_CONV_OPTAB);
-  return raw_optab_handler (scode);
+  return selected_raw_optab_handler (scode);
 }
 
 /* Return the insn used to perform conversion OP from mode FROM_MODE
@@ -52,7 +76,7 @@ convert_optab_handler (convert_optab op, machine_mode to_mode,
 {
   unsigned scode = (op << 20) | (from_mode << 10) | to_mode;
   gcc_assert (convert_optab_p (op));
-  return raw_optab_handler (scode);
+  return selected_raw_optab_handler (scode);
 }
 
 enum insn_code convert_optab_handler (convert_optab, machine_mode,

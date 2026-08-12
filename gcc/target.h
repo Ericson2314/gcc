@@ -343,6 +343,16 @@ extern struct gcc_target targetm;
    runtime value is needed for correctness, since the function only
    provides a rough guess.  */
 
+/* The out-of-line half of estimated_poly_value, in targhooks.cc.  The hook
+   call lives there rather than here so that this header inline has no
+   reference to `targetm' in its body: a body that names `targetm' is not the
+   same body in every translation unit once a compiler holds more than one
+   gcc_target, and an inline with the same mangled name and different bodies
+   is kept one-of-N by the linker with no diagnostic.  */
+
+extern HOST_WIDE_INT estimated_poly_value_1 (poly_int64,
+					     poly_value_estimate_kind);
+
 inline HOST_WIDE_INT
 estimated_poly_value (poly_int64 x,
 		      poly_value_estimate_kind kind = POLY_VALUE_LIKELY)
@@ -350,7 +360,7 @@ estimated_poly_value (poly_int64 x,
   if (NUM_POLY_INT_COEFFS == 1)
     return x.coeffs[0];
   else
-    return targetm.estimated_poly_value (x, kind);
+    return estimated_poly_value_1 (x, kind);
 }
 
 /* Return true when MODE can be used to copy GET_MODE_BITSIZE bits
@@ -389,9 +399,21 @@ omp_type_context (type_context_kind context)
 
 #ifdef GCC_TM_H
 
-#ifndef CUMULATIVE_ARGS_MAGIC
-#define CUMULATIVE_ARGS_MAGIC ((void *) &targetm.calls)
-#endif
+/* A token that marks a cumulative_args_t as having come through
+   pack_cumulative_args, so that get_cumulative_args can catch a raw
+   CUMULATIVE_ARGS * that was cast rather than packed.
+
+   This deliberately does NOT identify *which* target packed it.  It used
+   to be `(void *) &targetm.calls', an address used as an identity token,
+   which cannot work once more than one gcc_target exists in the program:
+   the packing site and the checking site then mint the token from
+   different objects and the assert fires on every function that has a
+   parameter.  Nor is there anything to gain from making it target
+   specific -- a compiler that holds several back ends has no single
+   "the target" for an address to name.  Do not put an `#ifndef' around
+   this: letting a target header quietly restore an address-shaped token
+   would restore the bug with no diagnostic.  */
+#define CUMULATIVE_ARGS_MAGIC ((void *) (size_t) 0x4d41474943ULL)
 
 inline CUMULATIVE_ARGS *
 get_cumulative_args (cumulative_args_t arg)

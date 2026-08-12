@@ -39,6 +39,17 @@ struct target_optabs *this_fn_optabs = &default_target_optabs;
 struct target_optabs *this_target_optabs = &default_target_optabs;
 #endif
 
+/* Look SCODE up in the selected target's optab table.  See the comment on
+   the declaration in optabs-query.h: this is the single point at which the
+   per-back-end raw_optab_handler is named, so that the header inlines that
+   reach it have one body rather than one body per back end.  */
+
+enum insn_code
+selected_raw_optab_handler (unsigned scode)
+{
+  return raw_optab_handler (scode);
+}
+
 /* Return the insn used to perform conversion OP from mode FROM_MODE
    to mode TO_MODE; return CODE_FOR_nothing if the target does not have
    such an insn, or if it is unsuitable for optimization type OPT_TYPE.  */

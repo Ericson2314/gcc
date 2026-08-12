@@ -2221,6 +2221,18 @@ default_estimated_poly_value (poly_int64 x, poly_value_estimate_kind)
   return x.coeffs[0];
 }
 
+/* The out-of-line half of target.h's estimated_poly_value.  It is here, and
+   not inline in the header, so that the header inline's body does not name
+   `targetm': see the comment on its declaration in target.h.  This is the one
+   place the hook is reached from, so it is also the one place a multi-target
+   compiler has to select in.  */
+
+HOST_WIDE_INT
+estimated_poly_value_1 (poly_int64 x, poly_value_estimate_kind kind)
+{
+  return targetm.estimated_poly_value (x, kind);
+}
+
 /* For hooks which use the MOVE_RATIO macro, this gives the legacy default
    behavior.  SPEED_P is true if we are compiling for speed.  */
 
