@@ -1,0 +1,205 @@
+/* Per-back-end register vocabulary: the data, the counts, and the numbering.
+   Copyright (C) 2026 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
+/* WHAT THIS IS, AND WHY IT IS TWO THINGS AT ONCE
+
+   `reginfo.cc' builds the compiler's whole register world out of six back-end
+   macros -- FIXED_REGISTERS, CALL_USED_REGISTERS, REG_ALLOC_ORDER,
+   REG_CLASS_CONTENTS, REGISTER_NAMES, REG_CLASS_NAMES -- evaluated at
+   reginfo.cc:76-119, in a MIDDLE-END translation unit, i.e. against the
+   PRIMARY base's tm.h.  In a compiler holding two back ends, generating
+   aarch64 code, those are i386's register names and i386's register classes.
+
+   It also walks them: `0 .. N_REG_CLASSES' and `0 .. FIRST_PSEUDO_REGISTER',
+   which are 34 and 92 for i386 and 20 and 95 for aarch64.  The class walk is
+   where the aarch64 arm has been stuck -- `init_reg_sets_1' asks
+   `targetm.class_max_nregs' about class 20..33, and aarch64 asserts.
+
+   BOTH HALVES ARE HERE ON PURPOSE, AND NEITHER IS USEFUL ALONE.  Bounding the
+   loops by a run-time count without moving the data makes `cc1' stop ICEing
+   and start compiling aarch64 against i386's register classes and i386's
+   register names -- in bounds, no diagnostic, and it would look like the arm
+   passing.  Moving the data without bounding the loops moves the ICE three
+   lines and reads as a new blocker.  A `cc1' that ICEs loudly is strictly
+   better than one that emits aarch64 with x86 register classes, so the two go
+   together or neither goes.
+
+   THREE NUMBERS, NOT ONE, AND THEY ARE DIFFERENT NUMBERS
+
+     * The compile-time WIDTHS -- FIRST_PSEUDO_REGISTER and N_REG_CLASSES as
+       defaults.h leaves them -- are the maxima over configured back ends and
+       are identical in EVERY translation unit.  They are the LAYOUT of
+       `target_hard_regs', `target_regs', `target_ira' and `target_ira_int',
+       which generic code XCNEWs (target-globals.cc:71-89) and every back end
+       reads.  One authority for the size and several for the contents is the
+       `cl_optimization' shape; there is exactly one size here.
+
+     * The selected base's own CLASS COUNT bounds the class loops.
+
+     * The selected base's own REGISTER COUNT bounds the register loops.  It
+       is a DIFFERENT number from the class count and from the union width;
+       hppa64's 62 against hppa's 90 shows it is not even a property of the
+       architecture, which is why this is keyed per CONFIGURATION, exactly the
+       way MT_BACKENDS keys everything else.
+
+   WHY `ALL_REGS' AND `GENERAL_REGS' BECOME RUN-TIME AND `NO_REGS' DOES NOT
+
+   Target-independent code spells exactly four class names -- NO_REGS (345
+   uses), ALL_REGS (64), GENERAL_REGS (56) and LIM_REG_CLASSES (31) -- and no
+   interior class name at all.  NO_REGS is 0 in all 52 back ends and
+   `reginfo.cc' and `ira.cc' seed their subunion/superunion tables by
+   `memset'-to-zero, which is only meaningful if 0 is the empty class, so it
+   stays the compile-time 0.  ALL_REGS and GENERAL_REGS appear in ZERO
+   constant-expression contexts -- no case label, no array bound, no static
+   initialiser, no `#if' -- so they can be variables, and each base keeps its
+   own numbering.
+
+   ANCHORING `ALL_REGS' AT `LIM_REG_CLASSES - 1' WAS CONSIDERED AND REJECTED.
+   It is free only while the PRIMARY has the largest class count.  The moment
+   a non-primary base has more, the union width grows, the primary's ALL_REGS
+   moves off 33, the primary's numbering stops being a prefix of the union's,
+   and the x86_64 byte-identity arm is put at risk for no gain.  Keeping the
+   numbering per base keeps the primary's numbering an identity prefix, so
+   that arm cannot move.
+
+   WHAT IS STILL WRONG AFTER THIS
+
+   A class number crossing between a back end and generic code still means
+   what it means IN THE SELECTED BASE'S NUMBERING, which is right, but nothing
+   type-checks that -- `reg_class_t' is an int.  And the register data
+   installed here is the selected base's; the many OTHER back-end macros
+   generic code expands to the primary's expressions (STACK_POINTER_REGNUM 7
+   vs 31, FRAME_POINTER_REGNUM 19 vs 64, ...) are a separate conversion and
+   are NOT fixed by this file.  See MACRO-LEAK.md.  */
+
+#ifndef GCC_TARGET_REGS_H
+#define GCC_TARGET_REGS_H
+
+/* One back end's register vocabulary, as measured in ITS OWN preprocessor
+   context by target-regs.cc.
+
+   Deliberately built from `int', `char' and pointers only.  This header is
+   reached from defaults.h, i.e. from the tail of every `tm.h', long before
+   `coretypes.h' -- so `enum reg_class', `machine_mode' and `HARD_REG_SET' are
+   all unavailable, and a use site casts.  The alternative (moving the
+   dispatch to `hard-reg-set.h') was what the earlier design did and it needs
+   a second, poisoned, declaration of every macro to stay honest; plain `int'
+   needs none.  */
+struct target_regs_desc
+{
+  /* The cpu_type this describes, for diagnostics.  */
+  const char *name;
+
+  /* THIS BASE'S OWN counts, not the union widths.  Both are <= the
+     corresponding MULTI_TARGET_UNION_* in multi-target-reg-widths.h, and
+     target-regs.cc static_asserts exactly that.  */
+  int n_reg_classes;
+  int first_pseudo_register;
+
+  /* (first_pseudo_register + 31) / 32 -- the row stride of
+     reg_class_contents below, in this base's own width.  reginfo.cc's
+     N_REG_INTS is the UNION's stride and is a different number.  */
+  int n_reg_ints;
+
+  /* Class numbers in this base's own numbering.  NO_REGS is 0 in all 52 back
+     ends and is not carried.  */
+  int all_regs;
+  int general_regs;
+
+  /* FIXED_REGISTERS and CALL_USED_REGISTERS (or CALL_REALLY_USED_REGISTERS),
+     first_pseudo_register entries each.  */
+  const char *d_fixed_regs;
+  const char *d_call_used_regs;
+
+  /* REG_ALLOC_ORDER, first_pseudo_register entries, or NULL if this back end
+     defines no REG_ALLOC_ORDER -- which is a real case and is why this is a
+     pointer that may be null rather than a flag plus an array.  */
+  const int *d_reg_alloc_order;
+
+  /* REG_CLASS_CONTENTS, flattened: row CL starts at [CL * n_reg_ints].  */
+  const unsigned *d_reg_class_contents;
+
+  /* REGISTER_NAMES (first_pseudo_register entries) and REG_CLASS_NAMES
+     (n_reg_classes entries).  */
+  const char *const *d_reg_names;
+  const char *const *d_reg_class_names;
+
+  /* THE LAYOUT WITNESS.  `sizeof' of the four structures that generic code
+     allocates and every back end reads, as computed IN THIS BACK END'S OWN
+     translation unit.  `init_reg_sets' compares them against the same four
+     `sizeof's taken in a middle-end translation unit and names the one that
+     disagrees.
+
+     This exists because the failure it catches has no other symptom.  The
+     bounds in hard-reg-set.h, regs.h, ira.h and ira-int.h must be the union
+     widths, spelled MULTI_TARGET_UNION_*; a field left spelled
+     FIRST_PSEUDO_REGISTER or N_REG_CLASSES still COMPILES in both places, and
+     simply gives the back end a struct that is smaller than the one generic
+     code XCNEWs.  Every read past the short field is then in someone else's
+     memory, with no diagnostic anywhere -- which is the shape this branch has
+     been finding for a year.  Four numbers turn "did I miss one" from
+     vigilance into a measurement.  */
+  unsigned long sizeof_target_hard_regs;
+  unsigned long sizeof_target_regs;
+  unsigned long sizeof_target_ira;
+  unsigned long sizeof_target_ira_int;
+
+  /* REGNO_REG_CLASS, FENCED.  Generic code walks 0..FIRST_PSEUDO_REGISTER,
+     which is the UNION width, so it will ask about register numbers this back
+     end does not have; i386's REGNO_REG_CLASS is `regclass_map[REGNO]' and
+     would read three elements past the end of a real array.  The
+     implementation answers NO_REGS outside its own range, which lets
+     reginfo.cc:405 fence `operand_reg_set' and `fixed_reg_set' by itself.  */
+  int (*regno_reg_class) (int regno);
+};
+
+/* One entry per configured back end, so a table can be found by name.  */
+struct target_regs_entry
+{
+  const char *name;
+  const struct target_regs_desc *regs;
+};
+
+extern const struct target_regs_entry targetm_regs_registry[];
+
+/* The vocabulary in force.
+
+   NULL UNTIL A TARGET IS SELECTED, DELIBERATELY.  `targetm_addr' and
+   `targetm_asm_ops' are constant-initialised with the PRIMARY's table because
+   they are valid before anything runs; doing that here would be the exact bug
+   this branch exists to remove -- a compiler that never selected would answer
+   i386's register classes for every target, correctly on the build machine
+   and wrongly everywhere else.  `init_reg_sets' checks by name instead.  */
+extern const struct target_regs_desc *targetm_regs;
+
+/* Look BASE up in the registry, or NULL.  BASE is a cpu_type, the same key
+   the tm-<base>.h files use.  */
+extern const struct target_regs_desc *target_regs_for (const char *base);
+
+/* THE RUN-TIME BOUNDS.  Spelled differently from N_REG_CLASSES and
+   FIRST_PSEUDO_REGISTER on purpose: those two are still needed, and still
+   mean the compile-time union LAYOUT.  A site that wants "how many are there
+   really" says so, and a site that wants "how big is the array" says that.
+   Making one name mean both is what put i386's 34 classes over aarch64's data
+   at reginfo.cc:293, :315 and :329 -- three loops that ran wrong for a year
+   without an assert to say so.  */
+#define MT_N_REG_CLASSES (targetm_regs->n_reg_classes)
+#define MT_FIRST_PSEUDO_REGISTER (targetm_regs->first_pseudo_register)
+
+#endif /* GCC_TARGET_REGS_H */

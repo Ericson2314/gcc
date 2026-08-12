@@ -1157,8 +1157,19 @@ general_init (const char *argv0, bool init_signals, unique_argv original_argv)
   line_table->default_range_bits = line_map_suggested_range_bits;
   init_ttree ();
 
-  /* Initialize register usage now so switches may override.  */
-  init_reg_sets ();
+  /* `init_reg_sets ()' USED TO BE HERE, and could not stay.
+
+     It reads the selected back end's register vocabulary (target-regs.h), and
+     `general_init' runs BEFORE `multi_target_select' -- so here it would read
+     a null table.  It did not fail before this change only because it read
+     the PRIMARY's six macros instead, which is the bug: every compilation,
+     for every target, started from i386's FIXED_REGISTERS, i386's register
+     names and i386's register classes, and the later `-ftarget-config='
+     never revisited them.
+
+     Moved to `toplev::main', immediately after the back end is selected and
+     still before `decode_options', so the original comment -- "now, so
+     switches may override" -- still holds.  */
 
   /* Create the singleton holder for global state.  This creates the
      dump manager.  */
@@ -2415,6 +2426,16 @@ toplev::main (int argc, char **argv)
     fatal_error (UNKNOWN_LOCATION,
 		 "target %qs is not one of the targets this compiler was "
 		 "configured for", targ_caps_target_name);
+
+  /* Register usage, from the back end just selected.  This was in
+     `general_init', which runs before the selection above and therefore
+     always read the PRIMARY's FIXED_REGISTERS, REG_CLASS_CONTENTS and
+     REGISTER_NAMES whatever target was asked for; see the note there.
+
+     Still before `decode_options' below, so the original reason for its
+     position -- "initialize register usage now so switches may override" --
+     is unchanged.  */
+  init_reg_sets ();
 
   /* One-off initialization of options that does not need to be
      repeated when options are added for particular functions.  */

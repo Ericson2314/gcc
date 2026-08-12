@@ -1047,6 +1047,47 @@ function emit_cdata_registry(	i, n, parts) {
   printf "target-cdata-select.o: multi-target-cdata.h\n\n";
 }
 
+# And the same for the register vocabularies -- a TABLE per base, like the
+# addressing one and unlike the (c-DATA) refresh functions, because none of
+# these values depends on option state: FIXED_REGISTERS and REG_CLASS_CONTENTS
+# are settled by the back end's headers alone.  target-regs.cc constant-
+# initialises the table with `constexpr' precisely so that a back end whose
+# ALL_REGS somehow did read an option would be a compile error naming it.
+#
+# Also emits the rule for the UNION WIDTHS, which is the one input on this
+# branch that cannot come from a generator: FIRST_PSEUDO_REGISTER and
+# N_REG_CLASSES are enum-derived, so the preprocessor cannot read them, and
+# `-DIN_GCC' is host-only (Makefile.in:1258) so no build/gen* program sees
+# config/<cpu>/<cpu>.h at all.  A host compile plus `nm -S' is the probe that
+# works, and it executes nothing, so it stays correct when cross-building.
+function emit_regs_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "multi-target-regs.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_regs_desc targetm_regs_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_REGS_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_REGS_ENTRY (\"%s\", targetm_regs_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-regs.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-regs.h $@\n\n";
+  printf "target-regs-select.o: multi-target-regs.h\n\n";
+
+  # The widths.  gen-reg-widths.sh refuses every way of learning nothing --
+  # no probe objects, a symbol nm did not print, a size of zero -- because a
+  # width that came back empty would size the HARD_REG_SET vocabulary of the
+  # whole compiler, and would do so in the direction that makes the build
+  # succeed.
+  printf "multi-target-reg-widths.h: $(MULTI_TARGET_REG_PROBES) \\\n";
+  printf "  $(srcdir)/gen-reg-widths.sh\n";
+  printf "\t$(SHELL) $(srcdir)/gen-reg-widths.sh \"$(NM)\" $@ \\\n";
+  printf "\t  $(MULTI_TARGET_REG_PROBES)\n\n";
+}
+
 # The registry multi-target-select.cc includes: every back end that has
 # objects, and the triple-to-back-end map.
 #
@@ -1207,6 +1248,7 @@ NF == 0		  { flush() }
 END		  { flush(); emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_addr_registry();
 		    emit_cdata_registry();
+		    emit_regs_registry();
 		    emit_backend_registry();
 		    emit_options_registry();
 		    emit_source_specs();
@@ -1542,6 +1584,35 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly) {
   printf "\t  $(srcdir)/target-cdata.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-cdata-" cpu ".o";
+
+  # This back end's register vocabulary; see target-regs.h.  Same loop and the
+  # same reason again -- the six data macros are plain macros in
+  # config/<cpu>/<cpu>.h and the only way to read THIS back end's is to
+  # compile against its headers.  It carries -DMULTI_TARGET_TARGETM_BASE from
+  # the assignment below, which is what keeps defaults.h from redirecting
+  # ALL_REGS and REGNO_REG_CLASS in the one file whose job is to supply them:
+  # without it this table would report the poison back to itself.
+  printf "target-regs-%s.o: $(srcdir)/target-regs.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) \\\n";
+  printf "  $(srcdir)/target-regs.h multi-target-reg-widths.h\n";
+  printf "\t$(COMPILE) -DTARGETM_REGS_SYMBOL=targetm_regs_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-regs.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-regs-" cpu ".o";
+
+  # And this back end's WIDTH PROBE.  Deliberately NOT in
+  # MULTI_TARGET_OBJS_<cpu>: it is never linked, it is compiled so that `nm -S'
+  # can read two array sizes back out of it, and -DMULTI_TARGET_REG_PROBE is
+  # what stops defaults.h overriding the very widths it exists to measure.
+  # See multi-target-reg-probe.cc for why this is not a generator.
+  printf "mt-%s/reg-probe.o: $(srcdir)/multi-target-reg-probe.cc %s-inc/s-inc \\\n",
+	 cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
+  printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
+  printf "\t$(COMPILE) -DMULTI_TARGET_REG_PROBE $<\n";
+  printf "\t$(POSTCOMPILE)\n";
+  printf "mt-%s/reg-probe.o: MULTI_TARGET_INC = -I%s-inc\n\n", cpu, cpu;
+  printf "MULTI_TARGET_REG_PROBES += mt-%s/reg-probe.o\n\n", cpu;
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;

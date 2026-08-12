@@ -38,6 +38,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-config.h"
 #include "regs.h"
 #include "ira.h"
+/* For `struct target_ira_int', the fourth of the shared layouts checked in
+   `init_reg_sets'.  reginfo.cc has no other use for ira-int.h.  */
+#include "ira-int.h"
 #include "recog.h"
 #include "diagnostic-core.h"
 #include "reload.h"
@@ -72,18 +75,20 @@ struct target_regs *this_target_regs = &default_target_regs;
 #define regs_invalidated_by_call \
   (this_target_hard_regs->x_regs_invalidated_by_call)
 
-/* Data for initializing fixed_regs.  */
-static const char initial_fixed_regs[] = FIXED_REGISTERS;
+/* WHERE THE SIX DATA MACROS WENT.
 
-/* Data for initializing call_used_regs.  */
-#ifdef CALL_REALLY_USED_REGISTERS
-#ifdef CALL_USED_REGISTERS
-#error CALL_USED_REGISTERS and CALL_REALLY_USED_REGISTERS are both defined
-#endif
-static const char initial_call_used_regs[] = CALL_REALLY_USED_REGISTERS;
-#else
-static const char initial_call_used_regs[] = CALL_USED_REGISTERS;
-#endif
+   FIXED_REGISTERS, CALL_USED_REGISTERS, REG_ALLOC_ORDER, REG_CLASS_CONTENTS,
+   REGISTER_NAMES and REG_CLASS_NAMES used to be evaluated right here.  This
+   is a MIDDLE-END translation unit, compiled once, against the PRIMARY base's
+   tm.h -- so in a compiler holding two back ends, every one of them was
+   i386's while generating aarch64 code.  They now come from
+   `targetm_regs' (target-regs.h), which is the SELECTED base's own table,
+   built in that base's own preprocessor context by target-regs.cc.
+
+   This half and the run-time loop bounds below are one change.  Either alone
+   is worse than the ICE they replace: bounded loops over the primary's data
+   compile aarch64 against i386's register names, in bounds and with no
+   diagnostic, and that would look exactly like the arm passing.  */
 
 /* Indexed by hard register number, contains 1 for registers
    that are being used for global register decls.
@@ -97,26 +102,20 @@ HARD_REG_SET global_reg_set;
 /* Declaration for the global register. */
 tree global_regs_decl[FIRST_PSEUDO_REGISTER];
 
-/* Used to initialize reg_alloc_order.  */
-#ifdef REG_ALLOC_ORDER
-static int initial_reg_alloc_order[FIRST_PSEUDO_REGISTER] = REG_ALLOC_ORDER;
-#endif
+/* Array containing all of the register class names.
 
-/* The same information, but as an array of unsigned ints.  We copy from
-   these unsigned ints to the table above.  We do this so the tm.h files
-   do not have to be aware of the wordsize for machines with <= 64 regs.
-   Note that we hard-code 32 here, not HOST_BITS_PER_INT.  */
-#define N_REG_INTS  \
-  ((FIRST_PSEUDO_REGISTER + (32 - 1)) / 32)
+   Sized by the UNION class count and FILLED at `init_reg_sets' from the
+   selected base's own REG_CLASS_NAMES, rather than initialised from the
+   primary's.  Rows the selected base does not have keep the sentinel below,
+   which is a string rather than NULL because every use site is a `%s' in a
+   dump and a NULL there is a crash three files away that names nothing.  */
+const char * reg_class_names[N_REG_CLASSES];
 
-static const unsigned int_reg_class_contents[N_REG_CLASSES][N_REG_INTS]
-  = REG_CLASS_CONTENTS;
-
-/* Array containing all of the register names.  */
-static const char *const initial_reg_names[] = REGISTER_NAMES;
-
-/* Array containing all of the register class names.  */
-const char * reg_class_names[] = REG_CLASS_NAMES;
+/* What a class or register beyond the selected base's own count is called.
+   It should never be printed; if it is, it says which of the two counts the
+   printing loop used.  */
+static const char mt_absent_class_name[] = "<class absent from this back end>";
+static const char mt_absent_reg_name[] = "<register absent from this back end>";
 
 /* No more global register variables may be declared; true once
    reginfo has been initialized.  */
@@ -169,35 +168,103 @@ init_reg_sets (void)
 {
   int i, j;
 
-  /* First copy the register information from the initial int form into
-     the regsets.  */
+  /* NO FALLBACK TO THE PRIMARY, DELIBERATELY.  A compiler that reached here
+     without selecting a back end has no register vocabulary, and saying so is
+     better than answering with whichever base happened to be linked first --
+     which is correct on the build machine and wrong everywhere else.  */
+  if (targetm_regs == NULL)
+    internal_error ("no target configuration was selected, so there is no "
+		    "register vocabulary to initialise");
+
+  const struct target_regs_desc *r = targetm_regs;
+  const int nclasses = r->n_reg_classes;
+  const int nregs = r->first_pseudo_register;
+
+  /* THE LAYOUT CHECK.  These four structures are allocated HERE, by generic
+     code (target-globals.cc XCNEWs them), and their fields are read by the
+     selected back end's own objects.  The `sizeof' on the right was computed
+     in that back end's translation unit; the one on the left is this one's.
+     If a bound in hard-reg-set.h, regs.h, ira.h or ira-int.h were left
+     spelled FIRST_PSEUDO_REGISTER instead of MULTI_TARGET_UNION_*, both
+     halves would still compile and the back end would read past the end of a
+     shorter struct, with nothing anywhere to say so.  Named individually
+     rather than summed: a check that cannot say WHICH structure disagrees is
+     most of a check.  */
+#define MT_CHECK_LAYOUT(TYPE, FIELD)					\
+  if (sizeof (struct TYPE) != r->FIELD)					\
+    internal_error ("back end %qs computes %<sizeof (struct " #TYPE ")%> "\
+		    "as %wu, but target-independent code allocates %wu; "\
+		    "a bound in its header is not spelled "		\
+		    "MULTI_TARGET_UNION_*",				\
+		    r->name, (unsigned HOST_WIDE_INT) r->FIELD,		\
+		    (unsigned HOST_WIDE_INT) sizeof (struct TYPE));
+  MT_CHECK_LAYOUT (target_hard_regs, sizeof_target_hard_regs)
+  MT_CHECK_LAYOUT (target_regs, sizeof_target_regs)
+  MT_CHECK_LAYOUT (target_ira, sizeof_target_ira)
+  MT_CHECK_LAYOUT (target_ira_int, sizeof_target_ira_int)
+#undef MT_CHECK_LAYOUT
+
+  /* The union is the LAYOUT and the selected base's counts are the CONTENTS,
+     so this cannot be one loop.  Every row of the union-sized table is
+     cleared; only the rows this base has are filled.  A phantom class is
+     therefore the EMPTY set, which is inert in the subunion and superunion
+     tables below (empty is a subset of everything, but both loops start from
+     class 0, which is NO_REGS and also empty, and neither will replace an
+     empty answer with another empty one).  */
+  gcc_assert (nclasses > 0 && nclasses <= N_REG_CLASSES);
+  gcc_assert (nregs > 0 && nregs <= FIRST_PSEUDO_REGISTER);
 
   for (i = 0; i < N_REG_CLASSES; i++)
-    {
-      CLEAR_HARD_REG_SET (reg_class_contents[i]);
+    CLEAR_HARD_REG_SET (reg_class_contents[i]);
 
-      /* Note that we hard-code 32 here, not HOST_BITS_PER_INT.  */
-      for (j = 0; j < FIRST_PSEUDO_REGISTER; j++)
-	if (int_reg_class_contents[i][j / 32]
-	    & ((unsigned) 1 << (j % 32)))
-	  SET_HARD_REG_BIT (reg_class_contents[i], j);
+  for (i = 0; i < nclasses; i++)
+    /* Note that we hard-code 32 here, not HOST_BITS_PER_INT.  The row stride
+       is the SELECTED base's N_REG_INTS, not the union's; using the union's
+       would read this base's rows at the wrong offsets and is exactly the
+       kind of in-bounds, undiagnosed wrongness this change exists to end.  */
+    for (j = 0; j < nregs; j++)
+      if (r->d_reg_class_contents[i * r->n_reg_ints + j / 32]
+	  & ((unsigned) 1 << (j % 32)))
+	SET_HARD_REG_BIT (reg_class_contents[i], j);
+
+  memcpy (fixed_regs, r->d_fixed_regs, nregs * sizeof fixed_regs[0]);
+  memcpy (call_used_regs, r->d_call_used_regs, nregs * sizeof call_used_regs[0]);
+  memcpy (reg_names, r->d_reg_names, nregs * sizeof reg_names[0]);
+
+  for (i = 0; i < nclasses; i++)
+    reg_class_names[i] = r->d_reg_class_names[i];
+  for (i = nclasses; i < N_REG_CLASSES; i++)
+    reg_class_names[i] = mt_absent_class_name;
+
+  /* THE TAIL FENCE, AND IT IS NOT TIDINESS.
+
+     The union width gives i386 three hard registers it does not have.  Left
+     zero-filled, `fixed_regs' would say those three are NOT FIXED and
+     `reg_alloc_order' would say they are all register 0 -- so
+     `inv_reg_alloc_order[reg_alloc_order[i]] = i' (below) would overwrite
+     entry 0 three times and the allocation order would stop being a
+     permutation.  Both silently change allocation on the PRIMARY, which is
+     the arm that must not move.  Fixed, never allocatable, and each its own
+     identity in the order.  */
+  for (i = nregs; i < FIRST_PSEUDO_REGISTER; i++)
+    {
+      fixed_regs[i] = 1;
+      call_used_regs[i] = 0;
+      reg_names[i] = mt_absent_reg_name;
     }
 
-  /* Sanity check: make sure the target macros FIXED_REGISTERS and
-     CALL_USED_REGISTERS had the right number of initializers.  */
-  gcc_assert (sizeof fixed_regs == sizeof initial_fixed_regs);
-  gcc_assert (sizeof call_used_regs == sizeof initial_call_used_regs);
-#ifdef REG_ALLOC_ORDER
-  gcc_assert (sizeof reg_alloc_order == sizeof initial_reg_alloc_order);
-#endif
-  gcc_assert (sizeof reg_names == sizeof initial_reg_names);
-
-  memcpy (fixed_regs, initial_fixed_regs, sizeof fixed_regs);
-  memcpy (call_used_regs, initial_call_used_regs, sizeof call_used_regs);
-#ifdef REG_ALLOC_ORDER
-  memcpy (reg_alloc_order, initial_reg_alloc_order, sizeof reg_alloc_order);
-#endif
-  memcpy (reg_names, initial_reg_names, sizeof reg_names);
+  /* A back end that defines no REG_ALLOC_ORDER used to be an `#ifdef' here --
+     which, in a middle-end translation unit, tested the PRIMARY's headers and
+     answered for every base.  It is a run-time property of the selected base
+     now, and it is a null pointer rather than a flag so that the two cannot
+     disagree.  */
+  if (r->d_reg_alloc_order != NULL)
+    {
+      memcpy (reg_alloc_order, r->d_reg_alloc_order,
+	      nregs * sizeof reg_alloc_order[0]);
+      for (i = nregs; i < FIRST_PSEUDO_REGISTER; i++)
+	reg_alloc_order[i] = i;
+    }
 
   SET_HARD_REG_SET (accessible_reg_set);
   SET_HARD_REG_SET (operand_reg_set);
@@ -254,10 +321,12 @@ init_reg_sets_1 (void)
 
   restore_register_info ();
 
-#ifdef REG_ALLOC_ORDER
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-    inv_reg_alloc_order[reg_alloc_order[i]] = i;
-#endif
+  /* Was `#ifdef REG_ALLOC_ORDER', i.e. the PRIMARY's headers deciding for
+     every base.  The tail fence in `init_reg_sets' made the order a
+     permutation over the UNION width, so this stays a full-width loop.  */
+  if (targetm_regs->d_reg_alloc_order != NULL)
+    for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+      inv_reg_alloc_order[reg_alloc_order[i]] = i;
 
   /* Let the target tweak things if necessary.  */
 
@@ -325,18 +394,31 @@ init_reg_sets_1 (void)
   /* Initialize the tables of subclasses and superclasses of each reg class.
      First clear the whole table, then add the elements as they are found.  */
 
+  /* Cleared over the UNION width -- this is the array, not the vocabulary.  */
   for (i = 0; i < N_REG_CLASSES; i++)
     {
       for (j = 0; j < N_REG_CLASSES; j++)
 	reg_class_subclasses[i][j] = LIM_REG_CLASSES;
     }
 
-  for (i = 0; i < N_REG_CLASSES; i++)
+  /* FILLED over the selected base's own count, and this one genuinely cannot
+     be left at the union width.  A class the selected base does not have is
+     the EMPTY set, and the empty set is a subset of every class -- so a
+     full-width loop would enter each of the 14 phantom classes into the
+     subclass list of every REAL class, and ira.cc walks those lists.  That is
+     in bounds, has no assert, and would be indistinguishable from working.
+     The subunion and superunion loops above are left full-width on purpose
+     and the difference is not an oversight: their tests are
+     `!hard_reg_set_subset_p (contents[k], contents[current])' and
+     `hard_reg_set_subset_p (c, contents[k])', both of which start from class
+     0 -- NO_REGS, also empty -- so an empty class can never displace the
+     answer there.  */
+  for (i = 0; i < (unsigned int) MT_N_REG_CLASSES; i++)
     {
       if (i == (int) NO_REGS)
 	continue;
 
-      for (j = i + 1; j < N_REG_CLASSES; j++)
+      for (j = i + 1; j < (unsigned int) MT_N_REG_CLASSES; j++)
 	if (hard_reg_set_subset_p (reg_class_contents[i],
 				  reg_class_contents[j]))
 	  {
@@ -437,7 +519,15 @@ init_reg_sets_1 (void)
       HARD_REG_SET ok_regs, ok_regs2;
       CLEAR_HARD_REG_SET (ok_regs);
       CLEAR_HARD_REG_SET (ok_regs2);
-      for (j = 0; j < FIRST_PSEUDO_REGISTER; j++)
+      /* The selected base's own register count, not the union width: this
+	 asks a BACK-END HOOK about a register number, and i386's
+	 `hard_regno_mode_ok' would be asked about registers 92, 93 and 94.
+	 The tail fence has already made those fixed, so the first test would
+	 in fact short-circuit today -- which is precisely why the bound is
+	 here rather than relied upon: the short circuit is an accident of the
+	 order of two conditions, and it is the kind of accident that stops
+	 being true when someone reorders them.  */
+      for (j = 0; j < (unsigned int) MT_FIRST_PSEUDO_REGISTER; j++)
 	if (!TEST_HARD_REG_BIT (fixed_nonglobal_reg_set, j)
 	    && targetm.hard_regno_mode_ok (j, (machine_mode) m))
 	  {
@@ -446,7 +536,14 @@ init_reg_sets_1 (void)
 	      SET_HARD_REG_BIT (ok_regs2, j);
 	  }
 
-      for (i = 0; i < N_REG_CLASSES; i++)
+      /* THIS IS THE LOOP THE aarch64 ARM HAS BEEN STUCK ON.  It asks a
+	 BACK-END HOOK about a class number; with i386 primary it asked
+	 aarch64 about classes 20..33 and `aarch64_class_max_nregs' asserted
+	 (aarch64.cc:14322).  Note what that means about the three loops
+	 above, which ran the same 34 classes over aarch64's data and said
+	 nothing: the ICE was never the first wrong thing, only the first
+	 wrong thing with an assert.  */
+      for (i = 0; i < (unsigned int) MT_N_REG_CLASSES; i++)
 	if ((targetm.class_max_nregs ((reg_class_t) i, (machine_mode) m)
 	     <= reg_class_size[i])
 	    && hard_reg_set_intersect_p (ok_regs, reg_class_contents[i]))

@@ -1934,11 +1934,71 @@ typedef TARGET_UNIT target_unit;
    MULTI_TARGET_TARGETM_BASE: `target.h:392' rejects that name without a
    matching `-Dtargetm='.  gen-multi-target-md.awk defines this one instead.  */
 #if defined (MULTI_TARGET_TARGETM_BASE) || defined (GENERATOR_FILE)	\
-    || defined (MULTI_TARGET_SUPPLY_TU)
+    || defined (MULTI_TARGET_SUPPLY_TU) || defined (MULTI_TARGET_REG_PROBE)
 /* A back end's own translation unit, a build-time generator, or another
    supply-side TU: keep the real macros.  */
 #else
 #include "target-cdata.h"
+
+/* ------------------------------------------------------------------------
+   THE REGISTER VOCABULARY, PART 2 OF 2: THE PER-CONFIGURATION DATA.
+
+   Only the two class NAMES that target-independent code actually spells, and
+   only because it spells them in no constant-expression context at all -- no
+   case label, no array bound, no static initialiser, no `#if' (swept).
+   `NO_REGS' is deliberately absent: it is 0 in all 52 back ends, and
+   reginfo.cc and ira.cc seed their subunion and superunion tables by
+   memset-to-zero, which is only meaningful if 0 is the empty class.
+
+   `REGNO_REG_CLASS' is here rather than left alone because it is called from
+   INSIDE the function that ICEs (reginfo.cc:405), and because i386's
+   definition is the bare subscript `regclass_map[REGNO]' -- with the union
+   width above, generic code asks it about three register numbers i386 does
+   not have.  The dispatched version answers NO_REGS out of range.  */
+#include "target-regs.h"
+#include "multi-target-reg-widths.h"
+
+/* THE COMPILE-TIME WIDTHS, FOR CONSUMER TRANSLATION UNITS.
+
+   Target-independent code declares its own arrays with these bounds -- one
+   `char global_regs[FIRST_PSEUDO_REGISTER]' in reginfo.cc is enough to make
+   the point -- and it is compiled ONCE, against the primary's tm.h.  Sized at
+   the primary's 92 they overflow the moment a base with 95 is selected.  So
+   for these translation units the two names mean the compile-time MAXIMUM
+   over the configured back ends.
+
+   THIS IS NOT WHAT MAKES `struct target_hard_regs' ONE LAYOUT, and it cannot
+   be.  A back end's own translation unit is exempt from this block by design,
+   and must be: `config/i386/i386.h' declares `regclass_map' and three
+   debugger register maps `[FIRST_PSEUDO_REGISTER]' at a point BEFORE
+   defaults.h has been reached, while `config/i386/i386.cc' defines them
+   after -- so an override here that reached back-end objects would make the
+   declaration 92 and the definition 95.  That is a hard error, and it was
+   the first thing this design hit.  The four SHARED structures name
+   MULTI_TARGET_UNION_* explicitly instead; see hard-reg-set.h.  A site missed
+   there is silent, so `init_reg_sets' checks all four struct sizes against
+   the values a back end's own translation unit computed.
+
+   `LIM_REG_CLASSES' KEEPS ITS ENUM TYPE.  It is assigned to `enum reg_class'
+   lvalues in eight places (reginfo.cc:374, ira.cc:541, :1212, :1253, ...) and
+   C++ has no implicit int-to-enum conversion, so a plain integer here would
+   be eight errors rather than a union.  It is also an array bound twice
+   (ira.cc:995, lra-constraints.cc:2170-2171), which is why it stays a
+   constant expression and does not become a run-time count.  */
+#undef FIRST_PSEUDO_REGISTER
+#define FIRST_PSEUDO_REGISTER MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER
+#undef N_REG_CLASSES
+#define N_REG_CLASSES MULTI_TARGET_UNION_N_REG_CLASSES
+#undef LIM_REG_CLASSES
+#define LIM_REG_CLASSES ((enum reg_class) MULTI_TARGET_UNION_N_REG_CLASSES)
+
+#undef ALL_REGS
+#define ALL_REGS ((enum reg_class) targetm_regs->all_regs)
+#undef GENERAL_REGS
+#define GENERAL_REGS ((enum reg_class) targetm_regs->general_regs)
+#undef REGNO_REG_CLASS
+#define REGNO_REG_CLASS(REGNO) \
+  ((enum reg_class) targetm_regs->regno_reg_class ((int) (REGNO)))
 
 /* `MAX_BITS_PER_WORD' is an array bound in eleven places.  If this back end
    did not supply its own, the fallback above derived it from BITS_PER_WORD,

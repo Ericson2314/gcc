@@ -81,6 +81,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-asm-ops.h"
 #include "target-addr.h"
 #include "target-cdata.h"
+#include "target-regs.h"
 
 /* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
    back end -- and MT_TARGET_BASES, which maps each configured triple to the
@@ -450,6 +451,25 @@ multi_target_select (const char *target)
 	  internal_error ("back end %qs has no target-cdata refresh function; "
 			  "one is emitted for every back end that has "
 			  "objects, so this is a build bug", base);
+
+	/* The register vocabulary: the six data arrays, the two counts, this
+	   base's ALL_REGS and GENERAL_REGS, and its REGNO_REG_CLASS.  A TABLE
+	   and not a refresh function, because none of it depends on option
+	   state -- FIXED_REGISTERS and REG_CLASS_CONTENTS are settled by the
+	   back end's headers alone -- so it can and does point here, before
+	   options are decoded and long before `init_reg_sets' reads it.
+
+	   Unlike `targetm_addr' and `targetm_asm_ops' above, `targetm_regs'
+	   is NULL until this line rather than pre-pointed at the primary.
+	   That is the difference between a mechanism that fails loudly and
+	   one that fails correctly on the build machine: a pre-pointed
+	   default here would compile aarch64 against i386's register classes
+	   and i386's register names, in bounds and with no diagnostic.  */
+	targetm_regs = target_regs_for (base);
+	if (targetm_regs == NULL)
+	  internal_error ("back end %qs has no register-vocabulary table; "
+			  "gen-multi-target-md.awk emits one for every back "
+			  "end that has objects, so this is a build bug", base);
 
 	mt_current = b;
 	return true;
