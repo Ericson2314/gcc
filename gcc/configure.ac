@@ -2294,6 +2294,96 @@ AC_DEFINE_UNQUOTED(LTOPLUGINSONAME,"${host_lto_plugin_soname}",
 # the gcc/collect-ld script.  So we need to know how libtool works, or
 # exec-tool will fail.
 
+# --enable-shared: build gcc's own host code as shared libraries.  Formerly
+# spelled --enable-host-shared.
+#
+# The `host-' prefix was redundant.  `--enable-shared' given to a package means
+# THAT PACKAGE's host: given to gcc it means gcc's own host, given to libgcc it
+# means libgcc's host, which is what gcc calls the target.  One rule, resolved
+# against whichever package is being configured -- so the prefix was a local
+# invention where a convention already existed.
+#
+# CORRECTION to a note that used to stand at the old declaration site.  It
+# claimed "the blocker is now gone" because the hand-written second
+# AC_ARG_ENABLE(shared) in this file -- the one meaning "do not provide a
+# shared libgcc", a target question -- had been removed (see the note above
+# DRIVER_DEFINES and libgcc/configure.ac:52).  That much is true; the
+# conclusion was wrong.  LT_INIT below declares --enable-shared too, invisibly,
+# out of libtool's own m4.  "There is no AC_ARG_ENABLE(shared) in this
+# configure.ac" is never evidence that the name is free -- autoconf sets
+# enable_<name> for any --enable-<name> whether or not anything declares it.
+# Grep the *generated* configure.
+#
+# THIS BLOCK MUST STAY IMMEDIATELY ABOVE LT_INIT.  LT_INIT declares
+# --enable-shared itself, and in its action-if-not-given it assigns
+# enable_shared=yes.  From that point on ${enable_shared+set} no longer
+# distinguishes "the user gave the option" from "libtool supplied its own
+# default", so an AC_ARG_ENABLE(shared) placed after LT_INIT would take the
+# action-if-given arm on every build and gcc's host-shared default would flip
+# from no to yes with nothing on the console to say so.  Both arms are
+# therefore spelled out explicitly, and they are evaluated before libtool has
+# had a chance to touch the variable.
+#
+# Sharing the name with libtool is a merge, not a collision: the libtool
+# instantiated here runs in the host context, so "build shared libraries" and
+# "build gcc's host objects shared" are the same question asked twice.  (gcc
+# builds no libtool libraries at all -- the _LT_CONFIG_COMMANDS stub below
+# suppresses libtool's config commands; LT_INIT is here only for the
+# @objdir@/@enable_fast_install@ substitutions that gcc/exec-tool.in needs.)
+# We deliberately do not assign to $enable_shared, so libtool's own behaviour
+# is bit-for-bit what it was before this rename.
+#
+# The default is the EMPTY STRING, not `no'.  --enable-host-shared had no
+# action-if-not-given at all, so the flagless value was empty, and
+# gcc/Makefile.in:1290 tests
+#     ifneq ($(enable_host_shared)$(enable_host_pie),)
+# -- emptiness, not the value.  A default of `no' is non-empty and would
+# therefore select ../libiberty/pic/libiberty.a on every flagless build.  Note
+# that --disable-shared does set it to `no' and so does select the pic build;
+# that is not new, --disable-host-shared did exactly the same.
+#
+# KNOWN BREAKAGE, NOT FIXABLE FROM THIS FILE -- vxworks targets.  The top level
+# forwards every user --enable-*/--disable-* into host_configargs, which is
+# passed verbatim to this configure, and ../configure.ac:4022-4026 additionally
+# appends a bare --disable-shared to host_configargs for *vxworks* -- for a
+# purely target-library reason, with the comment "So gcc knows ...".  Before
+# this rename gcc ignored it.  Now it sets enable_host_shared=no, which is
+# non-empty, which selects ../libiberty/pic/libiberty.a -- while the same
+# --disable-shared reaches libiberty and empties its PICFLAG, so libiberty
+# never builds pic/ at all and the gcc link fails on a missing archive.  The
+# same forwarding also means a user's top-level --enable-shared, a target-
+# library request, now silently makes gcc's own host code PIC.  Both are
+# top-level bugs -- a target fact reaching a host knob -- and the fix belongs
+# in ../configure.ac, which is not renamed yet.
+# The old spelling is rejected by name rather than quietly aliased.  This check
+# MUST come before the option below, which assigns enable_host_shared on every
+# build and would otherwise make ${enable_host_shared+set} true always -- the
+# very same "set does not mean given" trap as libtool's, one screen further on.
+#
+# Rejected rather than aliased because the failure mode of an ignored option
+# here is silent: host built non-shared, surfacing much later as a libgccjit
+# link error and never as a configure diagnostic.  The top level also passes
+# --disable-option-checking down to us, so an unrecognised option would not
+# even draw autoconf's warning.  The top level has not been renamed yet, so a
+# top-level --enable-host-shared does reach this error; that is intended.
+AC_ARG_ENABLE(host-shared,
+[AS_HELP_STRING([--enable-host-shared],
+		[obsolete spelling of --enable-shared; rejected])],
+[AC_MSG_ERROR([--enable-host-shared has been renamed to --enable-shared.
+
+An --enable-shared given to gcc means gcc's own host, the same way an
+--enable-shared given to libgcc means libgcc's host; the `host-' prefix was a
+local invention where a convention already existed.  Note that the top level's
+option of this name is not renamed yet, so if this came from a top-level
+configure line, that line needs updating too.])])
+
+AC_ARG_ENABLE(shared,
+[AS_HELP_STRING([--enable-shared],
+		[build host code as shared libraries])],
+[enable_host_shared=$enableval],
+[enable_host_shared=])
+AC_SUBST(enable_host_shared)
+
 m4_defun([_LT_CONFIG_COMMANDS], [])
 LT_INIT
 AC_SUBST(objdir)
@@ -3202,31 +3292,9 @@ if test x"$enable_plugin" = x"yes"; then
 fi
 
 
-# --enable-host-shared, --enable-host-pie.
-#
-# The `host-' prefix is redundant and is on its way out.  `--enable-shared'
-# given to a package means THAT PACKAGE's host: given to gcc it means gcc's own
-# host, given to libgcc it means libgcc's host, which is what gcc calls the
-# target.  One rule, resolved against whichever package is being configured --
-# so the prefix was a local invention where a convention already existed.
-#
-# THE BLOCKER IS NOW GONE.  This file used to carry a SECOND
-# AC_ARG_ENABLE(shared) meaning "do not provide a shared libgcc" -- a target
-# question -- so renaming these would have put two authorities behind one name
-# in a single file, the later one silently winning.  That option has been
-# removed (see the note above DRIVER_DEFINES and libgcc/configure.ac:52).
-#
-# What is left before the rename is purely the top level: it passes
-# --enable-host-shared and --enable-host-pie down here (22 uses in
-# ../configure.ac), so both files have to change together or the option becomes
-# unrecognised, enable_shared goes unset, and the host is built non-shared --
-# which shows up as a libgccjit link error, not as a configure diagnostic.
-# Acceptance therefore has to be "a build with no flags still produces a shared
-# host where it should", not "the old spelling is rejected".
-AC_ARG_ENABLE(host-shared,
-[AS_HELP_STRING([--enable-host-shared],
-		[build host code as shared libraries])])
-AC_SUBST(enable_host_shared)
+# --enable-host-pie is not renamed yet.  --enable-host-shared was: the merged
+# option, and the rejection of the old spelling, now live immediately above
+# LT_INIT.  See the long note there -- the placement is load-bearing.
 
 AC_ARG_ENABLE(host-pie,
 [AS_HELP_STRING([--enable-host-pie],
@@ -3246,7 +3314,7 @@ fi
 AC_SUBST(LIBGDIAGNOSTICS)
 
 
-# See the note above --enable-host-shared for why the prefix is still here.
+# See the note above --enable-host-pie for why the prefix is still here.
 AC_ARG_ENABLE(host-bind-now,
 [AS_HELP_STRING([--enable-host-bind-now],
 		[link host code as BIND_NOW])])

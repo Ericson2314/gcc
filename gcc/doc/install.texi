@@ -1151,8 +1151,16 @@ libraries, but yielding a slightly slower compiler.
 
 This option is required when building the libgccjit.so library.
 
-Contrast with @option{--enable-shared}, which affects @emph{target}
-libraries.
+Contrast with @option{--enable-shared}, which at this, the top level, affects
+@emph{target} libraries.
+
+Note that this is the @emph{top-level} spelling.  The @file{gcc} subdirectory's
+own @command{configure} has renamed its copy of this option to
+@option{--enable-shared} and rejects the old spelling by name: an
+@option{--enable-shared} given to a package means that package's host, so given
+to @file{gcc} it means gcc's host and given to @file{libgcc} it means libgcc's
+host, which is what gcc calls the target.  The top level has not been converted
+yet, so the two spellings coexist for now; the top level's is what a user types.
 
 @item --enable-versioned-jit
 Specify that the @samp{libgccjit} library is built with a soname matching
