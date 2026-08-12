@@ -1677,7 +1677,12 @@ enum reg_class
 /* Define how to find the value returned by a library function
    assuming the value has mode MODE.  */
 
-#define LIBCALL_VALUE(MODE) ix86_libcall_value (MODE)
+/* Deleted deliberately: this is now TARGET_LIBCALL_VALUE
+   (ix86_hook_libcall_value in i386.cc).  Leaving the macro behind would leave
+   default_libcall_value -- one shared middle-end body, compiled against the
+   primary base's tm.h -- able to answer for every base with i386's registers.
+   With the macro gone that path is gcc_unreachable (), so a base that fails to
+   supply the hook fails loudly instead of silently inheriting the primary's.  */
 
 /* Define the size of the result block used for communication between
    untyped_call and untyped_return.  The block contains a DImode value

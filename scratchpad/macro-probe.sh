@@ -136,7 +136,49 @@ PRE='#include "config.h"
 #include "tm.h"
 #include "hard-reg-set.h"'
 
-NAMES=$(grep -v '^#' "$MACROS" | awk 'NF{print $1}' | sort -u)
+########################################################################
+# THE ANTI-FLOOR GATE.
+#
+# Converting a macro to a hook DELETES its arm here: the name vanishes from
+# both bases' headers and the KIND probe scores absent/absent forever.  A
+# scoreboard that punishes progress invites the obvious next move -- quietly
+# editing this list -- which is the test-harness floor by a longer route.
+#
+# So a name may leave the header probe ONLY by being marked CONVERTED_GONE in
+# macro-status.txt AND appearing in tab-probe.sh's TAB_MACROS.  Both halves are
+# checked here, mechanically, before anything is probed.  Deleting a probe and
+# converting a macro out from under one now fail loudly, by name.
+########################################################################
+STATUS=${STATUS:-$HERE/macro-status.txt}
+TABSH=${TABSH:-$HERE/tab-probe.sh}
+[ -s "$STATUS" ] || die "no macro status file $STATUS"
+[ -s "$TABSH" ] || die "no $TABSH; a CONVERTED macro could not be covered"
+TAB_COVERED=$(sed -n 's/^TAB_MACROS="\(.*\)"$/\1/p' "$TABSH")
+[ -n "$TAB_COVERED" ] || die "could not read TAB_MACROS from $TABSH -- the \
+coverage check would pass vacuously, which is worse than no check"
+
+ALL=$(grep -v '^#' "$MACROS" | awk 'NF{print $1}' | sort -u)
+for n in $ALL; do
+  awk -v m="$n" '$1 !~ /^#/ && $1==m{f=1} END{exit !f}' "$STATUS" \
+    || die "$n is probed but has no status in $STATUS"
+done
+RETIRED=""
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_SUPPLY") {print $1}' "$STATUS"); do
+  case " $TAB_COVERED " in
+    *" $n "*) ;;
+    *) die "$n is marked CONVERTED in $STATUS but tab-probe.sh does not cover \
+it.  A macro may only move UNCONVERTED -> CONVERTED together with its TAB arm; \
+without one it would simply disappear from the score." ;;
+  esac
+done
+for n in $(awk '$1 !~ /^#/ && $2=="CONVERTED_GONE" {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
+echo "status: $(awk '$1 !~ /^#/ && $2=="UNCONVERTED"' "$STATUS" | wc -l) unconverted, \
+$(awk '$1 !~ /^#/ && $2 ~ /^CONVERTED/' "$STATUS" | wc -l) converted (all covered by TAB); \
+retiring from the header probe:${RETIRED:- none}"
+
+NAMES=$(for n in $ALL; do
+          case " $RETIRED " in *" $n "*) ;; *) echo "$n";; esac
+        done)
 NMACRO=$(echo "$NAMES" | wc -l)
 [ "$NMACRO" -ge 100 ] || die "macro list has only $NMACRO entries; refusing to \
 report a result from a nearly empty set"

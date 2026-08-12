@@ -4443,6 +4443,22 @@ ix86_libcall_value (machine_mode mode)
   return ix86_function_value_1 (NULL, NULL, mode, mode);
 }
 
+/* Implement TARGET_LIBCALL_VALUE.
+
+   This used to be reached only through the LIBCALL_VALUE macro, which the
+   middle end spells exactly once -- in default_libcall_value, in targhooks.cc.
+   targhooks.cc is a SHARED translation unit: it is compiled once, against the
+   primary base's tm.h.  With more than one back end linked in, every base
+   therefore got the primary's LIBCALL_VALUE, under a target-neutral name and
+   with no diagnostic.  Supplying the hook per back end is what makes each
+   base's targetm carry its own answer.  */
+
+static rtx
+ix86_hook_libcall_value (machine_mode mode, const_rtx fun ATTRIBUTE_UNUSED)
+{
+  return ix86_libcall_value (mode);
+}
+
 /* Return true iff type is returned in memory.  */
 
 static bool
@@ -28946,6 +28962,9 @@ ix86_libgcc_floating_mode_supported_p
 
 #undef TARGET_FUNCTION_VALUE_REGNO_P
 #define TARGET_FUNCTION_VALUE_REGNO_P ix86_function_value_regno_p
+
+#undef TARGET_LIBCALL_VALUE
+#define TARGET_LIBCALL_VALUE ix86_hook_libcall_value
 
 #undef TARGET_ZERO_CALL_USED_REGS
 #define TARGET_ZERO_CALL_USED_REGS ix86_zero_call_used_regs

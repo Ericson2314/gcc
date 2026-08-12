@@ -7471,6 +7471,15 @@ aarch64_return_in_msb (const_tree valtype)
   return true;
 }
 
+/* Implement TARGET_LIBCALL_VALUE.  Was the LIBCALL_VALUE macro in
+   aarch64.h; see the comment there.  */
+
+static rtx
+aarch64_libcall_value (machine_mode mode, const_rtx fun ATTRIBUTE_UNUSED)
+{
+  return gen_rtx_REG (mode, FLOAT_MODE_P (mode) ? V0_REGNUM : R0_REGNUM);
+}
+
 /* Implement TARGET_FUNCTION_VALUE.
    Define how to find the value returned by a function.  */
 
@@ -34126,6 +34135,9 @@ aarch64_run_selftests (void)
 
 #undef TARGET_FUNCTION_VALUE_REGNO_P
 #define TARGET_FUNCTION_VALUE_REGNO_P aarch64_function_value_regno_p
+
+#undef TARGET_LIBCALL_VALUE
+#define TARGET_LIBCALL_VALUE aarch64_libcall_value
 
 #undef TARGET_START_CALL_ARGS
 #define TARGET_START_CALL_ARGS aarch64_start_call_args

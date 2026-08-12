@@ -1051,9 +1051,11 @@ extern enum aarch64_cpu aarch64_tune;
 
 #define FIRST_PARM_OFFSET(FNDECL) 0
 
-/* Fix for VFP */
-#define LIBCALL_VALUE(MODE)  \
-  gen_rtx_REG (MODE, FLOAT_MODE_P (MODE) ? V0_REGNUM : R0_REGNUM)
+/* Fix for VFP.  Was LIBCALL_VALUE; now TARGET_LIBCALL_VALUE
+   (aarch64_libcall_value in aarch64.cc).  See the note in i386.h: the macro
+   was read by ONE shared middle-end body compiled against the primary base's
+   tm.h, so with two back ends linked together aarch64 was answering with
+   i386's registers.  */
 
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
