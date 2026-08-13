@@ -211,6 +211,27 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**THE SYMBOL INSTRUMENT IS BLIND TO MACROS THAT EXPAND TO OPTION STATE, AND
+THAT IS EXACTLY WHERE THE WORST LEAKS LIVE.** `nm -uC` scores them as *absent*,
+and not by bad luck: `ix86_pmode` is `global_options.x_ix86_pmode`, a struct
+member shared code legitimately links against, so **no object anywhere carries
+an undefined reference naming it**. Two agents hit this independently — one
+found `nm` scoring four real leaks clean because `Var(ix86_branch_cost)` is
+likewise `global_options.x_…`. So the instrument sees macros expanding to
+**code** and misses macros expanding to **option state**. When a macro's body
+is an option variable, `nm` cannot help you; read the value in the running
+`cc1`.
+
+**The silent-default variant, which is worse than an ordinary leak.** i386's
+`Pmode` is `(ix86_pmode == PMODE_DI ? DImode : SImode)`, and `ix86_pmode` is
+`Init (PMODE_SI)`, promoted to `PMODE_DI` only by `ix86_option_override` —
+which runs only when i386 is selected. So shared code compiling for aarch64
+did **not** get x86_64's answer; it got the primary's **unconfigured
+default**, correct for *neither* base. Note the trap in that: **a leak serving
+the primary's real value would have produced the right mode by luck and hidden
+this indefinitely.** When you find an option-state macro, check what it reads
+before any `*_option_override` has run, not what it reads afterwards.
+
 **An undefined symbol names the macro that DRAGGED IT IN, not the macro that
 caused the control flow.** `nm -uC` cleared three walls in a row and then
 pointed at the wrong macro on the fourth. `cfgexpand.o` showed
