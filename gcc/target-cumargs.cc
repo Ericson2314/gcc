@@ -239,6 +239,108 @@ mt_base_init_expanders (void)
 # define MT_BASE_INIT_EXPANDERS NULL
 #endif
 
+/* THE MOVE/CLEAR FAMILY, asked of THIS base; see target-frame.h for why all
+   seven move together and why `MAX_MOVE_MAX' does not move with them.
+
+   Every one of these is one macro expansion in a translation unit whose
+   `tm.h' is this back end's, which is the entire mechanism.  Four of the
+   seven have no definition in most back ends and pick up `defaults.h's
+   generic one HERE -- and that is the point rather than an accident: the
+   generic `STORE_MAX_PIECES' is `MIN (MOVE_MAX_PIECES, 2 * sizeof
+   (HOST_WIDE_INT))', so evaluating it here computes it from THIS base's
+   `MOVE_MAX' instead of from the primary's.
+
+   The casts to `int' are not cosmetic.  `MIN' against `sizeof' makes the
+   generic `STORE_MAX_PIECES' `size_t', and returning that through an `int'
+   field without saying so would be a silent narrowing on exactly the
+   member whose whole job is to be a byte count.  Every base's value is a
+   small positive constant, so the cast loses nothing; it is written down so
+   that a base whose value ever stops being small fails a review rather than
+   wrapping.  */
+
+static int
+mt_base_move_max (void)
+{
+  return (int) MOVE_MAX;
+}
+
+static int
+mt_base_move_max_pieces (void)
+{
+  return (int) MOVE_MAX_PIECES;
+}
+
+static int
+mt_base_store_max_pieces (void)
+{
+  return (int) STORE_MAX_PIECES;
+}
+
+static int
+mt_base_compare_max_pieces (void)
+{
+  return (int) COMPARE_MAX_PIECES;
+}
+
+static int
+mt_base_move_ratio (bool speed)
+{
+  return (int) MOVE_RATIO (speed);
+}
+
+static int
+mt_base_clear_ratio (bool speed)
+{
+  return (int) CLEAR_RATIO (speed);
+}
+
+static int
+mt_base_set_ratio (bool speed)
+{
+  return (int) SET_RATIO (speed);
+}
+
+/* `DATA_ALIGNMENT' and `DATA_ABI_ALIGNMENT', with the `(has_X, payload)'
+   shape.  See target-frame.h for why this pair carries a flag and the seven
+   above do not, and for the gdb confirmation that i386's implementation of
+   both faults on `int x = 1;' when aarch64 is selected.
+
+   The `#ifdef' is the SAME `#ifdef' varasm.cc used to spell.  What changed
+   is which translation unit evaluates it, and therefore which back end it is
+   a fact about: in varasm.cc it was a fact about i386 applied to all 48 back
+   ends.
+
+   No `#else' arm supplies a generic macro, because there is no generic macro
+   to supply -- `defaults.h' has none for either name, and inventing one
+   would be the floor PRINCIPLES forbids.  The identity behaviour a base with
+   neither macro needs lives in the SELECTION side, where "this base has
+   none" is a checked state rather than a silently missing definition.  */
+#ifdef DATA_ALIGNMENT
+static unsigned int
+mt_base_data_alignment (tree type, unsigned int align)
+{
+  return DATA_ALIGNMENT (type, align);
+}
+# define MT_BASE_HAS_DATA_ALIGNMENT true
+# define MT_BASE_DATA_ALIGNMENT mt_base_data_alignment
+#else
+# define MT_BASE_HAS_DATA_ALIGNMENT false
+# define MT_BASE_DATA_ALIGNMENT NULL
+#endif
+
+#ifdef DATA_ABI_ALIGNMENT
+static unsigned int
+mt_base_data_abi_alignment (tree type, unsigned int align)
+{
+  return DATA_ABI_ALIGNMENT (type, align);
+}
+# define MT_BASE_HAS_DATA_ABI_ALIGNMENT true
+# define MT_BASE_DATA_ABI_ALIGNMENT mt_base_data_abi_alignment
+#else
+# define MT_BASE_HAS_DATA_ABI_ALIGNMENT false
+# define MT_BASE_DATA_ABI_ALIGNMENT NULL
+#endif
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -275,7 +377,19 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_outgoing_reg_parm_stack_space,
   mt_base_function_arg_regno_p,
   MT_BASE_HAS_INIT_EXPANDERS,
-  MT_BASE_INIT_EXPANDERS
+  MT_BASE_INIT_EXPANDERS,
+  mt_base_move_max,
+  mt_base_move_max_pieces,
+  mt_base_store_max_pieces,
+  mt_base_compare_max_pieces,
+  mt_base_move_ratio,
+  mt_base_clear_ratio,
+  mt_base_set_ratio,
+  (int) MAX_MOVE_MAX,
+  MT_BASE_HAS_DATA_ALIGNMENT,
+  MT_BASE_DATA_ALIGNMENT,
+  MT_BASE_HAS_DATA_ABI_ALIGNMENT,
+  MT_BASE_DATA_ABI_ALIGNMENT
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL
