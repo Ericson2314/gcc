@@ -39,16 +39,22 @@ struct target_optabs *this_fn_optabs = &default_target_optabs;
 struct target_optabs *this_target_optabs = &default_target_optabs;
 #endif
 
-/* Look SCODE up in the selected target's optab table.  See the comment on
-   the declaration in optabs-query.h: this is the single point at which the
-   per-back-end raw_optab_handler is named, so that the header inlines that
-   reach it have one body rather than one body per back end.  */
+/* `selected_raw_optab_handler' USED TO BE DEFINED HERE, AS
+   `return raw_optab_handler (scode);'.
 
-enum insn_code
-selected_raw_optab_handler (unsigned scode)
-{
-  return raw_optab_handler (scode);
-}
+   That is the bare name, and the bare name is the PRIMARY's: it comes from
+   the un-namespaced `insn-opinit.o' that gcc/Makefile.in puts in $(OBJS).  So
+   the funnel this file's comment described as "the single point at which the
+   per-back-end raw_optab_handler is named" named exactly one back end's, for
+   every target.  Measured under gdb on an x86_64 + aarch64 cc1 with aarch64
+   selected: it answered icode 11383 for a SImode move, which against
+   aarch64's own `insn_data' is an SVE predicate pattern with a null `genfun',
+   and `emit_move_insn_1' jumped to it.
+
+   The definition now lives in multi-target-select.cc, next to the table that
+   says which back end is in force.  It is not moved for tidiness: it is moved
+   because that is the only translation unit that can answer the question, and
+   leaving a body here that could not would keep the mechanism looking done.  */
 
 /* Return the insn used to perform conversion OP from mode FROM_MODE
    to mode TO_MODE; return CODE_FOR_nothing if the target does not have

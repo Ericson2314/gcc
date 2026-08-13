@@ -2360,6 +2360,7 @@ FULL_DRIVER_NAME=gcc-$(version)$(exeext)
 
 MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  insn-config-union.list insn-config-*.part \
+ insn-opinit-union.list insn-opinit-*.part \
  insn-output.cc $(INSNRECOG_SEQ_SRC) insn-recog.h \
  $(INSNEMIT_SEQ_SRC) insn-extract.cc insn-peep.cc \
  insn-attr.h insn-attr-common.h insn-attrtab.cc insn-dfatab.cc \
@@ -3709,6 +3710,7 @@ multi-target-select.o: $(srcdir)/multi-target-select.cc \
   $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(TM_H) $(RTL_H) $(TREE_H) \
   $(REAL_H) $(HARD_REG_SET_H) insn-config.h $(RECOG_H) output.h \
   $(EMIT_RTL_H) $(DIAGNOSTIC_CORE_H) $(TARGET_H) tm-constrs.h \
+  insn-opinit.h \
   $(srcdir)/multi-target-select.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
@@ -3946,10 +3948,49 @@ s-attrtab : $(MD_DEPS) build/genattrtab$(build_exeext) \
 	$(SHELL) $(srcdir)/../move-if-change tmp-latencytab.cc insn-latencytab.cc
 	$(STAMP) s-attrtab
 
+# THE SHARED NUM_OPTAB_PATTERNS ANSWER.
+#
+# `insn-opinit.h' defines `struct target_optabs', whose `pat_enable[]' is
+# `NUM_OPTAB_PATTERNS' bools long -- and `default_target_optabs' is ONE object,
+# in optabs-query.cc, that the whole compiler shares.  The number is per back
+# end (it counts that back end's optab patterns), so before this rule the
+# shared struct was sized by the PRIMARY: 2975 for i386 against aarch64's 3328
+# in an x86_64 + aarch64 build dir, and `insn_aarch64::init_all_optabs' wrote
+# `pat_enable[0..3327]' -- 353 bools past the end of a 3465-byte object,
+# through `supports_vec_gather_load' and out the other side.  No link error and
+# no diagnostic.
+#
+# Like genconfig's maxima this cannot become a runtime value (it is an array
+# bound in a shared struct), so it takes the union over every configured back
+# end, and genopinit FAILS rather than defaulting if the list does not name
+# this base or omits the macro.  Note the bound genopinit uses for its OWN
+# `pats[]' table is deliberately NOT this macro -- see genopinit.cc, where
+# padding that table would silently unsort a binary search.
+#
+# Grep the generated multi-target-md.mk for `-Uinsn-opinit-union.list', not
+# this comment, to check it is still wired up.
+OPINIT_UNION_FLAGS = -Uinsn-opinit-union.list -A$(multi_target_base)
+
+# An empty $(multi_target_base) leaves genopinit with a bare `-A' whose
+# argument would then be the next word.  genopinit rejects `-A' with no
+# attached text, but it would then be reading the union file looking for a
+# base named `-U'-something and the message would point at the wrong thing.
+# Same check, same reason, as check_config_union_base.
+check_opinit_union_base = \
+  test -n "$(multi_target_base)" || { \
+    echo "s-opinit: multi_target_base is empty; genopinit cannot be told" >&2; \
+    echo "  which back end insn-opinit.h is being generated for." >&2; \
+    echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+    echo "  targetm_common_<base>_common" >&2; \
+    exit 1; }
+
 # genopinit produces two files.
 insn-opinit.cc insn-opinit.h: s-opinit ; @true
-s-opinit: $(MD_DEPS) build/genopinit$(build_exeext) insn-conditions.md
-	$(RUN_GEN) build/genopinit$(build_exeext) $(md_file) \
+s-opinit: $(MD_DEPS) build/genopinit$(build_exeext) insn-conditions.md \
+  insn-opinit-union.list
+	@$(check_opinit_union_base)
+	$(RUN_GEN) build/genopinit$(build_exeext) $(OPINIT_UNION_FLAGS) \
+	  $(md_file) \
 	  insn-conditions.md -htmp-opinit.h -ctmp-opinit.cc
 	$(SHELL) $(srcdir)/../move-if-change tmp-opinit.h insn-opinit.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-opinit.cc insn-opinit.cc

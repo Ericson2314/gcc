@@ -590,16 +590,42 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-latencytab-%s.cc mt-%s/insn-latencytab-%s.cc\n", cpu, cpu, cpu;
   printf "\t$(STAMP) s-attrtab-%s\n\n", cpu;
 
+  # genopinit takes the union flags for the same reason genconfig does:
+  # `NUM_OPTAB_PATTERNS' sizes `pat_enable[]' inside the SHARED `struct
+  # target_optabs', so it cannot be per back end.  See the long note at the
+  # top of genopinit.cc, and emit_opinit_union below.
   printf "mt-%s/insn-opinit-%s.cc insn-opinit-%s.h: s-opinit-%s; @true\n", cpu, cpu, cpu, cpu;
   printf "s-opinit-%s: build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu, cpu;
-  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md insn-opinit-union.list\n", md, cpu;
   printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
-  printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n", cpu;
+  printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) \\\n", cpu;
+  printf "\t  -Uinsn-opinit-union.list -A%s $(srcdir)/common.md \\\n", cpu;
   printf "\t  $(srcdir)/config/%s insn-conditions-%s.md \\\n", md, cpu;
   printf "\t  -htmp-opinit-%s.h -ctmp-opinit-%s.cc\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.h insn-opinit-%s.h\n", cpu, cpu;
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.cc mt-%s/insn-opinit-%s.cc\n", cpu, cpu, cpu;
   printf "\t$(STAMP) s-opinit-%s\n\n", cpu;
+
+  # This back end's contribution to the opinit union file.  Same shape as
+  # insn-config-<cpu>.part, including the `base' assertion: a part file with
+  # no `base' line would make the union silently narrower.
+  printf "insn-opinit-%s.part: build/genopinit-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	 cpu, cpu;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t$(RUN_GEN) build/genopinit-%s$(build_exeext) -l -A%s \\\n", cpu, cpu;
+  printf "\t  $(srcdir)/common.md $(srcdir)/config/%s insn-conditions-%s.md \\\n",
+	 md, cpu;
+  printf "\t  > tmp-opinit-%s.part\n", cpu;
+  # `grep -c ... -eq 1' rather than `grep -q': under a pipeline `grep -q'
+  # exits 141 on SIGPIPE, which scores a MATCH as a miss.
+  printf "\t@test `grep -c '^base %s$$' tmp-opinit-%s.part` -eq 1 || { \\\n", cpu, cpu;
+  printf "\t  echo 'insn-opinit-%s.part: no \"base %s\" line;' >&2; \\\n", cpu, cpu;
+  printf "\t  echo '  the union would then be taken over the OTHER back ends' >&2; \\\n";
+  printf "\t  echo '  and struct target_optabs sized for somebody else.' >&2; \\\n";
+  printf "\t  exit 1; }\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-opinit-%s.part $@\n\n",
+	 cpu;
+  opinit_parts = opinit_parts " insn-opinit-" cpu ".part";
 
   # genemit and genrecog do not write to stdout: they split their output over
   # NUM_INSNEMIT_SPLITS files named by -O, and genrecog writes a header named
@@ -1335,6 +1361,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_options_registry();
 		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
+		    emit_opinit_union();
 		    emit_inc_dirs() }
 
 # THE SHARED insn-config ANSWER.  Same shape as the mode numbering below, and
@@ -1377,6 +1404,39 @@ function emit_config_union(   nb, tmp_bases) {
   printf "\t  echo '  insn-config.h silently undersized.'; \\\n";
   printf "\t  exit 1; } >&2\n";
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-insn-config-union.list $@\n\n";
+}
+
+# THE SHARED `NUM_OPTAB_PATTERNS' ANSWER.  Same shape as emit_config_union
+# above, and for a sharper reason: `NUM_OPTAB_PATTERNS' is the length of
+# `pat_enable[]' inside `struct target_optabs', which is ONE object
+# (`default_target_optabs' in optabs-query.cc) shared by the whole compiler.
+# Measured in a two-target build dir before this: 2975 for i386 (and so for
+# the shared header, the primary's) against 3328 for aarch64, so
+# `insn_aarch64::init_all_optabs' wrote 353 bools past the end of an object
+# the middle end had sized at 3465 bytes.  Not a link error, not a warning.
+#
+# Check it is wired up against the GENERATED fragment, never against this file:
+#
+#	grep -c ' -Uinsn-opinit-union.list ' multi-target-md.mk
+function emit_opinit_union(   nb, tmp_bases) {
+  nb = split(config_bases, tmp_bases, " ");
+  if (nb == 0) {
+    print "gen-multi-target-md.awk: no back ends for insn-opinit-union.list" \
+	  > "/dev/stderr";
+    exit 1;
+  }
+
+  printf "# The shared NUM_OPTAB_PATTERNS answer; see emit_opinit_union in\n";
+  printf "# $(srcdir)/gen-multi-target-md.awk.\n";
+  printf "insn-opinit-union.list:%s\n", opinit_parts;
+  printf "\tcat%s > tmp-insn-opinit-union.list\n", opinit_parts;
+  printf "\t@test `grep -c '^base ' tmp-insn-opinit-union.list` -eq %d || { \\\n", nb;
+  printf "\t  echo 'insn-opinit-union.list: expected %d base lines, got' \\\n", nb;
+  printf "\t       `grep -c '^base ' tmp-insn-opinit-union.list`; \\\n";
+  printf "\t  echo '  a short list makes the union too small and every'; \\\n";
+  printf "\t  echo '  struct target_optabs silently undersized.'; \\\n";
+  printf "\t  exit 1; } >&2\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-insn-opinit-union.list $@\n\n";
 }
 
 # THE SHARED MODE NUMBERING.

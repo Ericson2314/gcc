@@ -53,7 +53,18 @@ convert_optab_p (optab op)
    calls them by name from thousands of sites, and there a namespace turns
    a link error into a wrong answer.  */
 
+/* All four are DEFINED IN multi-target-select.cc, not here and not in
+   optabs-query.cc: they forward to the entry point of the back end currently
+   in force, and that file is the one that knows which that is.  Shared code
+   must never name the bare `raw_optab_handler' / `init_all_optabs' /
+   `swap_optab_enable' / `partial_vectors_supported_p', because those resolve
+   to the PRIMARY's un-namespaced insn-opinit.o -- silently, and with another
+   machine's insn codes.  scratchpad/t117-guards.sh asserts that no object in
+   the link references any of the four bare names.  */
 extern enum insn_code selected_raw_optab_handler (unsigned);
+extern void selected_init_all_optabs (struct target_optabs *);
+extern bool selected_swap_optab_enable (optab, machine_mode, bool);
+extern bool selected_partial_vectors_supported_p (void);
 
 /* Return the insn used to implement mode MODE of OP, or CODE_FOR_nothing
    if the target does not have such an insn.  */
