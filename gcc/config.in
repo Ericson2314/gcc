@@ -77,12 +77,6 @@
 #endif
 
 
-/* Define to the dsymutil version. */
-#ifndef USED_FOR_TARGET
-#undef DSYMUTIL_VERSION
-#endif
-
-
 /* Define 0/1 if static analyzer feature is enabled. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_ANALYZER
@@ -271,143 +265,15 @@
 #endif
 
 
-/* Define if your assembler supports LSX and SCQ for 16B atomic. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_16B_ATOMIC
-#endif
-
-
-/* Define if your assembler supports architecture modifiers. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_ARCHITECTURE_MODIFIERS
-#endif
-
-
-/* Define if your avr assembler supports -mgcc-isr option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_AVR_MGCCISR_OPTION
-#endif
-
-
-/* Define if your avr assembler supports --mlink-relax option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_AVR_MLINK_RELAX_OPTION
-#endif
-
-
-/* Define if your avr assembler supports -mrmw option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_AVR_MRMW_OPTION
-#endif
-
-
 /* Define if your assembler supports DTPREL relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_DTPREL_RELOC
 #endif
 
 
-/* Define if your assembler supports eh_frame pcrel encoding. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT
-#endif
-
-
-/* Define if your assembler supports the R_PPC64_ENTRY relocation. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_ENTRY_MARKERS
-#endif
-
-
-/* Define if your assembler supports ltoffx and ldxmov relocations. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_LTOFFX_LDXMOV_RELOCS
-#endif
-
-
-/* Define if your assembler supports .machine and .machinemode. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MACHINE_MACHINEMODE
-#endif
-
-
-/* Define if your macOS assembler supports .build_version directives */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MACOS_BUILD_VERSION
-#endif
-
-
-/* Define if your assembler supports mfcr field. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MFCRF
-#endif
-
-
-/* Define if your macOS assembler supports the -mmacos-version-min option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
-#endif
-
-
-/* Define if your assembler supports .mspabi_attribute. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_MSPABI_ATTRIBUTE
-#endif
-
-
-/* Define if your assembler supports the -no-mul-bug-abort option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_NO_MUL_BUG_ABORT_OPTION
-#endif
-
-
-/* Define if your assembler supports R_PPC*_PLTSEQ relocations. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_PLTSEQ
-#endif
-
-
-/* Define if your assembler supports htm insns on power10. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_POWER10_HTM
-#endif
-
-
-/* Define if your assembler supports R_PPC_REL16 relocs. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_REL16
-#endif
-
-
-/* Define if your assembler supports call36 relocation. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_SUPPORT_CALL36
-#endif
-
-
 /* Define if your assembler and linker support thread-local storage. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_TLS
-#endif
-
-
-/* Define if your assembler supports tls le relocation. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_TLS_LE_RELAXATION
-#endif
-
-
-/* Define if your assembler supports vl/vst/vlm/vstm with an optional
-   alignment hint argument. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS
-#endif
-
-
-/* Define if your assembler supports vl/vst/vlm/vstm with an optional
-   alignment hint argument on z13. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS_ON_Z13
 #endif
 
 
@@ -991,100 +857,6 @@
 #endif
 
 
-/* Define if your Arm assembler permits context-specific feature extensions.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_ARM_EXTENDED_ARCH
-#endif
-
-
-/* Define if your assembler supports .balign and .p2align. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_BALIGN_AND_P2ALIGN
-#endif
-
-
-/* Define if your assembler supports .base64. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_BASE64
-#endif
-
-
-/* Define if your assembler supports .cv_ucomp. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_CV_UCOMP
-#endif
-
-
-/* Define if your assembler supports .lcomm with an alignment field. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_LCOMM_WITH_ALIGNMENT
-#endif
-
-
-/* Define if your assembler supports .literal16. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_LITERAL16
-#endif
-
-
-/* Define if your assembler supports specifying the maximum number of bytes to
-   skip when using the GAS .p2align command. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_MAX_SKIP_P2ALIGN
-#endif
-
-
-/* Define if your assembler supports .nsubspa comdat option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_NSUBSPA_COMDAT
-#endif
-
-
-/* Define if your assembler supports specifying the exclude section flag. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_SECTION_EXCLUDE
-#endif
-
-
-/* Define 0/1 if your assembler and linker support SHF_LINK_ORDER. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_SECTION_LINK_ORDER
-#endif
-
-
-/* Define 0/1 if your assembler and linker support SHF_GNU_RETAIN. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_SHF_GNU_RETAIN
-#endif
-
-
-/* Define 0/1 if your assembler supports marking sections with SHF_MERGE flag.
-   */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_SHF_MERGE
-#endif
-
-
-/* Define if your assembler supports .subsection and .subsection -1 starts
-   emitting at the beginning of your section. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_SUBSECTION_ORDERING
-#endif
-
-
-/* Define if your assembler supports .weak. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_WEAK
-#endif
-
-
-/* Define if your assembler supports .weakref. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GAS_WEAKREF
-#endif
-
-
 /* Define to 1 if you have the `getauxval' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GETAUXVAL
@@ -1130,13 +902,6 @@
 /* Define to 1 if you have the `get_current_dir_name' function. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_GET_CURRENT_DIR_NAME
-#endif
-
-
-/* Define if the gold linker supports split stack and is available as a
-   non-default */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GOLD_NON_DEFAULT_SPLIT_STACK
 #endif
 
 
@@ -1632,42 +1397,6 @@
 #endif
 
 
-/* Define to 1 if ld64 supports '-demangle'. */
-#ifndef USED_FOR_TARGET
-#undef LD64_HAS_DEMANGLE
-#endif
-
-
-/* Define to 1 if ld64 supports '-export_dynamic'. */
-#ifndef USED_FOR_TARGET
-#undef LD64_HAS_EXPORT_DYNAMIC
-#endif
-
-
-/* Define to 1 if ld64 supports '-macos_version_min'. */
-#ifndef USED_FOR_TARGET
-#undef LD64_HAS_MACOS_VERSION_MIN
-#endif
-
-
-/* Define to 1 if ld64 supports '-no_deduplicate'. */
-#ifndef USED_FOR_TARGET
-#undef LD64_HAS_NO_DEDUPLICATE
-#endif
-
-
-/* Define to 1 if ld64 supports '-platform_version'. */
-#ifndef USED_FOR_TARGET
-#undef LD64_HAS_PLATFORM_VERSION
-#endif
-
-
-/* Define to ld64 version. */
-#ifndef USED_FOR_TARGET
-#undef LD64_VERSION
-#endif
-
-
 /* Define to the name of the LTO plugin DSO that must be passed to the
    linker's -plugin=LIB option. */
 #ifndef USED_FOR_TARGET
@@ -1800,12 +1529,6 @@
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #ifndef USED_FOR_TARGET
 #undef TIME_WITH_SYS_TIME
-#endif
-
-
-/* Define if your assembler mis-optimizes .eh_frame data. */
-#ifndef USED_FOR_TARGET
-#undef USE_AS_TRADITIONAL_FORMAT
 #endif
 
 
