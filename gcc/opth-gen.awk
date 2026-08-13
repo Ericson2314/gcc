@@ -213,6 +213,66 @@ function decode_text(t)
 	return t
 }
 
+# Emit an `M' record for every macro this back end's HeaderInclude headers
+# define.  Both object-like and function-like: `#undef' takes either, and a
+# function-like macro leaking is the same defect (config/i386/i386-opts.h's
+# DEF_ALG, config/aarch64/aarch64-opts.h's AARCH64_CORE).
+#
+# The include guard is the one #define in these files that is NOT a leak, and
+# it is recognised narrowly: first define in the file, matching the enclosing
+# #ifndef, EMPTY replacement list.  `#ifndef X' followed by `#define X 8' is
+# not a guard, it is a defaultable value -- config/m32r/m32r-opts.h has three
+# of those (SDATA_DEFAULT_SIZE, M32R_MODEL_DEFAULT, M32R_SDATA_DEFAULT) and a
+# looser rule scores all three as guards and leaves them leaking.
+#
+# A header that cannot be opened is fatal.  getline returning -1 and getline
+# returning 0 differ by one character and only one of them means "empty file";
+# scoring an unreadable header as "defines nothing" would emit no undefs for
+# that back end and read exactly like a back end that leaks nothing.
+function emit_header_macros(   i, h, path, line, guard, dropped, name, body, r, n)
+{
+	if (srcdir == "")
+		union_fail("-v list_mode=1 needs -v srcdir=<gcc srcdir>;" \
+			   " the HeaderInclude paths are relative to it")
+	for (i = 0; i < n_extra_h_includes; i++) {
+		h = extra_h_includes[i]
+		path = srcdir "/" h
+		guard = ""
+		dropped = 0
+		n = 0
+		while ((r = (getline line < path)) > 0) {
+			n++
+			if (line ~ /^[ \t]*#[ \t]*ifndef[ \t]/) {
+				guard = line
+				sub(/^[ \t]*#[ \t]*ifndef[ \t]+/, "", guard)
+				sub(/[^A-Za-z_0-9].*$/, "", guard)
+				continue
+			}
+			if (line !~ /^[ \t]*#[ \t]*define[ \t]/)
+				continue
+			sub(/^[ \t]*#[ \t]*define[ \t]+/, "", line)
+			name = line
+			sub(/[^A-Za-z_0-9].*$/, "", name)
+			body = substr(line, length(name) + 1)
+			sub(/^[ \t]+/, "", body)
+			sub(/[ \t]+$/, "", body)
+			if (name == guard && !dropped && body == "") {
+				dropped = 1
+				guard = ""
+				continue
+			}
+			print "M\t" name
+		}
+		close(path)
+		if (r < 0)
+			union_fail("cannot read HeaderInclude header `" path \
+				   "'; without it the macros it contributes" \
+				   " would look like none")
+		if (n == 0)
+			union_fail("HeaderInclude header `" path "' is empty")
+	}
+}
+
 function union_fail(msg)
 {
 	print "opth-gen.awk: " (union_file == "" ? "<no union file>" : union_file) \
@@ -221,7 +281,7 @@ function union_fail(msg)
 }
 
 # Read the union file into u_* arrays, and check it names this back end.
-function read_union(   line, nf, f, key, n)
+function read_union(   line, nf, f, key, n, b)
 {
 	if (union_base == "")
 		union_fail("-v union_file needs -v union_base=<back end>")
@@ -232,10 +292,13 @@ function read_union(   line, nf, f, key, n)
 	n_u_D = 0
 	n_u_X = 0
 	n_u_X_extra = 0
+	n_u_macros = 0
+	cur_base = ""
 	while ((getline line < union_file) > 0) {
 		if (line ~ /^base /) {
 			sub(/^base /, "", line)
 			u_base[line] = 1
+			cur_base = line
 			n_bases++
 			continue
 		}
@@ -246,6 +309,28 @@ function read_union(   line, nf, f, key, n)
 			if (!(f[2] in u_include_seen)) {
 				u_include_seen[f[2]] = 1
 				u_include[n_u_includes++] = f[2]
+			}
+			continue
+		}
+		if (f[1] == "M0") {
+			if (cur_base == "")
+				union_fail("`M0' record before any `base' line")
+			u_mscan[cur_base] = 1
+			continue
+		}
+		if (f[1] == "M") {
+			# A macro one back end's HeaderInclude header defines.
+			# See the note above the undef block at the bottom of
+			# this file: the shared options.h includes EVERY back
+			# end's <cpu>-opts.h, so every one of these is in scope
+			# for all 48, first definition winning.
+			if (cur_base == "")
+				union_fail("`M' record before any `base' line")
+			if (cur_base == union_base)
+				u_macro_own[f[2]] = 1
+			else if (!(f[2] in u_macro_foreign)) {
+				u_macro_foreign[f[2]] = cur_base
+				u_macro[n_u_macros++] = f[2]
 			}
 			continue
 		}
@@ -358,6 +443,20 @@ function read_union(   line, nf, f, key, n)
 			   " ends and this one's members would be missing")
 	if (n_u_members == 0)
 		union_fail("no member records")
+	# Every base must have been scanned for HeaderInclude macros.  Without
+	# this, a part file written before this generator learned to read them
+	# contributes no `M' records, the undef block below comes out empty or
+	# short, and the header looks exactly like one for a back end whose
+	# headers define nothing.  There is no count to assert here on purpose
+	# -- 19 of the 35 HeaderInclude headers really are types only, so a
+	# threshold would be a number that expires -- but "was it scanned at
+	# all" is a fact the list can carry and does.
+	for (b in u_base)
+		if (!(b in u_mscan))
+			union_fail("back end `" b "' has no `M0' record; its" \
+				   " HeaderInclude headers were never scanned" \
+				   " for macros, so nothing would put them out" \
+				   " of scope for the other back ends")
 }
 
 # Every member this back end's own records require must be in the union, with
@@ -492,6 +591,20 @@ if (list_mode != "") {
 	print "base " union_base
 	for (i = 0; i < n_extra_h_includes; i++)
 		print "I\t" extra_h_includes[i]
+	# And what each of those headers DEFINES.  The `I' records already say
+	# which headers the shared options.h has to include; these say what
+	# comes in with them, so that every OTHER back end's copy can put it
+	# back out of scope.  Read here rather than in the generating run
+	# because this is the only run that knows which back end the header
+	# belongs to.
+	# The marker comes first and is unconditional.  Zero macros and "this
+	# back end was never scanned" are the same record set otherwise, and
+	# they mean opposite things: the first is sparc, whose sparc-opts.h is
+	# types only, and the second is a stale part file from before this
+	# generator learned to read the headers -- which would emit no undefs
+	# and leave the leak wide open with nothing to see.
+	print "M0\t" union_base
+	emit_header_macros()
 	for (i = 0; i < n_members; i++)
 		print member_line(member_order[i])
 	# The save/restore half of the list: RAW records, not derived members.
@@ -636,6 +749,65 @@ if (union_file != "") {
 		print "#include " quote u_include[i] quote
 	if (n_u_includes > 0)
 		print ""
+
+	# AND THEN PUT THE OTHER BACK ENDS' MACROS BACK OUT OF SCOPE.
+	#
+	# Those headers are wanted for their TYPES -- `enum aarch64_arch' for
+	# `x_selected_arch' -- and they carry 184 macros as well, of which
+	# config/loongarch/loongarch-opts.h alone contributes 32 including
+	# TARGET_64BIT, TARGET_HARD_FLOAT, TARGET_SOFT_FLOAT and TARGET_32BIT.
+	# One name, several authorities, no diagnostic: exactly the bug in
+	# PRINCIPLES section 3, one layer below the option ordinals.
+	#
+	# The loud half was 958 diagnostics, because loongarch spells them in
+	# terms of `la_target' and `la_target.isa.base == ISA_BASE_LA64' does
+	# not parse where another back end expected a flag.  The quiet half is
+	# the one that decides this cannot be fixed by renaming ten macros:
+	#
+	#   config/pa/pa.h        #ifndef TARGET_64BIT / #define TARGET_64BIT 0
+	#   config/alpha/alpha.h  #ifndef HAVE_AS_TLS  (and frv, mips, rs6000,
+	#   config/sparc/sparc.h                        xtensa -- six of them)
+	#
+	# Those `#ifndef's do not fire, because options.h got there first.  The
+	# back end's own answer is discarded, there is no diagnostic, and for
+	# HAVE_AS_TLS the answer it silently adopts is loongarch's floor of 0 --
+	# TLS quietly off in six back ends.  A rename fixes the names that
+	# collide today and leaves that shape intact for the next one.
+	#
+	# So the header does what it was always supposed to do and no more:
+	# every back end sees its OWN headers' macros and nobody else's.  This
+	# is not a rename, needs no back-end edit, and does not expire -- a
+	# macro added to any <cpu>-opts.h tomorrow is scoped by construction.
+	#
+	# Order does not matter, which is why there is no marker or #error
+	# here.  The block only ever undefines names this back end does not
+	# contribute, so a translation unit that reaches options.h before
+	# options-<cpu>.h, or after, or both, ends up in the same state: the
+	# `I' headers are include-guarded, so a second options header adds no
+	# definitions, and its undef block removes the same foreign set again.
+	# An earlier draft undefined the current base's macros too in the
+	# shared options.h; that version IS order-dependent, and the failure it
+	# produces is a target macro silently evaluating to 0 in an `#if'.
+	#
+	# Residual, stated rather than hidden: the shared options.h is
+	# generated with -v union_base=$(multi_target_base), so that one back
+	# end's macros are still in scope in it.  For an i386-based build that
+	# is one function-like macro, DEF_ALG.  Shrinking that to zero means
+	# giving the shared header no base at all, which is a bigger change
+	# than this one and belongs with deleting the shared tm.h.
+	if (n_u_macros > 0) {
+		nundef = 0
+		print "/* Macros from the other back ends' HeaderInclude"
+		print "   headers, put back out of scope.  Generated by"
+		print "   opth-gen.awk; see the note there.  */"
+		for (i = 0; i < n_u_macros; i++) {
+			if (u_macro[i] in u_macro_own)
+				continue
+			print "#undef " u_macro[i]
+			nundef++
+		}
+		print ""
+	}
 }
 else if (n_extra_h_includes > 0) {
 	for (i = 0; i < n_extra_h_includes; i++) {

@@ -142,6 +142,22 @@
 /* Use hardware floating point calling convention.  */
 #define TARGET_HARD_FLOAT_ABI   (csky_float_abi == CSKY_FLOAT_ABI_HARD)
 
+/* -mdouble-float.  The option variable is `csky_target_double_float' and not
+   `TARGET_DOUBLE_FLOAT', because config/loongarch/loongarch-opts.h defines a
+   MACRO of that name and that header is a `HeaderInclude', so the shared
+   options.h reads it for every back end.  csky's `extern int
+   TARGET_DOUBLE_FLOAT;' was then macro-expanded into
+   `extern int (la_target.isa.fpu == ISA_EXT_FPU64);' -- 974 diagnostics, every
+   one of them that single line, and no back end got as far as its first
+   object.
+
+   The macro lives HERE, in csky's tm.h header, and not in csky_opts.h: that
+   file is the `HeaderInclude' and anything defined in it is defined for all
+   48 back ends, which is the defect being removed.  It is an assignable
+   lvalue, as the four uses in csky.cc require.  Same shape and same remedy as
+   recip_mask, pool_node, fpu_type, asm_dialect and stringop_strategy.  */
+#define TARGET_DOUBLE_FLOAT     csky_target_double_float
+
 #define TARGET_SINGLE_FPU     (csky_fpu_index == TARGET_FPU_fpv2_sf \
 			       || csky_fpu_index == TARGET_FPU_fpv3_hsf \
 			       || csky_fpu_index == TARGET_FPU_fpv3_hf)
