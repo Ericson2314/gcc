@@ -10139,3 +10139,149 @@ this worktree.  Nothing from `/tmp/b141` is quoted.  The earlier dir's
   * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
   * The x86_64 identity is against this branch's own reference, not stock GCC;
     `stock-compare.sh` was not run in this dir.
+
+---
+
+# THE 101 `gcc/config/` FILES THAT INCLUDE `tm.h` -- HOW MANY ACTUALLY NEED IT
+
+Commits `f73a6637fc9` (delete 26) and `dd450c0eb40` (convert 22).
+Build dir `/tmp/b-a9d301f9fec3d38ad`, **named for the worktree, not for a task
+number**; its `config.log` names this worktree.  No task number is cited: the
+task list is not in the worktree.
+
+## 1. THE ANSWER, AND THE BRIEF'S GUESS WAS RIGHT BUT NOT FOR ITS REASON
+
+The brief suspected "a large fraction are vestigial".  Measured:
+
+| verdict | n | action |
+|---|---|---|
+| **VESTIGIAL** -- compiles identically without it | **29** | 26 deleted, **3 revoked** by a second instrument |
+| **NEEDS** -- named failure without it | **21** | 19 converted to `BASE_HEADER (tm.h)`, **2 drivers left** |
+| **UNCHECKABLE** -- does not compile here at all | **51** | untouched |
+
+**Of the 50 files the question could be PUT to, 29 are vestigial -- 58%.**
+Stated over all 101 it is 29%, and the difference between those two numbers is
+the whole of the honest reporting: **51 files, half the population, cannot be
+measured in a two-back-end build** and were not touched on suspicion.
+
+The brief's specific reasoning also held.  `darwin-d.cc` and `freebsd-rust.cc`
+name only hook-table macros from `d/d-target.h` and `rust/rust-target.h` and
+are vestigial; `i386-d.cc` is genuinely i386's (`TARGET_X32`).  But the
+language x OS matrix is **not** uniformly vestigial: `linux-d.cc` and
+`linux-rust.cc` are the only two OS shims that genuinely need it, both for
+`OPTION_GLIBC`, and both are in the 22.
+
+`config/linux.cc` -- the multi-base file, built as both `mt-i386/linux.o` and
+`mt-aarch64/linux.o` -- turned out to need `tm.h` **not at all** and is one of
+the 26 deletions.  The brief's population 3 is therefore empty as measured.
+
+## 2. THE COMPILE IS NOT A SUFFICIENT INSTRUMENT, AND THE GAP IS SILENT
+
+`scratchpad/tmh-probe.sh` compiles each file twice with a byte-identical
+command line taken **from the build's own log** rather than reconstructed --
+once as it stands, once with the include deleted in place.  Three outcomes,
+and the third is the one that makes this honest:
+
+    BASE ok, CUT ok      VESTIGIAL
+    BASE ok, CUT fail    NEEDS
+    BASE fail            UNCHECKABLE   -- not a pass, not a licence to delete
+
+Without the BASE arm, a file failing for reasons unrelated to `tm.h` scores as
+"needs it", and a file already broken is invisible.
+
+**BUT A COMPILE CANNOT SEE A PREPROCESSOR CONDITIONAL.**  `#if FOO` and
+`#ifdef FOO` do not error on an undefined `FOO` -- they silently evaluate to
+**false**.  So a file using a `tm.h` macro only inside a conditional compiles
+cleanly with the include gone, scores VESTIGIAL, and has had its behaviour
+changed with no diagnostic anywhere.  Three of the 29 are exactly that:
+
+    config/i386/i386-jit.cc        #if TARGET_64BIT_DEFAULT
+    config/mingw/msformat-c.cc     #ifdef TARGET_OVERRIDES_FORMAT_INIT
+    config/avr/avr-devices.cc      IN_GEN_AVR_MMCU_TEXI  (conservative hit)
+
+**AND THE FIRST VERSION OF THE SECOND INSTRUMENT SCORED `msformat-c.cc` CLEAR.**
+`tmh-undef.sh` derives the macro set `tm.h` contributes by difference -- `-dM`
+with the include minus `-dM` without -- which is rigorous and yields 12689
+names, and is **i386-linux's** 12689 names.  `TARGET_OVERRIDES_FORMAT_INIT` is
+defined in `config/mingw/mingw32.h`, so that instrument **cannot see it**, and
+reported the file safe to delete from.  It was caught only because the
+conditionals had already been read by eye first.
+
+The instrument that is right is `tmh-cond2.sh`, which asks the
+configuration-independent question: is this conditional identifier `#define`d
+**anywhere under `gcc/config/`**, i.e. is it a `tm.h`-chain macro for *some*
+target?  Deliberately over-broad -- it can only revoke, never clear -- because
+a false positive costs one unremoved include and a false negative costs
+correctness.
+
+**Generalise it: an instrument derived from the configured back end answers a
+question about the configured back end.**  Fifty-one of these files belong to
+back ends that are not configured, and nine of the vestigial ones were compiled
+against i386's header chain rather than their own.  For those nine the compile
+arms are still valid -- if they needed a name their own `tm.h` supplies, the
+BASE arm would have failed too -- but the conditional check had to be asked in
+a form that does not know which base is primary.
+
+## 3. THE DESIGN FORK: DRIVER OBJECTS HAVE NO `MT_BASE`
+
+The brief anticipated needing "a hook in `defaults.h`" to extend `BASE_HEADER`
+to the `config/` population.  **It is not needed.**  Every per-base `config/`
+object already carries `-DMT_BASE=<cpu>-inc` and `-I<cpu>-inc`; the conversion
+is the two-line pattern `target-regs.cc` already uses --
+`#include "multi-target-base.h"` then `#include BASE_HEADER (tm.h)` -- and
+nothing else was required.  Twenty-two files took it with no build-system
+change at all.
+
+**The real fork is elsewhere, and it is a genuine one.**  Two of the 21 NEEDS
+files are DRIVER objects, compiled **once, shared**:
+
+    -o driver-i386.o    carries NEITHER -DMT_BASE NOR -I i386-inc  (measured)
+
+so `multi-target-base.h` would `#error` on them.  They keep a plain
+`#include "tm.h"` and therefore still read the build root's copy -- **the
+primary's** -- which is the lying-`tm.h` channel, in the driver.  Deciding what
+a driver's `tm.h` should be is a design question (the driver serves N targets;
+`BASE_HEADER` is per *object*), so it was not resolved here.
+
+Noted alongside it, and possibly the more interesting half: **only
+`driver-i386.o` is built.  `driver-aarch64.o` is not.**  The `gcc` driver in a
+two-back-end build carries one back end's `-march=native` support.  That was
+found incidentally and is not fixed here.
+
+## 4. WHAT THE VERIFICATION COULD HAVE SAID AND DID NOT
+
+`tmh-verify.sh` recompiles all 101 after the change and checks the result
+**against the classification**, not against a target of zero failures: the 51
+UNCHECKABLE files must still FAIL.  A run in which everything passed would mean
+the harness had stopped compiling anything, which is the shape a broken
+injection produces.
+
+    51 FAIL   (exactly the UNCHECKABLE set)
+    50 OK     (26 deleted + 22 converted + 2 drivers left alone)
+    0 verdict changes
+
+## 5. BARS -- `/tmp/b-a9d301f9fec3d38ad`
+
+  * `make multi-target-objs cc1 lto1` **rc=0**, `grep -c 'error:'` **0**.
+  * x86_64 `-O2 scratchpad/big.c`: **12369 bytes, md5 `378fc33c1e70`**,
+    identical before and after **in the same build dir**, and matching the
+    recorded bar.
+  * aarch64 `-O2 scratchpad/t141-ptr.c`: **703 bytes, md5 `7d770f58768b`**,
+    identical before and after.  Input path quoted with the count.  Note this
+    is NOT #141's 1123/`b0b7bf393adb` -- that was `-mabi=lp64` with different
+    flags, and the two figures are not comparable.
+  * `stock-compare.sh` vs `/tmp/b-stock`: **5/5 IDENTICAL**, 5 distinct md5s
+    per side, negative control firing (1158 vs 804 lines, differ).
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+
+## 6. WHAT IS NOT DONE
+
+  * **51 files untouched** and listed in `scratchpad/tmh-probe-results.txt`.
+    17 riscv, 4 loongarch, 4 arm, 3 avr, and the OS shims `sol2-c.cc`,
+    `freebsd-d.cc`, `darwin-driver.cc`, `vxworks-driver.cc`.  Answering for
+    them needs those back ends configured; the harness takes them unchanged.
+  * **The two driver objects** (section 3), and `driver-aarch64.o` not being
+    built at all.
+  * `tmh-probe.sh` and its siblings need `$W/wk/build.out` (a full build log)
+    and `$W/wk/tmh-config.txt`; they FATAL by name without them.  `D` must be
+    set to your own build dir -- they refuse to default.
