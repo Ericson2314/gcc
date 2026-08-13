@@ -1994,6 +1994,22 @@ write_tm_preds_h (void)
   print_ns_close (stdout);
   print_ns_using (stdout);
 
+  /* THE SHARED COPY OF THIS HEADER IS THE PRIMARY'S, AND SHARED CODE READS IT.
+
+     On a multi-target build this function runs once per back end WITH a
+     namespace (writing tm-preds-<base>.h) and once WITHOUT one, from the
+     primary's .md, writing the build root's tm-preds.h.  That last file is
+     what `recog.cc', `lra-constraints.cc', `ira.cc' and eleven others get
+     through `tm_p.h' -- so every back end's insns were constraint-checked
+     against i386's letters.  See target-preds.h for the measurement.
+
+     The include goes LAST, after the inline wrappers above have been parsed,
+     because the redirection is a macro rename of their USES.  It is emitted
+     only for the un-namespaced run: a back end's own header keeps the
+     generated wrappers, which are already that back end's.  */
+  if (gen_multi_target_p () && gen_target_ns () == NULL)
+    puts ("\n#include \"multi-target-preds.h\"");
+
   puts ("#endif /* tm-preds.h */");
 }
 
@@ -2014,6 +2030,19 @@ write_insn_preds_c (void)
 /* Generated automatically by the program '%s'\n\
    from the machine description file '%s'.  */\n\n", progname,
 	  md_reader_ptr->get_top_level_filename ());
+
+  /* THE COMPANION OF THE INCLUDE AT THE END OF write_tm_preds_h, and it must
+     stay next to it in the same generator.
+
+     This file DEFINES `insn_const_int_ok_for_constraint' and
+     `eval_dependent_filter' -- the only two members of the constraint API
+     that are extern rather than inline -- so if multi-target-preds.h renamed
+     them here it would rename the DEFINITIONS, which would then collide with
+     the forwarders in target-cumargs-select.cc.  The un-namespaced
+     insn-preds.cc therefore opts out; the per-base ones never see the header
+     at all, since their tm-preds-<base>.h does not include it.  */
+  if (gen_multi_target_p () && gen_target_ns () == NULL)
+    puts ("#define MULTI_TARGET_PREDS_NO_REDIRECT 1");
 
   puts ("\
 #define IN_TARGET_CODE 1\n\

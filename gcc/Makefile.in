@@ -3820,7 +3820,8 @@ target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
 # and IN OBJS rather than in the c-family list: function.o, calls.o, expr.o,
 # dse.o and var-tracking.o are all in libbackend.a, so lto1 needs this too.
 target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
-  $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h $(srcdir)/target-insn.h
+  $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h $(srcdir)/target-insn.h \
+  $(srcdir)/target-preds.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 

@@ -566,6 +566,22 @@ multi_target_select (const char *target)
 			  "predate target-insn.h and are from a different "
 			  "build", base);
 
+	/* This back end's CONSTRAINT LETTERS; see target-preds.h.  Rides on
+	   the same table and is checked for the same reason as the two above.
+
+	   Until this line existed, `constrain_operands' -- shared code --
+	   asked the PRIMARY what every back end's constraint letters meant.
+	   aarch64's `k' is its stack register and i386's is a mask register,
+	   so aarch64's own `*adddi3_aarch64' rejected aarch64's stack
+	   pointer.  The per-base vocabularies were already generated and
+	   already linked; nothing selected between them.  */
+	targetm_preds = targetm_cumargs->preds;
+	if (targetm_preds == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no constraint table attached; its objects "
+			  "predate target-preds.h and are from a different "
+			  "build", base);
+
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
 	   a link-time one rather than a design preference.  Their tables call

@@ -5783,3 +5783,269 @@ the `*_POINTER_REGNUM` fork in section 2 and is the obvious place to look.
     t126-guards.sh   43 arms; ARM 0 content-by-name-and-value and runs first,
                      ARM 2 the divergence on the running cc1, ARM 4 the
                      injection
+
+# TASK #128 -- THE CONSTRAINT VOCABULARY WAS THE PRIMARY'S.  `k' MEANT
+# aarch64's STACK REGISTER AND i386's MASK REGISTERS
+
+Worktree came up at bare-repo HEAD `7208eca60d0` AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in` was **0** -- `git reset --hard multi-target` took
+it to **37**.  That is now seven worktrees in a row.  Build dir `/tmp/b128`,
+my own, cold.
+
+**#127 left no STATE.md section**; its findings are in commit `545bd5fff28`'s
+message.  This section does not restate them.
+
+## 0. THE WALL, DIAGNOSED IN THE RUNNING cc1 AND NOT INHERITED
+
+`int g (int a) { return a + 1; }` for aarch64 dies as
+
+    error: insn does not satisfy its constraints:
+    (insn/f 18 4 27 (set (reg/f:DI 31 sp)
+            (plus:DI (reg/f:DI 31 sp) (const_int -16))) 157 {*adddi3_aarch64})
+    internal compiler error: in final_scan_insn_1, at final.cc:2789
+
+`final.cc:2789` is `fatal_insn_not_found` after `constrain_operands_cached`.
+`constrain_operands` is in `recog.cc` -- SHARED -- and the constraint
+vocabulary it uses reaches it from the build root's `tm_p.h`, which includes
+the build root's `tm-preds.h`, which `build/genpreds` writes **from
+`config/i386/i386.md`** (the file says so in its first two lines).
+
+Measured with ONE BREAKPOINT PER RUN (`scratchpad/t128-cause.sh`,
+`_fatal_insn_not_found`, gdb's own reported breakpoint printed and matched, an
+x86_64 non-vacuity arm reaching exit):
+
+    recog_data.constraints[0] = "=rk,rk,w,rk,r,r,rk,rk"     <- aarch64's
+    GLOBAL       lookup_constraint ("k") = 18
+    insn_i386    lookup_constraint ("k") = 18
+    insn_aarch64 lookup_constraint ("k") =  2
+    GLOBAL       reg_class_for_constraint (k) = 0   = NO_REGS
+    insn_i386    reg_class_for_constraint (k) = 0   = NO_REGS
+    insn_aarch64 reg_class_for_constraint (k) = 6   = STACK_REG
+
+aarch64's `k` is `STACK_REG` (aarch64/constraints.md:21).  i386's is
+`TARGET_AVX512F ? ALL_MASK_REGS : NO_REGS` (i386/constraints.md:84), and
+`TARGET_AVX512F` is i386 option state no `ix86_option_override` has promoted
+-- the `Pmode` silent-default shape a third time -- so it answers NO_REGS.
+aarch64's real stack pointer was rejected by aarch64's own add pattern.
+
+Both directions diverge (18 vs 2, 0 vs 6), so this cannot be "everyone got the
+same new answer".
+
+**THE MECHANISM WAS ALREADY THERE AND NOTHING INVOKED IT.**  `genpreds` has
+long written `tm-preds-<base>.h` and `insn-preds-<base>.cc` in
+`namespace insn_<base>`, and both objects are linked.  `nm` on the build dir
+(`scratchpad/t128-syms.sh`, with a non-vacuity floor on nm's own output):
+
+    insn-preds.o          T lookup_constraint_1        <- un-namespaced, i386's
+    insn-preds-i386.o     T insn_i386::lookup_constraint_1
+    insn-preds-aarch64.o  T insn_aarch64::lookup_constraint_1
+    recog.o               U lookup_constraint_1        <- bound to the first
+
+Same shape as `gen_blockage` and `insn-emit-5.o` (#51) one layer up.
+
+## 1. THE BRIEF'S HYPOTHESIS -- TESTED, AND THE ANSWER IS NO
+
+The brief asked whether this needs something **the generators cannot express**,
+and said to stop rather than invent a channel if so.  Measured answer: **it
+does not.**  `genpreds.cc` gains **six lines** and no new input.  Each
+generator run still emits ONE back end's constants, exactly as today; what
+changes is that shared code stops reading the primary's copy.
+`build/genpreds.o` already carries `-DGEN_MULTI_TARGET` (Makefile.in:4573), so
+the singular run can already tell it is on a multi-target build -- a previous
+task had to teach it that for `test_register_filters`, which is the OTHER half
+of this same closure and is already fixed.
+
+## 2. WHAT LANDED
+
+Two new files, five edited, and no back end touched:
+
+  * **`target-preds.h`** (new) -- `struct target_preds_desc`, and the `mt_*`
+    shared spellings.
+  * **`multi-target-preds.h`** (new) -- 18 `#undef`/`#define` pairs.
+  * **`genpreds.cc`** -- emits `#include "multi-target-preds.h"` as the LAST
+    line of the shared `tm-preds.h`, and `#define
+    MULTI_TARGET_PREDS_NO_REDIRECT 1` at the top of the shared
+    `insn-preds.cc`.  Both guarded by
+    `gen_multi_target_p () && gen_target_ns () == NULL`.
+  * **`target-cumargs.cc`** -- 17 one-line thunks + `mt_base_preds`.
+  * **`target-cumargs.h`** -- the `preds` field.
+  * **`target-cumargs-select.cc`** -- the 18 forwarders.
+  * **`multi-target-select.cc`** -- `targetm_preds = targetm_cumargs->preds;`
+    with the stale-object check the other three carry.
+
+**WHY A MACRO RENAME AND NOT A `defaults.h` PAIR, which is what every other
+task on this branch used.**  These are `static inline` FUNCTIONS in a
+generated header, not macros, and `defaults.h` is reached from `tm.h` --
+BEFORE `tm_p.h`.  A macro defined there rewrites `tm-preds.h`'s own
+DEFINITIONS, not just its uses.  So the include goes at the END of the
+generated header, after the definitions are parsed, and renames only the uses.
+The primary's inline bodies survive unreferenced; being `static inline` they
+emit no code.
+
+**THE `int` BOUNDARY IS DELIBERATE.**  `enum constraint_num` is a distinct
+type per namespace and its VALUES are per base -- 18 and 2 above are the same
+letter.  The table traffics in `int` so the two vocabularies cannot look
+interchangeable to the type system.
+
+**SWEPT BEFORE LANDING.**  Over all of `gcc/` outside `config/`,
+`testsuite/`, `analyzer/` and `rust/`, shared code spells exactly three
+constraint names: `CONSTRAINT_LEN` (19 sites, a macro over
+`insn_constraint_len`, so renaming the function covers it),
+`CONSTRAINT__UNKNOWN` (0 in every back end -- deliberately NOT redirected, and
+a guard arm asserts it is not), and `CONSTRAINT_X`
+(`lra-constraints.cc:4055`), which becomes a call.  Measured: **aarch64 137,
+i386 87.**
+
+**THE OPT-OUT IS NOT OPTIONAL.**  The un-namespaced `insn-preds.cc` DEFINES
+`insn_const_int_ok_for_constraint` and `eval_dependent_filter` -- the only two
+members of the API that are extern rather than inline -- so without
+`MULTI_TARGET_PREDS_NO_REDIRECT` it would define `mt_*` instead and collide
+with the forwarders.  Emitted by the same generator, next to the include, so
+the two cannot drift.
+
+**ONE LAYOUT, NOT A GUARDED ONE.**  `target-preds.h` `#include`s
+`hard-reg-set.h` rather than wrapping its two `HARD_REG_SET` members in
+`#if defined GCC_HARD_REG_SET_H` the way `tm-preds.h` does.  A conditional
+member makes `struct target_preds_desc` a different SIZE in a TU that has not
+reached that header -- which is exactly the `struct target_constraints`
+layout-disagreement bug already paid for on this branch.
+
+## 3. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**, first try.
+  * **x86_64 `-O2` big.c md5 `378fc33c1e70`, 12369 bytes -- unmoved**, and the
+    three `t128-fn.sh` x86_64 outputs byte-identical before and after
+    (`f776a3b16e36`, `b9716cd03194`, `e2879feb51f6`), all in this same build
+    dir.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, 5
+    distinct md5 per side, negative control firing (1158 vs 804), rc=0, run
+    after the edit and again after the injection round trip.  O0
+    `1c00922491f8`, O1 `4fabab94b41b`, O2 `378fc33c1e70`, O3 `d220421237bc`,
+    Os `d6787f7e281f`.
+  * **aarch64 `int x = 1;` rc=0, 373 bytes, empty stderr, md5 `b01d9157fdc1`**
+    -- byte-identical.
+  * **`scratchpad/t128-guards.sh`: 62 PASS / 0 FAIL.**
+  * Cold `all-gcc` before any edit: **rc=0, 776 lines / 169 `warning:`**.
+    Incremental after the edit: 352 lines / 87 `warning:`.  Near-no-op
+    incremental: **8 lines / 0 `warning:`**, all `is unchanged` -- the low end
+    of the documented 8-to-32 floor.
+
+### THE ARMS THAT MATTER, AND TWO THEY CAUGHT
+
+  * **ARM 0 runs first and asserts the GENERATED content by name**: the shared
+    `tm-preds.h` HAS the include, both `tm-preds-<base>.h` do NOT, the shared
+    `insn-preds.cc` HAS the opt-out, both per-base ones do NOT.
+  * **ARM 3 is the arm on the SELECTION, separate from ARM 4's arm on the
+    DATA** -- the `targetm_asm_ops` lesson.  `recog.o`, `lra-constraints.o`,
+    `ira.o` and `stmt.o` each bind an `mt_*` forwarder AND no longer bind
+    `lookup_constraint_1` / `reg_class_for_constraint_1`.
+  * **ARM 4 is the divergence in the running cc1**, both sides, by value:
+    aarch64 `2 6 137`, x86_64 `18 0 87`.
+
+  **(a) THE INJECTION REMOVED HALF A HUNK AND THE BUILD DIED SOMEWHERE ELSE.**
+  Deleting only the `puts` left its `if` attached to the NEXT statement -- the
+  one emitting `#endif /* tm-preds.h */` -- so every PER-BASE header came out
+  unterminated and the injected build failed in `tm-preds-i386.h`.  cc1 was
+  therefore never relinked and the arm read the OLD, FIXED binary.  The arm
+  now removes both lines, asserts the `gen_target_ns () == NULL` count went
+  2 -> 1, and **asserts the injected build's rc is 0** before believing
+  anything it reads.  Third recorded instance of a half-removed hunk here.
+
+  **(b) THE INJECTION'S FIRST OBSERVABLE COULD NOT MOVE.**  It re-read
+  `mt_lookup_constraint` through gdb -- but that forwarder is still compiled
+  and still correct in the injected compiler; the injection removes the
+  RENAMING of shared code's call sites, not the table.  The arm was asking a
+  question whose answer the injection cannot change, which is a false green
+  waiting to happen.  It now asserts on `nm -uC recog.o`: injected, it binds
+  the primary's `lookup_constraint_1` again and no `mt_*` at all.
+
+## 4. WHAT THIS DID **NOT** FIX, MEASURED RATHER THAN ASSUMED
+
+**`int g (int a) { return a + 1; }` STILL FAILS, at the same line.**  Saying so
+plainly: the constraint vocabulary is now aarch64's and the insn is still
+rejected.  Second breakpoint run (`scratchpad/t128-cause2.sh`, same
+`_fatal_insn_not_found`, x86_64 non-vacuity arm reaching exit):
+
+    reg_class_contents[6] (STACK_REG)    = {0x80000000, 0x0}   <- reg 31 present
+    reg_class_contents[5] (GENERAL_REGS) = {0x7fffffff, 0x3}   <- regs 0-30,32,33
+    reg_class_size[6] = 1   reg_class_size[5] = 33
+    operand[0] regno = 31   operand[1] regno = 31
+    bool_attr_masks[157][BA_ENABLED] = 0xfffffffffffffff7
+
+The register data is correct aarch64.  **Bit 3 of the enabled mask is clear:
+alternative 3 is DISABLED** -- and alternative 3 is the one this insn needs
+(`op2`'s constraint list is `I,r,w,J,Uaa,Uai,Uav,UaV`; `J` is the
+negative-immediate alternative, and the addend is `-16`).
+
+`recog.cc:2717 get_enabled_alternatives` -> `get_bool_attr_mask` ->
+`get_attr_enabled`, and `nm` says the only definition of `get_attr_enabled` in
+the link is in **`insn-attrtab.o`**, whose generated source carries
+`#line` directives naming `config/i386/i386.md`.  `insn-attrtab-aarch64.o`
+exists, is built, is linked, and nothing selects it.
+
+**So the next wall is LOCATED AND DIAGNOSED: the insn ATTRIBUTE tables are the
+primary's, exactly as the predicates were.**  It is the same bug one layer
+along, and `Makefile.in:1757` names the whole family still in `OBJS`
+un-namespaced -- `insn-attrtab.o`, `insn-automata.o`, `insn-dfatab.o`,
+`$(INSNEMIT_SEQ_O)`, `insn-latencytab.o`, `insn-opinit.o`, `insn-preds.o`.
+`insn-preds.o` is the one this task went around rather than removed.
+
+That leak is bigger than this one: `get_attr_length`, `get_attr_enabled`,
+`insn_current_length` and the DFA scheduler entry points are all in it, and
+`HAVE_ATTR_*` are `#if`-shaped in `insn-attr.h`.  It wants its own task and a
+decision about whether `insn-attrtab.o` leaves `OBJS`.
+
+## 5. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard
+movement.**  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+32/0, aarch64 27/5**.
+
+Nothing here is in `macro-status.txt` at all: the constraint API is generated
+functions, not `tm.h` macros, so it has never had a probe arm and there is no
+flip to predict or retire.  The "converted but reads UNCONVERTED" list is
+unchanged.
+
+## 6. WHAT I DID NOT DO
+
+  * **No probe or TAB arm**, for the reason in section 5; recorded as
+    "no instrument exists", not as "clean".
+  * **`insn-attrtab.o` and the rest of the un-namespaced generated family are
+    untouched**, and are now the diagnosed next wall (section 4).
+  * **`insn-preds.o` is still in `OBJS`.**  Going around it (the opt-out) was
+    chosen over removing it, because `insn-attrtab.o` and `insn-emit*.o` --
+    also the primary's, also still linked -- may reference its predicates, and
+    dropping it would have coupled this change to the attribute-table task.
+    A deliberate deferral with a named reason, not an oversight.
+  * **The `fn-call` input still dies at `extract_insn, recog.cc:2890`** and I
+    did NOT diagnose it.  #127 warned it may be a second, distinct problem;
+    that is still unresolved.
+  * **No compile-time measurement.**  Every constraint question in shared code
+    is now an indirect call; `CONSTRAINT_LEN` in particular is in hot loops in
+    `recog.cc`, `lra-constraints.cc` and `ira.cc`.  x86_64 output is
+    byte-identical, so this is a throughput question and not a correctness
+    one, but it is unmeasured and I am not claiming it is free.  It joins
+    `Pmode`'s 648 sites (#125) as an open cost question.
+  * `make all-target-libgcc` not re-run; #119's `-m32` blocker unchanged.
+
+## 7. FILES
+
+    t128-clone.sh    derives my build-dir scripts from #127's; REFUSES on a
+                     leftover `b127'
+    t128-conf.sh     two-target configure, /tmp/b128
+    t128-build.sh    make at the TOP level
+    t128-gccbuild.sh make in $B/gcc -- where cc1 actually builds
+    t128-specs.sh    both target-specs probes, real aarch64 binutils
+    t128-dbg.sh      rebuilds recog.o with `-g' and relinks
+    t128-syms.sh     WHICH constraint vocabulary shared code links, by nm,
+                     with a non-vacuity floor on nm's own output
+    t128-cause.sh    THE DIAGNOSIS: one breakpoint per run, three vocabularies
+                     compared in one frame, x86_64 non-vacuity control
+    t128-cause2.sh   THE SECOND READING: reg_class_contents and the enabled-
+                     alternative mask, which is what found the NEXT wall
+    t128-state.sh    big.c site + `int x = 1;' + x86_64 -O2
+    t128-fn.sh       the three function-body inputs, both bases
+    t128-sc.sh       stock-compare, ABSOLUTE big.c, tagged outdir
+    t128-guards.sh   62 arms; ARM 0 generated-content-by-name and runs first,
+                     ARM 3 the selection, ARM 4 the data, ARM 5 the injection

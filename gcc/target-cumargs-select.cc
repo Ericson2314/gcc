@@ -604,3 +604,141 @@ mt_have_rotatert (void)
 {
   return mt_insn ()->have_rotatert;
 }
+
+/* ------------------------------------------------------------------------
+   THE CONSTRAINT VOCABULARY; see target-preds.h for the measurement.
+
+   These are the definitions of the names `multi-target-preds.h' renames
+   `tm-preds.h''s inline wrappers onto, so every constraint question shared
+   code asks -- in recog.cc, lra-constraints.cc, ira.cc, ira-costs.cc,
+   ira-lives.cc, ira-conflicts.cc, reload.cc, reload1.cc, postreload.cc,
+   cse.cc, stmt.cc and varasm.cc -- is answered by the back end in force
+   instead of by the primary.
+
+   NULL until a base is selected, like every other table here.  The default
+   that suggests itself is the primary's vocabulary, and that default is the
+   entire bug: it does not fail, it answers.  */
+const struct target_preds_desc *targetm_preds;
+
+static const struct target_preds_desc *
+mt_preds (void)
+{
+  if (targetm_preds == NULL)
+    internal_error ("no back end has been selected, so no constraint letters "
+		    "are defined; a target must be chosen with "
+		    "%<-ftarget-config=%> before an insn is constrained");
+  return targetm_preds;
+}
+
+int
+mt_lookup_constraint (const char *p)
+{
+  return mt_preds ()->lookup (p);
+}
+
+bool
+mt_constraint_satisfied_p (rtx x, int c)
+{
+  return mt_preds ()->satisfied_p (x, c);
+}
+
+int
+mt_reg_class_for_constraint (int c)
+{
+  return mt_preds ()->reg_class_for (c);
+}
+
+int
+mt_get_constraint_type (int c)
+{
+  return mt_preds ()->constraint_type (c);
+}
+
+bool
+mt_insn_extra_register_constraint (int c)
+{
+  return mt_preds ()->extra_register (c);
+}
+
+bool
+mt_insn_extra_memory_constraint (int c)
+{
+  return mt_preds ()->extra_memory (c);
+}
+
+bool
+mt_insn_extra_special_memory_constraint (int c)
+{
+  return mt_preds ()->extra_special_memory (c);
+}
+
+bool
+mt_insn_extra_relaxed_memory_constraint (int c)
+{
+  return mt_preds ()->extra_relaxed_memory (c);
+}
+
+bool
+mt_insn_extra_address_constraint (int c)
+{
+  return mt_preds ()->extra_address (c);
+}
+
+void
+mt_insn_extra_constraint_allows_reg_mem (int c, bool *allows_reg,
+					 bool *allows_mem)
+{
+  mt_preds ()->allows_reg_mem (c, allows_reg, allows_mem);
+}
+
+size_t
+mt_insn_constraint_len (char fc, const char *str)
+{
+  return mt_preds ()->constraint_len (fc, str);
+}
+
+bool
+mt_insn_const_int_ok_for_constraint (HOST_WIDE_INT v, int c)
+{
+  return mt_preds ()->const_int_ok (v, c);
+}
+
+const HARD_REG_SET *
+mt_get_register_filter (int c)
+{
+  return mt_preds ()->register_filter (c);
+}
+
+int
+mt_get_register_filter_id (int c)
+{
+  return mt_preds ()->register_filter_id (c);
+}
+
+int
+mt_get_dependent_filter_id (int c)
+{
+  return mt_preds ()->dependent_filter_id (c);
+}
+
+int
+mt_get_dependent_filter_ref (int id)
+{
+  return mt_preds ()->dependent_filter_ref (id);
+}
+
+bool
+mt_eval_dependent_filter (int id, unsigned int regno, machine_mode mode,
+			  unsigned int ref_regno, machine_mode ref_mode)
+{
+  return mt_preds ()->eval_dependent (id, regno, mode, ref_regno, ref_mode);
+}
+
+/* THE ONE ENUMERATOR SHARED CODE SPELLS BY NAME (lra-constraints.cc:4055).
+   A different number in every back end, so it is a read and not a constant.  */
+
+int
+mt_constraint_X (void)
+{
+  return mt_preds ()->constraint_X;
+}

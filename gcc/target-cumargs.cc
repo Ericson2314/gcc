@@ -583,6 +583,151 @@ static const struct target_insn_desc mt_base_insn = {
   HAVE_rotatert != 0
 };
 
+/* THIS BASE'S CONSTRAINT VOCABULARY; see target-preds.h for the measurement
+   that produced these and for why they cannot be unioned.
+
+   Every one of these thunks is one line calling the wrapper `genpreds' has
+   already written into THIS base's `tm-preds-<base>.h' -- reached because
+   this file includes `tm_p.h' and is compiled with `-I<base>-inc' ahead of
+   `-I.', so that spelling resolves to `tm_p-<base>.h'.  In the build root the
+   same spelling reaches the primary's, which is the bug.
+
+   `int' rather than `enum constraint_num' at the boundary, deliberately: the
+   enum is a distinct type per `namespace insn_<base>' and its VALUES are per
+   base -- `k' is 18 for i386 and 2 for aarch64 -- so letting one cross into
+   shared code as an enum would make the two vocabularies look interchangeable
+   to the type system.  target-preds.h says the same from the other side.  */
+
+static int
+mt_base_lookup_constraint (const char *p)
+{
+  return (int) lookup_constraint (p);
+}
+
+static bool
+mt_base_constraint_satisfied_p (rtx x, int c)
+{
+  return constraint_satisfied_p (x, (enum constraint_num) c);
+}
+
+static int
+mt_base_reg_class_for_constraint (int c)
+{
+  return (int) reg_class_for_constraint ((enum constraint_num) c);
+}
+
+static int
+mt_base_get_constraint_type (int c)
+{
+  return (int) get_constraint_type ((enum constraint_num) c);
+}
+
+static bool
+mt_base_insn_extra_register_constraint (int c)
+{
+  return insn_extra_register_constraint ((enum constraint_num) c);
+}
+
+static bool
+mt_base_insn_extra_memory_constraint (int c)
+{
+  return insn_extra_memory_constraint ((enum constraint_num) c);
+}
+
+static bool
+mt_base_insn_extra_special_memory_constraint (int c)
+{
+  return insn_extra_special_memory_constraint ((enum constraint_num) c);
+}
+
+static bool
+mt_base_insn_extra_relaxed_memory_constraint (int c)
+{
+  return insn_extra_relaxed_memory_constraint ((enum constraint_num) c);
+}
+
+static bool
+mt_base_insn_extra_address_constraint (int c)
+{
+  return insn_extra_address_constraint ((enum constraint_num) c);
+}
+
+static void
+mt_base_insn_extra_constraint_allows_reg_mem (int c, bool *allows_reg,
+					      bool *allows_mem)
+{
+  insn_extra_constraint_allows_reg_mem ((enum constraint_num) c,
+					allows_reg, allows_mem);
+}
+
+static size_t
+mt_base_insn_constraint_len (char fc, const char *str)
+{
+  return insn_constraint_len (fc, str);
+}
+
+static bool
+mt_base_insn_const_int_ok_for_constraint (HOST_WIDE_INT v, int c)
+{
+  return insn_const_int_ok_for_constraint (v, (enum constraint_num) c);
+}
+
+static const HARD_REG_SET *
+mt_base_get_register_filter (int c)
+{
+  return get_register_filter ((enum constraint_num) c);
+}
+
+static int
+mt_base_get_register_filter_id (int c)
+{
+  return get_register_filter_id ((enum constraint_num) c);
+}
+
+static int
+mt_base_get_dependent_filter_id (int c)
+{
+  return get_dependent_filter_id ((enum constraint_num) c);
+}
+
+static int
+mt_base_get_dependent_filter_ref (int id)
+{
+  return get_dependent_filter_ref (id);
+}
+
+static bool
+mt_base_eval_dependent_filter (int id, unsigned int regno, machine_mode mode,
+			       unsigned int ref_regno, machine_mode ref_mode)
+{
+  return eval_dependent_filter (id, regno, mode, ref_regno, ref_mode);
+}
+
+/* `static' and reached through the `preds' pointer below, for the same reason
+   `mt_base_frame' is.  */
+static const struct target_preds_desc mt_base_preds = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  (int) CONSTRAINT__LIMIT,
+  (int) CONSTRAINT_X,
+  mt_base_lookup_constraint,
+  mt_base_constraint_satisfied_p,
+  mt_base_reg_class_for_constraint,
+  mt_base_get_constraint_type,
+  mt_base_insn_extra_register_constraint,
+  mt_base_insn_extra_memory_constraint,
+  mt_base_insn_extra_special_memory_constraint,
+  mt_base_insn_extra_relaxed_memory_constraint,
+  mt_base_insn_extra_address_constraint,
+  mt_base_insn_extra_constraint_allows_reg_mem,
+  mt_base_insn_constraint_len,
+  mt_base_insn_const_int_ok_for_constraint,
+  mt_base_get_register_filter,
+  mt_base_get_register_filter_id,
+  mt_base_get_dependent_filter_id,
+  mt_base_get_dependent_filter_ref,
+  mt_base_eval_dependent_filter
+};
+
 /* `static', unlike the cumargs table: this one is reached only through the
    `frame' pointer in the table below, so it needs no name in the registry and
    gen-multi-target-md.awk needs no change to declare one.  */
@@ -648,5 +793,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   mt_base_call_pops_args,
   mt_base_override_abi_format,
   &mt_base_frame,
-  &mt_base_insn
+  &mt_base_insn,
+  &mt_base_preds
 };
