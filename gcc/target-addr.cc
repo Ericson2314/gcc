@@ -48,6 +48,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "rtl.h"
+/* `memmodel.h' BEFORE `tm_p.h', as target-cumargs.cc and target-regs.cc
+   already have it, and for a reason that only shows up once more than two
+   back ends are configured: `tm_p.h' is this base's `<cpu>-protos.h', and
+   alpha, ia64 and sparc declare functions taking `enum memmodel' there.  A
+   C++ enum cannot be introduced by an elaborated-type-specifier in a
+   parameter list, so those three fail with `use of enum memmodel without
+   previous declaration'.  Two of the five per-base sources that include
+   `BASE_HEADER (tm_p.h)' already had this include; the omission in the other
+   three was invisible because neither i386 nor aarch64 names the type.  */
+#include "memmodel.h"
 #include BASE_HEADER (tm_p.h)
 #include "regs.h"
 #include "target-addr.h"

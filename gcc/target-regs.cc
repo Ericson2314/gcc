@@ -150,9 +150,28 @@ static const char *const mt_reg_names[] = REGISTER_NAMES;
 static_assert (ARRAY_SIZE (mt_reg_names) == (size_t) OWN_FIRST_PSEUDO_REGISTER,
 	       "REGISTER_NAMES does not have FIRST_PSEUDO_REGISTER entries");
 
+/* `>=' AND NOT `==', AND THE ASYMMETRY WITH THE TWO ASSERTIONS ABOVE IS
+   DELIBERATE RATHER THAN SLOPPY.
+
+   The invariant that matters is that every class in `0 .. N_REG_CLASSES-1'
+   has a name, because that is the whole range anything indexes this table
+   with.  `==' additionally forbids a TRAILING entry, and three in-tree back
+   ends have one: h8300, mn10300 and v850 all end `REG_CLASS_NAMES' with
+   `"LIM_REGS"', a name for the `LIM_REG_CLASSES' sentinel, which is not a
+   class and is never indexed.  Upstream never noticed because upstream only
+   ever reads indices below `N_REG_CLASSES'.
+
+   So this is not a check being weakened to make a build pass -- the check
+   was asserting something upstream does not guarantee, and the direction
+   that can actually hurt (FEWER names than classes, i.e. an out-of-bounds
+   read of `reg_class_names') is still caught, by name, at the back end that
+   has it.  `REG_CLASS_CONTENTS' and `REGISTER_NAMES' keep `==': no
+   configured back end has a trailing row in either, so there is nothing
+   there for the stricter form to be wrong about, and a `==' that has never
+   fired is worth more than a `>=' that cannot.  */
 static const char *const mt_reg_class_names[] = REG_CLASS_NAMES;
-static_assert (ARRAY_SIZE (mt_reg_class_names) == (size_t) OWN_N_REG_CLASSES,
-	       "REG_CLASS_NAMES does not have N_REG_CLASSES entries");
+static_assert (ARRAY_SIZE (mt_reg_class_names) >= (size_t) OWN_N_REG_CLASSES,
+	       "REG_CLASS_NAMES has FEWER than N_REG_CLASSES entries");
 
 /* These are what the union COSTS, checked rather than assumed.  A back end
    configured into a build whose union widths are smaller than its own would

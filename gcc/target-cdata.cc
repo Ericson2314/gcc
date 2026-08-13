@@ -50,6 +50,10 @@ along with GCC; see the file COPYING3.  If not see
    `PIC_OFFSET_TABLE_REGNUM' notes in target-cdata.h.  This file runs once,
    with `cfun' null.  */
 #include "rtl.h"
+/* Same reason target-addr.cc has it: this base's `<cpu>-protos.h' may declare
+   a function taking `enum memmodel', and an elaborated-type-specifier cannot
+   introduce an enum in a parameter list.  */
+#include "memmodel.h"
 #include BASE_HEADER (tm_p.h)
 #include "target-cdata.h"
 
