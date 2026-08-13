@@ -252,6 +252,15 @@ Six rules that each cost a session:
    ran the grep it described. A `Makefile.in` comment about `OBJS` was false.
 4. **A measurement that scores 0 may be a false negative from the instrument.**
    Confirm a 0 by finding the thing under another name.
+
+   **And a count is not the divergence.** `ELIMINABLE_REGS` leaks between
+   bases, and i386 and aarch64 both have **exactly four pairs** — a
+   length check would have scored the leak as *absent*. (`vax.h` has one,
+   `rs6000.h` six, so a count looks like a discriminator until you try it on
+   the pair you actually have.) All four register *numbers* differ. **Print
+   the contents and compare them; do not assert on a count**, and do not
+   predict which elements differ — a previous wall's missing registers turned
+   out to be 16–19, not the 92–94 predicted.
 5. **A clean result from an instrument with unexamined blind spots is worth very
    little.** Strong-symbol sweeps hid COMDAT; the COMDAT sweep hid macros; the
    macro probe found `BYTES_BIG_ENDIAN` by failing to compile. **State your
@@ -296,6 +305,19 @@ Six rules that each cost a session:
    the specific keys you expect by name. If you find yourself asserting
    `test -s`, ask what a half-written version of that file looks like, because
    that is the case the assertion will meet.
+
+   **Third instance, and the sharpest: a GENERATOR that ran, exited 0, and
+   changed nothing.** An agent added a probe symbol, a loop and a refusal
+   check to `gen-reg-widths.sh` — but never added the `#define` to its
+   heredoc. The header came out **byte-identical**, `move-if-change` therefore
+   kept the old one, and make reported success. Exit status, existence,
+   timestamp and non-emptiness *all* pass on that. Note `move-if-change`
+   actively hides it: its whole purpose is to make "no change" invisible to
+   make.
+
+   **So for anything generated, assert on the CONTENT you added, by name and
+   value, and run that arm first.** "The generator ran" is not evidence the
+   generator did anything.
 
 **Check the count in BOTH directions when moving a walk onto a union list.** A
 fix can improve the axis you are watching while silently regressing the one you
