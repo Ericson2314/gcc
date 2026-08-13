@@ -523,7 +523,7 @@ riscv_expand_strcmp (rtx result, rtx src1, rtx src2,
     return false;
   alignment = UINTVAL (align_rtx);
 
-  if (TARGET_VECTOR && stringop_strategy & STRATEGY_VECTOR)
+  if (TARGET_VECTOR && riscv_stringop_strategy & STRATEGY_VECTOR)
     {
       bool ok = riscv_vector::expand_strcmp (result, src1, src2,
 					     bytes_rtx, alignment,
@@ -532,7 +532,7 @@ riscv_expand_strcmp (rtx result, rtx src1, rtx src2,
 	return true;
     }
 
-  if ((TARGET_ZBB || TARGET_XTHEADBB) && stringop_strategy & STRATEGY_SCALAR)
+  if ((TARGET_ZBB || TARGET_XTHEADBB) && riscv_stringop_strategy & STRATEGY_SCALAR)
     return riscv_expand_strcmp_scalar (result, src1, src2, nbytes, alignment,
 				       ncompare);
 
@@ -607,7 +607,7 @@ riscv_expand_strlen_scalar (rtx result, rtx src, rtx align)
 bool
 riscv_expand_strlen (rtx result, rtx src, rtx search_char, rtx align)
 {
-  if (TARGET_VECTOR && stringop_strategy & STRATEGY_VECTOR)
+  if (TARGET_VECTOR && riscv_stringop_strategy & STRATEGY_VECTOR)
     {
       riscv_vector::expand_rawmemchr (E_QImode, result, src, search_char,
 				      /* strlen */ true);
@@ -616,7 +616,7 @@ riscv_expand_strlen (rtx result, rtx src, rtx search_char, rtx align)
 
   gcc_assert (search_char == const0_rtx);
 
-  if ((TARGET_ZBB || TARGET_XTHEADBB) && stringop_strategy & STRATEGY_SCALAR)
+  if ((TARGET_ZBB || TARGET_XTHEADBB) && riscv_stringop_strategy & STRATEGY_SCALAR)
     return riscv_expand_strlen_scalar (result, src, align);
 
   return false;
@@ -791,7 +791,7 @@ riscv_expand_block_compare_scalar (rtx result, rtx src1, rtx src2, rtx nbytes)
 bool
 riscv_expand_block_compare (rtx result, rtx src1, rtx src2, rtx nbytes)
 {
-  if (stringop_strategy & STRATEGY_SCALAR)
+  if (riscv_stringop_strategy & STRATEGY_SCALAR)
     return riscv_expand_block_compare_scalar (result, src1, src2, nbytes);
 
   return false;
@@ -981,14 +981,14 @@ bool
 riscv_expand_block_move (rtx dest, rtx src, rtx length)
 {
   if (TARGET_VECTOR
-      && stringop_strategy & STRATEGY_VECTOR)
+      && riscv_stringop_strategy & STRATEGY_VECTOR)
     {
       bool ok = riscv_vector::expand_block_move (dest, src, length, false);
       if (ok)
 	return true;
     }
 
-  if (stringop_strategy & STRATEGY_SCALAR)
+  if (riscv_stringop_strategy & STRATEGY_SCALAR)
     return riscv_expand_block_move_scalar (dest, src, length);
 
   return false;
@@ -1087,7 +1087,7 @@ use_vector_stringop_p (struct stringop_info &info, HOST_WIDE_INT max_ew,
   HOST_WIDE_INT potential_ew = max_ew;
 
   if (!TARGET_VECTOR
-      || !(stringop_strategy & STRATEGY_VECTOR))
+      || !(riscv_stringop_strategy & STRATEGY_VECTOR))
     return false;
 
   if (TARGET_XTHEADVECTOR
@@ -1595,7 +1595,7 @@ check_vectorise_memory_operation (rtx length_in, HOST_WIDE_INT &lmul_out)
   /* If we either can't or have been asked not to vectorise, respect this.  */
   if (!TARGET_VECTOR)
     return false;
-  if (!(stringop_strategy & STRATEGY_VECTOR))
+  if (!(riscv_stringop_strategy & STRATEGY_VECTOR))
     return false;
 
   /* If we can't reason about the length, don't vectorise.  */

@@ -2235,7 +2235,7 @@ typedef struct
 {
   rtx value;			/* Value in table.  */
   rtx label;			/* Label of value.  */
-} pool_node;
+} mcore_pool_node;
 
 /* The maximum number of constants that can fit into one pool, since
    the pc relative range is 0...1020 bytes and constants are at least 4
@@ -2244,7 +2244,7 @@ typedef struct
 
 #define MAX_COUNT 1016
 #define MAX_POOL_SIZE (MAX_COUNT/4)
-static pool_node pool_vector[MAX_POOL_SIZE];
+static mcore_pool_node pool_vector[MAX_POOL_SIZE];
 static int pool_size;
 
 /* Dump out any constants accumulated in the final pass.  These
@@ -2261,7 +2261,7 @@ mcore_output_jump_label_table (void)
 
       for (i = 0; i < pool_size; i++)
 	{
-	  pool_node * p = pool_vector + i;
+	  mcore_pool_node * p = pool_vector + i;
 
 	  (*targetm.asm_out.internal_label) (asm_out_file, "L", CODE_LABEL_NUMBER (p->label));
 

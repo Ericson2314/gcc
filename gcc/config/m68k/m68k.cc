@@ -486,7 +486,7 @@ enum target_device m68k_cpu;
 enum uarch_type m68k_tune;
 
 /* Which FPU to use.  */
-enum fpu_type m68k_fpu;
+enum m68k_fpu_type m68k_fpu;
 
 /* The set of FL_* flags that apply to the target processor.  */
 unsigned int m68k_cpu_flags;

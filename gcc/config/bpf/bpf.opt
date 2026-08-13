@@ -96,7 +96,7 @@ EnumValue
 Enum(bpf_isa) String(v4) Value(ISA_V4)
 
 masm=
-Target RejectNegative Joined Var(asm_dialect) Enum(bpf_asm_dialect) Init(ASM_PSEUDOC)
+Target RejectNegative Joined Var(bpf_asm_dialect_var) Enum(bpf_asm_dialect) Init(ASM_PSEUDOC)
 Use given assembler dialect.
 
 Enum

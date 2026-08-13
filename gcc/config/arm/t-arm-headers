@@ -8,6 +8,30 @@ t_arm_headers_included := 1
 # multi-target build -- which includes no single target's tmake_file -- can
 # generate them too; see gen-multi-target-md.awk.
 
+# WHAT THIS FRAGMENT GENERATES, declared for the readers rather than left to
+# be inferred from the rules below.  gen-multi-target-md.awk's scan_hdr_frag
+# reads exactly this line; it is the only claim in the tree about these names,
+# and a fragment with rules but no `generated_files' is invisible to it.
+#
+# This fragment had the rules and not the declaration, so nothing depended on
+# the headers and a rule nothing depends on is never run.  Measured with 48
+# back ends configured: build/gencheck.o died on
+# `arm-isa.h: No such file or directory' -- reached through tm.h, options.h and
+# config/arm/arm-opts.h, none of which look like arm -- while s-arm-isa sat in
+# multi-target-md.mk the whole time.  The other six t-<cpu>-headers fragments
+# all carry the line; arm was the one that did not.
+#
+# arm-cpu-data.h and arm-native.h are deliberately included even though the
+# failure named only arm-isa.h: they come from the same generator for the same
+# reason, and listing only the name that happened to fail first is how the
+# next one gets found by another build.
+#
+# ON ONE LINE.  scan_hdr_frag matches `generated_files +=' and reads THAT
+# physical line; it does not follow a trailing backslash.  Written as a
+# continuation, this line put four headers in multi-target-md.mk and silently
+# dropped arm-native.h -- the under-read looks exactly like a complete list.
+generated_files += arm-cpu.h arm-isa.h arm-cpu-data.h arm-cpu-cdata.h arm-native.h
+
 
 arm-cpu.h: s-arm-cpu ; @true
 s-arm-cpu: $(srcdir)/config/arm/parsecpu.awk \

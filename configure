@@ -756,6 +756,7 @@ LN
 INSTALL_DATA
 INSTALL_SCRIPT
 INSTALL_PROGRAM
+gcc_backends_arg
 mt_target_subdirs
 target_os
 target_vendor
@@ -2702,6 +2703,11 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: target trees: ${mt_target_subdirs}" >&5
 $as_echo "$as_me: target trees: ${mt_target_subdirs}" >&6;}
+
+# THE SAME LIST, SPELLED FOR gcc/.  See configure.ac for why this is derived
+# from --enable-targets rather than being an option of its own.
+gcc_backends_arg="--enable-backends=`echo ${mt_target_subdirs} | tr ' ' ','`"
+
 
 
 

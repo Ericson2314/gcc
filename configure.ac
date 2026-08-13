@@ -166,6 +166,33 @@ fi
 AC_MSG_NOTICE([target trees: ${mt_target_subdirs}])
 AC_SUBST(mt_target_subdirs)
 
+# THE SAME LIST, SPELLED FOR gcc/.
+#
+# The top level takes TARGETS (triples, plural) and instantiates a tree per
+# target.  gcc/ takes BACK ENDS -- which back ends are compiled into the one
+# compiler binary -- and spells that --enable-backends, because it is a
+# property of the artefact and therefore host-side.  They are two names for
+# the same list here: a target you asked for a tree for is a target the
+# compiler must be able to generate code for.
+#
+# Without this, --enable-targets=LIST is accepted by the top level, never
+# reaches gcc/configure, and a cold build dies in the gcc/ subdirectory with
+#
+#     configure: error: --enable-backends=LIST is required
+#
+# which reads as a gcc/ bug rather than as a missing top-level mapping.  Every
+# build dir in this branch was configured by passing --enable-backends to the
+# top level BY HAND, where autoconf's auto-accept of unrecognised --enable-*
+# passed it down through HOST_CONFIGARGS.  That workaround hid the gap.
+#
+# Deliberately NOT an AC_ARG_ENABLE of its own: two spellings for one list is
+# this branch's signature bug (one name, several authorities).  There is one
+# authority, --enable-targets, and this is a derived value.  It is passed as
+# an explicit configure argument rather than left to HOST_CONFIGARGS so that
+# it is visible in gcc/config.log next to the other gcc-specific flags.
+gcc_backends_arg="--enable-backends=`echo ${mt_target_subdirs} | tr ' ' ','`"
+AC_SUBST(gcc_backends_arg)
+
 m4_pattern_allow([^AS_FOR_TARGET$])dnl
 m4_pattern_allow([^AS_FOR_BUILD$])dnl
 

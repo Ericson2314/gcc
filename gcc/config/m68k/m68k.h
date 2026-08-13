@@ -889,7 +889,7 @@ __transfer_from_trampoline ()					\
 
 #include "config/m68k/m68k-opts.h"
 
-enum fpu_type
+enum m68k_fpu_type
 {
   FPUTYPE_NONE,
   FPUTYPE_68881,
@@ -906,7 +906,7 @@ enum m68k_function_kind
 /* Variables in m68k.cc; see there for details.  */
 extern enum target_device m68k_cpu;
 extern enum uarch_type m68k_tune;
-extern enum fpu_type m68k_fpu;
+extern enum m68k_fpu_type m68k_fpu;
 extern unsigned int m68k_cpu_flags;
 extern unsigned int m68k_tune_flags;
 extern const char *m68k_symbolic_call;

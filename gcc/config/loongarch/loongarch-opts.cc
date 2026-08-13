@@ -1037,16 +1037,16 @@ loongarch_target_option_override (struct loongarch_target *target,
     {
       case ARCH_LA664:
 	/* Enable -mrecipe=all for LA664 by default.  */
-	if (!opts_set->x_recip_mask)
+	if (!opts_set->x_la_recip_mask)
 	  {
-	    opts->x_recip_mask = RECIP_MASK_ALL;
-	    opts_set->x_recip_mask = 1;
+	    opts->x_la_recip_mask = RECIP_MASK_ALL;
+	    opts_set->x_la_recip_mask = 1;
 	  }
     }
 
   /* -mrecip= */
   opts->x_la_recip_name
-    = loongarch_generate_mrecip_scheme (opts->x_recip_mask);
+    = loongarch_generate_mrecip_scheme (opts->x_la_recip_mask);
 
   /* Decide which rtx_costs structure to use.  */
   if (opts->x_optimize_size)
@@ -1100,7 +1100,7 @@ loongarch_init_misc_options (struct gcc_options *opts,
     opts->x_g_switch_value = 0;
 
   /* -mrecip options.  */
-  opts->x_recip_mask = loongarch_parse_mrecip_scheme (opts->x_la_recip_name);
+  opts->x_la_recip_mask = loongarch_parse_mrecip_scheme (opts->x_la_recip_name);
 
 #define INIT_TARGET_FLAG(NAME, INIT) \
   { \

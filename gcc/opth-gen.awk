@@ -793,6 +793,33 @@ for (i = 0; i < n_sd; i++) {
 	}
 	else
 		var_target_other[n_target_other++] = sd_decl[i];
+
+	# TWO PATHS REACH ONE cl_target_option MEMBER, AND ONLY ACROSS BACK
+	# ENDS.  A field can arrive here as a `D' record -- an explicit
+	# `TargetSave' declaration -- or from the `Save' loop below, which
+	# derives one from an option's Var().  Within a single back end it is
+	# never both, so upstream this cannot happen and nothing checks it.
+	#
+	# With arm and aarch64 in one binary it does: arm.opt carries
+	# `TargetVariable enum aarch_function_type aarch_ra_sign_scope' with a
+	# TargetSave, while aarch64.opt marks `msign-return-address=' `Save'.
+	# Both emit `x_aarch_ra_sign_scope' and the header does not compile --
+	# 725 diagnostics, one per translation unit, all of them
+	#   error: redeclaration of `... cl_target_option::x_aarch_ra_sign_scope'
+	# which reads as one broken header rather than as a union defect.
+	#
+	# Record the name so the Save loop can recognise it.  The DECLARATION
+	# is kept, not the derived one, because it is what the back end wrote.
+	sd_var = sd_decl[i]
+	sub(/\[.*\]$/, "", sd_var)
+	sub(/^.*[ *]/, "", sd_var)
+	sd_type = sd_decl[i]
+	sub(/[ *][_a-zA-Z0-9]+(\[.*\])?$/, "", sd_type)
+	if (sd_var ~ /^x_/) {
+		sd_base = sd_var
+		sub(/^x_/, "", sd_base)
+		sd_by_name[sd_base] = sd_type
+	}
 }
 
 if (have_save) {
@@ -808,6 +835,39 @@ if (have_save) {
 			var_save_seen[name]++;
 			n_target_explicit++;
 			otype = var_type_struct(sv_flags[i])
+
+			# NOTE the `n_target_explicit++' stays ABOVE this test.
+			# It counts options with explicit tracking, not struct
+			# members: the option is still Save-able and still
+			# needs its explicit bit whether or not some other back
+			# end already declared the field.  Moving the increment
+			# below the `continue' silently shortens the explicit
+			# mask by one for every field this skips -- an
+			# off-by-one in an array the whole option machinery
+			# indexes, which is not the kind of thing that fails
+			# loudly.
+			#
+			# Already declared by a `TargetSave' in some back end?
+			# Then the member exists; do not emit a second one.
+			# See the note in the sd_decl loop above.
+			#
+			# REFUSE rather than resolve if the two disagree about
+			# the type.  Silently keeping one of them is exactly
+			# the shared-numbering failure this file exists to
+			# remove: the struct would have one member and two
+			# back ends would read it as different types, in
+			# bounds, with no diagnostic.
+			if (name in sd_by_name) {
+				sv_type = otype
+				sub(/ *$/, "", sv_type)
+				if (sd_by_name[name] != sv_type)
+					union_fail("cl_target_option field `x_" \
+						   name "' is declared `" \
+						   sd_by_name[name] "' by a" \
+						   " TargetSave and `" sv_type \
+						   "' by a Save option")
+				continue;
+			}
 
 			if (opt_args("Mask", sv_flags[i]) != "" \
 			    || opt_args("InverseMask", sv_flags[i]))
