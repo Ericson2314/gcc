@@ -1021,6 +1021,39 @@ struct target_frame_desc
      sites pass an `fndecl', an `fntype' or a literal `(tree) 0'.  */
   bool (*has_reg_parm_stack_space) (void);
   int (*reg_parm_stack_space) (tree fndecl_or_type);
+
+  /* `PUSH_ROUNDING' -- 19 preprocessor sites and 12 value sites, classified
+     into five shapes by #133 and converted by #135.  Two slots again, and for
+     a sharper reason than `REG_PARM_STACK_SPACE': `PUSH_ROUNDING' is an
+     EXISTENCE question at almost every site.  `#ifdef PUSH_ROUNDING' does not
+     mean "the rounding is nonzero", it means "this target has push insns at
+     all", and eleven of the nineteen sites use it that way -- including
+     `default_push_argument', the default of the `TARGET_PUSH_ARGUMENT' hook
+     that several of the same sites then consult INSIDE the guard.
+
+     THE SIGNATURE IS THE DECISION, AND IT IS MADE ONCE HERE FOR ALL 12 VALUE
+     SITES.  `poly_int64 (poly_int64)':
+
+       - All FIVE function-implemented back-end macros already take and return
+         `poly_int64' (`ix86_push_rounding', `m68k_', `h8300_', `pdp11_',
+         `xstormy16_'), and the two macro-implemented ones (vax, avr) are the
+         identity `(BYTES)'.  So `poly_int64' fits every LIVE definition.
+         There are SEVEN live definitions, not the thirteen a `grep' for the
+         name suggests: sh's is inside `#if 0' and arm's, alpha's, pa's,
+         rs6000's, iq2000's and one of avr's are commented out.
+       - `MACRO_INT' STAYS IN THE PER-BASE THUNK AND LEAVES THE SHARED SITES.
+         It is `.to_constant ()' when `NUM_POLY_INT_COEFFS == 1' and the
+         identity otherwise, and it exists because a back end's macro may not
+         be poly-safe.  Keeping it in the thunk preserves recog.cc's exact
+         behaviour for every back end; dropping it at the shared sites is what
+         removes a compile-time constant-ness assumption from shared code.
+       - The alternative -- `HOST_WIDE_INT (HOST_WIDE_INT)' -- was rejected:
+         four of the twelve value sites pass a `poly_int64' whose constness is
+         not known at the call (`GET_MODE_SIZE (mode)' among them), so that
+         signature would have pushed a `.to_constant ()' into SHARED code,
+         which is the constant-ness assumption this project is removing.  */
+  bool (*has_push_rounding) (void);
+  poly_int64 (*push_rounding) (poly_int64 bytes);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1227,5 +1260,18 @@ extern int mt_incoming_reg_parm_stack_space (tree fndecl);
    primary's.  */
 extern bool mt_has_reg_parm_stack_space (void);
 extern int mt_reg_parm_stack_space (tree fndecl_or_type);
+
+/* `PUSH_ROUNDING', for shared code.  Not redirected either, and for the same
+   reason: the name is `#ifdef'-tested at nineteen shared sites.  `defaults.h'
+   `#undef's it after this header is included.
+
+   ONE OF THE NINETEEN IS NOT A VALUE QUESTION AT ALL AND CHANGES BEHAVIOUR:
+   `combine-stack-adj.cc''s pass gate is `#ifndef PUSH_ROUNDING', so today the
+   whole `if (ACCUMULATE_OUTGOING_ARGS) return false;' is COMPILED OUT for
+   every target because the primary defines the macro.  Converting it turns
+   that early return on for the 38 back ends with no `PUSH_ROUNDING' --
+   including aarch64, so it is observable on the configured pair.  */
+extern bool mt_has_push_rounding (void);
+extern poly_int64 mt_push_rounding (poly_int64 bytes);
 
 #endif /* GCC_TARGET_FRAME_H */

@@ -1832,9 +1832,11 @@ push_operand (rtx op, machine_mode mode)
 
   poly_int64 rounded_size = GET_MODE_SIZE (mode);
 
-#ifdef PUSH_ROUNDING
-  rounded_size = PUSH_ROUNDING (MACRO_INT (rounded_size));
-#endif
+  /* `MACRO_INT' has moved into the per-base thunk; see target-frame.h.  A
+     `.to_constant ()' here would be a compile-time constant-ness assumption
+     in shared code about a value only the selected back end can size.  */
+  if (mt_has_push_rounding ())
+    rounded_size = mt_push_rounding (rounded_size);
 
   op = XEXP (op, 0);
 

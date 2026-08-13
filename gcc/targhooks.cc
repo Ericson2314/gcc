@@ -909,11 +909,13 @@ hook_void_CUMULATIVE_ARGS_rtx_tree (cumulative_args_t, rtx, tree)
 bool
 default_push_argument (unsigned int)
 {
-#ifdef PUSH_ROUNDING
-  return !ACCUMULATE_OUTGOING_ARGS;
-#else
-  return false;
-#endif
+  /* The default of `TARGET_PUSH_ARGUMENT', and the hinge of the whole
+     `PUSH_ROUNDING' family: several shared sites consult
+     `targetm.calls.push_argument' INSIDE what used to be an
+     `#ifdef PUSH_ROUNDING', so for those the existence question was already
+     answered at run time and the guard was only a compile-time short circuit
+     on top of it -- one whose answer was the primary's.  */
+  return mt_has_push_rounding () && !ACCUMULATE_OUTGOING_ARGS;
 }
 
 void

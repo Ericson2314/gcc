@@ -5173,9 +5173,8 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
       /* Compute how much space the push instruction will push.
 	 On many machines, pushing a byte will advance the stack
 	 pointer by a halfword.  */
-#ifdef PUSH_ROUNDING
-      size = PUSH_ROUNDING (size);
-#endif
+      if (mt_has_push_rounding ())
+	size = mt_push_rounding (size);
       used = size;
 
       /* Compute how much space the argument should get:

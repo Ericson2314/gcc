@@ -3027,10 +3027,8 @@ elimination_effects (rtx x, machine_mode mem_mode)
 	    poly_int64 size = GET_MODE_SIZE (mem_mode);
 
 	    /* If more bytes than MEM_MODE are pushed, account for them.  */
-#ifdef PUSH_ROUNDING
-	    if (ep->to_rtx == stack_pointer_rtx)
-	      size = PUSH_ROUNDING (size);
-#endif
+	    if (mt_has_push_rounding () && ep->to_rtx == stack_pointer_rtx)
+	      size = mt_push_rounding (size);
 	    if (code == PRE_DEC || code == POST_DEC)
 	      ep->offset += size;
 	    else if (code == PRE_INC || code == POST_INC)

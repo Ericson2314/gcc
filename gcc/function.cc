@@ -4160,10 +4160,13 @@ locate_and_pad_parm (machine_mode passed_mode, tree type, int in_regs,
 			      &locate->alignment_pad);
       locate->slot_offset = *initial_offset_ptr;
 
-#ifdef PUSH_ROUNDING
-      if (passed_mode != BLKmode)
-	sizetree = size_int (PUSH_ROUNDING (TREE_INT_CST_LOW (sizetree)));
-#endif
+      /* `TREE_INT_CST_LOW' is a `HOST_WIDE_INT' and the result is fed to
+	 `size_int', so the poly value is taken apart here rather than at the
+	 thunk: this site was never poly to begin with.  */
+      if (mt_has_push_rounding () && passed_mode != BLKmode)
+	sizetree
+	  = size_int (mt_push_rounding (TREE_INT_CST_LOW (sizetree))
+		      .to_constant ());
 
       /* Pad_below needs the pre-rounded size to know how much to pad below
 	 so this must be done before rounding up.  */

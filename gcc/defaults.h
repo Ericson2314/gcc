@@ -2436,6 +2436,41 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    than by redirecting.  */
 #undef REG_PARM_STACK_SPACE
 
+/* `PUSH_ROUNDING' -- ALL 19 PREPROCESSOR SITES AND ALL 12 VALUE SITES IN
+   TARGET-INDEPENDENT CODE ARE CONVERTED (#135), BUT THE NAME CANNOT BE
+   `#undef'ED HERE, AND THE ATTEMPT IS THE FINDING.
+
+   Undefining it builds `libbackend' clean and then fails in
+   `insn-emit-1.cc' / `insn-emit-5.cc' with
+
+       config/i386/mmx.md:430:27: error: PUSH_ROUNDING was not declared
+       config/i386/i386.md:2221, :2313, :3884: likewise
+
+   -- fifteen errors from FOUR i386 `.md' files.  Those are `define_split'
+   preparation statements (`operands[2] = GEN_INT (-PUSH_ROUNDING (...))'),
+   i.e. BACK-END code, but the `insn-emit-*.o' family is the un-namespaced one:
+   it is compiled ONCE, shared, WITHOUT `MULTI_TARGET_TARGETM_BASE', with every
+   configured back end's patterns in it.  So a back end's own macro use lands
+   in a translation unit this file has classified as target-independent.
+
+   That is a pre-existing wall (the `insn-emit' family, whose forwarder scheme
+   decides `gen_movxf' by implication and needs the user's ruling), and it is
+   NOT this task's to fix -- but it is worth stating precisely, because it is
+   a shape no earlier conversion met: every macro retired so far was spelled
+   only by files under `gcc/' itself.  `PUSH_ROUNDING' is the first whose CONSUMERS are done
+   while its name must stay defined for a supply-side file that is compiled as
+   if it were shared.
+
+   `REG_PARM_STACK_SPACE' above CAN be `#undef'ed, and the difference is
+   measured rather than assumed: no `.md' file spells it, so the same build
+   that produced the errors above accepted that `#undef'.
+
+   Consequence recorded honestly: shared code no longer READS this macro, but
+   the name is still in scope in every shared translation unit with the
+   primary's definition, so a re-introduced `#ifdef PUSH_ROUNDING' in
+   shared code would silently be TRUE for every target -- the exact bug this
+   family had.  The protection here is the conversion, not a diagnostic.  */
+
 /* ------------------------------------------------------------------------
    THE NEIGHBOURS, CHECKED AND DELIBERATELY NOT REDIRECTED.  A family checked
    and judged fine is a result; silence about it is not.  All three verdicts
@@ -2480,10 +2515,20 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    taken.
 
    ------------------------------------------------------------------------
-   `PUSH_ROUNDING' -- ALL 19 PREPROCESSOR SITES CLASSIFIED, NONE CONVERTED
-   (#133; `scratchpad/t133-push-sites.sh' re-derives the list).  i386 defines
-   it (i386.h:1621, `ix86_push_rounding'), aarch64 does not, 13 of 51 back
-   ends do -- so every `#ifdef PUSH_ROUNDING' below is answered by i386 for
+   `PUSH_ROUNDING' -- CLASSIFIED BY #133, CONVERTED IN FULL BY #135.  All 19
+   preprocessor sites and all 12 value sites are now run-time; the shapes
+   below are kept because each records WHY its site converted the way it did,
+   and two of them are not substitutions.  What #135 added on top of the
+   classification is at the end of this block.
+
+   i386 defines it (i386.h:1621, `ix86_push_rounding'), aarch64 does not.
+   SEVEN back ends define it, not the thirteen a grep for the name suggests:
+   `#define PUSH_ROUNDING' at column 0 appears eight times and sh's is inside
+   `#if 0', while arm's, alpha's, pa's, rs6000's, iq2000's and one of avr's
+   are in comments.  Five of the seven are function calls taking and
+   returning `poly_int64' (i386, m68k, h8300, pdp11, stormy16) and two are
+   the identity `(BYTES)' (vax, avr) -- which is what makes the signature
+   below fit every live definition -- so every `#ifdef PUSH_ROUNDING' below is answered by i386 for
    every target, and `calls.o' carries `U ix86_push_rounding(poly_int<2u,
    long>)' as well, i.e. it leaks as a VALUE and as an EXISTENCE question
    both.  The classification is written down BEFORE any conversion because a
@@ -2516,7 +2561,7 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    `mt_accumulate_outgoing_args' zero times.  Converting it TURNS A GATE ON
    for the 38 back ends that define no `PUSH_ROUNDING', so it is the one site
    in this family whose conversion changes pass behaviour rather than a value,
-   and it wants its own before/after.
+   and it wants its own before/after.  IT GOT ONE; see the end of this block.
 
    SHAPE 3 -- guard over a DECLARATION or DEFINITION.  Cannot become an `if',
    but needs no flag either: drop the guard and declare/define
@@ -2543,6 +2588,71 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    the SHARED sites, but the PER-BASE thunk must keep it for those back ends
    -- so the signature is a decision, not a transcription, and it should be
    made once for all 12 value sites rather than site by site.
+   DECIDED THAT WAY IN #135, with the argument written out in target-frame.h.
+   `function.cc:4151' is the one value site that stays non-poly on purpose:
+   it feeds `size_int' from `TREE_INT_CST_LOW', so it was never poly and the
+   `.to_constant ()' is at the call rather than in the thunk.
+
+   ------------------------------------------------------------------------
+   WHAT #135 ADDED TO THE CLASSIFICATION.
+
+   THE PASS GATE, MEASURED BOTH WAYS IN ONE BUILD DIR
+   (`scratchpad/t135-gate.sh' + `t135-gate-inject.sh'; the reading is
+   `-fdump-rtl-csa', i.e. the COMPILER'S OWN report that the pass ran, not an
+   inference from the assembly):
+
+                       OFF (pre-#135)          ON (#135)
+       aarch64         csa dump, 273 lines     NO csa dump        CHANGED
+       x86_64          csa dump, 233 lines     csa dump, 233      unchanged
+
+   and the emitted assembly is BYTE-IDENTICAL on both bases either way
+   (aarch64 `be8a7f14b637', x86_64 `0b156589647b').  BOTH HALVES OF THAT ARE
+   THE RESULT.  The gate really did change -- aarch64 stops running
+   `combine_stack_adjustments', which is what an aarch64-only GCC does, since
+   `#ifndef PUSH_ROUNDING' is TRUE there -- so the conversion RESTORES
+   upstream behaviour for the 38 back ends that had been running a pass their
+   own headers gate off.  And the codegen for this input does not move, so no
+   claim is made that it produces different code; on an input where the pass
+   found nothing to combine, "the pass ran" and "the pass did not run" have
+   the same output, and reporting the dump difference as a codegen difference
+   would be exactly the overclaim this project keeps finding.
+
+   AND THE `#undef' THAT COULD NOT BE DONE; see the note beside the
+   `REG_PARM_STACK_SPACE' `#undef' above.  i386's `.md' files spell
+   `PUSH_ROUNDING' in `define_split' preparation statements, and those land in
+   the SHARED `insn-emit-*.o'.
+
+   THE OTHER TWO NAMES IN #134'S LADDER -- `STACK_GROWS_DOWNWARD' AND
+   `ARGS_GROW_DOWNWARD' -- ARE STILL UNCONVERTED, AND THEY CANNOT BE
+   CONVERTED THE WAY `PUSH_ROUNDING' WAS.  Reported rather than taken:
+
+     * Both are `#if'-TESTED, not `#ifdef'-tested, at thirteen shared sites
+       (explow.cc:1786; builtins.cc:5477, :5610, :5700, :5735; recog.cc:48;
+       rtlanal.cc:372, :582, :586, :594, :606, :610, :618, :629) -- and
+       `rtlanal.cc' tests them in NESTED pairs.  A call-valued macro in a
+       `#if' evaluates to 0, which is the `#if HAVE_ATTR_length' failure
+       this file already records; `FRAME_POINTER_CFA_OFFSET' above is the
+       same verdict.  So these need either a union check or a real
+       restructure of thirteen preprocessor sites, not a redirect.
+     * They are genuinely per-base: 46 back-end headers define
+       `STACK_GROWS_DOWNWARD 1' and the rest leave `defaults.h''s 0 (pa is
+       explicit about it, with the definition commented out); exactly three
+       define `ARGS_GROW_DOWNWARD 1' (pa, gcn, stormy16).
+     * BUT NOT ON THIS PAIR.  i386 and aarch64 both have
+       `STACK_GROWS_DOWNWARD 1' and neither has `ARGS_GROW_DOWNWARD', so
+       every one of the thirteen sites has the same answer for both, and no
+       arm built here could tell a converted version from the status quo.
+       UNMEASURABLE WITH THIS PAIR, exactly like `ARG_POINTER_CFA_OFFSET' --
+       recorded as that, and not as clean.
+     * ONE MIXED SPELLING, CHECKED AND FOUND HARMLESS TODAY, WHICH IS WORTH
+       STATING BECAUSE THE OBVIOUS READING IS THAT IT IS A BUG.
+       `defaults.h:533' (`DWARF_CIE_DATA_ALIGNMENT') tests
+       `#ifdef STACK_GROWS_DOWNWARD' while the thirteen sites above test
+       `#if'.  An `#ifdef' would be TRUE for a back end that defined the name
+       to 0 -- but no back end does: all 46 definitions are `1' and pa's is
+       commented out entirely, measured rather than assumed.  It is also
+       ABOVE this file's own `#ifndef ... 0' fallback at :1328, so the two
+       spellings do not currently disagree anywhere.  Fragile, not wrong.
 
    `PUSH_ARGS_REVERSED' -- FOUND IN THIS CLOSURE, AND IT IS A LEAK IN ITS OWN
    RIGHT.  i386.h:1658 defines it to 1; aarch64 does not; bpf and nvptx do.

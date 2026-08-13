@@ -795,11 +795,10 @@ mark_not_eliminable (rtx x, machine_mode mem_mode)
 	{
 	  poly_int64 size = GET_MODE_SIZE (mem_mode);
 
-#ifdef PUSH_ROUNDING
 	  /* If more bytes than MEM_MODE are pushed, account for
 	     them.  */
-	  size = PUSH_ROUNDING (size);
-#endif
+	  if (mt_has_push_rounding ())
+	    size = mt_push_rounding (size);
 	  if (code == PRE_DEC || code == POST_DEC)
 	    curr_sp_change -= size;
 	  else if (code == PRE_INC || code == POST_INC)

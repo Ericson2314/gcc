@@ -838,10 +838,14 @@ pass_stack_adjustments::gate (function *)
      even for machines with possibly nonzero TARGET_RETURN_POPS_ARGS
      and ACCUMULATE_OUTGOING_ARGS.  We expect that only ports having
      push instructions will have popping returns.  */
-#ifndef PUSH_ROUNDING
-  if (ACCUMULATE_OUTGOING_ARGS)
+  /* SHAPE 2, and the ONE site in this family whose conversion changes PASS
+     BEHAVIOUR rather than a value.  Written `#ifndef PUSH_ROUNDING', this
+     early return was compiled out for EVERY target -- because the primary
+     defines the macro -- so no target has been taking it.  Converted, the 38
+     back ends with no push insns (aarch64 among them) start taking it again,
+     which is what the comment above always said should happen.  */
+  if (!mt_has_push_rounding () && ACCUMULATE_OUTGOING_ARGS)
     return false;
-#endif
   return flag_combine_stack_adjustments;
 }
 

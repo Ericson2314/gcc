@@ -791,6 +791,30 @@ mt_base_reg_parm_stack_space (tree fndecl_or_type ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* `PUSH_ROUNDING', read in THIS base's translation unit.  See target-frame.h
+   for the signature argument; `MACRO_INT' is deliberately kept HERE and
+   removed from the shared sites, because it is exactly the wrapper that lets
+   a back end whose macro is not poly-safe keep working.  */
+static bool
+mt_base_has_push_rounding (void)
+{
+#ifdef PUSH_ROUNDING
+  return true;
+#else
+  return false;
+#endif
+}
+
+static poly_int64
+mt_base_push_rounding (poly_int64 bytes ATTRIBUTE_UNUSED)
+{
+#ifdef PUSH_ROUNDING
+  return PUSH_ROUNDING (MACRO_INT (bytes));
+#else
+  return bytes;
+#endif
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -1085,7 +1109,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_push_args_reversed,
   mt_base_incoming_reg_parm_stack_space,
   mt_base_has_reg_parm_stack_space,
-  mt_base_reg_parm_stack_space
+  mt_base_reg_parm_stack_space,
+  mt_base_has_push_rounding,
+  mt_base_push_rounding
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

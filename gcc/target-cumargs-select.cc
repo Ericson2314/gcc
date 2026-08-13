@@ -478,6 +478,25 @@ mt_reg_parm_stack_space (tree fndecl_or_type)
   return mt_frame ()->reg_parm_stack_space (fndecl_or_type);
 }
 
+/* `PUSH_ROUNDING', existence and value.  The assertion is not decoration
+   here: the `#else' arm of the per-base value thunk returns its argument
+   unrounded, which is a PLAUSIBLE number -- it is what a target with
+   `PUSH_ROUNDING(X) (X)' legitimately returns -- so a value site that escaped
+   its existence test would produce believable wrong code rather than
+   anything that fails.  */
+bool
+mt_has_push_rounding (void)
+{
+  return mt_frame ()->has_push_rounding ();
+}
+
+poly_int64
+mt_push_rounding (poly_int64 bytes)
+{
+  gcc_assert (mt_frame ()->has_push_rounding ());
+  return mt_frame ()->push_rounding (bytes);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

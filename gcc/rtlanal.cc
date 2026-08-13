@@ -4911,16 +4911,15 @@ nonzero_bits1 (const_rtx x, scalar_int_mode mode, const_rtx known_x,
 	  unsigned HOST_WIDE_INT alignment
 	    = REGNO_POINTER_ALIGN (REGNO (x)) / BITS_PER_UNIT;
 
-#ifdef PUSH_ROUNDING
-	  /* If PUSH_ROUNDING is defined, it is possible for the
-	     stack to be momentarily aligned only to that amount,
-	     so we pick the least alignment.  */
-	  if (x == stack_pointer_rtx && targetm.calls.push_argument (0))
+	  /* If the target has push insns, it is possible for the stack to be
+	     momentarily aligned only to the push rounding, so we pick the
+	     least alignment.  */
+	  if (mt_has_push_rounding ()
+	      && x == stack_pointer_rtx && targetm.calls.push_argument (0))
 	    {
-	      poly_uint64 rounded_1 = PUSH_ROUNDING (poly_int64 (1));
+	      poly_uint64 rounded_1 = mt_push_rounding (poly_int64 (1));
 	      alignment = MIN (known_alignment (rounded_1), alignment);
 	    }
-#endif
 
 	  nonzero &= ~(alignment - 1);
 	}

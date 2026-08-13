@@ -5625,13 +5625,14 @@ cse_insn (rtx_insn *insn)
 
       if (MEM_P (dest))
 	{
-#ifdef PUSH_ROUNDING
-	  /* Stack pushes invalidate the stack pointer.  */
-	  rtx addr = XEXP (dest, 0);
-	  if (GET_RTX_CLASS (GET_CODE (addr)) == RTX_AUTOINC
-	      && XEXP (addr, 0) == stack_pointer_rtx)
-	    invalidate (stack_pointer_rtx, VOIDmode);
-#endif
+	  if (mt_has_push_rounding ())
+	    {
+	      /* Stack pushes invalidate the stack pointer.  */
+	      rtx addr = XEXP (dest, 0);
+	      if (GET_RTX_CLASS (GET_CODE (addr)) == RTX_AUTOINC
+		  && XEXP (addr, 0) == stack_pointer_rtx)
+		invalidate (stack_pointer_rtx, VOIDmode);
+	    }
 	  dest = fold_rtx (dest, insn);
 	}
 

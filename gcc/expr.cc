@@ -105,9 +105,7 @@ static unsigned HOST_WIDE_INT highest_pow2_factor_for_target (const_tree, const_
 static bool is_aligning_offset (const_tree, const_tree);
 static rtx reduce_to_bit_field_precision (rtx, rtx, tree);
 static rtx do_store_flag (const_sepops, rtx, machine_mode);
-#ifdef PUSH_ROUNDING
 static void emit_single_push_insn (machine_mode, rtx, tree);
-#endif
 static void do_tablejump (rtx, machine_mode, rtx, rtx, rtx,
 			  profile_probability);
 static rtx const_vector_from_tree (tree);
@@ -1592,11 +1590,9 @@ op_by_pieces_d::run ()
 /* Derived class from op_by_pieces_d, providing support for block move
    operations.  */
 
-#ifdef PUSH_ROUNDING
-#define PUSHG_P(to)  ((to) == nullptr)
-#else
-#define PUSHG_P(to)  false
-#endif
+/* SHAPE 4 -- a guard over a MACRO DEFINITION.  The existence test folds into
+   the body, which was already a run-time expression.  */
+#define PUSHG_P(to)  (mt_has_push_rounding () && (to) == nullptr)
 
 class move_by_pieces_d : public op_by_pieces_d
 {
@@ -1636,13 +1632,11 @@ void
 move_by_pieces_d::generate (rtx op0, rtx op1,
 			    machine_mode mode ATTRIBUTE_UNUSED)
 {
-#ifdef PUSH_ROUNDING
-  if (op0 == NULL_RTX)
+  if (mt_has_push_rounding () && op0 == NULL_RTX)
     {
       emit_single_push_insn (mode, op1, NULL);
       return;
     }
-#endif
   emit_insn (m_gen_fun (op0, op1));
 }
 
@@ -1676,10 +1670,10 @@ rtx
 move_by_pieces (rtx to, rtx from, unsigned HOST_WIDE_INT len,
 		unsigned int align, memop_ret retmode)
 {
-#ifndef PUSH_ROUNDING
-  if (to == NULL)
+  /* SHAPE 2 -- a precondition, not a gate: a null TO means "push", and a
+     target with no push insns must never get here.  */
+  if (!mt_has_push_rounding () && to == NULL)
     gcc_unreachable ();
-#endif
 
   move_by_pieces_d data (to, from, len, align);
 
@@ -4295,9 +4289,8 @@ emit_move_resolve_push (machine_mode mode, rtx x)
   rtx temp;
 
   poly_int64 adjust = GET_MODE_SIZE (mode);
-#ifdef PUSH_ROUNDING
-  adjust = PUSH_ROUNDING (adjust);
-#endif
+  if (mt_has_push_rounding ())
+    adjust = mt_push_rounding (adjust);
   if (code == PRE_DEC || code == POST_DEC)
     adjust = -adjust;
   else if (code == PRE_MODIFY || code == POST_MODIFY)
@@ -4349,17 +4342,16 @@ emit_move_complex_push (machine_mode mode, rtx x, rtx y)
   scalar_mode submode = GET_MODE_INNER (mode);
   bool imag_first;
 
-#ifdef PUSH_ROUNDING
   poly_int64 submodesize = GET_MODE_SIZE (submode);
 
   /* In case we output to the stack, but the size is smaller than the
      machine can push exactly, we need to use move instructions.  */
-  if (maybe_ne (PUSH_ROUNDING (submodesize), submodesize))
+  if (mt_has_push_rounding ()
+      && maybe_ne (mt_push_rounding (submodesize), submodesize))
     {
       x = emit_move_resolve_push (mode, x);
       return emit_move_insn (x, y);
     }
-#endif
 
   /* Note that the real part always precedes the imag part in memory
      regardless of machine's endianness.  */
@@ -5144,14 +5136,15 @@ fixup_args_size_notes (rtx_insn *prev, rtx_insn *last,
   return args_size;
 }
 
-#ifdef PUSH_ROUNDING
-/* Emit single push insn.  */
+/* Emit single push insn.  SHAPE 3: defined unconditionally, because a guard
+   over a DEFINITION cannot become an `if' and does not need to -- the callers
+   carry the existence test, and `mt_push_rounding' asserts it again here.  */
 
 static void
 emit_single_push_insn_1 (machine_mode mode, rtx x, tree type)
 {
   rtx dest_addr;
-  poly_int64 rounded_size = PUSH_ROUNDING (GET_MODE_SIZE (mode));
+  poly_int64 rounded_size = mt_push_rounding (GET_MODE_SIZE (mode));
   rtx dest;
   enum insn_code icode;
 
@@ -5240,7 +5233,7 @@ emit_single_push_insn (machine_mode mode, rtx x, tree type)
      its own (e.g. if calling __tls_get_addr).  The REG_ARGS_SIZE notes
      for such pushes and pops must not include the effect of the future
      push of X.  */
-  stack_pointer_delta += PUSH_ROUNDING (GET_MODE_SIZE (mode));
+  stack_pointer_delta += mt_push_rounding (GET_MODE_SIZE (mode));
 
   last = get_last_insn ();
 
@@ -5255,7 +5248,6 @@ emit_single_push_insn (machine_mode mode, rtx x, tree type)
   gcc_assert (known_eq (delta, HOST_WIDE_INT_MIN)
 	      || known_eq (delta, old_delta));
 }
-#endif
 
 /* If reading SIZE bytes from X will end up reading from
    Y return the number of bytes that overlap.  Return -1
@@ -5379,7 +5371,6 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	 by setting SKIP to 0.  */
       skip = (reg_parm_stack_space == 0) ? 0 : used;
 
-#ifdef PUSH_ROUNDING
       /* NB: Let the backend known the number of bytes to push and
 	 decide if push insns should be generated.  */
       unsigned int push_size;
@@ -5388,10 +5379,22 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
       else
 	push_size = 0;
 
-      /* Do it with several push insns if that doesn't take lots of insns
+      /* SHAPE 5 -- the `#endif' sat between this `if' and its `else', so this
+	 is a RESTRUCTURE and not a substitution: the existence test becomes
+	 the FIRST conjunct of the `if', and the `else' arm below, which used
+	 to be the whole body on a target with no push insns, is now reached
+	 by that conjunct being false.  Reviewing it as a substitution is how
+	 a dropped `else' arm gets missed.
+
+	 The two `mt_push_rounding' calls are guarded by the same conjunct
+	 through `&&' short circuiting, which is why they need no test of
+	 their own.
+
+	 Do it with several push insns if that doesn't take lots of insns
 	 and if there is no difficulty with push insns that skip bytes
 	 on the stack for alignment purposes.  */
-      if (args_addr == 0
+      if (mt_has_push_rounding ()
+	  && args_addr == 0
 	  && targetm.calls.push_argument (push_size)
 	  && CONST_INT_P (size)
 	  && skip == 0
@@ -5402,9 +5405,10 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	     and such small pushes do rounding that causes trouble.  */
 	  && ((!targetm.slow_unaligned_access (word_mode, align))
 	      || align >= BIGGEST_ALIGNMENT
-	      || known_eq (PUSH_ROUNDING (align / BITS_PER_UNIT),
-			   align / BITS_PER_UNIT))
-	  && known_eq (PUSH_ROUNDING (INTVAL (size)), INTVAL (size)))
+	      || known_eq (mt_push_rounding (align / BITS_PER_UNIT),
+			   poly_int64 (align / BITS_PER_UNIT)))
+	  && known_eq (mt_push_rounding (INTVAL (size)),
+		       poly_int64 (INTVAL (size))))
 	{
 	  /* Push padding now if padding above and stack grows down,
 	     or if padding below and stack grows up.
@@ -5419,7 +5423,6 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 			  RETURN_BEGIN);
 	}
       else
-#endif /* PUSH_ROUNDING  */
 	{
 	  rtx target;
 
@@ -5615,11 +5618,11 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	  && where_pad != stack_direction)
 	anti_adjust_stack (gen_int_mode (extra, Pmode));
 
-#ifdef PUSH_ROUNDING
-      if (args_addr == 0 && targetm.calls.push_argument (0))
+      /* SHAPE 5 again: same restructure, same reason.  */
+      if (mt_has_push_rounding ()
+	  && args_addr == 0 && targetm.calls.push_argument (0))
 	emit_single_push_insn (mode, x, type);
       else
-#endif
 	{
 	  addr = simplify_gen_binary (PLUS, Pmode, args_addr, args_so_far);
 	  dest = gen_rtx_MEM (mode, memory_address (mode, addr));
