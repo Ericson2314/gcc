@@ -101,22 +101,43 @@ gen_target_ns (void)
    nothing.  The ambiguity was being bought at the price of the very thing
    this branch exists to fix.
 
-   The DEFINITION is namespaced now, like everything else, and the bare
-   `::gen_blockage' comes from multi-target-select.cc, which forwards to the
-   back end in force.  What survives is the declaration problem: a namespaced
-   declaration in insn-flags-<base>.h, pulled into scope by that header's
-   using-directive, makes every hand-written `gen_blockage ()' in
-   config/i386/i386.cc and config/aarch64/aarch64.cc an ambiguous overload
-   against emit-rtl.h's.  So genflags SKIPS the names on this list; see the
-   note at its call site.
+   The per-back-end DEFINITIONS are namespaced now, like everything else.
 
-   THE EDGE, STATED RATHER THAN FLOORED: multi-target-select.cc defines
-   `::gen_blockage' under `#if HAVE_blockage', which is the exact complement of
-   emit-rtl.cc's guard, and HAVE_blockage comes from the SINGULAR
-   insn-flags.h -- still the primary target's.  Configure a primary with no
-   `blockage' pattern alongside a base that has one and the middle end calls
-   emit-rtl.cc's generic expansion for both.  That is a wrong answer, not a
-   link failure, and the fix is to union the singular insn-flags.h -- the same
+   WHAT THIS COMMENT USED TO SAY, AND WHY IT WAS WRONG.  It said the bare
+   `::gen_blockage' "comes from multi-target-select.cc, which forwards to the
+   back end in force", and that multi-target-select.cc "defines `::gen_blockage'
+   under `#if HAVE_blockage'".  Neither is true and neither has ever been true:
+   multi-target-select.cc contains a COMMENT describing that forwarder and no
+   forwarder.  Measured (task #51, /tmp/b78, x86_64 + aarch64): the only strong
+   definition of the bare `::gen_blockage' in the whole link is in
+   `insn-emit-5.o' -- the PRIMARY's un-namespaced insn-emit, i.e. i386's
+   expander -- and `builtins.o', `explow.o', `function.o' and
+   `mt-aarch64/aarch64.o' all bind to it.  `UNSPECV_BLOCKAGE' is 1 in
+   insn-constants-i386.h and 5 in insn-constants-aarch64.h, so an aarch64
+   compilation emits an `unspec_volatile' numbered 1 that its own recog matches
+   at 5.  No link error, no diagnostic.
+
+   It is not one name either.  The same measurement found SIX bare names that
+   the primary's insn-emit answers for every configured target: `add_clobbers',
+   `added_clobbers_hard_reg_p', `gen_blockage', `gen_nop',
+   `gen_speculation_barrier' and `gen_movxf'.  Five of the six are defined by
+   every configured base in its own namespace and can take a uniform forwarder;
+   `gen_movxf' is defined by i386 and not by aarch64 and cannot.  See the
+   handover for #51.
+
+   What ALSO survives is a declaration problem: a namespaced declaration in
+   insn-flags-<base>.h, pulled into scope by that header's using-directive,
+   makes every hand-written `gen_blockage ()' in config/i386/i386.cc and
+   config/aarch64/aarch64.cc an ambiguous overload against emit-rtl.h's.  So
+   genflags SKIPS the names on this list; see the note at its call site.
+
+   THE EDGE, STATED RATHER THAN FLOORED: whatever eventually defines
+   `::gen_blockage' here must be guarded by the exact complement of
+   emit-rtl.cc's `#if !HAVE_blockage', and HAVE_blockage comes from the
+   SINGULAR insn-flags.h -- still the primary target's.  Configure a primary
+   with no `blockage' pattern alongside a base that has one and the middle end
+   calls emit-rtl.cc's generic expansion for both.  That is a wrong answer, not
+   a link failure, and the fix is to union the singular insn-flags.h -- the same
    job insn-config.h has already had done to it.  Until then it is written
    down, here and in multi-target-select.cc, rather than papered over.
 

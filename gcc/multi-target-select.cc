@@ -615,20 +615,60 @@ init_adjust_machine_modes (void)
 }
 
 
-/* THE TWO CONDITIONAL ONES.  Both guards are the exact complement of the
-   guard under which something ELSE in the tree defines the same name, so a
-   mistake in either is a duplicate-definition link error rather than a wrong
-   answer.  Neither guard is a floor: they do not supply a default, they
-   decide who owns the name.
-
-   gen_blockage: emit-rtl.cc defines it under `#if !HAVE_blockage'.
-   HAVE_blockage comes from the SINGULAR insn-flags.h, still the primary's --
-   see gen_name_is_global_p in gensupport.cc for what that means for a primary
-   with no `blockage' pattern.  That is an insn-flags.h union job, written down
-   and not papered over.
+/* THE CONDITIONAL ONE.  Its guard is the exact complement of the guard under
+   which something ELSE in the tree defines the same name, so a mistake in it
+   is a duplicate-definition link error rather than a wrong answer.  The guard
+   is not a floor: it does not supply a default, it decides who owns the name.
 
    verify_reg_names_in_constraints: genoutput emits it only under
-   `#if CHECKING_P'.  */
+   `#if CHECKING_P'.
+
+   THIS COMMENT SAID "THE TWO CONDITIONAL ONES" AND DESCRIBED A gen_blockage
+   FORWARDER BELOW IT.  There is no such forwarder and there never was -- the
+   description was the whole of it.  Do not read the paragraph that follows as
+   a record of something that exists; it is the open problem, restated with
+   what task #51 measured.
+
+   SIX bare names are supplied to every configured target by the PRIMARY's
+   un-namespaced insn-emit-*.o, measured on /tmp/b78 (x86_64 + aarch64) with
+   `nm' over every object in the link:
+
+     add_clobbers               <- combine.o recog.o rtl-ssa/changes.o
+     added_clobbers_hard_reg_p  <- gcse.o recog.o
+     gen_blockage               <- builtins.o explow.o function.o
+                                   insn-output-{i386,aarch64}.o
+                                   mt-i386/i386.o mt-aarch64/aarch64.o
+     gen_nop                    <- cfgrtl.o except.o targhooks.o varasm.o
+     gen_speculation_barrier    <- targhooks.o
+     gen_movxf                  <- reg-stack.o
+
+   gen_blockage is the one with a demonstrated wrong answer behind it:
+   UNSPECV_BLOCKAGE is 1 for i386 and 5 for aarch64, so aarch64 emits an
+   unspec_volatile numbered 1 that its own recog matches at 5.
+
+   Writing the forwarders is NOT what is blocking this.  gcc/Makefile.in's OBJS
+   names BOTH $(MULTI_TARGET_OBJS) and the primary's un-namespaced
+   $(INSNEMIT_SEQ_O), so a forwarder here collides with insn-emit-*.o
+   immediately.  (The comment further down that file claiming OBJS names the
+   former "rather than" the latter is false; both are on the list.)  That hunk
+   belongs to whoever owns Makefile.in.
+
+   And five of the six can take a uniform forwarder while ONE cannot: every
+   configured base defines add_clobbers, added_clobbers_hard_reg_p,
+   gen_blockage, gen_nop and gen_speculation_barrier in its own namespace, but
+   gen_movxf is defined by i386 and not by aarch64 -- so `fail to link, naming
+   the base' is the right behaviour for the five and the wrong behaviour for
+   gen_movxf, whose only caller (reg-stack.cc) is x87 code aarch64 cannot
+   reach.  That is a design question and is left to a ruling, not resolved
+   here by whichever choice makes the build succeed.
+
+   Separately, and true of gen_blockage, gen_nop, gen_speculation_barrier and
+   gen_movxf but not of the other two: WHETHER the middle end calls them at all
+   is decided by HAVE_blockage / HAVE_speculation_barrier / STACK_REGS out of
+   the SINGULAR insn-flags.h and tm.h, still the primary's.  Forwarding fixes
+   which expansion runs; it does not fix who decides that one runs.  That is an
+   insn-flags.h union job, the same one insn-config.h has already had done to
+   it.  */
 
 #if CHECKING_P
 void
