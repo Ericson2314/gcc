@@ -906,20 +906,41 @@ This is the hard consequence of "no single target ever" and it must be settled
   confirm the arm goes red. Without that, it is a false green of exactly the
   shape recorded in memory (§"False-green checks").
 
-**#62 dependency, stated plainly.** A fresh build directory does not bootstrap
-on this branch (circular `genconstants.o` ← `insn-constants.h`). Every build
-dir in use — including all six measured in §5.1 — is a survivor of an earlier
-state. **A top-level restructure changes the configure and directory layout,
-which means it cannot be verified against a tree that only builds from
-surviving artefacts.** Stage 3 therefore has a hard prerequisite that is not
-in the plan above:
+**#62 dependency — DISCHARGED 2026-08-12. This paragraph no longer blocks
+Stage 3; it is kept because it was quoted as a blocker after it stopped being
+true.**
 
-> **Stage 3 cannot be accepted until #62 is fixed and a cold build from an
-> empty directory succeeds.**
+It formerly read that a fresh build directory does not bootstrap on this
+branch (circular `genconstants.o` ← `insn-constants.h`), that every build dir
+in use — including all six measured in §5.1 — is a survivor of an earlier
+state, and therefore:
 
-I want to be blunt about this: if #62 is not fixed, Stage 3 is unverifiable in
-principle, and the honest thing is to say the restructure cannot proceed
-rather than to proceed on a build dir whose provenance we cannot reproduce.
+> ~~Stage 3 cannot be accepted until #62 is fixed and a cold build from an
+> empty directory succeeds.~~
+
+**The condition is met.** #62 and #109 both landed after this was written
+(#109 cut the dependency cycle). Measured, not assumed — `/tmp/cfgchk`,
+configured from an **empty** directory through the **top level** with two
+backends and built to completion:
+
+    make all-gcc -j4   ->   rc=0
+
+and the resulting `cc1` links **both** back ends — `mt-i386/i386-c.o`,
+`mt-aarch64/aarch64-c.o`, `target-c-ops-select.o` — so it is a genuine
+two-backend cold build, not a single-target one that happened to succeed.
+
+Two notes for whoever runs this next. `gcc/` must be configured **through the
+top level**; invoking `gcc/configure` directly with short backend names dies
+with `*** Configuration  not supported` and an *empty* triple in the message.
+And the build ends in a **loud** selftest SKIP — "NOTHING WAS TESTED; this is
+a skip, not a pass" — because `target-specs/configure` has not been run in
+that directory. That is the branch's own no-silent-default rule working, and
+must not be read as a passing selftest.
+
+The general warning in the struck-out text still stands on its own merits: a
+top-level restructure changes the configure and directory layout, so it must
+be verified against a cold build rather than a surviving build dir. That is
+now possible.
 **#62 should be promoted to a blocker of this project, not tracked beside it.**
 
 ### 6.3 The permutation harness
@@ -1091,8 +1112,12 @@ upper bound on the edit list, not the edit list.
    of it; see the annotation in §2.2. Bootstrap staging remains unprobed.
 2. **Run the `config.gcc` split probe** (§3.3, §7(1)). Half a day. It decides
    Stage 4's cost and whether "gcc/ is host-and-build only" survives.
-3. **Decide #62's status.** If a cold build cannot be made to work, Stage 3 is
-   unverifiable and this design should not be built (§6.2).
+3. ~~**Decide #62's status.** If a cold build cannot be made to work, Stage 3
+   is unverifiable and this design should not be built (§6.2).~~
+   **DONE 2026-08-12 — discharged, not decided.** A two-backend cold build
+   from an empty directory reaches `make all-gcc` rc=0, and the linked `cc1`
+   carries both back ends. See §6.2. **This is no longer a blocker; do not
+   quote it as one.**
 4. **Decide the gnattools/gotools question** (§2.2a(a)). Three of the 44
    dependency lines are host tools depending on *a* target library without
    saying which. Under "no primary" there is no default available.
