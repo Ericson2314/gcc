@@ -47,7 +47,19 @@ enum nds32_cpu_type
   CPU_GRAYWOLF,
   CPU_N12,
   CPU_N13,
-  CPU_SIMPLE
+  /* `NDS32_CPU_SIMPLE', not `CPU_SIMPLE'.  This header is a `HeaderInclude',
+     so the generated `options.h' and every `options-<base>.h' read it, and
+     those are read by every translation unit of all 48 back ends.
+     `CPU_SIMPLE' is also an enumerator of `enum attr_cpu' in
+     `insn-attr-common-frv.h', which genattr-common writes from the `simple'
+     value of frv's `(define_attr "cpu" ...)': 9 diagnostics in a 48-back-end
+     build.  Same family as LARCH_TUNE_GENERIC -- see the long note in
+     config/loongarch/loongarch-def.h -- and same reason it is a rename rather
+     than an `#undef'.  frv is the side that cannot move: its enumerator is
+     generated from an .md attribute VALUE, so renaming it would change the
+     attribute's string.  `-mcpu=simple' is unaffected; the `String()' in
+     nds32.opt does not change.  */
+  NDS32_CPU_SIMPLE
 };
 
 /* The code model defines the address generation strategy.  */

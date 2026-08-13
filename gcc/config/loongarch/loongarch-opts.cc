@@ -270,9 +270,9 @@ loongarch_config_target (struct loongarch_target *target,
   t.cpu_tune = constrained.tune ? target->cpu_tune
     : (constrained.arch
        ? default_tune_for_arch (target->cpu_arch, with_default_tune
-				? DEFAULT_CPU_TUNE : TUNE_GENERIC)
+				? DEFAULT_CPU_TUNE : LARCH_TUNE_GENERIC)
        : (with_default_tune ? DEFAULT_CPU_TUNE
-	  : default_tune_for_arch (DEFAULT_CPU_ARCH, TUNE_GENERIC)));
+	  : default_tune_for_arch (DEFAULT_CPU_ARCH, LARCH_TUNE_GENERIC)));
 
 
   /* Handle -march/tune=native */

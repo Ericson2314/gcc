@@ -151,7 +151,7 @@ EnumValue
 Enum(tune_type) String(native) Value(TUNE_NATIVE)
 
 EnumValue
-Enum(tune_type) String(generic) Value(TUNE_GENERIC)
+Enum(tune_type) String(generic) Value(LARCH_TUNE_GENERIC)
 
 EnumValue
 Enum(tune_type) String(loongarch64) Value(TUNE_LOONGARCH64)

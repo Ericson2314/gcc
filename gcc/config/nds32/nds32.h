@@ -882,7 +882,7 @@ enum nds32_builtins
 #define TARGET_PIPELINE_GRAYWOLF \
   (nds32_cpu_option == CPU_GRAYWOLF)
 #define TARGET_PIPELINE_SIMPLE \
-  (nds32_cpu_option == CPU_SIMPLE)
+  (nds32_cpu_option == NDS32_CPU_SIMPLE)
 
 #define TARGET_CMODEL_SMALL \
    (nds32_cmodel_option == NDS32_CMODEL_SMALL)

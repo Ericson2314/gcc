@@ -204,10 +204,31 @@ enum {
   N_ARCH_TYPES      = 9,
 };
 
-/* Tune target presets (-mtune=*) */
+/* Tune target presets (-mtune=*)
+
+   `LARCH_TUNE_GENERIC', not `TUNE_GENERIC', and the odd one out in this list
+   for a measured reason.  This file is reached from
+   `config/loongarch/loongarch-opts.h', which is a `HeaderInclude', so the
+   generated `options.h' and every `options-<base>.h' read it -- and those are
+   read by every translation unit of all 48 back ends.  `TUNE_GENERIC' is also
+   an enumerator of `enum attr_tune' in `insn-attr-common-aarch64.h' and
+   `insn-attr-common-riscv.h', which genattr-common writes from the `generic'
+   value of those back ends' `(define_attr "tune" ...)'.  The two declarations
+   meet in every aarch64 and riscv object: 30 `TUNE_GENERIC conflicts with a
+   previous declaration' diagnostics in a 48-back-end build.
+
+   This is the enumerator half of the leak f3a75a98014 closed for MACROS.  That
+   fix has each generated options header `#undef' the macros contributed by
+   other bases; an enumerator cannot be `#undef'ed, so the same remedy does not
+   reach this half and the leak itself is still open -- 421 enumerators from 49
+   headers are visible in every TU.  Only the names that actually collide are
+   qualified, which is `scratchpad/mtq-enumleak.sh''s output, not a guess.
+
+   The user-visible spelling does not move: `-mtune=generic' is the `String()'
+   in loongarch.opt and is untouched.  */
 enum {
   TUNE_NATIVE       = 0,
-  TUNE_GENERIC      = 1,
+  LARCH_TUNE_GENERIC = 1,
   TUNE_LOONGARCH64  = 2,
   TUNE_LA464	    = 3,
   TUNE_LA664	    = 4,
