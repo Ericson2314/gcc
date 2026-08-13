@@ -500,6 +500,17 @@ reports the syntax error several lines later.
      covers the `opth-gen.awk` change -- but it compares against this branch's
      own figure, and `/tmp/b-stock` does not exist on this host, so the arm
      that can see branch and reference moving together has NOT been run.
+
+     **[CORRECTED 2026-08-13 — `/tmp/b-stock` DOES exist and this note was
+     wrong.** Three later agents each rediscovered that independently and one
+     wasted an arm on it. It is a real upstream build: srcdir `/tmp/stock-src`
+     at **`c31b7a09eea`**, the merge-base, with **0** `MULTI_TARGET` hits in
+     its `gcc/Makefile.in`, and it has a built `cc1` and `xgcc`. Every
+     `stock-compare 5/5 IDENTICAL` in this file rests on it and is sound. The
+     original author could not see it from their worktree and reported absence
+     rather than checking — **an absence you could not observe is not an
+     absence**, which is this branch's own recorded rule turned on its
+     verification.]
   2. **The `poly_int` debt is now the critical path** and it is far larger
      than anything else in the census (~1800 diagnostics, 39 back ends).
      Nothing downstream -- `cc1` linking, `EXTRA_GCC_OBJS`, rs6000/AIX -- can
