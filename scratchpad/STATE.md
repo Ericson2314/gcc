@@ -2056,3 +2056,326 @@ last rebuilt is worthless.**  Add these to the 4 / 8 / 32 / 593 / 664 / 698 /
     t111-insn-guards.sh  target-insn.h, reads mt_base_insn out of .rodata for
                          both bases and requires the two tables to DIFFER
     t111-build/go/run/ts.sh, t111-reconf-gcc.sh, t111m-build.sh
+
+---
+
+# TASK #78 + #51 -- branched from `0b7c0542b2b`, build dir `/tmp/b78`
+
+Two tasks, one worktree.  #78 is measured and LANDED; #51 is measured and
+mostly HANDED OVER, with one part of the brief corrected.
+
+## 1. #78 -- THE PATH TABLE, MEASURED BY RUNNING EACH PATH
+
+`x86_64-pc-linux-gnu`, `/tmp/b78`, real `-flto` objects (12 `.gnu.lto_`
+sections in `a.o`, asserted before the link arms are scored).
+
+Two instruments, because neither can see the whole chain:
+
+  * `-###` shows the argv of everything the DRIVER spawns.  It cannot show
+    lto-wrapper's argv -- lto-wrapper is spawned by collect2 or by the linker
+    plugin, and neither argv is spec text.
+  * a SHIM named `lto-wrapper` on a `-B` directory (the driver finds it with
+    `find_a_program` and puts it in `COLLECT_LTO_WRAPPER`), which records its
+    own argv and `COLLECT_GCC_OPTIONS` and then execs the real one.
+
+| path | what runs | `-ftarget-config=` on the argv | in `COLLECT_GCC_OPTIONS` | verdict BEFORE this task |
+|---|---|---|---|---|
+| A `-c` | driver -> cc1 | **yes** (as a switch) | yes | forwarded |
+| B `-flto -c` | driver -> cc1 | **yes** | yes | forwarded |
+| C `-flto` link, default | driver -> collect2 -> ld -> **plugin** -> lto-wrapper | collect2 **yes**; lto-wrapper **NO** | yes | **FAILED LOUDLY** |
+| D `-flto -fno-use-linker-plugin` | driver -> collect2 -> lto-wrapper | collect2 **yes**; lto-wrapper **NO** | yes | **FAILED LOUDLY** |
+| E `-flto -fuse-linker-plugin` | as C | collect2 **yes**; lto-wrapper **NO** | yes | **FAILED LOUDLY** |
+| F plain link, no LTO | driver -> collect2 -> ld | collect2 **yes** | yes | forwarded |
+| lto1 | lto-wrapper re-execs **the driver** (`$COLLECT_GCC ... -fwpa`) | inherited: the driver re-resolves its own target | -- | covered by A/B |
+| offload / mkoffload | not configured in this build | **UNMEASURED** | -- | see below |
+
+So the answer to the brief's question is: **the driver forwards on every path
+it controls; the two spawners it does NOT control -- collect2's
+`lto_c_argv` and the linker plugin's `-plugin-opt=` list -- carried it on no
+route at all**, and all three LTO link routes died with
+
+    lto-wrapper: fatal error: `decode_cmdline_option' was reached before a
+    target was selected
+
+That is `e1b48233f0d` working exactly as it said it would: visible, named, and
+pointing at the cause.  It is also **every** `-flto` link, not an edge.
+
+### THE VALUE WAS NOT MISSING, IT WAS STRANDED
+
+The shim's decisive line, identical on all three routes:
+
+        --- argv has -ftarget-config=: 0
+        --- env  has -ftarget-config=: 1
+
+`-ftarget-config=` is a switch, so it is in `COLLECT_GCC_OPTIONS` -- which
+lto-wrapper treats as mandatory input and reads a few lines into `run_gcc`,
+i.e. *after* the decode that needs the tables.  `main()` scanned argv only.
+
+**Landed** (`gcc/lto-wrapper.cc`): when argv answers nothing, scan
+`COLLECT_GCC_OPTIONS` for `-ftarget-config=` before `run_gcc`.  Not a fallback
+and not a default: same value, same driver, same target selection, read one
+step earlier.  Argv still wins when both are present.
+
+After: C, D and E all **rc=0** and produce executables.
+
+### THE OTHER HALF OF THE BRIEF -- WHO HAS THE `cc1` EXPOSURE
+
+`4c3494e210c` moved cc1 off spec text because `-specs=` can replace
+`*cpp_options`/`*cc1_options`.  Asked of the other consumers, by doing the
+replacing (`scratchpad/t78-exposure.sh`, a one-line user spec file):
+
+| consumer | carrier | replaceable by a user `-specs=`? |
+|---|---|---|
+| cc1 | a **switch** (`carry_target_config_as_switch`) | no |
+| lto-wrapper | `COLLECT_GCC_OPTIONS` (as of this commit) | no |
+| **collect2** | `%(link_target_config)` inside `LINK_COMMAND_SPEC` | **YES -- measured 1 -> 0** |
+
+    === BASELINE (no -specs=)
+      collect2 argv carries -ftarget-config=<path>: 1
+    === WITH a user -specs= that replaces *link_target_config with nothing
+      collect2 argv carries -ftarget-config=<path>: 0
+
+**collect2 has exactly the exposure cc1 was taken off, and it is the one
+consumer that then fails SILENTLY**: the same run linked `rc=0` and produced a
+working binary, because `read_target_caps` returns quietly when it cannot open
+the file and collect2 falls back to the built-in capability defaults.  Absence
+of an answer read as an answer, with no diagnostic.
+
+**NOT FIXED, DELIBERATELY -- this is a design question (PRINCIPLES 2b).**
+`gcc.cc` documents `link_target_config` as a spec deliberately separate from
+`cc1_target_config` so "a spec file should be able to configure them
+independently".  Making collect2 fall back to `COLLECT_GCC_OPTIONS` would
+override a user's spec-file decision, which is the shape 2a warns about.  The
+options, with costs:
+
+  1. **collect2 reads `COLLECT_GCC_OPTIONS` when argv has none**, symmetric
+     with the lto-wrapper fix; collect2 already calls
+     `read_collect_gcc_options()`.  Cost: a user who deliberately blanks
+     `*link_target_config` no longer can.  Cheapest, and closes the silent arm.
+  2. **collect2 fails by name when it has no target-config**, like cc1 does.
+     Cost: any build without target-specs run stops linking.  Loudest, most in
+     the spirit of the branch, most disruptive.
+  3. **Leave it.**  Cost: a user who copies a stock `*link_command` from
+     upstream `-dumpspecs` (which has no `%(link_target_config)` -- the
+     `gcc.dg/pr48524.c` shape) silently gets built-in capability defaults at
+     link time.
+
+I did not pick one.  `gcc/collect2.cc` was unclaimed in STATE.md, so I could
+have; the reason I did not is that it is a ruling, not a bug.
+
+### A THIRD CARRIER NOBODY HAS COUNTED
+
+`readelf -p .gnu.lto_.opts a.o` on a `-flto` object:
+
+    '-fno-openmp' '-fno-openacc' '-fno-pie' '-fcf-protection=none' '-flto'
+    '-ftarget-config=/tmp/b78/gcc/specs-x86_64-pc-linux-gnu-config'
+
+Every LTO object carries the **build machine's absolute path** to a target
+config.  It cannot select the target (it is read in `find_and_merge_options`,
+inside `run_gcc`, after the decode that needs the tables), and
+`append_compiler_options`'s `default:` arm drops it again because the option is
+`Common`, not `CL_TARGET`.  So today it is inert.  It is still two latent
+problems -- a path that need not exist on the linking machine, and two objects
+built against different config paths meeting in one link -- and it is a fourth
+place the same value lives.  Not touched; recorded.
+
+### WHAT I DID NOT MEASURE
+
+  * **The offload route.**  This build has no offload targets, so
+    `compile_offload_image` was never reached.  Note it execs
+    `<accel>/mkoffload`, a *different compiler with its own target*, so it is
+    probably not the same question -- but that is reasoning, not measurement.
+  * **Both-sided (aarch64) evidence for #78.**  `target-specs/configure` for
+    `aarch64-unknown-linux-gnu` SKIPS on this host -- no `aarch64-...-as`/`-ld`
+    -- and writes no config file at all, exactly as DEVSHELL.md describes.  So
+    every #78 arm is x86_64-only.  What replaces the missing second side is
+    `scratchpad/t78-guards.sh`, which asks lto-wrapper directly, with only the
+    environment carrying the value, and requires the three failure shapes:
+
+        arm 1 PASS  decoded the full option set and reached lto1
+        arm 2 PASS  no -ftarget-config= anywhere        -> "before a target was selected"
+        arm 3 PASS  config names an unconfigured triple -> "is not one of the targets"
+        arm 4 PASS  config path does not exist          -> "no target could be read from it"
+
+    Arm 1 asserts something AFFIRMATIVE (it got as far as spawning lto1), not
+    the absence of a message; arm 4 exists because `read_target_caps` is silent
+    on a missing file, so without it a mangled path would read as "the
+    environment named no target".
+
+### TWO FALSE GREENS IN MY OWN INSTRUMENTS
+
+  1. **The driver's failure message advertises the option it is complaining
+     about.**  `grep -c -- '-ftarget-config='` scored 1 on every path in the
+     first run -- including paths where the driver had selected no target at
+     all -- because the error text contains
+     `-ftarget-config=FILE   name a target's configuration file explicitly`.
+     The instrument was counting the diagnostic that says the value is ABSENT
+     as evidence it was PRESENT.  Fixed by requiring `-ftarget-config=/`; the
+     help-text count is now printed beside it so they cannot be confused again.
+  2. **`./xgcc` selects no target**, because argv[0] has no triple and there is
+     no `default-target` file (correct, by design).  Every early arm was
+     measuring a driver that had already failed.  All arms use
+     `./x86_64-pc-linux-gnu-gcc`.
+
+## 2. #51 -- SIX NAMES, AND THE BRIEF WAS WRONG ABOUT ONE OF THEM
+
+Measured on `/tmp/b78` over **every** `.o` in the link
+(`scratchpad/t51-syms.sh`, `scratchpad/t51-classify.sh`):
+
+  * the primary's un-namespaced `insn-emit-*.o` exports **13,491** bare strong
+    definitions (+3 bare COMDAT);
+  * **6** of them are referenced by **16** other objects.  Reproduced
+    independently in `/tmp/b111`: same 6 names.
+
+| bare name | defined bare in | referenced by | i386 | aarch64 |
+|---|---|---|---|---|
+| `add_clobbers` | `insn-emit-4.o` | combine.o recog.o rtl-ssa/changes.o | 1 | 1 |
+| `added_clobbers_hard_reg_p` | `insn-emit-4.o` | gcse.o recog.o | 1 | 1 |
+| `gen_blockage` | `insn-emit-5.o` | builtins.o explow.o function.o insn-output-{i386,aarch64}.o mt-i386/i386.o mt-aarch64/aarch64.o | 1 | 1 |
+| `gen_nop` | `insn-emit-2.o` | cfgrtl.o except.o targhooks.o varasm.o | 1 | 1 |
+| `gen_speculation_barrier` | `insn-emit-10.o` | targhooks.o | **1** | **1** |
+| `gen_movxf` | `insn-emit-7.o` | reg-stack.o | **1** | **0** |
+
+**CORRECTION TO THE BRIEF: `gen_speculation_barrier` is not arm-only.**  Both
+configured bases define it in their own namespace (`speculation_barrier` is in
+arm, aarch64, mips, **i386**, rs6000, s390 and sparc `.md`).  So **ONE** name
+needs a ruling, not two.
+
+The `.md` files would have given the wrong answer for the name the ruling IS
+about: `"movxf"` appears literally only in `ia64.md` and `m68k.md`, yet i386
+defines `gen_movxf` through a mode iterator.  **Ask the objects, not the
+machine descriptions.**
+
+### THE DECOMPOSITION
+
+  * **Class A -- uniform forwarder, no guard involved (2):** `add_clobbers`,
+    `added_clobbers_hard_reg_p`.  Declared bare in `recog.h`, emitted
+    unconditionally by genemit for every base.  Nothing to decide.
+  * **Class B -- uniform forwarder writable, but the CALL is still decided by
+    the primary (3):** `gen_blockage`, `gen_nop`, `gen_speculation_barrier`.
+    Every configured base defines them, so the forwarder links.  But whether
+    the middle end calls them at all comes from `HAVE_blockage` /
+    `HAVE_speculation_barrier` in the **singular** `insn-flags.h`, still the
+    primary's.  Forwarding fixes *which* expansion runs; it does not fix *who
+    decides one runs*.  That is the `insn-flags.h` union job, the same one
+    `insn-config.h` has already had.
+  * **Class C -- needs a ruling (1):** `gen_movxf`.  `NS::gen_movxf` does not
+    exist for aarch64, so a uniform forwarder does not compile.  Its only
+    caller is `reg-stack.cc:1170`, inside `#ifdef STACK_REGS` -- x87 code
+    aarch64 can never reach.  Options, with costs:
+      1. **Forward it, guarded on the base having it, and `gcc_unreachable ()`
+         otherwise.**  Cost: reintroduces a runtime "this base cannot answer"
+         arm; but it fails loudly and at the right place.  Note it is NOT a
+         floor -- there is no wrong answer supplied, only a stop.
+      2. **Move `reg-stack.o` into the per-base object set** (it is x87-only
+         middle-end code compiled shared today), so the bare name is never
+         referenced from a shared TU.  Cost: touches the #68 Arm B boundary and
+         `Makefile.in`; arguably the *correct* answer, since `reg-stack.cc` is
+         as target-specific as `config/i386` is.
+      3. **Union `HAVE_movxf`/`STACK_REGS`** so the reference is only emitted
+         for bases that have it.  Cost: largest; it is the same union job as
+         Class B and would subsume it.
+    I did not pick one.  **Do not force a uniform forwarder onto it.**
+
+### WHY NOTHING LANDED IN CODE FOR #51
+
+`gcc/Makefile.in:1742` and `:1747` name **BOTH** `$(MULTI_TARGET_OBJS)` and the
+primary's `$(INSNEMIT_SEQ_O)`, so any forwarder collides with `insn-emit-*.o`
+before it can be tested.  The comment at `:2737` claiming OBJS names the former
+"rather than" the latter is **false** -- both are on the list.  (The brief's
+`:1679`/`:2642` are that file at an older revision.)
+
+`Makefile.in` belongs to another agent, so **this hunk is ROUTED, NOT APPLIED**:
+
+    - remove $(INSNEMIT_SEQ_O) from OBJS (gcc/Makefile.in, currently :1747)
+    - correct the false comment at :2737
+    - and note gcc/Makefile still has no dependency on gcc/Makefile.in (#108),
+      so the edit is invisible incrementally
+
+### WHAT DID LAND FOR #51 -- TWO FALSE INVARIANTS, DELETED
+
+Both are PRINCIPLES 4 rule 3 ("a written invariant is not evidence anyone ran
+it"), and both would have sent the next reader looking for code that is not
+there:
+
+  * `gcc/gen-target-ns.cc` said the bare `::gen_blockage` "comes from
+    multi-target-select.cc, which forwards to the back end in force", and that
+    multi-target-select.cc "defines `::gen_blockage' under `#if HAVE_blockage'".
+    **Neither has ever been true.**  Replaced with the measurement.
+  * `gcc/multi-target-select.cc` headed a block "THE TWO CONDITIONAL ONES" and
+    described a `gen_blockage` forwarder underneath it.  Only ONE exists
+    (`verify_reg_names_in_constraints`).  Replaced with the six-name table, the
+    A/B/C decomposition, and the Makefile.in blocker.
+
+Comment-only; no generated output changes (the x86_64 md5 below is unmoved).
+
+## 3. REGRESSION BARS -- ALL ON /tmp/b78, MY OWN BUILD DIR
+
+  * `make multi-target-objs cc1 lto1 lto-wrapper collect2` **rc=0**;
+    **`lto1` links** (86,442,888 bytes).
+  * `stock-compare.sh`, `IN` **absolute**
+    (`.../scratchpad/big.c`, 150 lines), `MT=/tmp/b78`, `ST=/tmp/b-stock`:
+    **5/5 IDENTICAL**, 5 distinct md5 per side, negative control firing
+    (1158 vs 804 lines), rc=0.  **-O2 md5 `378fc33c1e70`** -- the recorded bar.
+  * `scratchpad/t78-guards.sh`: **4/4**, one affirmative arm and three that
+    each remove or corrupt the thing arm 1 relies on.
+  * **SCOREBOARD NOT TOUCHED AND NOT BANKED.**  I did not run the header/TAB
+    probe harness and neither change adds an arm; the honest figure remains
+    aarch64 **5 PASS / 104 FAIL + 6 retired-pending**, TAB **27/5**.
+    (PRINCIPLES 6 still quotes the 224-arm framing with aarch64 2/110; that is
+    a different accounting and I am not reporting against it.  Flagged, not
+    reconciled.)
+
+### STDERR -- SAY WHICH ARM
+
+  * **cold** `multi-target-objs cc1 lto1 lto-wrapper collect2 xgcc`:
+    **666 lines / 109 `warning:`**.
+  * **after this task's edits**, which touch a generator support file and so
+    re-run genrecog/genemit for both bases: **105 lines / 17 `warning:`**,
+    composed of 4 `is unchanged` + 24 `'@' is redundant` + 17 `warning:` + the
+    rest genrecog/genattrtab **statistics** ("Number of decisions", "longest
+    path", "Shared N out of M states").  Those statistics are NOT in the
+    documented 32-line incremental floor because that floor was measured on
+    builds where the generators did not re-run.
+  * `make lto-wrapper` alone: **4 lines / 1 `warning:`** (a pre-existing
+    `-Wunused-result` on `read` at `lto-wrapper.cc:1181`, not mine).
+
+Add 105 and 666 to the 0 / 4 / 8 / 32 / 354 / 546 / 593 / 664 / 698 / 867 on
+record.  **The floor is a composition; quoting a number without saying what
+last rebuilt is worthless.**
+
+## 4. TRAPS PAID FOR THESE TASKS
+
+  1. **The worktree was at the bare-repo HEAD `7208eca60d0`**, as PRINCIPLES 5
+     says.  `grep -c MULTI_TARGET gcc/Makefile.in` gave 0.
+  2. **`grep -q` under `set -o pipefail` turns a MATCH into a MISS.**  `grep -q`
+     exits on the first hit, the upstream stage takes SIGPIPE, the pipeline
+     status becomes 141, and `... | grep -q X && echo found` prints nothing.
+     Every "who defines this bare name" cell read `<none>` on the first run --
+     including names another script of mine had already found in those exact
+     objects.  A false negative manufactured by a shell option.
+  3. **An apostrophe inside a single-quoted `nix-shell --run` body**, again --
+     this time in a comment I had just written *about* trap 2.  STATE.md
+     already has this entry; it cost me a second run anyway.
+  4. **`make target-specs` no longer exists**, by design (PRINCIPLES 2:
+     target-specs runs after the build, as its own configure).
+     `scratchpad/rv-specs.sh` drives that rule and is **stale**;
+     `scratchpad/t78-specs.sh` runs `target-specs/configure` directly.
+  5. **A spec file with an EMPTY body is rejected** -- `specs file malformed
+     after 22 characters`.  To measure "a user replaced this spec and their
+     value does not mention the target", the body must be text that *expands*
+     to nothing (`%{fzzz:...}`), not an empty line.
+
+## 5. FILES (scratchpad)
+
+    t78-build.sh / t78-go.sh   build (t111-build.sh repointed at this worktree)
+    t78-specs.sh               runs target-specs/configure per target, and
+                               CHECKS THE ARTEFACT, not the exit status
+    t78-setup.sh, t78-shim.sh  the lto-wrapper shim and its inputs
+    t78-run.sh                 the path table, A-F, -### plus the shim
+    t78-guards.sh              4 arms, 1 affirmative + 3 that must fail by name
+    t78-exposure.sh            the -specs= replacement arm (collect2: 1 -> 0)
+    t51-syms.sh                bare defs in the primary insn-emit x refs
+                               elsewhere; states its blind spots
+    t51-classify.sh            per-base availability of the six, with a
+                               non-vacuity check on the instrument

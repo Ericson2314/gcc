@@ -2354,18 +2354,73 @@ main (int argc, char *argv[])
      aarch64 LTO link classified its own target options against x86's answer,
      silently.  Same scan and same order as collect2 and driver::main.
 
-     WHAT IS AND IS NOT ESTABLISHED HERE.  When -ftarget-config= is on the
-     command line this selects the right tables.  When it is NOT, the tables
-     stay NULL and opts-common.cc reports it by name at the first option
-     decoded.  That is a louder failure than today's silent wrong answer and it
-     is NOT a claim that LTO now works: whether the driver passes
-     -ftarget-config= down to lto-wrapper on every path has not been measured,
-     and if it does not, this turns a silent miscompile into a visible one.
-     Deliberate -- a diagnostic naming the cause is what this branch trades
-     for, and an untested LTO path answering as x86 is the bug.  */
+     THAT MEASUREMENT HAS NOW BEEN MADE (task #78) and the answer was that
+     -ftarget-config= reaches lto-wrapper's ARGV on NO route at all.  Measured
+     with a shim named `lto-wrapper' on a -B directory, on x86_64-pc-linux-gnu
+     with real -flto objects, on all three LTO link routes -- the default
+     linker-plugin route, `-fno-use-linker-plugin' (collect2 spawns
+     lto-wrapper), and an explicit `-fuse-linker-plugin':
+
+	 route                     argv    COLLECT_GCC_OPTIONS
+	 default (plugin)            0             1
+	 -fno-use-linker-plugin      0             1
+	 -fuse-linker-plugin         0             1
+
+     and every one of the three died here, loudly, in `decode_cmdline_option'.
+     Neither spawner can carry it on argv: collect2 builds lto-wrapper's argv
+     out of COLLECT_LTO_WRAPPER plus the LTO object names and nothing else, and
+     the linker plugin builds it out of the `-plugin-opt=' the driver gave the
+     linker.  So the value was not missing -- it was STRANDED, one environment
+     variable away, in the channel lto-wrapper already treats as mandatory
+     input and already reads a few lines into run_gcc.
+
+     Reading it here is not a fallback and not a default.  It is the same
+     value, put there by the same driver, from the same target selection; the
+     only thing that changes is that the target is established BEFORE the first
+     option is decoded instead of after.  The alternative -- teaching collect2
+     and the plugin spec to forward it -- was rejected because the plugin half
+     of it lives in `%(link_plugin)', a named spec a user's `-specs=' can
+     replace, which is exactly the exposure carry_target_config_as_switch was
+     written to get cc1 out of.  A spec a user can replace is not a carrier.
+
+     COLLECT_GCC_OPTIONS is only consulted when argv did not answer, so an
+     explicit switch still wins, and a target named in both cannot disagree
+     silently.  */
   for (int i = 1; i < argc; i++)
     if (startswith (argv[i], "-ftarget-config="))
       read_target_caps (argv[i] + strlen ("-ftarget-config="));
+
+  if (targ_caps_target_name == NULL)
+    {
+      /* The driver's own switch list, shell-quoted.  Scanned as text rather
+	 than decoded, because decoding is the thing that cannot happen yet:
+	 decode_cmdline_options_to_array is what dies without the tables.  */
+      const char *opts = read_collect_gcc_options ();
+      const char *q = opts ? strstr (opts, "-ftarget-config=") : NULL;
+      if (q != NULL)
+	{
+	  q += strlen ("-ftarget-config=");
+	  const char *e = q;
+	  while (*e != '\0' && *e != '\'' && !ISSPACE ((unsigned char) *e))
+	    e++;
+	  char *file = XNEWVEC (char, e - q + 1);
+	  memcpy (file, q, e - q);
+	  file[e - q] = '\0';
+	  read_target_caps (file);
+
+	  /* read_target_caps says nothing when it cannot open the file, so
+	     without this a mangled path would come back out here as "the
+	     environment named no target" -- indistinguishable from the case
+	     where it really named none.  The one shape that can produce it is
+	     a config path containing a single quote, which the scan above
+	     stops at; say so by name rather than let it read as an absence.  */
+	  if (targ_caps_target_name == NULL)
+	    fatal_error (input_location,
+			 "%<COLLECT_GCC_OPTIONS%> names %<-ftarget-config=%s%>, "
+			 "but no target could be read from it", file);
+	}
+    }
+
   if (targ_caps_target_name != NULL
       && !multi_target_options_select (targ_caps_target_name))
     fatal_error (input_location,
