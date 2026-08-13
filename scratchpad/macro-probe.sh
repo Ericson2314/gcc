@@ -171,6 +171,19 @@ EXIST_COVERED=$(sed -n 's/^EXIST_MACROS="\(.*\)"$/\1/p' "$EXISTSH")
 [ -n "$EXIST_COVERED" ] || die "could not read EXIST_MACROS from $EXISTSH -- \
 the coverage check would pass vacuously, which is worse than no check"
 
+# THE SIXTH SHAPE'S LIST, kept separate for the third time and for the same
+# reason.  `union-probe.sh' scores a proposition neither of the other two can
+# state: that the ONE shared answer is the MAXIMUM over the configured back
+# ends and is not the primary's own.  For a union macro every other arm on this
+# board is green BY CONSTRUCTION -- the number is deliberately identical in
+# every translation unit, because it sizes stack buffers whose bounds checks
+# use the same constant -- so agreement is not evidence and must not be banked.
+UNIONSH=${UNIONSH:-$HERE/union-probe.sh}
+[ -s "$UNIONSH" ] || die "no $UNIONSH; a CONVERTED_UNION macro could not be covered"
+UNION_COVERED=$(sed -n 's/^UNION_MACROS="\(.*\)"$/\1/p' "$UNIONSH")
+[ -n "$UNION_COVERED" ] || die "could not read UNION_MACROS from $UNIONSH -- \
+the coverage check would pass vacuously, which is worse than no check"
+
 ALL=$(grep -v '^#' "$MACROS" | awk 'NF{print $1}' | sort -u)
 for n in $ALL; do
   awk -v m="$n" '$1 !~ /^#/ && $1==m{f=1} END{exit !f}' "$STATUS" \
@@ -185,7 +198,7 @@ done
 for st in $(awk '$1 !~ /^#/ && NF{print $2}' "$STATUS" | sort -u); do
   case $st in
     UNCONVERTED|CONVERTED_SUPPLY|CONVERTED_CDATA|CONVERTED_REGS|CONVERTED_GONE) ;;
-    CONVERTED_EXIST|CONVERTED_NOARM) ;;
+    CONVERTED_EXIST|CONVERTED_NOARM|CONVERTED_UNION) ;;
     *) die "unknown status word [$st] in $STATUS.  An unrecognised status is \
 treated as UNCONVERTED by every test below, so the macro would keep a header \
 arm it can no longer measure and would never be required to have a TAB arm." ;;
@@ -284,7 +297,51 @@ case the status is CONVERTED_EXIST, or the arm should be removed from \
 EXIST_MACROS."
 done
 
-for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS" || $2=="CONVERTED_EXIST") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
+# CONVERTED_UNION -- A SIXTH STATUS, AND THE WRONG-REASON GREEN IT RETIRES WAS
+# BEING BANKED AS ONE OF ONLY TWO TRUSTED PASSES ON THE WHOLE BOARD.
+#
+# `MAX_BITSIZE_MODE_ANY_MODE' is 1024 for i386 and 8192 for aarch64 (measured,
+# from the per-base generators).  The union run writes the maximum, 8192, into
+# the ONE shared `insn-modes.h', which is the correct and intended fix: the
+# macro sizes stack buffers in `fold-const.cc', `simplify-rtx.cc', `expr.cc'
+# and `gimple-fold.cc', and each buffer's bounds check is written in terms of
+# the same constant, so the value MUST be compile-time and identical in every
+# translation unit (genmodes.cc:1402-1434).
+#
+# The header arm therefore reads 8192 in both base contexts and scores PASS --
+# saying only "this name is now target-neutral", wrong-reason shape 2.  It has
+# been counted as TRUSTED because nothing on the board knew the macro had been
+# converted: the completeness gate derives the converted set from
+# `defaults.h''s redirects and a hand-declared no-redirect list, and a macro
+# converted by the genmodes UNION appears in NEITHER.  That is this branch's
+# own root pattern -- one name, several authorities, no diagnostic -- aimed at
+# the instrument for the second time, and in the opposite direction to the
+# first: the earlier defect made a converted macro invisible, this one made it
+# read as unconverted AND banked its green.
+#
+# Retired here, replaced by `union-probe.sh', which compares the shared answer
+# against the per-base generators' own answers and can fail (fault-injected:
+# `INJECT=primary' makes the shared answer the primary's 1024 and the arm
+# reports FAIL, which is the state the tree was actually in before the union
+# run was wired up).
+for n in $(awk '$1 !~ /^#/ && $2=="CONVERTED_UNION" {print $1}' "$STATUS"); do
+  case " $UNION_COVERED " in
+    *" $n "*) ;;
+    *) die "$n is marked CONVERTED_UNION in $STATUS but union-probe.sh's \
+UNION_MACROS does not cover it.  A macro may only move to CONVERTED_UNION \
+together with its UNION arm.  A TAB or EXIST arm does NOT satisfy this: the \
+shapes measure different propositions." ;;
+  esac
+done
+for n in $UNION_COVERED; do
+  st=$(awk -v m="$n" '$1 !~ /^#/ && $1==m{print $2}' "$STATUS")
+  [ -n "$st" ] || die "union-probe.sh scores $n but it has no status in $STATUS"
+  [ "$st" = CONVERTED_UNION ] || die "union-probe.sh scores $n but $STATUS says \
+$st.  Either the status is CONVERTED_UNION, or the arm should be removed from \
+UNION_MACROS."
+done
+
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS" || $2=="CONVERTED_EXIST" || $2=="CONVERTED_UNION") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
 
 ########################################################################
 # THE COMPLETENESS GATE -- "ABSENT" MUST NOT BE A THIRD, INVISIBLE VERDICT.
@@ -321,6 +378,21 @@ for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || 
 # cased silently) and must have an `mt_' declaration in target-frame.h (so it
 # cannot be a typo or a fiction).
 CONVERTED_NO_REDIRECT="PUSH_ROUNDING STACK_DYNAMIC_OFFSET INCOMING_REG_PARM_STACK_SPACE"
+
+# A SECOND BLIND SPOT, FOUND BY WALKING THE `UNCONVERTED' LIST RATHER THAN BY
+# TRUSTING IT: a macro converted by the genmodes UNION appears in neither
+# channel above.  It has no `#undef' in defaults.h -- there is nothing to
+# redirect, because the fix is that every translation unit gets ONE
+# compile-time number -- and no `mt_' thunk in target-frame.h, because it is
+# not a runtime read and must not become one.  `MAX_BITSIZE_MODE_ANY_MODE' sat
+# on the board saying UNCONVERTED, with a green header arm banked as one of the
+# board's two TRUSTED passes, while the conversion was landed and working.
+#
+# Bounded the same two ways as the list above, so it cannot become an
+# assertion: each name must be ABSENT from the derived redirect set, and must
+# be spelled by genmodes.cc's union machinery (`union_max_bitsize_any_*' /
+# `union_note_max_bitsize'), which is where the maximum is actually computed.
+CONVERTED_BY_UNION="MAX_BITSIZE_MODE_ANY_MODE"
 
 DEFAULTS_H=$SRC/defaults.h
 FRAME_H=$SRC/target-frame.h
@@ -364,7 +436,24 @@ done
 # the same bug in the `missing'/`lying' loops above would have reported
 # everything absent, and in a check written the other way round it would have
 # reported everything present.
-CONVERTED_SET="$DERIVED_SP $CONVERTED_NO_REDIRECT"
+GENMODES_CC=$SRC/genmodes.cc
+[ -s "$GENMODES_CC" ] || die "no $GENMODES_CC -- the union channel cannot be checked"
+for n in $CONVERTED_BY_UNION; do
+  case " $DERIVED_SP " in
+    *" $n "*) die "$n is in CONVERTED_BY_UNION but defaults.h DOES redirect it \
+now.  Remove it from the hand-written list: it is derived, and keeping it in \
+both places is a second authority for the same fact." ;;
+  esac
+  grep -q "union_note_max_bitsize\|union_max_bitsize" "$GENMODES_CC" \
+    || die "CONVERTED_BY_UNION names $n but genmodes.cc has no union-maximum \
+machinery at all.  The channel would be an assertion rather than a fact."
+  grep -qw "$n" "$GENMODES_CC" \
+    || die "$n is declared converted-by-union but genmodes.cc never spells it. \
+An unbacked name here would exempt a macro from the board on nothing but an \
+assertion."
+done
+
+CONVERTED_SET="$DERIVED_SP $CONVERTED_NO_REDIRECT $CONVERTED_BY_UNION"
 
 missing= ; lying=
 for n in $CONVERTED_SET; do
@@ -415,16 +504,20 @@ NOARM_LIST=$(awk '$1 !~ /^#/ && $2=="CONVERTED_NOARM" {printf "%s ", $1}' "$STAT
 [ -n "$NOARM_LIST" ] || die "CONVERTED_NOARM list read empty while the count \
 says $n_noarm -- the aarch64 PASS decomposition below would report every pass \
 as trusted, which is the exact inversion this branch keeps paying for"
+n_union=$(awk '$1 !~ /^#/ && $2=="CONVERTED_UNION"' "$STATUS" | wc -l)
 n_board=$(awk '$1 !~ /^#/ && NF' "$STATUS" | wc -l)
 echo "status: $n_board macros on the board = \
 $n_unconv unconverted \
 + $n_tab converted with a TAB (value) arm \
 + $n_exist converted with an EXIST (existence/distinctness) arm \
++ $n_union converted by the genmodes UNION with a UNION (maximum) arm \
 + $n_noarm converted with NO ARM AT ALL (the measurement debt)"
 echo "status: completeness -- $NDERIVED converted macros derived from \
 gcc/defaults.h plus $(echo $CONVERTED_NO_REDIRECT | wc -w) declared \
-converted-without-redirect; all present on the board and none saying UNCONVERTED"
-echo "status: an EXIST arm is NOT a value arm.  Do not add $n_tab and $n_exist."
+converted-without-redirect plus $(echo $CONVERTED_BY_UNION | wc -w) declared \
+converted-by-union; all present on the board and none saying UNCONVERTED"
+echo "status: an EXIST arm is NOT a value arm, and a UNION arm is neither. \
+Do not add $n_tab, $n_exist and $n_union."
 echo "status: retiring from the header probe:${RETIRED:- none}"
 
 NAMES=$(for n in $ALL; do

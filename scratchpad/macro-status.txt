@@ -64,6 +64,29 @@
 #                      recorded as a verdict, not smoothed into a pass.  The
 #                      status says "this macro has an arm that can fail"; it
 #                      does not say "this macro's value has been verified".
+#   CONVERTED_UNION    converted by the genmodes UNION: the macro is a
+#                      compile-time WIDTH that must be identical in every
+#                      translation unit, and the shared answer is the MAXIMUM
+#                      over the configured back ends.  Covered by the SIXTH
+#                      shape, `union-probe.sh'; the macro MUST appear in its
+#                      UNION_MACROS line, and a name in TAB_MACROS or
+#                      EXIST_MACROS does NOT satisfy it.
+#                        THIS STATUS EXISTS BECAUSE EVERY OTHER ARM ON THE
+#                      BOARD IS GREEN FOR A UNION MACRO BY CONSTRUCTION.  The
+#                      number is DELIBERATELY the same in both bases -- that is
+#                      the fix, not a symptom -- so the header arm's PASS says
+#                      only "this name is target-neutral", and a TAB arm
+#                      reading the running cc1 would say the same thing again.
+#                      Header arm RETIRED.
+#                        What `union-probe.sh' scores instead is the
+#                      proposition that is actually true of a union macro, in
+#                      three parts: NON-VACUITY (at least two bases must
+#                      disagree on their own, else the union does nothing),
+#                      MAXIMUM (the shared answer is the max, and in particular
+#                      is NOT the primary's own answer), and BOTH-SIDEDNESS
+#                      (the per-base generators are read separately, so the arm
+#                      can tell "the union works" from "everyone now gets
+#                      aarch64's answer").
 #   CONVERTED_NOARM    CONVERTED IN THE COMPILER AND NOT MEASURED BY ANYTHING.
 #                      This status exists because the alternative shapes are
 #                      both lies:
@@ -447,7 +470,7 @@ LOCAL_ALIGNMENT UNCONVERTED
 LOCAL_DECL_ALIGNMENT UNCONVERTED
 LONG_TYPE_SIZE CONVERTED_CDATA
 MALLOC_ABI_ALIGNMENT CONVERTED_CDATA
-MAX_BITSIZE_MODE_ANY_MODE UNCONVERTED
+MAX_BITSIZE_MODE_ANY_MODE CONVERTED_UNION
 MAX_BITS_PER_WORD UNCONVERTED
 MAX_FIXED_MODE_SIZE CONVERTED_CDATA
 MAX_MOVE_MAX UNCONVERTED

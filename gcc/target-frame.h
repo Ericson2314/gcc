@@ -215,18 +215,44 @@ struct target_frame_desc
   int (*clear_ratio) (bool speed);
   int (*set_ratio) (bool speed);
 
-  /* This base's own `MAX_MOVE_MAX', recorded ONLY so that the bound and the
-     index can be checked against each other.
+  /* This base's own `MAX_MOVE_MAX'.
+     WARNING: NOTHING WRITES THIS FIELD AND NOTHING READS IT.
 
      `caller-save.cc:55' sizes `regno_save_mem[][MAX_MOVE_MAX /
      MIN_UNITS_PER_WORD + 1]' from the PRIMARY's headers and then indexes it
      with `MOVE_MAX_WORDS', i.e. `MOVE_MAX / UNITS_PER_WORD', which the field
      above now makes the SELECTED base's.  That is exactly PRINCIPLES 3's
      "bound by one, indexed by another" -- the disguise that produced the
-     `NUM_UNSPECV_VALUES' 114-vs-40 overrun.  Today i386's 64 is comfortably
-     the larger and nothing overflows; recorded because it was checked, and
-     checked at selection time so that the day it stops being true is a
-     diagnostic naming the base rather than a corrupted array.  */
+     `NUM_UNSPECV_VALUES' 114-vs-40 overrun.
+
+     THE PARAGRAPH THAT STOOD HERE CLAIMED A CHECK THAT DOES NOT EXIST.  It
+     said this base's value was "checked at selection time so that the day it
+     stops being true is a diagnostic naming the base rather than a corrupted
+     array".  Measured 2026-08-13 by grepping the whole tree AND the generated
+     build directory: `max_move_max' occurs exactly twice, both in this file --
+     this declaration and the comment referring to it.  No initialiser, no
+     reader, no assertion.  It is PRINCIPLES section 4's "presence of a
+     mechanism is not evidence anything invokes it", and it reads as protection
+     while providing none.
+
+     WHAT THE NUMBERS ARE, so the next agent does not have to re-derive them.
+     i386.h:1929 `MAX_MOVE_MAX 64' and i386.h:770 `MIN_UNITS_PER_WORD 4';
+     aarch64 defines NEITHER, so its own answers come from the defaults.h
+     floors -- `MAX_MOVE_MAX' = its `MOVE_MAX' = 16, `MIN_UNITS_PER_WORD' =
+     its `UNITS_PER_WORD' = 8.  Shared code therefore sizes the array
+     64 / 4 + 1 = 17 and aarch64 indexes it to 16 / 8 = 2.  Nothing overflows.
+
+     IT IS CORRECT BY LUCK, AND THE LUCK IS NAMEABLE: the primary happens to
+     supply BOTH the largest numerator and the smallest denominator.  The
+     correct multi-target bound is max(MAX_MOVE_MAX) / min(MIN_UNITS_PER_WORD)
+     + 1, and for this base pair that is also 64 / 4 + 1 = 17 -- the same
+     number, which is why no measurement can currently tell the two apart.
+     Convert either name alone and it stops being true: with aarch64's
+     MIN_UNITS_PER_WORD of 8 as the denominator the bound becomes 16 / 8 + 1 =
+     3 while i386 still indexes to 64 / 4 = 16.  So the two are a CLOSURE --
+     `MAX_MOVE_MAX' unioned by MAXIMUM and `MIN_UNITS_PER_WORD' by MINIMUM,
+     together or not at all -- and both are array bounds, so both must stay
+     compile-time constants and neither may become an `mt_' call.  */
   int max_move_max;
 
   /* ------------------------------------------------------------------
