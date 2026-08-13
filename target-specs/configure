@@ -5132,6 +5132,7 @@ ts_expected="target leb128 decimal_float decimal_bid_format
   as_line_zero dwarf2_debug_line dwarf2_debug_view as_alpha_explicit_relocs
   as_alpha_jsrdirect_relocs as_aarch64_mabi as_aarch64_small_pic_relocs
   as_aarch64_aeabi_build_attributes
+  as_ltoffx_ldxmov_relocs
   as_mips_nan as_mips_micromips as_mips_dspr1_mult as_mips_explicit_relocs
   as_mips_explicit_relocs_pcrel as_ld_mips_jalr_reloc as_mips_dot_module
   as_loongarch_relax
