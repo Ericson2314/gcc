@@ -2983,3 +2983,278 @@ both do, and collect2 has since `fa93fd08c8f`. A written invariant, false.
     t24-perTarget.sh   absent / verbatim / searched + cross-target control
     t17-tools.sh       which tool NAMES collect2 searches, both targets
     t17-real.sh        real_nm_file_name: good / bad / control, both targets
+
+# TASK #113 -- ARM E RE-FILTERED, AND THE FIRST COMPLETE aarch64 `.s`
+
+Branched from `4af8355f59f` (merged in during the task).  Build dir `/tmp/b113`
+(x86_64 + aarch64, mine).  My worktree started at the bare-repo HEAD
+`7208eca60d0`; the PRINCIPLES 5 check caught it, as it did for #111 and #112.
+
+## 1. THE ARM E POPULATION: 40 -> 20, AND WHAT EACH FILTER DROPPED
+
+#112 published 40 as an explicit upper bound with known contamination and asked
+for a re-filter.  `scratchpad/t113-armE2.sh` is that, with three filters, each
+reporting its drops so they are auditable:
+
+    raw (t112/t113-armE.sh, text sweep of config/i386/*.h)      40
+      FILTER M  machinery-only spellings                        -3   -> 37
+      + the two-step chain members the sweep cannot see         +2   -> 39
+      FILTER P  is that the definition IN FORCE? (preprocessor) -13  -> 26
+      FILTER L  is the i386 symbol still needed? (nm on 663
+                shared objects), with the opt-var exception     -6   -> 20
+
+  * **FILTER M** drops a macro whose only shared spellings are the conversion
+    machinery naming it: `LOCAL_ALIGNMENT` (defaults.h), `TARGET_64BIT_MS_ABI`
+    (target-cdata.h), `TARGET_READ_MODIFY_WRITE` (genconditions.cc).  That is
+    the contamination #112 named.  It is only THREE of the forty.
+  * **FILTER P** is the one that settles membership, and it rediscovers the
+    already-converted set independently: `FUNCTION_ARG_REGNO_P`,
+    `MINIMUM_ALIGNMENT`, `STACK_SLOT_ALIGNMENT`, `PREFERRED_STACK_BOUNDARY`,
+    `OUTGOING_REG_PARM_STACK_SPACE` all come back as `(mt_... ())`.  Nothing
+    told it those were done; it read the preprocessor.
+  * **FILTER L** asks the LINKER, and it was added because P is still text.
+    `DATA_ALIGNMENT` and `DATA_ABI_ALIGNMENT` survive M and P after this task
+    converts them, because they were converted by deleting their `#ifdef` call
+    sites and the replacement code carries comments that still SPELL THE
+    MACRO.  My own comments contaminated my own instrument.
+
+**FILTER L GETS ONE CLASS WRONG, IN THE FLATTERING DIRECTION.**
+`ASSEMBLER_DIALECT` is `(ix86_asm_dialect)` and `i386.opt:269` declares that
+`Var(ix86_asm_dialect)`, i.e. a `#define` onto
+`global_options.x_ix86_asm_dialect`.  Shared code reading it emits **no `ix86_`
+symbol at all**, so `nm` scores it clean while the leak is entirely real.  Four
+macros were dropped that way before the exception existed (`ASSEMBLER_DIALECT`,
+`BRANCH_COST`, `CASE_VECTOR_MODE`, `OPTIMIZE_MODE_SWITCHING`).  The header's
+first draft claimed filter L "can only shrink a genuine over-count"; that claim
+was wrong and is kept in the file rather than quietly corrected.
+
+### THE RANKING, AND THE COLUMN THAT CANNOT BE RANKED
+
+The brief asked for LOUD vs QUIET.  The honest answer has **three** columns:
+
+    LOUD   macro body derefs a null back-end pointer                 0
+    QUIET  macro body reads a benign scalar -- silently i386's       5
+    UNRANK macro CALLS an i386 function -- not rankable from here   15
+
+**`DATA_ALIGNMENT` is why the third column exists**, and it arrived from the
+tool-paths agent mid-task.  Its body is `ix86_data_alignment ((TYPE), (ALIGN),
+true)` -- it dereferences nothing, so a body-reading classifier calls it QUIET.
+It is LOUD.  Confirmed under gdb (`scratchpad/t113-align-diag.sh`), not from the
+name:
+
+    #0 ix86_data_alignment <- align_variable <- varpool_node::analyze
+    => mov 0x190(%rax),%eax   with %rax == 0,  si_addr == 0x190
+    ix86_tune_cost holds 0x0000000000000000
+
+`ix86_data_alignment` reads `ix86_tune_cost->prefetch_block` (i386.cc:18641) and
+0x190 is that member's offset.  So it is the SAME mechanism as `MOVE_RATIO` --
+an uninitialised back-end pointer -- reached one call deeper.  **Ranking a FUNC
+row would need an interprocedural pass or a run; this instrument has neither.
+An UNRANK row is UNMEASURED, not absent.**  LOUD=0 today means only that every
+leak that announces itself has been converted.
+
+The two SHAPES the filter matches, stated because the coordinator was right to
+ask: `KIND=STATE` (6) is the macro body naming back-end state itself;
+`KIND=FUNC` (14) is the macro dispatching to a back-end function.  Both are
+counted, and the ranking is what distinguishes them, not the membership test.
+
+**BLIND SPOTS.**  Discovery is still the text sweep over `config/i386/*.h`, so a
+macro reaching state through a helper is invisible (LOWER bound).  `cp/rtti.o`
+does not exist in a `c,lto` build, so filter L cannot see the C++ front end at
+all.  `Pmode` survives as an opt-var row and is the known separate mode-union
+problem, not new work.
+
+## 2. WHAT LANDED: TEN MACROS, TWO SHAPES, ONE GROUP
+
+### THE MOVE/CLEAR FAMILY IS SEVEN, NOT THE FIVE THE HANDOVER NAMED
+
+#112 decomposed it as `MOVE_RATIO`, `CLEAR_RATIO`, `MOVE_MAX`,
+`MOVE_MAX_PIECES`, `STORE_MAX_PIECES`.  The transitive closure through
+`defaults.h`, measured by chasing each `-dM` definition to a fixpoint, is two
+larger:
+
+    MOVE_MAX_PIECES     <- MOVE_MAX          (defaults.h:1098)
+    STORE_MAX_PIECES    <- MOVE_MAX_PIECES   (defaults.h:1107)
+    COMPARE_MAX_PIECES  <- MOVE_MAX_PIECES   (defaults.h:1112)   <- ADDED
+    SET_RATIO           <- MOVE_RATIO        (defaults.h:1472)   <- ADDED
+
+`SET_RATIO` matters and is not bookkeeping: aarch64 defines its own, i386
+defines none, so shared code's `SET_RATIO` is i386's `MOVE_RATIO`.  Redirecting
+`MOVE_RATIO` alone would have made `SET_RATIO` silently become **aarch64's move
+ratio where aarch64 asks for its set ratio** -- the same half-fix #112 refused,
+reproduced one level down.  All seven landed together.
+
+**`MAX_MOVE_MAX` IS THE ONE NOT CONVERTED, AND THAT IS A CONSTRAINT.**
+`reload.h:179` and `caller-save.cc:55` use it as an **array bound**, which
+cannot hold a call.  It is also not a per-target question -- the array is sized
+once for a binary serving every back end -- so it is a union quantity and
+belongs with the mode/register unions.  Two consequences are written into the
+code rather than hoped for:
+
+  * a `static_assert (MAX_MOVE_MAX > 0)` in `target-cumargs-select.cc`.  i386
+    defines `MAX_MOVE_MAX` as 64 so `defaults.h:1116`'s
+    `#define MAX_MOVE_MAX MOVE_MAX` floor does not fire -- but that is a fact
+    about which back end happens to be primary.  If it ever changes,
+    `mt_move_max` would recurse into itself forever; the assert turns that into
+    a build failure by name.
+  * `mt_move_max` checks the selected base's `MOVE_MAX` against the primary's
+    `MAX_MOVE_MAX`.  `caller-save.cc` **sizes** `regno_save_mem` from the
+    latter and **indexes** it with `MOVE_MAX_WORDS` derived from the former:
+    PRINCIPLES 3's "bound by one, indexed by another".  i386's 64 is comfortably
+    the larger today; recorded because it was checked.
+
+### NO THREE-STATE FLAG ON THE SEVEN, AND THAT IS MEASURED
+
+The brief asked for the `INIT_EXPANDERS` three-state flag on this group.
+`scratchpad/t113-family.sh` says it does not apply: all 48 cpu back ends define
+`MOVE_MAX` directly, and every other member has a `defaults.h` floor -- a floor
+evaluated **in the per-base translation unit**, so a base with no
+`STORE_MAX_PIECES` gets the generic definition computed from ITS OWN `MOVE_MAX`,
+not the primary's.  There is no absence to record, and a flag would be inventing
+a state that cannot occur.  **Reporting against the brief here rather than
+building what it asked for.**
+
+### WHERE THE FLAG IS REAL: `DATA_ALIGNMENT` / `DATA_ABI_ALIGNMENT`
+
+This pair is an existence predicate AND a state leak at once -- five `#ifdef`
+sites (varasm.cc x4, cp/rtti.cc x1) answered by i386 for all 48 back ends.  31
+back ends define `DATA_ALIGNMENT`, only 5 define `DATA_ABI_ALIGNMENT`,
+`defaults.h` floors neither.  So `false` is legitimate and the pair carries the
+`(has_X, payload)` shape with the two-sided cross-check.
+
+**FOUR OF THE FIVE SITES LOST THEIR `#ifdef` AND ONE DID NOT, AND THE ONE THAT
+DID NOT IS WHY THE FLAG IS LOAD-BEARING.**  Where the guarded code is
+`align = data_align`, a thunk returning ALIGN unchanged makes the call
+identity-equivalent and the guard can go.  `cp/rtti.cc:1760` also sets
+`DECL_USER_ALIGN` inside the guard, so it is not identity-equivalent and keeps
+an explicit `if (mt_has_data_abi_alignment ())`.  Returning ALIGN is **not** the
+`#ifndef` floor PRINCIPLES forbids: it is i386.h's own documented semantics
+("If this macro is not defined, then ALIGN is used"), and it is computed in the
+base's own TU, so it is that base's answer and not the primary's.
+
+**A GUARD I WROTE FAILED, AND THE CODE WAS RIGHT.**  Arm 1 was written expecting
+aarch64 to define no `DATA_ALIGNMENT`.  `aarch64.h:133` defines it as
+`aarch64_data_alignment (EXP, ALIGN)`.  So the old `#ifdef` was not merely
+importing i386's presence into a back end that wanted none -- **it was calling
+i386's function instead of aarch64's own**, a wrong VALUE and not only a
+wrongly-taken branch.  The guard was corrected; the check was not relaxed.
+
+## 3. AARCH64 MOVES.  THE FIRST COMPLETE aarch64 `.s` ON THIS BRANCH
+
+    BEFORE  int x = 1;   x86_64 rc=0     aarch64 rc=4 ICE, 36 bytes / 2 lines
+    AFTER   int x = 1;   x86_64 rc=0     aarch64 rc=0 SUCCESS, 377 bytes / 17 lines
+
+and it is genuinely aarch64 -- `.arch armv8-a`, `.word`, the `aeabi_subsection`
+block -- against x86_64's `.long` and `.globl` from the same binary in the same
+run.  #112 recorded "aarch64 does NOT emit a complete `.s`"; that is now false
+for this input, and I am claiming exactly this input and no more.
+
+`scratchpad/big.c` still ICEs, but **further on**: at line 24 rather than at the
+first declaration.  Under gdb (`scratchpad/t113-wall.sh`) the next wall is
+
+    #0  0x0000000000000000 in ?? ()      <- PC is null, not a data fault
+    #1  emit_move_insn_1
+    #2  emit_move_insn
+    #3  init_set_costs
+    #4  initialize_rtl <- init_function_start <- cgraph_node::expand
+
+**#112 PREDICTED THE NEXT WALL WOULD BE ANOTHER ARM E MEMBER.  IT IS NOT**, and
+a prediction that is not checked is not a finding.  A null PC out of
+`emit_move_insn_1` is a null `GEN_FCN (icode)` -- the insn-code numbering and
+`insn-flags.h` family, i.e. #51's Class B/C and the mode union, not a macro
+reading back-end state.  The IPA wall #112 diagnosed is no longer reached on
+this input because compilation stops earlier.
+
+## 4. REGRESSION BARS, ALL ON /tmp/b113, MY OWN BUILD DIR
+
+  * `make multi-target-objs cc1 lto1` **rc=0**; lto1 links.
+  * x86_64 `-O2` md5 **`378fc33c1e70`** -- the recorded baseline, unmoved.
+  * `stock-compare.sh`, `IN` **absolute**, `MT=/tmp/b113`, `ST=/tmp/b-stock`:
+    **5/5 IDENTICAL**, 5 distinct md5 per side, **negative control firing**
+    (1158 vs 804 lines), rc=0.
+  * `scratchpad/t113-guards.sh`: **7/7**, five affirmative and two injections.
+    Arm 4 is the one that matters: it removes the `MOVE_RATIO` redirect from
+    defaults.h, rebuilds `tree-inline.o`, and **requires `ix86_cost` to come
+    back**.  It does.  Without that, arm 3's "no ix86_ symbols" green would be
+    a claim about the grep, not about the code.  The arm restores the object
+    and verifies the restore.
+
+### SCOREBOARD: NOT RUN, NOT BANKED
+
+I did not run the header/TAB probe harness and none of the ten macros is on the
+probe list.  Carrying the coordinator's correction unchanged: header
+**aarch64 8 PASS / 104 FAIL, of which only 2 passes are trusted** -- the other
+6 are #108's stack/arg-boundary macros, green only because the probe's base-B
+context omits `MULTI_TARGET_TARGETM_BASE` so the arm compares a redirect with
+itself.  TAB **27/5**.  Nothing here should be read as moving any of them.
+
+### STDERR -- WHICH ARM
+
+  * **cold** `multi-target-objs cc1 lto1`: **637 lines / 101 `warning:`**.
+  * **incremental after this task's edits** (6 files, one of them defaults.h,
+    so most of the middle end rebuilds): **387 / 61**, and **24 / 0** on a
+    later pass that rebuilt less.  Not comparable with the 32-line floor.
+  * My first version of `mt_check_align_pair` took the function pointer as
+    `const void *` and added **2 new `-Wconditionally-supported` warnings**;
+    fixed by passing the `!= NULL` result as a `bool`.  Counted, not excused.
+
+## 5. TRAPS PAID FOR THIS TASK
+
+  1. **The worktree was at the bare-repo HEAD `7208eca60d0`**, again.
+  2. **My own comments contaminated my own text sweep.**  Writing
+     "Was `#ifdef DATA_ABI_ALIGNMENT'" into varasm.cc kept the macro in the
+     arm E population after it had been converted.  That is what forced
+     filter L into existence, so it was productive -- but the general lesson
+     is that a name-matching instrument counts the FIX as an instance of the
+     bug.
+  3. **A non-vacuity assertion can be correct and useless at the same time.**
+     `t113-armE2.sh` originally required `MOVE_RATIO` to be in the leak list,
+     because it was gdb-confirmed.  Converting `MOVE_RATIO` made the script
+     abort.  Weakening it to "may be absent" would have been the test-harness
+     floor; it now checks the **disposition** -- each of `MOVE_RATIO` and
+     `MOVE_MAX` must be accounted for as EITHER a leak OR converted, and
+     anything else still refuses to score.
+  4. **`nm` cannot see an option variable.**  `Var(ix86_branch_cost)` is
+     `global_options.x_ix86_branch_cost`, not a symbol.  A linker-based sweep
+     scores those clean while the leak is real, and it does so in the
+     direction that flatters.
+  5. `x/20gx targetm_frame` fails with "has unknown type" at `-g0`; the cast
+     must be inside the expression (`x/20gx ((void**)targetm_frame)`).  gdb
+     prints a null pointer as `(nil)`, not `0x0`, and a pattern matching only
+     `0x0` turned a correct null into a guard failure.
+  6. An edit that inserts a comment block above a `for` can leave the `for`
+     line duplicated; `sh -n` catches it, a run reports it as an unrelated
+     "unexpected end of file" 160 lines later.
+
+## 6. FILES (scratchpad)
+
+    t113-mk.sh          derives this harness from #112's and asserts no
+                        residual t112/b112 references survive
+    t113-armE2.sh       ARM E RE-FILTERED: filters M / P / L, the opt-var
+                        exception, and the three-way LOUD/QUIET/UNRANK rank
+    t113-family.sh      is any move/clear member an existence predicate?  (no)
+    t113-sites.sh       every shared spelling of the eight names, for the
+                        constant-expression sweep MAX_MOVE_MAX failed
+    t113-align-diag.sh  gdb confirmation of the ix86_data_alignment fault
+    t113-wall.sh        gdb confirmation of where aarch64 stops NOW
+    t113-guards.sh      7 arms, TAB-shaped, with the defaults.h injection
+    t113-build/go/run/ts.sh, t113-reconf-gcc.sh, t113-armD2.sh, t113-armE.sh
+
+## 7. THE NATURAL NEXT SLICE
+
+The 20 survivors, in the order their risk is understood rather than by size:
+
+  * **`INCOMING_STACK_BOUNDARY`, `BRANCH_COST`, `ASSEMBLER_DIALECT`,
+    `CASE_VECTOR_MODE`, `OPTIMIZE_MODE_SWITCHING`** -- the QUIET five.  Known
+    to answer with i386's value and to say nothing.  `BRANCH_COST` reaches ten
+    shared TUs including `fold-const.cc` and `ifcvt.cc`.
+  * **the 15 UNRANK rows** -- each needs a run or an interprocedural check
+    before anyone calls it harmless.  `LOCAL_DECL_ALIGNMENT` and
+    `REG_PARM_STACK_SPACE` are the closest siblings of what landed here.
+  * **`Pmode`** stays blocked on the mode union (Stage 4), unchanged.
+
+And the wall itself has moved out of arm E: `emit_move_insn_1`'s null `GEN_FCN`
+is the insn-code/`insn-flags.h` job, which is #51's routed-but-unapplied
+`Makefile.in` hunk plus the union.  **Whoever takes aarch64 next should take
+that, not another arm E slice** -- arm E is now behind the wall rather than in
+front of it.

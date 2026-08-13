@@ -2122,6 +2122,43 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
   (mt_outgoing_reg_parm_stack_space ((FNTYPE)))
 #undef FUNCTION_ARG_REGNO_P
 #define FUNCTION_ARG_REGNO_P(N) (mt_function_arg_regno_p ((int) (N)))
+
+/* ------------------------------------------------------------------------
+   THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault
+   that starts this (`ix86_cost' null, `si_addr == 0xf4'), for why all seven
+   move together rather than just the one that crashes, and for why
+   `MAX_MOVE_MAX' is deliberately absent from the list.
+
+   Note that four of these seven are being `#undef'd from a definition made
+   by THIS FILE a thousand lines above -- `MOVE_MAX_PIECES' at :1098,
+   `STORE_MAX_PIECES' at :1107, `COMPARE_MAX_PIECES' at :1112 and
+   `SET_RATIO' at :1472 -- and those definitions are the ones that make the
+   leak transitive.  `MOVE_MAX_PIECES' looks target-neutral where it is
+   written; it is `MOVE_MAX', which is i386's AVX width.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING
+   (scratchpad/t113-sites.sh lists every shared spelling of all eight names).
+   Outside `config/' the seven appear only in ordinary run-time expressions:
+   loop bounds in `caller-save.cc', comparisons in `expr.cc',
+   `gimple-fold.cc', `gimple-ssa-store-merging.cc', `tree-inline.cc' and
+   `tree-sra.cc', and arguments in `targhooks.cc'.  The one `#ifdef
+   MOVE_RATIO' (targhooks.cc:2261) is unaffected -- the name stays defined.
+   `MAX_MOVE_MAX' is the single constant-expression user and is the single
+   name not converted; that is not a coincidence, it is the reason.  */
+#undef MOVE_MAX
+#define MOVE_MAX (mt_move_max ())
+#undef MOVE_MAX_PIECES
+#define MOVE_MAX_PIECES (mt_move_max_pieces ())
+#undef STORE_MAX_PIECES
+#define STORE_MAX_PIECES (mt_store_max_pieces ())
+#undef COMPARE_MAX_PIECES
+#define COMPARE_MAX_PIECES (mt_compare_max_pieces ())
+#undef MOVE_RATIO
+#define MOVE_RATIO(SPEED) (mt_move_ratio ((bool) (SPEED)))
+#undef CLEAR_RATIO
+#define CLEAR_RATIO(SPEED) (mt_clear_ratio ((bool) (SPEED)))
+#undef SET_RATIO
+#define SET_RATIO(SPEED) (mt_set_ratio ((bool) (SPEED)))
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

@@ -1757,11 +1757,21 @@ emit_tinfo_decl (tree decl)
       cp_finish_decl (decl, init, false, NULL_TREE, 0);
       /* Avoid targets optionally bumping up the alignment to improve
 	 vector instruction accesses, tinfo are never accessed this way.  */
-#ifdef DATA_ABI_ALIGNMENT
-      SET_DECL_ALIGN (decl, DATA_ABI_ALIGNMENT (TREE_TYPE (decl),
-						TYPE_ALIGN (TREE_TYPE (decl))));
-      DECL_USER_ALIGN (decl) = true;
-#endif
+      /* Was `#ifdef DATA_ABI_ALIGNMENT', answered by whichever base compiled
+	 this file rather than by the selected one; see target-frame.h.  THIS
+	 IS THE SITE THAT KEEPS AN EXPLICIT TEST rather than becoming an
+	 unconditional call: the guard also covers `DECL_USER_ALIGN', so a
+	 back end with no such macro must skip the whole block and not merely
+	 get its alignment back unchanged.  The other four sites are
+	 identity-equivalent and lost their guards; this one is not, which is
+	 why the existence flag is a separate answer and not a null pointer.  */
+      if (mt_has_data_abi_alignment ())
+	{
+	  SET_DECL_ALIGN (decl,
+			  mt_data_abi_alignment (TREE_TYPE (decl),
+						 TYPE_ALIGN (TREE_TYPE (decl))));
+	  DECL_USER_ALIGN (decl) = true;
+	}
       return true;
     }
   else

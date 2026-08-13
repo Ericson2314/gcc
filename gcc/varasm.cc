@@ -1147,14 +1147,21 @@ align_variable (tree decl, bool dont_output_data)
 
   if (! DECL_USER_ALIGN (decl))
     {
-#ifdef DATA_ABI_ALIGNMENT
+      /* Was `#ifdef DATA_ABI_ALIGNMENT'.  The guard was answered by whichever
+	 base compiled this file -- i386, which defines the macro -- so it was
+	 true for every target, and this called `ix86_data_alignment' while
+	 compiling for aarch64.  That is where `int x = 1;' died: the function
+	 reads `ix86_tune_cost->prefetch_block' and `ix86_tune_cost' is null
+	 until `ix86_option_override' runs.  The call is unconditional now
+	 because `mt_data_abi_alignment' returns ALIGN for a base with no such
+	 macro, which makes `align = data_abi_align' a no-op -- exactly what
+	 the skipped block did.  */
       unsigned int data_abi_align
-	= DATA_ABI_ALIGNMENT (TREE_TYPE (decl), align);
+	= mt_data_abi_alignment (TREE_TYPE (decl), align);
       /* For backwards compatibility, don't assume the ABI alignment for
 	 TLS variables.  */
       if (! DECL_THREAD_LOCAL_P (decl) || data_abi_align <= BITS_PER_WORD)
 	align = data_abi_align;
-#endif
 
       /* On some machines, it is good to increase alignment sometimes.
 	 But as DECL_ALIGN is used both for actually emitting the variable
@@ -1164,13 +1171,12 @@ align_variable (tree decl, bool dont_output_data)
       if (decl_binds_to_current_def_p (decl)
 	  && !DECL_VIRTUAL_P (decl))
 	{
-#ifdef DATA_ALIGNMENT
-	  unsigned int data_align = DATA_ALIGNMENT (TREE_TYPE (decl), align);
+	  /* Was `#ifdef DATA_ALIGNMENT'; see the note above.  */
+	  unsigned int data_align = mt_data_alignment (TREE_TYPE (decl), align);
 	  /* Don't increase alignment too much for TLS variables - TLS space
 	     is too precious.  */
 	  if (! DECL_THREAD_LOCAL_P (decl) || data_align <= BITS_PER_WORD)
 	    align = data_align;
-#endif
 	  if (DECL_INITIAL (decl) != 0
 	      /* In LTO we have no errors in program; error_mark_node is used
 		 to mark offlined constructors.  */
@@ -1204,10 +1210,9 @@ get_variable_align (tree decl)
   if (DECL_USER_ALIGN (decl) || !TREE_PUBLIC (decl))
     return align;
 
-#ifdef DATA_ABI_ALIGNMENT
+  /* Was `#ifdef DATA_ABI_ALIGNMENT'; see align_variable above.  */
   if (DECL_THREAD_LOCAL_P (decl))
-    align = DATA_ABI_ALIGNMENT (TREE_TYPE (decl), align);
-#endif
+    align = mt_data_abi_alignment (TREE_TYPE (decl), align);
 
   /* For decls that bind to the current definition, align_variable
      did also everything, except for not assuming ABI required alignment
@@ -1215,14 +1220,13 @@ get_variable_align (tree decl)
      as an optimization.  */
   if (!decl_binds_to_current_def_p (decl))
     {
-      /* On some machines, it is good to increase alignment sometimes.  */
-#ifdef DATA_ALIGNMENT
-      unsigned int data_align = DATA_ALIGNMENT (TREE_TYPE (decl), align);
+      /* On some machines, it is good to increase alignment sometimes.
+	 Was `#ifdef DATA_ALIGNMENT'; see align_variable above.  */
+      unsigned int data_align = mt_data_alignment (TREE_TYPE (decl), align);
       /* Don't increase alignment too much for TLS variables - TLS space
          is too precious.  */
       if (! DECL_THREAD_LOCAL_P (decl) || data_align <= BITS_PER_WORD)
 	align = data_align;
-#endif
       if (DECL_INITIAL (decl) != 0
 	  /* In LTO we have no errors in program; error_mark_node is used
 	     to mark offlined constructors.  */

@@ -197,6 +197,163 @@ mt_init_expanders (void)
 }
 
 /* ------------------------------------------------------------------------
+   THE MOVE/CLEAR FAMILY; see target-frame.h.
+
+   All seven forward unconditionally: there is no existence question here
+   (measured -- every cpu back end defines `MOVE_MAX' and `defaults.h' floors
+   the rest, evaluated per base), so there is no flag to check and a null
+   pointer could only mean an object built against an older `target-frame.h'.
+   That case is caught once, in `mt_move_max' below, rather than seven times.  */
+
+/* `MAX_MOVE_MAX' MUST STILL BE A CONSTANT HERE, AND THIS IS NOT A FORMALITY.
+   `defaults.h:1116' says `#define MAX_MOVE_MAX MOVE_MAX' for a back end that
+   defines no `MAX_MOVE_MAX' of its own, and `MOVE_MAX' is now redirected to a
+   call.  Today's primary, i386, defines `MAX_MOVE_MAX' as 64, so the floor
+   does not fire -- but that is a fact about which back end happens to be the
+   primary, which is precisely the kind of fact this project exists to stop
+   depending on.  If it ever changes, this line fails the build by name, and
+   `reload.h:179' and `caller-save.cc:55' -- which use `MAX_MOVE_MAX' as an
+   ARRAY BOUND -- fail immediately after it.  Without this, the first symptom
+   would be `mt_move_max' recursing into itself forever.  */
+static_assert (MAX_MOVE_MAX > 0,
+	       "MAX_MOVE_MAX is no longer a constant expression: the primary "
+	       "back end has stopped defining it and defaults.h has derived "
+	       "it from the redirected MOVE_MAX");
+
+int
+mt_move_max (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  /* The one check the whole family shares, and it is TWO-SIDED on purpose.
+     Side one: the table must actually carry these fields.  A stale object
+     shows up as a null pointer, and calling through it is a fault with no
+     name attached; this makes it a diagnostic naming the base.
+     Side two -- the half that catches a real bug rather than a stale build:
+     `caller-save.cc' sizes `regno_save_mem' from the PRIMARY's
+     `MAX_MOVE_MAX' and indexes it with `MOVE_MAX_WORDS', which this function
+     now makes the SELECTED base's.  A base whose `MOVE_MAX' exceeds the
+     primary's `MAX_MOVE_MAX' would run off the end of that array silently.
+     Checking only the pointer would leave that overrun invisible; checking
+     only the bound would not notice a stale table.  Neither alone is
+     evidence, which is what makes this pair worth its cost.  */
+  if (f->move_max == NULL)
+    internal_error ("back end %qs supplies no %<MOVE_MAX%>; its objects and "
+		    "%<target-frame.h%> are from different builds", f->name);
+
+  int mm = f->move_max ();
+  if (mm > MAX_MOVE_MAX)
+    internal_error ("back end %qs moves %d bytes at a time but this compiler "
+		    "was built with %<MAX_MOVE_MAX%> of %d; the caller-save "
+		    "tables are sized by the latter and indexed by the "
+		    "former", f->name, mm, (int) MAX_MOVE_MAX);
+  return mm;
+}
+
+int
+mt_move_max_pieces (void)
+{
+  return mt_frame ()->move_max_pieces ();
+}
+
+int
+mt_store_max_pieces (void)
+{
+  return mt_frame ()->store_max_pieces ();
+}
+
+int
+mt_compare_max_pieces (void)
+{
+  return mt_frame ()->compare_max_pieces ();
+}
+
+int
+mt_move_ratio (bool speed)
+{
+  return mt_frame ()->move_ratio (speed);
+}
+
+int
+mt_clear_ratio (bool speed)
+{
+  return mt_frame ()->clear_ratio (speed);
+}
+
+int
+mt_set_ratio (bool speed)
+{
+  return mt_frame ()->set_ratio (speed);
+}
+
+/* ------------------------------------------------------------------------
+   `DATA_ALIGNMENT' / `DATA_ABI_ALIGNMENT'; see target-frame.h.
+
+   The `(has_X, payload)' cross-check is the same one `mt_init_expanders'
+   does and is here for the same reason, but the consequence of getting it
+   wrong is different and worth naming: a missing INIT_EXPANDERS leaves
+   `cfun->machine' null and faults, whereas a wrongly-absent DATA_ALIGNMENT
+   just returns ALIGN and emits an under-aligned variable.  Nothing crashes
+   and nothing is diagnosed; the object file is simply wrong.  So the state
+   this checks is one whose failure mode is silent, which is exactly when a
+   check earns its keep.  */
+
+static void
+/* HAVE_FN is passed as a `bool' the caller computed, not as the pointer
+   itself: casting a pointer-to-function to `void *' is only
+   conditionally-supported in C++ and this tree builds with
+   `-Wconditionally-supported'.  The check is the same one either way.  */
+mt_check_align_pair (const struct target_frame_desc *f, bool has,
+		     bool have_fn, const char *macro)
+{
+  if (has == have_fn)
+    return;
+  if (has)
+    internal_error ("back end %qs records that it defines %qs but supplies "
+		    "no function for it; its objects and "
+		    "%<target-frame.h%> are from different builds",
+		    f->name, macro);
+  else
+    internal_error ("back end %qs records that it defines no %qs yet supplies "
+		    "a function for it; its objects and "
+		    "%<target-frame.h%> are from different builds",
+		    f->name, macro);
+}
+
+unsigned int
+mt_data_alignment (tree type, unsigned int align)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  mt_check_align_pair (f, f->has_data_alignment, f->data_alignment != NULL,
+		       "DATA_ALIGNMENT");
+  if (!f->has_data_alignment)
+    return align;
+  return f->data_alignment (type, align);
+}
+
+bool
+mt_has_data_abi_alignment (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  mt_check_align_pair (f, f->has_data_abi_alignment,
+		       f->data_abi_alignment != NULL,
+		       "DATA_ABI_ALIGNMENT");
+  return f->has_data_abi_alignment;
+}
+
+unsigned int
+mt_data_abi_alignment (tree type, unsigned int align)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (!mt_has_data_abi_alignment ())
+    return align;
+  return f->data_abi_alignment (type, align);
+}
+
+/* ------------------------------------------------------------------------
    THE INSN-PATTERN EXISTENCE ANSWERS; see target-insn.h.
 
    NULL until a base is selected, like every other table here, and for the
