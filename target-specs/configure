@@ -652,6 +652,7 @@ with_libatomic
 with_shared_libgcc
 with_glibc_version
 with_s390_excess_float_precision
+enable_sjlj_exceptions
 with_specs_file
 with_source_specs
 with_gxx_include_dir
@@ -1285,6 +1286,9 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-sjlj-exceptions
+                          force setjmp/longjmp exception handling for this
+                          target
   --enable-linker-build-id
                           always pass --build-id to the linker
 
@@ -2145,6 +2149,14 @@ else
 fi
 
 
+# Check whether --enable-sjlj-exceptions was given.
+if test "${enable_sjlj_exceptions+set}" = set; then :
+  enableval=$enable_sjlj_exceptions; spec_sjlj_exceptions=`if test "$enableval" = yes; then echo 1; else echo 0; fi`
+else
+  spec_sjlj_exceptions=-1
+fi
+
+
 
 # Check whether --with-specs-file was given.
 if test "${with_specs_file+set}" = set; then :
@@ -2609,6 +2621,9 @@ leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
 decimal_float ${spec_decimal_float}
 decimal_bid_format ${spec_decimal_bid_format}
 s390_excess_float_precision ${spec_s390_excess_fp}
+# Was gcc/configure.ac's --enable-sjlj-exceptions.  -1 = not configured (do not
+# force; the back end decides), 0 = given as =no, 1 = force setjmp/longjmp.
+sjlj_exceptions ${spec_sjlj_exceptions}
 # Target C library.  0.0 means "not glibc, or not told"; consumers treat that as
 # "assume nothing newer", which is what a build with no target headers got.
 glibc_major ${spec_glibc_major}
@@ -5125,7 +5140,8 @@ EOF
 fi
 
 ts_expected="target leb128 decimal_float decimal_bid_format
-  s390_excess_float_precision glibc_major glibc_minor libc_hwcap_in_tcb
+  s390_excess_float_precision sjlj_exceptions
+  glibc_major glibc_minor libc_hwcap_in_tcb
   libc_gnustack ld_broken_secrel32 as_ref xcoff_dwarf_extras
   as_relax_option as_offsetable_lo10 as_gnu_attribute cfi_directive
   cfi_personality cfi_sections gas_loc_stmt gas_discriminator

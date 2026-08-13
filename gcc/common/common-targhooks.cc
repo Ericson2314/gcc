@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "target-caps.h"
 #include "common/common-target.h"
 #include "common/common-targhooks.h"
 #include "opts.h"
@@ -30,11 +31,12 @@ along with GCC; see the file COPYING3.  If not see
 enum unwind_info_type
 default_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
 {
-  /* Obey the configure switch to turn on sjlj exceptions.  */
-#ifdef CONFIG_SJLJ_EXCEPTIONS
-  if (CONFIG_SJLJ_EXCEPTIONS)
+  /* Obey the former --enable-sjlj-exceptions configure switch, now a
+     per-target capability.  Only a positive answer forces; -1 (not
+     configured) and 0 (configured `=no') fall through, exactly as an
+     undefined CONFIG_SJLJ_EXCEPTIONS did.  */
+  if (targ_caps.sjlj_exceptions > 0)
     return UI_SJLJ;
-#endif
 
   /* ??? Change all users to the hook, then poison this.  */
 #ifdef DWARF2_UNWIND_INFO
@@ -50,11 +52,12 @@ default_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
 enum unwind_info_type
 dwarf2_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
 {
-  /* Obey the configure switch to turn on sjlj exceptions.  */
-#ifdef CONFIG_SJLJ_EXCEPTIONS
-  if (CONFIG_SJLJ_EXCEPTIONS)
+  /* Obey the former --enable-sjlj-exceptions configure switch, now a
+     per-target capability.  Only a positive answer forces; -1 (not
+     configured) and 0 (configured `=no') fall through, exactly as an
+     undefined CONFIG_SJLJ_EXCEPTIONS did.  */
+  if (targ_caps.sjlj_exceptions > 0)
     return UI_SJLJ;
-#endif
 
   return UI_DWARF2;
 }

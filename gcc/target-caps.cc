@@ -57,6 +57,10 @@ struct target_caps targ_caps =
   .vms_debug = false,
   .glibc_major = 0,
   .glibc_minor = 0,
+  /* -1, not 0: "not configured" is the answer that means "do not force", and
+     0 is a distinct answer meaning the switch was given as `=no'.  A 0 floor
+     here would silently claim every target had been configured `=no'.  */
+  .sjlj_exceptions = -1,
   .libc_hwcap_in_tcb = false,
   .libc_gnustack = false,
   .ld_broken_secrel32 = false,
@@ -424,6 +428,8 @@ read_target_caps (const char *file)
 	targ_caps.decimal_bid_format = value != 0;
       else if (strcmp (name, "vms_debug") == 0)
 	targ_caps.vms_debug = value != 0;
+      else if (strcmp (name, "sjlj_exceptions") == 0)
+	targ_caps.sjlj_exceptions = value;
       else if (strcmp (name, "glibc_major") == 0)
 	targ_caps.glibc_major = value;
       else if (strcmp (name, "glibc_minor") == 0)

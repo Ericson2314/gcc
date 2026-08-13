@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm-ia64.h"
 #include "memmodel.h"
 #include "tm_p-ia64.h"
+#include "target-caps.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"
@@ -75,11 +76,14 @@ ia64_handle_option (struct gcc_options *opts ATTRIBUTE_UNUSED,
 enum unwind_info_type
 ia64_except_unwind_info (struct gcc_options *opts)
 {
-  /* Honor the --enable-sjlj-exceptions configure switch.  */
-#ifdef CONFIG_SJLJ_EXCEPTIONS
-  if (CONFIG_SJLJ_EXCEPTIONS)
+  /* Honor the former --enable-sjlj-exceptions configure switch, now a
+     per-target capability.  It had to move: the switch was GLOBAL, so in a
+     build serving several targets it forced sjlj for all of them with no way
+     to name one.  Only a positive answer forces; -1 (not configured) and 0
+     (configured `=no') both fall through to the target-derived choice below,
+     exactly as an undefined CONFIG_SJLJ_EXCEPTIONS did.  */
+  if (targ_caps.sjlj_exceptions > 0)
     return UI_SJLJ;
-#endif
 
   /* For simplicity elsewhere in this file, indicate that all unwind
      info is disabled if we're not emitting unwind tables.  */

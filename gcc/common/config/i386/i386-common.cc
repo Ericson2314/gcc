@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm-i386.h"
 #include "memmodel.h"
 #include "tm_p-i386.h"
+#include "target-caps.h"
 #include "common/common-target.h"
 #include "common/common-target-def.h"
 #include "opts.h"
@@ -2109,11 +2110,14 @@ ix86_supports_split_stack (bool report,
 static enum unwind_info_type
 i386_except_unwind_info (struct gcc_options *opts)
 {
-  /* Honor the --enable-sjlj-exceptions configure switch.  */
-#ifdef CONFIG_SJLJ_EXCEPTIONS
-  if (CONFIG_SJLJ_EXCEPTIONS)
+  /* Honor the former --enable-sjlj-exceptions configure switch, now a
+     per-target capability.  It had to move: the switch was GLOBAL, so in a
+     build serving several targets it forced sjlj for all of them with no way
+     to name one.  Only a positive answer forces; -1 (not configured) and 0
+     (configured `=no') both fall through to the target-derived choice below,
+     exactly as an undefined CONFIG_SJLJ_EXCEPTIONS did.  */
+  if (targ_caps.sjlj_exceptions > 0)
     return UI_SJLJ;
-#endif
 
   /* On windows 64, prefer SEH exceptions over anything else.  */
   if (TARGET_64BIT && DEFAULT_ABI == MS_ABI && opts->x_flag_unwind_tables)

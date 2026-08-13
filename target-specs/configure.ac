@@ -267,6 +267,24 @@ AC_ARG_WITH([s390-excess-float-precision],
      [s390 target C library typedefs float_t to double])],
   [spec_s390_excess_fp=$withval], [spec_s390_excess_fp=0])
 
+dnl Was gcc/configure.ac's --enable-sjlj-exceptions.  It had to move because
+dnl the switch was GLOBAL: in a build serving arm and i386, one flag forced
+dnl sjlj for BOTH, with no way to name a single target.  Here it is asked once
+dnl per configured target, which is the whole point.
+dnl
+dnl THREE STATES, and -1 is a real answer rather than a missing one: -1 means
+dnl "not configured, do not force -- let the back end derive the model from its
+dnl own target state", which is exactly what an undefined CONFIG_SJLJ_EXCEPTIONS
+dnl did.  A 0 floor here would silently claim every target had been configured
+dnl `=no'.  Only 1 changes behaviour; 0 is recorded because the switch really
+dnl does accept `=no' and folding that into "unset" would discard something the
+dnl user said.
+AC_ARG_ENABLE([sjlj-exceptions],
+  [AS_HELP_STRING([--enable-sjlj-exceptions],
+     [force setjmp/longjmp exception handling for this target])],
+  [spec_sjlj_exceptions=`if test "$enableval" = yes; then echo 1; else echo 0; fi`],
+  [spec_sjlj_exceptions=-1])
+
 AC_ARG_WITH([specs-file],
   [AS_HELP_STRING([--with-specs-file=PATH], [where to write the spec file])],
   [specs_file=$withval], [specs_file=specs-${target}])
@@ -893,6 +911,9 @@ leb128 `if test x"$gcc_cv_as_leb128" = xyes; then echo 1; else echo 0; fi`
 decimal_float ${spec_decimal_float}
 decimal_bid_format ${spec_decimal_bid_format}
 s390_excess_float_precision ${spec_s390_excess_fp}
+# Was gcc/configure.ac's --enable-sjlj-exceptions.  -1 = not configured (do not
+# force; the back end decides), 0 = given as =no, 1 = force setjmp/longjmp.
+sjlj_exceptions ${spec_sjlj_exceptions}
 # Target C library.  0.0 means "not glibc, or not told"; consumers treat that as
 # "assume nothing newer", which is what a build with no target headers got.
 glibc_major ${spec_glibc_major}
@@ -3123,7 +3144,8 @@ dnl truncated heredoc turned into 97 silent defaults.
 dnl
 dnl Use \047 for an apostrophe and NO BACKTICKS in the message text.
 ts_expected="target leb128 decimal_float decimal_bid_format
-  s390_excess_float_precision glibc_major glibc_minor libc_hwcap_in_tcb
+  s390_excess_float_precision sjlj_exceptions
+  glibc_major glibc_minor libc_hwcap_in_tcb
   libc_gnustack ld_broken_secrel32 as_ref xcoff_dwarf_extras
   as_relax_option as_offsetable_lo10 as_gnu_attribute cfi_directive
   cfi_personality cfi_sections gas_loc_stmt gas_discriminator

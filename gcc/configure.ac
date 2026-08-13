@@ -1539,15 +1539,44 @@ AC_SUBST(manext)
 AC_SUBST(objext)
 
 # With Setjmp/Longjmp based exception handling.
+#
+# MOSTLY MOVED OUT, AND DELIBERATELY NOT ALL THE WAY.  The unwind-model choice
+# is a target fact, and the switch was worse than merely misplaced: it was
+# GLOBAL, so in a build serving arm and i386 one --enable-sjlj-exceptions
+# forced sjlj for BOTH, with no way to name a single target.  A target-side
+# knob with no target.  It is now the per-target `sjlj_exceptions' capability
+# (target-specs/configure.ac --enable-sjlj-exceptions, gcc/target-caps.h).
+#
+# Five of the seven consumers were ordinary runtime tests and moved cleanly:
+# common/common-targhooks.cc (twice -- the default for EVERY target) and the
+# i386, arm, c6x and ia64 common files.
+#
+# TWO CANNOT MOVE, because of where they are used rather than what they mean.
+# config/vxworks.h and config/i386/cygming.h spell CONFIG_SJLJ_EXCEPTIONS on
+# `#if' lines, and cygming.h uses it to DEFINE DWARF2_UNWIND_INFO.  A macro on
+# a `#if' line cannot become a runtime value.  Deleting this switch would not
+# make those two targets read the capability -- it would silently hand them
+# the not-defined arm, flipping cygwin/mingw 32-bit to sjlj with no
+# diagnostic.  That is the probe-removal trap, so the switch stays until those
+# two are given a channel of their own, and it now says what it still does.
 AC_ARG_ENABLE(sjlj-exceptions,
 [AS_HELP_STRING([--enable-sjlj-exceptions],
-                [arrange to use setjmp/longjmp exception handling])],
+                [force setjmp/longjmp exception handling for the two targets
+                 that still decide it at build time (vxworks, cygwin/mingw);
+                 every other target takes this per-target from target-specs])],
 [force_sjlj_exceptions=yes],
 [force_sjlj_exceptions=no])
 if test $force_sjlj_exceptions = yes; then
   sjlj=`if test $enableval = yes; then echo 1; else echo 0; fi`
+  AC_MSG_WARN([--enable-sjlj-exceptions now affects only vxworks and
+cygwin/mingw, which select the unwind model on a `#if' line and so cannot read
+a runtime value.  Every other target takes this per target from
+target-specs/configure --enable-sjlj-exceptions; setting it here does NOT
+change them.])
   AC_DEFINE_UNQUOTED(CONFIG_SJLJ_EXCEPTIONS, $sjlj,
-    [Define 0/1 to force the choice for exception handling model.])
+    [Define 0/1 to force the choice for exception handling model.  Read only
+     from `#if' lines in config/vxworks.h and config/i386/cygming.h; every
+     other consumer reads targ_caps.sjlj_exceptions instead.])
 fi
 
 # Windows32 UTF-8 manifest support for running the driver and compiler

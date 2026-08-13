@@ -100,6 +100,27 @@ struct target_caps
   int glibc_major;
   int glibc_minor;
 
+  /* The former `--enable-sjlj-exceptions' configure switch, per target.
+     THREE-STATE, and -1 is a real answer rather than a missing one:
+
+       -1  not configured -- do not force anything; the back end decides the
+	   unwind model from its own target state, which is what happens when
+	   the switch is not given.
+	0  configured as `=no'.
+	1  configured as `=yes' -- force setjmp/longjmp.
+
+     Only `1' changes behaviour.  Upstream defined CONFIG_SJLJ_EXCEPTIONS only
+     when the switch was given and every consumer tests `if (CONFIG_...)', so
+     `=no' and "not given" were already indistinguishable in the compiler.  The
+     0/-1 split is kept because the switch genuinely accepts `=no' and folding
+     that into "unset" would discard something the user said, but nothing reads
+     the distinction today -- do not build on it without adding a consumer.
+
+     It has to be per target because the override was GLOBAL: in a build with
+     arm and i386, one `--enable-sjlj-exceptions' forced sjlj for BOTH, with no
+     way to name a single target.  A target-side knob with no target.  */
+  int sjlj_exceptions;
+
   /* powerpc only: the target C library exports AT_PLATFORM and AT_HWCAP in the
      TCB, which __builtin_cpu_supports and target_clones need.  glibc has done
      so since 2.23.  Both this and libc_gnustack below combine a triple test
