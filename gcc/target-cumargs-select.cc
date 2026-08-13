@@ -161,3 +161,37 @@ mt_function_arg_regno_p (int regno)
 {
   return mt_frame ()->function_arg_regno_p (regno);
 }
+
+/* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
+   back end instead of by whichever base compiled emit-rtl.cc.
+
+   The `has_init_expanders' / `init_expanders' pair is checked against itself
+   here, not merely dereferenced.  A back end with nothing to run is a normal
+   and common case -- 35 of the 48 are in it -- so a null pointer alone cannot
+   be treated as an error; but a null pointer that the base did NOT claim, or
+   a claim with no function behind it, is an object built against a different
+   version of target-frame.h, and that has exactly one symptom otherwise:
+   `cfun->machine' stays null and the back end faults on it much later.  This
+   turns that into a diagnostic naming the base.  */
+void
+mt_init_expanders (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->has_init_expanders != (f->init_expanders != NULL))
+    {
+      if (f->has_init_expanders)
+	internal_error ("back end %qs records that it defines "
+			"%<INIT_EXPANDERS%> but supplies no function for it; "
+			"its objects and %<target-frame.h%> are from "
+			"different builds", f->name);
+      else
+	internal_error ("back end %qs records that it defines no "
+			"%<INIT_EXPANDERS%> yet supplies a function for it; "
+			"its objects and %<target-frame.h%> are from "
+			"different builds", f->name);
+    }
+
+  if (f->init_expanders != NULL)
+    f->init_expanders ();
+}

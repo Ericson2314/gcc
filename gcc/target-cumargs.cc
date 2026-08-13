@@ -203,6 +203,35 @@ mt_base_function_arg_regno_p (int regno ATTRIBUTE_UNUSED)
   return FUNCTION_ARG_REGNO_P (regno);
 }
 
+/* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
+   predicate is a different animal from the six value thunks above.
+
+   The `#ifdef' is the SAME `#ifdef' emit-rtl.cc used to spell; the only thing
+   that changed is which translation unit evaluates it, and therefore which
+   back end it is a fact about.  In emit-rtl.cc it was a fact about i386 (which
+   defines no INIT_EXPANDERS) applied to all 48 back ends.  Here it is a fact
+   about MULTI_TARGET_TARGETM_BASE, because this file is compiled once per base
+   with `-I<base>-inc'.
+
+   Note there is deliberately no `#else' arm supplying a generic
+   INIT_EXPANDERS.  Unlike STACK_SLOT_ALIGNMENT above, defaults.h has no
+   generic definition to fall back on, and inventing one would be the
+   `#ifndef' floor PRINCIPLES forbids.  A base with no INIT_EXPANDERS has
+   nothing to run, and says so through `has_init_expanders' below rather than
+   through a null pointer that could equally mean a stale object.  */
+#ifdef INIT_EXPANDERS
+static void
+mt_base_init_expanders (void)
+{
+  INIT_EXPANDERS;
+}
+# define MT_BASE_HAS_INIT_EXPANDERS true
+# define MT_BASE_INIT_EXPANDERS mt_base_init_expanders
+#else
+# define MT_BASE_HAS_INIT_EXPANDERS false
+# define MT_BASE_INIT_EXPANDERS NULL
+#endif
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -216,7 +245,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_stack_slot_alignment,
   mt_base_minimum_alignment,
   mt_base_outgoing_reg_parm_stack_space,
-  mt_base_function_arg_regno_p
+  mt_base_function_arg_regno_p,
+  MT_BASE_HAS_INIT_EXPANDERS,
+  MT_BASE_INIT_EXPANDERS
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

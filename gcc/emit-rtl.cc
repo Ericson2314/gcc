@@ -6035,9 +6035,12 @@ init_emit (void)
   REGNO_POINTER_ALIGN (VIRTUAL_CFA_REGNUM) = BITS_PER_WORD;
 #endif
 
-#ifdef INIT_EXPANDERS
-  INIT_EXPANDERS;
-#endif
+  /* Was `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;'.  This file is compiled
+     ONCE, against one base's headers, so that `#ifdef' asked whether THAT base
+     defines INIT_EXPANDERS -- and answered for all 48.  The base in question
+     defines none, so the 13 back ends that do were silently never initialised.
+     The question is now asked per base; see target-frame.h.  */
+  mt_init_expanders ();
 }
 
 /* Return the value of element I of CONST_VECTOR X as a wide_int.  */
@@ -6367,13 +6370,15 @@ init_emit_once (void)
 
   reg_attrs_htab = hash_table<reg_attr_hasher>::create_ggc (37);
 
-#ifdef INIT_EXPANDERS
   /* This is to initialize {init|mark|free}_machine_status before the first
      call to push_function_context_to.  This is needed by the Chill front
      end which calls push_function_context_to before the first call to
-     init_function_start.  */
-  INIT_EXPANDERS;
-#endif
+     init_function_start.
+
+     The guard that used to be here was `#ifdef INIT_EXPANDERS', evaluated
+     against the single base this file is compiled with; see the note at the
+     other call site and target-frame.h.  */
+  mt_init_expanders ();
 
   /* Create the unique rtx's for certain rtx codes and operand values.  */
 

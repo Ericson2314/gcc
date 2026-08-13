@@ -105,6 +105,42 @@ struct target_frame_desc
      the union width is safe here; it is recorded because it was checked, not
      because it is obvious.  */
   bool (*function_arg_regno_p) (int regno);
+
+  /* INIT_EXPANDERS -- AND THE FIRST ENTRY HERE THAT IS AN *EXISTENCE*
+     PREDICATE RATHER THAN A VALUE.
+
+     The other six above are all questions whose answer every back end has.
+     This one is a question about whether the back end has anything to say at
+     all: `emit-rtl.cc' spells it `#ifdef INIT_EXPANDERS', 13 back ends define
+     it (aarch64 arc arm avr cris csky epiphany ia64 m32r mmix nds32 sparc
+     visium) and i386 -- the base the middle end is compiled against -- is not
+     one of them.  So in shared code the `#ifdef' is FALSE, for every target,
+     and the 13 back ends that install an `init_machine_status' never get it
+     installed.
+
+     THAT IS WHY THIS ONE MATTERS MORE THAN ITS SIZE SUGGESTS.  A leaked VALUE
+     is wrong but present, and tends to fail near where it was read.  A leaked
+     ABSENCE emits no code at all: nothing is mis-set, and the damage surfaces
+     arbitrarily far away.  Concretely, for aarch64 it surfaced as
+
+         emit-rtl.cc:6038   #ifdef INIT_EXPANDERS  -- false, so nothing runs
+         => cfun->machine is never allocated
+         => aarch64_set_current_function writes ARM_PCS_UNKNOWN to NULL+0x7b0
+
+     a SIGSEGV in a back end whose own code is correct, four call levels and
+     one compilation phase away from the guard that caused it.
+
+     WHY A PAIR OF FIELDS AND NOT JUST A POINTER.  `has_init_expanders' is the
+     base's own answer to `#ifdef INIT_EXPANDERS', recorded in the translation
+     unit where that question is meaningful.  A bare NULL pointer would carry
+     the same information and would be indistinguishable from a table built
+     before this field existed -- i.e. from a stale object -- which is exactly
+     the failure mode PRINCIPLES warns about: never let the absence of an
+     answer BE an answer.  The two are cross-checked at selection time, so
+     `(false, NULL)' means "this back end genuinely has none" and every other
+     inconsistent combination fails by name.  */
+  bool has_init_expanders;
+  void (*init_expanders) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -122,5 +158,12 @@ extern unsigned int mt_stack_slot_alignment (tree, machine_mode, unsigned int);
 extern unsigned int mt_minimum_alignment (tree, machine_mode, unsigned int);
 extern int mt_outgoing_reg_parm_stack_space (tree);
 extern bool mt_function_arg_regno_p (int);
+
+/* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
+   emit-rtl.cc.  Unconditional at the call site on purpose: the condition is
+   per back end, so it belongs where the back end is known, not in shared code
+   which cannot evaluate it correctly for anyone but the base it was compiled
+   against.  */
+extern void mt_init_expanders (void);
 
 #endif /* GCC_TARGET_FRAME_H */
