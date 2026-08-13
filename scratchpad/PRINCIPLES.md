@@ -683,6 +683,22 @@ answer is still wrong is worse than the failure.**
   `MIN_UNITS_PER_WORD` (i386 4, aarch64 8, mt 4), measured in all three
   contexts first, with 0/1-valued candidates rejected because a defaulted 0 is
   indistinguishable from a correct reading.
+  **THE TRUSTED COUNT IS ZERO.** Re-measured 2026-08-13 after the probe
+  controls were rebuilt on harness-written fixtures:
+
+  ```
+  149 on the board = 71 unconverted + 32 TAB + 37 EXIST + 1 UNION + 8 debt
+  probing 81 macros;  i386 81/0;  aarch64 PASS 5 / FAIL 76
+  aarch64 5 = 4 redirect-vs-itself (UNTRUSTED BY CONSTRUCTION) + 1 other
+  ```
+
+  and the single "other" is `MAX_BITS_PER_WORD` reading **64 in all three
+  contexts** -- target-neutral agreement, wrong-reason shape 2. So **no
+  aarch64 header pass is currently trusted.** Earlier claims of 2, then 1,
+  were each one wrong-reason green short of this. **Do not diff 216 arms
+  against 162**: the difference is the retire set growing, which is
+  legitimate retirement, not loss.
+
 
   Current reading, **which the harness now prints with its own decomposition**
   rather than leaving it to prose here: **216 arms over 108 macros — i386
