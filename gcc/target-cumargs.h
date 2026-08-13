@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-frame.h"
 #include "target-insn.h"
 #include "target-preds.h"
+#include "target-attr.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -155,6 +156,12 @@ struct target_cumargs_desc
      reason: the per-base translation unit that defines this table defines
      that one too.  */
   const struct target_preds_desc *preds;
+
+  /* THIS BASE'S INSN-ATTRIBUTE ENTRY POINTS; see target-attr.h.  Rides here
+     for the same reason `frame', `insn' and `preds' do, and is never null for
+     the same reason: the per-base translation unit that defines this table
+     defines that one too.  */
+  const struct target_attr_desc *attr;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

@@ -742,3 +742,90 @@ mt_constraint_X (void)
 {
   return mt_preds ()->constraint_X;
 }
+
+/* ------------------------------------------------------------------------
+   THE INSN-ATTRIBUTE ENTRY POINTS; see target-attr.h for the measurement.
+
+   These are the definitions of the names `multi-target-attr.h' renames
+   `insn-attr.h''s declarations onto, so `recog.cc''s enabled-alternative
+   masks and `final.cc''s instruction lengths are computed from the attribute
+   tables of the back end in force instead of from the primary's.
+
+   NULL until a base is selected, like every other table here.  The default
+   that suggests itself is the primary's tables, and that default is the
+   entire bug: it does not fail, it answers -- with an alternative mask for a
+   different machine's insn code.  */
+const struct target_attr_desc *targetm_attr;
+
+static const struct target_attr_desc *
+mt_attr (void)
+{
+  if (targetm_attr == NULL)
+    internal_error ("no back end has been selected, so no insn attributes "
+		    "are defined; a target must be chosen with "
+		    "%<-ftarget-config=%> before an insn is recognised");
+  return targetm_attr;
+}
+
+/* WHICH ATTRIBUTES THE SELECTED BASE HAS.  `recog.cc''s `have_bool_attr' and
+   six sites in `final.cc' used to read these off the primary's `#if'.  */
+
+bool
+mt_have_attr_length (void)
+{
+  return mt_attr ()->have_attr_length;
+}
+
+bool
+mt_have_attr_enabled (void)
+{
+  return mt_attr ()->have_attr_enabled;
+}
+
+bool
+mt_have_attr_preferred_for_size (void)
+{
+  return mt_attr ()->have_attr_preferred_for_size;
+}
+
+bool
+mt_have_attr_preferred_for_speed (void)
+{
+  return mt_attr ()->have_attr_preferred_for_speed;
+}
+
+int
+mt_get_attr_enabled (rtx_insn *insn)
+{
+  return mt_attr ()->enabled (insn);
+}
+
+int
+mt_get_attr_preferred_for_size (rtx_insn *insn)
+{
+  return mt_attr ()->preferred_for_size (insn);
+}
+
+int
+mt_get_attr_preferred_for_speed (rtx_insn *insn)
+{
+  return mt_attr ()->preferred_for_speed (insn);
+}
+
+int
+mt_insn_default_length (rtx_insn *insn)
+{
+  return mt_attr ()->default_length (insn);
+}
+
+int
+mt_insn_min_length (rtx_insn *insn)
+{
+  return mt_attr ()->min_length (insn);
+}
+
+int
+mt_insn_current_length (rtx_insn *insn)
+{
+  return mt_attr ()->current_length (insn);
+}

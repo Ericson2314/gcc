@@ -3822,7 +3822,7 @@ target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
 # dse.o and var-tracking.o are all in libbackend.a, so lto1 needs this too.
 target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
   $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h $(srcdir)/target-insn.h \
-  $(srcdir)/target-preds.h
+  $(srcdir)/target-preds.h $(srcdir)/target-attr.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
@@ -4632,6 +4632,18 @@ build/genconstants.o : BUILD_CPPFLAGS += \
 # genconstants above: gen_target_ns () is null in the singular run, so this
 # is the only way it can know.
 build/genpreds.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# The SINGULAR genattr writes the insn-attr.h the middle end reads, and the
+# SINGULAR genattrtab writes the insn-attrtab.cc that answered from it.  That
+# pair is what made recog.o ask i386's attribute tables which alternatives of
+# an aarch64 insn were enabled; see target-attr.h for the measurement.  The
+# singular run is the only one that must emit the redirect (genattr) and the
+# opt-out (genattrtab), and gen_target_ns () is null in it, so -- exactly as
+# for genconstants and genpreds above -- this flag is the only way it can
+# know it is on a multi-target build at all.
+build/genattr.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+build/genattrtab.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 # NO $(GTM_H) HERE, and none in gen-target-ns.o either: this is the program
 # that writes insn-constants.h, which $(GTM_H) contains.  Adding a target

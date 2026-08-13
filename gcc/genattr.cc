@@ -348,6 +348,26 @@ main (int argc, const char **argv)
      its unqualified spelling.  */
   print_ns_using (stdout);
 
+  /* THE SHARED COPY OF THIS HEADER IS THE PRIMARY'S, AND SHARED CODE READS
+     IT.
+
+     On a multi-target build this function runs once per back end WITH a
+     namespace (writing insn-attr-<base>.h) and once WITHOUT one, from the
+     primary's .md, writing the build root's insn-attr.h.  That last file is
+     what `recog.cc' and `final.cc' get, so every back end's insns were
+     having their enabled-alternative masks and their lengths computed from
+     i386's attribute tables.  See target-attr.h for the measurement, and for
+     why a base with no `preferred_for_size' attribute is answered by the
+     stub this very function emitted a few lines above rather than by a
+     decision taken here.
+
+     The include goes LAST, after the declarations above have been parsed,
+     because the redirection is a macro rename of their USES.  It is emitted
+     only for the un-namespaced run: a back end's own header keeps the
+     generated names, which are already that back end's.  */
+  if (gen_multi_target_p () && gen_target_ns () == NULL)
+    puts ("\n#include \"multi-target-attr.h\"");
+
   puts ("\n#endif /* GCC_INSN_ATTR_H */");
 
   if (ferror (stdout) || fflush (stdout) || fclose (stdout))

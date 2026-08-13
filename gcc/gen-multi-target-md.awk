@@ -1997,7 +1997,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # selector's idea of it: silent, and indistinguishable from a stale object.
   printf "  $(TM_P_H) $(TARGET_H) $(srcdir)/target-cumargs.h \\\n";
   printf "  $(srcdir)/target-frame.h $(srcdir)/target-insn.h \\\n";
-  printf "  $(srcdir)/target-preds.h \\\n";
+  printf "  $(srcdir)/target-preds.h $(srcdir)/target-attr.h \\\n";
   printf "  multi-target-reg-widths.h\n";
   printf "\t$(COMPILE) -DTARGETM_CUMARGS_SYMBOL=targetm_cumargs_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-cumargs.cc\n";

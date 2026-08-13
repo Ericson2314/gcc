@@ -4708,7 +4708,14 @@ public:
 bool
 pass_split_before_regstack::gate (function *)
 {
-#if HAVE_ATTR_length
+  /* RUNTIME `if', NOT `#if', AND THAT IS THE WHOLE POINT OF THE REWRITE.
+     `HAVE_ATTR_length' is now a call into the selected back end's attribute
+     table (multi-target-attr.h), and a macro that expands to a call is
+     silently ZERO on a `#if' line -- the preprocessor would have turned this
+     gate off for every target with no diagnostic whatsoever.  Both arms
+     below compile in either case, so nothing is lost by asking at run time.  */
+  if (!HAVE_ATTR_length)
+    return false;
   if (targetm.stack_regs ().empty_p ())
     return false;
   /* If flow2 creates new instructions which need splitting
@@ -4720,9 +4727,6 @@ pass_split_before_regstack::gate (function *)
   return !enable_split_before_sched2 () || flag_selective_scheduling2;
 #else
   return !enable_split_before_sched2 ();
-#endif
-#else
-  return false;
 #endif
 }
 
@@ -4761,11 +4765,8 @@ public:
     {
       /* The placement of the splitting that we do for shorten_branches
 	 depends on whether regstack is used by the target or not.  */
-#if HAVE_ATTR_length
-      return targetm.stack_regs ().empty_p ();
-#else
-      return false;
-#endif
+      /* Runtime `if' for the same reason as the gate above.  */
+      return HAVE_ATTR_length && targetm.stack_regs ().empty_p ();
     }
 
   unsigned int execute (function *) final override

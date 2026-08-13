@@ -6428,3 +6428,268 @@ a claim about the pattern, not about the code.**
     t129-guards.sh   32 arms; ARM 0 content-by-name-and-value and runs first,
                      ARM 1 the size prediction, ARM 3 the injection with a
                      control and a restore, ARM 4 the leak ratchet
+
+# TASK #130 -- THE `insn-attrtab' FAMILY IS SELECTED.  `int g (int a)
+# { return a + 1; }' NOW COMPILES FOR aarch64, AND THE ASSEMBLY IS aarch64's.
+
+Worktree came up at bare-repo HEAD `7208eca60d0' AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in' was **0**, `git reset --hard multi-target' took
+it to **37**, and there was no `scratchpad/' in the worktree at all.  That is
+now NINE worktrees in a row.  Build dir `/tmp/b130', my own, cold.
+
+**The brief named no task numbers I could read**; everything below is measured
+in `/tmp/b130'.
+
+## 0. THE PRIZE, AND THE ASSEMBLY, BECAUSE A DISAPPEARED ICE IS NOT A RESULT
+
+    add  aarch64  rc=0  COMPILED  bytes=557  md5=2a70c955a1b1
+    add  x86_64   rc=0  COMPILED  bytes=397  md5=f776a3b16e36   (unmoved)
+
+Before, in this same build dir: `add aarch64 rc=1 ICE: in final_scan_insn_1,
+at final.cc:2789', no `.s' written at all.  What it emits now:
+
+        sub     sp, sp, #16
+        str     w0, [sp, 12]
+        ldr     w0, [sp, 12]
+        add     w0, w0, 1
+        add     sp, sp, 16
+        ret
+
+`sp', `w0', `.arch armv8-a', `.global' (aarch64's spelling, not i386's
+`.globl'), and the `aeabi_feature_and_bits' subsection.  **A REAL aarch64
+ASSEMBLER ACCEPTS IT** (`pkgsCross.aarch64-multiplatform.buildPackages.
+binutils'), and the disassembly is aarch64 machine code implementing `a + 1':
+`d10043ff sub sp, sp, #0x10' ... `11000400 add w0, w0, #0x1' ... `d65f03c0
+ret'.  So this is not a loud failure that went quiet.
+
+**ONE THING IN THAT OUTPUT IS STILL WRONG, AND IT IS NOT MINE TO BANK AS
+CLEAN.**  The CFI reads `.cfi_def_cfa_offset 16' BEFORE the `sub', then 32
+after -- i.e. the CFA is 16 too high throughout.  aarch64 does not define
+`INCOMING_FRAME_SP_OFFSET' at all (so `defaults.h:1230' gives it 0);
+`i386.h:2177' does define it, and `DEFAULT_INCOMING_FRAME_SP_OFFSET' too.  That
+is a DIFFERENT leak, in the same family as #125's, and it was INVISIBLE until
+this task produced output to look at.  **I did not diagnose which of the two
+macros carries it, and 16 is not `UNITS_PER_WORD' (8) on its face, so the
+mechanism is recorded as UNMEASURED with two named candidates -- not as
+understood.**
+
+`big.c' and `fn-call' now both die at `extract_insn, recog.cc:2890' -- the wall
+MOVED, and #127 already warned that site may be a second, distinct problem.
+Still a loud failure with no output; not diagnosed here.
+
+## 1. THE `HAVE_ATTR_*' FORK -- RESOLVED BY MEASUREMENT, NOT BY CHOICE
+
+The brief asked me to work out what stock GCC does for a back end WITHOUT the
+attribute and make the thunk return exactly that, and to STOP if the absent
+case were not expressible as a return value.  **It is expressible, and the
+generator had already expressed it.**  `genattr.cc:313-336' emits, into every
+base's header and OUTSIDE the namespace:
+
+    extern int hook_int_rtx_1 (rtx);
+    #if !HAVE_ATTR_preferred_for_size
+    #define get_attr_preferred_for_size hook_int_rtx_1
+    #endif
+
+and `hooks.cc:253' is `return 1;'.  So in a translation unit compiled with
+`-I<base>-inc', the SPELLING `get_attr_preferred_for_size (insn)' is already
+the right answer for that base.  **Nothing in this change decides what absence
+means.**  `target-cumargs.cc' -- which is already compiled once per base
+against that base's headers -- simply gains six one-line thunks spelling those
+names, and the decision travels with the header.
+
+**This is therefore NOT the sjlj shape.**  The one place it nearly was: the two
+`#if HAVE_ATTR_length' PASS GATES in `recog.cc' (4711, 4764).  A macro that
+expands to a CALL is silently 0 on a `#if' line -- both gates would have turned
+off for every target with no diagnostic.  Both are rewritten to a runtime `if'
+(each arm compiled in both cases before, so nothing is lost), and **ARM 2
+asserts no `#if HAVE_ATTR_' survives in shared code, with ARM 5c injecting one
+and requiring ARM 2 to catch it.**
+
+## 2. WHAT LANDED
+
+  * **`gcc/target-attr.h'** -- `struct target_attr_desc': four booleans
+    (`have_attr_length/enabled/preferred_for_size/preferred_for_speed') and six
+    function pointers.  NOT unioned: `HAVE_V8HFmode' is already on the books as
+    the case where the UNION's answer leaked, and "some configured back end has
+    a preferred_for_size attribute" is not an answer to "does the selected one".
+  * **`gcc/multi-target-attr.h'** -- renames the USES, emitted as the last line
+    of the un-namespaced `insn-attr.h' by `genattr'.  Exact shape of
+    `multi-target-preds.h'; no second mechanism invented.
+  * **`genattrtab.cc'** emits `#define MULTI_TARGET_ATTR_NO_REDIRECT 1' from
+    `write_header' under the SAME condition, so the file that DEFINES those
+    names does not have its definitions renamed.
+  * **`Makefile.in'** gives `build/genattr.o' and `build/genattrtab.o'
+    `-DGEN_MULTI_TARGET', which is the only way the SINGULAR run can know it is
+    on a multi-target build (`gen_target_ns ()' is null in it).
+  * **`target-cumargs.cc'** grows six thunks and `mt_base_attr'; it rides on
+    `target_cumargs_desc' like `frame', `insn' and `preds' -- no new registry.
+  * **`multi-target-select.cc'** installs it and refuses BY NAME if null;
+    `targetm_attr' starts NULL, never at the primary.
+
+**THE MEMBER NAMES OF `target_attr_desc' ARE SHORT, AND THAT IS LOAD-BEARING.**
+First attempt named them `get_attr_enabled', `insn_default_length' and so on.
+The per-base `insn-attr.h' stub `#define's REWRITE THE STRUCT DECLARATION:
+measured, `redeclaration of int (* target_attr_desc::hook_int_rtx_1)' and `too
+many initializers'.  It failed loudly only because TWO members collided into
+one name -- **a table with a single such member would have compiled, been
+initialised through a silently renamed field, and been correct on the
+primary.**
+
+## 3. BOTH-SIDED EVIDENCE, IN THE RUNNING cc1 (`t130-cause.sh')
+
+One breakpoint per run, `mt_get_attr_enabled', and gdb's own
+`Breakpoint N, mt_get_attr_enabled' matched before anything is scored.  (The
+first version broke on `mt_get_attr_preferred_for_size', which at `-O0' is
+never reached -- and **my confirmation check passed anyway**, because it
+matched the `info breakpoints' listing rather than a stop.  Fixed to require
+`^Breakpoint [0-9]+, '.  An arm that confirms a breakpoint it never hit is the
+gdb blind spot in PRINCIPLES arriving from a new direction.)
+
+    aarch64:  targetm_attr->name = "aarch64"
+              have_attr_length/enabled = true, preferred_for_size/speed = FALSE
+    i386:     targetm_attr->name = "i386"
+              all four = TRUE
+
+Both directions diverge, so this cannot be "everyone now gets the same new
+answer".  And the VALUE, read out of the objects rather than the source:
+
+    target-cumargs-aarch64.o  mt_base_get_attr_preferred_for_size
+        jmp -> R_X86_64_PLT32  _Z14hook_int_rtx_1P7rtx_def
+    target-cumargs-i386.o     mt_base_get_attr_preferred_for_size
+        jmp -> R_X86_64_PLT32  _ZN9insn_i38627get_attr_preferred_for_sizeEP8rtx_insn
+
+i.e. aarch64's slot holds the GENERATOR's own absent-answer and i386's holds
+i386's real function.  (An earlier version of that arm grepped the disassembly
+AND the relocations together and matched the thunk's own LABEL, scoring
+aarch64's slot as if it called the real function -- the `nm' pattern lesson
+again.  It reads only `R_X86_64_PLT32' lines now.)
+
+## 4. THE LEAK SURFACE, BEFORE AND AFTER (`t130-syms.sh', `t130-family.sh')
+
+Before, `recog.o' bound the BARE `get_attr_enabled', i.e. i386's.  After:
+
+    get_attr_enabled             0 binders
+    get_attr_preferred_for_size  0
+    get_attr_preferred_for_speed 0
+    insn_default_length          0
+    insn_min_length              0
+    insn_current_length          0
+
+**`num_delay_slots' also reads 0, and that is NOT evidence of this change** --
+#129 measured it at 0 already, because reorg's delay-slot path is not linked
+for these two back ends.  Recorded rather than banked.
+
+**STILL LEAKING, DELIBERATELY, AND UNDER A RATCHET ARM** -- the scheduling
+families, which are a real seam (`haifa-sched.o' is their dominant consumer):
+
+    internal_dfa_insn_code   insn-automata.o
+    insn_default_latency     haifa-sched.o sel-sched-ir.o
+    state_transition         haifa-sched.o modulo-sched.o sel-sched.o
+    dfa_start / dfa_finish   haifa-sched.o
+    ... and the rest of #129's list, unchanged.
+
+ARM 4b asserts these still have NONZERO binders, so wiring one up FAILS a
+guard and has to be recorded rather than landing unremarked.
+
+## 5. THE TWO FORKS THE BRIEF ASKED ME TO ANSWER EXPLICITLY
+
+**FORK 1 -- the `internal_dfa_insn_code' function-POINTER kind mismatch.
+ALREADY RESOLVED, upstream of selection, and not by me.**  `genattrtab.cc:5166-
+5200' already emits the bare names as POINTERS in every configuration, with a
+comment saying why: upstream emits plain functions and `#define's
+`init_sched_attrs' away, "which makes the KIND of two extern names depend on
+the machine description -- unusable when the middle end is compiled once
+against a single insn-attr.h".  So there is no kind mismatch left to trip over.
+**What remains is not a rename**: selecting `internal_dfa_insn_code' means
+selecting which base's `init_sched_attrs ()' RUNS, and `cfgexpand.o' and
+`run-rtl-passes.o' call the bare one.  That is the scheduling task, and I did
+not do it.
+
+**FORK 2 -- a base with no `define_insn_reservation's.  STILL UNMEASURABLE
+WITH THIS PAIR, and I am not manufacturing a green for it.**  i386 and aarch64
+both have reservations (`dfa_start' is declared in both per-base headers), so
+the DFA block exists in both and the case where it does not cannot be
+exercised here.  "Cannot be checked, because both configured bases have
+reservations" -- not clean.
+
+## 6. `insn-emit' -- NOT TOUCHED, AND WHY
+
+Still leaking exactly as #129 recorded, including `insn-emit-aarch64-6.o' and
+`insn-output-aarch64.o' binding the bare `gen_blockage'.  I did not act on it:
+five of the six names could take a uniform forwarder and **`gen_movxf' cannot**
+(i386 defines it, aarch64 does not, and its only caller is x87 code), which the
+brief says needs the user's ruling.  Since any forwarder scheme I wrote would
+have decided `gen_movxf' by implication, **I stopped.**  Nothing in this task
+pre-empts that ruling.
+
+## 7. THE BARS
+
+  * `make multi-target-objs cc1 lto1' in `$B/gcc' -- **rc=0**.
+  * **x86_64 `-O2' big.c md5 `378fc33c1e70', 12369 bytes -- UNMOVED**, measured
+    BEFORE and AFTER in this same build dir.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock', absolute `IN', 5
+    distinct md5 per side, **negative control firing (1158 vs 804)**, and it
+    demonstrably runs in THIS build dir (log names
+    `/tmp/b130/lib/gcc/17.0.0/x86_64-pc-linux-gnu/specs-config').
+    O0 `1c00922491f8', O1 `4fabab94b41b', O2 `378fc33c1e70', O3 `d220421237bc',
+    Os `d6787f7e281f'.
+  * **aarch64 `int x = 1;' rc=0, 373 bytes, empty stderr, md5 `b01d9157fdc1'**
+    -- byte-identical before and after.
+  * **x86_64 `fn-add'/`fn-call'/`fn-data' byte-identical**: `f776a3b16e36',
+    `b9716cd03194', `e2879feb51f6'.
+  * **`scratchpad/t130-guards.sh': 38 PASS / 0 FAIL**, with ARM 0 (generated
+    content by name and value) FIRST, ARM 1 non-vacuity, ARM 2b the value read
+    out of the objects, ARM 4b the ratchet, and ARM 5 injection with a control
+    (5a), a state assertion in both directions (5b) and a restore (5z).
+  * Cold `all-gcc' before any edit: **rc=0**.  Incremental after: 13 stderr
+    lines / 2 `warning:', within the documented 8-to-32 incremental floor.
+
+## 8. THE SCOREBOARD -- NOT RUN, NOT MOVED, NOT BANKED
+
+**I did not run `macro-probe-run.sh' and I claim no scoreboard movement.**
+Carrying the recorded line unchanged: header **i386 112 PASS / 0 FAIL, aarch64
+8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386 32/0, aarch64
+27/5**.  Nothing in this task is in `macro-status.txt': `HAVE_ATTR_*' and the
+attribute entry points are GENERATED symbols, not `tm.h' macros.  The correct
+entry is **"no probe arm exists, because the scoreboard measures `tm.h' macros
+and these are generated symbols"** -- unmeasurable, not clean.
+
+## 9. WHAT I DID NOT DO
+
+  * The three SCHEDULING families (`insn-automata', `insn-dfatab',
+    `insn-latencytab') -- ~15 more names, under the ratchet.
+  * `insn-emit''s six bare names -- section 6.
+  * The `extract_insn, recog.cc:2890' wall that both `big.c' and `fn-call' now
+    reach.  Not diagnosed.
+  * The CFI/`INCOMING_FRAME_SP_OFFSET' divergence in section 0.  Observed,
+    named, NOT diagnosed.
+  * No compile-time or memory measurement.  Every attribute query in shared
+    code is now an indirect call, and `get_attr_enabled' sits in
+    `get_bool_attr_mask_uncached''s inner loop over alternatives -- though it
+    is cached per insn code, so the loop runs once per code.  x86_64 output is
+    byte-identical, so this is a throughput question and not a correctness one,
+    but it is unmeasured and I am not claiming it is free.  It joins `Pmode''s
+    648 sites (#125) and #128's constraint indirection.
+  * `make all-target-libgcc' not re-run; #119's `-m32' blocker unchanged.
+
+## 10. FILES
+
+    t130-clone.sh    derives my build-dir scripts from #129's; REFUSES on a
+                     leftover `b129'
+    t130-conf.sh     two-target configure, /tmp/b130
+    t130-build.sh    make at the TOP level
+    t130-gccbuild.sh make in $B/gcc -- where cc1 actually builds
+    t130-reconf-gcc.sh  re-runs gcc/configure via the TOP LEVEL
+    t130-specs.sh    both target-specs probes, real aarch64 binutils
+    t130-dbg.sh      rebuilds recog.o AND target-cumargs-select.o with `-g'
+    t130-syms.sh     WHICH attribute vocabulary shared code links, by nm, with
+                     a non-vacuity floor on nm's own output
+    t130-family.sh   the seven-family (a)/(b)/(c) sweep, re-run
+    t130-cause.sh    THE DIAGNOSIS: one breakpoint per run, both bases, gdb's
+                     own STOP line matched (not its breakpoint listing)
+    t130-state.sh    big.c site + `int x = 1;' + x86_64 -O2
+    t130-fn.sh       the three function-body inputs, both bases
+    t130-sc.sh       stock-compare, ABSOLUTE big.c, tagged outdir (/tmp/sc130-*)
+    t130-guards.sh   38 arms; ARM 0 content-by-name-and-value runs first,
+                     ARM 2b reads the VALUE out of the objects, ARM 4b the
+                     leak ratchet, ARM 5 injection with control and restore

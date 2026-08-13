@@ -582,6 +582,26 @@ multi_target_select (const char *target)
 			  "predate target-preds.h and are from a different "
 			  "build", base);
 
+	/* This back end's INSN ATTRIBUTE tables; see target-attr.h.  Rides on
+	   the same table and is checked for the same reason as the three
+	   above.
+
+	   Until this line existed, `get_bool_attr_mask_uncached' -- shared
+	   code -- asked the PRIMARY which alternatives of every back end's
+	   insns were enabled.  aarch64's `*adddi3_aarch64' is insn code 157,
+	   and i386's attribute tables answered for it: alternative 3, the `J'
+	   negative-immediate one that `sp = sp + (-16)' needs, came back
+	   disabled, and the compiler died in `final_scan_insn_1' having
+	   emitted no assembly at all.  The per-base attribute tables were
+	   already generated and already linked; nothing selected between
+	   them.  */
+	targetm_attr = targetm_cumargs->attr;
+	if (targetm_attr == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no insn-attribute table attached; its objects "
+			  "predate target-attr.h and are from a different "
+			  "build", base);
+
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
 	   a link-time one rather than a design preference.  Their tables call

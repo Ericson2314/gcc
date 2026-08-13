@@ -53,6 +53,13 @@ along with GCC; see the file COPYING3.  If not see
    `insn-config-<base>.h'.  In the build root the same spelling resolves to
    whichever base wrote the plain file, which is the bug.  */
 #include "insn-config.h"
+/* THIS BASE'S insn-attr.h, by the same `-I<base>-inc' mechanism and for the
+   same reason.  It is what makes `get_attr_preferred_for_size' below mean
+   `insn_aarch64::get_attr_preferred_for_size' where the attribute exists and
+   `hook_int_rtx_1' where it does not -- the generated header carries both
+   answers already, and this file simply gets compiled once per base so that
+   it picks up each.  See target-attr.h.  */
+#include "insn-attr.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
@@ -703,6 +710,79 @@ mt_base_eval_dependent_filter (int id, unsigned int regno, machine_mode mode,
   return eval_dependent_filter (id, regno, mode, ref_regno, ref_mode);
 }
 
+/* THIS BASE'S INSN-ATTRIBUTE ENTRY POINTS; see target-attr.h for the
+   measurement and for why "this base has no such attribute" is a return
+   value rather than a design fork.
+
+   Each of these six spellings resolves, in THIS translation unit, to either
+   the back end's own namespaced function or to the stub `genattr' put behind
+   the same name -- `hook_int_rtx_1' (constant 1) for a missing bool
+   attribute, `hook_int_rtx_insn_unreachable' for a missing `length'.  The
+   thunks add nothing to that decision and must not: reproducing exactly what
+   the generator already means by "absent" is the whole reason this could be
+   converted at all.
+
+   `int' rather than the per-base `enum attr_enabled' at the boundary, for the
+   same reason target-preds.h keeps `int': the enum is a distinct type in each
+   `namespace insn_<base>'.  */
+
+static int
+mt_base_get_attr_enabled (rtx_insn *insn)
+{
+  return (int) get_attr_enabled (insn);
+}
+
+static int
+mt_base_get_attr_preferred_for_size (rtx_insn *insn)
+{
+  return (int) get_attr_preferred_for_size (insn);
+}
+
+static int
+mt_base_get_attr_preferred_for_speed (rtx_insn *insn)
+{
+  return (int) get_attr_preferred_for_speed (insn);
+}
+
+static int
+mt_base_insn_default_length (rtx_insn *insn)
+{
+  return insn_default_length (insn);
+}
+
+static int
+mt_base_insn_min_length (rtx_insn *insn)
+{
+  return insn_min_length (insn);
+}
+
+static int
+mt_base_insn_current_length (rtx_insn *insn)
+{
+  return insn_current_length (insn);
+}
+
+/* `static' and reached through the `attr' pointer below, for the same reason
+   `mt_base_frame' is.
+
+   The four booleans are read HERE, where `HAVE_ATTR_*' is still this base's
+   own `#if'-able constant out of `insn-attr-<base>.h'.  That is the only
+   place they can be read correctly, and it is why they are carried as data
+   rather than left to shared code.  */
+static const struct target_attr_desc mt_base_attr = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  HAVE_ATTR_length != 0,
+  HAVE_ATTR_enabled != 0,
+  HAVE_ATTR_preferred_for_size != 0,
+  HAVE_ATTR_preferred_for_speed != 0,
+  mt_base_get_attr_enabled,
+  mt_base_get_attr_preferred_for_size,
+  mt_base_get_attr_preferred_for_speed,
+  mt_base_insn_default_length,
+  mt_base_insn_min_length,
+  mt_base_insn_current_length
+};
+
 /* `static' and reached through the `preds' pointer below, for the same reason
    `mt_base_frame' is.  */
 static const struct target_preds_desc mt_base_preds = {
@@ -794,5 +874,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   mt_base_override_abi_format,
   &mt_base_frame,
   &mt_base_insn,
-  &mt_base_preds
+  &mt_base_preds,
+  &mt_base_attr
 };

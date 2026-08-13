@@ -5229,6 +5229,18 @@ write_header (FILE *outf)
   fprintf (outf, "/* Generated automatically by the program `genattrtab'\n"
 	         "   from the machine description file `md'.  */\n\n");
 
+  /* THE COMPANION OF THE INCLUDE AT THE END OF write_attr_h's genattr.cc
+     counterpart, and it must stay under the same condition.
+
+     insn-attrtab.cc DEFINES `get_attr_enabled', `insn_default_length',
+     `insn_min_length' and `insn_current_length'.  If multi-target-attr.h
+     renamed them here it would rename the DEFINITIONS, which would then
+     collide with the forwarders in target-cumargs-select.cc.  The
+     un-namespaced run therefore opts out; the per-base ones never see the
+     header at all, since their insn-attr-<base>.h does not include it.  */
+  if (gen_multi_target_p () && gen_target_ns () == NULL)
+    fprintf (outf, "#define MULTI_TARGET_ATTR_NO_REDIRECT 1\n");
+
   fprintf (outf, "#define IN_TARGET_CODE 1\n");
   fprintf (outf, "#include \"config.h\"\n");
   fprintf (outf, "#include \"system.h\"\n");
