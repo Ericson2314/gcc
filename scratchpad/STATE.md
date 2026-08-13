@@ -1,4 +1,237 @@
 ================================================================================
+SESSION: ALL BACK ENDS ON.  The two-back-end habit was never a property of the
+environment.  48 of 48 back ends CONFIGURE.  The build failures sort into
+EIGHT causes, not fifty; seven are fixed and one is a design fork.
+Build dirs: /tmp/b-a0e67dff8d4a6fbbd-all (48), -47 (48 minus loongarch),
+-pair, -nomap.  All named for worktree agent-a0e67dff8d4a6fbbd.
+================================================================================
+
+## 0. THE BRIEF'S SEQUENCING WAS OVERRIDDEN MID-TASK, AND THE OVERRIDE WAS RIGHT
+
+The brief said: start from the working pair, add ONE back end at a time.  The
+user replaced that with *"the obvious thing to do is enable all backends and
+then grind fixing build failures."*
+
+The difference is measurable, not a matter of taste.  One-at-a-time would have
+met `recip_mask` on the loongarch step, `pool_node` on the mcore or sh step,
+`fpu_type` on the m68k step, `arm-isa.h` on the arm step, the ambiguous
+predicates on the frv step -- five separate walls, each reading as *that back
+end's* problem.  All 48 at once produced them as **one distribution with eight
+entries**, and two pairs of those entries turned out to be the same cause in
+different back ends (`generated_files` missing in a `t-<cpu>-headers`
+fragment: arm and loongarch; a hand-declared predicate: frv, m32r, stormy16)
+-- which is only visible when you see both at once.
+
+**Every single cause was found by an existing check firing by name.** Nothing
+was found by inspection.  The mechanisms this branch built work; they had
+simply never been given more than two back ends to check.
+
+## 1. THE HEADLINE NUMBERS
+
+  * **48 back ends** in `gcc/config/` -- 51 directories minus `mingw`, `vms`,
+    `vxworks`, which are OS families with no `cpu_type`.  `stormy16` is the
+    DIRECTORY name and `xstormy16` the `cpu_type`; a census keyed on directory
+    names and one keyed on `cpu_type` disagree by one unless you look.
+  * **188/188 triples in `contrib/config-list.mk` are accepted by
+    `config.gcc`.**  No back end fails there, so the representative-triple
+    choice in `scratchpad/all-backends.txt` is about which triple is typical,
+    not about which one works.
+  * **48/48 reach (a) configure.**  `make configure-gcc` rc=0, and the
+    manifest has **48 stanzas with 48 distinct `cpu_type`s**.  Nobody had
+    measured this.  The answer is "all of them", and it was true before this
+    session's fixes -- configure was never the obstacle.
+  * **(b) `multi-target-objs`**: eight cause classes (section 3).  Seven
+    fixed.  The eighth confines loongarch alone.
+  * **(c) `cc1` linking**: NOT reached.  Stated as a bound, not a result.
+
+## 2. THE TOP-LEVEL MAPPING WAS BROKEN, AND THE WORKAROUND IS WHY NOBODY KNEW
+
+`--enable-targets=LIST` was accepted, canonicalised, sorted and substituted
+into `MT_TARGET_SUBDIRS`, and **never reached `gcc/configure`**, which died
+with `configure: error: --enable-backends=LIST is required`.  The flag
+appeared nowhere in `Makefile.tpl`, `Makefile.def` or the generated `Makefile`.
+
+Every build dir on this branch was configured by passing `--enable-backends`
+to the top level **by hand**, where autoconf's auto-accept of unrecognised
+`--enable-*` carried it down through `HOST_CONFIGARGS`.  **The workaround is
+the reason the gap survived: nothing anyone ran took the broken path.**
+
+Fixed as a value DERIVED from `mt_target_subdirs`, not as an option of its own
+-- two spellings with two authorities for one list is this branch's signature
+bug, and a second `AC_ARG_ENABLE` would have BEEN it.
+
+**`autogen` and `autoconf` are BOTH absent from the dev shell**, so
+`Makefile.in` and `configure` are hand-edited in step with `Makefile.def` and
+`configure.ac`.  Add that to the environment traps.
+
+Control: `scratchpad/mtN-nomap-ctl.sh` asserts the exact message, not the exit
+status.  Its first draft died at `*** Configuration not supported` with
+`--build/--host/--target` unset and would have "confirmed" the control while
+never reaching the check.
+
+## 3. THE EIGHT CAUSES -- THE DELIVERABLE
+
+| # | cause | scale | class | status |
+|---|---|---|---|---|
+| 1 | `recip_mask`: `int` (i386) vs `unsigned int` (loongarch) | 1 member | shared numbering | FIXED — `la_recip_mask` |
+| 2 | `pool_node` defined by sh and mcore; gengtype is one global pass | 1 type | shared numbering | FIXED — `mcore_pool_node` |
+| 3 | `enum fpu_type` from arm's generated `arm-cpu.h` and from `m68k.h` | 1 type | shared numbering | FIXED — `m68k_fpu_type` |
+| 4 | `x_aarch_ra_sign_scope` emitted twice into `cl_target_option` | **725** | two authorities, one member | FIXED in `opth-gen.awk` |
+| 5 | `t-<cpu>-headers` has rules but no `generated_files +=` | arm + loongarch, 31 | rule nothing depends on | FIXED — family swept + guard |
+| 6 | back end hand-declares its own generated predicates | frv 59, m32r 1, stormy16 1 | cost of the namespacing | FIXED — swept |
+| 7 | `asm_dialect`: a `Var()` in bpf, an enum TYPE in i386 | **94, all 47 back ends** | one name, two kinds | FIXED — `bpf_asm_dialect_var` |
+| 8 | `<cpu>-opts.h` macros leak through the shared `options.h` | **958** | the union answering for everyone | **DESIGN FORK — not fixed** |
+
+Read the shape, not the list: **four of the eight are the same bug** (one
+name, several authorities, no diagnostic), one is a dependency gap that
+occurred twice, one is a self-inflicted cost of namespacing, one is a
+generator defect, and one is a design question.  Fifty back ends did not have
+fifty problems.
+
+Note causes 4 and 7 especially: **one collision each, and 725 and 94
+diagnostics.**  A shared header means one defect is N failures, and the log
+reads as something systemic and terrifying.  Count the distinct *identifiers*
+in a failure like that before counting the diagnostics.
+
+## 4. CAUSE 8, THE ONE THAT IS A DESIGN QUESTION
+
+The shared `options.h` includes every back end's `config/<cpu>/<cpu>-opts.h`
+through the `I` records.  Those headers are back-end-private **by convention,
+with nothing enforcing it**.  Measured across all 48 by
+`scratchpad/mtN-optsleak.sh`: **10 macros** defined in some `<cpu>-opts.h` are
+also defined elsewhere under `config/`, and **nine of the ten are
+loongarch's**:
+
+    loongarch  TARGET_64BIT           also: i386 mips pa riscv rs6000
+    loongarch  TARGET_HARD_FLOAT      also: arc arm csky mips nds32 xtensa
+    loongarch  TARGET_SOFT_FLOAT      also: arm csky mips nds32
+    loongarch  TARGET_32BIT           also: arm rs6000
+    loongarch  HAVE_AS_TLS            also: alpha frv mips rs6000 sparc xtensa
+    loongarch  TARGET_HARD_FLOAT_ABI  also: arm csky
+    loongarch  TARGET_CMODEL_LARGE    also: nds32 or1k
+    loongarch  TARGET_CMODEL_MEDIUM   also: nds32
+    loongarch  TARGET_TLS_DESC        also: aarch64
+    m32r       SDATA_DEFAULT_SIZE     also: frv rs6000
+
+loongarch defines them in terms of `la_target`, a loongarch global:
+`#define TARGET_64BIT (la_target.isa.base == ISA_BASE_LA64)`.  Because
+`loongarch-opts.h` is pulled into the shared header, **every other back end
+sees loongarch's `TARGET_64BIT` first**, and uses preceding that back end's own
+`#define` expand to `la_target.…` and do not parse -- 958 diagnostics.
+
+**This is the union's answer leaking -- the `HAVE_V8HFmode` shape -- in the
+most consulted macro in the compiler.**  And note the trap: a back end that
+merely *redefines* `TARGET_64BIT` gets a warning and then its own answer, so
+only uses BEFORE the redefinition are wrong.  **The 958 errors are the loud
+half.  The quiet half is any expansion that happened to still parse.**  Do not
+treat "loongarch is the only back end affected" as established until that has
+been looked for.
+
+Options, none free:
+
+  a. **Stop putting back-end `-opts.h` into the shared `options.h`.**  The `I`
+     records exist because the union's member declarations need the enum and
+     struct types those headers define.  Splitting types from macros across 32
+     `<cpu>-opts.h` files is the honest fix, and it is 32 files.
+  b. **Emit the `I` includes into the per-base `options-<cpu>.h` only** and
+     have the shared header carry types by forward declaration.  Smaller, but
+     the shared `cl_target_option` genuinely needs complete types for its
+     members.
+  c. **Qualify the offending macros in the back ends** (`LARCH_TARGET_64BIT`
+     …).  Ten names, mechanical, and it is the ruling already applied four
+     times this session.  But it treats the ten that collide TODAY, and the
+     next back end to define `TARGET_64BIT` in an `-opts.h` reopens it
+     silently -- so it needs a one-directional guard alongside, or it expires.
+
+**Do not resolve this by making one spelling win.**  The value that leaks here
+IS the primary's answer, arriving by a different route.
+
+## 5. FOUR INSTRUMENT FAILURES, ALL OF THE SILENT KIND
+
+  * **`sed 's/\brecip_mask\b/…/'` does not match `x_recip_mask`**, because `_`
+    is a word character.  `loongarch-opts.cc` was left reading
+    `opts->x_recip_mask`, which after the rename resolves to **i386's**
+    member: in bounds, correctly typed, silently the wrong option, **and the
+    build would have succeeded**.  This is the closest this task came to
+    landing a silent wrong answer, and only re-grepping caught it.
+  * **A variable assignment emitted between a target line and its recipe does
+    not warn.**  It ENDS the rule, and make says
+    `multi-target-md.mk:484: *** recipe commences before first target`,
+    naming the assignment and nothing about the rule it broke.  Worse, the
+    broken generated `.mk` then **blocks its own regeneration**, so the fix
+    appears not to work until the stale file is deleted by hand.
+  * **`generated_files += a b c \` + continuation silently drops everything
+    after the first physical line.**  `scan_hdr_frag` reads one line.  A
+    four-name result is indistinguishable from a complete list.  No other
+    fragment uses a continuation -- checked, not assumed.
+  * **A sweep keyed on a name suffix deletes live code.**  m32r's
+    `addr24_operand`, `addr32_operand`, `call26_operand`, `call_operand`,
+    `memreg_operand`, `small_data_operand` are declared in `m32r-protos.h` and
+    are NOT `define_predicate`s.  Keying cause 6 on `_operand` rather than on
+    the `.md` would have removed six live declarations.
+
+And one already in PRINCIPLES and committed anyway: **an apostrophe in a
+comment inside a single-quoted `awk` program closes the quote**, and the shell
+reports the syntax error several lines later.
+
+## 6. WHAT WAS NOT MEASURED, STATED AS BOUNDS
+
+  * **`cc1` linking was not reached.**  The census answers (a) and (b); (c) is
+    open.  `EXTRA_GCC_OBJS` not being wired per target (avr, msp430,
+    loongarch) is a *link* failure and is downstream of where this got to, so
+    it was neither re-derived nor confirmed.  rs6000/AIX likewise: this
+    session used `powerpc64-linux-gnu`, deliberately, so it says nothing about
+    the recorded AIX breakage.  The `config.gcc` defect around xtensa did not
+    appear -- `xtensa-elf` configured and built like any other; that is a
+    negative result about this triple, not a refutation of the report.
+  * **THE CODEGEN BARS WERE NOT RE-RUN, AND I CANNOT SAY THEY DID NOT MOVE.**
+    `opth-gen.awk` changed, and that changes `options.h` for every build
+    including the two-back-end one.  The x86_64 `-O2 scratchpad/big.c` bar
+    (12369 / `378fc33c1e70`) and `stock-compare` **must be re-run** before this
+    work is treated as settled.  Saying "no compiler source was touched, so
+    the bars cannot have moved" would be false this session.
+  * **No back end was compiled FOR.**  Every verdict here is "the objects
+    built", which this branch has repeatedly shown is not "the compiler is
+    right for that target".  The `str x19, [x7, -32]!` precedent stands.
+    Nothing here is a correctness claim for any of the 46 newly buildable back
+    ends.
+  * **The probe scoreboard was not run.**  No figure is quoted.
+  * **`ARG_POINTER_CFA_OFFSET` was NOT re-measured**, so the brief's
+    expectation that a third back end destroys it is untested.
+
+## 7. WHAT THE NEXT SESSION SHOULD DO, IN ORDER
+
+  1. **Re-run the codegen bars and `stock-compare`.**  `opth-gen.awk` is the
+     only landed change touching a shared generated header and it is
+     unmeasured.  Do this before anything else.
+  2. Take `multi-target-objs` for the 47 to completion, then `cc1 lto1`.  That
+     is where `EXTRA_GCC_OBJS` and rs6000/AIX are expected to appear.
+  3. Decide cause 8.  It is the only thing between 47 and 48, and nothing
+     about loongarch can be measured until it is resolved.
+  4. **Re-run every verdict recorded as "unmeasurable with this pair"** -- the
+     51 `tm.h` files, `INCOMING_REG_PARM_STACK_SPACE`, `ARG_POINTER_CFA_OFFSET`,
+     `STACK_GROWS_DOWNWARD`, `RELOAD_ELIMINABLE_REGS`, the DFA-absent case.
+     **The premise those were recorded under is gone.**  A new red there is
+     the correct result and should be reported as progress.
+
+## 8. SCRIPTS LEFT BEHIND
+
+  * `mtN-conf.sh` — configure with an arbitrary back-end list; passes ONLY
+    `--enable-targets`, so a regression in the mapping fails here.
+  * `mtN-nomap-ctl.sh` — its negative control.
+  * `mtN-make.sh` — run make in the dev shell against a named build dir.
+  * `mtN-classify.sh` — group a `make -k` log by cause and by back end.
+  * `mtN-optclash.sh` — the whole options-union collision distribution, not
+    the first one `opth-gen.awk` stops at.
+  * `mtN-optsleak.sh` — macros a `<cpu>-opts.h` leaks into the shared header.
+  * `mtN-varvstype.sh` — identifiers that are an option `Var()` in one back end
+    and an enum TYPE in another.
+  * `mtN-preddup.sh` — back ends hand-declaring their own generated predicates.
+  * `mtN-hdrfrag-guard.sh` — refuses if a `t-<cpu>-headers` fragment rules a
+    build-directory artefact it does not declare.  Negative control run.
+  * `all-backends.txt` — one representative triple per back end, 48 lines.
+
+================================================================================
 SESSION: the header probe's controls are no longer GCC macros.  Arm 0 died for
 the THIRD time in three days; it is now a fixture the harness writes, and so
 are the STR and EXP controls.  Two harness deaths were stacked, not one.
