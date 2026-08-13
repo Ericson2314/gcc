@@ -523,6 +523,24 @@ answer is still wrong is worse than the failure.**
   **because the raw number was quoted anyway, twice, after a warning not to.**
   If a caveat has to be remembered, it will not be.
 
+  **A FALLING PASS COUNT IS THE SHAPE OF SUCCESS HERE.** Closing the arm debt
+  took the aarch64 header PASS column **29 → 3**, and that is the good
+  outcome: 29 was 2 trusted + 27 `UNTRUSTED-redirect-vs-itself`, 3 is 2
+  trusted + 1, and **the trusted count never moved.** Twenty-six untrusted
+  greens were exchanged for arms that can fail. Anyone reading the raw total
+  as a regression has read it backwards — which is precisely why the harness
+  now prints the decomposition rather than trusting a reader to remember it.
+
+  **A THRESHOLD CALIBRATED ON A NUMBER THIS PROJECT MOVES IS THE SAME BUG AS
+  THE DEAD CONTROL.** `macro-probe.sh` carried `[ NMACRO -ge 100 ]`, which
+  refused a *correct* run at 82 after macros retired to other arms. The fix is
+  not to lower it to 80 — that expires at the next retirement and is
+  indistinguishable from moving a number to make a check pass. It is now the
+  identity `NMACRO + |RETIRED ∩ ALL| == |ALL|`. Its first draft immediately
+  earned its keep by firing on something else: **11 board macros had never
+  been in `macro-probe-list.txt` at all**, because they never had a header
+  arm.
+
   This line was reconciled after two documents disagreed, and **both were
   partly right on the same board**: this file had #92's retire-3 but not
   #108's six (2 / 110); STATE.md had #108's six but not #92's retire-3
