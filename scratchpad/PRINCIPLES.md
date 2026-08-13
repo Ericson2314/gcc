@@ -16,6 +16,47 @@ in one session and were right every time.
 One compiler binary serving all back ends, with **zero target-specific
 information baked in at compile time**.
 
+**PREFER THE LOUDEST AVAILABLE SIGNAL, AND CHECK WHETHER YOU CAN MANUFACTURE
+ONE.** The user, after a day of this: *"the obvious thing to do is enable all
+backends and then grind fixing build failures … build failures are the easiest
+thing to debug."* He is right, and the failure of judgement is worth naming
+precisely.
+
+A whole day went into the **hardest** class of signal — silent wrong code, a
+wrong CFA offset, a null `ix86_cost` found under gdb, a macro resolving to the
+primary's *unconfigured* default. Each of those costs a debugger session and a
+bespoke injection arm to establish anything at all. Meanwhile a **build
+failure** names a file, a line and a cause, deterministically, and forty of
+them at once sort into five groups.
+
+And the lever that converts one into the other was sitting unused: **configure
+more back ends.** The two-back-end habit is *why* those bugs were silent — with
+only i386 and aarch64, a leak usually produces a plausible answer rather than
+a diagnostic.
+
+So before starting a deep investigation, ask: **is there a configuration in
+which this bug would announce itself?** If yes, build that configuration
+first. Depth on a narrow build feels productive because every wall yields a
+real result; it is still the expensive way to find them.
+
+**PRIORITY RULE, from the user: build failures before test failures.**
+*"correctness failures are harder … so lets prioritize build failures over
+test failures — unless we think we are breaking the compiler when we fix the
+build."*
+
+The exception is the load-bearing half, because **"make it build" has a known
+wrong shape on this branch**: adding an `#ifndef` floor, a default value or a
+"sensible fallback" so a missing answer stops erroring. That is the first item
+in §2a. It converts a loud build failure into a silent correctness bug, and
+the fallback is always the primary's answer, which is the bug being
+eliminated. **A build fix that could not have been written without inventing
+an answer is not a build fix.**
+
+So: grind build failures first, and for each one ask whether the fix supplies
+a *real* per-base answer or merely stops the compiler complaining. If the
+latter, it is a correctness change wearing a build fix's clothes — stop and
+report it as a design question.
+
 **TWO BACK ENDS IS A HABIT, NOT A CONSTRAINT — AND IT IS WHY SO MUCH HERE IS
 "UNMEASURABLE".** Everything on this branch has been built with i386 +
 aarch64, and that got treated as a property of the environment. It is a
