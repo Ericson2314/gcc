@@ -1009,10 +1009,32 @@ today:
   symptom.**
 
 So #64 is fixed for triple-named drivers and unfixed for the native one, which
-is the case the bug was filed about. The remaining work is a rule that writes
+is the case the bug was filed about. ~~The remaining work is a rule that writes
 `default-target` at install time — small, but it must be scheduled, and it
 should not be assumed done because #65a is. Suggested placement: **Stage 0**,
-since it is independent of everything else here.
+since it is independent of everything else here.~~
+
+**SUPERSEDED 2026-08-12. Do not schedule that rule without a ruling from the
+user — writing it would contradict a deliberate decision made *after* this
+paragraph.**
+
+`64d8d28b30a` states, in both code and commit message: *"Nothing in this
+compiler's build or installation writes that file, by design."* So the "zero
+hits" above is **not** an unfinished rule; it is the recorded intent. This
+document read an absence as an oversight, which is the standing
+absent-artefact-vs-absent-mechanism trap arriving from the other side: the
+grep is accurate and the conclusion drawn from it is wrong.
+
+An agent tasked with wiring it stopped and said so rather than building it,
+which was correct — landing it would have been a change that *looks* like a
+fix and quietly reinstates a default target (§2a).
+
+What is genuinely still open is the **design question**, not the rule: a plain
+installed `gcc` with no triple in its name must resolve to *some* target, and
+under "I don't want a single target ever" there is no default available to
+resolve to. That is a ruling, and it belongs with #75 and #120 rather than in
+a Stage-0 work item. Note the user has already rejected one shape of it —
+an installed default-target file inside `gcc/` is a primary by another name.
 
 ---
 
@@ -1123,7 +1145,13 @@ upper bound on the edit list, not the edit list.
    saying which. Under "no primary" there is no default available.
 5. **Confirm the reviewer accepts that `/tmp/b-ref1` dies** and that
    permutation replaces reference (§6.2).
-6. **Schedule the `default-target` install rule** — #64 is only half fixed
+6. ~~**Schedule the `default-target` install rule** — #64 is only half fixed~~
+   **STRUCK 2026-08-12: stale, and actively misleading.** `64d8d28b30a` says
+   in code and commit message that nothing writes that file **by design**, so
+   scheduling the rule would contradict a later deliberate decision. What
+   remains is a *ruling* — what a triple-less installed `gcc` resolves to when
+   there is no default target — not a work item. See §6.5.
+   ~~and the half that is missing is the native-`gcc` case the bug is about
    and the half that is missing is the native-`gcc` case the bug is about
    (§6.5).
 
