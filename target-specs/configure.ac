@@ -408,6 +408,85 @@ dnl built-in value is "" and the entry is dropped from the search path.
 dnl
 dnl Emitting a guess would put a nonexistent system include directory into
 dnl every compilation, silently skipped.  Pass what mkheaders printed.
+dnl WHERE BINUTILS PUT THIS TARGET'S SYSTEM HEADERS -- cppdefault.cc's
+dnl "BINUTILS" entry, historically <prefix>/<triple>/include.
+dnl
+dnl It was gcc's compile-time -DTOOL_INCLUDE_DIR=$(gcc_tooldir)/include, and it
+dnl was BROKEN IN A WAY NOTHING COULD SEE: $(gcc_tooldir) ends in
+dnl $(target_noncanonical), which is unsubstituted on this branch, so the path
+dnl collapsed to $(prefix)/include -- `/usr/include' by default.  The host's
+dnl own system headers, in EVERY target's include search path, under the
+dnl control of no key at all: it survived with gxx_tool_include_dir,
+dnl fixed_include_dir and native_system_header_dir every one of them "".
+dnl
+dnl Same three states and the same discipline as fixed_include_dir below: no
+dnl derivation and no default, because <prefix>/<triple>/include is a
+dnl convention some binutils installations follow and others do not, and a
+dnl guessed path is a system include directory that nothing created.  Pass the
+dnl one this target's binutils actually has, or "no".
+ts_emit_tool_include_dir=no
+ts_tool_include_dir=
+AC_ARG_WITH([tool-include-dir],
+  [AS_HELP_STRING([--with-tool-include-dir=DIR],
+     [where this target's binutils installation keeps its system headers
+      (the "BINUTILS" include-path entry); "no" for none])],
+  [ts_emit_tool_include_dir=yes
+   case $withval in
+     no|"") ts_tool_include_dir= ;;
+     yes)   AC_MSG_ERROR([--with-tool-include-dir needs a directory or "no"]) ;;
+     *)     ts_tool_include_dir=$withval ;;
+   esac], [])
+
+dnl THIS TARGET'S NATIVE ld, nm AND strip, BY ABSOLUTE PATH -- formerly the
+dnl tm.h macros REAL_LD_FILE_NAME / REAL_NM_FILE_NAME / REAL_STRIP_FILE_NAME
+dnl (rs6000/aix.h: nm is /usr/ucb/nm), which collect2 consulted before its
+dnl ordinary search.  They were gated on `#ifdef CROSS_DIRECTORY_STRUCTURE',
+dnl i.e. on "am I a cross compiler?", a question a compiler with no single
+dnl target cannot ask -- and with that guard permanently false the macros
+dnl leaked in from whichever tm.h collect2 was compiled against.
+dnl
+dnl Whether /usr/ucb/nm exists is a fact about the DEPLOYED MACHINE and can
+dnl change without rebuilding gcc, so these are capabilities.  Absent means
+dnl "nothing said" and collect2 does its ordinary search; a value given here is
+dnl used verbatim and collect2 makes it a HARD ERROR, naming this target and
+dnl this path, if it is not executable.  It never silently falls back to
+dnl another target's tools.
+dnl
+dnl Not probed, on purpose: a probe would have to decide that some ld it found
+dnl on PATH is "this target's real ld", which is exactly the guess that put the
+dnl host's tools in front of every target in the first place.
+ts_emit_real_tools=no
+ts_real_ld_file_name=
+ts_real_nm_file_name=
+ts_real_strip_file_name=
+AC_ARG_WITH([real-ld],
+  [AS_HELP_STRING([--with-real-ld=PATH],
+     [absolute path to this target's native ld, for collect2])],
+  [ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_ld_file_name= ;;
+     yes)   AC_MSG_ERROR([--with-real-ld needs a path or "no"]) ;;
+     *)     ts_real_ld_file_name=$withval ;;
+   esac], [])
+AC_ARG_WITH([real-nm],
+  [AS_HELP_STRING([--with-real-nm=PATH],
+     [absolute path to this target's native nm, for collect2])],
+  [ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_nm_file_name= ;;
+     yes)   AC_MSG_ERROR([--with-real-nm needs a path or "no"]) ;;
+     *)     ts_real_nm_file_name=$withval ;;
+   esac], [])
+AC_ARG_WITH([real-strip],
+  [AS_HELP_STRING([--with-real-strip=PATH],
+     [absolute path to this target's native strip, for collect2])],
+  [ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_strip_file_name= ;;
+     yes)   AC_MSG_ERROR([--with-real-strip needs a path or "no"]) ;;
+     *)     ts_real_strip_file_name=$withval ;;
+   esac], [])
+
 ts_emit_fixed_include_dir=no
 ts_fixed_include_dir=
 AC_ARG_WITH([fixed-include-dir],
@@ -2984,6 +3063,29 @@ cat >> "$target_config_file" <<EOF
 fixed_include_dir ${ts_fixed_include_dir}
 EOF
 fi
+if test x"$ts_emit_tool_include_dir" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# Where this target's binutils installation keeps its system headers -- the
+# "BINUTILS" entry of the include search path.  Absent means this compiler has
+# none for this target; the built-in default is "" so that no entry can name a
+# directory nothing created.  It used to be a compile-time path that collapsed
+# to the HOST's /usr/include for every target.
+tool_include_dir ${ts_tool_include_dir}
+EOF
+fi
+if test x"$ts_emit_real_tools" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# This target's native ld/nm/strip by absolute path, for collect2 -- the old
+# REAL_{LD,NM,STRIP}_FILE_NAME tm.h macros.  Empty means "no such path, do the
+# ordinary search"; a path given here must exist and be executable, or collect2
+# fails naming this target and this path rather than using the host's tools.
+real_ld_file_name ${ts_real_ld_file_name}
+real_nm_file_name ${ts_real_nm_file_name}
+real_strip_file_name ${ts_real_strip_file_name}
+EOF
+fi
 
 dnl --- WHAT WAS ACTUALLY WRITTEN, CHECKED AGAINST WHAT SHOULD HAVE BEEN.
 dnl
@@ -3062,6 +3164,12 @@ if test x"$ts_emit_gxx_libcxx" = xyes; then
 fi
 if test x"$ts_emit_fixed_include_dir" = xyes; then
   ts_expected="$ts_expected fixed_include_dir"
+fi
+if test x"$ts_emit_tool_include_dir" = xyes; then
+  ts_expected="$ts_expected tool_include_dir"
+fi
+if test x"$ts_emit_real_tools" = xyes; then
+  ts_expected="$ts_expected real_ld_file_name real_nm_file_name real_strip_file_name"
 fi
 
 dnl Read the artefact back.  A key with an EMPTY value is written as its name

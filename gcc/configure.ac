@@ -3031,8 +3031,16 @@ case "$CFLAGS" in
   ;;
 esac
 
-gcc_tooldir='$(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)'
-AC_SUBST(gcc_tooldir)
+dnl gcc_tooldir IS GONE, and it is a TARGET fact, which is why it cannot be
+dnl here.  It was
+dnl   $(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)
+dnl and $(target_noncanonical) is unsubstituted on this branch, so the path
+dnl collapsed to $(prefix) and -DTOOL_INCLUDE_DIR became $(prefix)/include --
+dnl `/usr/include' by default, i.e. the HOST's headers offered to every target
+dnl through cppdefault.cc's "BINUTILS" entry, under no capability's control.
+dnl A compiler serving N targets has N answers here and no way to pick one, so
+dnl the answer moved to the per-target config file as `tool_include_dir'
+dnl (gcc/target-caps.h, target-specs/configure.ac --with-tool-include-dir).
 AC_SUBST(dollar)
 
 # Find a directory in which to install a shared libgcc.

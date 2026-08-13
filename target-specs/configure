@@ -658,6 +658,10 @@ with_gxx_include_dir
 with_gxx_tool_include_dir
 with_gxx_backward_include_dir
 with_gxx_libcxx_include_dir
+with_tool_include_dir
+with_real_ld
+with_real_nm
+with_real_strip
 with_fixed_include_dir
 with_local_prefix
 with_native_system_header_dir
@@ -1330,6 +1334,16 @@ Optional Packages:
   --with-gxx-libcxx-include-dir=DIR
                           where this target's libc++ header files are; "no"
                           for none at all
+  --with-tool-include-dir=DIR
+                          where this target's binutils installation keeps its
+                          system headers (the "BINUTILS" include-path entry);
+                          "no" for none
+  --with-real-ld=PATH     absolute path to this target's native ld, for
+                          collect2
+  --with-real-nm=PATH     absolute path to this target's native nm, for
+                          collect2
+  --with-real-strip=PATH  absolute path to this target's native strip, for
+                          collect2
   --with-fixed-include-dir=DIR
                           where fixincludes/mkheaders put this target's fixed
                           system headers; "no" for none
@@ -2214,6 +2228,58 @@ if test "${with_gxx_libcxx_include_dir+set}" = set; then :
      no|"") ts_gxx_libcxx_include_dir= ;;
      yes)   as_fn_error $? "--with-gxx-libcxx-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
      *)     ts_gxx_libcxx_include_dir=$withval ;;
+   esac
+fi
+
+
+ts_emit_tool_include_dir=no
+ts_tool_include_dir=
+
+# Check whether --with-tool-include-dir was given.
+if test "${with_tool_include_dir+set}" = set; then :
+  withval=$with_tool_include_dir; ts_emit_tool_include_dir=yes
+   case $withval in
+     no|"") ts_tool_include_dir= ;;
+     yes)   as_fn_error $? "--with-tool-include-dir needs a directory or \"no\"" "$LINENO" 5 ;;
+     *)     ts_tool_include_dir=$withval ;;
+   esac
+fi
+
+
+ts_emit_real_tools=no
+ts_real_ld_file_name=
+ts_real_nm_file_name=
+ts_real_strip_file_name=
+
+# Check whether --with-real-ld was given.
+if test "${with_real_ld+set}" = set; then :
+  withval=$with_real_ld; ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_ld_file_name= ;;
+     yes)   as_fn_error $? "--with-real-ld needs a path or \"no\"" "$LINENO" 5 ;;
+     *)     ts_real_ld_file_name=$withval ;;
+   esac
+fi
+
+
+# Check whether --with-real-nm was given.
+if test "${with_real_nm+set}" = set; then :
+  withval=$with_real_nm; ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_nm_file_name= ;;
+     yes)   as_fn_error $? "--with-real-nm needs a path or \"no\"" "$LINENO" 5 ;;
+     *)     ts_real_nm_file_name=$withval ;;
+   esac
+fi
+
+
+# Check whether --with-real-strip was given.
+if test "${with_real_strip+set}" = set; then :
+  withval=$with_real_strip; ts_emit_real_tools=yes
+   case $withval in
+     no|"") ts_real_strip_file_name= ;;
+     yes)   as_fn_error $? "--with-real-strip needs a path or \"no\"" "$LINENO" 5 ;;
+     *)     ts_real_strip_file_name=$withval ;;
    esac
 fi
 
@@ -5027,6 +5093,29 @@ cat >> "$target_config_file" <<EOF
 fixed_include_dir ${ts_fixed_include_dir}
 EOF
 fi
+if test x"$ts_emit_tool_include_dir" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# Where this target's binutils installation keeps its system headers -- the
+# "BINUTILS" entry of the include search path.  Absent means this compiler has
+# none for this target; the built-in default is "" so that no entry can name a
+# directory nothing created.  It used to be a compile-time path that collapsed
+# to the HOST's /usr/include for every target.
+tool_include_dir ${ts_tool_include_dir}
+EOF
+fi
+if test x"$ts_emit_real_tools" = xyes; then
+cat >> "$target_config_file" <<EOF
+
+# This target's native ld/nm/strip by absolute path, for collect2 -- the old
+# REAL_{LD,NM,STRIP}_FILE_NAME tm.h macros.  Empty means "no such path, do the
+# ordinary search"; a path given here must exist and be executable, or collect2
+# fails naming this target and this path rather than using the host's tools.
+real_ld_file_name ${ts_real_ld_file_name}
+real_nm_file_name ${ts_real_nm_file_name}
+real_strip_file_name ${ts_real_strip_file_name}
+EOF
+fi
 
 ts_expected="target leb128 decimal_float decimal_bid_format
   s390_excess_float_precision glibc_major glibc_minor libc_hwcap_in_tcb
@@ -5074,6 +5163,12 @@ if test x"$ts_emit_gxx_libcxx" = xyes; then
 fi
 if test x"$ts_emit_fixed_include_dir" = xyes; then
   ts_expected="$ts_expected fixed_include_dir"
+fi
+if test x"$ts_emit_tool_include_dir" = xyes; then
+  ts_expected="$ts_expected tool_include_dir"
+fi
+if test x"$ts_emit_real_tools" = xyes; then
+  ts_expected="$ts_expected real_ld_file_name real_nm_file_name real_strip_file_name"
 fi
 
 sed 's/#.*//' "$target_config_file" \
