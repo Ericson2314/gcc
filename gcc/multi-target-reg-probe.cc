@@ -149,4 +149,34 @@ char mt_probe_cumulative_args_align[alignof (CUMULATIVE_ARGS) + 1];
 
    +1 as above, so a measured value and a missing symbol stay distinguishable.  */
 char mt_probe_regno_save_mode_cols[MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1 + 1];
+
+/* THE WORD WIDTH, WHICH IS THE SAME BUG AGAIN AND IS INVISIBLE ON EVERY
+   64-BIT PAIR.
+
+   `MAX_BITS_PER_WORD' is the last dimension of four arrays in
+   `struct target_expmed' (expmed.h:168-171) and the only dimension of three
+   in `struct lower_subreg_choices' (lower-subreg.h:35-37), which
+   `struct target_lower_subreg' contains.  Both structures are XCNEW'd by
+   target-globals.cc and both headers are included by back ends' own sources
+   -- `config/xtensa/xtensa.cc', `config/m68k/m68k.cc', `config/pdp11/pdp11.cc'
+   and `config/visium/visium.cc' among twenty for expmed.h alone -- so this is
+   the `target_rtl' shape exactly: one authority for the size, several for the
+   contents.
+
+   14 back ends give `MAX_BITS_PER_WORD' explicitly and the rest inherit
+   defaults.h's `BITS_PER_WORD' fallback, so the value genuinely varies:
+   i386, aarch64, rs6000, riscv, pa, mips, sparc, sh, iq2000, loongarch 64;
+   mcore, h8300, xtensa 32; m68k and visium 32 by inheritance; pdp11 16 and
+   avr 8, both by inheritance (`UNITS_PER_WORD' 2 and 1).  A shared
+   translation unit gets the PRIMARY's, because `MAX_BITS_PER_WORD' is an
+   array bound and so is one of the names defaults.h must leave as a constant
+   expression -- it cannot become a run-time load, and defaults.h says so at
+   line 2038 and refuses by name if the primary leaves it to BITS_PER_WORD.
+
+   Which means it must be measured, exactly like the four above, rather than
+   redirected.  On i386 + aarch64 (+ rs6000) every configured base says 64,
+   so this probe reads 64 three times and the structures agree: the pair
+   CANNOT show this one, and that is the reason it is being fixed from the
+   source rather than from a failure.  */
+char mt_probe_max_bits_per_word[MAX_BITS_PER_WORD + 1];
 }

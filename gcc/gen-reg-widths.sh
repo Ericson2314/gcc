@@ -28,6 +28,7 @@ max_cas=0
 max_caa=0
 max_ner=0
 max_rsc=0
+max_mbw=0
 
 # One line per (object, symbol) so that a failure names both.  `nm -S' prints
 # `<value> <size> <type> <name>'; the size is field 2 and is hexadecimal.
@@ -48,7 +49,8 @@ for obj in "$@"; do
   }
   for sym in mt_probe_first_pseudo_register mt_probe_n_reg_classes \
 	     mt_probe_cumulative_args_size mt_probe_cumulative_args_align \
-	     mt_probe_num_eliminable_regs mt_probe_regno_save_mode_cols; do
+	     mt_probe_num_eliminable_regs mt_probe_regno_save_mode_cols \
+	     mt_probe_max_bits_per_word; do
     # Anchor on the END of the line: `nm' prints the name last, and an
     # unanchored match would also accept a longer name that contains this one.
     line=`echo "$syms" | grep " $sym\$"` || line=
@@ -89,16 +91,19 @@ for obj in "$@"; do
 	[ "$val" -gt "$max_ner" ] && max_ner=$val;;
       mt_probe_regno_save_mode_cols)
 	[ "$val" -gt "$max_rsc" ] && max_rsc=$val;;
+      mt_probe_max_bits_per_word)
+	[ "$val" -gt "$max_mbw" ] && max_mbw=$val;;
     esac
   done
 done
 
 if [ "$max_fpr" -le 0 ] || [ "$max_nrc" -le 0 ] \
    || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ] || [ "$max_ner" -le 0 ] \
-   || [ "$max_rsc" -le 0 ]; then
+   || [ "$max_rsc" -le 0 ] || [ "$max_mbw" -le 0 ]; then
   echo "gen-reg-widths.sh: ended with fpr=$max_fpr nrc=$max_nrc" \
        "cumargs_size=$max_cas cumargs_align=$max_caa" \
-       "num_eliminable_regs=$max_ner regno_save_mode_cols=$max_rsc; refusing" >&2
+       "num_eliminable_regs=$max_ner regno_save_mode_cols=$max_rsc" \
+       "max_bits_per_word=$max_mbw; refusing" >&2
   exit 1
 fi
 
@@ -157,6 +162,20 @@ cat > "$OUT".tmp <<EOF
    chosen, not by this.  See multi-target-reg-probe.cc for the measurement
    that found it.  */
 #define MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS $max_rsc
+
+/* The WORD WIDTH used as an array bound: the last dimension of the four
+   shift-cost tables in \`struct target_expmed' (expmed.h) and the only
+   dimension of the three splitting tables in \`struct lower_subreg_choices'
+   (lower-subreg.h), both of which target-globals.cc XCNEWs and both of whose
+   headers a back end's own sources include.  \`MAX_BITS_PER_WORD' is one of
+   the names defaults.h must leave as a constant expression precisely because
+   it is an array bound, so a shared translation unit gets the PRIMARY's
+   value while a back end's own gets its own -- 64 for i386, aarch64 and
+   rs6000, but 32 for xtensa, m68k and visium, 16 for pdp11 and 8 for avr.
+   Measured, not redirected, for the same reason as the widths above.
+   target-regs.cc static_asserts each configured base's own value against
+   this bound.  */
+#define MULTI_TARGET_UNION_MAX_BITS_PER_WORD $max_mbw
 
 #endif /* GCC_MULTI_TARGET_REG_WIDTHS_H */
 EOF

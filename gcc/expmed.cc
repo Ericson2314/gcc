@@ -125,8 +125,8 @@ struct init_expmed_rtl
   rtx zext;
   rtx trunc;
 
-  rtx pow2[MAX_BITS_PER_WORD];
-  rtx cint[MAX_BITS_PER_WORD];
+  rtx pow2[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  rtx cint[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
 };
 
 static void
@@ -205,7 +205,7 @@ init_expmed_one_mode (struct init_expmed_rtl *all,
     set_shiftsub1_cost (speed, mode, 0, cost);
   }
 
-  n = MIN (MAX_BITS_PER_WORD, mode_bitsize);
+  n = MIN (MULTI_TARGET_UNION_MAX_BITS_PER_WORD, mode_bitsize);
   for (m = 1; m < n; m++)
     {
       XEXP (all->shift, 1) = all->cint[m];
@@ -256,7 +256,7 @@ init_expmed (void)
   int m, speed;
 
   memset (&all, 0, sizeof all);
-  for (m = 1; m < MAX_BITS_PER_WORD; m++)
+  for (m = 1; m < MULTI_TARGET_UNION_MAX_BITS_PER_WORD; m++)
     {
       all.pow2[m] = GEN_INT (HOST_WIDE_INT_1 << m);
       all.cint[m] = GEN_INT (m);
@@ -2607,7 +2607,7 @@ expand_shift_1 (enum tree_code code, machine_mode mode, rtx shifted,
       && CONST_INT_P (op1)
       && INTVAL (op1) > 0
       && INTVAL (op1) < GET_MODE_PRECISION (scalar_mode)
-      && INTVAL (op1) < MAX_BITS_PER_WORD
+      && INTVAL (op1) < MULTI_TARGET_UNION_MAX_BITS_PER_WORD
       && (shift_cost (speed, mode, INTVAL (op1))
 	  > INTVAL (op1) * add_cost (speed, mode))
       && shift_cost (speed, mode, INTVAL (op1)) != MAX_COST)
@@ -3255,7 +3255,7 @@ synth_mult (struct algorithm *alg_out, unsigned HOST_WIDE_INT t,
 
   /* If we are getting a too long sequence for `struct algorithm'
      to record, make this search fail.  */
-  if (best_alg->ops == MAX_BITS_PER_WORD)
+  if (best_alg->ops == MULTI_TARGET_UNION_MAX_BITS_PER_WORD)
     return;
 
   /* Copy the algorithm from temporary space to the space at alg_out.

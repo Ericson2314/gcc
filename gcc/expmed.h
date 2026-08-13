@@ -22,6 +22,20 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "insn-codes.h"
 
+/* For MULTI_TARGET_UNION_MAX_BITS_PER_WORD.  `struct target_expmed' below is
+   allocated by target-globals.cc and read from back ends' own translation
+   units (twenty of them include this header), so its bounds must be the same
+   number in both -- see the long note in hard-reg-set.h.  Generators keep
+   their own width: they are single-target programs compiled against one
+   base's headers, and multi-target-reg-widths.h is downstream of them.  */
+#ifdef GENERATOR_FILE
+#ifndef MULTI_TARGET_UNION_MAX_BITS_PER_WORD
+#define MULTI_TARGET_UNION_MAX_BITS_PER_WORD MAX_BITS_PER_WORD
+#endif
+#else
+#include "multi-target-reg-widths.h"
+#endif
+
 enum alg_code {
   alg_unknown,
   alg_zero,
@@ -102,8 +116,14 @@ struct algorithm
      consecutive ones or zeros, i.e., a multiplicand like 10101010101...
      In that case we will generate shift-by-2, add, shift-by-2, add,...,
      in total wordsize operations.  */
-  enum alg_code op[MAX_BITS_PER_WORD];
-  char log[MAX_BITS_PER_WORD];
+  /* The union width, not MAX_BITS_PER_WORD: this header is included by both
+     shared and back-end-own translation units, and the two see different
+     values of the plain name.  `struct algorithm' is not itself in a
+     `target_*' struct, so nothing allocates it on one side and reads it on
+     the other today -- but a type with two definitions in one program is the
+     same defect one step earlier, and the union costs nothing here.  */
+  enum alg_code op[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  char log[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
 };
 
 /* The entry for our multiplication cache/hash table.  */
@@ -165,10 +185,10 @@ struct target_expmed {
   int x_zero_cost[2];
   struct expmed_op_costs x_add_cost;
   struct expmed_op_costs x_neg_cost;
-  int x_shift_cost[2][NUM_MODE_IPV_INT][MAX_BITS_PER_WORD];
-  int x_shiftadd_cost[2][NUM_MODE_IPV_INT][MAX_BITS_PER_WORD];
-  int x_shiftsub0_cost[2][NUM_MODE_IPV_INT][MAX_BITS_PER_WORD];
-  int x_shiftsub1_cost[2][NUM_MODE_IPV_INT][MAX_BITS_PER_WORD];
+  int x_shift_cost[2][NUM_MODE_IPV_INT][MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  int x_shiftadd_cost[2][NUM_MODE_IPV_INT][MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  int x_shiftsub0_cost[2][NUM_MODE_IPV_INT][MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  int x_shiftsub1_cost[2][NUM_MODE_IPV_INT][MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
   struct expmed_op_costs x_mul_cost;
   struct expmed_op_costs x_sdiv_cost;
   struct expmed_op_costs x_udiv_cost;

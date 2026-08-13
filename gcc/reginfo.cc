@@ -49,6 +49,23 @@ along with GCC; see the file COPYING3.  If not see
 #include "output.h"
 #include "tree-pass.h"
 #include "function-abi.h"
+/* THE REST OF target-globals.h, FOR THE LAYOUT CHECK, AND FOR NO OTHER
+   REASON.  The check is only as complete as the list of structures it can
+   name, and the previous list was the ones somebody had already found a bug
+   in.  These are the remaining members of `class target_globals' -- every one
+   of them XCNEW'd by the same loop in target-globals.cc and reachable from
+   back ends' own translation units -- so the list is now derived from that
+   class rather than from memory.  target-regs.cc includes the same set, in
+   the same order: a `sizeof' taken after a different set of headers is not a
+   witness.  */
+#include "flags.h"
+#include "expmed.h"
+#include "libfuncs.h"
+#include "cfgloop.h"
+#include "gcse.h"
+#include "bb-reorder.h"
+#include "lower-subreg.h"
+#include "insn-opinit.h"
 
 /* Maximum register number used in this function, plus one.  */
 
@@ -208,6 +225,24 @@ init_reg_sets (void)
   MT_CHECK_LAYOUT (target_rtl, sizeof_target_rtl)
   MT_CHECK_LAYOUT (target_builtins, sizeof_target_builtins)
   MT_CHECK_LAYOUT (target_reload, sizeof_target_reload)
+  /* The other eleven members of `class target_globals'.  Two of these are
+     known to diverge on back ends this build does not configure --
+     `target_expmed' and `target_lower_subreg' are bounded by
+     MAX_BITS_PER_WORD, which is 64 for i386, aarch64 and rs6000 but 32 for
+     xtensa and m68k, 16 for pdp11 and 8 for avr -- and the other nine are
+     checked because "I read the bounds and they looked fine" is what this
+     witness exists to replace.  */
+  MT_CHECK_LAYOUT (target_flag_state, sizeof_target_flag_state)
+  MT_CHECK_LAYOUT (target_recog, sizeof_target_recog)
+  MT_CHECK_LAYOUT (target_function_abi_info, sizeof_target_function_abi_info)
+  MT_CHECK_LAYOUT (target_expmed, sizeof_target_expmed)
+  MT_CHECK_LAYOUT (target_optabs, sizeof_target_optabs)
+  MT_CHECK_LAYOUT (target_libfuncs, sizeof_target_libfuncs)
+  MT_CHECK_LAYOUT (target_cfgloop, sizeof_target_cfgloop)
+  MT_CHECK_LAYOUT (target_gcse, sizeof_target_gcse)
+  MT_CHECK_LAYOUT (target_bb_reorder, sizeof_target_bb_reorder)
+  MT_CHECK_LAYOUT (target_lower_subreg, sizeof_target_lower_subreg)
+  MT_CHECK_LAYOUT (target_constraints, sizeof_target_constraints)
 #undef MT_CHECK_LAYOUT
 
   /* The union is the LAYOUT and the selected base's counts are the CONTENTS,

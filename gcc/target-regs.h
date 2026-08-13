@@ -204,6 +204,33 @@ struct target_regs_desc
   unsigned long sizeof_target_builtins;
   unsigned long sizeof_target_reload;
 
+  /* SEVEN WAS NOT ENOUGH EITHER, AND THE LIST IS NOW THE WHOLE OF
+     `class target_globals' RATHER THAN THE STRUCTS SOMEONE HAD ALREADY FOUND
+     A BUG IN.  Every member of that class is XCNEW'd by the same loop in
+     target-globals.cc and every one of their headers is reachable from a back
+     end's own translation unit, so the argument for checking `target_rtl'
+     applies verbatim to all eighteen.  Two of the eleven added here are
+     bounded by something that genuinely varies and were wrong in exactly the
+     `target_rtl' way: `target_expmed' and `target_lower_subreg' size seven
+     arrays by MAX_BITS_PER_WORD, which defaults.h must leave as a constant
+     expression BECAUSE it is an array bound, so a shared translation unit
+     gets the primary's 64 while `config/xtensa/xtensa.cc' -- one of twenty
+     back-end sources that include expmed.h -- computes 32.  They now use
+     MULTI_TARGET_UNION_MAX_BITS_PER_WORD.  The other nine were measured
+     clean and are listed anyway, because an unchecked struct and a checked
+     one look identical from here.  */
+  unsigned long sizeof_target_flag_state;
+  unsigned long sizeof_target_recog;
+  unsigned long sizeof_target_function_abi_info;
+  unsigned long sizeof_target_expmed;
+  unsigned long sizeof_target_optabs;
+  unsigned long sizeof_target_libfuncs;
+  unsigned long sizeof_target_cfgloop;
+  unsigned long sizeof_target_gcse;
+  unsigned long sizeof_target_bb_reorder;
+  unsigned long sizeof_target_lower_subreg;
+  unsigned long sizeof_target_constraints;
+
   /* REGNO_REG_CLASS, FENCED.  Generic code walks 0..FIRST_PSEUDO_REGISTER,
      which is the UNION width, so it will ask about register numbers this back
      end does not have; i386's REGNO_REG_CLASS is `regclass_map[REGNO]' and

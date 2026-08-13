@@ -53,6 +53,9 @@ along with GCC; see the file COPYING3.  If not see
 #define MULTI_TARGET_UNION_N_REG_CLASSES N_REG_CLASSES
 #define MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS \
   (MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1)
+#ifndef MULTI_TARGET_UNION_MAX_BITS_PER_WORD
+#define MULTI_TARGET_UNION_MAX_BITS_PER_WORD MAX_BITS_PER_WORD
+#endif
 #else
 #include "multi-target-reg-widths.h"
 #endif

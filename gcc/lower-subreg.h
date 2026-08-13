@@ -20,6 +20,18 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef LOWER_SUBREG_H
 #define LOWER_SUBREG_H 1
 
+/* For MULTI_TARGET_UNION_MAX_BITS_PER_WORD; see the note in expmed.h.
+   `struct target_lower_subreg' below is allocated by target-globals.cc and
+   this header is reachable from back ends' own translation units, so its
+   bounds must be the same number in both.  */
+#ifdef GENERATOR_FILE
+#ifndef MULTI_TARGET_UNION_MAX_BITS_PER_WORD
+#define MULTI_TARGET_UNION_MAX_BITS_PER_WORD MAX_BITS_PER_WORD
+#endif
+#else
+#include "multi-target-reg-widths.h"
+#endif
+
 /* Information about whether, and where, lower-subreg should be applied.  */
 struct lower_subreg_choices {
   /* A boolean vector for move splitting that is indexed by mode and is
@@ -32,9 +44,9 @@ struct lower_subreg_choices {
 
   /* Index X is true if twice_word_mode shifts by X + BITS_PER_WORD
      should be split.  */
-  bool splitting_ashift[MAX_BITS_PER_WORD];
-  bool splitting_lshiftrt[MAX_BITS_PER_WORD];
-  bool splitting_ashiftrt[MAX_BITS_PER_WORD];
+  bool splitting_ashift[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  bool splitting_lshiftrt[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
+  bool splitting_ashiftrt[MULTI_TARGET_UNION_MAX_BITS_PER_WORD];
 
   /* True if there is at least one mode that is worth splitting.  */
   bool something_to_do;

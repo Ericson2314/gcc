@@ -64,6 +64,22 @@ along with GCC; see the file COPYING3.  If not see
    the same ones.  */
 #include "builtins.h"
 #include "reload.h"
+/* The remaining members of `class target_globals'.  Same list, same order as
+   reginfo.cc's, for the same reason as above: the two sides must compute
+   their `sizeof's after the same headers or they are not comparing the same
+   layout.  insn-opinit.h is named through BASE_HEADER rather than left to
+   -I<base>-inc, so that `struct target_optabs' here is sized by THIS base's
+   generated header and a missing -I cannot silently substitute the
+   primary's.  */
+#include "flags.h"
+#include "expmed.h"
+#include "libfuncs.h"
+#include "cfgloop.h"
+#include "gcse.h"
+#include "bb-reorder.h"
+#include "lower-subreg.h"
+#include "function-abi.h"
+#include BASE_HEADER (insn-opinit.h)
 #include "target-regs.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE
@@ -200,6 +216,14 @@ static_assert (MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1
 	       <= MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS,
 	       "this back end needs more caller-save mode columns than the "
 	       "union width; gen-reg-widths.sh did not see it");
+/* Likewise for the word width.  This translation unit is exempt from the
+   defaults.h redirects, so MAX_BITS_PER_WORD here is THIS back end's own --
+   which is the number the seven arrays in expmed.h and lower-subreg.h would
+   have used before they were given the union width, and is 32 or less on
+   xtensa, m68k, visium, mcore, h8300, pdp11 and avr.  */
+static_assert (MAX_BITS_PER_WORD <= MULTI_TARGET_UNION_MAX_BITS_PER_WORD,
+	       "this back end has a wider word than the union width; "
+	       "gen-reg-widths.sh did not see it");
 
 /* NO_REGS is 0 in all 52 back ends -- checked textually over every
    config/<cpu>/<cpu>.h declaring `enum reg_class' -- and reginfo.cc and ira.cc seed
@@ -261,5 +285,16 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
   sizeof (struct target_rtl),
   sizeof (struct target_builtins),
   sizeof (struct target_reload),
+  sizeof (class target_flag_state),
+  sizeof (struct target_recog),
+  sizeof (struct target_function_abi_info),
+  sizeof (struct target_expmed),
+  sizeof (struct target_optabs),
+  sizeof (struct target_libfuncs),
+  sizeof (struct target_cfgloop),
+  sizeof (struct target_gcse),
+  sizeof (struct target_bb_reorder),
+  sizeof (struct target_lower_subreg),
+  sizeof (struct target_constraints),
   mt_regno_reg_class
 };
