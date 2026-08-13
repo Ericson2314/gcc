@@ -16,10 +16,79 @@ in one session and were right every time.
 One compiler binary serving all back ends, with **zero target-specific
 information baked in at compile time**.
 
-**Terminal state: there is no `tm.h` in `gcc/` at all** — only, possibly, in
-`libgcc`. `tm.h` reaches ~520 of 622 middle-end TUs, and every macro in the
-conversion programme is one of its exports. "Delete `tm.h` from `gcc/`" and
-"finish the macro conversion" are the same task stated twice.
+**Terminal state: no SHARED translation unit includes `tm.h`** — the singular
+`gcc/tm.h` that `mkconfig.sh` generates from one target's header chain goes
+away; only `libgcc` may possibly keep one. **A per-base file including its own
+`tm.h` is correct and stays.** Say it in the shared/per-base form, not as "no
+`tm.h` anywhere": the stronger phrasing has been in this file and an agent
+could act on it wrongly.
+
+Currently **256 files outside `config/` include `tm.h`**, plus 101 under it.
+Those 256 are the channel: `INIT_EXPANDERS`, `Pmode`, `ELIMINABLE_REGS`,
+`ACCUMULATE_OUTGOING_ARGS` and `STACK_DYNAMIC_OFFSET` were each a shared TU
+reading the primary's `tm.h`. **"Delete the shared `tm.h`" and "finish the
+macro conversion" are the same task stated twice.**
+
+**DO NOT RELY ON `-I` SHADOWING. Name the base at the point of inclusion.**
+User ruling: *"I think it would be good to do `#include \"<base>/tm.h\"` …
+that way we don't rely on -I shadowing."* Each back end has a `<base>-inc/`
+directory carrying its own `tm.h`, `tm_p.h`, `tm-preds.h`, `tm-constrs.h` and
+generated `insn-*.h` — **this branch invented those; upstream has exactly one
+`tm.h`.** Per-base files got them via `-I<base>-inc` plus a plain
+`#include "tm.h"`, which means **a missing or mis-ordered `-I` silently
+resolves to the primary's header with no diagnostic.**
+
+That is not hypothetical: `d7a12b9d5c4`'s own subject is *"one `.o` rule per
+back-end object, **and the include directory did not reach them**"* — the
+mechanism existed and did not reach its consumers, in the include path.
+
+Two populations, two spellings. A **genuine per-base source** can name the path
+literally. A **shared source compiled N times** (one file → `foo-i386.o` and
+`foo-aarch64.o`) cannot, and takes the base as a macro.
+
+**The landed form** is `gcc/multi-target-base.h`:
+
+```c
+#define BASE_HEADER(f) <MT_BASE/f>      /* -DMT_BASE=<cpu>-inc per object */
+#include BASE_HEADER (tm.h)
+```
+
+Plain parameter substitution into the angle-bracket form — **no `#`, no `##`**,
+one `-D` serving every header. Everything else was measured and fails:
+
+```
+#include BASE "/tm.h"                 warning only, silently drops "/tm.h"
+#define H(f) BASE ## "/" ## f         error: pasting "BASE" and ""/"" ...
+#define H(f) CAT(<,BASE/f>)           error: pasting "<" and "i386" ...
+#include <MT_BASE/tm.h>               no expansion in the literal <> form
+#include H("tm.h")   (quoted arg)     i386-inc/"tm.h": No such file
+```
+
+**`##` cannot express this, for two independent reasons**: its operands are
+**not macro-expanded** (the error says pasting `"BASE"`, not `"i386-inc"`), and
+it must yield **one** valid preprocessing token, which a path is not. And
+`#include` does not concatenate adjacent string literals — it takes the first
+and **warns** about the rest, which is the dangerous outcome.
+
+**The `-D` is `MT_BASE`, not `BASE`: `BASE` collides** — a template parameter
+in `aarch64-sve-builtins-shapes.cc:1154` and a macro parameter in two more
+files. `-DBASE=aarch64-inc` fails with `error: expected nested-name-specifier
+before 'aarch64'`, **naming neither the flag nor the file**.
+
+**BASE_HEADER ALONE DOES NOT CLOSE THE HOLE, and the reason is a lesson about
+testing.** Transitive includes (`rtl.h` → `insn-modes.h`) are still resolved by
+`-I`, so `-DMT_BASE` and `-I<base>-inc` become **two authorities for one
+fact** — this branch's own root bug. A generated **witness pair** makes them
+check each other: `<base>-inc/mt-inc-witness.h`, reachable *only* through the
+`-I`, containing `#include BASE_HEADER (mt-inc-tag-<base>.h)`.
+
+**A TEST IN A REDUCED ENVIRONMENT CAN PASS FOR A REASON THE REAL ENVIRONMENT
+REMOVES.** The coordinator "measured" that a wrong base fails by name — in a
+toy directory containing **only** `i386-inc`. In a real two-base build
+`aarch64-inc/tm.h` **exists**, so a wrong `MT_BASE` silently compiles the wrong
+headers. The reassuring result was produced by the *absence* of the other
+directory, which is exactly what the real build supplies. Build the minimal
+case, then ask what the real environment adds back.
 
 ## 2. The user's standing rulings
 
