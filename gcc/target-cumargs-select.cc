@@ -656,16 +656,22 @@ mt_move_max (void)
     internal_error ("back end %qs reports %<UNITS_PER_WORD%> of %d",
 		    f->name, upw);
 
-  const int bound = MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1;
+  /* THE BOUND IS NOW THE UNION ONE, NOT THIS TRANSLATION UNIT'S.  It used to
+     be `MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1' read here, i.e. the PRIMARY's,
+     which is the same defect the tables themselves had: shared code sized
+     them at i386's 17 columns while aarch64's own objects computed 3 and read
+     6664 bytes low in `struct target_reload'.  Both tables are now sized by
+     MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS -- the measured maximum of the
+     per-base quotient, which is the tight bound because base b never indexes
+     past its own `MAX_MOVE_MAX_b / MIN_UNITS_PER_WORD_b' -- so the guard must
+     compare against the same name or it is guarding a number nothing uses.  */
+  const int bound = MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS;
   if (mm / upw >= bound)
     internal_error ("back end %qs moves %d bytes at a time with "
 		    "%<UNITS_PER_WORD%> of %d, so shared code indexes the "
 		    "caller-save tables at %d, but this compiler sized them "
-		    "at %d from %<MAX_MOVE_MAX%> %d and "
-		    "%<MIN_UNITS_PER_WORD%> %d; the bound and the index come "
-		    "from different back ends",
-		    f->name, mm, upw, mm / upw, bound,
-		    (int) MAX_MOVE_MAX, (int) MIN_UNITS_PER_WORD);
+		    "at %d; gen-reg-widths.sh did not see this back end",
+		    f->name, mm, upw, mm / upw, bound);
   return mm;
 }
 

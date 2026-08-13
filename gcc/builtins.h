@@ -22,21 +22,30 @@ along with GCC; see the file COPYING3.  If not see
 
 #include <mpc.h>
 
-/* Target-dependent globals.  */
+/* Target-dependent globals.
+
+   The two register-indexed arrays below spell
+   MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER rather than
+   FIRST_PSEUDO_REGISTER; see the comment on `struct target_rtl' in rtl.h and
+   the long form in hard-reg-set.h.  This struct is allocated by
+   target-globals.cc and its fields are reachable from a back end's own
+   translation unit, which is exempt from the defaults.h override, so the
+   unqualified name gives the two kinds of translation unit different offsets
+   for `x_apply_args_size_plus_one' and everything after it.  */
 struct target_builtins {
   /* For each register that may be used for calling a function, this
      gives a mode used to copy the register's value.  VOIDmode indicates
      the register is not used for calling a function.  If the machine
      has register windows, this gives only the outbound registers.
      INCOMING_REGNO gives the corresponding inbound register.  */
-  fixed_size_mode_pod x_apply_args_mode[FIRST_PSEUDO_REGISTER];
+  fixed_size_mode_pod x_apply_args_mode[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* For each register that may be used for returning values, this gives
      a mode used to copy the register's value.  VOIDmode indicates the
      register is not used for returning values.  If the machine has
      register windows, this gives only the outbound registers.
      INCOMING_REGNO gives the corresponding inbound register.  */
-  fixed_size_mode_pod x_apply_result_mode[FIRST_PSEUDO_REGISTER];
+  fixed_size_mode_pod x_apply_result_mode[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* Nonzero iff the arrays above have been initialized.  The _plus_one suffix
      is for zero initialization to make it an unreasonable size, used to signal

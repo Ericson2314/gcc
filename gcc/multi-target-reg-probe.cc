@@ -125,4 +125,28 @@ char mt_probe_num_eliminable_regs[(MT_PROBE_ELIM_N > MT_PROBE_RELOAD_ELIM_N
    "measured zero" and "nm printed nothing" remain different outcomes.  */
 char mt_probe_cumulative_args_size[sizeof (CUMULATIVE_ARGS) + 1];
 char mt_probe_cumulative_args_align[alignof (CUMULATIVE_ARGS) + 1];
+
+/* THE CALLER-SAVE MODE TABLE'S COLUMN COUNT, WHICH IS THE SAME BUG IN A
+   DIFFERENT MACRO.
+
+   `target_reload::x_regno_save_mode' (reload.h) and `regno_save_mem'
+   (caller-save.cc:54) are both
+   `[FIRST_PSEUDO_REGISTER][MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1]'.  The row
+   count is the union width above; the COLUMN count is this, and it is per
+   back end for a reason defaults.h spells out at length: `MAX_MOVE_MAX' and
+   `MIN_UNITS_PER_WORD' are the two members of the MOVE/CLEAR and
+   option-state families that must stay constant expressions, precisely
+   BECAUSE they are array bounds, so they are not redirected and a shared
+   translation unit gets the primary's.
+
+   Measured on i386 + aarch64 + rs6000: i386 has `MAX_MOVE_MAX 64' and
+   `MIN_UNITS_PER_WORD 4', giving 17 columns, while aarch64 has neither macro
+   and inherits `MOVE_MAX' 16 over `UNITS_PER_WORD' 8, giving 3.  So
+   `sizeof (struct target_reload)' was 256832 in shared code and 250168 in
+   aarch64's own -- a 6664-byte disagreement, which is 119 rows * 4 bytes *
+   14 columns.  Found by the layout check in `init_reg_sets' the moment
+   `target_reload' was added to it, not by a crash.
+
+   +1 as above, so a measured value and a missing symbol stay distinguishable.  */
+char mt_probe_regno_save_mode_cols[MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1 + 1];
 }

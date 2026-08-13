@@ -51,8 +51,12 @@ along with GCC; see the file COPYING3.  If not see
 /* For each hard register, a place on the stack where it can be saved,
    if needed.  */
 
+/* Union widths, matching `target_reload::x_regno_save_mode' in reload.h; this
+   array is indexed with the same pair of subscripts, and `MAX_MOVE_MAX' /
+   `MIN_UNITS_PER_WORD' are the primary's here.  */
 static rtx
-  regno_save_mem[FIRST_PSEUDO_REGISTER][MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1];
+  regno_save_mem[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER]
+		[MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS];
 
 /* The number of elements in the subsequent array.  */
 static int save_slots_num;

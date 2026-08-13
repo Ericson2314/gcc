@@ -27,6 +27,7 @@ max_nrc=0
 max_cas=0
 max_caa=0
 max_ner=0
+max_rsc=0
 
 # One line per (object, symbol) so that a failure names both.  `nm -S' prints
 # `<value> <size> <type> <name>'; the size is field 2 and is hexadecimal.
@@ -47,7 +48,7 @@ for obj in "$@"; do
   }
   for sym in mt_probe_first_pseudo_register mt_probe_n_reg_classes \
 	     mt_probe_cumulative_args_size mt_probe_cumulative_args_align \
-	     mt_probe_num_eliminable_regs; do
+	     mt_probe_num_eliminable_regs mt_probe_regno_save_mode_cols; do
     # Anchor on the END of the line: `nm' prints the name last, and an
     # unanchored match would also accept a longer name that contains this one.
     line=`echo "$syms" | grep " $sym\$"` || line=
@@ -86,15 +87,18 @@ for obj in "$@"; do
 	[ "$val" -gt "$max_caa" ] && max_caa=$val;;
       mt_probe_num_eliminable_regs)
 	[ "$val" -gt "$max_ner" ] && max_ner=$val;;
+      mt_probe_regno_save_mode_cols)
+	[ "$val" -gt "$max_rsc" ] && max_rsc=$val;;
     esac
   done
 done
 
 if [ "$max_fpr" -le 0 ] || [ "$max_nrc" -le 0 ] \
-   || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ] || [ "$max_ner" -le 0 ]; then
+   || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ] || [ "$max_ner" -le 0 ] \
+   || [ "$max_rsc" -le 0 ]; then
   echo "gen-reg-widths.sh: ended with fpr=$max_fpr nrc=$max_nrc" \
        "cumargs_size=$max_cas cumargs_align=$max_caa" \
-       "num_eliminable_regs=$max_ner; refusing" >&2
+       "num_eliminable_regs=$max_ner regno_save_mode_cols=$max_rsc; refusing" >&2
   exit 1
 fi
 
@@ -141,6 +145,18 @@ cat > "$OUT".tmp <<EOF
    \`target_frame_desc'.  target-cumargs.cc static_asserts each base's own count
    against this bound.  */
 #define MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS $max_ner
+
+/* The COLUMN count of the caller-save mode table,
+   \`MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1'.  Those two macros are the members
+   of the MOVE/CLEAR and option-state families that defaults.h deliberately
+   does NOT redirect, because they are array bounds and must stay constant
+   expressions -- which means a shared translation unit gets the PRIMARY's
+   pair and a back end's own gets its own.  It is the LAYOUT of
+   \`target_reload::x_regno_save_mode' (reload.h) and of \`regno_save_mem'
+   (caller-save.cc); the loops over it are bounded by the mode actually
+   chosen, not by this.  See multi-target-reg-probe.cc for the measurement
+   that found it.  */
+#define MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS $max_rsc
 
 #endif /* GCC_MULTI_TARGET_REG_WIDTHS_H */
 EOF

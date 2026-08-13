@@ -44,6 +44,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "recog.h"
 #include "diagnostic-core.h"
 #include "reload.h"
+/* For the layout check below; `target_rtl' comes with rtl.h.  */
+#include "builtins.h"
 #include "output.h"
 #include "tree-pass.h"
 #include "function-abi.h"
@@ -100,7 +102,7 @@ char global_regs[FIRST_PSEUDO_REGISTER];
 HARD_REG_SET global_reg_set;
 
 /* Declaration for the global register. */
-tree global_regs_decl[FIRST_PSEUDO_REGISTER];
+tree global_regs_decl[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
 /* Array containing all of the register class names.
 
@@ -180,11 +182,12 @@ init_reg_sets (void)
   const int nclasses = r->n_reg_classes;
   const int nregs = r->first_pseudo_register;
 
-  /* THE LAYOUT CHECK.  These four structures are allocated HERE, by generic
+  /* THE LAYOUT CHECK.  These structures are allocated HERE, by generic
      code (target-globals.cc XCNEWs them), and their fields are read by the
      selected back end's own objects.  The `sizeof' on the right was computed
      in that back end's translation unit; the one on the left is this one's.
-     If a bound in hard-reg-set.h, regs.h, ira.h or ira-int.h were left
+     If a bound in hard-reg-set.h, regs.h, ira.h, ira-int.h, rtl.h, builtins.h
+     or reload.h were left
      spelled FIRST_PSEUDO_REGISTER instead of MULTI_TARGET_UNION_*, both
      halves would still compile and the back end would read past the end of a
      shorter struct, with nothing anywhere to say so.  Named individually
@@ -202,6 +205,9 @@ init_reg_sets (void)
   MT_CHECK_LAYOUT (target_regs, sizeof_target_regs)
   MT_CHECK_LAYOUT (target_ira, sizeof_target_ira)
   MT_CHECK_LAYOUT (target_ira_int, sizeof_target_ira_int)
+  MT_CHECK_LAYOUT (target_rtl, sizeof_target_rtl)
+  MT_CHECK_LAYOUT (target_builtins, sizeof_target_builtins)
+  MT_CHECK_LAYOUT (target_reload, sizeof_target_reload)
 #undef MT_CHECK_LAYOUT
 
   /* The union is the LAYOUT and the selected base's counts are the CONTENTS,

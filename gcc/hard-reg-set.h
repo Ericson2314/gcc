@@ -40,7 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 
    Which means a bound below left spelled with the UNQUALIFIED name is SILENT
    -- it simply gives back-end objects a smaller struct than the middle end
-   allocates.  `init_reg_sets' therefore checks all four sizes at start-up
+   allocates.  `init_reg_sets' therefore checks all seven sizes at start-up
    against the values target-regs.cc computed in a back end's own context, and
    names the struct that disagrees.  Do not add a field here using the
    unqualified name.
@@ -51,6 +51,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifdef GENERATOR_FILE
 #define MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER FIRST_PSEUDO_REGISTER
 #define MULTI_TARGET_UNION_N_REG_CLASSES N_REG_CLASSES
+#define MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS \
+  (MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1)
 #else
 #include "multi-target-reg-widths.h"
 #endif

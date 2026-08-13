@@ -405,7 +405,10 @@ extern bool lra_undo_inheritance (void);
 extern int lra_live_max_point;
 extern int *lra_point_freq;
 
-extern int lra_hard_reg_usage[FIRST_PSEUDO_REGISTER];
+/* Union bound: see `struct target_rtl' in rtl.h.  The definition is in the
+   shared lra-lives.cc, and this header is reachable from a back end's own
+   translation unit, which sees a smaller FIRST_PSEUDO_REGISTER.  */
+extern int lra_hard_reg_usage[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
 extern int lra_live_range_iter;
 extern void lra_reset_live_range_list (lra_live_range_t &);

@@ -57,6 +57,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "ira.h"
 #include "recog.h"
 #include "ira-int.h"
+/* `target_rtl' comes with rtl.h above.  These two are the other structures
+   target-globals.cc allocates that have a register-indexed field; reginfo.cc,
+   whose include list this one mirrors, already has reload.h.  A witness taken
+   after a different set of headers is not a witness, so both sides must name
+   the same ones.  */
+#include "builtins.h"
+#include "reload.h"
 #include "target-regs.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE
@@ -167,6 +174,13 @@ static_assert (OWN_FIRST_PSEUDO_REGISTER
 static_assert (OWN_N_REG_CLASSES <= MULTI_TARGET_UNION_N_REG_CLASSES,
 	       "this back end has more register classes than the union width; "
 	       "gen-reg-widths.sh did not see it");
+/* This translation unit is exempt from the defaults.h redirects, so these two
+   are THIS back end's own; the caller-save tables are sized by the maximum
+   over the configured bases.  See multi-target-reg-probe.cc.  */
+static_assert (MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1
+	       <= MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS,
+	       "this back end needs more caller-save mode columns than the "
+	       "union width; gen-reg-widths.sh did not see it");
 
 /* NO_REGS is 0 in all 52 back ends -- checked textually over every
    config/<cpu>/<cpu>.h declaring `enum reg_class' -- and reginfo.cc and ira.cc seed
@@ -225,5 +239,8 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
   sizeof (struct target_regs),
   sizeof (struct target_ira),
   sizeof (struct target_ira_int),
+  sizeof (struct target_rtl),
+  sizeof (struct target_builtins),
+  sizeof (struct target_reload),
   mt_regno_reg_class
 };
