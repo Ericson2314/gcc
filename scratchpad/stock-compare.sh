@@ -81,7 +81,19 @@ nix-shell -I "nixpkgs=$NP" -p coreutils diffutils --substituters 'https://cache.
  rm -rf "$OUT"; mkdir -p "$OUT" || { echo "FATAL: cannot recreate $OUT"; exit 9; }
  # THE CONFIG FILE MOVED, AND ITS ABSENCE LOOKED LIKE A COMPILER BUG.
  #
- # This was `-ftarget-config=specs-x86_64-pc-linux-gnu-config', a RELATIVE name
+ # NO APOSTROPHE MAY APPEAR ANYWHERE BELOW THIS LINE, INCLUDING IN COMMENTS.
+ # Everything from the --run down to the final quote is ONE single-quoted
+ # argument.  A GCC-style quote character in a COMMENT ends that argument, and
+ # the words after it leave the string and become extra nix-shell -p packages.
+ # Measured: this file had two such characters, nix-shell died with
+ # "undefined variable a" (from the comment text "a RELATIVE name"), and THE
+ # REST OF THE SCRIPT THEN RAN IN THE OUTER SHELL, outside nix-shell entirely.
+ # It still printed 5/5 IDENTICAL with the negative control firing, so the
+ # defect was invisible in the RESULT and visible only on stderr, which nobody
+ # read.  Section 5 of PRINCIPLES, committed inside the acceptance bar itself.
+ # A first attempt to document it re-broke it the same way, with the words
+ # "closing quote": assert the stderr is EMPTY, do not eyeball this.
+ # This was -ftarget-config=specs-x86_64-pc-linux-gnu-config, a RELATIVE name
  # in $MT/gcc.  #119 deliberately stopped linking the config file into gcc/
  # (only the spec file is linked; see Makefile.tpl), so in any build dir made
  # since, all five levels died with
@@ -97,7 +109,7 @@ nix-shell -I "nixpkgs=$NP" -p coreutils diffutils --substituters 'https://cache.
  [ -n "$MTCFG" ] && [ -s "$MTCFG" ] || {
    echo "FATAL: no x86_64 target config for the multi-target build."
    echo "       looked for $MT/lib/gcc/*/x86_64-pc-linux-gnu/specs-config"
-   echo "       run target-specs' configure for x86_64 first, or set MTCFG."
+   echo "       run the target-specs configure for x86_64 first, or set MTCFG."
    exit 9; }
  echo "mt cfg : $MTCFG"
  rc=0
