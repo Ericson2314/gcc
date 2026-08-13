@@ -503,6 +503,62 @@ mt_base_dwarf_frame_registers (void)
   return (unsigned int) DWARF_FRAME_REGISTERS;
 }
 
+/* THE FOUR POINTER REGNUMS, read in THIS base's translation unit.  The values
+   this pair produces are 7/19/6/16 for i386 and 31/64/29/65 for aarch64, and
+   the divergence is the whole content of the `aarch64_can_eliminate' ICE --
+   see target-frame.h for the assert and the call site.
+
+   No bound check and no sentinel: these take no argument, so unlike
+   `mt_base_debugger_regno' there is no out-of-range case to answer.
+
+   `HARD_FRAME_POINTER_REGNUM' is reached through rtl.h's `#ifndef' fallback
+   for a back end that does not define it, and that fallback is evaluated HERE,
+   with this base's `FRAME_POINTER_REGNUM' -- which is the point.  rtl.h is
+   included by this file, so all four names are in scope with this base's
+   answers in force.  */
+static unsigned int
+mt_base_stack_pointer_regnum (void)
+{
+  return (unsigned int) STACK_POINTER_REGNUM;
+}
+
+static unsigned int
+mt_base_frame_pointer_regnum (void)
+{
+  return (unsigned int) FRAME_POINTER_REGNUM;
+}
+
+static unsigned int
+mt_base_hard_frame_pointer_regnum (void)
+{
+  return (unsigned int) HARD_FRAME_POINTER_REGNUM;
+}
+
+static unsigned int
+mt_base_arg_pointer_regnum (void)
+{
+  return (unsigned int) ARG_POINTER_REGNUM;
+}
+
+/* THE TWO DERIVED PREDICATES, and they are asked HERE rather than derived from
+   the four above precisely because six back ends -- arm, mips, xtensa,
+   loongarch and gcn -- define them outright as 0 instead of letting rtl.h
+   compare the regnums.  Reconstructing them from the regnums in shared code
+   would silently discard those six answers.  Neither i386 nor aarch64 defines
+   them, so on this pair both come from rtl.h's comparison and both are false;
+   that is a measured fact about this pair, not an assumption about the rest.  */
+static bool
+mt_base_hard_frame_pointer_is_frame_pointer (void)
+{
+  return HARD_FRAME_POINTER_IS_FRAME_POINTER ? true : false;
+}
+
+static bool
+mt_base_hard_frame_pointer_is_arg_pointer (void)
+{
+  return HARD_FRAME_POINTER_IS_ARG_POINTER ? true : false;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -564,7 +620,13 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_pmode,
   mt_base_debugger_regno,
   mt_base_dwarf_frame_regnum,
-  mt_base_dwarf_frame_registers
+  mt_base_dwarf_frame_registers,
+  mt_base_stack_pointer_regnum,
+  mt_base_frame_pointer_regnum,
+  mt_base_hard_frame_pointer_regnum,
+  mt_base_arg_pointer_regnum,
+  mt_base_hard_frame_pointer_is_frame_pointer,
+  mt_base_hard_frame_pointer_is_arg_pointer
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

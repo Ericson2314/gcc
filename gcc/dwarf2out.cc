@@ -21128,9 +21128,14 @@ rtl_for_decl_location (tree decl)
 	       && (!REG_P (XEXP (rtl, 0))
 		   || REGNO (XEXP (rtl, 0)) == HARD_FRAME_POINTER_REGNUM
 		   || REGNO (XEXP (rtl, 0)) == STACK_POINTER_REGNUM
-#if !HARD_FRAME_POINTER_IS_ARG_POINTER
-		   || REGNO (XEXP (rtl, 0)) == ARG_POINTER_REGNUM
-#endif
+		   /* Was `#if !HARD_FRAME_POINTER_IS_ARG_POINTER'; a `#if'
+		      cannot ask the selected back end, so the guard is a
+		      run-time conjunct of the disjunct it guarded.  When the
+		      hard frame pointer IS the arg pointer the preceding
+		      disjunct already covers this regno, so the value of the
+		      whole expression is unchanged either way.  */
+		   || (!HARD_FRAME_POINTER_IS_ARG_POINTER
+		       && REGNO (XEXP (rtl, 0)) == ARG_POINTER_REGNUM)
 		     )
 	       /* Big endian correction check.  */
 	       && BYTES_BIG_ENDIAN

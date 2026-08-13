@@ -330,6 +330,54 @@ mt_dwarf_frame_registers (void)
   return mt_frame ()->dwarf_frame_registers ();
 }
 
+/* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES.  Uncached through
+   `mt_frame ()' like the family above, and here the reason is not hypothetical:
+   arm's `HARD_FRAME_POINTER_REGNUM' is
+   `(TARGET_ARM ? ARM_HARD_FRAME_POINTER_REGNUM : THUMB_HARD_FRAME_POINTER_REGNUM)',
+   so the answer moves with `-mthumb' inside a single run.  Caching at selection
+   time would freeze the answer at whatever the options said then.
+
+   NO RANGE CHECK AND NO SENTINEL, unlike `mt_debugger_regno': these take no
+   argument.  Adding a plausibility test here -- "is the answer below
+   `FIRST_PSEUDO_REGISTER'?" -- would be the mistake #126 records, because that
+   name is the UNION width in this file (95) and the base's own count in the
+   thunk, so the test would pass on precisely the wrong answers.  */
+unsigned int
+mt_stack_pointer_regnum (void)
+{
+  return mt_frame ()->stack_pointer_regnum ();
+}
+
+unsigned int
+mt_frame_pointer_regnum (void)
+{
+  return mt_frame ()->frame_pointer_regnum ();
+}
+
+unsigned int
+mt_hard_frame_pointer_regnum (void)
+{
+  return mt_frame ()->hard_frame_pointer_regnum ();
+}
+
+unsigned int
+mt_arg_pointer_regnum (void)
+{
+  return mt_frame ()->arg_pointer_regnum ();
+}
+
+bool
+mt_hard_frame_pointer_is_frame_pointer (void)
+{
+  return mt_frame ()->hard_frame_pointer_is_frame_pointer ();
+}
+
+bool
+mt_hard_frame_pointer_is_arg_pointer (void)
+{
+  return mt_frame ()->hard_frame_pointer_is_arg_pointer ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

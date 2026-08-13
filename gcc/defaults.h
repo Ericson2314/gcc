@@ -2293,6 +2293,65 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define DWARF_FRAME_REGISTERS (mt_dwarf_frame_registers ())
 
 /* ------------------------------------------------------------------------
+   THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES -- MACRO-LEAK.md
+   class (d), the fork #124 and #126 both stopped at.
+
+   THE ICE THIS FIXES, in shared code, at alias.cc:3358:
+
+       targetm.can_eliminate (FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM)
+
+   i386 supplies the two numbers (19 and 7) and the SELECTED back end supplies
+   the hook, so `aarch64_can_eliminate' was asked about register 19 and its
+   first statement asserts the FROM is one of aarch64's own 64 or 65.  That is
+   `internal compiler error: in aarch64_can_eliminate, at aarch64.cc:14153' on
+   `int g (int a) { return a + 1; }'.  ira.cc:2587 is the same call.
+
+   ALL SIX MOVE TOGETHER.  `STACK_POINTER_REGNUM' was the one member of the set
+   free of `#if' arithmetic and therefore the one a smaller change would have
+   taken; that would have made `stack_pointer_rtx' correct while
+   `hard_frame_pointer_rtx' kept i386's 6, and dwarf2cfi.cc:3250/3309 feed both
+   of those rtxes to `DEBUGGER_REGNO' -- a half-right CFA, a QUIETER wrong
+   answer than the one being fixed.
+
+   WHAT HAD TO CHANGE FIRST, AND IT IS NOT IN THIS FILE.  A `#if' cannot call a
+   function, and `enum global_rtl_index' in rtl.h used three of these names on
+   `#if' lines to decide its own SHAPE.  Left alone, a call-valued regnum makes
+   the preprocessor see undefined identifiers, evaluate `0 == 0' as TRUE, and
+   alias `GR_ARG_POINTER' onto `GR_FRAME_POINTER' for every back end.  The enum
+   now gives all three a distinct slot unconditionally and `init_emit_regs'
+   performs the aliasing by storing one rtx OBJECT in two slots, which is what
+   the invariant actually requires; rtl.h carries the argument and the
+   guards measure it.  The other two `#if' users of these names -- emit-rtl.cc
+   and dwarf2out.cc, both `#if !HARD_FRAME_POINTER_IS_ARG_POINTER' -- became
+   run-time conjuncts of the expressions they guarded.
+
+   `HARD_FRAME_POINTER_REGNUM' IS DEFINED HERE UNCONDITIONALLY, which also
+   settles rtl.h's `#ifndef HARD_FRAME_POINTER_REGNUM' fallback: in shared code
+   that `#ifndef' was answered by the PRIMARY's headers, so a back end that
+   leaves it to rtl.h would have got i386's answer.  tm.h reaches every shared
+   TU before rtl.h does, so this definition is the one in force there, and each
+   base's own `#ifndef' outcome is recorded by its own thunk instead.
+
+   NOT `#ifdef'-BREAKING: reginfo.cc:792 spells `#ifdef
+   HARD_FRAME_POINTER_REGNUM' and the name stays defined, so that guard takes
+   the branch it takes today and both of its arms now name the selected back
+   end's register.  */
+#undef STACK_POINTER_REGNUM
+#define STACK_POINTER_REGNUM (mt_stack_pointer_regnum ())
+#undef FRAME_POINTER_REGNUM
+#define FRAME_POINTER_REGNUM (mt_frame_pointer_regnum ())
+#undef HARD_FRAME_POINTER_REGNUM
+#define HARD_FRAME_POINTER_REGNUM (mt_hard_frame_pointer_regnum ())
+#undef ARG_POINTER_REGNUM
+#define ARG_POINTER_REGNUM (mt_arg_pointer_regnum ())
+#undef HARD_FRAME_POINTER_IS_FRAME_POINTER
+#define HARD_FRAME_POINTER_IS_FRAME_POINTER \
+  (mt_hard_frame_pointer_is_frame_pointer ())
+#undef HARD_FRAME_POINTER_IS_ARG_POINTER
+#define HARD_FRAME_POINTER_IS_ARG_POINTER \
+  (mt_hard_frame_pointer_is_arg_pointer ())
+
+/* ------------------------------------------------------------------------
    THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault
    that starts this (`ix86_cost' null, `si_addr == 0xf4'), for why all seven
    move together rather than just the one that crashes, and for why

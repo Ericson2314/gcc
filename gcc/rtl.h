@@ -3925,29 +3925,48 @@ extern GTY(()) rtx_insn *invalid_insn_rtx;
   (HARD_FRAME_POINTER_REGNUM == ARG_POINTER_REGNUM)
 #endif
 
-/* Index labels for global_rtl.  */
+/* Index labels for global_rtl.
+
+   THE SHAPE OF THIS ENUM USED TO CHANGE PER TARGET, AND THAT IS WHY THE FOUR
+   `*_POINTER_REGNUM' MACROS COULD NOT BE MADE RUN-TIME.  The stock version
+   collapsed `GR_ARG_POINTER' onto `GR_FRAME_POINTER' under
+   `#if FRAME_POINTER_REGNUM == ARG_POINTER_REGNUM', and `GR_HARD_FRAME_POINTER'
+   onto one or the other under the two `HARD_FRAME_POINTER_IS_*' derivations.
+   A `#if' cannot call a function, so a run-time regnum made the preprocessor
+   see undefined identifiers and evaluate `0 == 0' as TRUE -- silently aliasing
+   the arg pointer onto the frame pointer for every back end.
+
+   THE STANDING RULE ON THIS BRANCH APPLIES UNCHANGED: union the vocabulary,
+   keep the data per configuration, select at run time.  All three names get a
+   distinct slot for every back end; the ALIASING, which is the part that
+   really is per-configuration, becomes a property of the DATA -- for a base
+   whose frame and arg pointers are the same register, `init_emit_regs' stores
+   the SAME rtx OBJECT in both slots.
+
+   THE INVARIANT THE OLD COMMENT STATED IS PRESERVED, AND IT IS ABOUT THE RTX,
+   NOT ABOUT THE SLOT.  It read: "For register elimination to work properly
+   these hard_frame_pointer_rtx, frame_pointer_rtx, and arg_pointer_rtx must be
+   the same if they refer to the same register."  Every consumer of it in
+   target-independent code tests rtx identity -- `ep->from_rtx == x' in
+   reload1.cc, `x == arg_pointer_rtx' in rtlanal.cc, `base == arg_pointer_rtx'
+   in dse.cc -- never `GR_ARG_POINTER == GR_FRAME_POINTER', which nothing
+   outside this file even spells.  Pointer equality of the rtx is therefore the
+   whole requirement, and two slots holding one pointer satisfy it.
+
+   NOTE FOR ANYONE MEASURING THIS ON THE CURRENTLY CONFIGURED PAIR: neither
+   i386 (SP 7, HFP 6, FP 19, AP 16) nor aarch64 (SP 31, HFP 29, FP 64, AP 65)
+   aliases any of the three, so BOTH bases took the all-distinct branch of the
+   old `#if' too and the enum's LAYOUT never differed between them.  What
+   differed, and what the ICE was made of, is the VALUES.  The aliasing branch
+   is real for other back ends (six define `HARD_FRAME_POINTER_IS_*' as 0
+   outright) but cannot be observed on this machine without forcing it; see
+   scratchpad/t127-guards.sh ARM 6, which forces it and reads the pointers.  */
 enum global_rtl_index
 {
   GR_STACK_POINTER,
   GR_FRAME_POINTER,
-/* For register elimination to work properly these hard_frame_pointer_rtx,
-   frame_pointer_rtx, and arg_pointer_rtx must be the same if they refer to
-   the same register.  */
-#if FRAME_POINTER_REGNUM == ARG_POINTER_REGNUM
-  GR_ARG_POINTER = GR_FRAME_POINTER,
-#endif
-#if HARD_FRAME_POINTER_IS_FRAME_POINTER
-  GR_HARD_FRAME_POINTER = GR_FRAME_POINTER,
-#else
   GR_HARD_FRAME_POINTER,
-#endif
-#if FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
-#if HARD_FRAME_POINTER_IS_ARG_POINTER
-  GR_ARG_POINTER = GR_HARD_FRAME_POINTER,
-#else
   GR_ARG_POINTER,
-#endif
-#endif
   GR_VIRTUAL_INCOMING_ARGS,
   GR_VIRTUAL_STACK_ARGS,
   GR_VIRTUAL_STACK_DYNAMIC,

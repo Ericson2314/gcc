@@ -604,6 +604,77 @@ struct target_frame_desc
      shipped a wrong bound into every target's `libgcc_eh'.  A function and not
      a constant because cygming.h:96 makes it `(TARGET_64BIT ? 33 : 17)'.  */
   unsigned int (*dwarf_frame_registers) (void);
+
+  /* ----------------------------------------------------------------------
+     THE FOUR `*_POINTER_REGNUM' NAMES, PLUS THE TWO DERIVED PREDICATES.
+     MACRO-LEAK.md class (d), and the fork that #124 and #126 both stopped at
+     rather than guessing.
+
+     THE VALUES, WHICH ARE THE BUG:
+
+	 STACK_POINTER_REGNUM        i386  7   aarch64 31
+	 HARD_FRAME_POINTER_REGNUM   i386  6   aarch64 29
+	 FRAME_POINTER_REGNUM        i386 19   aarch64 64
+	 ARG_POINTER_REGNUM          i386 16   aarch64 65
+
+     ALL SIX MOVE TOGETHER BECAUSE THEY ARE A CLOSURE.  `emit-rtl.cc' builds
+     `stack_pointer_rtx', `frame_pointer_rtx', `hard_frame_pointer_rtx' and
+     `arg_pointer_rtx' from all four in SHARED code, and `dwarf2cfi.cc:3250'
+     and `:3309' hand two of those rtxes straight to `dwf_cfa_reg', i.e. to
+     `DEBUGGER_REGNO'.  Converting `STACK_POINTER_REGNUM' alone -- the only one
+     of the four that was free of `#if' arithmetic, and therefore the tempting
+     one -- would have made `stack_pointer_rtx' correct while
+     `hard_frame_pointer_rtx' stayed at i386's 6: a HALF-RIGHT CFA, which is a
+     quieter wrong answer than the one being fixed.  PRINCIPLES section 4
+     records that "convert one member of a closure, leave its siblings" has
+     nearly landed three times.
+
+     WHAT THE ICE ACTUALLY WAS, and it is the plainest instance of the shared-
+     numbering bug on this branch so far.  `alias.cc:3358', shared code, says
+
+	 targetm.can_eliminate (FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM)
+
+     which with i386 supplying the macros is `can_eliminate (19, 7)' -- and the
+     hook it reaches is the SELECTED back end's, `aarch64_can_eliminate'
+     (aarch64.cc:14151), whose first statement is
+
+	 gcc_assert (from == ARG_POINTER_REGNUM || from == FRAME_POINTER_REGNUM);
+
+     evaluated in aarch64's OWN translation unit, where those names are 65 and
+     64.  19 is neither, so `int g (int a) { return a + 1; }' died in
+     `postreload' at aarch64.cc:14153.  One name, two authorities, no
+     diagnostic.  `ira.cc:2587' is the same call with the same numbers.
+
+     CALLS AND NOT `target-cdata' CONSTANTS.  i386 and aarch64 both spell all
+     four as plain integer constants, so a constant field would have compiled
+     and measured green on this pair -- and been wrong for arm, whose
+     `HARD_FRAME_POINTER_REGNUM' is
+     `(TARGET_ARM ? ARM_HARD_FRAME_POINTER_REGNUM : THUMB_HARD_FRAME_POINTER_REGNUM)',
+     i.e. option state, the `Pmode' shape.  A field that is right for the two
+     configured bases and silently wrong for a third is the thing this branch
+     keeps producing; asking the base's own TU at run time cannot have that
+     failure mode.
+
+     THE TWO PREDICATES ARE SEPARATE FIELDS RATHER THAN DERIVED FROM THE
+     REGNUMS, for the `#ifndef'-answered-by-the-primary reason that made
+     `DWARF_FRAME_REGNUM' its own field in #126.  rtl.h derives them from the
+     regnums only `#ifndef' the back end supplied them, and SIX back ends
+     supply them outright -- arm, mips, xtensa, loongarch, gcn all define both
+     as 0.  Deriving them here would bake i386's "nobody defined these, so
+     compare the numbers" into all 48 and lose those six answers with no
+     diagnostic: the `unsupplied hook' disguise.  Each base's own translation
+     unit includes rtl.h with its own tm.h in force, so what is recorded is
+     that base's own `#ifndef' outcome.
+
+     NO OUT-OF-RANGE CASE AND THEREFORE NO SENTINEL.  Unlike `debugger_regno'
+     above these take no argument; there is nothing to bound-check and nothing
+     to fill.  */
+  unsigned int (*stack_pointer_regnum) (void);
+  unsigned int (*frame_pointer_regnum) (void);
+  unsigned int (*hard_frame_pointer_regnum) (void);
+  unsigned int (*arg_pointer_regnum) (void);
+  bool (*hard_frame_pointer_is_frame_pointer) (void);
+  bool (*hard_frame_pointer_is_arg_pointer) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -732,5 +803,36 @@ extern scalar_int_mode mt_pmode (void);
 extern unsigned int mt_debugger_regno (unsigned int regno);
 extern unsigned int mt_dwarf_frame_regnum (unsigned int regno);
 extern unsigned int mt_dwarf_frame_registers (void);
+
+/* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES, for shared code.
+   See the field comments above for why all six move as one set and why they
+   are calls rather than constants.
+
+   ALL SIX ARE REDIRECTED IN `defaults.h', which required removing the only
+   thing that stopped them being run-time values: the per-target SHAPE of
+   `enum global_rtl_index' at rtl.h.  That enum now has a distinct slot for
+   each of the three pointers on every back end, and `init_emit_regs' does the
+   aliasing by storing one rtx OBJECT in two slots.  The invariant the enum
+   used to enforce is about rtx identity, not slot identity; rtl.h carries the
+   evidence for that reading and t127-guards.sh ARM 5 and ARM 6 measure it in
+   the running cc1.
+
+   SWEPT BEFORE REDIRECTING, over all of `gcc/' outside `config/',
+   `testsuite/' and `ada/gcc-interface/': every `#if'/`#elif' line naming any
+   of the six is either inside rtl.h itself (deleted), or one of the two
+   `#if !HARD_FRAME_POINTER_IS_ARG_POINTER' sites (emit-rtl.cc and
+   dwarf2out.cc, both rewritten as run-time conjuncts of the expression they
+   guarded), or `reginfo.cc:792', which is a `#ifdef' and stays true because
+   the redirect keeps the name defined.  Of the remaining shared uses none is
+   a case label, an array bound or a static initialiser -- the bracketed ones
+   are all subscripts of run-time tables (`fixed_regs[ARG_POINTER_REGNUM]',
+   `static_reg_base_value[STACK_POINTER_REGNUM]', `regno_reg_rtx[...]'), which
+   a call-valued macro serves correctly.  */
+extern unsigned int mt_stack_pointer_regnum (void);
+extern unsigned int mt_frame_pointer_regnum (void);
+extern unsigned int mt_hard_frame_pointer_regnum (void);
+extern unsigned int mt_arg_pointer_regnum (void);
+extern bool mt_hard_frame_pointer_is_frame_pointer (void);
+extern bool mt_hard_frame_pointer_is_arg_pointer (void);
 
 #endif /* GCC_TARGET_FRAME_H */

@@ -813,11 +813,15 @@ gen_rtx_REG (machine_mode mode, unsigned int regno)
 	  && regno == HARD_FRAME_POINTER_REGNUM
 	  && (!reload_completed || frame_pointer_needed))
 	return hard_frame_pointer_rtx;
-#if !HARD_FRAME_POINTER_IS_ARG_POINTER
-      if (FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
+      /* Was `#if !HARD_FRAME_POINTER_IS_ARG_POINTER' around this block.  A
+	 `#if' cannot ask the SELECTED back end anything, so it is a run-time
+	 conjunct now, in the same shape as the
+	 `!HARD_FRAME_POINTER_IS_FRAME_POINTER' test just above which was
+	 already run-time in stock GCC.  The guarded statement is unchanged.  */
+      if (!HARD_FRAME_POINTER_IS_ARG_POINTER
+	  && FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
 	  && regno == ARG_POINTER_REGNUM)
 	return arg_pointer_rtx;
-#endif
 #ifdef RETURN_ADDRESS_POINTER_REGNUM
       if (regno == RETURN_ADDRESS_POINTER_REGNUM)
 	return return_address_pointer_rtx;
@@ -6262,11 +6266,41 @@ init_emit_regs (void)
   /* We need reg_raw_mode, so initialize the modes now.  */
   init_reg_modes_target ();
 
-  /* Assign register numbers to the globally defined register rtx.  */
-  stack_pointer_rtx = gen_raw_REG (Pmode, STACK_POINTER_REGNUM);
-  frame_pointer_rtx = gen_raw_REG (Pmode, FRAME_POINTER_REGNUM);
-  hard_frame_pointer_rtx = gen_raw_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
-  arg_pointer_rtx = gen_raw_REG (Pmode, ARG_POINTER_REGNUM);
+  /* Assign register numbers to the globally defined register rtx.
+
+     THE ALIASING USED TO BE DONE BY `enum global_rtl_index' AND IS NOW DONE
+     HERE, which is the whole point of the change: the enum had a per-target
+     SHAPE and this has a per-configuration VALUE.  rtl.h states the invariant
+     it has to keep -- hard_frame_pointer_rtx, frame_pointer_rtx and
+     arg_pointer_rtx must be the SAME OBJECT when they name the same register,
+     because every consumer tests rtx identity -- so where the old enum made
+     two slots one slot, this makes two slots hold one pointer.
+
+     Written as explicit comparisons rather than through
+     `HARD_FRAME_POINTER_IS_FRAME_POINTER' so that the object identity is
+     driven by the very numbers that were just used to build the rtxes.  A back
+     end that defines those derived macros inconsistently with its own regnums
+     would otherwise get two objects for one register here, which is exactly
+     the failure the invariant exists to prevent, and it would be silent.  */
+  unsigned int sp_regno = STACK_POINTER_REGNUM;
+  unsigned int fp_regno = FRAME_POINTER_REGNUM;
+  unsigned int hfp_regno = HARD_FRAME_POINTER_REGNUM;
+  unsigned int ap_regno = ARG_POINTER_REGNUM;
+
+  stack_pointer_rtx = gen_raw_REG (Pmode, sp_regno);
+  frame_pointer_rtx = gen_raw_REG (Pmode, fp_regno);
+
+  if (hfp_regno == fp_regno)
+    hard_frame_pointer_rtx = frame_pointer_rtx;
+  else
+    hard_frame_pointer_rtx = gen_raw_REG (Pmode, hfp_regno);
+
+  if (ap_regno == fp_regno)
+    arg_pointer_rtx = frame_pointer_rtx;
+  else if (ap_regno == hfp_regno)
+    arg_pointer_rtx = hard_frame_pointer_rtx;
+  else
+    arg_pointer_rtx = gen_raw_REG (Pmode, ap_regno);
   virtual_incoming_args_rtx =
     gen_raw_REG (Pmode, VIRTUAL_INCOMING_ARGS_REGNUM);
   virtual_stack_vars_rtx =
