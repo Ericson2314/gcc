@@ -815,8 +815,32 @@ AC_SUBST(accel_dir_suffix)
 AC_SUBST(omp_device_properties)
 AC_SUBST(omp_device_property_deps)
 
-AC_DEFINE_UNQUOTED(OFFLOAD_TARGETS, "$offload_targets",
-  [Define to offload targets, separated by commas.])
+dnl OFFLOAD_TARGETS is DELIBERATELY AND EXPLICITLY EMPTY -- not unconfigured.
+dnl
+dnl This was AC_DEFINE_UNQUOTED(OFFLOAD_TARGETS, "$offload_targets", ...), and
+dnl ${offload_targets} is a name NOTHING assigns: --enable-offload-targets was
+dnl removed from this branch along with the rest of the target-side options, and
+dnl no assignment replaced it.  The expansion was therefore always "", but by
+dnl accident -- it read as a configurable value that merely happened to be
+dnl unset.  Spelling the empty string literally is the same bytes with the
+dnl authority made visible; `grep OFFLOAD_TARGETS auto-host.h' gave
+dnl `#define OFFLOAD_TARGETS ""' before this change and gives it after.
+dnl
+dnl Empty is MEANINGFUL here, and is the behaviour this project wants, so it is
+dnl recorded rather than left to be rediscovered.  gcc.cc's
+dnl check_offload_target_name() walks OFFLOAD_TARGETS looking for a match; with
+dnl "" nothing can match, so every -foffload=<target> fails BY NAME with
+dnl "GCC is not configured to support %qs as -foffload= argument" and lists the
+dnl valid arguments.  -foffload=default and -foffload=disable are handled before
+dnl that walk and keep working.  So a missing answer errors instead of
+dnl defaulting, which is the rule; it is not a silently-taken empty branch.
+dnl
+dnl Note also that gcc.cc has its own file-scope `offload_targets' -- one name,
+dnl two authorities, no diagnostic.  They are unrelated: the C one holds what
+dnl the user asked for, this one what the compiler was built to support.
+AC_DEFINE(OFFLOAD_TARGETS, "",
+  [Offload targets, separated by commas.  Empty: this compiler supports no
+   offload targets, so every -foffload=<target> is rejected by name.])
 AC_DEFINE(ENABLE_OFFLOADING, 0,
   [Define this to enable support for offloading.])
 

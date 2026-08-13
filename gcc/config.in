@@ -1688,7 +1688,8 @@
 #endif
 
 
-/* Define to offload targets, separated by commas. */
+/* Offload targets, separated by commas. Empty: this compiler supports no
+   offload targets, so every -foffload=<target> is rejected by name. */
 #ifndef USED_FOR_TARGET
 #undef OFFLOAD_TARGETS
 #endif

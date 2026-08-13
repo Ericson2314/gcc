@@ -1155,11 +1155,35 @@ case ${target} in
   fortran_target_objs="vms-f.o"
   use_gcc_stdint=provide
   tm_file="${tm_file} vms/vms-stdint.h"
-  if test x$ld_flavor != xgnu; then
-    # Build wrappers for native case.
-    extra_programs="ld\$(exeext) ar\$(exeext)"
-    tmake_file="$tmake_file vms/t-vmsnative"
-  fi
+  # ${ld_flavor} USED TO GUARD THIS, AND NEVER COULD.  The guard was
+  # `if test x$ld_flavor != xgnu', and nothing has ever set ${ld_flavor} by
+  # the time config.gcc runs -- so it took the wrapper branch unconditionally.
+  #
+  # That is an UPSTREAM bug, not one of ours, and it is an ordering bug rather
+  # than a misspelling: upstream sources config.gcc at configure.ac:1927 and
+  # only assigns `ld_flavor=gnu' at configure.ac:2819, nine hundred lines
+  # later.  Upstream even documents the rule this line breaks, at
+  # configure.ac:2866: "Settings that depend on ld_flavor must be done here
+  # instead of config.gcc."  Measured both ways with scratchpad/t45-probe.sh:
+  # unset (the only reachable state) gives extra_programs="ld ar", while a
+  # forced ld_flavor=gnu gives extra_programs="" -- the arms really do differ,
+  # and only one of them was ever selectable.
+  #
+  # On this branch the probe is gone outright, gcc/configure.ac being about
+  # host and build only.  So the conditional is deleted rather than repaired:
+  # keeping it would advertise a choice that cannot be made.  The body is
+  # retained because it is exactly what was already happening.
+  #
+  # OPEN, and deliberately not decided here: "does the deployed machine's ld
+  # behave like GNU ld for this target" is a per-target fact about the
+  # DEPLOYED machine that can change without rebuilding gcc.  By the
+  # hook-vs-capability test that makes it a target-specs capability, not build
+  # configuration -- the same category as MD_EXEC_PREFIX and fixincludes.
+  # Building the wrappers unconditionally is the conservative superset until
+  # that capability exists.
+  # Build wrappers for native case.
+  extra_programs="ld\$(exeext) ar\$(exeext)"
+  tmake_file="$tmake_file vms/t-vmsnative"
   ;;
 *-*-vxworks*)
   tmake_file=t-vxworks
@@ -2949,12 +2973,36 @@ msp430-*-*)
 	tmake_file="${tmake_file} msp430/t-msp430"
 	extra_objs="${extra_objs} msp430-devices.o"
 	extra_gcc_objs="driver-msp430.o msp430-devices.o"
-	# Enable .init_array unless it has been explicitly disabled.
-	# The MSP430 EABI mandates the use of .init_array, and the Newlib CRT
-	# code since mid-2019 expects it.
-	if test x${disable_initfini_array} != xyes; then
-		gcc_cv_initfini_array=yes
-	fi
+	# Enable .init_array.  The MSP430 EABI mandates the use of .init_array,
+	# and the Newlib CRT code since mid-2019 expects it.
+	#
+	# This used to read "unless it has been explicitly disabled", guarded by
+	# `if test x${disable_initfini_array} != xyes'.  It never could be
+	# disabled.  ${disable_initfini_array} is a name NOTHING assigns: the
+	# option is spelled --disable-initfini-array, and autoconf records that
+	# as enable_initfini_array=no.  There is no `disable_*' namespace.
+	#
+	# UPSTREAM's bug, not ours -- identical at c31b7a09eea:gcc/config.gcc:2872
+	# -- and the same shape as the with_multllib_default misspelling, except
+	# that this one is live code rather than a comment.  Upstream reads the
+	# CORRECT name in configure.ac:1949 ("Support --enable-initfini-array"),
+	# which is what makes the config.gcc spelling look plausible.
+	#
+	# Measured with scratchpad/t45-probe.sh, all three arms:
+	#   unset                        -> gcc_cv_initfini_array=yes  (taken)
+	#   disable_initfini_array=yes   -> gcc_cv_initfini_array=      (unreachable)
+	#   enable_initfini_array=no     -> gcc_cv_initfini_array=yes
+	# The third is the one that matters: forcing the name autoconf ACTUALLY
+	# sets changes nothing, so --disable-initfini-array demonstrably cannot
+	# reach this code.  "Empty" and "unconfigured" are not the same thing
+	# here, and only the latter was ever happening.
+	#
+	# Deleted rather than respelt.  Respelling it would silently give
+	# --disable-initfini-array an effect it has never had, and on this branch
+	# it would also contradict configure.ac:1646, where initfini-array.h is
+	# added to tm_file unconditionally and enable_initfini_array is read
+	# nowhere at all.
+	gcc_cv_initfini_array=yes
 	case ${target} in
 	  msp430-*-elfbare)
 	    # __cxa_atexit increases code size, and we don't need to support
