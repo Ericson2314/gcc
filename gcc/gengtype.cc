@@ -513,6 +513,13 @@ pair_p variables = NULL;
 
 static type_p adjust_field_rtx_def (type_p t, options_p opt);
 
+/* MULTI-TARGET helpers, defined below next to new_structure but needed from
+   here: which back end a file belongs to, and whether two such answers are
+   the same back end.  */
+extern const char *mt_config_dir_of_file (const input_file *);
+static bool mt_same_base_p (const char *, const char *);
+static type_p type_for_name_in_base (const char *, const char *);
+
 /* Define S as a typedef to T at POS.  */
 
 void
@@ -530,6 +537,23 @@ do_typedef (const char *s, type_p t, struct fileloc *pos)
   for (p = typedefs; p != NULL; p = p->next)
     if (strcmp (p->name, s) == 0)
       {
+	/* MULTI-TARGET: two back ends typedef-ing the same name to their own
+	   struct are not a redefinition, they are two per-back-end types --
+	   `typedef struct GTY(()) machine_function {...} machine_function;'
+	   is how eighteen of the thirty-four spell it.  Keep both entries and
+	   let resolve_typedef pick the one belonging to the file asking.
+
+	   Before per-base variants existed this could not arise: all 34
+	   definitions collapsed to one type_p, so `p->type == t' held and the
+	   check was silent.  It started firing the moment the types became
+	   distinct, which is the check doing its job on a fact that had been
+	   invisible -- five back ends named arc, arm, csky, pa and rs6000, all
+	   reported against aarch64.h:1264.  */
+	if (p->type != t
+	    && !mt_same_base_p (mt_config_dir_of_file (p->line.file),
+				mt_config_dir_of_file (pos->file))
+	    && mt_config_dir_of_file (pos->file) != NULL)
+	  break;
 	if (p->type != t && strcmp (s, "result_type") != 0)
 	  {
 	    error_at_line (pos, "type `%s' previously defined", s);
@@ -694,6 +718,30 @@ type_for_name (const char *s)
   return NULL;
 }
 
+/* MULTI-TARGET: as type_for_name, but when several back ends have typedef-ed
+   S, prefer the one from BASE.  BASE may be NULL (shared code), in which case
+   the first entry is returned exactly as before.  */
+
+static type_p
+type_for_name_in_base (const char *s, const char *base)
+{
+  pair_p p;
+
+  if (startswith (s, "gcc::"))
+    s += 5;
+
+  if (base != NULL)
+    for (p = typedefs; p != NULL; p = p->next)
+      if (strcmp (p->name, s) == 0
+	  && mt_same_base_p (mt_config_dir_of_file (p->line.file), base))
+	return p->type;
+
+  for (p = typedefs; p != NULL; p = p->next)
+    if (strcmp (p->name, s) == 0)
+      return p->type;
+  return NULL;
+}
+
 
 /* Create an undefined type with name S and location POS.  Return the
    newly created type.  */
@@ -715,7 +763,11 @@ type_p
 resolve_typedef (const char *s, struct fileloc *pos)
 {
   bool is_template_instance = (strchr (s, '<') != NULL);
-  type_p p = type_for_name (s);
+  /* MULTI-TARGET: a name typedef-ed by several back ends resolves to the one
+     belonging to the file doing the asking.  Falling back on `type_for_name'
+     -- first entry wins -- would give a back end another back end's struct,
+     silently, which is the whole bug this is part of fixing.  */
+  type_p p = type_for_name_in_base (s, mt_config_dir_of_file (pos->file));
 
   /* If we did not find a typedef registered, generate a TYPE_UNDEFINED
      type for regular type identifiers.  If the type identifier S is a
@@ -803,9 +855,39 @@ mt_config_dir_of_file (const input_file *inpf)
 const char *
 mt_config_dir_of_type (const_type_p s)
 {
-  if (!union_or_struct_p (s))
-    return NULL;
-  return mt_config_dir_of_file (s->u.s.line.file);
+  /* TYPE_UNDEFINED IS INCLUDED, AND LEAVING IT OUT COST A 47-BACK-END BUILD.
+
+     A struct is registered only when its CLOSING BRACE is reached, so a name
+     mentioned inside its own body -- riscv's `mode_switching_info ()'
+     constructor, at riscv.cc:189, inside the struct that starts at :178 --
+     resolves first and creates a TYPE_UNDEFINED placeholder that the real
+     definition then fills in.  That placeholder carries a perfectly good
+     `u.s.line.file'.
+
+     With `union_or_struct_p' as the guard it answered NULL for the
+     placeholder, so `new_structure' compared NULL against "riscv", concluded
+     the two definitions came from different back ends, and split the type in
+     two -- leaving the placeholder as the group's parent and the real
+     definition as a variant.  Every later use of the name then resolved to
+     the UNDEFINED one, and gengtype stopped with `undefined type
+     `mode_switching_info'' and `undefined type `rvv_builtin_types_t''.
+
+     Those two are worth keeping in mind for another reason: the control run
+     shows riscv's `mode_switching_info' is walked by NOTHING in the
+     pre-change build, because riscv's `machine_function' was one of the 33
+     that lost.  So the placeholder bug was mine, but the types behind it had
+     never been marked at all.  */
+  switch (s->kind)
+    {
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+    case TYPE_LANG_STRUCT:
+    case TYPE_USER_STRUCT:
+    case TYPE_UNDEFINED:
+      return mt_config_dir_of_file (s->u.s.line.file);
+    default:
+      return NULL;
+    }
 }
 
 /* Whether two results of mt_config_dir_of_* name the same back end.  NULL

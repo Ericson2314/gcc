@@ -290,7 +290,20 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # filter the duplicate out but to stop having a privileged chain at all:
   # gcc/Makefile.in no longer lists $(tm_file_list), and this union is the
   # single authority for which target headers gengtype reads.
+  #
+  # A `./' PREFIX MEANS THE BUILD DIRECTORY, NOT THE SOURCE TREE, and those
+  # entries are skipped.  config.gcc writes `./gcn-device-macros.h' and
+  # `./sysroot-suffix.h' into tm_file for headers a tmake_file GENERATES; they
+  # are handled a few lines below as tm_generated_headers.  Prefixing them with
+  # $(srcdir)/config/ names a file that does not exist and cannot be built, and
+  # make says so -- `No rule to make target
+  # .../gcc/config/./gcn-device-macros.h, needed by s-gtype'.  It did not show
+  # up on the two-back-end pair, because neither i386 nor aarch64 generates a
+  # tm.h fragment; it showed up the moment gcn was configured.
   for gcc_mt_tmf in `echo "${gcc_mt_data}" | sed -n 's/^tm_file //p'`; do
+    case "${gcc_mt_tmf}" in
+      ./*) continue ;;
+    esac
     gcc_mt_gtf="${gcc_mt_gtf} \$(srcdir)/config/${gcc_mt_tmf}"
   done
   for gcc_mt_f in ${gcc_mt_gtf}; do
