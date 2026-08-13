@@ -40,8 +40,15 @@ simply never been given more than two back ends to check.
     manifest has **48 stanzas with 48 distinct `cpu_type`s**.  Nobody had
     measured this.  The answer is "all of them", and it was true before this
     session's fixes -- configure was never the obstacle.
-  * **(b) `multi-target-objs`**: eight cause classes (section 3).  Seven
-    fixed.  The eighth confines loongarch alone.
+  * **(b) `multi-target-objs`, INFRASTRUCTURE STAGE**: eight cause classes
+    (section 3).  Seven fixed.  The eighth confines loongarch alone.  With
+    those seven fixed, **all 47 back ends get through the manifest, the
+    options union, gengtype and every generator**, which is where each of the
+    eight walls lived.
+  * **(b) `multi-target-objs`, BACK-END COMPILATION STAGE**: this is as far as
+    it goes, and the wall is large and different in kind -- see section 3a.
+    **45 of 47 back ends fail.  The two that pass are i386 and aarch64** --
+    exactly the pair that has always been configured.  160 objects built.
   * **(c) `cc1` linking**: NOT reached.  Stated as a bound, not a result.
 
 ## 2. THE TOP-LEVEL MAPPING WAS BROKEN, AND THE WORKAROUND IS WHY NOBODY KNEW
@@ -92,6 +99,53 @@ Note causes 4 and 7 especially: **one collision each, and 725 and 94
 diagnostics.**  A shared header means one defect is N failures, and the log
 reads as something systemic and terrifying.  Count the distinct *identifiers*
 in a failure like that before counting the diagnostics.
+
+## 3a. THE SECOND WALL: BACK-END COMPILATION, AND IT IS A DIFFERENT ANIMAL
+
+Once the eight infrastructure causes are out of the way the build reaches the
+back ends' own `.cc` and generated `.md` output, and **45 of 47 fail**.  Only
+`mt-i386` and `mt-aarch64` are clean -- the pair that has always been
+configured.  That is not a coincidence and it is the whole point of the
+exercise: **everything that was ever compiled is fine, and nothing else ever
+was.**
+
+This wall is NOT eight more name collisions.  It is three structural classes,
+and none of them is a rename:
+
+  1. **`poly_int` arity -- ~1800 diagnostics across 39 back ends.**
+     `NUM_POLY_INT_COEFFS` is **2** because aarch64 is configured, so
+     `poly_int64` is `poly_int<2, long>` for EVERY back end.  The other 45 are
+     written against the scalar case and do arithmetic, comparison, casts and
+     `switch` on it directly: `cannot convert poly_int<2, long int> to long
+     int`, `no match for operator&`, `switch quantity not an integer`.
+     PRINCIPLES already records "a poly_int sweep fixed 2 sites and left 7
+     identical siblings" and "~186 targets are never built".  **This is that
+     debt, measured: it is the largest single class in the whole census.**
+     Note the shape -- one configured back end (aarch64) sets a compile-time
+     arity for everybody.  That is the union answering for everyone again, and
+     it is structural, not a typo.
+  2. **The `incoming_args::info` static assertion -- 1196 diagnostics,
+     46 back ends.**  The assertion fires by name and says so:
+     *"some configured back end X's, so the offset of `incoming_args::info` --
+     chosen by THIS translation unit -- is not good enough for it;
+     `MT_INCOMING_ARGS_PAD` only fixes size"*.  A designed check doing its job
+     on a population it had never seen.  It is a real layout problem, not a
+     check to relax -- **do not touch `MT_INCOMING_ARGS_PAD` to make this
+     green.**
+  3. **Mode-union gaps -- 606 diagnostics, avr and msp430 only.**
+     `E_PSImode was not declared in this scope`.  PSImode is in the mode
+     vocabulary of those two back ends and the union is not producing the
+     `E_` enumerator for it.  Narrow and probably tractable.
+
+Plus a tail, of which `JUMP_TABLES_IN_TEXT_SECTION was not declared` (17) is
+the recognisable shape: a `tm.h` macro not reaching per-base code, i.e. the
+macro-conversion work this branch has been doing all along, now visible for
+back ends that were never compiled.
+
+**The honest summary of (b): the infrastructure now serves 48 back ends; the
+back ends themselves do not yet compile, and the reason is overwhelmingly a
+pre-existing structural debt (poly_int) that only becomes visible when
+something other than the pair is built.**
 
 ## 4. CAUSE 8, THE ONE THAT IS A DESIGN QUESTION
 
@@ -214,8 +268,12 @@ reports the syntax error several lines later.
   1. **Re-run the codegen bars and `stock-compare`.**  `opth-gen.awk` is the
      only landed change touching a shared generated header and it is
      unmeasured.  Do this before anything else.
-  2. Take `multi-target-objs` for the 47 to completion, then `cc1 lto1`.  That
-     is where `EXTRA_GCC_OBJS` and rs6000/AIX are expected to appear.
+  2. **The `poly_int` debt is now the critical path** and it is far larger
+     than anything else in the census (~1800 diagnostics, 39 back ends).
+     Nothing downstream -- `cc1` linking, `EXTRA_GCC_OBJS`, rs6000/AIX -- can
+     be reached without it, so it should be attacked as a class with a sweep
+     over the SOURCE, not over what some configured triple happens to compile.
+     Sizing it properly is probably a session on its own.
   3. Decide cause 8.  It is the only thing between 47 and 48, and nothing
      about loongarch can be measured until it is resolved.
   4. **Re-run every verdict recorded as "unmeasurable with this pair"** -- the
