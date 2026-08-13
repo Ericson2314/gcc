@@ -10285,3 +10285,195 @@ injection produces.
   * `tmh-probe.sh` and its siblings need `$W/wk/build.out` (a full build log)
     and `$W/wk/tmh-config.txt`; they FATAL by name without them.  `D` must be
     set to your own build dir -- they refuse to default.
+
+---
+
+# `EXTRA_GCC_OBJS` PER BACK END -- AND FOUR WALLS IN FRONT OF THE ONES IT SERVES
+
+Commit `ba2e480125d`.  Build dir `/tmp/b-agent-aa90078782f5e0d84`, named for
+the worktree.  No task number is cited: the task list is not in this worktree.
+Anchor held at **43** deliberately -- an earlier draft of a comment in
+`gcc/Makefile.in` mentioned `MULTI_TARGET_OBJS` by name and took the anchor to
+44, and `eg-conf.sh` refused the build by name.  The comment was reworded
+rather than the anchor moved.
+
+## 1. THE POPULATION, AND THE GROUPING IS THE ANSWER
+
+Six `extra_gcc_objs` settings in `config.gcc`, and they split two ways:
+
+| where | value |
+|---|---|
+| `loongarch*-*-*` (543) | `loongarch-driver.o loongarch-cpu.o loongarch-opts.o loongarch-def.o` |
+| `arc*-*-elf*` (1493), `arc*-*-linux*` (1514) | `driver-arc.o` |
+| `avr-*-*` (1821) | `driver-avr.o avr-devices.o` |
+| `msp430-*-*` (2975) | `driver-msp430.o msp430-devices.o` |
+| `*-*-darwin*` (883) | `darwin-driver.o` |
+| `*vxworks*` (1203) | `vxworks-driver.o` |
+
+**Four are on a CPU case and their sources live in `config/<cpu>/`; two are on
+an OS case and live in `config/`.**  That is not cosmetic -- see section 4.
+
+Note also `avr-devices.o`, `msp430-devices.o` and loongarch's `-cpu/-opts/-def`
+are in **both** `extra_objs` and `extra_gcc_objs`.  Upstream compiles each once
+and links the one object into cc1 and into the driver.  Here it cannot: the
+`mt-<cpu>/` copy carries `MULTI_TARGET_RENAMES`, so it refers to `targetm_avr`,
+which exists only in `libbackend.a`.  Hence `mtd-<cpu>/`, a second compilation
+without the renames.
+
+**`driver-i386.o` is NOT in this population.**  It comes from `config.host`
+(`host_extra_gcc_objs`), is host-side, answers `-march=native` about the machine
+the driver is RUNNING on, and correctly stays shared.  The recorded observation
+that "only `driver-i386.o` is built" is explained by that, not by a bug in this
+area -- and it means the recorded **design fork about driver objects having no
+`MT_BASE` does not apply here.**  Target-side `extra_gcc_objs` objects are per
+back end by construction, so they can and now do carry `-I<cpu>-inc` and
+`-DMT_BASE=<cpu>-inc`.
+
+## 2. WHAT WAS ACTUALLY BROKEN, MEASURED
+
+`EXTRA_GCC_OBJS` in a freshly configured `gcc/Makefile`, three back ends:
+
+    EXTRA_GCC_OBJS =driver-i386.o
+
+`gcc/configure.ac:1680` composes it as `${host_extra_gcc_objs} ${extra_gcc_objs}`
+and nothing sets the second, because `gcc/configure.ac` no longer runs
+`config.gcc` for a target.  So the target half was the empty string for every
+back end, silently.
+
+The consumer is `spec-functions-<base>.o`, which expands that base's
+`EXTRA_SPEC_FUNCTIONS` and therefore names functions living in
+`config/<cpu>/driver-<cpu>.cc`.  With arc configured:
+
+    nm -uC spec-functions-arc.o
+      U arc_cpu_to_as(int, char const**)      <- the ONLY undefined symbol
+    nm --defined-only -C mtd-arc/driver-arc.o
+      T arc_cpu_to_as(int, char const**)
+
+and `scratchpad/eg-linkprobe.cc` settles it as a **link verdict, both ways**:
+
+    without the per-base driver object   rc=1, ld: undefined reference to
+                                           `arc_cpu_to_as(int, char const**)'
+    with mtd-arc/driver-arc.o            rc=0, binary produced
+
+## 3. THE FIX, AND THE THREE PLACES THE OBVIOUS VERSION IS WRONG
+
+`gen-target-manifest.sh` records `extra_gcc_objs` per target;
+`gen-multi-target-md.awk` unions it per back end and emits `MT_GCC_OBJS_<cpu>`
+beside `MULTI_TARGET_OBJS_<cpu>` with the same two target-specific assignments;
+`gcc/Makefile.in` links `$(MT_GCC_OBJS)`.
+
+  * **Union over EVERY manifest record, not the first for a cpu_type.**
+    `extra_gcc_objs` is set by TRIPLE: `x86_64-*-darwin*` sets
+    `darwin-driver.o` and `x86_64-*-linux*` sets nothing, and both are
+    cpu_type i386.  First-record-wins would make the driver's contents depend
+    on the order targets were named on the command line.
+  * **`mtd-<cpu>/`, a separate compilation** from `mt-<cpu>/` -- see the
+    renames note above.
+  * **`-DMULTI_TARGET_SUPPLY_TU=1`**, exactly as `spec-functions.cc` is
+    compiled.  Without it `defaults.h` treats these as CONSUMER TUs and
+    redirects the (c-DATA) macros to `targetm_cdata`/`targetm_regs`, which the
+    driver does not link.  On arc that fails **by name** at `defaults.h:2045`
+    (`MAX_BITS_PER_WORD`) rather than as an undefined symbol in `xgcc`, which
+    is how it was found.
+
+Confirmed the objects read their OWN headers, by the branch's own witness:
+`mtd-arc/.deps/driver-arc.Po` names `arc-inc/tm.h`, `tm-arc.h` **and**
+`arc-inc/mt-inc-tag-arc.h` -- the witness pair, so the `-I` and the `-DMT_BASE`
+agree.  The six per-base sources took the two-line `BASE_HEADER` pattern.
+
+## 4. THE OS-SIDE HALF IS A DESIGN FORK AND IS NOT EMITTED
+
+`darwin-driver.cc` spells `DEF_MIN_OSX_VERSION` and switches on
+`#if DARWIN_X86` / `#elif DARWIN_PPC`.  Those are names in the **darwin
+target's** header chain.  `tm-i386.h` is built from the FIRST i386 target's
+`tm_file`, which for `x86_64-pc-linux-gnu` is the linux chain, so `DARWIN_X86`
+is undefined -- and `#if` on an undefined name does not error, it quietly
+evaluates **false**.  This branch has a `tm-<base>.h` per back end and **no
+`tm-<target>.h` at all**, so there is no per-base answer to give.
+
+Options, with costs, for whoever takes this:
+
+  a. **A per-TARGET header** (`tm-<triple>.h`) for the objects that need one.
+     Correct, and the largest change: it duplicates the `tm-<base>.h`
+     machinery at triple granularity, and 183 targets is a lot of headers.
+  b. **Move the OS driver hook behind a registry**, as `spec-functions.cc`
+     already was: `darwin_driver_init` becomes a per-target entry selected at
+     run time.  Smaller, and consistent with what this branch did for the spec
+     functions -- but the object still has to be compiled against something.
+  c. **Refuse loudly** with `$(error)` when a configured target sets an
+     OS-side `extra_gcc_objs`.  Cheapest and honest, but it breaks any
+     `--enable-backends` list containing a darwin or vxworks target, including
+     the all-back-ends grind now in progress.
+
+**Nothing was guessed.**  The generated fragment emits
+`MT_GCC_OBJS_UNHANDLED += <base>:<obj>.o` plus a comment, so the gap is
+greppable rather than absent -- absence of an artefact is not absence of a
+mechanism -- and behaviour is exactly today's, since those objects are not
+linked now either.  `vxworks-driver.cc` names **no** target macro at all and is
+probably safe per base, but it is grouped with darwin because the test used
+(source not under `config/<cpu>/`) is deliberately over-broad: it can only
+revoke, never authorise.
+
+## 5. THE BRIEF'S PREMISE COULD NOT BE MEASURED AS STATED, AND THAT IS THE FINDING
+
+The brief said `xgcc` fails to link for avr, msp430 and loongarch.  **None of
+those three back ends can be built at all alongside i386+aarch64 today**; each
+dies well before the driver link, in a different place, and none of the causes
+is `EXTRA_GCC_OBJS`.  Measured, one configure per set, in this build dir:
+
+  * **loongarch** -- `opth-gen.awk: gcc-options-union.list: member recip_mask
+    declared twice, differently`.  `i386.opt:44` has `int recip_mask`,
+    `loongarch.opt:35` has `unsigned int recip_mask`.  This is the options
+    union working: one name, two authorities.  It poisons the **whole** build,
+    not just loongarch -- `options-aarch64.h`, `options-avr.h` and
+    `options-msp430.h` all fail with it, because the union list is global.
+  * **msp430** -- `target-c-ops-msp430.o`: `msp430.h:32` `TARGET_CPU_CPP_BUILTINS`
+    spells bare `builtin_define`/`builtin_assert`, which `target-c-ops.cc` does
+    not provide.
+  * **avr** and **arc** -- `mt-cumulative-args.h:155` static assertion,
+    `the comparison reduces to (8 <= 4)`: some configured back end's
+    `CUMULATIVE_ARGS` needs stricter alignment than this one's.
+  * **arc**, additionally -- `mt-arc/options-tables.o` hits the same
+    `defaults.h:2045` `MAX_BITS_PER_WORD` refusal described in section 3.
+    That object is emitted by `multi-target-common.mk` and goes into
+    `libcommon-target.a`, i.e. into the DRIVER, and it has no supply-side
+    marker.  **It is latently the same bug as section 3's third bullet** and
+    is untouched here: i386 and aarch64 both define `MAX_BITS_PER_WORD`
+    explicitly, so it is silent for the configured pair.
+
+So "which back ends could not link `xgcc` before and can after" has no
+measured answer yet for those four, and manufacturing one would be a green.
+What IS measured is section 2's link verdict, which isolates exactly the
+question `EXTRA_GCC_OBJS` answers.
+
+## 6. BARS -- `/tmp/b-agent-aa90078782f5e0d84`, x86_64 + aarch64
+
+  * `make all-gcc` **rc=0**; `make multi-target-objs cc1 lto1` **rc=0**,
+    `grep -c 'error:'` **0**; `make xgcc` **rc=0**.
+  * `EXTRA_GCC_OBJS = driver-i386.o  $(MT_GCC_OBJS)` with `MT_GCC_OBJS` empty
+    for this pair, since neither i386 nor aarch64 sets `extra_gcc_objs`.  The
+    linked object set is therefore unchanged for the pair **by construction**,
+    which is why the identities below are expected to hold rather than lucky.
+  * x86_64 `-O2 scratchpad/big.c`: **12369 bytes, md5 `378fc33c1e70`** --
+    matches the recorded bar exactly.  Input path quoted with the count.
+  * `stock-compare.sh` vs `/tmp/b-stock`: **5/5 IDENTICAL**, 5 distinct md5s
+    per side, negative control firing (1158 vs 804 lines, differ), and the run
+    printed `mt cfg : /tmp/b-agent-aa90078782f5e0d84/...` so it is confirmed to
+    have run in THIS dir.
+  * `specs-config` for x86_64 is **230 lines**, against the recorded ~230, not
+    merely non-empty.  It needs
+    `TOOLS_DIR_FOR_x86_64-pc-linux-gnu=/tmp/t141-bin`; without it
+    `configure-target-specs-x86_64-pc-linux-gnu` fails by name.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+
+## 7. WHAT IS NOT DONE
+
+  * The OS-side fork (section 4).
+  * The four walls (section 5), none of them this change's.
+  * `mt-<base>/options-tables.o` missing `-DMULTI_TARGET_SUPPLY_TU`
+    (section 5, last bullet) -- a driver-side per-base object with the same
+    defect this change fixed for `mtd-<base>/`, latent for i386 and aarch64.
+    It lives in `multi-target-common.mk`; not touched here to avoid colliding
+    with the all-back-ends grind.
+  * No full `xgcc` link with a back end that actually sets `extra_gcc_objs`,
+    for the reason in section 5.
