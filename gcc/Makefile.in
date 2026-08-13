@@ -829,7 +829,7 @@ plugin_includedir = $(plugin_resourcesdir)/include
 plugin_bindir = $(libexecsubdir)/plugin
 # Directory where files for installed testing are installed
 testsuitedir = $(libsubdir)/testsuite
-# Used to produce a relative $(gcc_tooldir) in gcc.o
+# Used to produce a relative $(libsubdir_to_prefix).
 ifeq ($(enable_as_accelerator),yes)
 unlibsubdir = ../../../../..
 else
@@ -865,10 +865,29 @@ libsubdir_to_prefix := \
 prefix_to_exec_prefix := \
   $(shell echo "$(exec_prefix)" | \
     sed -e 's|^$(prefix)||' -e 's|^/||' -e '/./s|$$|/|')
-# Directory in which to find other cross-compilation tools and headers.
 dollar = @dollar@
-# Used in install-cross.
-gcc_tooldir = @gcc_tooldir@
+# gcc_tooldir IS GONE.  It was
+#   $(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)
+# -- the same unsubstituted $(target_noncanonical) that build_tooldir just
+# below was fixed for, one line apart, and this one was left behind.  With the
+# last component empty the path collapsed to $(prefix), so its only two
+# consumers, -DTOOL_INCLUDE_DIR for cppdefault.o/cppbuiltin.o and for gcc.o,
+# both said "$(prefix)/include" -- `/usr/include' under the default prefix.
+# That put the HOST's system headers into EVERY target's include search path,
+# controlled by no capability: it survived with gxx_tool_include_dir,
+# fixed_include_dir and native_system_header_dir all set to "".  On a host that
+# has a /usr/include (i.e. almost every Linux box, though not this one) every
+# target compiled against the host's headers and succeeded.
+#
+# There is no value to put here instead, for the same reason build_tooldir's
+# comment gives inverted: build_tooldir has one legitimate triple, the one
+# whose target libraries this tree builds, and gcc_tooldir has none -- the
+# compiler serves all of them.  The answer is per-target and post-install, so
+# it is the `tool_include_dir' capability (gcc/target-caps.h,
+# gcc/cppdefault.cc, target-specs' --with-tool-include-dir).
+#
+# install-gcc-tooldir went with it: it was a .PHONY rule no other rule
+# depended on, whose body created $(DESTDIR)$(gcc_tooldir), i.e. $(prefix).
 # Since gcc_tooldir does not exist at build-time, use -B$(build_tooldir)/bin/
 #
 # $(build_target_triple), not a compiler-wide target: this directory is only
@@ -1582,7 +1601,6 @@ FLAGS_TO_PASS = \
 	"gxx_include_dir=$(gcc_gxx_include_dir)" \
 	"gxx_libcxx_include_dir=$(gcc_gxx_libcxx_include_dir)" \
 	"build_tooldir=$(build_tooldir)" \
-	"gcc_tooldir=$(gcc_tooldir)" \
 	"bindir=$(bindir)" \
 	"libexecsubdir=$(libexecsubdir)" \
 	"datarootdir=$(datarootdir)" \
@@ -3111,20 +3129,23 @@ collect2$(exeext): $(COLLECT2_OBJS) $(LIBDEPS)
 # extension warning is turned off here rather than the safety given up.
 CFLAGS-target-caps.o += -Wno-c++20-extensions
 
-# UNRESOLVED, AND KNOWN EMPTY.  $(target_noncanonical) is unsubstituted, so
-# TARGET_MACHINE is "" and collect2 builds its tool names as concat
-# (target_machine, "-", "nm") = "-nm", "-ld", "-strip", "-gcc" (collect2.cc
-# :812-:875, :1161, :3055).  Those lookups simply never match and collect2
-# falls back to the unprefixed names, so it is not currently mis-executing --
-# but it is searching for filenames that begin with a dash.
+# RESOLVED, and -DTARGET_MACHINE IS GONE.  collect2 learns its target the way
+# cc1 does -- from the -ftarget-config= file the driver hands it -- and builds
+# `<triple>-nm', `<triple>-ld', `<triple>-strip', `<triple>-gcc' from
+# targ_caps_target_name at run time.  See collect2_target_machine and
+# target_qualified in gcc/collect2.cc.
 #
-# This is NOT fixable by picking a value here: unlike build_tooldir, collect2
-# is compiled once and serves every target, so a single triple baked into it
-# would be exactly the privileged target this branch removed.  The real fix is
-# in collect2.cc -- either drop the prefixed lookups (the resolution taken for
-# GCC_DRIVER_NAME in configure.ac) or have collect2 learn its target the way
-# cc1 does, from the driver.  Left as-is deliberately; see the report.
-CFLAGS-collect2.o += -DTARGET_MACHINE=\"$(target_noncanonical)\" \
+# THE COMMENT THAT USED TO BE HERE WAS WRONG, and worth recording because the
+# error is instructive.  It said collect2 searched for "-nm", "-ld", "-strip"
+# -- names beginning with a dash -- because $(target_noncanonical) is empty.
+# The concat it described never compiled: every one of those lines sat inside
+# `#ifdef CROSS_DIRECTORY_STRUCTURE', which nothing defines any more, so the
+# variable `target_machine' did not even exist and collect2 searched the
+# UNPREFIXED names.  Two faults in opposite directions cancelling to something
+# that looks harmless -- an empty prefix, and a guard that discarded the
+# prefixing altogether -- and the real consequence was worse than the one
+# described: collect2 used the HOST's nm/ld/strip for every target, silently,
+# which on a native x86_64 build is indistinguishable from working.
 
 LTO_WRAPPER_OBJS = lto-wrapper.o collect-utils.o ggc-none.o lockfile.o \
   lto-ltrans-cache.o
@@ -3182,7 +3203,6 @@ DRIVER_DEFINES = \
   $(VALGRIND_DRIVER_DEFINES) \
   $(if $(SHLIB),-DENABLE_SHARED_LIBGCC) \
   -DCONFIGURE_SPECS="\"@CONFIGURE_SPECS@\"" \
-  -DTOOL_INCLUDE_DIR=\"$(gcc_tooldir)/include\" \
   -DNATIVE_SYSTEM_HEADER_DIR=\"$(NATIVE_SYSTEM_HEADER_DIR)\"
 
 CFLAGS-gcc.o += $(DRIVER_DEFINES) -DBASEVER=$(BASEVER_s)
@@ -4684,8 +4704,9 @@ CFLAGS-intl.o += -DLOCALEDIR=\"$(localedir)\"
 # directory is per-target by construction, so any single value would reinstate
 # exactly the privileged target this branch removed.  It is now fixable in the
 # place it belongs: a target config file that sets gxx_tool_include_dir.
-# TOOL_INCLUDE_DIR, whose $(gcc_tooldir) has the same hole in it, still has not
-# got such a key and remains a compile-time default only.
+# TOOL_INCLUDE_DIR had the same hole and is now GONE from here entirely: it has
+# its own key, `tool_include_dir', and gcc_tooldir has been deleted.  See the
+# comment at the former gcc_tooldir above and gcc/cppdefault.cc.
 #
 # GPLUSPLUS_*_ADD_SYSROOT are literal 0 and no longer configurable: gcc has no
 # --with-sysroot, so the configure variables they came from could only ever be
@@ -4701,7 +4722,6 @@ PREPROCESSOR_DEFINES = \
   -DGPLUSPLUS_LIBCXX_INCLUDE_DIR_ADD_SYSROOT=0 \
   -DLOCAL_INCLUDE_DIR=\"$(local_includedir)\" \
   -DCROSS_INCLUDE_DIR=\"$(CROSS_SYSTEM_HEADER_DIR)\" \
-  -DTOOL_INCLUDE_DIR=\"$(gcc_tooldir)/include\" \
   -DNATIVE_SYSTEM_HEADER_DIR=\"$(NATIVE_SYSTEM_HEADER_DIR)\" \
   -DPREFIX=\"$(prefix)/\" \
   -DSTANDARD_EXEC_PREFIX=\"$(libdir)/gcc/\" \
@@ -4856,10 +4876,6 @@ stmp-int-hdrs: $(T_GLIMITS_H) $(T_STDINT_GCC_H) $(USER_H) fixinc_list
 # The README that used to be copied into include-fixed/ went with the
 # directory: mkheaders creates that directory, per target, after install.
 	$(STAMP) $@
-
-.PHONY: install-gcc-tooldir
-install-gcc-tooldir:
-	$(mkinstalldirs) $(DESTDIR)$(gcc_tooldir)
 
 # `macro_list' is GONE from gcc/'s build.  It is the set of macros the
 # preprocessor predefines, which fixinc.sh consults so that it does not rename

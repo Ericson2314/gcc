@@ -764,6 +764,59 @@ struct target_caps
      same statement.  */
   const char *fixed_include_dir;
 
+  /* WHERE THIS TARGET'S BINUTILS-INSTALLED SYSTEM HEADERS LIVE -- the
+     "BINUTILS" entry of cppdefault.cc's table, historically the compile-time
+     -DTOOL_INCLUDE_DIR=$(gcc_tooldir)/include.
+
+     THE HOLE THIS CLOSES.  $(gcc_tooldir) was
+     `$(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)', and
+     $(target_noncanonical) is unsubstituted on this branch, so the trailing
+     component was EMPTY and the whole path collapsed to $(prefix) -- making
+     TOOL_INCLUDE_DIR plain `/usr/include' under the default prefix.  That is
+     the host's headers, entered into EVERY target's system include path, under
+     no capability's control at all: it survived with gxx_tool_include_dir,
+     fixed_include_dir and native_system_header_dir all set to "".  A build on a
+     host with a populated /usr/include therefore compiled every target against
+     the host's headers and SUCCEEDED, producing wrong code.  On a host without
+     one (NixOS) the entry is merely inert, which is why it went unnoticed.
+
+     Deliberately NOT the same key as gxx_tool_include_dir and NOT derived from
+     any other: this is where a binutils installation put a target's headers,
+     and a target may perfectly well use the host's C++ headers while needing
+     its own binutils tree, or the reverse.
+
+     DEFAULT "" FOR THE SAME REASON AS fixed_include_dir: there is no
+     compile-time answer, because there is no compile-time target.  Any
+     non-empty default would be one target's directory offered to all of them,
+     which is the defect above restated.  cppdefault.cc compacts the entry
+     away, so a compiler nobody has told about a tool include directory does not
+     claim to have one.  Say `tool_include_dir <path>' in the target config
+     (target-specs' --with-tool-include-dir) to get the entry back.  */
+  const char *tool_include_dir;
+
+  /* THIS TARGET'S NATIVE ld, nm AND strip, BY ABSOLUTE PATH -- formerly the
+     tm.h macros REAL_LD_FILE_NAME, REAL_NM_FILE_NAME and REAL_STRIP_FILE_NAME
+     (rs6000/aix.h says nm is /usr/ucb/nm), consulted by collect2 before its
+     ordinary search.
+
+     They were suppressed by `#ifdef CROSS_DIRECTORY_STRUCTURE #undef ...' in
+     collect2.cc, i.e. by the question "am I a cross compiler?".  That question
+     HAS NO COMPILE-TIME ANSWER HERE: CROSS_DIRECTORY_STRUCTURE is never defined
+     any more, so the block is dead and the macros survive from whichever tm.h
+     collect2 happens to include -- letting collect2 execute a path that names
+     one target's native tools on a host that has no such tools, or worse, on
+     behalf of a different target.
+
+     Whether /usr/ucb/nm exists is a fact about the DEPLOYED MACHINE and can
+     change without rebuilding the compiler, so it is a capability, not a hook.
+     Default "" = "nothing said", and collect2 then runs its ordinary
+     COMPILER_PATH/PATH search.  A non-empty value is used verbatim and must
+     exist and be executable; collect2 diagnoses it by name if it does not,
+     rather than falling through to another target's tools.  */
+  const char *real_ld_file_name;
+  const char *real_nm_file_name;
+  const char *real_strip_file_name;
+
   /* WHERE THIS TARGET'S SITE-LOCAL AND SYSTEM HEADERS LIVE -- /usr/local/include
      and /usr/include on a typical GNU system.  Formerly the configure options
      --with-local-prefix and --with-native-system-header-dir, plus config.gcc's

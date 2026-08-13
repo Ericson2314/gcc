@@ -195,10 +195,27 @@ cpp_include_defaults_table (void)
     /* One place the target system's headers might be.  */
     { CROSS_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },
 #endif
-#ifdef TOOL_INCLUDE_DIR
-    /* Another place the target system's headers might be.  */
-    { TOOL_INCLUDE_DIR, "BINUTILS", 0, 1, 0, 0 },
-#endif
+    /* Another place the target system's headers might be: the include
+       directory of the binutils installation for this target.  FORMERLY the
+       compile-time -DTOOL_INCLUDE_DIR="$(gcc_tooldir)/include", and that macro
+       was the last entry in this table under the control of NO capability at
+       all -- it survived with gxx_tool_include_dir, fixed_include_dir and
+       native_system_header_dir every one of them set to "".
+
+       It was also WRONG, silently.  $(gcc_tooldir) ends in
+       $(target_noncanonical), which is unsubstituted on this branch and so
+       EMPTY, collapsing $(prefix)/<triple>/include to $(prefix)/include --
+       `/usr/include' under the default prefix.  So the entry named the HOST's
+       system headers, for every target, and a host that has a /usr/include
+       compiled every target against it and succeeded.  gcc/Makefile.in:864
+       diagnoses exactly this shape one line below where it was introduced, for
+       build_tooldir; gcc_tooldir was left alone.
+
+       Per target now, three-state like fixed_include_dir, default "" and
+       compacted out below.  Separate from gxx_tool_include_dir on purpose: a
+       target may use the host's C++ headers while needing its own binutils
+       tree.  */
+    { targ_caps.tool_include_dir, "BINUTILS", 0, 1, 0, 0 },
     /* /usr/include comes dead last.  Unconditional for the same reason as
        LOCAL_INCLUDE_DIR above.  */
     { cap_dir (targ_caps.native_system_header_dir,

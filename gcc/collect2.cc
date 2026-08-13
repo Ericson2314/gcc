@@ -59,22 +59,37 @@ along with GCC; see the file COPYING3.  If not see
    the utilities are not correct for a cross-compiler; we have to hope that
    cross-versions are in the proper directories.  */
 
-/* FIXME (multi-target): CROSS_DIRECTORY_STRUCTURE is never defined any more,
-   so this entire block is dead.  Two consequences, one handled and one not:
-   OBJECT_FORMAT_COFF now survives into a Linux-hosted AIX build (handled --
-   see the CROSS_AIX_SUPPORT guard below), and MD_EXEC_PREFIX /
-   REAL_{LD,NM,STRIP}_FILE_NAME are no longer suppressed, so collect2 can reach
-   for a target's native tool paths on a host that has no such tools.  The
-   latter needs a runtime answer, not a preprocessor one.  */
-#ifdef CROSS_DIRECTORY_STRUCTURE
-#ifndef CROSS_AIX_SUPPORT
-#undef OBJECT_FORMAT_COFF
-#endif
+/* THE FIXME THAT WAS HERE IS RESOLVED.  CROSS_DIRECTORY_STRUCTURE is never
+   defined any more, so the block that used to stand here was dead, and with it
+   dead the tm.h macros it existed to suppress came back to life:
+
+     OBJECT_FORMAT_COFF   -- handled separately, see the CROSS_AIX_SUPPORT
+			     guard below;
+     MD_EXEC_PREFIX       -- collect2 never read it; only gcc.cc does, and
+			     there it already travels through the spec file
+			     (gen-target-specs.cc emits `md_exec_prefix'), so
+			     the `#undef' was suppressing nothing;
+     REAL_{LD,NM,STRIP}_FILE_NAME
+			  -- absolute paths to a target's NATIVE tools, e.g.
+			     rs6000/aix.h's "/usr/ucb/nm".  These were live,
+			     and collect2 would execute them on a host that has
+			     no such tools, having got them from whichever
+			     tm.h it happened to include -- i.e. from a target
+			     that is not necessarily the one being linked for.
+
+   The question the deleted block asked -- "am I a cross compiler?" -- has no
+   compile-time answer in a compiler with no single target.  Nor is it even the
+   right question: whether /usr/ucb/nm exists is a fact about the DEPLOYED
+   MACHINE, per target, and can change without rebuilding gcc.  So the three
+   REAL_* macros are now the `real_ld_file_name', `real_nm_file_name' and
+   `real_strip_file_name' capabilities, read out of the target config file that
+   collect2 is already handed as -ftarget-config=.  They are `#undef'd
+   unconditionally here so that no tm.h can reintroduce a compile-time
+   answer.  */
 #undef MD_EXEC_PREFIX
 #undef REAL_LD_FILE_NAME
 #undef REAL_NM_FILE_NAME
 #undef REAL_STRIP_FILE_NAME
-#endif
 
 /* If we cannot use a special method, use the ordinary one:
    run nm to find what symbols are present.
@@ -528,12 +543,68 @@ is_ctor_dtor (const char *s)
 
 static struct path_prefix cpath, path;
 
-#ifdef CROSS_DIRECTORY_STRUCTURE
-/* This is the name of the target machine.  We use it to form the name
-   of the files to execute.  */
+/* The name of the target machine, used to form the names of the files to
+   execute -- `aarch64-linux-gnu-nm' rather than `nm'.
 
-static const char *const target_machine = TARGET_MACHINE;
-#endif
+   WAS `static const char *const target_machine = TARGET_MACHINE;', compiled in
+   from $(target_noncanonical) and wrapped in `#ifdef
+   CROSS_DIRECTORY_STRUCTURE', which is never defined.  BOTH halves of that were
+   broken, in opposite directions, and they hid each other:
+
+     - $(target_noncanonical) is unsubstituted on this branch, so TARGET_MACHINE
+       was "" and the prefixed names would have been "-nm", "-ld", "-strip";
+     - but the `#ifdef' was false, so those lines never compiled and collect2
+       searched the UNPREFIXED names for every target -- i.e. the HOST's nm,
+       ld and strip, whatever target it was actually linking for.  Silent, and
+       correct-looking on a native x86_64 build, which is why it survived.
+
+   gcc/Makefile.in's comment on -DTARGET_MACHINE described the first failure
+   ("searching for filenames that begin with a dash"); that was wrong, because
+   the second one meant the concat never happened at all.
+
+   Runtime now, from the target config file collect2 is handed as
+   -ftarget-config=, which is the only thing here that knows which target this
+   link is for.  NULL means no target was named, and then there is no such
+   thing as a target-qualified tool name -- the caller uses the plain one.  */
+
+static const char *
+collect2_target_machine (void)
+{
+  return targ_caps_target_name;
+}
+
+/* Qualify tool name SUFFIX with the target triple, or return it unchanged if
+   this collect2 has not been told a target.  */
+
+static const char *
+target_qualified (const char *suffix)
+{
+  const char *tm = collect2_target_machine ();
+  return tm != NULL ? concat (tm, "-", suffix, NULL) : suffix;
+}
+
+/* Resolve one of the REAL_{LD,NM,STRIP}_FILE_NAME capabilities.  CAP is the
+   capability's value and WHAT names it for a diagnostic.
+
+   "" means the target config said nothing, and the ordinary search runs.  A
+   non-empty value is this target saying "my <tool> is exactly here", so a value
+   that does not resolve is a HARD ERROR naming the target and the path: falling
+   through to the search would run some other target's tool, or the host's,
+   which is the failure this whole file is being untangled from.  */
+
+static char *
+resolve_real_tool (const char *cap, const char *what)
+{
+  if (cap[0] == '\0')
+    return NULL;
+
+  char *found = find_a_file (&path, cap, X_OK);
+  if (found == NULL)
+    fatal_error (input_location,
+		 "target %qs sets %qs to %qs, which is not an executable file",
+		 targ_caps_target_name_for_report (), what, cap);
+  return found;
+}
 
 /* Search for NAME using prefix list PPREFIX.  We only look for executable
    files.
@@ -815,34 +886,24 @@ main (int argc, char **argv)
   static const char *const strip_suffix = "strip";
   static const char *const gstrip_suffix = "gstrip";
 
-  const char *full_ld_suffixes[USE_LD_MAX];
-#ifdef CROSS_DIRECTORY_STRUCTURE
-  /* If we look for a program in the compiler directories, we just use
-     the short name, since these directories are already system-specific.
-     But it we look for a program in the system directories, we need to
-     qualify the program name with the target machine.  */
+  /* If we look for a program in the compiler directories, we just use the
+     short name, since these directories are already system-specific.  But if
+     we look for a program in the system directories, we need to qualify the
+     program name with the target machine.
 
-  const char *const full_nm_suffix =
-    concat (target_machine, "-", nm_suffix, NULL);
-  const char *const full_gnm_suffix =
-    concat (target_machine, "-", gnm_suffix, NULL);
+     NOT INITIALISED HERE, and that is the point: the target is not known until
+     the -ftarget-config= scan below has run, so these are filled in after it.
+     They used to be `const char *const' initialised in this declaration block,
+     which is precisely why the qualification had to be a compile-time
+     question.  */
+  const char *full_ld_suffixes[USE_LD_MAX];
+  const char *full_nm_suffix;
+  const char *full_gnm_suffix;
 #ifdef LDD_SUFFIX
-  const char *const full_ldd_suffix =
-    concat (target_machine, "-", ldd_suffix, NULL);
+  const char *full_ldd_suffix;
 #endif
-  const char *const full_strip_suffix =
-    concat (target_machine, "-", strip_suffix, NULL);
-  const char *const full_gstrip_suffix =
-    concat (target_machine, "-", gstrip_suffix, NULL);
-#else
-#ifdef LDD_SUFFIX
-  const char *const full_ldd_suffix	= ldd_suffix;
-#endif
-  const char *const full_nm_suffix	= nm_suffix;
-  const char *const full_gnm_suffix	= gnm_suffix;
-  const char *const full_strip_suffix	= strip_suffix;
-  const char *const full_gstrip_suffix	= gstrip_suffix;
-#endif /* CROSS_DIRECTORY_STRUCTURE */
+  const char *full_strip_suffix;
+  const char *full_gstrip_suffix;
 
   const char *arg;
   FILE *outf;
@@ -881,17 +942,6 @@ main (int argc, char **argv)
 #endif
   int i;
 
-  for (i = 0; i < USE_LD_MAX; i++)
-#ifdef CROSS_DIRECTORY_STRUCTURE
-    /* lld and mold are platform-agnostic and not prefixed with target
-       triple.  */
-    if (!(i == USE_LLD_LD || i == USE_MOLD_LD || i == USE_WILD_LD))
-      full_ld_suffixes[i] = concat (target_machine, "-", ld_suffixes[i],
-				    NULL);
-    else
-#endif
-      full_ld_suffixes[i] = ld_suffixes[i];
-
   p = argv[0] + strlen (argv[0]);
   while (p != argv[0] && !IS_DIR_SEPARATOR (p[-1]))
     --p;
@@ -915,6 +965,24 @@ main (int argc, char **argv)
   for (i = 1; argv[i] != NULL; i++)
     if (startswith (argv[i], "-ftarget-config="))
       read_target_caps (argv[i] + strlen ("-ftarget-config="));
+
+  /* The target is known from here on, so the target-qualified tool names can
+     be built.  This MUST stay after the scan above: when it was in the
+     declaration block it could only use a compile-time triple, which is the
+     bug being fixed.  lld and mold are platform-agnostic and are never
+     prefixed with a target triple.  */
+  for (i = 0; i < USE_LD_MAX; i++)
+    if (i == USE_LLD_LD || i == USE_MOLD_LD || i == USE_WILD_LD)
+      full_ld_suffixes[i] = ld_suffixes[i];
+    else
+      full_ld_suffixes[i] = target_qualified (ld_suffixes[i]);
+  full_nm_suffix = target_qualified (nm_suffix);
+  full_gnm_suffix = target_qualified (gnm_suffix);
+#ifdef LDD_SUFFIX
+  full_ldd_suffix = target_qualified (ldd_suffix);
+#endif
+  full_strip_suffix = target_qualified (strip_suffix);
+  full_gstrip_suffix = target_qualified (gstrip_suffix);
 
   if (!HAVE_LD_DEMANGLE)
     {
@@ -1114,14 +1182,17 @@ main (int argc, char **argv)
     }
   if (ld_file_name == 0 && access (DEFAULT_LINKER, X_OK) == 0)
     ld_file_name = DEFAULT_LINKER;
-  if (ld_file_name == 0)
 #endif
-#ifdef REAL_LD_FILE_NAME
-  ld_file_name = find_a_file (&path, REAL_LD_FILE_NAME, X_OK);
+  /* This target's own ld, if the target config named one.  Was
+     `#ifdef REAL_LD_FILE_NAME' over a tm.h macro; see the block comment at the
+     top of this file.  A named-but-unresolvable path is fatal rather than a
+     fall-through to the search below.  */
   if (ld_file_name == 0)
-#endif
-  /* Search the (target-specific) compiler dirs for ld'.  */
-  ld_file_name = find_a_file (&cpath, real_ld_suffix, X_OK);
+    ld_file_name = resolve_real_tool (targ_caps.real_ld_file_name,
+				      "real_ld_file_name");
+  /* Search the (target-specific) compiler dirs for `real-ld'.  */
+  if (ld_file_name == 0)
+    ld_file_name = find_a_file (&cpath, real_ld_suffix, X_OK);
   /* Likewise for `collect-ld'.  */
   if (ld_file_name == 0)
     {
@@ -1137,11 +1208,10 @@ main (int argc, char **argv)
   if (ld_file_name == 0)
     ld_file_name = find_a_file (&path, full_ld_suffixes[selected_linker], X_OK);
 
-#ifdef REAL_NM_FILE_NAME
-  nm_file_name = find_a_file (&path, REAL_NM_FILE_NAME, X_OK);
+  nm_file_name = resolve_real_tool (targ_caps.real_nm_file_name,
+				    "real_nm_file_name");
   if (nm_file_name == 0)
-#endif
-  nm_file_name = find_a_file (&cpath, gnm_suffix, X_OK);
+    nm_file_name = find_a_file (&cpath, gnm_suffix, X_OK);
   if (nm_file_name == 0)
     nm_file_name = find_a_file (&path, full_gnm_suffix, X_OK);
   if (nm_file_name == 0)
@@ -1155,11 +1225,10 @@ main (int argc, char **argv)
     ldd_file_name = find_a_file (&path, full_ldd_suffix, X_OK);
 #endif
 
-#ifdef REAL_STRIP_FILE_NAME
-  strip_file_name = find_a_file (&path, REAL_STRIP_FILE_NAME, X_OK);
+  strip_file_name = resolve_real_tool (targ_caps.real_strip_file_name,
+				       "real_strip_file_name");
   if (strip_file_name == 0)
-#endif
-  strip_file_name = find_a_file (&cpath, gstrip_suffix, X_OK);
+    strip_file_name = find_a_file (&cpath, gstrip_suffix, X_OK);
   if (strip_file_name == 0)
     strip_file_name = find_a_file (&path, full_gstrip_suffix, X_OK);
   if (strip_file_name == 0)
@@ -1171,11 +1240,12 @@ main (int argc, char **argv)
   c_file_name = getenv ("COLLECT_GCC");
   if (c_file_name == 0)
     {
-#ifdef CROSS_DIRECTORY_STRUCTURE
-      c_file_name = concat (target_machine, "-gcc", NULL);
-#else
-      c_file_name = "gcc";
-#endif
+      /* `<triple>-gcc' when we know the triple, which is also how the driver
+	 itself resolves its target when no -ftarget-config= is given (see
+	 find_target_config in gcc.cc), so the two agree.  Was an
+	 `#ifdef CROSS_DIRECTORY_STRUCTURE' whose true arm never compiled, so
+	 this always said plain "gcc" -- the host's driver, for every target.  */
+      c_file_name = target_qualified ("gcc");
     }
 
   p = find_a_file (&cpath, c_file_name, X_OK);
@@ -3065,11 +3135,7 @@ do_dsymutil (const char *output_file) {
    here is consistent with the way other installations work (and one can
    always symlink a multitarget dsymutil with a target-specific name).  */
   const char *dsname = "dsymutil";
-#ifdef CROSS_DIRECTORY_STRUCTURE
-  const char *qname = concat (target_machine, "-", dsname, NULL);
-#else
-  const char *qname = dsname;
-#endif
+  const char *qname = target_qualified (dsname);
 #ifdef DEFAULT_DSYMUTIL
   /* Configured default takes priority.  */
   if (dsymutil == 0 && access (DEFAULT_DSYMUTIL, X_OK) == 0)

@@ -2815,3 +2815,171 @@ either with the 32-line incremental floor.
     t112-ipa-diag.sh    the gdb confirmation of the estimate_move_cost fault
     t112-guards.sh      4 both-sided arms on the running cc1
     t112-build/go/run/ts.sh, t112-reconf-gcc.sh
+
+---
+
+# Tasks #24 + #17 — `TOOL_INCLUDE_DIR` and collect2's tool paths (commit `7983dcdde9e`)
+
+Branched from `0b7c0542b2b` (STATE: #111 handover). Worktree started at the
+bare-repo HEAD `7208eca60d0`; `git reset --hard multi-target` recovered it.
+
+## 1. What was wrong, and why nothing here could see it
+
+**`gcc_tooldir` did not collapse to `$(prefix)/include`. It collapsed to
+`$(prefix)/../include`.** Measured in a real configured tree, not derived:
+
+    prefix               = [/tmp/fp]
+    libsubdir            = [/tmp/fp/lib/gcc/17.0.0]
+    libsubdir_to_prefix  = [../../../../]          <- FOUR ups, not three
+    target_noncanonical  = []
+    gcc_tooldir          = [/tmp/fp/lib/gcc/17.0.0/../../../../]
+    TOOL_INCLUDE_DIR     = [/tmp/fp/lib/gcc/17.0.0/../../../..//include]
+    readlink -f          -> /tmp/include
+    build_tooldir        = [/tmp/fp/x86_64-pc-linux-gnu]   <- the fixed sibling
+
+So under `--prefix=/usr/local` it is **`/usr/include`** exactly as #24 said,
+and the mechanism is worse than "the target component is empty": with the
+component gone, `libsubdir_to_prefix`'s fourth `..` escapes the prefix. **A
+side finding I did not chase: `libsubdir_to_prefix` looks off by one in its own
+right** — `unlibsubdir` (`../../..`) already accounts for libdir's last
+component, and the `sed` counts it again. It is invisible while a non-empty
+`$(target_noncanonical)` is appended. `gcc_gxx_include_dir` is built from the
+same variable, so `GPLUSPLUS_INCLUDE_DIR` is very likely one directory too high
+as well. **Not measured. Worth a task.**
+
+**Why every earlier arm scored it green.** `cc1 -v` prints only include
+directories that *exist*, and on NixOS none of the built-in ones do. Both arms
+print an empty list. My first four measurements were vacuous for that reason,
+and two of them looked like clean passes:
+
+    === /tmp/b111  target=x86_64-pc-linux-gnu
+    #include <...> search starts here:
+    End of search list.
+
+That is not "the entry is absent". It is "this host cannot answer".
+
+## 2. The environment that could see it
+
+`--prefix=/tmp/fp` with two directories created by hand, and the second one
+was the part I got wrong first:
+
+  * `/tmp/include/t24poison.h` — the poison header, at the path the `..`-chain
+    actually resolves to. Putting it in `/tmp/fp/include` (the path the *name*
+    suggests) made the test report "not found" in both arms — a false green,
+    from a poison file the compiler was never going to look for.
+  * `/tmp/fp/lib/gcc/17.0.0/` — **required**, and this is the subtle one. A
+    `..`-relative path cannot be traversed if the intermediate directories do
+    not exist, so before I created it the entry was dropped for a reason that
+    had nothing to do with the bug.
+
+Two full builds under that prefix, one per arm, so no `git stash` A/B:
+
+    /tmp/b24-before   SRC=.../agent-a583ac0157ff44074   (pre-change tree)
+    /tmp/b24-after    SRC=.../agent-ad79a17e47a430c73   (this tree)
+    scratchpad/t24-fp-build.sh, driven by SRC= D= PREFIX=
+
+`scratchpad/t24-poison.sh` uses `-fsyntax-only`. It must: with codegen on,
+**aarch64 ICEs in `ix86_data_alignment`** on `int x = 1;` — i386's hook
+answering for aarch64, present in BOTH arms, nothing to do with this change.
+**Unreported elsewhere as far as I can tell; it deserves its own task.**
+
+## 3. Results
+
+    BEFORE  x86_64:   FOUND /tmp/include/t24poison.h   <-- host header reached
+    BEFORE  aarch64:  FOUND /tmp/include/t24poison.h   <-- the SAME directory
+    AFTER   x86_64:   not found
+    AFTER   aarch64:  not found
+
+and the `-v` lists, which name the path rather than just scoring it:
+
+    BEFORE both targets:  /tmp/fp/lib/gcc/17.0.0/include
+                          /tmp/fp/lib/gcc/17.0.0/../../../..//include
+    AFTER  both targets:  /tmp/fp/lib/gcc/17.0.0/include
+
+Per-target arm (`scratchpad/t24-perTarget.sh`), three arms + control each:
+
+    x86_64   absent 0 | verbatim /tmp/t24-tid-x86 | searched "x86-tool-include-dir" | control 0
+    aarch64  absent 0 | verbatim /tmp/t24-tid-a64 | searched "a64-tool-include-dir" | control 0
+
+The `absent` arm self-checks that the shipped config file has no
+`tool_include_dir` line, so it cannot pass vacuously.
+
+## 4. #17 — and a comment in the tree that was wrong
+
+`gcc/Makefile.in` claimed collect2 searched `"-nm"`, `"-ld"`, `"-strip"`
+because `$(target_noncanonical)` is empty. **The concat it described never
+compiled**: every one of those lines was inside `#ifdef
+CROSS_DIRECTORY_STRUCTURE`, so `target_machine` did not exist as a variable and
+collect2 searched the *unprefixed* names — the host's tools, for every target.
+Two faults in opposite directions cancelling into something that reads
+harmless. Measured with `collect2 -debug`, which reports the NAME asked for
+rather than what happens to exist here:
+
+    BEFORE  x86_64:   collect-ld gcc gnm gstrip ld nm real-ld strip
+    BEFORE  aarch64:  collect-ld gcc gnm gstrip ld nm real-ld strip      identical
+    AFTER   x86_64:   ... + x86_64-pc-linux-gnu-{ld,nm,strip,gnm,gstrip,gcc}
+    AFTER   aarch64:  ... + aarch64-unknown-linux-gnu-{ld,nm,strip,gnm,gstrip,gcc}
+
+The enabling change is ordering: the `-ftarget-config=` scan now runs BEFORE
+the `full_*_suffix` construction, which used to be `const char *const`
+initialisers in the declaration block — which is *why* the question had to be
+a compile-time one.
+
+`real_{ld,nm,strip}_file_name`, via `collect2`'s own resolution dump (an
+execution test scores both arms the same here, because with no `ld` on this
+host collect2 gives up before it would run `nm`):
+
+    BEFORE  c_file_name = gcc            nm_file_name = not found   (key ignored)
+    AFTER   c_file_name = x86_64-pc-linux-gnu-gcc   nm_file_name = <the named one>
+    AFTER   collect2: fatal error: target 'x86_64-pc-linux-gnu' sets
+            'real_nm_file_name' to '/nonexistent/x86_64-pc-linux-gnu/nm',
+            which is not an executable file
+    AFTER   ... and the same naming aarch64-unknown-linux-gnu
+
+`MD_EXEC_PREFIX` needed no capability: **collect2 never read it.** Only
+`gcc.cc` does, and there it already travels through the spec file
+(`gen-target-specs.cc` emits `md_exec_prefix`). The `#undef` was suppressing
+nothing. It is now unconditional so no `tm.h` can reintroduce one.
+
+Corrected in passing: `target-caps.cc`'s header claimed *"Only cc1 calls
+read_target_caps"*. The driver (`gcc.cc:8716`) and collect2 (`collect2.cc:916`)
+both do, and collect2 has since `fa93fd08c8f`. A written invariant, false.
+
+## 5. Numbers in the brief that did not survive contact
+
+  * Brief: *"aarch64 5/104 header + 6 retired-pending"*. **Measured 8 PASS /
+    104 FAIL** — and identically in the PRE-CHANGE build `/tmp/b111`, so the 3
+    are someone else's landed work, not mine. PRINCIPLES §6 says 2/110, which
+    is stale from a different direction. FAIL 104 is the number both the brief
+    and I agree on.
+  * TAB 64 arms: **i386 32 PASS / 0 FAIL, aarch64 27 PASS / 5 FAIL** — matches
+    both documents. The five are `BYTES_/WORDS_/FLOAT_WORDS_/REG_WORDS_BIG_ENDIAN`
+    and `SHIFT_COUNT_TRUNCATED`.
+  * `Makefile.in:857` in the brief is `:871` on this base.
+
+## 6. What I did NOT do
+
+  * `config/linux.h` and `config/rs6000/sysv4.h` build their own
+    `INCLUDE_DEFAULTS` from `#ifdef TOOL_INCLUDE_DIR`. With the `-D` gone those
+    entries simply drop. That is the same treatment `cppdefault.cc` already
+    gives `INCLUDE_DEFAULTS` deliberately, and getting `INCLUDE_DEFAULTS` out
+    of the privileged target's `tm.h` remains its own job. **Not measured** —
+    no build here takes that arm.
+  * No probe: `--with-real-ld` and friends are pass-only. A probe would have to
+    decide that some `ld` on `PATH` is "this target's real ld", which is the
+    guess that caused this.
+  * The `libsubdir_to_prefix` off-by-one and the `ix86_data_alignment` aarch64
+    ICE are both flagged above and both unfixed.
+
+## 7. FILES (scratchpad)
+
+    t24-build.sh       my build dir /tmp/b24 (t111-build.sh repointed)
+    t24-fp-build.sh    the FAKE PREFIX build; SRC= D= PREFIX=
+    t24-ts.sh          target-specs/configure per target (`make target-specs`
+                       does not exist any more; rv-specs.sh is stale)
+    t24-inc.sh         cc1 -v system include list, both targets
+    t24-poison.sh      does a header that exists ONLY in the host directory get
+                       found?  -fsyntax-only, see the aarch64 ICE above
+    t24-perTarget.sh   absent / verbatim / searched + cross-target control
+    t17-tools.sh       which tool NAMES collect2 searches, both targets
+    t17-real.sh        real_nm_file_name: good / bad / control, both targets

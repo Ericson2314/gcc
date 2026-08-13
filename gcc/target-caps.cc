@@ -20,8 +20,9 @@ along with GCC; see the file COPYING3.  If not see
 /* This lives in libcommon.a because every host binary that consults a
    capability has to resolve targ_caps: cc1 and the language front ends, the
    driver and the language spec programs via libcommon-target.a, and collect2,
-   which links neither opts.o nor toplev.o.  Only cc1 calls read_target_caps;
-   everything else sees the built-in defaults.  */
+   which links neither opts.o nor toplev.o.  cc1, the driver and collect2 all
+   call read_target_caps, each off its own -ftarget-config=; the language spec
+   programs see the built-in defaults.  */
 
 #include "config.h"
 #include "system.h"
@@ -287,6 +288,20 @@ struct target_caps targ_caps =
      See target-caps.h.  */
   .fixed_include_dir = "",
 
+  /* "" for the same reason, and this one closes a hole that was WORSE than a
+     missing directory.  The compile-time -DTOOL_INCLUDE_DIR was
+     $(gcc_tooldir)/include with an EMPTY target component, i.e. $(prefix)
+     -- `/usr/include' by default.  Every target got the host's headers, under
+     no capability's control.  See target-caps.h.  */
+  .tool_include_dir = "",
+
+  /* "" = "nothing said": collect2 does its ordinary search.  There is no
+     compile-time answer because the tm.h macros these replace were gated on
+     "am I a cross compiler?", which a multi-target compiler cannot ask.  */
+  .real_ld_file_name = "",
+  .real_nm_file_name = "",
+  .real_strip_file_name = "",
+
   /* The site-local and system header directories, and the component of the
      latter.  NULL rather than a string, and that is deliberate: see
      target-caps.h.  The compile-time answer for these three is not a plain
@@ -352,6 +367,10 @@ read_target_caps (const char *file)
 	  { "gxx_backward_include_dir", &targ_caps.gxx_backward_include_dir },
 	  { "gxx_libcxx_include_dir", &targ_caps.gxx_libcxx_include_dir },
 	  { "fixed_include_dir", &targ_caps.fixed_include_dir },
+	  { "tool_include_dir", &targ_caps.tool_include_dir },
+	  { "real_ld_file_name", &targ_caps.real_ld_file_name },
+	  { "real_nm_file_name", &targ_caps.real_nm_file_name },
+	  { "real_strip_file_name", &targ_caps.real_strip_file_name },
 	  { "local_include_dir", &targ_caps.local_include_dir },
 	  { "native_system_header_dir", &targ_caps.native_system_header_dir },
 	  { "native_system_header_component",

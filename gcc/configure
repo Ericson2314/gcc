@@ -716,7 +716,6 @@ all_compilers
 srcdir
 subdirs
 dollar
-gcc_tooldir
 enable_lto
 DO_LINK_SERIALIZATION
 DO_LINK_MUTEX
@@ -20900,7 +20899,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 20903 "configure"
+#line 20902 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21006,7 +21005,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21009 "configure"
+#line 21008 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -25279,8 +25278,6 @@ case "$CFLAGS" in
   echo "source ${srcdir}/gdbasan.in" >> .gdbinit
   ;;
 esac
-
-gcc_tooldir='$(libsubdir)/$(libsubdir_to_prefix)$(target_noncanonical)'
 
 
 

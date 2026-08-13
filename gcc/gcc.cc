@@ -11940,11 +11940,15 @@ find_fortran_preinclude_file (int argc, const char **argv)
   /* Search first for 'finclude' folder location for a header file
      installed by the compiler (similar to omp_lib.h).  */
   add_prefix (&prefixes, argv[2], NULL, 0, 0, 0);
-#ifdef TOOL_INCLUDE_DIR
-  /* Then search: <prefix>/<target>/<include>/finclude */
-  add_prefix (&prefixes, TOOL_INCLUDE_DIR "/finclude/",
-	      NULL, 0, 0, 0);
-#endif
+  /* Then search: <prefix>/<target>/<include>/finclude.  Was the compile-time
+     TOOL_INCLUDE_DIR, whose target component was empty (see
+     gcc/cppdefault.cc), so this prefix was really <prefix>/include/finclude --
+     the host's, for every target.  "" means this target has no binutils
+     include directory and the prefix is simply not added.  */
+  if (targ_caps.tool_include_dir[0] != '\0')
+    add_prefix (&prefixes, concat (targ_caps.tool_include_dir, "/finclude/",
+				   NULL),
+		NULL, 0, 0, 0);
 #ifdef NATIVE_SYSTEM_HEADER_DIR
   /* Then search: <sysroot>/usr/include/finclude/<multilib> */
   add_sysrooted_hdrs_prefix (&prefixes, NATIVE_SYSTEM_HEADER_DIR "/finclude/",
