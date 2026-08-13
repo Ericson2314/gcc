@@ -16,6 +16,31 @@ in one session and were right every time.
 One compiler binary serving all back ends, with **zero target-specific
 information baked in at compile time**.
 
+**TWO BACK ENDS IS A HABIT, NOT A CONSTRAINT — AND IT IS WHY SO MUCH HERE IS
+"UNMEASURABLE".** Everything on this branch has been built with i386 +
+aarch64, and that got treated as a property of the environment. It is a
+choice, and the goal is **all** back ends in one binary. The user: *"aren't we
+trying to build **all** the backends?"*
+
+Look how much rests on it, every item a recorded honest negative:
+
+- **51 `gcc/config/` files** whose `tm.h` include could not be classified.
+- `INCOMING_REG_PARM_STACK_SPACE` — correct **by luck**: i386 returns 0 for
+  SysV, the same as aarch64's absence.
+- `ARG_POINTER_CFA_OFFSET` — correct **only because `FIRST_PARM_OFFSET` is 0
+  in both bases**. *Passing for a reason a third back end would destroy.*
+- `STACK_GROWS_DOWNWARD` / `ARGS_GROW_DOWNWARD` — genuinely per-base, **46 vs
+  3** definers, but they **agree on this pair**.
+- `RELOAD_ELIMINABLE_REGS`, `HONOR_REG_ALLOC_ORDER` — no in-tree back end
+  defines them, so no arm can be both-sided.
+- The DFA-absent case — both configured bases have reservations.
+
+Every one is the same sentence: **two back ends cannot tell.** So "unmeasurable
+with this pair" is not a permanent verdict, it is a **request for a third back
+end** — and adding one is worth more than most individual conversions, because
+it converts a whole class of luck into evidence at once. Before writing that
+phrase, ask whether one more configured target would settle it.
+
 **THERE IS NO NON-ARCH-SPECIFIC `tm.h`, AND THERE NEVER WAS ONE.** This is the
 whole bug in one artefact, and it is worth reading the file before reasoning
 about it. The bare `gcc/tm.h` in a two-backend build is 1578 bytes whose
