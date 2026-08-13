@@ -558,6 +558,17 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
+**The anchor value is 47 as of `1518ec4f96f`, not 45.** The `target_*` struct
+sweep added a `DEPFILES` rule naming `MULTI_TARGET_REG_PROBES` twice. Every
+`*-conf.sh` written before that merge asserts `WANT_ANCHOR:-45` *exactly*, so
+they now refuse a **correct** tree with rc=9. That is the intended direction —
+an exact assert fails loudly rather than silently measuring the wrong tree —
+but it means a new task must set `WANT_ANCHOR=47` or write a fresh conf script.
+Do not relax the assert to `>=`: the whole point is that a tree missing the
+change fails here rather than reporting a green for a compiler that is not this
+one. Expect this line to need updating again; the number is not the invariant,
+the exactness is.
+
 Generalise it: **"this artefact names the wrong path" and "this artefact was
 USED to produce a wrong result" are two claims, and the second needs its own
 instrument.** Repairing the first without measuring the second leaves you
