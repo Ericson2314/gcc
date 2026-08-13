@@ -8210,3 +8210,199 @@ the table'.  Restored, and the restore asserted.
                      the replacement contains `||'.  Not python3.
     exist-probe.sh   THE FIFTH PROBE SHAPE.  Pre-registered table, distinctness
                      control asserted FIRST and fatal, blind spots stated.
+
+# TASK -- WHICH REPORTED GREENS DID THE BROKEN GUARD SCRIPTS ACTUALLY
+# PRODUCE?  ANSWER: NONE.  THE LIST OF UNCORROBORATED CONVERSIONS IS EMPTY,
+# AND IT IS EMPTY FOR A STRUCTURAL REASON, NOT A LUCKY ONE.
+
+Worktree came up at bare-repo HEAD `7208eca60d0' AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in' **0**, `git reset --hard multi-target' took it
+to **39**, no `scratchpad/'.  SIXTEEN in a row.  **The brief named no task
+numbers I could read**; per PRINCIPLES section 7 that is the coordinator's
+error and everything below is measured.  Build dir `/tmp/b-a36-t111', my own,
+cold.
+
+## 1. THE FINDING: `HARDCODED-SELF' AT AUTHORING TIME, `FOREIGN' ONLY BY
+## INHERITANCE
+
+The brief asked which previously-reported greens routed through the 23 broken
+scripts.  The premise behind the question is that a script naming
+`agent-XXXX' built a *stranger's* tree.  **Measured, that is not what
+happened, and the distinction decides the whole audit.**
+
+For all 22 `FOREIGN-SRC' scripts, the worktree named in `SRC=' is the worktree
+of the agent who WROTE that script:
+
+    t106-build.sh -> a7faca...  (that tree's highest task: t106)
+    t107-build.sh -> a14027...  (t107)
+    t108-build.sh -> a7d5fb...  (t108)
+    t111-build.sh -> a583ac...  (t111)     t112 -> aa0b6d (t112)
+    t113-build.sh -> a8e4f8...  (t113)     t116 -> a3f44d (t116)
+    t117-build.sh -> a75a2f...  (t117)     t135 -> ab8de4 (t135)
+    t77-conf.sh   -> af7e06...  (t77)      t24/t45/t78 -> the t111-era trees
+    t88/t92       -> the t106-era trees    eb-*/rv-* -> their own
+
+Every author hardcoded its OWN absolute path.  The line was correct when
+written and correct when run.  It became `FOREIGN' only at the moment the file
+was committed and inherited by the NEXT worktree.
+
+**Scale of the exposure, measured**: across ~50 worktrees there are **506**
+scripts carrying a hardcoded `SRC=', of which **21** name their containing
+worktree and **485** name a different one.  So the loaded guns were real and
+numerous.  The question is whether any was fired.
+
+## 2. THE INDEPENDENT INSTRUMENT -- `scratchpad/built-tree-audit.sh'
+
+`conf-audit.sh' scores the SCRIPTS AS THEY STAND.  It cannot answer a question
+about builds that already happened, and it reads the very artefacts under
+suspicion.  So the evidence here comes from somewhere else entirely: **each
+build dir's own `config.log', which records the absolute srcdir `configure'
+was invoked from.**  That is the build's own testimony about what it compiled.
+It does not depend on reading, trusting or re-running any guard script, and it
+survives the scripts being repaired afterwards -- which is the actual situation.
+
+**96 `config.log's read.  EVERY build dir was configured from the worktree of
+the agent that OWNED that task number, at that task's own timestamp.**  Not
+one build anywhere used a foreign tree.
+
+And the anchor is **MONOTONIC IN TIME**, which is the both-sided half:
+
+    08-12 (early)  anchor 23   b-cold62, b-mst
+    08-12          anchor 27   b101 b106 b107 b64 b65 b-77t b88* b-92 b93 b94 ...
+    08-12 (18:56+) anchor 28   b108 b108f b111 b111m b112 b113 b116 b117
+                               b24 b45 b78
+    08-12          anchor 30   b-43  (that tree's own WIP, ahead of branch)
+    08-12 (23:36+) anchor 37   b119 b119c b122
+    08-13          anchor 37   b123 b124 b125 b126 b127 b128 b129
+    08-13 (04:53+) anchor 39   b130 b131 b132 b133 b134 b135
+
+No agent built a tree staler than its own era.  A fired FOREIGN-SRC would show
+as a build dir whose srcdir tree is not its owner's, or as an anchor going
+BACKWARDS against the clock.  **Neither appears.**
+
+## 3. THE RANKED LIST THE BRIEF ASKED FOR
+
+**It is empty, and here is the reasoning that establishes it rather than
+asserts it.**  Ranking the affected conversions by how much independent
+corroboration they have, worst first:
+
+  RANK 1 (weakest evidence, and still sufficient): #106, #107, #111, #112,
+    #113, #116, #117, #24, #45, #77, #78, #88, #92, rv, eb.  Their guard
+    script carried a hardcoded SRC.  **Corroborated** by the config.log of
+    their own build dir naming their own tree at their own timestamp.  This is
+    object-level and independent of the script.  No re-run needed.
+  RANK 2: #108 -- same, PLUS a live re-run of `t108-build.sh' by the previous
+    agent after repair, PLUS `t108-evidence.sh' object-level readings.
+  RANK 3: #135 -- same, PLUS `t135-obj.sh' `nm' readings (`ix86_reg_parm_
+    stack_space' 1->0 in `calls.o'/`expr.o' while `ix86_push_rounding' still
+    scored 1 in seven objects in the SAME run), PLUS the `-fdump-rtl-csa'
+    pass-gate arm.  Note its SRC tree `ab8de4' measures **39**, i.e. current.
+  NOT AFFECTED AT ALL: #119, #122-#134.  Their scripts are 15 of the
+    "already correct" set and never carried the defect.
+
+**The brief's five examples are all in the NOT-AFFECTED band, and I checked
+rather than assumed** -- attributed by line number to their task headers in
+STATE.md:
+
+    `bl g; bl f' -> `bl f; bl g'            STATE.md:7618   TASK #134
+    850 -> 793 bytes, x86_64 byte-identical STATE.md:7057   TASK #132
+    aarch64 97/16/30/97 vs x86_64 17/...    STATE.md:5684   TASK #126
+    the CFI/`bl f' assembly reading         STATE.md:6728   TASK #131
+
+    `1->0' on `function.o'/`calls.o'/`expr.o'  #134/#135 -- #135 IS in the
+    affected set, and is the best-corroborated entry in it (RANK 3).
+    `{0,0}' -> `{16,0}' STACK_DYNAMIC_OFFSET is #132-era, not affected.
+
+So: **a covered conversion is a result, and these are covered.**
+
+## 4. THE ONE APPARENT ANOMALY, RESOLVED AS CORRECT PRACTICE
+
+`b24-before' was configured from `a583ac' (the **t111** tree) while `b24' and
+`b24-after' used `ad79a1' (its own).  That reads exactly like a fired
+FOREIGN-SRC.  It is not: #24's own STATE.md:2118-2119 documents it as a
+deliberate A/B --
+
+    /tmp/b24-before   SRC=.../a583ac...   (pre-change tree)
+    /tmp/b24-after    SRC=.../ad79a1...   (this tree)
+
+which is the CORRECT control shape, and is precisely what PRINCIPLES section 5
+demands when it says an A/B across `git stash' is not an A/B (mtimes refresh).
+Building the "before" side from a genuinely separate tree is the fix, not the
+bug.  **Found by looking, not by assuming; reported because the obvious
+reading is that it is the defect.**
+
+## 5. THE LIVE ARM -- 22 STATIC-ONLY BECAME 21
+
+The previous agent live-ran `t108-build.sh' and recorded the honest bound: 22
+of 23 verified statically only.  I ran ONE more, chosen by the ranking rather
+than by convenience: **`t111-build.sh' -- the lineage TEMPLATE, which STATE.md
+records "every later tNNN-build.sh is a copy of"**, so it is the single script
+whose correctness propagates furthest.
+
+    D=/tmp/b-a36-t111 sh scratchpad/t111-build.sh multi-target-objs
+    rc=0
+    13 objects in mt-i386/, 23 in mt-aarch64/   (identical to the t108 run)
+    1093 `worktrees/agent-' references in the build log, resolving to
+    EXACTLY ONE id: `agent-a3611764dba7e82f4' -- MY worktree.
+
+That last line is the positive evidence, not the absence of an error: the
+self-relative `SRC' demonstrably took effect.  **21 of 23 remain static-only
+and I am not quoting that as more.**
+
+The one `collect2: error: ld returned 1 exit status' in its stderr is #119's
+recorded `-m32' multilib CONFIGURE PROBE -- it prints `Multilib is mandatory
+... configuring will continue' and does.  Checked, not reported as a failure.
+
+Stderr composition, COLD arm for `multi-target-objs' only (NOT comparable with
+either the 32-line incremental floor or the ~870-line cold `all-gcc'): 164
+lines, 23 `warning:', 24 `'@' is redundant', 0 `is unchanged', 1 `error:' (the
+probe above).
+
+## 6. A LIMIT OF THE REPAIRED GUARD, STATED RATHER THAN "FIXED"
+
+The repair added to each script:
+
+    grep -q MULTI_TARGET "$SRC/gcc/Makefile.in" || { echo FATAL...; exit 9; }
+
+**That is a 0/non-0 test, not a value test.**  It catches the documented
+bare-repo-HEAD case (0 hits) and would NOT catch a 27 or a 28.  With `SRC' now
+self-relative the stale-sibling case can no longer arise from the `SRC' line,
+so the guard is proportionate to the residual risk -- but the guard alone is
+NOT what makes the corpus safe, the self-relative `SRC' is.  Hardcoding `-eq
+39' would be worse: the number legitimately grows with every landed change, so
+it would be a floor that has to be edited, i.e. the test-harness floor.
+Recorded so the next reader does not mistake the grep for a full anchor check.
+
+## 7. WHAT I DID NOT DO
+
+  * **21 of the 23 repaired scripts are STILL verified statically only.**  I
+    converted one (t111).  23 cold builds remains unaffordable.
+  * **The scoreboard was NOT run and I claim NO movement.**  Carrying the
+    recorded line unchanged: header **i386 112 PASS / 0 FAIL, aarch64 8 PASS /
+    104 FAIL of which only 2 are TRUSTED**; TAB **i386 32/0, aarch64 27/5**.
+  * **No compiler source was changed by this task**, so `stock-compare',
+    `big.c', `int x = 1;' and the x86_64 `-O2' md5 cannot have moved, and
+    re-running them would have been a claim rather than a measurement.  The
+    live t111 build is a build-system arm, not a codegen arm.
+  * `insn-emit' untouched; the `gen_movxf' ruling is unchanged.
+  * **A diagnostic I found and did NOT silence**: `target-regs.cc:65' and one
+    sibling emit `warning: missing terminating ' character', from the
+    apostrophes in the TEXT of two `#error' guards ("that base's", "this back
+    end's").  PRINCIPLES names unterminated quotes as twice meaning silent
+    truncation, so I established what it reports before leaving it: the two
+    `#error's are inert here (the file IS compiled with both macros), and the
+    warning is the lexer noticing an apostrophe in `#error' text.  Benign, but
+    it is 2 of the 23 warnings in every build of that file.  Rewording the two
+    messages would remove it; that touches compiler source and was not this
+    task's remit.
+
+## 8. FILES
+
+    built-tree-audit.sh  THE DURABLE HALF.  Recovers, for every build dir,
+                         WHICH TREE it was configured from, out of its own
+                         `config.log'.  Independent of the guard scripts by
+                         construction.  Non-vacuity FATAL, fault-injected
+                         (matcher pointed at a nonexistent prefix -> rc=9).
+                         Blind spots written in the file: deleted build dirs
+                         are invisible, and gcc-level srcdirs print GONE for
+                         the anchor by path construction, not by defect.

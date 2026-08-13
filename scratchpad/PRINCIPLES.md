@@ -229,6 +229,36 @@ Two lessons, and the second is the sharper one:
   a noisy failure in something that was not being watched, **audit the thing
   mechanically rather than by eye** before declaring it healthy.
 
+**AND THE FOLLOW-UP CORRECTED THE PARAGRAPH ABOVE — READ BOTH.** The trees
+those scripts pointed at measure **23, 27, 28 or 39** (the paragraph above
+says 27/28/39; `eb-*` pointed at a **23**, the stalest, and it was missed).
+More importantly the framing "**another** agent's worktree" is wrong about
+*authoring time* and right only about *inheritance*. Measured: for all 22
+`FOREIGN-SRC` scripts, the worktree in `SRC=` is **the worktree of the agent
+who wrote that script**. Each author hardcoded its OWN absolute path; the line
+was correct when written and when run, and became foreign only when the file
+was committed and inherited by the next worktree. Across ~50 worktrees, **506**
+scripts carry a hardcoded `SRC=`: **21** name their own tree, **485** name
+someone else's. So the exposure was real and large — **and never fired.**
+
+**The distinction matters because it decides whether past greens survive**, and
+you cannot settle it from the scripts. Settle it from **the builds' own
+testimony**: each build dir's `config.log` records the absolute srcdir
+`configure` ran from. That instrument is independent of the scripts by
+construction and survives them being repaired afterwards. 96 read: **every
+build dir was configured from the tree of the agent that owned that task, at
+that task's own timestamp, with the anchor monotonic in time (23→27→28→30→37→
+39)**. A fired defect would show as an owner mismatch or an anchor going
+backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
+
+Generalise it: **"this artefact names the wrong path" and "this artefact was
+USED to produce a wrong result" are two claims, and the second needs its own
+instrument.** Repairing the first without measuring the second leaves you
+unable to say which past results still stand — and the honest answer here was
+*all of them*, which no amount of re-reading the scripts could have shown.
+An all-clear is only worth stating when the instrument that produced it could
+have said otherwise.
+
 **SWEEP THE FAMILY; DO NOT MEET IT ONE WALL AT A TIME.** Four generated
 per-base families were found built, linked, **and never selected** — the
 `targetm` asm ops, the optab tables, the predicates/constraints, and the insn
