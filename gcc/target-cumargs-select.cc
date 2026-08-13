@@ -454,6 +454,30 @@ mt_incoming_reg_parm_stack_space (tree fndecl)
   return mt_frame ()->incoming_reg_parm_stack_space (fndecl);
 }
 
+/* `REG_PARM_STACK_SPACE', existence and value.  Uncached, like every other
+   member of this family: `has_' is a load and a compare, and the value one is
+   a target hook call on i386 (`ix86_reg_parm_stack_space' reads
+   `ix86_function_abi (fndecl)'), so it depends on the decl and cannot be
+   cached per function anyway.
+
+   `mt_reg_parm_stack_space' asserts the existence answer rather than trusting
+   its callers.  Every shared value site sits under `if (mt_has_reg_parm_
+   stack_space ())' today, and a site that stopped doing so would otherwise
+   read the `#else' arm's 0 -- which is the primary's answer by another route,
+   and indistinguishable from a real 0 exactly on the pair configured here.  */
+bool
+mt_has_reg_parm_stack_space (void)
+{
+  return mt_frame ()->has_reg_parm_stack_space ();
+}
+
+int
+mt_reg_parm_stack_space (tree fndecl_or_type)
+{
+  gcc_assert (mt_frame ()->has_reg_parm_stack_space ());
+  return mt_frame ()->reg_parm_stack_space (fndecl_or_type);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

@@ -758,6 +758,39 @@ mt_base_incoming_reg_parm_stack_space (tree fndecl ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* `REG_PARM_STACK_SPACE' itself, read in THIS base's translation unit -- the
+   calls.cc and expr.cc paths.  Two thunks, because the shared sites ask two
+   different questions: twelve of them ask whether the base defines the macro
+   AT ALL, and two ask for its value.  See target-frame.h for why collapsing
+   them into "the value, with 0 meaning absent" is wrong for
+   args-grow-downward back ends.
+
+   The value thunk is `#ifdef'-ed rather than floored: a base that defines
+   nothing cannot evaluate the macro, and shared code never asks it to,
+   because every value site is now under the existence test.  The `0' in the
+   `#else' arm is therefore unreachable-by-contract rather than a fallback --
+   it exists so the field is always filled and so a base that acquires the
+   macro later needs no edit here.  */
+static bool
+mt_base_has_reg_parm_stack_space (void)
+{
+#ifdef REG_PARM_STACK_SPACE
+  return true;
+#else
+  return false;
+#endif
+}
+
+static int
+mt_base_reg_parm_stack_space (tree fndecl_or_type ATTRIBUTE_UNUSED)
+{
+#ifdef REG_PARM_STACK_SPACE
+  return REG_PARM_STACK_SPACE (fndecl_or_type);
+#else
+  return 0;
+#endif
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -1050,7 +1083,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_accumulate_outgoing_args,
   mt_base_stack_dynamic_offset,
   mt_base_push_args_reversed,
-  mt_base_incoming_reg_parm_stack_space
+  mt_base_incoming_reg_parm_stack_space,
+  mt_base_has_reg_parm_stack_space,
+  mt_base_reg_parm_stack_space
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

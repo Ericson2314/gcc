@@ -2417,6 +2417,25 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef PUSH_ARGS_REVERSED
 #define PUSH_ARGS_REVERSED (mt_push_args_reversed ())
 
+/* `REG_PARM_STACK_SPACE' -- UNDEFINED FOR SHARED CODE, NOT REDIRECTED, and
+   the difference is the point.  The name was `#ifdef'-tested at twelve shared
+   sites (eleven in calls.cc, one `#if defined' in expr.cc); defining it to a
+   call would have made every one of those guards TRUE for every target, which
+   is the `#if HAVE_ATTR_length' failure recorded above running the other way.
+   #135 replaced the guards with `mt_has_reg_parm_stack_space ()' and the two
+   value uses with `mt_reg_parm_stack_space (...)', so nothing shared spells
+   the macro any more -- and this `#undef' is what makes a future spelling
+   fail to compile instead of quietly picking up i386's.
+
+   AN `#undef' WITH NO `#define' IS A WEAKER GUARANTEE THAN A REDIRECT AND IS
+   RECORDED AS SUCH: a re-introduced `REG_PARM_STACK_SPACE (x)' fails by name,
+   but a re-introduced `#ifdef REG_PARM_STACK_SPACE' silently reads FALSE for
+   every target.  That is strictly better than today (it reads the PRIMARY's
+   answer for every target) and it is not the same as impossible.  The same
+   caveat applies to every macro this project retires by undefining rather
+   than by redirecting.  */
+#undef REG_PARM_STACK_SPACE
+
 /* ------------------------------------------------------------------------
    THE NEIGHBOURS, CHECKED AND DELIBERATELY NOT REDIRECTED.  A family checked
    and judged fine is a result; silence about it is not.  All three verdicts
@@ -2570,16 +2589,41 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    which is the `Pmode' trap running the other way, and the reason the
    evidence here is the tail-jmp and the symbol count rather than a value.
 
-   THE OTHER PATHS ARE OPEN AND ARE NOT CLAIMED CLOSED.  Enumerated from the
-   source by `scratchpad/t134-rpss.sh', with a verdict for each:
-     - `calls.cc' -- ELEVEN `#ifdef REG_PARM_STACK_SPACE' sites (:174, :1096,
-       :2793, :2885, :3568, :4014, :4257, :4272, :4597, :4945, closing at
-       :1194) and TWO value sites (:2886, :4273).  `calls.o' still binds
-       `U ix86_reg_parm_stack_space'.  OPEN, and the largest remaining piece;
-       several of the `#ifdef's span whole blocks, so this is `PUSH_ROUNDING'
-       SHAPE 2/5 work, not a redirect.
-     - `expr.cc:2192/:2198' -- one `#if defined' plus a value use, and
-       `expr.o' binds the symbol too.  OPEN.
+   #135 CLOSED THE REMAINING TWO, and the enumeration is now complete:
+     - `calls.cc' -- the ELEVEN `#ifdef' sites and TWO value sites.  CLOSED.
+       Three of the eleven were guards over a DECLARATION or a DEFINITION
+       (:174, :1096, :1194) and are simply dropped; two were guards over LOCAL
+       VARIABLES (:2793, :4257), now declared unconditionally with
+       `low_to_save'/`high_to_save' initialised, because with the guard gone
+       the compiler can no longer see that they are written before read; four
+       became `if (mt_has_reg_parm_stack_space () && ...)' or, where
+       `save_area' already answers the question by being null, nothing at all;
+       and the two value sites became `mt_reg_parm_stack_space (...)'.
+     - `expr.cc:2192/:2198' -- CLOSED, and the `(void) fn;' that existed only
+       to silence a set-but-not-used warning went with it, since `fn' is now
+       used unconditionally further down the same function.
+   `calls.o' and `expr.o' bind `ix86_reg_parm_stack_space' ZERO times where
+   both bound it ONCE, measured in the same run in which `ix86_push_rounding'
+   still scores 1 in seven objects -- so the zero is a finding and not a
+   demangling failure (`scratchpad/t135-obj.sh', `index ($0, f)', nm
+   non-vacuity floor of 117319 undefined lines).
+
+   TWO SLOTS AND NOT ONE, which is the design decision in this conversion.
+   `has_reg_parm_stack_space' answers what the `#ifdef's asked and
+   `reg_parm_stack_space' answers what the two value uses asked, because
+   "defined and yielding 0" and "not defined" are NOT the same state at every
+   site: `save_fixed_argument_area' does `high = reg_parm_stack_space;
+   if (ARGS_GROW_DOWNWARD) high += 1;', so on an args-grow-downward back end a
+   zero value still inspects `stack_usage_map[0]' while the undefined case
+   never calls the function.  Neither configured base grows args downward, so
+   this pair could not have caught a collapse of the two; it was found by
+   reading the callee.  See target-frame.h.
+
+   THE THUNKS DIVERGE IN THE EXISTENCE ANSWER, WHICH IS THE PART THE VALUE
+   CANNOT SHOW: i386's `mt_base_has_reg_parm_stack_space' is
+   `mov $0x1,%eax; ret' and its value thunk is a `call' to
+   `ix86_reg_parm_stack_space' (R_X86_64_PLT32); aarch64's are
+   `mov $0x0,%eax; ret' and `mov $0x0,%eax; ret'.
      - `function.cc' -- CLOSED by #134; the name is now undefined there, so a
        future shared spelling fails by name.
      - `target-cumargs.cc:683-686, :745-748' -- the two per-base derivations.

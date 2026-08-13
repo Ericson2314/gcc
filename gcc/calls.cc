@@ -171,10 +171,12 @@ static bool check_sibcall_argument_overlap (rtx_insn *, struct arg_data *,
 					    bool);
 static tree split_complex_types (tree);
 
-#ifdef REG_PARM_STACK_SPACE
+/* Declared unconditionally: `#ifdef REG_PARM_STACK_SPACE' over a DECLARATION
+   is #133's SHAPE 3, and the guard is not replaced by a run-time test because
+   there is nothing run-time about a declaration.  The definitions below are
+   likewise unconditional and the CALLS are what carry the existence test.  */
 static rtx save_fixed_argument_area (int, rtx, int *, int *);
 static void restore_fixed_argument_area (rtx, rtx, int, int);
-#endif
 
 /* Return true if bytes [LOWER_BOUND, UPPER_BOUND) of the outgoing
    stack region might already be in use.  */
@@ -1093,11 +1095,9 @@ precompute_register_parameters (int num_actuals, struct arg_data *args,
       }
 }
 
-#ifdef REG_PARM_STACK_SPACE
-
-  /* The argument list is the property of the called routine and it
-     may clobber it.  If the fixed area has been used for previous
-     parameters, we must save and restore it.  */
+/* The argument list is the property of the called routine and it
+   may clobber it.  If the fixed area has been used for previous
+   parameters, we must save and restore it.  */
 
 static rtx
 save_fixed_argument_area (int reg_parm_stack_space, rtx argblock, int *low_to_save, int *high_to_save)
@@ -1191,7 +1191,6 @@ restore_fixed_argument_area (rtx save_area, rtx argblock, int high_to_save, int 
 		     GEN_INT (high_to_save - low_to_save + 1),
 		     BLOCK_OP_CALL_PARM);
 }
-#endif /* REG_PARM_STACK_SPACE */
 
 /* If any elements in ARGS refer to parameters that are to be passed in
    registers, but not in memory, and whose alignment does not permit a
@@ -2790,12 +2789,15 @@ expand_call (tree exp, rtx target, int ignore)
   /* Mask of ECF_ and ERF_ flags.  */
   int flags = 0;
   int return_flags = 0;
-#ifdef REG_PARM_STACK_SPACE
   /* Define the boundary of the register parm stack space that needs to be
-     saved, if any.  */
-  int low_to_save, high_to_save;
+     saved, if any.  Declared unconditionally now that the existence question
+     is answered at run time; `save_area' stays null on a target with no
+     register parm stack space, which is the state the `#ifdef' produced.
+     `low_to_save' and `high_to_save' are initialised rather than left
+     indeterminate: with the guard gone the compiler can no longer see that
+     they are written before they are read.  */
+  int low_to_save = 0, high_to_save = 0;
   rtx save_area = 0;		/* Place that it is saved */
-#endif
 
   unsigned int initial_highest_arg_in_use = highest_outgoing_arg_in_use;
   char *initial_stack_usage_map = stack_usage_map;
@@ -2882,9 +2884,9 @@ expand_call (tree exp, rtx target, int ignore)
 	}
     }
 
-#ifdef REG_PARM_STACK_SPACE
-  reg_parm_stack_space = REG_PARM_STACK_SPACE (!fndecl ? fntype : fndecl);
-#endif
+  if (mt_has_reg_parm_stack_space ())
+    reg_parm_stack_space
+      = mt_reg_parm_stack_space (!fndecl ? fntype : fndecl);
 
   if (! OUTGOING_REG_PARM_STACK_SPACE ((!fndecl ? fntype : TREE_TYPE (fndecl)))
       && reg_parm_stack_space > 0 && targetm.calls.push_argument (0))
@@ -3565,13 +3567,11 @@ expand_call (tree exp, rtx target, int ignore)
       else
 	static_chain_value = 0;
 
-#ifdef REG_PARM_STACK_SPACE
       /* Save the fixed argument area if it's part of the caller's frame and
 	 is clobbered by argument setup for this call.  */
-      if (ACCUMULATE_OUTGOING_ARGS && pass)
+      if (mt_has_reg_parm_stack_space () && ACCUMULATE_OUTGOING_ARGS && pass)
 	save_area = save_fixed_argument_area (reg_parm_stack_space, argblock,
 					      &low_to_save, &high_to_save);
-#endif
 
       /* Now store (and compute if necessary) all non-register parms.
 	 These come before register parms, since they can require block-moves,
@@ -4011,11 +4011,12 @@ expand_call (tree exp, rtx target, int ignore)
 	}
       else if (ACCUMULATE_OUTGOING_ARGS && pass)
 	{
-#ifdef REG_PARM_STACK_SPACE
+	  /* No `mt_has_reg_parm_stack_space ()' test here: `save_area' is
+	     non-null only if the save above ran, so the existence question is
+	     already answered by the value.  */
 	  if (save_area)
 	    restore_fixed_argument_area (save_area, argblock,
 					 high_to_save, low_to_save);
-#endif
 
 	  /* If we saved any argument areas, restore them.  */
 	  for (i = 0; i < num_actuals; i++)
@@ -4254,12 +4255,10 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
   bool have_push_fusage;
   tree tfom;			/* type_for_mode (outmode, 0) */
 
-#ifdef REG_PARM_STACK_SPACE
   /* Define the boundary of the register parm stack space that needs to be
-     save, if any.  */
+     save, if any.  Unconditional; see `expand_call' above.  */
   int low_to_save = 0, high_to_save = 0;
   rtx save_area = 0;            /* Place that it is saved.  */
-#endif
 
   /* Size of the stack reserved for parameter registers.  */
   unsigned int initial_highest_arg_in_use = highest_outgoing_arg_in_use;
@@ -4269,9 +4268,8 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 
   rtx struct_value = targetm.calls.struct_value_rtx (0, 0);
 
-#ifdef REG_PARM_STACK_SPACE
-  reg_parm_stack_space = REG_PARM_STACK_SPACE ((tree) 0);
-#endif
+  if (mt_has_reg_parm_stack_space ())
+    reg_parm_stack_space = mt_reg_parm_stack_space ((tree) 0);
 
   /* By default, library functions cannot throw.  */
   flags = ECF_NOTHROW;
@@ -4594,8 +4592,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 
   argnum = nargs - 1;
 
-#ifdef REG_PARM_STACK_SPACE
-  if (ACCUMULATE_OUTGOING_ARGS)
+  if (mt_has_reg_parm_stack_space () && ACCUMULATE_OUTGOING_ARGS)
     {
       /* The argument list is the property of the called routine and it
 	 may clobber it.  If the fixed area has been used for previous
@@ -4603,7 +4600,6 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
       save_area = save_fixed_argument_area (reg_parm_stack_space, argblock,
 					    &low_to_save, &high_to_save);
     }
-#endif
 
   rtx call_cookie
     = targetm.calls.function_arg (args_so_far,
@@ -4942,11 +4938,10 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 
   if (ACCUMULATE_OUTGOING_ARGS)
     {
-#ifdef REG_PARM_STACK_SPACE
+      /* `save_area' is non-null only if the save ran; see `expand_call'.  */
       if (save_area)
 	restore_fixed_argument_area (save_area, argblock,
 				     high_to_save, low_to_save);
-#endif
 
       /* If we saved any argument areas, restore them.  */
       for (count = 0; count < nargs; count++)

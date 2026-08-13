@@ -987,6 +987,40 @@ struct target_frame_desc
      `int reg_parm_stack_space' in `assign_parm_data_all', and every back
      end's macro is an integer constant or an `int'-returning function.  */
   int (*incoming_reg_parm_stack_space) (tree fndecl);
+
+  /* `REG_PARM_STACK_SPACE' -- the THIRD and FOURTH paths, `calls.cc' (eleven
+     `#ifdef's and two value uses) and `expr.cc:2192/:2198'.  Two slots and not
+     one, and the split is the whole point:
+
+     `has_reg_parm_stack_space' answers the EXISTENCE question that the
+     `#ifdef's asked, `reg_parm_stack_space' answers the VALUE question.  A
+     single value slot cannot serve both, because `REG_PARM_STACK_SPACE'
+     yielding 0 and `REG_PARM_STACK_SPACE' being undefined are NOT the same
+     state at every site: `save_fixed_argument_area' computes
+     `high = reg_parm_stack_space; if (ARGS_GROW_DOWNWARD) high += 1;', so on
+     an args-grow-downward base a zero value still inspects
+     `stack_usage_map[0]' whereas the undefined case never calls the function
+     at all.  Collapsing the two would have changed behaviour for exactly
+     those back ends, silently, in the direction where nothing fails to
+     build.  (Neither configured base is one -- i386 and aarch64 both grow
+     args upward -- so this pair could not have caught it; it is the same
+     "correct by luck on this pair" shape recorded for the value below, found
+     by reading the callee rather than by measuring.)
+
+     THE VALUE ARM CANNOT DISCRIMINATE ON THIS PAIR AND THAT IS THE RESULT,
+     not a pass.  `ix86_reg_parm_stack_space' returns 32 only for
+     `TARGET_64BIT && MS_ABI' and 0 otherwise, which is exactly what aarch64's
+     absence yields.  The defect is `ix86_function_abi' being handed an
+     aarch64 `FUNCTION_DECL' and reading i386's option state about it, so the
+     evidence is which FUNCTION is called (a tail `jmp' to
+     `ix86_reg_parm_stack_space' in the i386 thunk, `xor %eax,%eax' in
+     aarch64's) and the existence answer, which DOES differ: true vs false.
+
+     `tree' and not `const_tree': back ends spell the macro's argument both
+     ways (i386's takes `const_tree', rs6000's takes `tree'), and the shared
+     sites pass an `fndecl', an `fntype' or a literal `(tree) 0'.  */
+  bool (*has_reg_parm_stack_space) (void);
+  int (*reg_parm_stack_space) (tree fndecl_or_type);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1181,5 +1215,17 @@ extern bool mt_push_args_reversed (void);
    help with.  The call replaces the guard and the body together, and the
    name stays undefined in shared code so a future spelling fails by name.  */
 extern int mt_incoming_reg_parm_stack_space (tree fndecl);
+
+/* `REG_PARM_STACK_SPACE', for shared code -- calls.cc and expr.cc.  NOT
+   redirected in `defaults.h' for the reason `FRAME_POINTER_CFA_OFFSET' cannot
+   be redirected at all: the name is `#ifdef'-tested at twelve shared sites,
+   and defining it to a call would make every one of those guards TRUE for
+   every target.  Position of use decides shape, so the guards are replaced by
+   `if (mt_has_reg_parm_stack_space ())' and the value uses by
+   `mt_reg_parm_stack_space (...)', and `defaults.h' then `#undef's the name so
+   that a future shared spelling fails to compile rather than picking up the
+   primary's.  */
+extern bool mt_has_reg_parm_stack_space (void);
+extern int mt_reg_parm_stack_space (tree fndecl_or_type);
 
 #endif /* GCC_TARGET_FRAME_H */

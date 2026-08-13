@@ -2189,15 +2189,13 @@ block_move_libcall_safe_for_call_parm (void)
 
   /* If registers go on the stack anyway, any argument is sure to clobber
      an outgoing argument.  */
-#if defined (REG_PARM_STACK_SPACE)
-  fn = builtin_decl_implicit (BUILT_IN_MEMCPY);
-  /* Avoid set but not used warning if *REG_PARM_STACK_SPACE doesn't
-     depend on its argument.  */
-  (void) fn;
-  if (OUTGOING_REG_PARM_STACK_SPACE ((!fn ? NULL_TREE : TREE_TYPE (fn)))
-      && REG_PARM_STACK_SPACE (fn) != 0)
-    return false;
-#endif
+  if (mt_has_reg_parm_stack_space ())
+    {
+      fn = builtin_decl_implicit (BUILT_IN_MEMCPY);
+      if (OUTGOING_REG_PARM_STACK_SPACE ((!fn ? NULL_TREE : TREE_TYPE (fn)))
+	  && mt_reg_parm_stack_space (fn) != 0)
+	return false;
+    }
 
   /* If any argument goes in memory, then it might clobber an outgoing
      argument.  */
