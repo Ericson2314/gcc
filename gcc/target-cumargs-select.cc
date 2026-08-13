@@ -162,6 +162,37 @@ mt_function_arg_regno_p (int regno)
   return mt_frame ()->function_arg_regno_p (regno);
 }
 
+/* The stack-alignment closure; see target-frame.h.  These go through
+   `mt_frame ()' like the six above, so a compilation with no target selected
+   fails by name instead of reading a null table -- which matters more here
+   than elsewhere, because `mt_supports_stack_alignment' guards an early
+   `return' and a garbage `false' would look exactly like the correct answer
+   for a back end that does not realign.  */
+
+unsigned int
+mt_incoming_stack_boundary (void)
+{
+  return mt_frame ()->incoming_stack_boundary ();
+}
+
+unsigned int
+mt_max_stack_alignment (void)
+{
+  return mt_frame ()->max_stack_alignment ();
+}
+
+unsigned int
+mt_max_supported_stack_alignment (void)
+{
+  return mt_frame ()->max_supported_stack_alignment ();
+}
+
+bool
+mt_supports_stack_alignment (void)
+{
+  return mt_frame ()->supports_stack_alignment ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

@@ -341,6 +341,49 @@ mt_base_data_abi_alignment (tree type, unsigned int align)
 # define MT_BASE_DATA_ABI_ALIGNMENT NULL
 #endif
 
+/* THE STACK-ALIGNMENT CLOSURE, asked of THIS base; see target-frame.h for why
+   all four move together and for why the one the `nm' output names is not the
+   one that stops `big.c'.
+
+   Four macro expansions in a translation unit whose `tm.h' is this back end's.
+   Two of the four are defined by this back end (i386's
+   `INCOMING_STACK_BOUNDARY' and `MAX_STACK_ALIGNMENT') and two are always
+   `defaults.h's; for aarch64 all four are `defaults.h's, computed HERE from
+   aarch64's own `STACK_BOUNDARY' and `PREFERRED_STACK_BOUNDARY' rather than
+   from the primary's.
+
+   No `#ifdef' and no `#else' arm anywhere below, and that is the point rather
+   than an oversight: `defaults.h:1249's `#ifdef MAX_STACK_ALIGNMENT' has
+   ALREADY RUN by the time control reaches here, against this base's headers,
+   and has already chosen which of the two definitions of
+   `MAX_SUPPORTED_STACK_ALIGNMENT' is in force.  Repeating the test here would
+   ask the same question twice and offer a second place for the two answers to
+   disagree.  */
+
+static unsigned int
+mt_base_incoming_stack_boundary (void)
+{
+  return (unsigned int) INCOMING_STACK_BOUNDARY;
+}
+
+static unsigned int
+mt_base_max_stack_alignment (void)
+{
+  return (unsigned int) MAX_STACK_ALIGNMENT;
+}
+
+static unsigned int
+mt_base_max_supported_stack_alignment (void)
+{
+  return (unsigned int) MAX_SUPPORTED_STACK_ALIGNMENT;
+}
+
+static bool
+mt_base_supports_stack_alignment (void)
+{
+  return SUPPORTS_STACK_ALIGNMENT;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -389,7 +432,11 @@ static const struct target_frame_desc mt_base_frame = {
   MT_BASE_HAS_DATA_ALIGNMENT,
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,
-  MT_BASE_DATA_ABI_ALIGNMENT
+  MT_BASE_DATA_ABI_ALIGNMENT,
+  mt_base_incoming_stack_boundary,
+  mt_base_max_stack_alignment,
+  mt_base_max_supported_stack_alignment,
+  mt_base_supports_stack_alignment
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

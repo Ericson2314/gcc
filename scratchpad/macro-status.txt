@@ -47,6 +47,37 @@
 # A macro may move UNCONVERTED -> CONVERTED_* only in the same change that adds
 # its TAB arm.  macro-probe.sh enforces that mechanically against
 # tab-probe.sh's TAB_MACROS line; it is not an invariant anyone has to remember.
+#
+# ---------------------------------------------------------------------------
+# TEN MACROS BELOW SAY `UNCONVERTED' AND HAVE ALREADY BEEN CONVERTED.  READ
+# THIS BEFORE CONVERTING ANY OF THEM AGAIN.
+#
+# #108's six  STACK_BOUNDARY  PREFERRED_STACK_BOUNDARY  STACK_SLOT_ALIGNMENT
+#             MINIMUM_ALIGNMENT  OUTGOING_REG_PARM_STACK_SPACE
+#             FUNCTION_ARG_REGNO_P
+# #123's four INCOMING_STACK_BOUNDARY  MAX_STACK_ALIGNMENT
+#             MAX_SUPPORTED_STACK_ALIGNMENT  SUPPORTS_STACK_ALIGNMENT
+#
+# All ten are redirected by `defaults.h' to `mt_*' calls and supplied per base
+# from `target-cumargs.cc' (see `target-frame.h').  They are still recorded
+# UNCONVERTED here ON PURPOSE, and it is the rule above doing its job rather
+# than an oversight: a TAB arm is mandatory for any CONVERTED_* status, and
+# `tab-probe.sh's harness reads CONSTANTS out of the running cc1.  These ten
+# are CALLS -- four of #108's take arguments, and #123's four vary with option
+# state -- so there is nothing for that harness to read, and inventing a
+# status without an arm would be banking a pass.
+#
+# Their header arms are ALSO not evidence, in the direction that looks like
+# good news: the probe's base-B context does not define
+# MULTI_TARGET_TARGETM_BASE, so `defaults.h' redirects BOTH sides and the arm
+# compares a redirect with itself.  That is why PRINCIPLES says never to quote
+# aarch64's raw 8.  #123's four will do the same to four more arms the next
+# time the probe runs -- a WRONG-REASON flip, to be retired and not banked.
+#
+# The real both-sided evidence for all ten is at run time on the linked `cc1':
+#   #108  scratchpad/t108-evidence.sh   (object level)
+#   #123  scratchpad/t123-guards.sh     (gdb on the running cc1, ARM 2)
+# ---------------------------------------------------------------------------
 ACCUMULATE_OUTGOING_ARGS UNCONVERTED
 ADDITIONAL_REGISTER_NAMES UNCONVERTED
 ADJUST_REG_ALLOC_ORDER UNCONVERTED

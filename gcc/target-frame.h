@@ -279,6 +279,96 @@ struct target_frame_desc
   unsigned int (*data_alignment) (tree type, unsigned int align);
   bool has_data_abi_alignment;
   unsigned int (*data_abi_alignment) (tree type, unsigned int align);
+
+  /* ------------------------------------------------------------------
+     THE STACK-ALIGNMENT CLOSURE -- FOUR NAMES, AND THE ONE THAT ACTUALLY
+     STOPS `big.c' IS NOT THE ONE THE SYMBOL NAMES.
+
+     `nm -uC cfgexpand.o' reports `U ix86_incoming_stack_boundary' and nothing
+     else in this family, so `INCOMING_STACK_BOUNDARY' is the name the
+     instrument hands you.  It is a real leak -- i386.h:803 makes it that
+     global, i386 is the ONLY one of the 48 back ends that defines the macro,
+     and `defaults.h:944's `#ifndef' is therefore false in shared code for
+     every target, so all 47 others read i386's option state.
+
+     BUT IT IS NOT WHY `expand_stack_alignment' IS ENTERED.  cfgexpand.cc:6895
+     is `if (! SUPPORTS_STACK_ALIGNMENT) return;', and defaults.h:1256 makes
+     that `(MAX_STACK_ALIGNMENT > STACK_BOUNDARY)'.  `MAX_STACK_ALIGNMENT' is
+     defined by exactly three headers -- i386.h:850, i386/cygming.h:42 and
+     nvptx.h:61 -- so defaults.h:1249's `#ifdef' is TRUE in shared code
+     because the primary is i386, and every target gets i386's
+     `MAX_OFILE_ALIGNMENT' (2^31 from elfos.h:63).  aarch64 defines no
+     `MAX_STACK_ALIGNMENT', so its own answer is defaults.h:1252's
+     `STACK_BOUNDARY', 128, and `SUPPORTS_STACK_ALIGNMENT' should be
+     `128 > 128' -- FALSE.  The function should return at its second line and
+     never reach line 6941's `gcc_assert (targetm.calls.get_drap_rtx != NULL)'
+     at all.  DRAP is an i386 concept; aarch64 supplies no `get_drap_rtx'
+     because it never asked to be here.
+
+     SO CONVERTING `INCOMING_STACK_BOUNDARY' ALONE WOULD HAVE BEEN THE HALF-FIX
+     PRINCIPLES 2a NAMES.  aarch64 would still enter the function, still be
+     asked to realign a stack it does not realign, and the 6941 assert would
+     still be reached -- or, worse, `INCOMING_STACK_BOUNDARY' would now answer
+     128 and `crtl->stack_alignment_estimated' would happen to be <= 128, the
+     assert would pass, and aarch64 would silently run i386's stack-realignment
+     path with `stack_realign_needed' false.  A loud failure traded for a quiet
+     one.  All four move together.
+
+     WHY `MAX_SUPPORTED_STACK_ALIGNMENT' AND `SUPPORTS_STACK_ALIGNMENT' ARE
+     THEIR OWN FIELDS RATHER THAN BEING DERIVED FROM THE OTHER TWO.  Both
+     could be spelled in `defaults.h' as arithmetic over the redirected
+     `MAX_STACK_ALIGNMENT' and `STACK_BOUNDARY', and it would even give the
+     right answer.  It would also re-derive, in shared code, a choice that
+     defaults.h:1249 makes with an `#ifdef' -- and the `#ifdef' is precisely
+     the thing shared code cannot evaluate.  A base WITH `MAX_STACK_ALIGNMENT'
+     has `MAX_SUPPORTED == MAX_STACK_ALIGNMENT'; a base WITHOUT has
+     `MAX_SUPPORTED == PREFERRED_STACK_BOUNDARY', which is NOT equal to its
+     `MAX_STACK_ALIGNMENT' (`STACK_BOUNDARY') whenever the two boundaries
+     differ.  Deriving would silently pick one arm for everyone.  Each thunk
+     below is one macro expansion in the base's own translation unit, so the
+     `#ifdef' is consumed where it is meaningful and neither arm is preferred
+     here.
+
+     NO `has_' FLAG ON ANY OF THE FOUR, and that is a measured claim rather
+     than an omission: `defaults.h' gives all four an unconditional definition
+     by the time the per-base translation unit reaches the table, both arms of
+     the :1249 `#ifdef' included.  There is no absence to record.  The
+     existence question does not disappear -- it is answered inside the base's
+     own preprocessing, which is the whole mechanism.
+
+     BOUND-VS-INDEX, CHECKED RATHER THAN ASSUMED.  These are boundary
+     constants, which is the shape that produced `NUM_OPTAB_PATTERNS' and
+     `N_REG_CLASSES'.  Swept: outside `config/' nothing is dimensioned by any
+     of the four.  `MAX_STACK_ALIGNMENT' has exactly one shared use
+     (tree-vect-data-refs.cc:6808, a `known_le' comparison);
+     `MAX_SUPPORTED_STACK_ALIGNMENT' has 21, all comparisons or assignments to
+     an `unsigned int'; `SUPPORTS_STACK_ALIGNMENT' has 11, all `if'
+     conditions; `INCOMING_STACK_BOUNDARY' has 2, both in cfgexpand.cc above.
+     No `#if', no case label, no array bound, no static initialiser -- which
+     is what makes a call-valued redirect legal at all.
+
+     THE TYPES ARE `unsigned int' AND THAT IS NOT COSMETIC.  i386.h:2614
+     declares `ix86_incoming_stack_boundary' `unsigned int', and i386's
+     `MAX_STACK_ALIGNMENT' is elfos.h:63's `(((unsigned int) 1 << 28) * 8)' --
+     2147483648, which does not fit in `int'.  Returning that through an `int'
+     field would be implementation-defined narrowing on the single member
+     whose entire job is to be an upper bound.  It also removes, rather than
+     relocates, the pre-existing `-Wsign-compare' on `SUPPORTS_STACK_ALIGNMENT'
+     (48 occurrences in a cold log), which came from comparing that unsigned
+     constant with a signed `STACK_BOUNDARY'.
+
+     ONE CONSEQUENCE WORTH WRITING DOWN.  asan.cc:1573 asserts
+     `BITS_PER_UNIT * ASAN_SHADOW_GRANULARITY <= MAX_SUPPORTED_STACK_ALIGNMENT'
+     -- 64 <= the value.  It has been comparing against i386's 2^31 for every
+     target and could not fail.  It now compares against the selected base's
+     answer (aarch64: 128, so still true).  A back end whose
+     `PREFERRED_STACK_BOUNDARY' is below 64 would newly trip it.  That is the
+     assert doing its job for the first time, not a regression introduced
+     here.  */
+  unsigned int (*incoming_stack_boundary) (void);
+  unsigned int (*max_stack_alignment) (void);
+  unsigned int (*max_supported_stack_alignment) (void);
+  bool (*supports_stack_alignment) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -327,5 +417,15 @@ extern int mt_set_ratio (bool);
 extern unsigned int mt_data_alignment (tree, unsigned int);
 extern unsigned int mt_data_abi_alignment (tree, unsigned int);
 extern bool mt_has_data_abi_alignment (void);
+
+/* The stack-alignment closure.  `defaults.h' points all four macros at these
+   for every translation unit that is not a back end's own.  Unlike
+   `DATA_ALIGNMENT' these ARE redirected rather than being spelled at the call
+   sites: none of their 35 shared uses is `#ifdef'-guarded, so there is no
+   guard that could end up answered by a different back end than the body.  */
+extern unsigned int mt_incoming_stack_boundary (void);
+extern unsigned int mt_max_stack_alignment (void);
+extern unsigned int mt_max_supported_stack_alignment (void);
+extern bool mt_supports_stack_alignment (void);
 
 #endif /* GCC_TARGET_FRAME_H */

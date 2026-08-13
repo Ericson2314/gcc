@@ -2158,6 +2158,39 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef FUNCTION_ARG_REGNO_P
 #define FUNCTION_ARG_REGNO_P(N) (mt_function_arg_regno_p ((int) (N)))
 
+/* THE STACK-ALIGNMENT CLOSURE.  See target-frame.h for the full argument; the
+   short version is that the leak `nm -uC cfgexpand.o' names
+   (`ix86_incoming_stack_boundary', from i386.h:803 -- and i386 is the only one
+   of the 48 back ends to define `INCOMING_STACK_BOUNDARY' at all) is NOT the
+   one that makes `expand_stack_alignment' run for aarch64.  That is
+   `SUPPORTS_STACK_ALIGNMENT' at :1256, whose `MAX_STACK_ALIGNMENT' comes from
+   the `#ifdef' at :1249 being answered by the primary.  Redirecting only the
+   named one leaves aarch64 inside a function it should return from, which is
+   a quieter version of the same bug rather than a fix.
+
+   ALL FOUR ARE `#undef'-THEN-DEFINE FROM A DEFINITION THIS FILE MADE ABOVE --
+   :945, :1250/:1252, :1250/:1253 and :1256 -- and those definitions are what
+   makes the leak transitive: `SUPPORTS_STACK_ALIGNMENT' names no back-end
+   symbol and looks target-neutral where it is written.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING.  Outside `config/'
+   the four have 2 + 1 + 21 + 11 uses and every one is an ordinary run-time
+   expression: `if' conditions in builtins.cc, calls.cc, cfgexpand.cc,
+   explow.cc and function.cc, comparisons and assignments in cfgexpand.cc,
+   function.cc and asan.cc, and one `known_le' in tree-vect-data-refs.cc.
+   There is no `#if', no case label, no array bound and no static initialiser
+   -- and none of the four is `#ifdef'-guarded at a use site, so unlike
+   `DATA_ALIGNMENT' there is no guard here that a redirect could leave being
+   answered by a different back end than the body.  */
+#undef INCOMING_STACK_BOUNDARY
+#define INCOMING_STACK_BOUNDARY (mt_incoming_stack_boundary ())
+#undef MAX_STACK_ALIGNMENT
+#define MAX_STACK_ALIGNMENT (mt_max_stack_alignment ())
+#undef MAX_SUPPORTED_STACK_ALIGNMENT
+#define MAX_SUPPORTED_STACK_ALIGNMENT (mt_max_supported_stack_alignment ())
+#undef SUPPORTS_STACK_ALIGNMENT
+#define SUPPORTS_STACK_ALIGNMENT (mt_supports_stack_alignment ())
+
 /* ------------------------------------------------------------------------
    THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault
    that starts this (`ix86_cost' null, `si_addr == 0xf4'), for why all seven

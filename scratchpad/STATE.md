@@ -4765,3 +4765,240 @@ Not comparable with the 32-line incremental floor.
     t122-specs.sh     both target-specs probes, real aarch64 binutils
     t122-diag.sh      the gdb diagnosis, with the non-vacuity FATAL that fired
     t122-guards.sh    9 arms; ARM 2 both-sided on the running cc1, ARM 4 the injection
+
+# TASK #123 -- THE STACK-ALIGNMENT CLOSURE.  THE SYMBOL `nm` NAMES IS NOT THE ONE THAT STOPS `big.c`
+
+Branched from `77bd4356973`.  Worktree came up at the bare-repo HEAD
+`7208eca60d0` AGAIN -- `grep -c MULTI_TARGET gcc/Makefile.in` was **0** --
+`git reset --hard multi-target` took it to **37**.  Build dir `/tmp/b123`, my
+own, cold.
+
+## 0. THE FINDING THAT CHANGED THE SCOPE
+
+The brief handed me `nm -uC cfgexpand.o -> U ix86_incoming_stack_boundary`
+and `ICE: expand_stack_alignment, at cfgexpand.cc:6941`.  Both reproduced
+exactly.  `INCOMING_STACK_BOUNDARY` is a real leak: `i386.h:803` makes it that
+global, and **i386 is the only one of the 48 back ends that defines the macro
+at all**, so `defaults.h:944`'s `#ifndef` is false in shared code and the other
+47 read i386's option state.
+
+**It is not why the function is entered, and converting it alone would have
+been the half-fix PRINCIPLES 2a names.**  cfgexpand.cc:6895 is
+`if (! SUPPORTS_STACK_ALIGNMENT) return;`, which `defaults.h:1256` makes
+`(MAX_STACK_ALIGNMENT > STACK_BOUNDARY)`.  `MAX_STACK_ALIGNMENT` is defined by
+exactly three headers -- `i386.h:850`, `i386/cygming.h:42`, `nvptx.h:61` -- so
+`defaults.h:1249`'s `#ifdef` is TRUE in shared code because the primary is
+i386, and every target gets i386's `MAX_OFILE_ALIGNMENT` (2^31, elfos.h:63).
+aarch64's own answer is `defaults.h:1252`'s `STACK_BOUNDARY`, 128, so
+`SUPPORTS_STACK_ALIGNMENT` should be `128 > 128` -- **FALSE**, and
+`expand_stack_alignment` should return at its second line and never reach
+line 6941 at all.  DRAP is an i386 concept; aarch64 supplies no `get_drap_rtx`
+because it never asked to be in that function.
+
+So the group is **four**, not one:
+`INCOMING_STACK_BOUNDARY`, `MAX_STACK_ALIGNMENT`,
+`MAX_SUPPORTED_STACK_ALIGNMENT`, `SUPPORTS_STACK_ALIGNMENT` -- the transitive
+closure through `defaults.h:944` and `:1249-1256`.  Had I converted only the
+name the instrument gave me, `SUPPORTS_STACK_ALIGNMENT` would have stayed
+wrongly true, aarch64 would have stayed inside the function, and the most
+likely outcome is the *quieter* one: `INCOMING_STACK_BOUNDARY` now answers 128,
+`stack_alignment_estimated` happens to be <= 128, the assert passes, and
+aarch64 silently runs i386's stack-realignment path.  **A generalisation worth
+keeping: an undefined symbol names the macro that DRAGGED IT IN, not the macro
+that CAUSED the control flow.  Two different macros in one closure, and only
+one of them names anything.**
+
+## 1. WHAT LANDED
+
+Same mechanism as #108's six, no new registry, no back end edited:
+
+  * **`target-frame.h`** -- four new fields on `target_frame_desc`.  All
+    `unsigned int` / `bool`, and the types are not cosmetic:
+    `ix86_incoming_stack_boundary` is `unsigned int` (i386.h:2614) and i386's
+    `MAX_STACK_ALIGNMENT` is 2147483648, which **does not fit in `int`**.
+  * **`target-cumargs.cc`** -- four thunks, each one macro expansion in the
+    per-base TU compiled with `-I<base>-inc`.  **No `#ifdef` and no `#else`
+    arm anywhere**, and that is the design rather than an omission:
+    `defaults.h:1249`'s `#ifdef MAX_STACK_ALIGNMENT` has ALREADY RUN against
+    this base's headers by the time control reaches the thunk, and has already
+    chosen which definition is in force.  The existence question does not
+    disappear -- it is consumed where it is meaningful.
+  * **`target-cumargs-select.cc`** -- four `mt_*` entry points through
+    `mt_frame ()`, so no target selected fails by name.
+  * **`defaults.h`** -- the four `#undef`/`#define` redirects, beside #108's.
+
+**Why `MAX_SUPPORTED_STACK_ALIGNMENT` and `SUPPORTS_STACK_ALIGNMENT` are their
+own fields and are not derived in `defaults.h` from the other two.**  Deriving
+would give the right answer today and would re-derive, in shared code, the
+choice `defaults.h:1249` makes with an `#ifdef` -- the one thing shared code
+cannot evaluate.  A base WITH `MAX_STACK_ALIGNMENT` has
+`MAX_SUPPORTED == MAX_STACK_ALIGNMENT`; a base WITHOUT has
+`MAX_SUPPORTED == PREFERRED_STACK_BOUNDARY`, which is **not** its
+`MAX_STACK_ALIGNMENT` whenever the two boundaries differ.  Deriving picks one
+arm for everyone.
+
+**Swept for constant-expression contexts before landing.**  Outside `config/`
+the four have 2 + 1 + 21 + 11 uses and every one is an ordinary run-time
+expression -- `if` conditions, comparisons, assignments to `unsigned int`, and
+one `known_le`.  No `#if`, no case label, no array bound, no static
+initialiser.  **Bound-vs-index checked explicitly** (these are boundary
+constants, the shape that produced `NUM_OPTAB_PATTERNS` and `N_REG_CLASSES`):
+nothing outside `config/` is dimensioned by any of the four.  And unlike
+`DATA_ALIGNMENT`, **none of the four is `#ifdef`-guarded at a use site**, so a
+redirect cannot leave the guard answered by one back end and the body by
+another.
+
+## 2. WHERE `big.c` GETS TO NOW, AND THE NEXT WALL
+
+**Past RTL expand entirely.**  It now stops one pass later:
+
+    during RTL pass: ira
+    internal compiler error: in aarch64_can_eliminate, at aarch64.cc:14153
+
+Line 14153 is `gcc_assert (from == ARG_POINTER_REGNUM || from == FRAME_POINTER_REGNUM)`,
+reached from `ira_setup_eliminable_regset`.  **Diagnosed with the same
+instrument, before any inference:** `nm -uC ira.o` shows
+`U ix86_initial_elimination_offset` and `U ix86_push_rounding`, and
+`reload1.o` shows the same two.  So `ira.cc` is walking **i386's
+`ELIMINABLE_REGS` table** and handing aarch64's hook i386's register numbers.
+That is `INITIAL_ELIMINATION_OFFSET` (macro-status.txt, `UNCONVERTED`)
+plus the `ELIMINABLE_REGS` table and the `*_POINTER_REGNUM` names -- a known,
+tracked family, not a new mystery.  It is the natural next task and it is
+register-vocabulary shaped, i.e. #92/#122 territory.
+
+## 3. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**.
+  * **x86_64 `-O2` md5 `378fc33c1e70`, 12369 bytes -- unmoved** (measured
+    before AND after the edit in this same build dir).
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`,
+    **5 distinct md5 per side**, **negative control firing** (1158 vs 804),
+    rc=0.  All five match #122's record: O0 `1c00922491f8`, O1 `4fabab94b41b`,
+    O2 `378fc33c1e70`, O3 `d220421237bc`, Os `d6787f7e281f`.  It does run in
+    this build dir -- checked, given #122 found it had been scoring the
+    driverless `cc1`'s correct refusal as five compiler failures.
+  * **`scratchpad/t123-guards.sh`: 11 PASS / 0 FAIL.**
+  * **aarch64 `int x = 1;` still rc=0, 373 bytes, empty stderr, and
+    byte-identical to the pre-edit output.**
+  * Cold `all-gcc` before any edit: **rc=0, 745 lines / 126 `warning:`** --
+    matching #119's and #122's recorded cold arm exactly.
+
+### THE ARMS THAT MATTER
+
+  * **ARM 2 is TAB-shaped**: gdb on the RUNNING `cc1`, one breakpoint per run.
+    `MAX_SUPPORTED_STACK_ALIGNMENT` is **aarch64 128 vs x86_64 2147483648** --
+    the two OPPOSITE arms of the `#ifdef` shared code could not evaluate --
+    and `SUPPORTS_STACK_ALIGNMENT` is **false vs true**, so the divergence is
+    in the truth value itself and cannot be "everyone got the same new answer".
+  * **ARM 2c is asymmetric on purpose.**  `INCOMING_STACK_BOUNDARY` is 128 for
+    BOTH bases (i386's default and aarch64's fall-through coincide), so an
+    equality arm on its value would pass while proving nothing.  What
+    distinguishes them is whether it is asked at all: x86_64 reaches it,
+    **aarch64 never does**, because it now returns early.  The aarch64 side
+    additionally requires the run to reach `ira`, so that "not asked" is the
+    early return and not an early crash.
+  * **ARM 4 is the injection**: reverse-applies the `defaults.h` hunk only (so
+    the thunks stay compiled and only the redirect goes), rebuilds, and
+    **requires `ix86_incoming_stack_boundary` back in `cfgexpand.o` (0 -> 1)
+    and the OLD ICE back by name**.  Both fired.  Restore then requires both
+    to reverse (1 -> 0, and `big.c` back to `aarch64_can_eliminate`), verified.
+
+## 4. MY INSTRUMENT WAS WRONG AND ONE ARM PASSED ON IT
+
+Recorded because the arm that passed is the interesting half.
+
+The first ARM 2 set all three breakpoints in ONE gdb run and narrated
+`HIT <name>` between `finish` commands, assuming they would be reached in the
+order set.  They are not: `mt_supports_stack_alignment` is hit first and
+repeatedly (from `record_alignment_for_reg_var`), so **all three printed
+values were that one function's return value under three different names**.
+Two arms compared the wrong function's answer and reported FAIL -- and the
+third, `supports`, **PASSED**, because 0-for-aarch64 / 1-for-x86_64 is what it
+happened to be reading anyway.  A correct-looking pass on a mislabelled read.
+
+Fixed by giving each function its own run with exactly one breakpoint, and by
+matching **the breakpoint gdb REPORTS** against the function under test before
+scoring any value -- the check the first version lacked, and the one that
+would have caught it.
+
+**Then the repaired non-vacuity FATAL fired, and it was right.**
+`mt_max_stack_alignment` is **never called for aarch64**: outside `config/`
+that macro has exactly one use (tree-vect-data-refs.cc:6808), which needs the
+vectoriser, which aarch64 cannot reach while it still ICEs in `ira`.  So
+**`MAX_STACK_ALIGNMENT` is currently UNCHECKABLE at run time on this machine**
+-- a measured "cannot be checked, because X", not a pass.  The arm was moved to
+`MAX_SUPPORTED_STACK_ALIGNMENT`, which is reached on every function and
+diverges by the same 16-million-fold margin because it is the other arm of the
+same `#ifdef`.
+
+## 5. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard movement.**
+Carrying the recorded line unchanged: header **i386 112 PASS / 0 FAIL,
+aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386 32/0,
+aarch64 27/5**.
+
+All four macros stay **`UNCONVERTED`** in `macro-status.txt`, and that is the
+rule working rather than an oversight.  `tab-probe.sh`'s harness reads
+CONSTANTS out of the running `cc1`; these four are calls that vary with option
+state, so there is nothing for it to read, and the file's own rule is that a
+macro may move to `CONVERTED_*` **only in the change that adds its TAB arm**.
+They are in exactly #108's six's position, for exactly the same reason.
+
+**Predicted, so that it is caught rather than banked:** the next probe run will
+flip four more aarch64 header arms FAIL -> PASS **for the wrong reason** --
+base-B's context does not define `MULTI_TARGET_TARGETM_BASE`, so `defaults.h`
+redirects both sides and the arm compares a redirect with itself.  Retire
+those four; do not bank them.  A note to this effect is now in
+`macro-status.txt`'s header naming all ten macros, so the next agent does not
+spend a session re-converting something that says `UNCONVERTED`.
+
+## 6. A PRE-EXISTING DEFECT THIS REMOVED, MEASURED
+
+#122 recorded a `-Wsign-compare` on `SUPPORTS_STACK_ALIGNMENT` (`defaults.h`)
+as "a real signedness defect for whoever owns `STACK_BOUNDARY`", 48
+occurrences in a cold log.  Measured here: cold log **48** mentions of
+`SUPPORTS_STACK_ALIGNMENT` and 35 `-Wsign-compare`; after this change,
+**0** mentions and 18 `-Wsign-compare` (the rest are unrelated).  Comparing
+i386's unsigned 2^31 with a signed `STACK_BOUNDARY` is what produced it, and
+giving the closure honest `unsigned int` types removes the comparison rather
+than silencing it.
+
+## 7. STDERR -- WHICH ARM
+
+  * Cold `all-gcc`, before any edit: **745 lines / 126 `warning:`**.
+  * Incremental `multi-target-objs cc1 lto1` after the edit: **299 lines / 52
+    `warning:`** (many TUs rebuild -- `defaults.h` reaches ~520 of them).
+  * A second, near-no-op incremental: **34 lines / 3 `warning:`**, composed of
+    **24 `'@' is redundant`** from unmodified aarch64 `.md` files, **0
+    `is unchanged`**, and one 3-warning `lto-common.cc` block.  Same shape as
+    the 32-line floor with the 8 `is unchanged` absent, which PRINCIPLES
+    records as varying with what was last rebuilt.
+
+## 8. WHAT I DID NOT DO
+
+  * **No TAB arms for the four**, for the reason in section 5.  This is the
+    same debt #108's six carry and it is now written down in one place.
+  * **`MAX_STACK_ALIGNMENT` has no run-time arm**, because nothing aarch64 can
+    currently reach evaluates it (section 4).  It gains one for free the day
+    the `ira` wall falls and the vectoriser runs.
+  * **`nvptx`'s `MAX_STACK_ALIGNMENT` is untested** -- it is the third definer
+    and is not a configured base here, so any arm would be one-sided.
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker
+    is unchanged.
+  * The `asan.cc:1573` assert now compares against the selected base's
+    `MAX_SUPPORTED_STACK_ALIGNMENT` instead of i386's 2^31.  aarch64's 128 >=
+    64 so it holds; a back end whose `PREFERRED_STACK_BOUNDARY` is below 64
+    would newly trip it.  That is the assert working for the first time, and
+    it is written at the point of the decision in `target-frame.h`.
+
+## 9. FILES
+
+    t123-conf.sh      two-target configure, /tmp/b123
+    t123-build.sh     make at the TOP level
+    t123-gccbuild.sh  make in $B/gcc -- where cc1 actually builds
+    t123-specs.sh     both target-specs probes, real aarch64 binutils
+    t123-guards.sh    11 arms; ARM 2 gdb on the running cc1, ARM 4 the injection
+    eb-shell-gdb.sh   the build shell PLUS gdb -- gdb is not in the plain
+                      DEVSHELL set, and a missing tool scores 0 in the
+                      direction that makes the reference look correct
