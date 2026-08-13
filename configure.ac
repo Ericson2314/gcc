@@ -82,6 +82,90 @@ test "$host_noncanonical" = "$target_noncanonical" &&
 AC_CANONICAL_TARGET
 AC_ARG_PROGRAM
 
+# ---------------------------------------------------------------------------
+# THE TARGET LIST.  TARGETS, PLURAL.
+#
+# The top level is the ONLY component in this tree that legitimately deals in
+# targets, because it is the dispatcher: it takes a list of triples and
+# instantiates one tree per target.  Everything below it -- every runtime
+# library, and gcc itself -- is configured with --host and a back-end list,
+# never with --target.  This is the stated exception to the standing "avoid
+# --target" rule, not a violation of it.
+#
+# THERE IS DELIBERATELY NO DEFAULT AND NO FALLBACK.  Omitting the option is an
+# error, not a build of "whatever the host is": a default target is a primary
+# by another name, and this tree does not have one.  A build that quietly
+# produced a one-element list from $host would reintroduce the privileged
+# target this whole branch exists to delete.
+#
+# SPELLING.  The user asked for `--targets='.  That spelling cannot be
+# implemented without hand-editing the generated `configure': autoconf's
+# option parser auto-accepts only --enable-* and --with-*, and anything else
+# reaches a hard `as_fn_error ... unrecognized option' (configure.ac generates
+# it; see the `-*)' arm).  Note that error is NOT suppressed by
+# --disable-option-checking, which only governs the --enable/--with
+# unrecognized list.  `--enable-targets' is therefore the closest legitimate
+# spelling.  It is unambiguous today because gcc/'s old --enable-targets is
+# GONE -- renamed --enable-backends, with no deprecation stanza -- so the
+# name collision that once made this spelling a bad idea no longer exists.
+AC_ARG_ENABLE(targets,
+[AS_HELP_STRING([--enable-targets=LIST],
+		[comma-separated list of target triples to instantiate a
+		 tree for.  REQUIRED: there is no default target and no
+		 primary.])],
+[], [enable_targets=])
+
+case ${enable_targets} in
+  yes | no)
+    AC_MSG_ERROR([--enable-targets needs a comma-separated list of target triples, not `${enable_targets}'])
+    ;;
+esac
+
+# --target is meaningless here and is almost always a mistake for --host.  Warn
+# explicitly rather than relying on autoconf's unrecognized-option machinery:
+# --disable-option-checking propagates into every subdirectory configure, and a
+# silently ignored --target is exactly the kind of thing that reads as working.
+if test "x${target_alias}" != x; then
+  AC_MSG_WARN([--target=${target_alias} is not how this tree selects targets.])
+  AC_MSG_WARN([Use --enable-targets=LIST (plural).  --target names a single])
+  AC_MSG_WARN([privileged target, which this tree does not have.])
+fi
+
+# Canonicalise each element with config.sub, INDIVIDUALLY, so a bad triple
+# fails BY NAME rather than becoming an empty element that is silently
+# skipped.  "No element ever becomes empty and is skipped" -- an empty element
+# is the absence of an answer being treated as an answer.
+mt_target_subdirs=
+for mt_t in `echo "${enable_targets}" | sed -e 's/,/ /g'`; do
+  test x"${mt_t}" = x && continue
+  mt_canon=`$SHELL ${srcdir}/config.sub "${mt_t}" 2>/dev/null`
+  if test x"${mt_canon}" = x; then
+    AC_MSG_ERROR([--enable-targets: `${mt_t}' is not a recognised target triple])
+  fi
+  mt_target_subdirs="${mt_target_subdirs} ${mt_canon}"
+done
+
+# Sort and deduplicate.  Sorting is not tidiness: it is the enforcement
+# mechanism for "no primary".  The build must be identical for any permutation
+# of the input, so that nothing can treat position 1 as privileged; if
+# reordering the list changes an output, something is wrong and a permutation
+# test will find it.
+mt_target_subdirs=`echo ${mt_target_subdirs} | tr ' ' '\012' | grep . | sort -u | tr '\012' ' '`
+mt_target_subdirs=`echo ${mt_target_subdirs}`
+
+if test x"${mt_target_subdirs}" = x; then
+  AC_MSG_ERROR([--enable-targets=LIST is required.
+
+This tree has no default target and no primary, so there is nothing to fall
+back to when no target is named.  Name the targets you want a tree for, e.g.
+
+    --enable-targets=aarch64-unknown-linux-gnu,x86_64-pc-linux-gnu
+])
+fi
+
+AC_MSG_NOTICE([target trees: ${mt_target_subdirs}])
+AC_SUBST(mt_target_subdirs)
+
 m4_pattern_allow([^AS_FOR_TARGET$])dnl
 m4_pattern_allow([^AS_FOR_BUILD$])dnl
 
@@ -143,7 +227,11 @@ host_libs="gettext libiberty opcodes bfd readline tcl tk itcl libgui zlib libbac
 # binutils, gas and ld appear in that order because it makes sense to run
 # "make check" in that particular order.
 # If --enable-gold is used, "gold" may replace "ld".
-host_tools="texinfo flex bison binutils gas ld fixincludes gcc cgen sid sim gdb gdbserver gprof etc expect dejagnu m4 utils guile fastjar gnattools libcc1 gm2tools gotools c++tools target-specs"
+# NOTE: target-specs is deliberately NOT here.  It is not a host tool: it
+# probes one target's assembler and linker, so there is one instance of it per
+# configured target, each configured with --host=<that target>.  Its rules are
+# generated per target from the $(MT_TARGET_SUBDIRS) loop in Makefile.tpl.
+host_tools="texinfo flex bison binutils gas ld fixincludes gcc cgen sid sim gdb gdbserver gprof etc expect dejagnu m4 utils guile fastjar gnattools libcc1 gm2tools gotools c++tools"
 
 # these libraries are built for the target environment, and are built after
 # the host libraries and the host tools (which may be a cross compiler)

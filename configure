@@ -756,6 +756,7 @@ LN
 INSTALL_DATA
 INSTALL_SCRIPT
 INSTALL_PROGRAM
+mt_target_subdirs
 target_os
 target_vendor
 target_cpu
@@ -817,6 +818,7 @@ alphaieee_frag
 ospace_frag'
 ac_user_opts='
 enable_option_checking
+enable_targets
 with_build_libsubdir
 with_system_zlib
 with_zstd
@@ -1556,6 +1558,9 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-targets=LIST   comma-separated list of target triples to
+                          instantiate a tree for. REQUIRED: there is no
+                          default target and no primary.
   --enable-as-accelerator-for=ARG
                           build as offload target compiler. Specify offload
                           host triple by ARG
@@ -2610,6 +2615,95 @@ ac_script='s/[\\$]/&&/g;s/;s,x,x,$//'
 program_transform_name=`$as_echo "$program_transform_name" | sed "$ac_script"`
 
 
+# ---------------------------------------------------------------------------
+# THE TARGET LIST.  TARGETS, PLURAL.
+#
+# The top level is the ONLY component in this tree that legitimately deals in
+# targets, because it is the dispatcher: it takes a list of triples and
+# instantiates one tree per target.  Everything below it -- every runtime
+# library, and gcc itself -- is configured with --host and a back-end list,
+# never with --target.  This is the stated exception to the standing "avoid
+# --target" rule, not a violation of it.
+#
+# THERE IS DELIBERATELY NO DEFAULT AND NO FALLBACK.  Omitting the option is an
+# error, not a build of "whatever the host is": a default target is a primary
+# by another name, and this tree does not have one.  A build that quietly
+# produced a one-element list from $host would reintroduce the privileged
+# target this whole branch exists to delete.
+#
+# SPELLING.  The user asked for `--targets='.  That spelling cannot be
+# implemented without hand-editing the generated `configure': autoconf's
+# option parser auto-accepts only --enable-* and --with-*, and anything else
+# reaches a hard `as_fn_error ... unrecognized option' (configure.ac generates
+# it; see the `-*)' arm).  Note that error is NOT suppressed by
+# --disable-option-checking, which only governs the --enable/--with
+# unrecognized list.  `--enable-targets' is therefore the closest legitimate
+# spelling.  It is unambiguous today because gcc/'s old --enable-targets is
+# GONE -- renamed --enable-backends, with no deprecation stanza -- so the
+# name collision that once made this spelling a bad idea no longer exists.
+# Check whether --enable-targets was given.
+if test "${enable_targets+set}" = set; then :
+  enableval=$enable_targets;
+else
+  enable_targets=
+fi
+
+
+case ${enable_targets} in
+  yes | no)
+    as_fn_error $? "--enable-targets needs a comma-separated list of target triples, not \`${enable_targets}'" "$LINENO" 5
+    ;;
+esac
+
+# --target is meaningless here and is almost always a mistake for --host.  Warn
+# explicitly rather than relying on autoconf's unrecognized-option machinery:
+# --disable-option-checking propagates into every subdirectory configure, and a
+# silently ignored --target is exactly the kind of thing that reads as working.
+if test "x${target_alias}" != x; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --target=${target_alias} is not how this tree selects targets." >&5
+$as_echo "$as_me: WARNING: --target=${target_alias} is not how this tree selects targets." >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Use --enable-targets=LIST (plural).  --target names a single" >&5
+$as_echo "$as_me: WARNING: Use --enable-targets=LIST (plural).  --target names a single" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: privileged target, which this tree does not have." >&5
+$as_echo "$as_me: WARNING: privileged target, which this tree does not have." >&2;}
+fi
+
+# Canonicalise each element with config.sub, INDIVIDUALLY, so a bad triple
+# fails BY NAME rather than becoming an empty element that is silently
+# skipped.  "No element ever becomes empty and is skipped" -- an empty element
+# is the absence of an answer being treated as an answer.
+mt_target_subdirs=
+for mt_t in `echo "${enable_targets}" | sed -e 's/,/ /g'`; do
+  test x"${mt_t}" = x && continue
+  mt_canon=`$SHELL ${srcdir}/config.sub "${mt_t}" 2>/dev/null`
+  if test x"${mt_canon}" = x; then
+    as_fn_error $? "--enable-targets: \`${mt_t}' is not a recognised target triple" "$LINENO" 5
+  fi
+  mt_target_subdirs="${mt_target_subdirs} ${mt_canon}"
+done
+
+# Sort and deduplicate.  Sorting is not tidiness: it is the enforcement
+# mechanism for "no primary".  The build must be identical for any permutation
+# of the input, so that nothing can treat position 1 as privileged; if
+# reordering the list changes an output, something is wrong and a permutation
+# test will find it.
+mt_target_subdirs=`echo ${mt_target_subdirs} | tr ' ' '\012' | grep . | sort -u | tr '\012' ' '`
+mt_target_subdirs=`echo ${mt_target_subdirs}`
+
+if test x"${mt_target_subdirs}" = x; then
+  as_fn_error $? "--enable-targets=LIST is required.
+
+This tree has no default target and no primary, so there is nothing to fall
+back to when no target is named.  Name the targets you want a tree for, e.g.
+
+    --enable-targets=aarch64-unknown-linux-gnu,x86_64-pc-linux-gnu
+" "$LINENO" 5
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: target trees: ${mt_target_subdirs}" >&5
+$as_echo "$as_me: target trees: ${mt_target_subdirs}" >&6;}
+
+
 
 # Get 'install' or 'install-sh' and its variants.
 # Find a good install program.  We prefer a C program (faster),
@@ -2905,7 +2999,11 @@ host_libs="gettext libiberty opcodes bfd readline tcl tk itcl libgui zlib libbac
 # binutils, gas and ld appear in that order because it makes sense to run
 # "make check" in that particular order.
 # If --enable-gold is used, "gold" may replace "ld".
-host_tools="texinfo flex bison binutils gas ld fixincludes gcc cgen sid sim gdb gdbserver gprof etc expect dejagnu m4 utils guile fastjar gnattools libcc1 gm2tools gotools c++tools target-specs"
+# NOTE: target-specs is deliberately NOT here.  It is not a host tool: it
+# probes one target's assembler and linker, so there is one instance of it per
+# configured target, each configured with --host=<that target>.  Its rules are
+# generated per target from the $(MT_TARGET_SUBDIRS) loop in Makefile.tpl.
+host_tools="texinfo flex bison binutils gas ld fixincludes gcc cgen sid sim gdb gdbserver gprof etc expect dejagnu m4 utils guile fastjar gnattools libcc1 gm2tools gotools c++tools"
 
 # these libraries are built for the target environment, and are built after
 # the host libraries and the host tools (which may be a cross compiler)

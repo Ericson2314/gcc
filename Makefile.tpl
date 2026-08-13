@@ -305,6 +305,27 @@ POSTSTAGE1_HOST_EXPORTS = \
 	LDFLAGS="$(POSTSTAGE1_LDFLAGS) $(BOOT_LDFLAGS)"; export LDFLAGS; \
 	HOST_LIBS="$(POSTSTAGE1_LIBS)"; export HOST_LIBS;
 
+# THE TARGET LIST, PLURAL.  One entry per --enable-targets element, already
+# canonicalised, deduplicated and SORTED by configure.  Sorted so that the
+# build is identical under any permutation of the option: if reordering
+# --enable-targets changes an output, something is treating position 1 as
+# privileged, and that is the primary this branch exists to delete.
+MT_TARGET_SUBDIRS = @mt_target_subdirs@
+
+# FAIL BY NAME if the list is empty.
+#
+# This guard is the difference between "no targets were configured" and a
+# build that runs its per-target loop zero times, emits no rules, and exits 0
+# having built nothing.  Those two are indistinguishable from the exit status
+# alone, and the second one reads as a pass.  configure already refuses an
+# empty list; this catches a Makefile that was generated before that check
+# existed, or a config.status re-run that dropped the substitution.
+ifeq ($(strip $(MT_TARGET_SUBDIRS)),)
+$(error MT_TARGET_SUBDIRS is empty: no target was configured, so no per-target \
+tree exists.  This tree has no default target and no primary.  Re-run \
+configure with --enable-targets=LIST)
+endif
+
 # Target libraries are put under this directory:
 TARGET_SUBDIR = @target_subdir@
 # This is set by the configure script to the arguments to use when configuring
@@ -2208,6 +2229,121 @@ install-gdb: $(INSTALL_GDB_TK)
 # each other, due to contention over config.cache.  Target configures and 
 # build configures are similar.
 @serialization_dependencies@
+
+# ---------------------------------------------------------------------------
+# PER-TARGET MODULE INSTANTIATION
+# ---------------------------------------------------------------------------
+#
+# THE DIVISION OF LABOUR.  AutoGen owns the MODULE dimension: it runs before
+# configure and can never learn the target list, so it emits one PARAMETERISED
+# block per module.  GNU make owns the TARGET dimension: it is handed those
+# blocks and expands them across $(MT_TARGET_SUBDIRS) with $(foreach)/$(eval).
+# Neither tool is asked for information it cannot have.  This is why the list
+# is not baked into Makefile.def: encoding it there would make the target list
+# "configured once, baked in", which is the property this branch deletes.
+#
+# QUOTING.  `$(eval $(call blk,T))' expands the body TWICE -- once by `call',
+# which substitutes $(1), then `eval' parses the result as makefile text.  So
+# every `$' that must survive to RULE time is written `$$', and every `$' that
+# must reach the SHELL is written `$$$$'.
+#
+# GETTING THAT WRONG DOES NOT PRODUCE AN ERROR, AND IT DOES NOT PRODUCE AN
+# EMPTY RECIPE EITHER.  Measured (scratchpad/t113-eval-probe.sh, arm 4):
+# dropping one level of quoting yields a COMPLETE, PLAUSIBLE recipe with the
+# call-time value baked in where a deferred reference belonged.  An assertion
+# that the rule is non-empty scores that as a pass.  The check that works is
+# diffing the generated rule text against a control; do not substitute a
+# length or existence test for it.
+#
+# target-specs IS DELIBERATELY NOT PART OF `all'.  It probes the assembler and
+# linker of the DEPLOYED machine for one target.  The build machine is not the
+# deployment machine, and a compiler serving N targets has no single answer to
+# bake anyway, so these goals exist to be invoked by the user after install --
+# never as a build-time prerequisite of gcc.
+define mt_target_specs_rules
+MT_SPECS_EMITTED += $(1)
+.PHONY: configure-target-specs-$(1)
+configure-target-specs-$(1):
+	@r=`$${PWD_COMMAND}`; export r; \
+	s=`cd $$(srcdir); $${PWD_COMMAND}`; export s; \
+	mt_tools="$$(TOOLS_DIR_FOR_$(1))"; \
+	if test x"$$$$mt_tools" = x; then \
+	  mt_as=`command -v $(1)-as 2>/dev/null`; \
+	  if test x"$$$$mt_as" = x; then \
+	    echo "*** target-specs for $(1): cannot find \`$(1)-as'." >&2; \
+	    echo "***" >&2; \
+	    echo "*** These specs are produced by PROBING $(1)'s assembler and" >&2; \
+	    echo "*** linker.  With that toolchain absent, configure would fall" >&2; \
+	    echo "*** back to this machine's own \`as' and \`ld' and write a spec" >&2; \
+	    echo "*** file that NAMES $(1) while describing the build machine --" >&2; \
+	    echo "*** plausible, undiagnosed, and wrong.  Measured: doing exactly" >&2; \
+	    echo "*** that produced two spec files identical in all 95 probed" >&2; \
+	    echo "*** lines, differing only in the target name." >&2; \
+	    echo "***" >&2; \
+	    echo "*** Put $(1)'s binutils on PATH, or pass" >&2; \
+	    echo "***     make configure-target-specs-$(1) TOOLS_DIR_FOR_$(1)=DIR" >&2; \
+	    exit 1; \
+	  fi; \
+	  mt_tools=`dirname "$$$$mt_as"`; \
+	fi; \
+	$$(SHELL) $$(srcdir)/mkinstalldirs $(1)/target-specs; \
+	echo Configuring target-specs for $(1) in $(1)/target-specs; \
+	cd "$(1)/target-specs" || exit 1; \
+	case $$(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$$(srcdir) ;; \
+	  *) topdir=`echo $(1)/target-specs/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$$(srcdir) ;; \
+	esac; \
+	rm -f no-such-file || : ; \
+	CONFIG_SITE=no-such-file $$(SHELL) \
+	  $$$$s/target-specs/configure \
+	  --srcdir=$$$${topdir}/target-specs \
+	  --build=$${build_alias} --host=$(1) --with-target=$(1) \
+	  --with-tools-dir="$$$$mt_tools" \
+	  || exit 1
+endef
+
+$(foreach mt_t,$(MT_TARGET_SUBDIRS),\
+  $(eval $(call mt_target_specs_rules,$(mt_t))))
+
+# The aggregate.  Note it is a convenience for running every target's probe,
+# NOT a build-time dependency of anything.
+.PHONY: configure-target-specs
+configure-target-specs: $(foreach mt_t,$(MT_TARGET_SUBDIRS),configure-target-specs-$(mt_t))
+
+# NON-VACUITY GUARD ON THE LOOP ITSELF.
+#
+# $(MT_TARGET_SUBDIRS) is non-empty (checked above), but that does not prove
+# the loop above actually emitted anything -- a mis-quoted `define' can expand
+# to nothing while the list is perfectly healthy, and the result is a
+# `configure-target-specs' with no prerequisites that succeeds instantly.
+# That is a loop running zero times scoring as a build.  Assert the
+# prerequisite list is as long as the target list.
+# $(MT_SPECS_EMITTED) is appended to INSIDE the `define' body, so it counts
+# how many times the body was actually evaluated -- which is the thing in
+# doubt.  Comparing it against the target list distinguishes "expanded N
+# times" from "expanded zero times and left a goal with no prerequisites".
+ifneq ($(words $(MT_TARGET_SUBDIRS)),$(words $(MT_SPECS_EMITTED)))
+$(error per-target instantiation ran $(words $(MT_SPECS_EMITTED)) times for \
+$(words $(MT_TARGET_SUBDIRS)) configured targets [$(MT_TARGET_SUBDIRS)]: the \
+$$(eval) loop did not emit a rule for every target)
+endif
+
+# The old unsuffixed names, which were host-module goals before target-specs
+# became per-target.  They must FAIL BY NAME rather than either working (on
+# whose target?) or producing "No rule to make target", which is not a
+# diagnosis.  This is the only defensible answer under "no primary": there is
+# no target these could mean.
+.PHONY: all-target-specs
+all-target-specs:
+	@echo "make: *** \`all-target-specs' is ambiguous in a multi-target build." >&2
+	@echo "target-specs is instantiated once per configured target, and it is" >&2
+	@echo "not built by \`all' -- it probes the deployed machine's toolchain," >&2
+	@echo "so you run it after installing.  Use one of:" >&2
+	@for mt_t in $(MT_TARGET_SUBDIRS); do \
+	  echo "    make configure-target-specs-$$mt_t" >&2; \
+	done
+	@exit 1
 
 # --------------------------------
 # Regenerating top level configury

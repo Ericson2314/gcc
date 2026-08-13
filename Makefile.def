@@ -45,19 +45,19 @@ host_modules= { module= fixincludes; bootstrap=true;
 		missing= TAGS;
 		missing= install-dvi; };
 host_modules= { module= flex; no_check_cross= true; };
-// Generates a spec file per target by probing that target's assembler and
-// linker.  A host module rather than part of gcc: the probing is not specific
-// to one target, and it must be able to run after gcc is built.
-host_modules= { module= target-specs;
-		missing= TAGS;
-		missing= install-dvi;
-		missing= install-pdf;
-		missing= install-html;
-		missing= install-info;
-		missing= dvi;
-		missing= pdf;
-		missing= html;
-		missing= info; };
+// target-specs USED TO BE A host_modules ENTRY AND IS NOT ONE ANY MORE.
+//
+// It generates a spec file for ONE target by probing THAT target's assembler
+// and linker, so "the probing is not specific to one target" -- the reason
+// given for making it a host module -- was wrong: it is specific to exactly
+// one target, and a build serving N targets needs N instances of it.
+//
+// It is now instantiated once per configured target, each with
+// --host=<that target>, by the $(MT_TARGET_SUBDIRS) loop in Makefile.tpl.
+// It is NOT declared here as a target_modules entry either, because that
+// would put it in `all', and target-specs must NOT run at build time: it
+// probes the DEPLOYED machine's toolchain, which is not the build machine's,
+// and the user runs its configure after gcc is installed.
 host_modules= { module= gas; bootstrap=true; };
 host_modules= { module= gcc; bootstrap=true; 
 		extra_make_flags="$(EXTRA_GCC_FLAGS)";

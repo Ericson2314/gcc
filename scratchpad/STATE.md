@@ -3736,3 +3736,247 @@ is the insn-code/`insn-flags.h` job, which is #51's routed-but-unapplied
 `Makefile.in` hunk plus the union.  **Whoever takes aarch64 next should take
 that, not another arm E slice** -- arm E is now behind the wall rather than in
 front of it.
+
+# TASK #113b -- #65 AND #67: THE TOP LEVEL TAKES TARGETS, PLURAL
+
+Branched from `3c56965981e`.  Worktree came up at the bare-repo HEAD AGAIN and
+needed a second `git reset --hard multi-target` -- the trap fires on every new
+worktree, not once per agent.
+
+## 1. WHAT LANDED
+
+**#67 -- the top level owns the target list.**  `configure.ac` grows
+`--enable-targets=LIST`: canonicalised per element by `config.sub`,
+deduplicated, **sorted**, mandatory, with no default and no fallback.
+`AC_SUBST(mt_target_subdirs)`.  `--target=` now warns explicitly.
+
+**#65 -- `target-specs` stops being a host module.**  Removed from
+`Makefile.def`'s `host_modules` and from `configure.ac`'s `host_tools`.  It is
+instantiated **once per configured target** by a `define` + `$(foreach)`/
+`$(eval)` block in `Makefile.tpl`, each instance configured
+`--host=<triple> --with-target=<triple>`.  This is the #113 route in
+production: AutoGen emits ONE parameterised block (module dimension), GNU make
+expands it across N targets (target dimension).
+
+It is deliberately **not** a `target_modules` entry either, because that would
+put it in `all`.  target-specs probes the DEPLOYED machine's assembler and
+linker; the build machine is not the deployment machine, so it must stay a
+goal the user invokes after installing.  Both rulings are honoured at once:
+per-target instantiation, and not a build-time prerequisite.
+
+## 2. THE ARMS -- 5 CONFIGURE, 4 MAKE, AND THE TWO THAT MATTER ARE NEGATIVE
+
+`scratchpad/t113b-conf.sh`, `scratchpad/t113b-make.sh`.  Every arm asserts the
+DIAGNOSTIC TEXT, not merely a non-zero exit: "configure failed" is not a
+diagnosis and would be satisfied by an unrelated breakage.
+
+    A  NEG  no --enable-targets            rc=1 "--enable-targets=LIST is required"
+    B  NEG  triple config.sub rejects      rc=1 "`nosucharch-...' is not a recognised
+                                                 target triple"  -- NOT silently dropped
+    C  WARN --target=<t>                   "is not how this tree selects targets"
+    D  AFF  two targets                    rc=0, MT_TARGET_SUBDIRS has 2 entries
+    E  PERM reversed --enable-targets      byte-identical list
+
+    F  AFF  per-target rules exist         one per target, each naming its OWN
+                                           subdir, neither mentioning the other
+    G  NEG  MT_TARGET_SUBDIRS emptied      rc=2 "MT_TARGET_SUBDIRS is empty"
+    H  NEG  loop sabotaged, LIST HEALTHY   rc=2 "per-target instantiation ran 0
+                                                 times for 2 configured targets"
+    I  NEG  old `all-target-specs'         rc=2 "is ambiguous in a multi-target
+                                                 build", and it lists the goals
+                                                 that do exist
+
+**Arm H is the one the brief asked for and it is NOT the same as arm G.**  G
+is an empty list.  H leaves the list healthy and breaks the loop that consumes
+it, which is the case that actually reads as success: without the counter you
+get a `configure-target-specs` with no prerequisites that exits 0 instantly.
+The guard is `MT_SPECS_EMITTED`, appended to **inside** the `define` body, so
+it counts how many times the body was really evaluated -- the thing in doubt --
+and is compared against `$(words $(MT_TARGET_SUBDIRS))`.  A loop that ran zero
+times cannot score as a build.
+
+**Arm E is the enforcement mechanism for "no primary"**, not tidiness.  The
+list is sorted so that any permutation of `--enable-targets` gives an
+identical build; if reordering ever changes an output, something is treating
+position 1 as privileged and this arm finds it.
+
+## 2b. THE LEAK THE AFFIRMATIVE ARM ALMOST BANKED -- AND THE FIX
+
+The first run of `make configure-target-specs` returned **rc=0 and produced
+two per-target trees with the right names and the right `--host` each**.  That
+is the bar as written, and I nearly recorded it as met.  Checking the CONTENT
+rather than the existence of the artefacts:
+
+    aarch64-.../target-specs/config.log:282   gcc_cv_as=as
+    aarch64-.../target-specs/config.log:377   gcc_cv_ld=ld
+
+    diff specs-aarch64-unknown-linux-gnu specs-x86_64-pc-linux-gnu
+      -> 6 differing lines out of 101, and ALL SIX are the target's own name
+         and the path to its config file.  All 95 PROBED lines are IDENTICAL.
+
+`aarch64-unknown-linux-gnu-as` does not exist on this machine, so
+`target-specs/configure` fell back to the build machine's own `as` and `ld`
+and wrote a spec file that **names aarch64 while describing x86_64**.  Two
+distinct trees, two distinct md5s, correct `--host` recorded in each -- every
+signal I had been checking said PASS -- and the content was one machine's
+answer served to both targets.  **This is the branch's signature bug reproduced
+inside the fix for it**, and the both-sided arm that caught it was comparing
+the two spec files' BODIES, not their existence or their names.
+
+**Fixed in the generated rule**, per "never let the absence of an answer be an
+answer": the per-target recipe now requires `<triple>-as` on PATH, or an
+explicit `TOOLS_DIR_FOR_<triple>=DIR`, and otherwise **fails by name** with
+the measurement above quoted in the message.  Verified: aarch64 now exits 1
+with that diagnostic and **leaves no tree behind**, so there is no
+half-written plausible artefact to mistake for a result.  x86_64 with an
+explicit `TOOLS_DIR_FOR_x86_64-pc-linux-gnu` still succeeds, rc=0.
+
+### OPEN DECISION FOR THE USER -- NOT RESOLVED HERE
+
+`x86_64-pc-linux-gnu-as` is not on PATH either; only unprefixed `as` is.  So
+the strict check refuses the native case too, and a native build now needs an
+explicit `TOOLS_DIR_FOR_<triple>`.  The fork:
+
+  (a) **Strict, as landed.**  No target may use unprefixed tools.  Nothing is
+      privileged; the cost is that every invocation, native included, must say
+      where the toolchain is.
+  (b) **Allow unprefixed tools when the triple EQUALS the canonical build
+      triple.**  Defensible on the ground that this tests a measured fact
+      about the machine rather than inventing a default, and it privileges no
+      target -- `config.guess`'s answer is not a position in a list.  The risk
+      is that it is one short step from "the native target is special", which
+      is the primary by another name.
+
+I have landed (a) because it cannot be wrong in the direction that matters,
+and (b) is a one-line relaxation if the user wants it.  **Choosing (b)
+unilaterally is exactly the debugging-shaped task that contains a design
+decision**, so it is reported rather than taken.
+
+## 3. REGENERATION CONTROLS, RUN BEFORE ANY EDIT
+
+`Makefile.in` and `configure` are generated, and I could not have told my
+change from tool noise without this:
+
+  * `autogen Makefile.def` on the UNMODIFIED tree -> `Makefile.in` **byte
+    identical** (md5 `5cb459d46b28`).
+  * `autoconf -I config` on the UNMODIFIED `configure.ac` -> `configure`
+    **byte identical** (md5 `06d626d31355`).
+
+Both tools come from the pinned nixpkgs and are **not** in `eb-shell.sh`'s
+package set: `autogen` 5.18.16 and `autoconf269`.  Add `-p autogen` /
+`-p autoconf269` rather than concluding they are unavailable, as I first did.
+
+## 4. THE SPELLING IS `--enable-targets`, NOT `--targets`, AND THAT IS FORCED
+
+TOPLEVEL-DESIGN.md section 1.3 recommends `--targets=` and does not price the
+parser.  **Measured: it cannot be implemented without hand-editing the
+generated `configure`.**  Autoconf's option loop auto-accepts only
+`--enable-*` and `--with-*`; anything else reaches the `-*)` arm at
+`configure:1320` and is a hard `as_fn_error ... unrecognized option`.  Note
+that error is **not** suppressed by `--disable-option-checking`, which governs
+only the `--enable`/`--with` unrecognized *list*.
+
+Section 1.2 had rejected `--enable-targets` solely because it would collide
+with `gcc/`'s `--enable-targets`.  **That reason has evaporated**: measured,
+`enable_targets` no longer appears in `gcc/configure.ac` at all (the only hit
+anywhere under `gcc/` is `CONFIGURE-HISTORY.md`).  The name is now free and
+unambiguous.
+
+**This is a visible interface decision the user expressed a preference about,
+so it is flagged rather than buried.**  Every semantic ruling is honoured --
+plural, mandatory, no default, no fallback, sorted.  Only the spelling
+differs, and changing it later is a one-line edit plus a regenerate.
+
+## 4b. THE BARS: THREE MET, ONE NOT -- AND THE ONE THAT IS NOT IS PRE-EXISTING
+
+    all-gcc rc=0                          MET.  /tmp/t113b/two, cold, -j8.
+    two DISTINCT per-target trees         MET.  See section 2b -- and note the
+                                          first version of this claim was
+                                          FALSE-GREEN until the bodies were
+                                          diffed.
+    a negative control that fails         MET.  Arms G and H; H is the
+                                          "loop ran zero times" case.
+    libgcc.a builds                       *** NOT MET ***
+
+**Non-vacuity on the two-backend build** (the "one target is not a
+demonstration of N" bar): `cc1` is 88 MB and carries **both** `targetm_i386`
+and `targetm_aarch64`, `mt-i386/` and `mt-aarch64/` object dirs, and 40,772
+aarch64 symbols.  (`aarch64_option_override` scored 0 and that was MY
+INSTRUMENT: the symbol is `aarch64_override_options`.  A zero from a
+name-matching instrument is a claim about the instrument.)
+
+### WHY libgcc DOES NOT BUILD, AND WHY IT IS NOT THIS CHANGE
+
+`make all-target-libgcc` fails in libgcc's own configure:
+
+    x86_64-pc-linux-gnu-gcc: fatal error: no configuration file for target
+      `x86_64-pc-linux-gnu'.  Looked in:
+        <build>/gcc/../lib/gcc/17.0.0/x86_64-pc-linux-gnu/specs-config
+        /usr/local/lib/gcc/17.0.0/x86_64-pc-linux-gnu/specs-config
+
+Measured, and it is **design doc section 6.5's shape exactly -- a mechanism
+that reads a file no rule produces**:
+
+  * `specs-config` appears in `gcc/gcc.cc` (:8609, :8646), which READS it.
+  * It appears **nowhere in `gcc/Makefile.in`**.  Nothing writes or installs
+    it into the driver's search path, which is an INSTALL path
+    (`$(libdir)/gcc/$(version)/<target>/`), not a build path.
+  * **No `libgcc.a` exists in ANY build directory on this branch** --
+    `/tmp/b112`, `/tmp/b-objs`, or the coordinator's fresh `/tmp/cfgchk`.
+  * Nothing I changed touches the driver's lookup or libgcc's configure.
+    Before this change, target-specs configured into `<build>/target-specs/`,
+    which is equally not in the driver's search path, so libgcc was blocked
+    identically.
+
+**The positive half, and it is the useful part:** the config file my
+per-target rule produces is FUNCTIONAL.  Pointed at explicitly, the built
+driver compiles a real object with it:
+
+    xgcc -B<build>/gcc/ \
+      -ftarget-config=<build>/x86_64-pc-linux-gnu/target-specs/specs-x86_64-pc-linux-gnu-config \
+      -c hello.c -o hello.o        ->  hello.o, 1232 bytes
+
+So for the first time there is a **working producer** of per-target
+`specs-config`.  What is missing is one rule connecting it to the driver's
+search path.  **That is the natural next task and it is now unblocked**; it is
+the sibling of the missing `default-target` install rule that design doc
+section 6.5 already tracks, and both should be done together.
+
+Bare `xgcc` with no target selected says *"no target selected: this compiler
+serves several targets and has no default among them"* -- correct behaviour,
+not a bug to fix.
+
+## 5. WHAT IS NOT DONE, STATED PLAINLY
+
+  * **`libgcc` is NOT yet per-target.**  It remains a normal `target_modules`
+    entry on the single `TARGET_SUBDIR`.  This round instantiates
+    `target-specs` only.  `target-specs` was the right first module and not
+    merely the easy one: it is not part of `all`, so making it multi-instance
+    cannot break the build, whereas `libgcc` going multi-instance immediately
+    exposes Stage 3a (`libgcc/Makefile.in:285-286`'s `-I$(gcc_objdir)` builds
+    N-1 of N libgccs against the primary's `tm.h`, and they compile).  Doing
+    both in one change would have coupled a working interface to that leak.
+  * **The triple -> back-end mapping has NOT moved up** (Stage 4).  It is
+    gated on TOPLEVEL-DESIGN.md section 8 item 2, a probe that has still not
+    been run.  So `gcc/configure.ac` sheds nothing this round: it still
+    canonicalises `${target}` and still does
+    `gcc_manifest_targets="${gcc_extra_targets} ${target}"`, which is the
+    residual primary.  **Deliberately untouched, not overlooked.**
+  * **#75 (gnattools/gotools) is untouched**, as scoped.  Nothing here
+    depends on it.
+  * The other 24 target modules are untouched.
+
+## 6. FLAG DAY -- READ THIS BEFORE REUSING AN OLD BUILD DIR
+
+`--enable-targets` is **mandatory**.  Every existing harness script that
+configures this tree's top level (`t112-build.sh` and its ancestors) will now
+fail at configure time until it adds `--enable-targets=...`.  That is the
+ruling working as intended -- there is nothing to fall back to -- but it is a
+coordination cost across in-flight worktrees, and the error message names the
+option and shows an example.  `stock-build.sh` is unaffected: `/tmp/b-stock`
+is genuine upstream and does not have this option.
+
+## 7. FILES (scratchpad)
+
+    t113b-conf.sh   arms A-E, the configure side
+    t113b-make.sh   arms F-I, the make side; H is the false-green control
