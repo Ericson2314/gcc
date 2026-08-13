@@ -25,6 +25,19 @@ else
 loongarch-multilib.h: ; @touch $@
 endif
 
+# WHAT THIS FRAGMENT GENERATES, declared for gen-multi-target-md.awk's
+# scan_hdr_frag.  The rules above are not enough on their own: a rule nothing
+# depends on is never run, and this fragment had the rules without the
+# declaration -- the same gap config/arm/t-arm-headers had.  Measured with 48
+# back ends configured, 16 objects failed on
+# `loongarch-multilib.h: No such file or directory` while the rule sat in
+# multi-target-md.mk unused.
+#
+# On ONE line: scan_hdr_frag reads the physical line and does not follow a
+# trailing backslash, so a continuation silently drops every name after the
+# first line.
+generated_files += loongarch-multilib.h
+
 loongarch-common.o: loongarch-multilib.h
 
 endif
