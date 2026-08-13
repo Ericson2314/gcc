@@ -482,7 +482,12 @@ ${AWK} '
       # so the union rule is a concatenation and cannot half-succeed.
       printf "gcc-options-%s.part: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/opth-gen.awk\n", b, b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
-      printf "\t  -v list_mode=1 -v union_base=%s \\\n", b
+      # srcdir: list mode also records what each HeaderInclude header DEFINES,
+      # so that every other back end copy of options.h can undefine it.  The
+      # `HeaderInclude paths are srcdir-relative and awk runs in the build
+      # directory, so it cannot find them otherwise -- and opth-gen.awk
+      # refuses rather than scoring an unopenable header as "defines nothing".
+      printf "\t  -v list_mode=1 -v union_base=%s -v srcdir=$(srcdir) \\\n", b
       printf "\t  -f $(srcdir)/opth-gen.awk < $< > tmp-gcc-options-%s.part\n", b
       # Every quote below is written \047, not typed.  This whole awk program
       # is inside a single-quoted shell word, so one literal apostrophe ends

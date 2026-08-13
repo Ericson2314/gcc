@@ -90,7 +90,7 @@ Target RejectNegative Joined Enum(csky_fpu) Var(csky_fpu_index) Init(CSKY_TARGET
 Specify the target floating-point hardware/format.
 
 mdouble-float
-Target Var(TARGET_DOUBLE_FLOAT) Init(-1)
+Target Var(csky_target_double_float) Init(-1)
 Generate C-SKY FPU double float instructions (default for hard float).
 
 mfdivdu
