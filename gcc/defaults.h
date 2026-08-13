@@ -2346,6 +2346,96 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef DEFAULT_INCOMING_FRAME_SP_OFFSET
 #define DEFAULT_INCOMING_FRAME_SP_OFFSET (mt_default_incoming_frame_sp_offset ())
 
+/* ------------------------------------------------------------------------
+   `ACCUMULATE_OUTGOING_ARGS' -- THE OTHER READ OF `cfun->machine' THAT SHARED
+   CODE CAN REACH, and after this the last one.  #131 closed
+   `INCOMING_FRAME_SP_OFFSET' (i386.h:2177) and recorded i386.h:1650 as an
+   untouched sibling reading the same bitfield; this is that sibling.  The
+   full enumeration behind "the last one" is `scratchpad/t132-sweep.sh': of
+   the eleven macros i386.h defines whose bodies reach `cfun->machine', these
+   two are the only names spelled anywhere outside `config/'.  The other nine
+   (`ix86_stack_locals', `ix86_varargs_gpr_size', `ix86_varargs_fpr_size',
+   `ix86_optimize_mode_switching', `ix86_pc_thunk_call_expanded',
+   `ix86_tls_descriptor_calls_expanded_in_cfun', `ix86_static_chain_on_stack',
+   `ix86_red_zone_used', `TARGET_INDIRECT_BRANCH_REGISTER') are spelled only
+   inside `config/i386/', where `cfun->machine' does mean i386's struct.  A
+   checked-and-clean family is a result, so they are named here rather than
+   passed over in silence.
+
+   THE MISREAD IS BROADER HERE THAN AT :2177.  That one is
+   `func_type == TYPE_EXCEPTION', so exactly one of the eight bit patterns
+   gives the wrong branch.  This one is `func_type != TYPE_NORMAL', so seven
+   of the eight do.  #131 measured aarch64's bits reading 3.
+
+   `#undef' FIRST, and here it is not merely hygiene: this file DEFINES the
+   name itself at :902 (`#ifndef ACCUMULATE_OUTGOING_ARGS' -> 0), so without
+   the `#undef' the redirect below is a redefinition of a macro this same
+   header already wrote, on top of i386.h:1647 which tm.h read earlier still.
+   #131 paid 495 warnings to learn that "no fallback in this file" and "not
+   yet defined" are different questions; here there IS a fallback in this
+   file.
+
+   NOT `#ifdef'-BREAKING AND NOT CONSTANT-EXPRESSION-BREAKING.  Swept over all
+   of `gcc/' outside `config/' and `testsuite/' (`scratchpad/t132-sites.sh'):
+   ~40 use sites across calls.cc, expr.cc, function.cc, dce.cc, cselib.cc,
+   builtins.cc, combine.cc, cfgcleanup.cc, combine-stack-adj.cc,
+   var-tracking.cc and targhooks.cc, and every one is an ordinary run-time
+   expression.  The only preprocessor occurrence in the tree is the `#ifndef'
+   at :901, which is this file's own guard and is a definition, not a use.
+   That distinction is what separates this macro from `FRAME_POINTER_CFA_
+   OFFSET' below, which is `#ifdef'-tested at six shared sites and therefore
+   cannot become a call at all.
+
+   `function.cc:1423' and `:1430' USE IT INSIDE A MACRO BODY
+   (`STACK_DYNAMIC_OFFSET'), which is still an ordinary run-time expression at
+   every expansion of that macro -- checked, because a macro-in-a-macro is the
+   shape that looks like a constant context and is not.  */
+#undef ACCUMULATE_OUTGOING_ARGS
+#define ACCUMULATE_OUTGOING_ARGS (mt_accumulate_outgoing_args ())
+
+/* ------------------------------------------------------------------------
+   THE NEIGHBOURS, CHECKED AND DELIBERATELY NOT REDIRECTED.  A family checked
+   and judged fine is a result; silence about it is not.  All three verdicts
+   are `scratchpad/t132-sites.sh' and `t132-closure.sh'.
+
+   `ARG_POINTER_CFA_OFFSET' (:1219) -- CORRECT TODAY, AND CORRECT FOR A REASON
+   THAT DOES NOT SCALE.  Neither i386 nor aarch64 defines it, so both reach
+   this file's `FIRST_PARM_OFFSET (FNDECL) + crtl->args.pretend_args_size',
+   and `FIRST_PARM_OFFSET' is the literal 0 in BOTH (i386.h:1661,
+   aarch64.h:1062).  So the leak is real and its value happens to agree.  That
+   is the wrong-reason green PRINCIPLES names: nine back ends define
+   `ARG_POINTER_CFA_OFFSET' directly (rx 4, avr -1, pru non-constant, six
+   others 0) and `FIRST_PARM_OFFSET' varies more widely still, so this becomes
+   a live leak the moment a third base joins.  Not redirected because doing so
+   for a pair that agrees banks no evidence and cannot be measured apart from
+   the status quo -- it needs a base that disagrees, which this configuration
+   does not have.  Recorded as UNMEASURABLE WITH THIS PAIR, not as clean.
+
+   `FRAME_POINTER_CFA_OFFSET' -- CANNOT BECOME A CALL, and here position of
+   use decides shape.  It is `#ifdef'-tested at six shared sites (function.cc
+   :1466, :1967; var-tracking.cc:9990, :10093, :10146, :10166, :10202;
+   dwarf2out.cc:21620), so a runtime value is impossible: defining the name to
+   a call would make every one of those guards TRUE for every target, which is
+   the `#if HAVE_ATTR_length' failure in reverse.  Only nvptx, vax and pa
+   define it; neither configured base does, so all six guards are FALSE and
+   that is each base's own answer.  What this needs is a build-time union
+   check -- "no configured base may define FRAME_POINTER_CFA_OFFSET unless
+   they all agree" -- not a conversion.  Not written here; it belongs with the
+   other union-list checks.
+
+   dwarf2out.cc:21505-21509 -- THE ONE PLACE SHARED CODE DEREFERENCES
+   `cfun->machine' DIRECTLY, and it is not fixable by any redirect.  It reads
+   `cfun->machine->fs.cfa_reg', `.fs.fp_valid', `.fs.fp_offset' and
+   `.fs.sp_offset' -- i386's `machine_frame_state', by field name, from a
+   shared translation unit.  It is inside `#ifdef CODEVIEW_DEBUGGING_INFO',
+   which only config/i386/cygming.h defines, so it is DEAD in this
+   configuration and in any configuration whose bases exclude cygming.  It is
+   not dead in general: with cygming among the bases, that block compiles and
+   then reads `fs' out of whichever base is selected.  There is no macro to
+   redirect -- shared code names a back-end-private struct field -- so the fix
+   is a target hook, i.e. a design decision, and it is recorded rather than
+   taken.  */
+
 #undef DEBUGGER_REGNO
 #define DEBUGGER_REGNO(REGNO) (mt_debugger_regno ((unsigned int) (REGNO)))
 #undef DWARF_FRAME_REGNUM

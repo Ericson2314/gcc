@@ -405,6 +405,16 @@ mt_default_incoming_frame_sp_offset (void)
   return mt_frame ()->default_incoming_frame_sp_offset ();
 }
 
+/* `ACCUMULATE_OUTGOING_ARGS'.  Uncached for the same reason as the pair above
+   and one stronger: i386's body reads `crtl->stack_realign_needed', which is
+   written during reload, so this is not constant even across two passes over
+   one function.  */
+bool
+mt_accumulate_outgoing_args (void)
+{
+  return mt_frame ()->accumulate_outgoing_args ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

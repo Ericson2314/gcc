@@ -51,6 +51,16 @@ along with GCC; see the file COPYING3.  If not see
    `tm.h' -- is the entire point of the thunk: shared code read that same
    bitfield out of aarch64's object and got TYPE_EXCEPTION.  */
 #include "function.h"
+/* For `crtl' and for `optimize_function_for_speed_p'.  i386's
+   `ACCUMULATE_OUTGOING_ARGS' (i386.h:1647) reads `crtl->stack_realign_needed',
+   `crtl->profile' and `optimize_function_for_speed_p (cfun)'.  Without these
+   the build failed BY NAME -- `i386.h:1651: crtl was not declared in this
+   scope' -- which is the mechanism working exactly as it did for `cfun' in
+   #131: the read now happens in the translation unit where `cfun->machine'
+   means i386's `machine_function', so i386's headers have to be satisfiable
+   here.  */
+#include "emit-rtl.h"
+#include "predict.h"
 #include "multi-target-reg-widths.h"
 /* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
    booleans at the bottom of this file: `-I<base>-inc' comes ahead of `-I.' on
@@ -619,6 +629,30 @@ mt_base_default_incoming_frame_sp_offset (void)
 #endif
 }
 
+/* `ACCUMULATE_OUTGOING_ARGS', read in THIS base's translation unit -- the
+   second and last shared-code-reachable read of `cfun->machine' through the
+   wrong `struct machine_function' declaration.  See target-frame.h.
+
+   `? true : false' AND NOT A BARE CAST.  Every back end that defines the macro
+   at all spells it `1' (39 of them), `TARGET_ACCUMULATE_OUTGOING_ARGS' (sh),
+   `avr_accumulate_outgoing_args ()' (avr) or i386's `||' chain, and
+   defaults.h:902 spells it `0'.  Those are `int', not `bool', and a base is
+   free to write any nonzero int; the explicit test is what makes every such
+   spelling arrive here as the same two values.  It is the same shape as
+   `mt_base_hard_frame_pointer_is_arg_pointer' above.
+
+   NOTE THAT THIS THUNK CANNOT BE HOISTED OUT OF THE PER-FUNCTION LOOP by a
+   caller.  i386's body reads `optimize_function_for_speed_p (cfun)' and
+   `crtl->stack_realign_needed', and the latter is written during reload, so
+   the answer can differ between two passes over one function.  That is
+   upstream behaviour and shared code already re-evaluates the macro at each
+   of its ~40 sites; this preserves that rather than improving on it.  */
+static bool
+mt_base_accumulate_outgoing_args (void)
+{
+  return ACCUMULATE_OUTGOING_ARGS ? true : false;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -907,7 +941,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_hard_frame_pointer_is_frame_pointer,
   mt_base_hard_frame_pointer_is_arg_pointer,
   mt_base_incoming_frame_sp_offset,
-  mt_base_default_incoming_frame_sp_offset
+  mt_base_default_incoming_frame_sp_offset,
+  mt_base_accumulate_outgoing_args
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

@@ -817,6 +817,55 @@ struct target_frame_desc
      `testsuite/').  */
   HOST_WIDE_INT (*incoming_frame_sp_offset) (void);
   HOST_WIDE_INT (*default_incoming_frame_sp_offset) (void);
+
+  /* `ACCUMULATE_OUTGOING_ARGS' -- THE SECOND READ OF `cfun->machine->func_type'
+     THROUGH THE WRONG STRUCT DECLARATION, and the only one left that shared
+     code can reach.  #131 closed `INCOMING_FRAME_SP_OFFSET' (i386.h:2177);
+     i386.h:1647 is the sibling it named and did not close:
+
+	 #define ACCUMULATE_OUTGOING_ARGS \
+	   ((TARGET_ACCUMULATE_OUTGOING_ARGS \
+	     && optimize_function_for_speed_p (cfun)) \
+	    || (cfun->machine->func_type != TYPE_NORMAL \
+		&& crtl->stack_realign_needed) \
+	    || TARGET_STACK_PROBE \
+	    || TARGET_64BIT_MS_ABI \
+	    || (TARGET_MACHO && crtl->profile))
+
+     Same `identity by address' disguise as :2177: `cfun->machine' points at
+     the SELECTED base's `machine_function' object, while calls.cc, expr.cc,
+     function.cc, dce.cc, cselib.cc, builtins.cc, combine.cc, cfgcleanup.cc,
+     combine-stack-adj.cc, var-tracking.cc and targhooks.cc were all compiled
+     against I386's declaration of that struct name.  The 3-bit `func_type'
+     bitfield is read out of whatever aarch64 keeps at that offset.  It is a
+     worse read than :2177's, not a milder one: :2177 compares for equality
+     with `TYPE_EXCEPTION', so only one of the eight bit patterns is wrong,
+     whereas this one is `!= TYPE_NORMAL', so SEVEN of the eight are.  #131
+     measured that bitfield reading 3 on aarch64.
+
+     Note what the leak decides.  aarch64's own answer is the constant 1
+     (aarch64.h:1060); i386's is a run-time expression that is usually 0 on
+     x86_64-linux.  So every one of the ~40 shared use sites -- argument-block
+     layout in `expand_call', the `NO_DEFER_POP' pushes, dce's stack-store
+     analysis, cfgcleanup's cross-jumping -- was taking i386's answer while
+     generating aarch64 code, i.e. aarch64 was compiled in the
+     PUSH-ARGUMENTS-INDIVIDUALLY shape it never uses.
+
+     A CALL, EVALUATED AT EVERY USE, for the same measured reason as the two
+     sp offsets above and one more: i386's body reads `cfun' three ways
+     (`optimize_function_for_speed_p (cfun)', `cfun->machine->func_type',
+     `crtl->stack_realign_needed'), and `crtl->stack_realign_needed' is set
+     DURING reload.  It is not constant across a run, not constant across two
+     functions, and not even constant across two passes over one function.  A
+     `target-cdata' constant would be read once with `cfun' null.
+
+     EVERY USE SITE IS AN ORDINARY RUN-TIME EXPRESSION -- no `#if', no case
+     label, no array bound, no static initialiser.  Swept over all of `gcc/'
+     outside `config/' and `testsuite/' (`scratchpad/t132-sites.sh'): the only
+     preprocessor occurrence anywhere is defaults.h's own `#ifndef' guard,
+     which is the definition and not a use.  That is what makes this one
+     convertible where `FRAME_POINTER_CFA_OFFSET' is not; see defaults.h.  */
+  bool (*accumulate_outgoing_args) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -989,5 +1038,6 @@ extern bool mt_hard_frame_pointer_is_arg_pointer (void);
    whichever base compiled dwarf2cfi.cc.  */
 extern HOST_WIDE_INT mt_incoming_frame_sp_offset (void);
 extern HOST_WIDE_INT mt_default_incoming_frame_sp_offset (void);
+extern bool mt_accumulate_outgoing_args (void);
 
 #endif /* GCC_TARGET_FRAME_H */
