@@ -46,15 +46,28 @@ Two populations, two spellings. A **genuine per-base source** can name the path
 literally. A **shared source compiled N times** (one file → `foo-i386.o` and
 `foo-aarch64.o`) cannot, and takes the base as a macro.
 
-**The landed form** is `gcc/multi-target-base.h`:
+**The landed form** is `gcc/multi-target-base.h`, with `-DMT_BASE=<cpu>-inc`
+per object and **the call site taking a bare, unquoted argument**:
 
 ```c
-#define BASE_HEADER(f) <MT_BASE/f>      /* -DMT_BASE=<cpu>-inc per object */
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#define BASE_HEADER(f) XSTR (MT_BASE/f)   /* -> "i386-inc/tm.h" */
 #include BASE_HEADER (tm.h)
 ```
 
-Plain parameter substitution into the angle-bracket form — **no `#`, no `##`**,
-one `-D` serving every header. Everything else was measured and fails:
+**User preference: the `"..."` result over `<...>`.** Both work; the angled
+form (`#define BASE_HEADER(f) <MT_BASE/f>`) needs no helper macros at all, so
+if you are reading old commits, that is what it was.
+
+**The double indirection is mandatory, not decoration.** `STR`'s parameter is
+adjacent to `#`, so its argument is **not** expanded; `XSTR` forces one
+expansion first. Get it wrong and you silently produce `"MT_BASE/tm.h"` — a
+*plausible-looking wrong path*, which is the exact failure shape this whole
+mechanism exists to remove. Any arm here must assert the expansion contains the
+**actual base name**.
+
+Everything else was measured and fails:
 
 ```
 #include BASE "/tm.h"                 warning only, silently drops "/tm.h"
