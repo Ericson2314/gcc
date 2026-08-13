@@ -1933,10 +1933,45 @@ typedef TARGET_UNIT target_unit;
    MULTI_TARGET_OBJS ones, and it is not `targetm'-renamed, so it cannot carry
    MULTI_TARGET_TARGETM_BASE: `target.h:392' rejects that name without a
    matching `-Dtargetm='.  gen-multi-target-md.awk defines this one instead.  */
+/* `!defined (__cplusplus)' IS THE FOURTH, AND IT IS `libgcc'.
+
+   `libgcc' compiles C, and it reaches this file through `tconfig.h' ->
+   `tm.h' -> here.  `target-frame.h' declares `mt_minimum_alignment (tree,
+   machine_mode, unsigned int)' and friends, and a C translation unit has no
+   `tree' and no `machine_mode', so every `libgcc' object that includes
+   `libgcov.h' or `generic-morestack.c' failed with
+
+       error: unknown type name 'machine_mode'
+
+   and NO `libgcc.a' has been built on this branch since.  The compile error
+   was the visible half; the invisible half is that a C consumer cannot use
+   this machinery at all -- the redirects expand to calls into the compiler's
+   own per-base tables, which are not linked into a runtime library and never
+   will be.
+
+   THIS IS NOT A LEAK BEING REOPENED, and the distinction matters because
+   "keep the real macros" normally means "the primary answers".  A runtime
+   library is single-target by ruling: one host per runtime tree.  So the one
+   tm.h it is compiled against is legitimately ITS OWN target's, and taking
+   that target's `STACK_BOUNDARY' is the right answer rather than a primary's.
+   That the tm.h it is handed today is `gcc/'s build-directory one is a real
+   and separate bug -- libgcc/Makefile.in's `-I$(gcc_objdir)' -- and it is not
+   this guard's to fix; converting these macros would not fix it either, since
+   the wrong tm.h would still be the one supplying the base.
+
+   MEASURED BEFORE RELYING ON IT: no C source under `libgcc/' spells any of
+   the thirteen names redirected below.  The hits a grep for them returns are
+   `X86_64_SAVE_NEW_STACK_BOUNDARY' in `config/i386/morestack.S' (assembly, a
+   different identifier) and `__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__' in
+   `unwind-dw2.c'.  So this arm changes no value that anything reads; it stops
+   a header the C front end cannot parse from being parsed.  If a libgcc file
+   ever does spell one, it gets its own target's tm.h answer, which is the
+   answer it wants.  */
 #if defined (MULTI_TARGET_TARGETM_BASE) || defined (GENERATOR_FILE)	\
-    || defined (MULTI_TARGET_SUPPLY_TU) || defined (MULTI_TARGET_REG_PROBE)
-/* A back end's own translation unit, a build-time generator, or another
-   supply-side TU: keep the real macros.  */
+    || defined (MULTI_TARGET_SUPPLY_TU) || defined (MULTI_TARGET_REG_PROBE) \
+    || !defined (__cplusplus)
+/* A back end's own translation unit, a build-time generator, another
+   supply-side TU, or a C consumer such as libgcc: keep the real macros.  */
 #else
 #include "target-cdata.h"
 
