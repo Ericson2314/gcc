@@ -211,6 +211,23 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**SWEEP THE FAMILY; DO NOT MEET IT ONE WALL AT A TIME.** Four generated
+per-base families were found built, linked, **and never selected** — the
+`targetm` asm ops, the optab tables, the predicates/constraints, and the insn
+attribute tables — each discovered by *walking into it* during an unrelated
+debug session. When the fourth turned up, enumerating the whole of `OBJS`
+took one agent-session and produced a verdict per family, including six that
+were already clean (worth stating: **a family you checked and judged fine is
+a result; silence about it is not**). It also found, *outside* the family it
+was sent to look at, a **163KB overrun of a shared `.bss` object**:
+`NUM_INSN_CODES` was 15429 (i386's) while shared code writes at codes up to
+20511.
+
+**"Is a per-base variant built?" and "does a selector exist?" and "does
+anything CALL the selector?" are three arms, not one.** A selector has been
+found complete, well-commented and with **no caller anywhere** while its table
+arm was green and correct.
+
 **"WHERE DOES IT ICE" IS NOT THE MEASUREMENT. "IS THE OUTPUT RIGHT" IS.**
 A wall was handed between agents as *"`int g(int a){return a+1;}` fails in
 `aarch64_can_eliminate` during postreload"*. At branch HEAD it did not fail at
