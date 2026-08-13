@@ -523,6 +523,25 @@ answer is still wrong is worse than the failure.**
   **because the raw number was quoted anyway, twice, after a warning not to.**
   If a caveat has to be remembered, it will not be.
 
+  **THE "TRUSTED 2" WAS NEVER 2.** `MAX_BITSIZE_MODE_ANY_MODE` had **already
+  been converted** by the genmodes union (i386 1024, aarch64 8192, shared
+  8192) while the board said `UNCONVERTED` — the completeness gate derives
+  conversions from `defaults.h` redirects plus a hand list, and **a union
+  macro is in neither**. Both base contexts therefore read 8192, so its header
+  arm was green for target-neutral-agreement and **was banked as one of the
+  two trusted passes**. Trusted is **1**. A sixth probe shape,
+  `union-probe.sh`, exists because no other shape can score a union macro: the
+  number is deliberately identical, so every other arm is green by
+  construction.
+
+  **THE aarch64 CODEGEN BAR IS FILENAME-SENSITIVE AND WAS QUOTED WITHOUT ITS
+  INPUT.** `-S` emits a `.file` directive, so the same compiler on the same
+  source gives 369 / 371 / 373 bytes for `x.c` / `one.c` / `mtbar.c`. The
+  recorded "373 bytes / `b01d9157fdc1`" is reproduced by **any seven-character
+  basename** — it is evidence about a filename, not about codegen. **Never
+  quote that bar without the input path**, and prefer a diff against a control
+  to a byte count.
+
   **A FALLING PASS COUNT IS THE SHAPE OF SUCCESS HERE.** Closing the arm debt
   took the aarch64 header PASS column **29 → 3**, and that is the good
   outcome: 29 was 2 trusted + 27 `UNTRUSTED-redirect-vs-itself`, 3 is 2
