@@ -259,6 +259,21 @@ Six rules that each cost a session:
    names and confirm the mitigation fires.** An unfired mitigation is
    indistinguishable from an absent one, and reads as protection.
 
+   **The same lesson arrived twice in one day by a different route, which is
+   the signal.** `target-specs/configure` was exiting 1 for *every* target
+   (a key emitted but absent from `ts_expected`), aborting partway and leaving
+   `specs-<target>` **truncated at 39 lines** instead of 101. Every aarch64
+   measurement taken in that window used a truncated spec file. The guards
+   missed it because **they assert the file is non-empty — and 39 lines is
+   non-empty.**
+
+   So: **"non-empty" and "long enough" and "exists" are not checks.** They are
+   the shape that passes on the corrupted artefact. Check the artefact against
+   what it should *be* — a line count you predicted, a diff against a control,
+   the specific keys you expect by name. If you find yourself asserting
+   `test -s`, ask what a half-written version of that file looks like, because
+   that is the case the assertion will meet.
+
 **Check the count in BOTH directions when moving a walk onto a union list.** A
 fix can improve the axis you are watching while silently regressing the one you
 are not. Real case: `cl_optimization_compare` walked `flags[]` with 1116
