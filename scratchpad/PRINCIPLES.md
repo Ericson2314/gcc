@@ -367,6 +367,18 @@ commit it on your behalf, which is slower and puts an unreviewed change in
 someone else's hands. `git diff --cached` before committing (the index is
 shared), then `git log --oneline -1` to confirm the commit exists.
 
+**"No `AC_ARG_*` and no assignment" does NOT mean a variable is unsettable.**
+Generated `configure` auto-assigns `with_X` / `enable_X` from the command line
+even with no `AC_ARG_*` for them. A naive scan for unsettable variables reports
+**~40 false positives**; the genuinely unsettable set is small. Force the
+variable and observe the branch before believing it is dead.
+
+**When every arm of your probe reads empty, that looks exactly like "branch not
+taken."** An agent's probe harness was wrong four ways and **all four failed
+towards its hypothesis** — because an all-empty read is indistinguishable from
+the thing it was trying to prove. Add a non-vacuity FATAL: the harness must
+refuse to score when it cannot show it read anything at all.
+
 **A count check passes when two errors cancel.** Measured: a generated
 `global_options_init` had **1674 elements for a 1669-member struct** — five
 invented and two missing. All the compiler said was `too many initializers for
