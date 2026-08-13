@@ -2056,3 +2056,167 @@ last rebuilt is worthless.**  Add these to the 4 / 8 / 32 / 593 / 664 / 698 /
     t111-insn-guards.sh  target-insn.h, reads mt_base_insn out of .rodata for
                          both bases and requires the two tables to DIFFER
     t111-build/go/run/ts.sh, t111-reconf-gcc.sh, t111m-build.sh
+
+# TASK #45 / #98 -- HANDOVER (config.gcc + configure.ac variables nothing sets)
+
+Branched from `0b7c0542b2b`.  Landed as `df3fbeb8915`.  Build dir `/tmp/b45`
+(mine, x86_64 + aarch64); `--enable-backends=all` dir `/tmp/b45all`.
+
+## 1. PER VARIABLE: CODE OR COMMENT, SET OR UNSET, OURS OR UPSTREAM'S
+
+The brief asked for this distinction explicitly because #71 was filed the same
+way and was INVERTED (`with_multllib_default` is comments only and correctly
+spelt).  Establishing it first was right: it changed the verdict twice.
+
+| variable | code/comment | settable? | whose | action |
+|---|---|---|---|---|
+| `ld_flavor` | CODE (`config.gcc:1158`) | no | **upstream** | conditional deleted, body kept |
+| `disable_initfini_array` | CODE (`:2979`) | no | **upstream** | conditional deleted, body kept |
+| `x86_with_multilib` | CODE, but message text only, in an arm unreachable here | no | **upstream** | **NOT CHANGED** -- see below |
+| `offload_targets` | CODE (`configure.ac:818`) | no | **ours** (the option was deleted here) | explicit `AC_DEFINE(...,"")` |
+| `t_t_f_c` | COMMENT only (`:189`) | -- | upstream | none -- the #71 shape |
+| `target_header_dir` | COMMENT only (`:1284`) | -- | ours | none -- the #71 shape |
+| `enable_multilib` | COMMENT only (`:1878`, `:2623`) | -- | ours | none -- the #71 shape |
+
+**Do not re-file the last three as bugs.**  They are prose describing things
+that were removed, which is exactly what #71 turned out to be.
+
+### The method point worth keeping
+
+`with_*`/`enable_*` are auto-assigned by generated `configure` from the command
+line **even with no `AC_ARG_WITH`/`AC_ARG_ENABLE`**.  So "no `AC_ARG_*` and no
+assignment" does NOT mean unsettable, and a naive scan of `config.gcc` reports
+~40 false positives (`with_avrlibc`, `with_fp`, `enable_fdpic`, ...).  The
+genuinely unsettable set is much smaller and is the table above.  Any future
+sweep that skips this step will re-file the same 40.
+
+### `ld_flavor` is UPSTREAM'S, and I first concluded the opposite
+
+The tempting reading -- "this branch deleted the `ld_flavor` probe, so we broke
+it" -- is WRONG, and measurement refuted it.  Upstream sources `config.gcc` at
+`configure.ac:1927` and only assigns `ld_flavor=gnu` at `:2819`.  The read has
+therefore ALWAYS been empty, upstream included, and upstream documents the rule
+it breaks at `:2866`.  Extractable upstream as-is.
+
+## 2. STILL OPEN -- ROUTED, NOT DONE
+
+### (a) `accel_dir_suffix` needs a `Makefile.in` hunk -- ANOTHER AGENT'S FILE
+
+Untouched on purpose.  Always empty (`configure.ac:42`, and
+`/tmp/b45/gcc/Makefile:74` confirms `accel_dir_suffix = `), but still threaded
+through:
+
+    Makefile.in:821   libsubdir = $(libdir)/gcc/$(version)$(accel_dir_suffix)
+    Makefile.in:823   libexecsubdir = $(libexecdir)/gcc/$(version)$(accel_dir_suffix)
+    Makefile.in:3181  -DACCEL_DIR_SUFFIX=\"$(accel_dir_suffix)\"
+
+and consumed in `gcc.cc` at 1763, 5667, 8686, 9240, 9470.  Removing it is a
+`Makefile.in` + `gcc.cc` + `configure.ac` change, so it is one routed unit.
+
+**This is a DESIGN question, not a cleanup, and it belongs to #96.**
+`accel_dir_suffix` sits in exactly the path #96 extends -- per-target data at
+`$(libdir)/gcc/$(version)/<target>/`.  There are then TWO per-target axes
+(offload accel target, and configured target) and nobody has said how they
+compose.  Offloading is GCC's pre-existing narrow multi-target: one host
+compiler also emitting for nvptx/amdgcn.  If it returns, accel targets are
+arguably just more configured targets and the suffix should not exist as a
+separate axis at all.  Decide that with #96 rather than deleting the suffix
+first and discovering the axis was load-bearing.
+
+### (b) `gcc/config.in` IS STALE BY ~278 LINES -- found incidentally
+
+`autoheader configure.ac` produces a **-278 / +2** diff.  ~46 macros still have
+`#undef` entries whose `AC_DEFINE`s this branch removed (`HAVE_AS_*`,
+`HAVE_GAS_*`, `LD64_*`, `DSYMUTIL_VERSION`, `USE_AS_TRADITIONAL_FORMAT`, ...).
+
+Behaviourally inert -- a `#undef X` that configure never converts to `#define`
+leaves X undefined, same as deleting the line -- so this is NOT urgent.  But it
+means **anyone who runs `autoheader` gets a 278-line drive-by in a shared file**.
+I reverted it and hand-applied only my own hunk, so my diff stays reviewable.
+Worth doing deliberately as its own commit; it is a good independent check on
+"which target probes are really gone".
+
+### (c) `config.gcc` error messages go to STDOUT
+
+`config.gcc:3032` and the two x86 sites `echo` rejections without `1>&2`.  The
+riscv comment at `:2623` already records this biting once ("an empty message
+because the echo went to stdout").  Not fixed here -- it is a separate sweep
+across many arms.
+
+## 3. TRAPS PAID THIS TASK
+
+1. **`config.status --recheck` AT THE TOP LEVEL DOES NOT RECONFIGURE `gcc/`.**
+   `gcc/auto-host.h` and `gcc/config.status` kept their original timestamps.
+   The `diff` then said "identical" about a file nothing had touched -- a
+   comparison that could not have failed.  `t45-reconf.sh` now asserts the
+   mtime advanced before any verdict is believed.
+2. **A hand-run `cd gcc && config.status --recheck` SILENTLY FLIPPED
+   `TARGET_PROVIDES_LIBATOMIC` from 1 to undefined.**  `TARGET_CONFIGDIRS`
+   reaches `gcc/configure` only as an env var exported by the top-level
+   Makefile.  `configure.ac:2650-2665` ALREADY DOCUMENTS THIS EXACT FAILURE and
+   I walked into it anyway -- the warning is in the file, and it was still
+   cheaper to hit than to read.  Correct route: remove `gcc/config.status` and
+   `gcc/Makefile`, reconfigure via the TOP-LEVEL make.
+3. **My probe harness was wrong in four ways, all failing TOWARDS the
+   hypothesis** -- every arm read "empty", which is exactly what "the branch is
+   not taken" looks like:
+   `set -u` killed the subshell at `config.gcc:306`'s unset `${target_min}`
+   before the value was ever read; `"$@"` ran the forced assignments as
+   COMMANDS so the forced arms were never forced; `eval "echo \"\$$v\""`
+   double-expanded and ran `$(exeext)` as a command substitution; and the
+   triples were not run through `config.sub`, so `msp430-elf` fell through to
+   `*)` and printed "not supported" -- the harness's omission, not a fact about
+   msp430.  The non-vacuity counter in `t45-probe.sh` exists because of this:
+   an all-empty run is now FATAL, never a result.
+4. **The `-p` set matters for reconfigures.**  Adding `autoconf269 automake116x`
+   to the recheck shell put binutils' `ld.bfd` on PATH and configure's link
+   probes failed with `cannot find -lgcc` -- the hazard `t111-build.sh` already
+   warns about.  Reconfigure in the SAME known-cached set as the build.
+
+## 4. NUMBERS I COULD NOT RECONCILE WITH THE BRIEF
+
+The brief's `--enable-backends=all` figure, "**43,186 lines** for 48 back ends",
+matches no artefact `configure-gcc` produces here.  Measured:
+
+    multi-target-common.mk          4033
+    multi-target.manifest           4512
+    multi-target-common.h            240
+    multi-target-spec-functions.h    239
+    total                           9024
+
+"48 back ends" IS right -- 48 distinct `cpu_type` across **188** target stanzas.
+The 43,186 is presumably a later, make-generated artefact (`multi-target-md.mk`)
+or is stale.  **Zero `$(error)` is the part that matters and it holds.**
+Reporting it as "43,186 lines" without saying which file would be quoting a
+number I did not measure.
+
+## 5. REGRESSION BARS, MEASURED ON /tmp/b45
+
+  * `make cc1 multi-target-objs lto1` rc=0; `lto1` links (86 MB).
+  * x86_64: rc=0, 12369 bytes, md5 `378fc33c1e70` -- matches the bar.
+  * aarch64: rc=4 ICE at `big.c:90`, `gimplify_init_constructor` -- the wall
+    STATE.md section 3 already records.  Unchanged.
+  * `stock-compare.sh`, `IN` ABSOLUTE, `MT=/tmp/b45`: **5/5 IDENTICAL** vs
+    /tmp/b-stock, 5 distinct md5 per side, negative control firing, rc=0.
+  * `--enable-backends=all`: configures, 188 stanzas, **0 `$(error)`**, and the
+    two edited arms are actually covered (msp430 x2, vms x3).
+  * Probe scoreboard NOT run and NOT moved: aarch64 5/104 header + 6
+    retired-pending, TAB 27/5.  Nothing here adds or retires an arm.
+
+### STDERR -- WHICH ARM
+
+Both `cc1 multi-target-objs lto1` runs here are **COLD** (`auto-host.h` changed,
+so everything rebuilt): **637 lines / 101 `warning:`** before, **615 / 100**
+after.  Comparable to each other, NOT to the 32-line incremental floor.  The
+difference is host-compiler noise from nixpkgs gcc 15.2, not this tree.
+
+## 6. FILES (scratchpad)
+
+    t45-probe.sh    the before/after arm; sources config.gcc per target and
+                    reports observables, with a non-vacuity FATAL and all four
+                    of its own bugs documented in the header
+    t45-reconf.sh   how to reconfigure gcc/ WITHOUT destroying
+                    TARGET_PROVIDES_LIBATOMIC; both wrong ways kept
+    t45-all.sh      --enable-backends=all blast radius, scored on ARTEFACTS
+    t45-build.sh / t45-go.sh / t45-run.sh / t45-ts.sh
+                    t111-* repointed at this worktree and /tmp/b45
