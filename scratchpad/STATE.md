@@ -3071,3 +3071,155 @@ in a working build, so the 17 unconverted readers take the absent arm today.
   * **#116** the 17 above.
   * **#51 corrected**: `gen_speculation_barrier` is **not** arm-only (i386 and
     aarch64 both define it), so the fork is **one** name, `gen_movxf`.
+
+# TASK #113 -- THE $(eval) PROBE: THE TOP-LEVEL ROUTE EXISTS.  GATE CLEARED
+
+Worktree started at the bare-repo HEAD `7208eca60d0` and needed the documented
+`git reset --hard multi-target`; the PRINCIPLES 5 check caught it, as it did
+for #111 and #112.  Note the branch tip had moved to `44027e85f2f`, past the
+`cfd84583a55` quoted in my brief.
+
+This task ran **TOPLEVEL-DESIGN.md section 8 item 1**, which that document
+names as the **highest-priority thing that must happen before the design is
+approved**, and section 7(3) names as its **top-ranked risk** -- "that the
+split-loop route's make half survives contact with `$(eval)`".  It decides
+whether the recommended route *exists*, not merely what it costs.
+
+## THE VERDICT: IT WORKS.  4/4 ARMS, BOTH-SIDED, WITH NEGATIVE CONTROLS
+
+`scratchpad/t113-eval-probe.sh`, N=2 (aarch64-unknown-linux-gnu,
+x86_64-pc-linux-gnu), module `libgcc`, non-bootstrap `configure` and `all`
+rules, recipe text lifted VERBATIM from the shipped generated `Makefile.in`
+(lines 50383-50424 and 50836-50851).
+
+    arm 1  AFFIRMATIVE   $(eval) output == literal output, per target, for the
+                         stored rule text AND the fully expanded text.
+                         6/6 IDENTICAL.  md5s recorded per arm.
+    arm 2  BOTH-SIDED    the two targets are NOT identical: each names its own
+                         subdir and its own --host, and neither mentions the
+                         other.  (If they were identical, arm 1 would STILL
+                         pass while one target served both -- a primary by
+                         another name.)
+    arm 3  NEGATIVE      an EMPTY target list FAILS BY NAME (rc=2,
+                         "MT_TARGETS is empty: no target was configured"),
+                         not silently with zero rules.  This is the false
+                         green the brief demanded a control for: a loop that
+                         runs zero times must not score as a build.
+    arm 4  NEGATIVE      an injected under-quoting error (one level of `$`
+                         doubling dropped) makes arm 1 go RED.  Without this,
+                         arm 1's pass would prove nothing about quoting.
+
+The control (`probe-lit.mk`) is the design doc's option (B) -- the shipped
+text written out once per target -- so it is **independent of the `define`
+block** and cannot be wrong in the way the subject might be.
+
+## THREE FINDINGS THE DESIGN DOC DOES NOT HAVE, ONE OF THEM A CORRECTION
+
+**(1) CORRECTION: the `$(eval)` failure mode is silently WRONG, not silently
+EMPTY.**  TOPLEVEL-DESIGN.md section 2.2 says twice that getting the `$`
+doubling wrong yields "a silently empty recipe", and builds its mitigation
+around asserting rules are non-empty.  **Measured, it does not.**  Dropping
+one level of quoting on `$$(srcdir)` produced a rule that is complete,
+non-empty, and *plausible* -- with `MARK_SRCDIR` (the value at
+`call`-expansion time) baked in where `$(srcdir)` should have been deferred:
+
+    correct    ... s=`cd $(srcdir); ...` ... $(SHELL) $(srcdir)/mkinstalldirs
+    under-quoted ... s=`cd MARK_SRCDIR; ...` ... $(SHELL) MARK_SRCDIR/mkinstalldirs
+
+A non-emptiness assertion scores that PASS.  **The mitigation the design doc
+specifies would not have caught the error it was written to catch.**  The
+check must compare rule TEXT against a control, not measure its length.  This
+is PRINCIPLES 2a's "a count is the weakest evidence available" in a new
+location, and it is the single most useful thing this probe found.
+
+**(2) `$(call)`/`$(eval)` COLLAPSES backslash-newline continuations.**  The
+literal form keeps one physical line per continuation; the `$(eval)` form
+emits one long logical line.  The two are the same command -- make hands the
+recipe to `/bin/sh` with continuations intact and sh joins them -- but any
+acceptance test that diffs raw recipe text will go RED on a CORRECT change.
+`scratchpad/t113-norm.sh` normalises both sides to the shell-visible text;
+arm 4 is what proves the normalisation has not flattened the comparison into
+insensitivity.  **Anyone planning to accept Stage 3 by diffing `Makefile.in`
+before and after needs to know this first.**
+
+**(3) `make -n` EXECUTES recipe lines containing `$(MAKE)`.**  This is
+documented GNU make behaviour (so sub-makes recurse under `--dry-run`) and it
+bit the first version of this probe: `make -n all-target-libgcc-<t>` RAN the
+recipe (`MARK_PWD: command not found`).  Consequence for the design doc's
+section 6.3 **permutation harness**: a permutation arm built on `--dry-run`
+over target-module rules will *actually run sub-makes*, and on a tree with N
+targets that is not a dry run at all.  The permutation harness must use
+`make -p` (rule database) or a real build, never `-n`.  Recorded before
+anyone builds that harness on the wrong instrument.
+
+## WHAT THIS DOES AND DOES NOT LICENSE
+
+Proven: the make half of the accepted split-loop route (autogen owns modules
+M, make owns targets N) reproduces the shipped recipes exactly, for N=2, with
+per-target `--host` and per-target subdirs, and fails loudly when the list is
+empty.  The quoting is tractable.
+
+**Blind spots, stated per PRINCIPLES 4 rule 5:**
+
+  * **Expansion only.**  `-p`/`-n` do not execute, so a recipe that expands
+    correctly and then fails at run time scores PASS here.  This is not a
+    build of two libgccs.
+  * **Non-bootstrap only.**  The bootstrap stage machinery
+    (`Makefile.tpl:1779-1793`, the `mv stageN-$(TARGET_SUBDIR)` shuffle) is
+    the design doc's own stated worst case for this route and is NOT probed.
+    A pass here is not a verdict on it.
+  * **One module, not 26.**  The claim tested is "the quoting is tractable",
+    which the design doc argues generalises; that generalisation is not
+    itself measured.
+
+## VERIFIED RATHER THAN TRUSTED, AS THE BRIEF ASKED
+
+  * **#74 is DONE.**  `Makefile.tpl:27-34` -- the GNU make 3.80 check is
+    unconditional, no longer wrapped in `@if gcc`, and carries a comment
+    explaining why.  Regenerated into `Makefile.in:24-31`.  `$(eval)` is safe.
+  * **`delete-with-multisrctop` is ALREADY MERGED**, as #72 reported -- but
+    NOT as `bb013cbe0f6`, which is **not an ancestor of HEAD**.  It was
+    re-landed as **`abd0a87eb25`**, which is.  Every live `MULTISRCTOP` use is
+    gone; the 8 remaining hits are ChangeLogs and TOPLEVEL-DESIGN.md itself.
+    **Do not re-cherry-pick it.**  (TOPLEVEL-DESIGN.md section 2.2 says
+    `bb013cbe0f6` "is confirmed present in the branch's history" -- true only
+    if that means the object exists, which it does on another branch.  By
+    ancestry it is not there and its content is.)
+  * A first grep for `MULTISRCTOP` with an `--include` filter scored **0**,
+    wrongly -- PRINCIPLES 7's "your grep's `--include` list can exclude the
+    answer", committed again.  The unfiltered grep found 8.
+
+## WHY #65/#67 ARE NOT LANDED HERE
+
+The brief directed the `$(eval)` probe first and a report before building on
+it, and that is where this stops.  Beyond that instruction, two things should
+be settled by the user rather than guessed:
+
+  * **#62 is a hard blocker on Stage 3 and it is not mine to overrule.**
+    TOPLEVEL-DESIGN.md section 6.2 states that a fresh build directory does
+    not bootstrap on this branch, that every build dir in use is a survivor of
+    an earlier state, and therefore that **"Stage 3 cannot be accepted until
+    #62 is fixed and a cold build from an empty directory succeeds"** -- a
+    restructure of configure and the directory layout cannot be verified
+    against a tree that only builds from surviving artefacts.  The brief's bar
+    ("configure and build with two targets, producing two distinct per-target
+    trees") is exactly the thing that document says is unverifiable in
+    principle until #62 lands.
+  * **The gnattools/gotools question** (design doc section 2.2a(a)): three of
+    the 44 target-module dependency lines are HOST tools depending on *a*
+    target library without saying which.  Under "no single target ever" there
+    is no default available, and inventing one would be a per-target default
+    that amounts to a primary by another name -- the exact mistake the brief
+    names and the user has already caught once.  Options are "all of them" or
+    "gnattools/gotools become per-target too"; this is a design decision with
+    materially different work behind each, so per PRINCIPLES 2b it is reported
+    rather than resolved.
+
+## FILES (scratchpad)
+
+    t113-eval-probe.sh  the probe: 4 arms, 2 affirmative + 2 negative, with a
+                        non-vacuity gate that REFUSES TO SCORE when a recipe
+                        is too short -- which is what caught the collapsed
+                        continuations instead of silently diffing them
+    t113-norm.sh        normalises a recipe to the text the shell receives,
+                        with the argument for why that is legitimate
