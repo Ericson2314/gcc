@@ -1618,10 +1618,14 @@ c_cpp_builtins (cpp_reader *pfile)
 #ifdef DONT_USE_BUILTIN_SETJMP
       cpp_define (pfile, "__LIBGCC_DONT_USE_BUILTIN_SETJMP__");
 #endif
-#ifdef DWARF_ALT_FRAME_RETURN_COLUMN
-      builtin_define_with_int_value ("__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__",
-				     DWARF_ALT_FRAME_RETURN_COLUMN);
-#endif
+      /* Was `#ifdef DWARF_ALT_FRAME_RETURN_COLUMN' with no `#else', so this
+	 libgcc-facing predefine was emitted for no target at all -- the
+	 guard asked the primary base, and i386 has no alternative return
+	 column.  libgcc's unwinder reads it.  See target-cdata.h.  */
+      if (targetm_cdata.has_dwarf_alt_frame_return_column)
+	builtin_define_with_int_value
+	  ("__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__",
+	   targetm_cdata.dwarf_alt_frame_return_column);
       builtin_define_with_int_value ("__LIBGCC_DWARF_FRAME_REGISTERS__",
 				     DWARF_FRAME_REGISTERS);
       builtin_define_with_int_value ("__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__",

@@ -728,13 +728,21 @@ layout_decl (tree decl, unsigned int known_align)
 		do_type_align (type, decl);
 	      else
 		{
-#ifdef EMPTY_FIELD_BOUNDARY
-		  if (EMPTY_FIELD_BOUNDARY > DECL_ALIGN (decl))
+		  /* Was `#ifdef EMPTY_FIELD_BOUNDARY' with no `#else'.  This
+		     file is compiled once, against the primary's tm.h, so
+		     that guard asked i386 -- which has no such macro --
+		     whether aarch64 has one.  The answer was no for every
+		     target and this block was emitted for none of the 32 back
+		     ends that do define it.  The presence flag is a real
+		     answer either way; see target-cdata.h.  */
+		  if (targetm_cdata.has_empty_field_boundary
+		      && targetm_cdata.empty_field_boundary
+			 > DECL_ALIGN (decl))
 		    {
-		      SET_DECL_ALIGN (decl, EMPTY_FIELD_BOUNDARY);
+		      SET_DECL_ALIGN (decl,
+				      targetm_cdata.empty_field_boundary);
 		      DECL_USER_ALIGN (decl) = 0;
 		    }
-#endif
 		}
 	    }
 
@@ -882,19 +890,20 @@ start_record_layout (tree t)
   rli->unpacked_align = rli->record_align;
   rli->offset_align = MAX (rli->record_align, BIGGEST_ALIGNMENT);
 
-#ifdef STRUCTURE_SIZE_BOUNDARY
-  /* Packed structures don't need to have minimum size.  */
-  if (! TYPE_PACKED (t))
+  /* Was `#ifdef STRUCTURE_SIZE_BOUNDARY' with no `#else', answered by the
+     primary for every target -- i386 has no such macro, so the minimum
+     structure alignment was applied for none of the 24 back ends that do.
+     Packed structures don't need to have minimum size.  */
+  if (targetm_cdata.has_structure_size_boundary && ! TYPE_PACKED (t))
     {
       unsigned tmp;
 
       /* #pragma pack overrides STRUCTURE_SIZE_BOUNDARY.  */
-      tmp = (unsigned) STRUCTURE_SIZE_BOUNDARY;
+      tmp = (unsigned) targetm_cdata.structure_size_boundary;
       if (maximum_field_alignment != 0)
 	tmp = MIN (tmp, maximum_field_alignment);
       rli->record_align = MAX (rli->record_align, tmp);
     }
-#endif
 
   rli->offset = size_zero_node;
   rli->bitpos = bitsize_zero_node;
