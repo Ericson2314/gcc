@@ -3212,7 +3212,7 @@ nds32_asm_file_start (void)
       fprintf (asm_out_file, "\t! Pipeline model\t: %s\n", "N13");
       break;
 
-    case CPU_SIMPLE:
+    case NDS32_CPU_SIMPLE:
       fprintf (asm_out_file, "\t! Pipeline model\t: %s\n", "SIMPLE");
       break;
 

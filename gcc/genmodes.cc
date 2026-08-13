@@ -2064,6 +2064,19 @@ enum machine_mode\n{");
 	if (!m->is_hole && strcmp (m->name, m->bare))
 	  {
 	    printf ("#define HAVE_%smode\n", m->bare);
+	    /* And the `E_'-prefixed spelling, which is a THIRD name for the
+	       same ordinal and is the one that appears where a `case' label
+	       or an `==' needs an integral constant rather than a
+	       `scalar_int_mode'.  Both the back end's own sources
+	       (`config/avr/avr.cc' has seven `case E_PSImode:', msp430 four)
+	       and the generated `insn-recog'/`insn-emit'/`insn-output' for
+	       this back end spell it: read-rtl.cc:218 and genrecog.cc:4569
+	       build it as "E_" GET_MODE_NAME (mode) "mode", and
+	       GET_MODE_NAME answers `bare'.  Without this line those are 606
+	       diagnostics from the two back ends that collide, and the
+	       unqualified `PSImode' alias below cannot serve them because it
+	       expands to a class object, not to an enumerator.  */
+	    printf ("#define E_%smode E_%smode\n", m->bare, m->name);
 	    printf ("#ifdef USE_ENUM_MODES\n");
 	    printf ("#define %smode E_%smode\n", m->bare, m->name);
 	    printf ("#else\n");

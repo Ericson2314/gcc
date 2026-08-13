@@ -143,7 +143,7 @@ EnumValue
 Enum(tune_type) String(@@STR_CPU_NATIVE@@) Value(TUNE_NATIVE)
 
 EnumValue
-Enum(tune_type) String(@@STR_TUNE_GENERIC@@) Value(TUNE_GENERIC)
+Enum(tune_type) String(@@STR_TUNE_GENERIC@@) Value(LARCH_TUNE_GENERIC)
 
 EnumValue
 Enum(tune_type) String(@@STR_CPU_LOONGARCH64@@) Value(TUNE_LOONGARCH64)

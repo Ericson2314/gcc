@@ -354,7 +354,7 @@ EnumValue
 Enum(nds32_cpu_type) String(n1337-spu) Value(CPU_N13)
 
 EnumValue
-Enum(nds32_cpu_type) String(simple) Value(CPU_SIMPLE)
+Enum(nds32_cpu_type) String(simple) Value(NDS32_CPU_SIMPLE)
 
 mconfig-fpu=
 Target RejectNegative Joined Enum(float_reg_number) Var(nds32_fp_regnum) Init(TARGET_CONFIG_FPU_DEFAULT)

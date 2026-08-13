@@ -11792,3 +11792,178 @@ constant expressions): i386 64/4 -> 17, aarch64 16/8 -> 3.
     numbering.
   * The remaining 15 `target_*` structs in target-globals.h were not swept
     beyond the register/class-indexed grep that found these three.
+
+---
+
+# `E_PSImode`, THE ENUMERATOR HALF OF THE OPTIONS LEAK, AND A BRIEF ITEM THAT
+# WAS ALREADY CLOSED
+
+Worktree `agent-aa6bdcb8763597fb1`, build dirs `/tmp/b-aa6bdcb8763597fb1` (48
+back ends) and `/tmp/b-aa6bdcb8763597fb1-pair` (i386 + aarch64, same tree),
+named for the worktree and never for a task number.  Anchor **45**, asserted by
+`scratchpad/mtq-conf.sh` before either configure.  **No task number is cited:
+the list is not in the worktree.**  The worktree came up at bare-repo HEAD
+`7208eca60d0` with anchor **0** and was reset to `multi-target` -- the trap
+PRINCIPLES section 5 names, hit again, caught by the anchor.
+
+Two other agents were running and own `poly_int`/`NUM_POLY_INT_COEFFS` + the
+mode machinery, and the three-back-end i386 `insn_default_length` crash.
+Everything attributed to them below was measured and left alone.
+
+## 0. THE NUMBERS, ONE BUILD DIR, RECONFIGURED IN PLACE BETWEEN ARMS
+
+|  | before | after |
+|---|---|---|
+| total `error:` lines | **3408** | **2762** |
+| `E_PSImode` was not declared | 606 | **0** |
+| `TUNE_GENERIC` conflicts | 30 | **0** |
+| `CPU_SIMPLE` conflicts | 9 | **0** |
+| back ends attempted | 48 | 48 |
+| back ends with zero make errors | **6** | **8** |
+| error CLASSES present after but not before | -- | **NONE** |
+
+The class diff is the evidence, not the arithmetic.  `3408 - 2762 = 646 =
+606 + 30 + 9 + 1` closes, and closing arithmetic is exactly how a wrong shared
+number survives, so the histograms were joined instead: four classes vanish
+(the fourth is one transient `gtype-desc.h: No such file or directory` from
+generator ordering) and **not one class appears**.
+
+The before figure of 6 is one this worktree measured.  It is NOT comparable
+with the "8 of 47" in the section above: that census dropped loongarch and ran
+47, this one runs 48, and the two 8s are different sets.
+
+## 1. `E_PSImode` -- THE BRIEF'S DIAGNOSIS WAS RIGHT, AND WORTH THE CHECK
+
+606 diagnostics from **two** back ends (avr, msp430) -- the amplification
+shape that makes a count misleading, and the count is real anyway.
+
+A qualified mode had two aliases and needed three.  `insn-modes-avr.h` emitted
+`#define HAVE_PSImode` and `#define PSImode (scalar_int_mode (... ))` but no
+`E_PSImode`, while the `E_`-prefixed spelling is what every `case` label and
+`==` needs.  Both halves of the consumer population write it: the back ends'
+own sources (`avr.cc` has seven `case E_PSImode:`, `msp430.cc` four) and the
+generated `insn-recog`/`insn-emit`/`insn-output`, because `read-rtl.cc:218` and
+`genrecog.cc:4569` build the name as `"E_" GET_MODE_NAME (mode) "mode"` and
+`GET_MODE_NAME` answers `bare`.  One `printf` in `genmodes.cc`'s alias block.
+Commit `b63e8f3b489`.
+
+**Both-sided, and the negative side is the informative one:**
+
+```
+insn-modes-avr.h      #define E_PSImode  E_avr_PSImode
+insn-modes-msp430.h   #define E_PSImode  E_msp430_PSImode
+insn-modes-i386.h     no `#define E_' at all
+```
+
+i386 has nothing qualified, so it gets no alias.  Holes keep the qualified
+spelling as their `bare`, so nothing here lets one back end reach another's
+mode by a plain name.
+
+**And an instrument caution paid for on the spot**: `grep -c E_PSImode
+insn-modes-avr.h` reads **1** on the UNFIXED header, because `HAVE_PSImode`
+contains the substring.  The arm that means anything is `grep '^#define
+E_PSImode'`, and it was run before the build, per "assert on the CONTENT you
+added, by name and value, and run that arm first".
+
+## 2. `TUNE_GENERIC` / `CPU_SIMPLE` -- THE BRIEF'S DIAGNOSIS DID NOT SURVIVE,
+## AND THE CORRECTION CHANGES WHICH MECHANISM IS AT FAULT
+
+Handed over as *"`insn-attr-common-aarch64.h` and `insn-attr-common-riscv.h`
+both declare `TUNE_GENERIC`"*, i.e. two genattr headers colliding with each
+other, with f3a75a98014's `#undef`-in-the-generator as the model.  The
+compiler names the other party:
+
+```
+./insn-attr-common-aarch64.h:31: error: `TUNE_GENERIC' conflicts with a
+                                        previous declaration
+config/loongarch/loongarch-def.h:210: note: previous declaration
+                                        `<unnamed enum> TUNE_GENERIC'
+./insn-attr-common-frv.h:7: error: `CPU_SIMPLE' conflicts with ...
+config/nds32/nds32-opts.h:50: note: previous declaration
+                                        `nds32_cpu_type CPU_SIMPLE'
+```
+
+One side is genattr; **the other is the `HeaderInclude` option-header leak,
+i.e. cause 8's ENUMERATOR HALF.**  aarch64 is not a party at all except as a
+victim, and neither is riscv or frv.  Every generated `options-<base>.h`
+includes all 35 `I` headers -- the shared `gcc_options` has a member of every
+back end's option types -- so loongarch's `TUNE_GENERIC = 1` and nds32's
+`CPU_SIMPLE` are declared in every TU of all 48 back ends.
+
+**The named model cannot be applied: an enumerator cannot be `#undef`ed.**  So
+this is the other clause -- qualify only what actually collides -- with the set
+measured rather than guessed.  `scratchpad/mtq-enumleak.sh` reports exactly
+three (name, header, back end) triples over two names, which is exactly what
+the build reports.  The hand-written side moves, because the genattr side's
+enumerators come from an .md attribute VALUE and renaming them would change
+the attribute's string.  No user-visible spelling changes: `-mtune=generic`
+and `-mcpu=simple` are `String()` entries and are untouched.  Commit
+`d1a73d21bd6`.
+
+**The sweep's transitive step is not decoration.**  `TUNE_GENERIC` is declared
+in `loongarch-def.h`, which is *included by* the `I` header rather than being
+one; the first draft read only the `I` files and scored loongarch as
+contributing no enumerator at all -- **the reassuring answer**, and it is the
+same failure shape as the `--include` filter in PRINCIPLES section 7.
+
+**THE QUIET HALF, QUANTIFIED, AND THIS DOES NOT CLOSE THE LEAK.**  421
+enumerators from 49 headers (35 `I` files plus one level of their own
+includes) are declared in every TU of every back end.  Two collide today and
+are qualified.  A rename set chosen from today's collisions is exactly the
+shape f3a75a98014 argued expires, and it would; the sweep is committed
+alongside so the next one is found by running a script rather than by hitting
+a wall.  The non-expiring fix is for the options headers to stop reading
+foreign back ends' `I` headers at all, which needs the shared `gcc_options` to
+stop carrying every back end's option types -- design, not debugging, and it
+belongs with deleting the shared `tm.h`.
+
+One live false positive is recorded in the script rather than silently
+filtered: `ENUM_VALUE`, reported under the IHDR arm from `c6x-opts.h` and
+`m68k-opts.h`, is a macro PARAMETER of `C6X_ISA` / `M68K_DEVICE`, not a
+declaration.  The reader is left over-broad on purpose -- it can only ever add
+a suspect, never clear one.
+
+## 3. THE `JUMP_TABLES_IN_TEXT_SECTION` ITEM WAS ALREADY CLOSED, AND THE 17 IS
+## NOT A DIAGNOSTIC COUNT
+
+The brief asked about *"17 residual `JUMP_TABLES_IN_TEXT_SECTION`
+diagnostics"*.  Measured in the 48-back-end before log:
+`grep -c JUMP_TABLES_IN_TEXT_SECTION` is **0** -- not 0 errors, 0 mentions of
+the string anywhere in 84,764 lines.
+
+The 17 is traceable and is a count of **back ends**, not diagnostics.
+`target-cdata.cc:96` says *"Measured in a 47-back-end build: 17 of 47 bases"*,
+describing the population the supply-side floor was written for.  It was
+already landed and already judged admissible; nothing here changes it.  Stated
+because "17 residual diagnostics" and "17 affected back ends" read identically
+in a brief and mean opposite things about whether there is work to do.
+
+## 4. BARS
+
+  * 48-back-end `/tmp/b-aa6bdcb8763597fb1`: `make -k all-gcc` rc=2 (40 back
+    ends still fail, overwhelmingly `poly_int`, owned elsewhere), 48/48
+    attempted, **0 `NOT-ATTEMPTED`**, 8 with zero make errors.  Scored by
+    `mta7-bescore.sh`.  **"48 back ends produce objects" is not "the compiler
+    is right for them", and nothing here upgrades it.**
+  * PAIR CONTROL, SAME TREE, `/tmp/b-aa6bdcb8763597fb1-pair`:
+      - top-level `make all-gcc` rc=0, 0 `error:`;
+      - `make multi-target-objs cc1 lto1` in `<builddir>/gcc` printed
+        **`MAKERC=0`** -- read from make's own exit status.  (Run at the TOP
+        LEVEL it is `No rule to make target 'multi-target-objs'`, and the
+        wrapper's own `echo rc=$?` still reported 0.  PRINCIPLES section 5,
+        hit and caught by reading the artefact.)
+      - x86_64 `-O2` on
+        `.../agent-aa6bdcb8763597fb1/scratchpad/big.c` (md5
+        `e4558c736e241860bc610c56e66f9c43`, 150 lines):
+        **12369 bytes / `378fc33c1e70`** -- the recorded bar exactly, input
+        path quoted with the count.
+      - `specs-config` for x86_64 is **230 lines**, probed with the real
+        aarch64 binutils for the other target (`mta7-specs.sh`, rc=0).
+      - `stock-compare.sh` vs `/tmp/b-stock` (genuine upstream, **0**
+        `MULTI_TARGET` hits in its `gcc/Makefile`): **5/5 IDENTICAL**, 5
+        distinct md5s on each side, negative control firing (1158 vs 804
+        lines, differ), and it printed
+        `mt cfg : /tmp/b-aa6bdcb8763597fb1-pair/...`, so it is confirmed to
+        have run in THIS dir.
+  * Both build dirs' `config.log` name this worktree.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**

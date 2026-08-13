@@ -10002,7 +10002,7 @@ loongarch_cpu_sched_reassociation_width (struct loongarch_target *target,
 {
   switch (target->cpu_tune)
     {
-    case TUNE_GENERIC:
+    case LARCH_TUNE_GENERIC:
     case TUNE_LOONGARCH64:
     case TUNE_LA464:
     case TUNE_LA664:
