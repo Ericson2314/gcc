@@ -6432,4 +6432,32 @@ $(ALL_HOST_OBJS) : | $(generated_files)
 DEPFILES = \
   $(foreach obj,$(ALL_HOST_OBJS),\
     $(dir $(obj))$(DEPDIR)/$(patsubst %.o,%.Po,$(notdir $(obj))))
+
+# AND FOR THE REGISTER PROBES, WHICH ARE NOT HOST OBJECTS AND WHOSE ABSENCE
+# HERE MADE THE UNION WIDTHS SILENTLY STALE.
+#
+# $(MULTI_TARGET_REG_PROBES) are compiled but never linked -- they exist so
+# `nm -S' can read a back end's own FIRST_PSEUDO_REGISTER, N_REG_CLASSES,
+# sizeof (CUMULATIVE_ARGS), ELIMINABLE_REGS length, caller-save column count
+# and MAX_BITS_PER_WORD out of an object file -- so they are not in
+# $(ALL_HOST_OBJS), and their `.Po' files were therefore never included.  The
+# only prerequisites make could see were the probe source and
+# `<base>-inc/s-inc', a stamp for the SHIM headers, which does not change when
+# `config/<cpu>/<cpu>.h' does.
+#
+# So editing a back end's own header did not rebuild that back end's probe,
+# `multi-target-reg-widths.h' kept the widths from the last cold build, and
+# every structure in target-globals.h stayed sized by a number that was no
+# longer true -- with `move-if-change' making the non-update invisible and the
+# build succeeding.  That is the "one authority for the size" defect the
+# widths exist to remove, reintroduced through the dependency graph.
+#
+# Measured rather than reasoned: with `MAX_BITS_PER_WORD' changed from 64 to
+# 32 in `config/aarch64/aarch64.h', `make multi-target-objs cc1' left
+# `mt-aarch64/reg-probe.o' untouched and `nm -S' still read 64; deleting the
+# object by hand and rebuilding read 32.  A cold build was always correct,
+# which is why this survived.
+DEPFILES += \
+  $(foreach obj,$(MULTI_TARGET_REG_PROBES),\
+    $(dir $(obj))$(DEPDIR)/$(patsubst %.o,%.Po,$(notdir $(obj))))
 -include $(DEPFILES)
