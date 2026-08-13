@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "c-family/c-common.h"
 #include "stringpool.h"
 #include "c-family/c-pragma.h"

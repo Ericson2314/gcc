@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 
 void
 vms_c_register_includes (const char *sysroot ATTRIBUTE_UNUSED,
