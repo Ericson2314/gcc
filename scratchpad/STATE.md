@@ -2056,3 +2056,275 @@ last rebuilt is worthless.**  Add these to the 4 / 8 / 32 / 593 / 664 / 698 /
     t111-insn-guards.sh  target-insn.h, reads mt_base_insn out of .rodata for
                          both bases and requires the two tables to DIFFER
     t111-build/go/run/ts.sh, t111-reconf-gcc.sh, t111m-build.sh
+
+# TASK #112 -- THE aarch64 SLICE OF ARM D CONVERTED; THE IPA WALL DIAGNOSED
+
+Branched from `0b7c0542b2b` (#111's handover).  Commit `2f214ef2f52`.
+Build dir `/tmp/b112` (x86_64 + aarch64, mine).  My worktree started at the
+bare-repo HEAD and needed the documented `git reset --hard multi-target`;
+the PRINCIPLES 5 check caught it, as it did for #111.
+
+## 1. THE COUNT IS ELEVEN, NOT TWELVE -- AND THE CORRECTION IS A CHECK WORKING
+
+#111's handover named 12 macros aarch64 defines that shared code cannot see,
+including `INIT_EXPANDERS` marked DONE.  Re-measured here:
+
+    population (config macro, existence-tested in a shared TU)   212  (was 213)
+    ACTIONABLE (>=1 back end has it, i386 does not, no floor)     110  (was 111)
+      SILENT (no #else)                                           78  (was  79)
+    of the SILENT, confirmed absent by the REAL PREPROCESSOR       70
+    of those, macros AARCH64 ITSELF DEFINES                        11
+
+Each figure is exactly one lower than #111's: `INIT_EXPANDERS` leaving the
+population is the whole difference, which is a good non-vacuity signal.
+
+**But 12 - 1 = 11 only works because the text sweep ALSO scored a false
+positive that the preprocessor arm drops.**  The text sweep says twelve; the
+twelfth is `INIT_ARRAY_SECTION_ASM_OP`, and `t112-armD-verify.sh` removes it:
+aarch64 defines it, but so does the context shared code compiles in, because
+`config/initfini-array.h` is on i386-linux's tm_file chain too.  There is no
+absence and nothing to fix.  So #111's list of 12 was one member short AND
+one member wrong, and the two errors cancelled in the count -- PRINCIPLES 7's
+"a count check passes when two errors cancel", observed again.
+
+**A grep for which back end spells a macro cannot see a definition that
+arrives through an included header.**  The text sweep is an upper bound; the
+preprocessor arm is what settles membership.  Do not quote the text figure.
+
+### THE ELEVEN, WITH DISPOSITIONS
+
+CONVERTED HERE (4, plus one sibling) -- scalars, into `target-cdata`:
+
+    STATIC_CHAIN_REGNUM            45  targhooks.cc          DONE
+    STATIC_CHAIN_INCOMING_REGNUM    1  (same use site)       DONE, rides along
+    EMPTY_FIELD_BOUNDARY           32  stor-layout.cc        DONE
+    STRUCTURE_SIZE_BOUNDARY        24  stor-layout.cc        DONE
+    DWARF_ALT_FRAME_RETURN_COLUMN  11  dwarf2cfi, cppbuiltin DONE
+
+`STATIC_CHAIN_INCOMING_REGNUM` is NOT one of the eleven (one back end, not
+aarch64).  It is converted anyway because it shares `default_static_chain`
+with `STATIC_CHAIN_REGNUM`; leaving it would put one arm of that function on
+the run-time answer and the other on the primary's `#ifdef`.
+
+NOT CONVERTED (7), each with the reason, NOT merely "ran out of time":
+
+    ADJUST_INSN_LENGTH        13  final.cc x4.  CODE, not a value: a statement
+                                  macro mutating `length`.  Needs a function
+                                  pointer on a per-base descriptor, not cdata.
+    FINAL_PRESCAN_INSN        14  same shape (statement macro, 2 sites).
+    BLOCK_REG_PADDING          6  13 SITES across calls/expr/function.cc, and
+                                  it returns a `pad_direction`.  Biggest of the
+                                  seven by call-site count; wants its own task.
+    CASE_VECTOR_SHORTEN_MODE   7  returns a `machine_mode`.  BLOCKED on mode
+                                  numbering (Stage 4): a mode number moved from
+                                  aarch64's vocabulary into shared code means
+                                  something else there.  Do NOT convert this
+                                  before the mode union is settled.
+    EH_RETURN_TAKEN_RTX        1  `gen_rtx_REG (Pmode, R4_REGNUM)` -- an rtx
+                                  built lazily, and it spells `Pmode`.  Same
+                                  Stage 4 blocker.
+    ASM_OUTPUT_POOL_EPILOGUE   1  function pointer; varasm.cc:4809.  Cheap.
+    HARDREG_PRE_REGNOS         1  an INITIALISER LIST `{ FPM_REGNUM, 0 }`, so
+                                  it is array data, not a scalar.  Cheap.
+
+The natural next slice is `ASM_OUTPUT_POOL_EPILOGUE` + `HARDREG_PRE_REGNOS`
+(cheap), then the three statement macros as a family on a per-base descriptor.
+The two `Pmode`/mode ones should WAIT.
+
+## 2. THE MECHANISM: `(bool has_X, payload)`, EXTENDED TO cdata
+
+New `TARGET_CDATA_OPT_FIELDS` list in `target-cdata.h`, generating
+`signed char has_<f>` + value.  The struct, the refresh, the poisoned
+initialiser and the post-refresh check all come from that one list, exactly
+as the mandatory list does.
+
+Three things worth keeping:
+
+  * **The flag is THREE-state, not `bool`.**  `false` is a legitimate answer
+    -- most back ends define none of these -- so it cannot double as "the
+    refresh never ran".  `TARGET_CDATA_POISON_FLAG` is the third state.
+  * **The post-refresh check is TWO-SIDED.**  Present implies not-poison;
+    absent implies the value slot is STILL POISONED.  The second half is the
+    one that catches a leak: a back end reporting "absent" that nonetheless
+    wrote a value has evaluated a macro it does not have.
+  * **The `#ifdef` survives, in `target-cdata-opt.h`, and that is correct.**
+    That header is reachable only from `target-cdata.cc`, i.e. compiled once
+    per base with `-I<base>-inc`, so every `#ifdef` is answered by the back
+    end the answer is for.  It `#error`s without MULTI_TARGET_TARGETM_BASE.
+    A field in the list with no entry there fails to compile BY NAME
+    (`MT_HAS_<macro> was not declared`), not as a silent zero -- a silent zero
+    would report every back end as having no answer and would look exactly
+    like a correct build.
+
+Why cdata and not a new descriptor: all five are constants or enum constants
+on the bases that define them, so neither the invariance precondition nor the
+"can it be evaluated at the refresh point" precondition bites.  The ones that
+take arguments or build rtx cannot come here -- see the seven above.
+
+## 3. TASK B -- WHERE AARCH64 STOPS, AND WHY.  IT IS A LEAK, AND A NEW KIND
+
+Both #111 walls reproduce unchanged.  On the MINIMAL input
+`int f (int a) { return a + 1; }`, `-O2`:
+
+    rc=4, GIMPLE pass local-fnsummary, SIGSEGV
+    estimate_move_cost <- ipa_populate_param_decls <- analyze_function_body
+      <- compute_fn_summary <- pass_local_fn_summary::execute
+
+**DIAGNOSED, and confirmed under gdb (`scratchpad/t112-ipa-diag.sh`), not
+inferred:**
+
+    mov 0x31ec3c4(%rip),%rax    # 0x4b6dde8 <ix86_cost>
+    mov 0xf4(%rax),%eax         <- SIGSEGV, si_addr == 0xf4
+    ix86_cost holds 0x0000000000000000
+
+`tree-inline.cc:4296` is `size > MOVE_MAX_PIECES * MOVE_RATIO (speed_p)`.
+`tree-inline.cc` is SHARED, compiled once against i386, so `MOVE_RATIO` is
+`config/i386/i386.h:1968`:
+
+    #define MOVE_RATIO(speed) ((speed) ? ix86_cost->move_ratio : 3)
+
+`ipa-prop.cc:395` passes `speed_p = true`.  `ix86_cost` is
+`config/i386/i386.cc:130`, `= NULL`, written only by `ix86_option_override`,
+which does not run when aarch64 is the selected target.  0xf4 is
+`offsetof (processor_costs, move_ratio)`.
+
+### THE CATEGORY: NOT a baked-in constant.  A leak into the PRIMARY'S MUTABLE RUNTIME STATE
+
+The brief's standing suspicion was a baked-in divergent constant
+(`STACK_POINTER_REGNUM` 7 vs 31, `UNITS_PER_WORD`, `Pmode`).  **It is not
+that.**  It is not a constant at all, and it is not arm D's absence either.
+Precisely:
+
+    not arm A       -- no divergent macro TEXT is compared; shared code never
+                       sees aarch64's MOVE_RATIO at all.
+    not arms B/C    -- `ix86_cost` is DEFINED in i386.cc and links cleanly.
+    not arm D       -- no `#ifdef`, nothing absent.
+    not a constant  -- it is a POINTER DEREFERENCE of back-end state.
+
+The macro does not expand to a value.  It expands to **a dereference of a
+back-end global that only that back end's option-override initialises.**
+
+**THE CRASH IS LUCK, AND THAT IS WHY THIS MATTERS.**  `ix86_cost` happens to
+start NULL, so it faults.  A sibling reading a back-end global with a benign
+initialiser answers with i386's tuning while compiling for aarch64 and emits
+WRONG CODE with no diagnostic at all.  `MOVE_MAX_PIECES` -> `MOVE_MAX` ->
+`ix86_move_max` is exactly that, and it is in the SAME EXPRESSION on
+tree-inline.cc:4296.
+
+### ARM E -- THE MECHANISM COUNTED (`scratchpad/t112-armE.sh`)
+
+Macros in `config/i386/*.h` whose body reads `ix86_`/`ia32_` state, that are
+also spelled in genuinely shared code: **40**.  The instrument's non-vacuity
+check requires it to find `MOVE_RATIO` independently, and it does.
+
+Six are already ticketed (target-cdata.h records them as measured NOT
+invariant and forbidden from the cheap path): BIGGEST_ALIGNMENT,
+STACK_BOUNDARY, STORE_MAX_PIECES, MOVE_MAX, MOVE_MAX_PIECES,
+COMPARE_MAX_PIECES.  **The other ~34 have no ticket**, including MOVE_RATIO,
+CLEAR_RATIO, BRANCH_COST, REGMODE_NATURAL_SIZE, PIC_OFFSET_TABLE_REGNUM,
+DATA_ALIGNMENT, LOCAL_ALIGNMENT, ASSEMBLER_DIALECT, SELECT_CC_MODE.
+
+**40 IS AN UPPER BOUND WITH KNOWN CONTAMINATION.**  Some hits are the
+conversion machinery mentioning the macro (`target-cdata.h`,
+`target-c-ops-select.cc`) rather than a leak, and `Pmode`/`PUSH_ROUNDING` are
+already-known separate problems.  Do not quote 40 as "40 bugs"; re-filter it.
+Other blind spots are stated in the script header (text-only; two-step chains
+through defaults.h are missed, so it is a LOWER bound on the problem).
+
+### WHY I DID NOT FIX MOVE_RATIO
+
+`MOVE_RATIO` takes an argument, so it cannot be a cdata scalar; it belongs on
+`target_frame_desc` as a call, exactly like `STACK_BOUNDARY`.  That part is
+easy.  **The reason to stop is that `MOVE_MAX_PIECES` is in the same
+expression and is the SILENT member of the same family.**  Converting
+`MOVE_RATIO` alone removes the SIGSEGV and leaves tree-inline.cc computing a
+move cost from i386's `ix86_move_max` for aarch64 -- turning a loud failure
+into a silent wrong answer, and moving the wall somewhere less informative.
+That is PRINCIPLES 2a ("a half-fix that makes a failing check pass while the
+answer is still wrong is worse than the failure") and 4.
+
+**Decomposition for whoever takes it:** convert `MOVE_RATIO`, `CLEAR_RATIO`,
+`MOVE_MAX`, `MOVE_MAX_PIECES` and `STORE_MAX_PIECES` TOGETHER onto
+`target_frame_desc` as calls.  Expect the next wall immediately after, and
+expect it to be another arm E member rather than an arm D one.
+
+## 4. WHERE AARCH64 STOPS -- SCORED ON rc, NOT ON `-s out.s`
+
+    x86_64  : rc=0 SUCCESS, 12369 bytes / 804 lines
+    aarch64 : rc=4 ICE, 30 bytes / 2 lines
+
+Both walls are unchanged by this commit, and I am NOT claiming aarch64 got
+further.  **aarch64 does NOT emit a complete `.s`.**  The four conversions are
+correct and both-sided but none of them is on the path to either wall -- the
+walls are arm E, not arm D.  `STACK_POINTER_REGNUM` is still 7.
+
+That is the honest result and it is worth stating plainly: **arm D's aarch64
+slice is real and worth closing, but it was not what was holding aarch64
+back.**  #111 moved the wall from parsing to IPA by fixing `INIT_EXPANDERS`;
+this one did not move it at all.
+
+## 5. REGRESSION BARS, ALL MEASURED ON /tmp/b112 AFTER THE COMMIT
+
+  * `make multi-target-objs cc1 lto1` rc=0; **lto1 links**.
+  * x86_64 -O2 md5 `378fc33c1e70` -- the reference, unchanged.
+  * `stock-compare.sh`, `IN` ABSOLUTE, `MT=/tmp/b112`: **5/5 IDENTICAL** vs
+    /tmp/b-stock, 5 distinct md5 per side, negative control firing, rc=0.
+  * `t112-guards.sh` 4/4, both-sided, TAB-shaped (reads the RUNNING cc1's
+    `targetm_cdata` per selected base; the header probe would have compared a
+    redirect with itself -- the vacuous shape #108 refused).
+
+### SCOREBOARD: NOT MOVED, DELIBERATELY
+
+I did not run or edit the header/TAB probe harness.  None of the five macros
+is on the probe list.  The honest figures remain **aarch64 5 PASS / 104 FAIL
++ 6 retired-pending, TAB 27/5**.  Nothing here should be read as moving them.
+
+### STDERR -- COMPOSITION, AND WHICH ARM
+
+`/tmp/b112`, incremental `multi-target-objs cc1 lto1` after editing 8 files:
+**354 lines / 58 `warning:`** on the first pass, **326 / 51** on the second
+(fewer files rebuilt).  These are REBUILD arms, not cold and not no-op; the
+354/58 figure coincides with #111's recorded cold `-O1 -g0` number, which is
+a coincidence of composition and NOT evidence of anything.  Do not compare
+either with the 32-line incremental floor.
+
+## 6. TRAPS PAID FOR THIS TASK
+
+  1. **The derived harness still called the ORIGINAL build script.**
+     `t112-go.sh`, sed-copied from #111, kept `"$S/t111-build.sh"` because my
+     rename pattern only matched paths, not the invocation.  It would have
+     built into someone else's dir with someone else's SRC.  Caught by
+     grepping the derived scripts for the old names -- `t112-mk.sh` now does
+     that automatically and prints residual hits.
+  2. **`p ix86_cost` in gdb returned NOTHING, and my first verdict script read
+     that as "hypothesis not confirmed".**  The tree is built `-g0`, so there
+     is no DWARF and the symbol has no type -- the failure was the
+     INSTRUMENT's, not the hypothesis's, and it reported in the direction that
+     would have made me abandon a correct diagnosis.  Read globals through the
+     minimal symbol table (`x/1gx &sym`) in this tree, and make a
+     "not confirmed" distinguishable from a "could not ask".
+  3. **A text sweep cannot see a macro that arrives via an included header.**
+     `INIT_ARRAY_SECTION_ASM_OP` looked like a clean aarch64-only definition
+     and is on i386-linux's chain through `config/initfini-array.h`.  I had
+     already written it into a conversion list before the preprocessor arm
+     dropped it.
+  4. The harness refuses shell redirections and multi-command lines in this
+     worktree; anything with `>` or `for ... done` has to become a script
+     file.  Several greps and every build wrapper are scripts for that reason
+     alone, not by preference.
+
+## 7. FILES (scratchpad)
+
+    t112-mk.sh          derives this task's harness from #111's and ASSERTS no
+                        residual t111/b111 references survive
+    t112-armD2.sh       arm D v2, repointed -- the population
+    t112-armD-verify.sh the preprocessor confirmation; THIS is what settles
+                        membership, not the text sweep
+    t112-a64.sh         the aarch64 slice; warns loudly when run without the
+                        preprocessor confirmation (upper bound)
+    t112-a64-defs.sh    per-macro aarch64 vs i386 vs shared-floor definitions
+    t112-sites.sh       every SHARED spelling of the converted macros
+    t112-armE.sh        NEW ARM: macros reading the primary's mutable state
+    t112-ipa-diag.sh    the gdb confirmation of the estimate_move_cost fault
+    t112-guards.sh      4 both-sided arms on the running cc1
+    t112-build/go/run/ts.sh, t112-reconf-gcc.sh
