@@ -9236,7 +9236,7 @@ decide_alg (HOST_WIDE_INT count, HOST_WIDE_INT expected_size,
 	       ? rep_prefix_1_byte : loop_1_byte;
       else
 	return alg_usable_p (rep_prefix_4_byte, memset, dst_as, src_as)
-	       ? rep_prefix_4_byte : loop;
+	       ? rep_prefix_4_byte : alg_loop;
     }
   /* Very tiny blocks are best handled via the loop, REP is expensive to
      setup.  */
@@ -9335,7 +9335,7 @@ decide_alg (HOST_WIDE_INT count, HOST_WIDE_INT expected_size,
 		   && ADDR_SPACE_GENERIC_P (src_as));
 
   return (alg_usable_p (algs->unknown_size, memset, dst_as, src_as)
-	  ? algs->unknown_size : have_as ? loop : libcall);
+	  ? algs->unknown_size : have_as ? alg_loop : libcall);
 }
 
 /* Decide on alignment.  We know that the operand is already aligned to ALIGN
@@ -9686,7 +9686,7 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
       need_zero_guard = true;
       move_mode = QImode;
       break;
-    case loop:
+    case alg_loop:
       need_zero_guard = true;
       break;
     case unrolled_loop:
@@ -10004,7 +10004,7 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
     case last_alg:
       gcc_unreachable ();
     case loop_1_byte:
-    case loop:
+    case alg_loop:
     case unrolled_loop:
       expand_set_or_cpymem_via_loop (dst, src, destreg, srcreg, promoted_val,
 				     count_exp, move_mode, unroll_factor,

@@ -74,7 +74,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    block is skipped.
 
    For example initializer:
-    {{256, loop}, {-1, rep_prefix_4_byte}}
+    {{256, alg_loop}, {-1, rep_prefix_4_byte}}
    will use loop for blocks smaller or equal to 256 bytes, rep prefix will
    be used otherwise.  */
 struct stringop_algs

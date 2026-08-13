@@ -17,12 +17,26 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the files COPYING3.  If not,
 see <http://www.gnu.org/licenses/>.  */
 
+/* First column: the C enumerator of `enum stringop_alg'.  Second column: the
+   -mstringop-strategy= spelling, which is user-visible and must not change.
+
+   The two differ for `alg_loop' alone, and deliberately.  i386-opts.h is a
+   `HeaderInclude', so every generated options-<base>.h reads it and this enum
+   is declared in EVERY translation unit of EVERY back end.  An enumerator
+   named `loop' at global scope hides `class loop' from cfgloop.h, so
+   `loop *loop = alloc_loop ();' stops being a declaration and becomes a
+   multiplication of two enumerators.  Upstream already pays for this inside
+   i386 itself -- i386.cc spells `class loop *loop' in
+   ix86_loop_unroll_adjust for exactly this reason -- and the shared options
+   header spreads that obligation to the other 47 back ends, where it is
+   unpaid.  */
+
 DEF_ALG (no_stringop, no_stringop)
 DEF_ALG (libcall, libcall)
 DEF_ALG (rep_prefix_1_byte, rep_byte)
 DEF_ALG (rep_prefix_4_byte, rep_4byte)
 DEF_ALG (rep_prefix_8_byte, rep_8byte)
 DEF_ALG (loop_1_byte, byte_loop)
-DEF_ALG (loop, loop)
+DEF_ALG (alg_loop, loop)
 DEF_ALG (unrolled_loop, unrolled_loop)
 DEF_ALG (vector_loop, vector_loop)

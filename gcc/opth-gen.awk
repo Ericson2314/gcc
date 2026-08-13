@@ -858,6 +858,121 @@ print "#endif"
 print "#endif"
 print ""
 
+# The OTHER back ends' option ACCESSOR MACROS, put back out of scope.
+#
+# The struct above is the union, so it has a member for every option of every
+# back end, and each member is emitted with its own
+#
+#     #define <name> global_options.x_<name>
+#
+# convenience macro.  That macro is what a back end writes when it says
+# `ix86_stringop_alg' or `arm_arch_name'.  Emitted for the union it is
+# ~2200 macros named after 47 other back ends' options, defined in every
+# translation unit of all 48 -- the same defect f3a75a98014 closed for the
+# `HeaderInclude' headers' macros, one field down: not a macro a back end
+# HEADER defines, but a macro the OPTIONS GENERATOR defines on a back end's
+# behalf.
+#
+# It is not hypothetical and it is not a warning.  aarch64.opt has
+#
+#     TargetVariable
+#     enum aarch64_arch selected_arch = aarch64_no_arch
+#
+# so options-arm.h line 165 reads `#define selected_arch
+# global_options.x_selected_arch', and arm-common.cc's own
+#
+#     const arch_option *selected_arch = NULL;
+#
+# becomes `const arch_option *global_options.x_selected_arch = NULL;'.
+# Measured: 27 diagnostics in one file, none of which names aarch64 or says
+# the word `option'.  The three that name the header say
+# `expected initializer before "." token'.
+#
+# The set removed here is exactly "in the union, not in this back end's own
+# records".  Common options come from common.opt, which every back end reads,
+# so they are in every base's own set and are never removed; only another back
+# end's target options are.  A name that is BOTH -- two back ends spelling one
+# option -- is own, and stays.
+#
+# THE POSITION OF THIS BLOCK IS LOAD-BEARING, AND THE FIRST DRAFT PUT IT AT
+# THE END OF THE FILE AND WAS WRONG BY 191 DIAGNOSTICS.
+#
+# One name can have two authorities INSIDE THIS GENERATOR, which is the same
+# defect the block exists to close, one level in.  `TARGET_FDPIC' is
+#
+#     config/arm/arm.opt       Target Mask(FDPIC)     -> a macro over
+#                                                        target_flags
+#     config/bfin/bfin.opt     Target Var(TARGET_FDPIC) -> a gcc_options member
+#                                                        and an accessor macro
+#
+# so options-arm.h defines it TWICE: once at the struct as bfin's accessor,
+# once further down as arm's own Mask expression, the second silently winning
+# with a redefinition warning nobody reads.  A block at the end of the file
+# undefines BOTH, and arm loses its own macro.  Measured, with the block at
+# the end: 63 -> 254 errors and 5 -> 21 back ends, all of it a class that did
+# not exist before -- `TARGET_FDPIC' was not declared in this scope -- naming
+# arm, frv, v850, bfin, c6x, riscv and pa, i.e. the Mask/Var overlap set.  The
+# diagnostic named the back end's own file and never the generator.
+#
+# Emitted here instead, immediately after the struct and BEFORE the Mask,
+# Enum and target_flags macros, each back end's own later definitions stand.
+# The rule is: this removes accessor macros the STRUCT defined, so it belongs
+# where the struct ends and nowhere else.
+#
+# The reflex fix for those 191 was to drop the block from the shared
+# options.h, on a plausible story about config/arm/arm-c.cc seeing both
+# headers.  It was tried and it changed the count by ZERO (254 -> 254), which
+# is what says the story was wrong: the second authority is arm.opt, not
+# options.h.  Recorded because a plausible untested cause that moves no number
+# is the shape this project keeps mistaking for a fix.
+#
+# Residual, stated rather than hidden, and it is f3a75a98014's residual with a
+# bigger number: the shared options.h is generated with
+# -v union_base=$(multi_target_base), so it removes only what is foreign TO
+# THAT BASE and every shared TU still sees the primary's option vocabulary.
+# Shrinking that to zero means the shared header having no base at all, which
+# is the same change as deleting the shared tm.h.
+if (union_file != "") {
+	n_undef_opt = 0
+	for (i = 0; i < n_u_members; i++) {
+		key = u_order[i]
+		# member_text is this back end's OWN set, keyed identically.
+		if (key in member_text)
+			continue
+		split(key, kf, SUBSEP)
+		nm = kf[2]
+		# S members name `x_<name>' and F members
+		# `frontend_set_<name>'; neither defines <name>.  Rather than
+		# re-derive the kind, ask the member's own text whether it
+		# defines the accessor macro.
+		if (index(decode_text(u_text[key]), \
+			  "#define " nm " global_options.x_" nm) == 0)
+			continue
+		if (n_undef_opt == 0) {
+			print "/* Option accessor macros belonging to the other"
+			print "   back ends, put back out of scope.  Generated"
+			print "   by opth-gen.awk; see the note there.  */"
+		}
+		print "#undef " nm
+		n_undef_opt++
+	}
+	if (n_undef_opt > 0)
+		print ""
+	# NON-VACUITY.  A union over more than one back end always contains
+	# some other back end's target options -- 47 of the 48 have at least
+	# one -- so an empty block here means the own-set key or the member
+	# text stopped matching, not that there is nothing to remove.  That
+	# failure is silent by construction: the header still compiles, and
+	# every leak this block exists to close is simply back.  Asserted
+	# rather than assumed, and only for n_bases > 1, because a union of
+	# one back end legitimately removes nothing.
+	if (n_bases > 1 && n_undef_opt == 0)
+		union_fail("the union spans " n_bases " back ends and not one" \
+			   " option accessor macro was scoped out; the own-set" \
+			   " test or the member text has changed shape and" \
+			   " this block has silently become a no-op")
+}
+
 # All of the optimization switches gathered together so they can be saved and restored.
 # This will allow attribute((cold)) to turn on space optimization.
 
@@ -1403,5 +1518,6 @@ printf("  {%-40s 0},\n", "CPP_W_NONE,")
 print "};"
 print "#endif"
 print ""
+
 print "#endif /* " guard " */"
 }

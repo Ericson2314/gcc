@@ -504,7 +504,7 @@ EnumValue
 Enum(stringop_alg) String(byte_loop) Value(loop_1_byte)
 
 EnumValue
-Enum(stringop_alg) String(loop) Value(loop)
+Enum(stringop_alg) String(loop) Value(alg_loop)
 
 EnumValue
 Enum(stringop_alg) String(unrolled_loop) Value(unrolled_loop)

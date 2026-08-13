@@ -662,7 +662,7 @@ struct processor_costs lakemont_cost = {
    way to go.  Rep movsb has apparently more expensive startup time in CPU,
    but after 4K the difference is down in the noise.  */
 static stringop_algs pentiumpro_memcpy[2] = {
-  {rep_prefix_4_byte, {{128, loop, false}, {1024, unrolled_loop, false},
+  {rep_prefix_4_byte, {{128, alg_loop, false}, {1024, unrolled_loop, false},
                        {8192, rep_prefix_4_byte, false},
                        {-1, rep_prefix_1_byte, false}}},
   DUMMY_STRINGOP_ALGS};
@@ -1172,12 +1172,12 @@ struct processor_costs athlon_cost = {
    small blocks it is better to use loop. For large blocks, libcall can
    do nontemporary accesses and beat inline considerably.  */
 static stringop_algs k8_memcpy[2] = {
-  {libcall, {{6, loop, false}, {14, unrolled_loop, false},
+  {libcall, {{6, alg_loop, false}, {14, unrolled_loop, false},
              {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{16, loop, false}, {8192, rep_prefix_8_byte, false},
+  {libcall, {{16, alg_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
 static stringop_algs k8_memset[2] = {
-  {libcall, {{8, loop, false}, {24, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {24, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   {libcall, {{48, unrolled_loop, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
@@ -1309,12 +1309,12 @@ struct processor_costs k8_cost = {
    very small blocks it is better to use loop. For large blocks, libcall can
    do nontemporary accesses and beat inline considerably.  */
 static stringop_algs amdfam10_memcpy[2] = {
-  {libcall, {{6, loop, false}, {14, unrolled_loop, false},
+  {libcall, {{6, alg_loop, false}, {14, unrolled_loop, false},
              {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{16, loop, false}, {8192, rep_prefix_8_byte, false},
+  {libcall, {{16, alg_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
 static stringop_algs amdfam10_memset[2] = {
-  {libcall, {{8, loop, false}, {24, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {24, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   {libcall, {{48, unrolled_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
@@ -1454,12 +1454,12 @@ struct processor_costs amdfam10_cost = {
     very small blocks it is better to use loop. For large blocks, libcall
     can do nontemporary accesses and beat inline considerably.  */
 static stringop_algs bdver_memcpy[2] = {
-  {libcall, {{6, loop, false}, {14, unrolled_loop, false},
+  {libcall, {{6, alg_loop, false}, {14, unrolled_loop, false},
              {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{16, loop, false}, {8192, rep_prefix_8_byte, false},
+  {libcall, {{16, alg_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
 static stringop_algs bdver_memset[2] = {
-  {libcall, {{8, loop, false}, {24, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {24, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   {libcall, {{48, unrolled_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
@@ -1594,16 +1594,16 @@ const struct processor_costs bdver_cost = {
     can do nontemporary accesses and beat inline considerably.  */
 static stringop_algs znver1_memcpy[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{6, loop, false},
+  {libcall, {{6, alg_loop, false},
 	     {14, unrolled_loop, false},
 	     {-1, libcall, false}}},
   /* 64-bit tuning.  */
-  {libcall, {{16, loop, false},
+  {libcall, {{16, alg_loop, false},
 	     {128, rep_prefix_8_byte, false},
 	     {-1, libcall, false}}}};
 static stringop_algs znver1_memset[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{8, loop, false},
+  {libcall, {{8, alg_loop, false},
 	     {24, unrolled_loop, false},
 	     {128, rep_prefix_4_byte, false},
 	     {-1, libcall, false}}},
@@ -1764,16 +1764,16 @@ struct processor_costs znver1_cost = {
     can do nontemporary accesses and beat inline considerably.  */
 static stringop_algs znver2_memcpy[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{6, loop, false},
+  {libcall, {{6, alg_loop, false},
 	     {14, unrolled_loop, false},
 	     {-1, libcall, false}}},
   /* 64-bit tuning.  */
-  {libcall, {{16, loop, false},
+  {libcall, {{16, alg_loop, false},
 	     {64, rep_prefix_4_byte, false},
 	     {-1, libcall, false}}}};
 static stringop_algs znver2_memset[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{8, loop, false},
+  {libcall, {{8, alg_loop, false},
 	     {24, unrolled_loop, false},
 	     {128, rep_prefix_4_byte, false},
 	     {-1, libcall, false}}},
@@ -2406,21 +2406,21 @@ struct processor_costs znver5_cost = {
 static stringop_algs skylake_memcpy[2] =   {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 
 static stringop_algs skylake_memset[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 
 static const
@@ -2549,21 +2549,21 @@ struct processor_costs skylake_cost = {
 static stringop_algs icelake_memcpy[2] =   {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 
 static stringop_algs icelake_memset[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 
 static const
@@ -2690,20 +2690,20 @@ struct processor_costs icelake_cost = {
 static stringop_algs alderlake_memcpy[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 static stringop_algs alderlake_memset[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 static const
 struct processor_costs alderlake_cost = {
@@ -2827,12 +2827,12 @@ struct processor_costs alderlake_cost = {
      very small blocks it is better to use loop. For large blocks, libcall can
      do nontemporary accesses and beat inline considerably.  */
 static stringop_algs btver1_memcpy[2] = {
-  {libcall, {{6, loop, false}, {14, unrolled_loop, false},
+  {libcall, {{6, alg_loop, false}, {14, unrolled_loop, false},
              {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{16, loop, false}, {8192, rep_prefix_8_byte, false},
+  {libcall, {{16, alg_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
 static stringop_algs btver1_memset[2] = {
-  {libcall, {{8, loop, false}, {24, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {24, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   {libcall, {{48, unrolled_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
@@ -2954,12 +2954,12 @@ const struct processor_costs btver1_cost = {
 };
 
 static stringop_algs btver2_memcpy[2] = {
-  {libcall, {{6, loop, false}, {14, unrolled_loop, false},
+  {libcall, {{6, alg_loop, false}, {14, unrolled_loop, false},
              {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{16, loop, false}, {8192, rep_prefix_8_byte, false},
+  {libcall, {{16, alg_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
 static stringop_algs btver2_memset[2] = {
-  {libcall, {{8, loop, false}, {24, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {24, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   {libcall, {{48, unrolled_loop, false}, {8192, rep_prefix_8_byte, false},
              {-1, libcall, false}}}};
@@ -3084,7 +3084,7 @@ static stringop_algs pentium4_memcpy[2] = {
   {libcall, {{12, loop_1_byte, false}, {-1, rep_prefix_4_byte, false}}},
   DUMMY_STRINGOP_ALGS};
 static stringop_algs pentium4_memset[2] = {
-  {libcall, {{6, loop_1_byte, false}, {48, loop, false},
+  {libcall, {{6, loop_1_byte, false}, {48, alg_loop, false},
              {20480, rep_prefix_4_byte, false}, {-1, libcall, false}}},
   DUMMY_STRINGOP_ALGS};
 
@@ -3208,13 +3208,13 @@ struct processor_costs pentium4_cost = {
 
 static stringop_algs nocona_memcpy[2] = {
   {libcall, {{12, loop_1_byte, false}, {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{32, loop, false}, {20000, rep_prefix_8_byte, false},
+  {libcall, {{32, alg_loop, false}, {20000, rep_prefix_8_byte, false},
              {100000, unrolled_loop, false}, {-1, libcall, false}}}};
 
 static stringop_algs nocona_memset[2] = {
-  {libcall, {{6, loop_1_byte, false}, {48, loop, false},
+  {libcall, {{6, loop_1_byte, false}, {48, alg_loop, false},
              {20480, rep_prefix_4_byte, false}, {-1, libcall, false}}},
-  {libcall, {{24, loop, false}, {64, unrolled_loop, false},
+  {libcall, {{24, alg_loop, false}, {64, unrolled_loop, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
 
 static const
@@ -3336,13 +3336,13 @@ struct processor_costs nocona_cost = {
 };
 
 static stringop_algs atom_memcpy[2] = {
-  {libcall, {{11, loop, false}, {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{32, loop, false}, {64, rep_prefix_4_byte, false},
+  {libcall, {{11, alg_loop, false}, {-1, rep_prefix_4_byte, false}}},
+  {libcall, {{32, alg_loop, false}, {64, rep_prefix_4_byte, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
 static stringop_algs atom_memset[2] = {
-  {libcall, {{8, loop, false}, {15, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {15, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
-  {libcall, {{24, loop, false}, {32, unrolled_loop, false},
+  {libcall, {{24, alg_loop, false}, {32, unrolled_loop, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
 static const
 struct processor_costs atom_cost = {
@@ -3463,13 +3463,13 @@ struct processor_costs atom_cost = {
 };
 
 static stringop_algs slm_memcpy[2] = {
-  {libcall, {{11, loop, false}, {-1, rep_prefix_4_byte, false}}},
-  {libcall, {{32, loop, false}, {64, rep_prefix_4_byte, false},
+  {libcall, {{11, alg_loop, false}, {-1, rep_prefix_4_byte, false}}},
+  {libcall, {{32, alg_loop, false}, {64, rep_prefix_4_byte, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
 static stringop_algs slm_memset[2] = {
-  {libcall, {{8, loop, false}, {15, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {15, unrolled_loop, false},
              {2048, rep_prefix_4_byte, false}, {-1, libcall, false}}},
-  {libcall, {{24, loop, false}, {32, unrolled_loop, false},
+  {libcall, {{24, alg_loop, false}, {32, unrolled_loop, false},
              {8192, rep_prefix_8_byte, false}, {-1, libcall, false}}}};
 static const
 struct processor_costs slm_cost = {
@@ -3592,20 +3592,20 @@ struct processor_costs slm_cost = {
 static stringop_algs tremont_memcpy[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 static stringop_algs tremont_memset[2] = {
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}},
   {libcall,
    {{256, rep_prefix_1_byte, true},
-    {256, loop, false},
+    {256, alg_loop, false},
     {-1, libcall, false}}}};
 static const
 struct processor_costs tremont_cost = {
@@ -3732,15 +3732,15 @@ struct processor_costs tremont_cost = {
 
 /* lujiazui_cost should produce code tuned for ZHAOXIN lujiazui CPU.  */
 static stringop_algs lujiazui_memcpy[2] = {
-  {libcall, {{32, loop, false}, {8192, rep_prefix_4_byte, false},
+  {libcall, {{32, alg_loop, false}, {8192, rep_prefix_4_byte, false},
 			 {-1, libcall, false}}},
-  {libcall, {{12, unrolled_loop, true}, {32, loop, false},
+  {libcall, {{12, unrolled_loop, true}, {32, alg_loop, false},
 			 {6144, rep_prefix_8_byte, false},
 			 {-1, libcall, false}}}};
 static stringop_algs lujiazui_memset[2] = {
-  {libcall, {{32, loop, false}, {8192, rep_prefix_4_byte, false},
+  {libcall, {{32, alg_loop, false}, {8192, rep_prefix_4_byte, false},
 			 {-1, libcall, false}}},
-  {libcall, {{12, loop, true}, {32, loop, false},
+  {libcall, {{12, alg_loop, true}, {32, alg_loop, false},
 			 {640, rep_prefix_8_byte, false},
 			 {-1, libcall, false}}}};
 static const
@@ -3866,12 +3866,12 @@ struct processor_costs lujiazui_cost = {
 static stringop_algs yongfeng_memcpy[2] = {
   {libcall, {{6, unrolled_loop, true}, {256, unrolled_loop, false},
 			 {-1, libcall, false}}},
-  {libcall, {{8, loop, false}, {512, unrolled_loop, false},
+  {libcall, {{8, alg_loop, false}, {512, unrolled_loop, false},
 			 {-1, libcall, false}}}};
 static stringop_algs yongfeng_memset[2] = {
-  {libcall, {{6, loop_1_byte, false}, {128, loop, false},
+  {libcall, {{6, loop_1_byte, false}, {128, alg_loop, false},
 			 {-1, libcall, false}}},
-  {libcall, {{2, rep_prefix_4_byte, false}, {64, loop, false},
+  {libcall, {{2, rep_prefix_4_byte, false}, {64, alg_loop, false},
 			 {1024, vector_loop, false},
 			 {-1, libcall, false}}}};
 static const
@@ -3996,12 +3996,12 @@ struct processor_costs yongfeng_cost = {
 static stringop_algs shijidadao_memcpy[2] = {
   {libcall, {{8, unrolled_loop, true}, {256, unrolled_loop, false},
 			 {-1, libcall, false}}},
-  {libcall, {{10, loop, true}, {256, unrolled_loop, false},
+  {libcall, {{10, alg_loop, true}, {256, unrolled_loop, false},
 			 {-1, libcall, false}}}};
 static stringop_algs shijidadao_memset[2] = {
-  {libcall, {{4, loop, true}, {128, unrolled_loop, false},
+  {libcall, {{4, alg_loop, true}, {128, unrolled_loop, false},
 			 {-1, libcall, false}}},
-  {libcall, {{1, rep_prefix_4_byte, false}, {14, loop, true},
+  {libcall, {{1, rep_prefix_4_byte, false}, {14, alg_loop, true},
 			 {1024, vector_loop, false},
 			 {-1, libcall, false}}}};
 static const
@@ -4280,14 +4280,14 @@ struct processor_costs generic_cost = {
 /* core_cost should produce code tuned for Core family of CPUs.  */
 static stringop_algs core_memcpy[2] = {
   {libcall, {{1024, rep_prefix_4_byte, true}, {-1, libcall, false}}},
-  {libcall, {{24, loop, true}, {128, rep_prefix_8_byte, true},
+  {libcall, {{24, alg_loop, true}, {128, rep_prefix_8_byte, true},
              {-1, libcall, false}}}};
 static stringop_algs core_memset[2] = {
   {libcall, {{6, loop_1_byte, true},
-             {24, loop, true},
+             {24, alg_loop, true},
              {8192, rep_prefix_4_byte, true},
              {-1, libcall, false}}},
-  {libcall, {{24, loop, true}, {512, rep_prefix_8_byte, true},
+  {libcall, {{24, alg_loop, true}, {512, rep_prefix_8_byte, true},
              {-1, libcall, false}}}};
 
 static const
@@ -4425,16 +4425,16 @@ struct processor_costs core_cost = {
     can do nontemporary accesses and beat inline considerably.  */
 static stringop_algs c86_4g_m4_memcpy[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{6, loop, false},
+  {libcall, {{6, alg_loop, false},
 	     {14, unrolled_loop, false},
 	     {-1, libcall, false}}},
   /* 64-bit tuning.  */
-  {libcall, {{16, loop, false},
+  {libcall, {{16, alg_loop, false},
 	     {128, rep_prefix_8_byte, false},
 	     {-1, libcall, false}}}};
 static stringop_algs c86_4g_m4_memset[2] = {
   /* 32-bit tuning.  */
-  {libcall, {{8, loop, false},
+  {libcall, {{8, alg_loop, false},
 	     {24, unrolled_loop, false},
 	     {128, rep_prefix_4_byte, false},
 	     {-1, libcall, false}}},
