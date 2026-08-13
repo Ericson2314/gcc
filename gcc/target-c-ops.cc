@@ -70,6 +70,37 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "target.h"
 #include "c-family/c-pragma.h"
+/* THE REST OF `TARGET_CPU_CPP_BUILTINS' VOCABULARY, and the same lesson as
+   the paragraph above, arrived at from a 47-back-end build rather than from
+   one more back end.
+
+   i386 and aarch64 reach `builtin_define' through their own `*_cpu_cpp_builtins
+   (pfile)' helper, which is compiled in `config/<cpu>/<cpu>-c.cc' -- a file
+   that includes `c-family/c-common.h' itself.  So the two configured bases
+   never needed any of this vocabulary AT THIS CALL SITE.  Thirty-three of
+   forty-seven back ends expand the macro to a body written inline in
+   `config/<cpu>/<cpu>.h', and those bodies spell the names `c_cpp_builtins'
+   had in scope at the original call site.  Measured, as the set of names the
+   build reported undeclared: builtin_define (33 objects), builtin_assert (25),
+   builtin_define_std (17), builtin_define_with_int_value (10),
+   builtin_define_with_value (3), preprocessing_asm_p (2), c_dialect_cxx (2),
+   c_dialect_objc (2), c_register_addr_space (3), flag_iso (1).
+
+   All but the two `#define's below are already `extern' in
+   `c-family/c-common.h'; nothing here is being invented or given a value.
+   This restores exactly the scope the macro was expanded in before it moved
+   out of `c_cpp_builtins'.  */
+#include "c-family/c-common.h"
+/* `memmodel.h' IS ALSO ONE OF `c-family/c-pragma.cc's OWN INCLUDES (:26), and
+   it is needed for the same reason the three above are: `tm_p.h' is this
+   base's `<cpu>-protos.h', and sparc-protos.h:46 declares
+   `sparc_emit_membar_for_model (enum memmodel, int, int)'.  A C++ enum cannot
+   be introduced by an elaborated-type-specifier in a parameter list, so the
+   base whose protos file names the type fails with `use of enum memmodel
+   without previous declaration' -- a HARD error rather than the silent
+   absence `#ifdef TREE_CODE' produced, but the same root: a per-base protos
+   header dropped into a scope smaller than the one it was written for.  */
+#include "memmodel.h"
 
 #include BASE_HEADER (tm_p.h)
 
@@ -89,11 +120,27 @@ along with GCC; see the file COPYING3.  If not see
    Renaming it would break every back end whose expansion mentions it, silently
    for the ones whose expansion does not.  */
 
+/* Verbatim from `c_cpp_builtins' in c-family/c-cppbuiltin.cc, where this macro
+   used to be expanded.  They are function-like macros over `pfile', which is
+   why they cannot simply be functions in c-common.h and why they have to be
+   repeated rather than shared -- and why the parameter below is named `pfile'.
+   Kept adjacent to the expansion and #undef-ed after it so that this file
+   cannot change the meaning of the names for anything else it includes.  */
+# define preprocessing_asm_p() (cpp_get_options (pfile)->lang == CLK_ASM)
+# define preprocessing_trad_p() (cpp_get_options (pfile)->traditional)
+# define builtin_define(TXT) cpp_define (pfile, TXT)
+# define builtin_assert(TXT) cpp_assert (pfile, TXT)
+
 static void
 mt_cpu_cpp_builtins (struct cpp_reader *pfile ATTRIBUTE_UNUSED)
 {
   TARGET_CPU_CPP_BUILTINS ();
 }
+
+#undef preprocessing_asm_p
+#undef preprocessing_trad_p
+#undef builtin_define
+#undef builtin_assert
 
 /* Most back ends define REGISTER_TARGET_PRAGMAS; some do not.  Which it is, is
    a fact about the back end, and this is where that back end's tm.h is

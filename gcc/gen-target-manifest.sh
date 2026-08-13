@@ -594,7 +594,24 @@ ${AWK} '
       printf "mt-%s/options-tables.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
       printf "mt-%s/options-tables.o: mt-%s/options-tables.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
-      printf "\t$(COMPILE) $<\n"
+      # -DMULTI_TARGET_SUPPLY_TU=1, EXACTLY AS options-init.o ABOVE, and it was
+      # missing here.  Both objects are compiled with -I<base>-inc, so both see
+      # that base tm.h and both are on the supply side of the (c-DATA)
+      # redirection at the end of defaults.h.  Without the marker this object
+      # is treated as a CONSUMER: its macros are redirected to targetm_cdata
+      # and targetm_regs, which are in libbackend.a and are NOT linked by the
+      # driver that consumes this object.
+      #
+      # It was silent for i386 + aarch64 because both of those define
+      # MAX_BITS_PER_WORD explicitly.  A base that does not gets defaults.h
+      # deriving it from BITS_PER_WORD, which the redirection turns into a
+      # run-time load, and the guard at defaults.h refuses BY NAME.  Measured
+      # in a 47-back-end build: 36 of 47 bases failed here.  Thirteen back ends
+      # spell MAX_BITS_PER_WORD somewhere under their directory, which is close
+      # to the eleven survivors but is NOT the same set -- a definition under
+      # config/<cpu>/ is not necessarily in the tm.h chain of the triple this
+      # build picked -- so the survivor list is quoted as measured, not derived.
+      printf "\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 $<\n"
       printf "\t$(POSTCOMPILE)\n\n"
       # libcommon-target.a, NOT libbackend.a: the driver is the caller that
       # needed this and it links only the former.

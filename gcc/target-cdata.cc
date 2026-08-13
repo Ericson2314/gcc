@@ -68,6 +68,36 @@ the real tm.h macros of that base, not the redirected ones)
    only meaningful when asked of one particular back end.  */
 #include "target-cdata-opt.h"
 
+/* `JUMP_TABLES_IN_TEXT_SECTION' IS NOT AN OPTIONAL FIELD, AND ITS FALLBACK IS
+   NOT AN INVENTED ANSWER -- IT IS UPSTREAM'S OWN, MOVED TO WHERE IT CAN STILL
+   FIRE.
+
+   Upstream keeps the default at the CONSUMER: `final.cc:101' opens with
+   `#ifndef JUMP_TABLES_IN_TEXT_SECTION / #define ... 0', and final.cc is the
+   only file outside `config/' that reads the macro.  So a back end that does
+   not define it has a real, upstream-defined answer, 0, and absence is not the
+   `STATIC_CHAIN_REGNUM' shape -- there is nothing to represent with a
+   `has_' flag.
+
+   What changed is WHERE the question is asked.  defaults.h now defines the
+   name unconditionally for every consumer translation unit (as
+   `targetm_cdata.jump_tables_in_text_section'), so final.cc's `#ifndef' is
+   dead there and cannot supply the 0 for anybody.  Meanwhile THIS file, the
+   supply side, evaluates the macro against one base's own tm.h and had no
+   fallback at all, so a base that does not spell it failed to compile with
+   `JUMP_TABLES_IN_TEXT_SECTION was not declared in this scope'.
+
+   Measured in a 47-back-end build: 17 of 47 bases.  Invisible on the
+   i386 + aarch64 pair because both of them define it.
+
+   The chain this `#ifndef' is asked against is the same chain final.cc would
+   have been compiled against for a single-target build of this base, so the
+   answer is identical to upstream's for every back end, both when the macro is
+   present and when it is not.  */
+#ifndef JUMP_TABLES_IN_TEXT_SECTION
+#define JUMP_TABLES_IN_TEXT_SECTION 0
+#endif
+
 /* Every field, from the one list in target-cdata.h.  Written this way rather
    than as a run of assignments so that a field cannot be added to the struct
    and forgotten here -- which would leave it holding the poison in a build
