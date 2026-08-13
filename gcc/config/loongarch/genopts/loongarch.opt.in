@@ -24,7 +24,7 @@ HeaderInclude
 config/loongarch/loongarch-str.h
 
 TargetVariable
-unsigned int recip_mask = 0
+unsigned int la_recip_mask = 0
 
 ; ISA related options
 ;; Base ISA
