@@ -211,6 +211,24 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**A GUARD SCRIPT CAN BUILD SOMEBODY ELSE'S TREE AND REPORT A CLEAN GREEN.**
+Twenty-three `tNNN-build.sh` scripts had `SRC=` hardcoded to **another agent's
+worktree**. They configure, build and pass — against a compiler that is not
+the one under test. Measured by content anchor: this worktree has **39**
+`MULTI_TARGET` hits in `gcc/Makefile.in`; the trees those scripts pointed at
+had **27, 28 or 39**. A script pointing at a 28 builds a compiler **missing
+eleven landed changes** and reports success, with no diagnostic anywhere.
+
+Two lessons, and the second is the sharper one:
+- **Every harness must assert which tree it is measuring**, by content anchor,
+  not by assuming its own `$0` location.
+- **A loud break can mask a silent one.** These scripts were *also* broken by
+  the `--enable-targets` flag day, which is what got them looked at. Fixing
+  only the loud defect would have left every "repaired" script measuring the
+  wrong compiler — and would have looked like a completed repair. When you fix
+  a noisy failure in something that was not being watched, **audit the thing
+  mechanically rather than by eye** before declaring it healthy.
+
 **SWEEP THE FAMILY; DO NOT MEET IT ONE WALL AT A TIME.** Four generated
 per-base families were found built, linked, **and never selected** — the
 `targetm` asm ops, the optab tables, the predicates/constraints, and the insn
