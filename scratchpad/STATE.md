@@ -11781,3 +11781,192 @@ constant expressions): i386 64/4 -> 17, aarch64 16/8 -> 3.
     numbering.
   * The remaining 15 `target_*` structs in target-globals.h were not swept
     beyond the register/class-indexed grep that found these three.
+
+---
+
+# THE `target_*` SWEEP: 18 STRUCTS, 2 VULNERABLE, AND A DEPENDENCY HOLE THAT
+# MADE THE UNION WIDTHS STALE
+
+Worktree `agent-ad827eb24f334c52d`, commits `25ddc938e50` and `c6ca6c36316`.
+Build dirs `/tmp/b-ad827eb24f334c52d-pair` (i386 + aarch64) and
+`-tri` (+ rs6000), both COLD from this worktree, both `config.log`-asserted.
+**The `MULTI_TARGET` anchor in this tree is now 47, not 45** -- the
+`DEPFILES` change names `MULTI_TARGET_REG_PROBES` twice.  Anything asserting
+an exact 45 will refuse a correct tree.
+
+## 0. HOW THE PER-BASE QUANTITIES WERE DERIVED RATHER THAN TAKEN ON TRUST
+
+Every bound in every member of `class target_globals` was extracted
+mechanically, and each distinct bound was then MEASURED in three (pair) and
+four (triple) translation-unit contexts by `scratchpad/mtsw-size-probe.cc`,
+which carries each value in the size of an object and reads it back with
+`nm -S`.  Nothing is executed.  `scratchpad/mtsw-probe-run.sh` LIFTS the
+compile commands out of the build's own log -- `reginfo.o`'s for the shared
+arm, `target-regs-<base>.o`'s for each per-base arm -- so the probe is not a
+fourth context nobody ships, and it refuses to score if any context fails to
+compile or yields fewer than 20 symbols.
+
+The instrument can fail: `MAX_MOVE_MAX` and `MIN_UNITS_PER_WORD` come back
+`64/64/16/8` and `4/4/8/4` and are tagged `<== DIVERGES` -- the known pair that
+`defaults.h` deliberately leaves unredirected.
+
+**`BITS_PER_WORD` cannot be probed at all**, and that is the finding behind
+the fix: naming it in a shared TU is a compile error, because `defaults.h` has
+already made it a run-time load.  `MAX_BITS_PER_WORD` exists precisely because
+it must stay a constant expression.
+
+## 1. THE VERDICT, PER STRUCT.  ALL 18, INCLUDING THE CLEAN ONES
+
+Clean means: measured equal in every context, in both builds.
+
+| struct | bounds | verdict |
+|---|---|---|
+| `target_hard_regs` | UNION_FPR, UNION_NRC, HARD_REG_SET | clean (already) |
+| `target_regs` | UNION_FPR, UNION_NRC, MAX_MACHINE_MODE | clean (already) |
+| `target_rtl` | UNION_FPR, MAX_MACHINE_MODE, GR_MAX | clean (fixed in 8b) |
+| `target_builtins` | UNION_FPR | clean (fixed in 8b) |
+| `target_reload` | UNION_FPR, UNION_REGNO_SAVE_MODE_COLS | clean (fixed in 8b) |
+| `target_ira` | UNION_FPR, UNION_NRC, mode counts | clean (already) |
+| `target_ira_int` | UNION_FPR, UNION_NRC, MAX_RECOG_OPERANDS | clean |
+| **`target_expmed`** | **MAX_BITS_PER_WORD**, mode counts | **VULNERABLE, fixed** |
+| **`target_lower_subreg`** | **MAX_BITS_PER_WORD**, MAX_MACHINE_MODE | **VULNERABLE, fixed** |
+| `target_recog` | NUM_INSN_CODES, BA_LAST | clean |
+| `target_optabs` | NUM_OPTAB_PATTERNS, NUM_MACHINE_MODES | clean |
+| `target_constraints` | NUM_REGISTER_FILTERS, HARD_REG_SET | clean |
+| `target_function_abi_info` | NUM_ABI_IDS, HARD_REG_SET | clean |
+| `target_libfuncs` | LTI_MAX | clean |
+| `target_gcse` | NUM_MACHINE_MODES | clean |
+| `target_flag_state` | none | clean |
+| `target_cfgloop` | none (literal 2) | clean |
+| `target_bb_reorder` | none | clean |
+
+**18 swept, 2 vulnerable, 2 fixed.**  The "clean" verdicts that rest on a
+MECHANISM rather than on a constant are worth naming, because a mechanism can
+break: `NUM_INSN_CODES` (20512), `NUM_OPTAB_PATTERNS` (3328),
+`MAX_RECOG_OPERANDS` (30) and `NUM_REGISTER_FILTERS` (4) are unioned by
+`genconfig`/`genopinit` and measured identical in every context; the mode
+counts come from the `genmodes` union; `GR_MAX` 10, `LTI_MAX` 3,
+`NUM_ABI_IDS` 12, `NUM_ALG_HASH_ENTRIES` 1031 and `BA_LAST` 2 are
+target-independent.
+
+## 2. THE DEFECT, AND WHY THE PAIR AND THE TRIPLE BOTH SAY IT IS FINE
+
+`MAX_BITS_PER_WORD` is the last dimension of four tables in `target_expmed`
+and the only dimension of three in `lower_subreg_choices`.  It is an ARRAY
+BOUND, so `defaults.h` cannot redirect it -- it says so at :2038 and refuses
+by name if the primary leaves it to `BITS_PER_WORD` -- which means a shared
+translation unit gets the PRIMARY's value and a back end's own gets its own.
+**Twenty back-end sources include `expmed.h`**, `config/xtensa/xtensa.cc`,
+`config/m68k/m68k.cc`, `config/pdp11/pdp11.cc` and `config/visium/visium.cc`
+among them.
+
+14 back ends state it (i386, aarch64, rs6000, riscv, pa, mips, sparc, sh,
+iq2000, loongarch 64; mcore, h8300, xtensa 32) and the rest inherit
+`BITS_PER_WORD`: m68k and visium 32, pdp11 16, avr 8.
+
+**Every base in a 2- or 3-back-end build says 64, so neither acceptance build
+can show it.**  One more instance of "two back ends cannot tell", fixed from
+the source with the divergence SUPPLIED by an injection arm.
+
+The fix is a measured union width, `MULTI_TARGET_UNION_MAX_BITS_PER_WORD`,
+because the position of use forbids a run-time call -- the same reasoning and
+the same machinery as `MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS`.  The four
+remaining uses in `expmed.cc` are capacity guards on those same arrays and
+move with them: :259 fills `pow2[]`/`cint[]` that :208 indexes, so widening
+one without the other would have introduced a NULL dereference.
+
+**On section 2a**: the fallback for a base that does not define
+`MAX_BITS_PER_WORD` is `defaults.h`'s own `BITS_PER_WORD` derivation,
+evaluated in THAT base's translation unit -- upstream's answer for that back
+end standing alone, not the primary's.  The union is a maximum over those and
+is used only as a LAYOUT bound; loops and values stay each base's own.
+
+## 3. THE WITNESS: 7 STRUCTS -> 18, LIST DERIVED FROM `target-globals.cc`
+
+`init_reg_sets`'s `MT_CHECK_LAYOUT` and `target_regs_desc` now carry all
+eighteen members of `class target_globals` -- the same eighteen
+`save_target_globals` XCNEWs.  Both sides gained the same headers in the same
+order; `insn-opinit.h` is named through `BASE_HEADER` so a missing `-I` cannot
+substitute the primary's `target_optabs`.
+
+**Four injection arms, run rather than described** (`scratchpad/mtsw-inject.sh`,
+each asserting that its edit produced the intended state, each restoring):
+
+  * **1a** aarch64 `MAX_BITS_PER_WORD` 64 -> 32, WITH the fix: builds, the
+    union width stays 64, `nm -S` on `mt-aarch64/reg-probe.o` reads **32**
+    (non-vacuity), cc1 clean.
+  * **1b** same divergence, bounds reverted to the plain name:
+    `back end 'aarch64' computes 'sizeof (struct target_expmed)' as 131584,
+    but target-independent code allocates 232960`.
+  * **2** perturbing one reported size by 8 fires by name for
+    `target_flag_state` (72 vs 64) and for `target_optabs` (3824 vs 3816) --
+    the descriptor initialiser is positional, so this is the arm that shows
+    the new entries are WIRED and not merely present.
+  * **3** restored: 12369 bytes, md5 unchanged from the baseline.
+
+`target_lower_subreg`'s entry is checked but has not been observed FIRING:
+`target_expmed` is earlier in the list and aborts first.  Stated rather than
+implied.  Nine of the eleven added entries were not individually perturbed.
+
+## 4. THE DEPENDENCY HOLE, FOUND BY AN ARM THAT COULD NOT FIRE
+
+The first run of arm 1a failed its own non-vacuity check: aarch64.h said 32
+and the probe still read 64.  `$(MULTI_TARGET_REG_PROBES)` are compiled but
+never linked, so they are not in `$(ALL_HOST_OBJS)`, and `DEPFILES` is built
+from `$(ALL_HOST_OBJS)` alone -- **their `.Po` files were written on every
+compile and never included.**  The only prerequisites make could see were the
+probe source and `<base>-inc/s-inc`, a stamp for the SHIM headers, which does
+not change when `config/<cpu>/<cpu>.h` does.
+
+So editing a back end's own header left `multi-target-reg-widths.h` carrying
+the previous cold build's maxima, `move-if-change` made the non-update
+invisible, and every structure in `target-globals.h` stayed sized by a number
+that was no longer true.  **A cold build was always correct**, which is why it
+survived -- it is invisible to exactly the `rm -rf` arm this branch's guards
+habitually use.  Fixed by extending `DEPFILES`; anchor 45 -> 47.
+
+## 5. BARS
+
+  * `/tmp/b-ad827eb24f334c52d-pair` and `-tri`, both cold: `make all-gcc`
+    **rc=0** read from make's exit status, `grep -c 'error:'` **0**;
+    `make multi-target-objs cc1 lto1` **rc=0**, 0 `error:`.
+  * x86_64 `-O2` on `scratchpad/big.c` (md5 `e4558c736e241860bc610c56e66f9c43`,
+    150 lines): **12369 bytes / `378fc33c1e70`** in BOTH dirs -- the recorded
+    bar exactly, input path quoted with the count.
+  * `specs-config` for x86_64 is **230 lines** in both, checked as a value.
+  * `stock-compare.sh` vs `/tmp/b-stock` (genuine upstream at `c31b7a09eea`,
+    **0** `MULTI_TARGET` hits in its `gcc/Makefile`), absolute `IN`:
+    **5/5 IDENTICAL** for the pair AND the triple, 5 distinct md5s per side,
+    negative control firing (1158 vs 804 lines, differ).
+  * The generated header is asserted BY CONTENT:
+    `MULTI_TARGET_UNION_MAX_BITS_PER_WORD 64` read out of
+    `multi-target-reg-widths.h`, not "the generator ran".
+  * No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.
+
+## 6. NOT MINE, FOUND ON THE WAY
+
+**`big.c` through the aarch64 configuration ICEs in `add_clobbers, at
+config/i386/sync.md:2483`.**  Measured on the RESTORED tree in the pair, so it
+is a pre-existing branch defect, not this change's: the primary's generated
+`add_clobbers` is answering for every base -- the one-name-several-authorities
+shape again, in `insn-emit`.  `scratchpad/mtsw-small.c` exists only because of
+it, and it emits real aarch64 (`add w0, w0, 1`, `.arch armv8-a`).
+
+## 7. WHAT THIS DOES NOT CLAIM
+
+  * **The two fixed structs were structurally wrong and that is a bug even
+    though no measured input changed.**  Every artefact here is byte-identical
+    before and after in the pair and the triple, because all their bases agree
+    at 64.  An input that makes it observable needs a configured back end whose
+    `MAX_BITS_PER_WORD` is not the primary's -- xtensa, m68k, pdp11, visium,
+    avr -- at which point that base's own objects address `x_shift_cost` and
+    every field after it at offsets the middle end did not allocate.  The bug
+    is not downgraded on the strength of identical output.
+  * The sweep covers `class target_globals` only.  Other shared structures with
+    per-base bounds were not enumerated; `recog_data`'s
+    `dup_loc[MAX_DUP_OPERANDS]` is the obvious neighbour and is covered by
+    `genconfig`'s union, but that is one case, not a survey.
+  * `ada/gcc-interface/utils.cc:291` still spells `2 * MAX_BITS_PER_WORD + 1`.
+    It is a shared TU with no per-base counterpart, so there is no
+    cross-translation-unit disagreement today; Ada is not built here and it was
+    left alone rather than changed unverified.
