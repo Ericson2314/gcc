@@ -42,9 +42,45 @@ That is not hypothetical: `d7a12b9d5c4`'s own subject is *"one `.o` rule per
 back-end object, **and the include directory did not reach them**"* — the
 mechanism existed and did not reach its consumers, in the include path.
 
-Two populations, two spellings. A **genuine per-base source** can name the path
-literally. A **shared source compiled N times** (one file → `foo-i386.o` and
-`foo-aarch64.o`) cannot, and takes the base as a macro.
+**RULED: wherever a `tm.h` include survives it is `BASE_HEADER (tm.h)`;
+wherever it need not survive it is DELETED. Never hardcode a path.** Hardcoding
+*can* work for a single-base file, and is still wrong, because **it fails
+silently when the classification is wrong**: a file spelling
+`"riscv-inc/tm.h"` that is ever built for a second base gets riscv's headers
+and compiles cleanly, since that file exists. `BASE_HEADER` cannot do that —
+`MT_BASE` is per *object*, so it always follows what is actually being built.
+
+The classification is genuinely error-prone, which is the point.
+`config/linux.cc` is built for **both** bases (`mt-i386/linux.o` and
+`mt-aarch64/linux.o`), so "it lives under `config/`" tells you nothing. And the
+upstream population is inconsistent for no reason: of the `config/*/*-c.cc`
+files, `aarch64-c.cc`, `arc-c.cc`, `bpf-c.cc`, `ia64-c.cc` spell `tm.h` while
+`arm-c.cc`, `avr-c.cc`, `i386-c.cc`, `microblaze-c.cc` do not. Hardcoding means
+auditing 101 files and being right every time, with silence as the penalty for
+being wrong. The macro needs no audit — which also keeps the upstreaming story
+to one mechanical transformation rather than a per-file judgement a reviewer
+must re-derive.
+
+**The four populations, with no `-I` selection anywhere:**
+
+| population | count | action |
+|---|---|---|
+| **shared headers** | **5** — `target.h`, `backend.h`, `multi-target-base.h`, `cp/cp-tree.h`, `m2/gm2-gcc/gcc-consolidation.h` | **stop including `tm.h`** |
+| shared TUs | 248 | stop including it (macro conversion) |
+| `gcc/config/` glue | 101 | `BASE_HEADER (tm.h)` |
+| compiled N times | 7 | `BASE_HEADER` — **done** |
+
+**Those five headers are the whole transitive channel** — `i386.cc` and
+`aarch64.cc` spell no `tm.h` at all and reach it through them. They are why
+`tm.h` reaches ~520 of 622 TUs, and being shared they cannot name a base, so
+for them the only move is deletion.
+
+**Note for upstreaming: upstream also finds `tm.h` via `-I`**, since it is
+generated into the build dir — but upstream has **one candidate**, so `-I` is
+finding a file, not choosing between bases. Using `-I` to *select* is this
+branch's invention, and removing it removes a divergence rather than adding
+one. (`gcc/config/` and `libgcc/config/` are separate trees with the same
+directory names and entirely different contents; all of the above is `gcc/`.)
 
 **The landed form** is `gcc/multi-target-base.h`, with `-DMT_BASE=<cpu>-inc`
 per object and **the call site taking a bare, unquoted argument**:
