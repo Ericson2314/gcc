@@ -359,6 +359,14 @@ reachable () {
 # whose stimulus is the bug stops working the moment the bug is fixed -- which
 # is exactly what would happen if lto_plugin were used as the must-hit.  These
 # four cannot be moved by anything anyone does to GCC.
+# Snapshot the real corpus before the synthetic stimuli are appended.  The
+# reference arm near the end must not see the zzz_ keys: they are references
+# to fields that deliberately do not exist, which is precisely what that arm
+# reports, so it would fire on the calibration every run.  Keeping them in a
+# separate file rather than filtering `zzz_' out by name means the arm has no
+# name-shaped hole for a real key to hide in.
+cp "$work"/code "$work"/code.real
+
 mkdir -p "$work"/calib
 cat > "$work"/calib/reader.cc <<'EOF'
 /* A comment mentioning targ_caps.zzz_comment_only, which must NOT count.  */
@@ -617,6 +625,63 @@ fi
 
 printf '%s\n' "$declared" > "$work"/declared
 printf '%s\n' "$emitted" > "$work"/emitted
+
+# --- The OTHER direction: a reference with no field. -----------------------
+#
+# WHY.  Everything above starts from a field and asks who writes or reads it.
+# That shape cannot see a consumer naming a field that does not exist, because
+# there is no field to start from -- the check is blind to it from BOTH arms.
+#
+# It happened.  defaults.h defined
+#
+#   #define HAVE_AS_LTOFFX_LDXMOV_RELOCS (targ_caps.as_ltoffx_ldxmov_relocs)
+#
+# over a struct field that had never been added.  `--enable-backends' naming
+# ia64 would have failed to compile, blaming defaults.h, and nothing here said
+# a word.  It hid because the macro is only expanded in an ia64 build and none
+# happens in this tree -- so this arm is not merely a tidiness check, it is the
+# only thing standing between a two-backend build set and a reference that
+# breaks the first person to configure a third backend.
+#
+# The compiler does catch this, eventually, for whoever builds that backend.
+# The point is to catch it at check time, for everyone, in the tree that
+# cannot build it.
+#
+# Aliases are excluded: `target' is read through targ_caps_target_name and
+# deliberately has no field (see the backlog).  Comments are already stripped
+# from $work/code, which matters here -- target-caps.h and s390.h each carry
+# PROSE naming as_s390_machine_machinemode as deliberately absent, and a
+# comment-blind scan would report both as violations.
+grep -oE 'targ_caps\.[a-z_][a-z_0-9]*' "$work"/code.real \
+  | sed 's/^targ_caps\.//' | sort -u > "$work"/referenced
+awk '{print $1}' "$work"/aliases | grep -v '^#' | sort -u > "$work"/aliaskeys
+comm -23 "$work"/referenced "$work"/aliaskeys > "$work"/ref_known
+comm -23 "$work"/ref_known "$work"/declared > "$work"/ref_nofield
+
+# A null result here must not be confusable with success: if the pattern ever
+# stops matching, every reference vanishes and the arm passes for a reason
+# that has nothing to do with the tree.  This is the recorded false-green
+# shape, so the scan is required to have found SOMETHING before its emptiness
+# is allowed to mean anything.
+if test ! -s "$work"/referenced; then
+  echo "check-target-caps: the reference scan found no \`targ_caps.KEY' at" \
+       "all.  The corpus or this pattern has changed, and then a reference" \
+       "to a nonexistent field would pass unnoticed.  Fix the scan; do not" \
+       "delete this test." >&2
+  exit 1
+fi
+
+if test -s "$work"/ref_nofield; then
+  echo "check-target-caps: `wc -l < "$work"/ref_nofield | tr -d ' '`" \
+       "reference(s) to a capability that \`struct target_caps' does not" \
+       "declare.  This does not break the build HERE -- it breaks it for" \
+       "whoever first configures a backend whose code expands the macro," \
+       "and it blames the file holding the reference rather than the missing" \
+       "field.  Add the field to target-caps.h (and emit it from" \
+       "target-specs/configure.ac), or drop the reference:" >&2
+  sed 's/^/  /' "$work"/ref_nofield >&2
+  exit 1
+fi
 
 # --- The backlog.  KEY  KIND  REASON.  See the header for the rules. --------
 # KIND is `bug' (a real defect, reported every run until fixed) or `optout' (a
