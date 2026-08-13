@@ -245,6 +245,19 @@ Six rules that each cost a session:
    compiles.** A poly_int sweep fixed 2 sites and left 7 identical siblings,
    having demonstrably reached those files. **Sweep the source, not the build
    output** — ~186 targets are never built.
+7. **A mitigation can score the very error it was written to catch as a pass.**
+   TOPLEVEL-DESIGN §2.2 twice described the `$(eval)` failure mode as "a
+   silently empty recipe" and mandated a **non-emptiness assertion**. Measured
+   by injecting the error rather than by reading: under-quoting `$$(srcdir)`
+   produces a complete, non-empty, *plausible* recipe with the call-time value
+   baked in where a deferred one belonged. The prescribed check would have
+   passed. **The failure was silently WRONG, not silently EMPTY** — and a
+   length test cannot tell those apart. Diff the artefact against an
+   independently-produced control; never assert on its size.
+
+   Generalise it: **whenever you write a mitigation, inject the exact fault it
+   names and confirm the mitigation fires.** An unfired mitigation is
+   indistinguishable from an absent one, and reads as protection.
 
 **Check the count in BOTH directions when moving a walk onto a union list.** A
 fix can improve the axis you are watching while silently regressing the one you
