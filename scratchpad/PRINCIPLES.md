@@ -495,22 +495,33 @@ answer is still wrong is worse than the failure.**
   reported "ok, differs" while comparing two nonexistent files) —
   **5/5 IDENTICAL** vs `/tmp/b-stock` (genuine upstream at merge-base
   `c31b7a09eea`), distinct md5s per side, negative control firing.
-- **Probe scoreboard** (re-measured 2026-08-12 by running
-  `scratchpad/macro-probe-run.sh`, not by reconciling on paper — quote these):
-  **224 header arms over 112 macros — i386 112 PASS / 0 FAIL, aarch64 8 PASS /
-  104 FAIL, of which only 2 of the 8 passes are TRUSTED; 64 TAB arms — i386 32
-  PASS / 0 FAIL, aarch64 27 PASS / 5 FAIL.** **Diff verdicts and probe shapes,
-  never totals.**
+- **Probe scoreboard — DO NOT QUOTE A FIGURE FROM THIS FILE. Run the harness
+  and read what it prints.** The figures below are a record, not a reading.
 
-  **Never quote the raw 8.** It is 2 trusted (`MAX_BITS_PER_WORD`,
-  `MAX_BITSIZE_MODE_ANY_MODE`) + **6 retired-pending** — #108's stack/arg
-  boundary set (`FUNCTION_ARG_REGNO_P`, `MINIMUM_ALIGNMENT`,
-  `OUTGOING_REG_PARM_STACK_SPACE`, `PREFERRED_STACK_BOUNDARY`,
-  `STACK_BOUNDARY`, `STACK_SLOT_ALIGNMENT`), which are green because the
-  probe's base-B context does not define `MULTI_TARGET_TARGETM_BASE`, so
-  `defaults.h` redirects both sides and **the arm compares the redirect with
-  itself**. Their real both-sided evidence is at the object level
-  (`scratchpad/t108-evidence.sh`); they need TAB arms before any of it counts.
+  **The instrument died and nobody noticed for a day.** `macro-probe-run.sh`
+  exited **rc=9 before probing anything** — arm 0's INT control had been
+  re-anchored to `STACK_POINTER_REGNUM`, which was then converted to a runtime
+  call, and a call is not an integral constant expression. Every figure quoted
+  in that window was **the last successful run's**, propagated into brief after
+  brief as if current. **A control anchored on a macro this project is
+  converting is a control with an expiry date**; the comment above that control
+  had predicted exactly this death, about a *different* macro, and nobody
+  applied the sentence to the control's own witness. It is re-anchored to
+  `MIN_UNITS_PER_WORD` (i386 4, aarch64 8, mt 4), measured in all three
+  contexts first, with 0/1-valued candidates rejected because a defaulted 0 is
+  indistinguishable from a correct reading.
+
+  Current reading, **which the harness now prints with its own decomposition**
+  rather than leaving it to prose here: **216 arms over 108 macros — i386
+  108/0, aarch64 29/79**, where the 29 is **2 trusted +
+  27 `UNTRUSTED-redirect-vs-itself`**, each tagged in the listing. The rise
+  from 8 to 29 is **21 more macros having become target-neutral, which is not
+  progress**; the trusted count is unchanged at **2**. The board is
+  **149 macros = 75 unconverted + 32 TAB + 9 EXIST + 33 with no arm at all**.
+
+  The decomposition moved from prose here to computed-at-the-point-of-print
+  **because the raw number was quoted anyway, twice, after a warning not to.**
+  If a caveat has to be remembered, it will not be.
 
   This line was reconciled after two documents disagreed, and **both were
   partly right on the same board**: this file had #92's retire-3 but not
