@@ -4439,7 +4439,8 @@ s-generic-match: build/genmatch$(build_exeext) \
 GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(host_xm_file_list) \
   $(OPTIONS_H_EXTRA) \
-  $(tm_file_list) $(HASHTAB_H) $(SPLAY_TREE_H) $(srcdir)/bitmap.h \
+  options.h $(srcdir)/defaults.h $(srcdir)/config/initfini-array.h \
+  $(HASHTAB_H) $(SPLAY_TREE_H) $(srcdir)/bitmap.h \
   $(srcdir)/wide-int.h $(srcdir)/alias.h \
   $(srcdir)/coverage.cc  $(srcdir)/rtl.h \
   $(srcdir)/optabs.h $(srcdir)/tree.h $(srcdir)/tree-core.h \
@@ -4525,6 +4526,32 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/calls.cc \
   $(srcdir)/analyzer/analyzer-language.cc \
   @all_gtfiles@
+# `$(tm_file_list)' USED TO BE ON THE LINE ABOVE, and taking it off is the
+# point rather than a tidy-up.  It is ONE target's tm.h chain -- the primary's
+# -- so gengtype read i386's `machine_function' and had never heard of
+# aarch64's, even though both back ends were configured and both declare one.
+# Sixteen of the thirty-four back ends that define `machine_function' define
+# it in a header, and every one of them was invisible.  The per-base union in
+# @all_gtfiles@ now carries every configured back end's tm_file entries; see
+# the loop in gen-target-manifest.sh.  What is kept here explicitly is the two
+# entries of that chain that are NOT target headers: `options.h', which
+# carries `gcc_options', `cl_optimization' and `cl_target_option', and
+# `defaults.h', which has no GTY declaration at all but is kept so that the
+# set of files gengtype reads is a superset of what it read before.
+# `initfini-array.h' is kept for the same reason and was found MISSING by that
+# check rather than by reading -- configure appends it to $(tm_file_list) and
+# config.gcc's tm_file does not name it, so the per-base union cannot see it.
+# It has no GTY declaration either, which is why nothing broke and why the
+# superset assertion is what noticed.
+# scratchpad/gt-gtfiles.sh asserts exactly that superset property.
+#
+# THE PARAGRAPH BELOW IS STALE and is left only because the rest of it is not.
+# It describes @all_gtfiles@ as the primary's files and the union as a switch
+# still to be flipped; the switch WAS flipped -- configure.ac:2865 reads
+# `all_gtfiles="$gcc_all_target_gtfiles"' -- and the substituted value has been
+# the union for some time.  Read it as a record of why, not as a description of
+# what is here.
+#
 # STILL THE PRIMARY TARGET'S FILES ONLY, and that is an ordering constraint,
 # not an oversight.  gen-target-manifest.sh already computes the union over
 # every configured back end (gcc_all_target_gtfiles, which also folds in each

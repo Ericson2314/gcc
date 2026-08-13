@@ -12194,3 +12194,204 @@ in a brief and mean opposite things about whether there is work to do.
         have run in THIS dir.
   * Both build dirs' `config.log` name this worktree.
   * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+
+---
+
+# `machine_function` GC: THE MISCOLLECTION IS OBSERVED, NOT IMPLIED, AND IT IS
+# FIXED -- 0 OF 33 BACK ENDS HAD THEIR OWN MARKER, NOW 33 OF 33
+
+Worktree `agent-a2c4f72addc68d136`, build dirs `/tmp/b-a2c4f72addc68d136-pair`
+(i386 + aarch64) and `-47` (48-back-end list minus loongarch), both named for
+the worktree and never a task number.  Anchor **45**.  The worktree came up at
+bare-repo HEAD `7208eca60d0` with no `scratchpad/` at all -- `git reset --hard
+multi-target` -- which is now TWELVE in a row.  **No task number is cited: the
+list is not in this worktree.**  Commits `b1d30fa6d35`, `ae3f1b74f42`.
+
+## 0. JOB 1 -- IT MISCOLLECTS.  MEASURED.
+
+The previous record was careful to call this an unmeasured implication.  It is
+now an observed one.  `/tmp/gt-small.c`, two lines, through the pair build:
+
+    aarch64, no collection forced                         rc=0, 921 bytes
+    aarch64, --param ggc-min-expand=0 ggc-min-heapsize=0  SIGSEGV
+    x86_64,  either way                                   rc=0, 629 bytes
+
+and gdb -- one breakpoint per run, `--args` not `gdb run` -- names the path
+rather than leaving it to be argued:
+
+    ggc_set_mark <- gt_ggc_mx_stack_local_entry <- gt_ggc_mx_machine_function
+                 <- gt_ggc_mx_function <- ggc_mark_roots <- ggc_collect
+
+`stack_locals` is **i386's** field at offset 0.  aarch64 keeps `poly_int64
+aarch64_frame::reg_offset[0]` there, so a frame offset was marked as a pointer.
+x86_64 was fine because the surviving marker was i386's -- **one base correct
+by luck, one corrupt**, which is the shape to expect from this bug class rather
+than symmetrical damage.
+
+The other half stays silent by construction and is worth naming: aarch64's
+`saved_gprs`, `saved_fprs`, `saved_prs`, `tpidr2_block`, `za_save_buffer`,
+`zt0_save_buffer` were **never marked at all**.  A clean run is not evidence
+that half is absent; only the crashing half is observable.
+
+## 1. IT WAS TWO CAUSES, AND THE SECOND IS THE BIGGER ONE
+
+  1. **gengtype has no per-base namespace.**  `new_structure` overwrites on a
+     second definition with the same lang bitmap, and every back end shares one
+     bitmap.  Last file parsed wins.
+
+  2. **gengtype never saw aarch64's declaration at all.**  `GTFILES` reached
+     target headers through `$(tm_file_list)` -- ONE target's tm.h chain.
+     Measured: `gtyp-input.list` named `config/i386/i386.h` and did **not**
+     name `config/aarch64/aarch64.h`.  **Sixteen of the 34 back ends declare
+     `machine_function` in their tm.h fragment and every one was invisible.**
+
+     Separate these two when reading the old finding: aarch64's GC data was not
+     being *overwritten* by i386's, it was *absent*.  A per-base namespace
+     fixes nothing for a definition gengtype never reads, which is why both
+     halves had to land in one change.
+
+## 2. THE FIX -- THE SHAPE THE BRANCH ALREADY USES
+
+Union the vocabulary, keep the data per configuration, select at run time,
+qualify only what collides.
+
+  * `gengtype.cc`: definitions of one tag from different `config/<D>/`
+    directories become distinct variants instead of overwriting, reusing the
+    existing lang_struct chain **so nothing new has to round-trip through
+    `gtype.state`** -- gengtype writes state and re-reads it to generate, and a
+    new serialised field would have to be taught to both halves.
+  * Each variant emits `gt_ggc_mx_<tag>_<D>` / `gt_pch_nx_<tag>_<D>` into that
+    back end's own `gt-<D>.h`.
+  * `config/<D>/<D>.h` -- a tm.h fragment, which **cannot be included on its
+    own** -- routes to `gt-<D>.h` instead of shared `gtype-desc.cc`.
+  * `mt_write_dispatchers` emits the unsuffixed name shared code already calls
+    as a dispatch, plus one installer.  Shared call sites are unchanged.
+  * `multi_target_select` installs, beside the six tables it already selects.
+  * `gen-target-manifest.sh` unions every configured back end's `tm_file`;
+    `$(tm_file_list)` is gone from `GTFILES`.
+
+**NO FALLBACK, and on the section 2a test there is no defensible side.** For
+`JUMP_TABLES_IN_TEXT_SECTION` the floor supplies upstream's own value, which is
+that back end's own answer.  A marker routine is a **memory layout**, and no
+other back end's layout is ever this one's answer -- a second configured back
+end changes it, so it is banned.  An uninstalled dispatcher calls
+`gt_multi_target_no_marker` and dies naming the type.
+
+## 3. THE NUMBERS, ONE BUILD DIR, CONTROL BY SWAPPING ONE FILE
+
+`/tmp/b-a2c4f72addc68d136-47`, reconfigured in place; the control is
+`gengtype.cc` alone swapped back to HEAD~1 and `s-gtype` re-run in the SAME
+directory, so nothing but the generator differs.
+
+|  | before | after |
+|---|---|---|
+| `gt_ggc_mx_machine_function` definitions | **1**, in `gt-xtensa.h` | 1 dispatcher + **33 per-base** |
+| back ends with their own marker | **0 of 33** | **33 of 33** |
+| `gt-*.h` files | 166 | 174 |
+| gengtype rc | 0 | 0 |
+
+Pair build, `nm -C ./cc1`: `gt_ggc_mx_machine_function*` text symbols **1 -> 3**,
+the two new ones defined in `mt-i386/i386.o` and `mt-aarch64/aarch64.o`, and
+`objdump -dr` (**not `-d`**, which erases callee names) shows both reached by
+relocation from the installer.  The symbols in the object are **mangled**, so
+an arm anchored on the demangled spelling reads empty -- a first version of
+`gt-syms.sh` did exactly that and now refuses to score on an empty match.
+
+**The five back ends failing `gt-<cpu>.h: No such file` -- moxie, cris, ft32,
+iq2000, bpf -- all have that file now**, and have it because they own a
+`machine_function`, not because anything was created to silence the message.
+
+## 4. ONE HANDED-OVER DETAIL CORRECTED, AND ONE FOUND FOR FREE
+
+**The `arc` / `xtensa` disagreement does not reproduce.**  The finding was
+handed over as "`gtype.state` attributes the type to arc while the routine
+landed in `gt-xtensa.h`, and the disagreement is itself the evidence".  In the
+control both artefacts say **xtensa** (`(!srcfileloc "config/xtensa/xtensa.cc"
+113)`).  The conclusion is unchanged -- last definition parsed wins -- but the
+evidence is simpler than advertised, and the two artefacts agree.
+
+**A second collision fell out without being looked for**: 36 installer entries
+over 33 back ends, because `registered_function` is defined by aarch64
+(`aarch64-sve-builtins`) and riscv (`riscv-vector-builtins`).  It is qualified
+and dispatched the same way.  Asking the question generically found it; nothing
+searched for it.
+
+## 5. THREE WRONG VERSIONS, EACH NAMING A BOUNDARY
+
+Recorded because each is a real temptation and each failed loudly:
+
+  * Redirecting **every** back-end header to `gt-<D>.h` broke
+    `registered_function` -- 20 errors, incomplete type in a TU that does not
+    include it.  Only the `<D>/<D>.h` tm.h fragment may move.
+  * Adding only `*/*` `tm_file` entries left the privileged chain in place and
+    gengtype refused **by name**, nine times: `config/i386/i386.h specified
+    more than once for language (all)`.  The answer was to stop having a
+    privileged chain, not to filter the duplicate.
+  * `mt_config_dir_of_type` guarded on `union_or_struct_p`, excluding
+    TYPE_UNDEFINED.  A struct registers at its **closing brace**, so riscv's
+    `mode_switching_info ()` constructor at riscv.cc:189 -- inside the struct
+    opening at :178 -- creates a placeholder the real definition fills in.
+    Answering NULL for it split the type and left every later use resolving to
+    the undefined half.  **The control shows `mode_switching_info` is walked by
+    NOTHING before this change**, because riscv's `machine_function` was one of
+    the 33 that lost: the placeholder bug was mine, the unmarked types were not.
+
+**My own superset check earned its keep.**  `gt-gtfiles.sh` asserts that the new
+gengtype input set is a superset of the old, and found `config/initfini-array.h`
+silently dropped -- configure appends it to `$(tm_file_list)` and config.gcc's
+`tm_file` does not name it.  It has **no GTY declaration**, so nothing broke and
+only the assertion noticed.  Its first draft also scored 53 legitimate
+front-end repeats (one per `[lang]` section) as failures, so duplicates are
+counted over `config/` only, and that restriction is stated in the script.
+
+## 6. BARS -- ALL RE-TAKEN AGAINST THE FINAL CODE, NOT CARRIED OVER
+
+  * `make multi-target-objs cc1 lto1` **rc=0 read from make's exit status**,
+    0 `error:`, stderr **32 lines** (8 `is unchanged` + 24 `'@' is redundant`)
+    -- the recorded incremental composition.
+  * x86_64 `-O2` on
+    `.../agent-a2c4f72addc68d136/scratchpad/big.c` (150 lines, md5
+    `e4558c736e241860bc610c56e66f9c43`): **12369 bytes / `378fc33c1e70`**.
+    Input path quoted with the count.
+  * `specs-config` **230 lines** for both targets, probed with the real
+    aarch64 binutils.
+  * `stock-compare.sh` vs `/tmp/b-stock`: **5/5 IDENTICAL**, 5 distinct md5s
+    per side, negative control firing (1158 vs 804 lines, differ).
+  * aarch64 under forced collection: **rc=0, byte-identical to the unforced
+    arm** on both inputs.
+  * `config.log` in both build dirs names this worktree; every script asserts
+    it and refuses otherwise.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+
+## 7. WHAT IS LEFT, ATTRIBUTED
+
+  * **`all-gcc` at 47 back ends still fails**, and not on anything here:
+    `poly_int`/`NUM_POLY_INT_COEFFS`, `E_PSImode`, the `<cpu>-opts.h` leak and
+    the i386 `insn_default_length` crash are all owned elsewhere and untouched.
+    What changed is that the **generator stage now completes** for 47 back
+    ends, which it did before only by discarding 33 back ends' GC data.
+  * **`stormy16` is the one back end where gengtype's directory name
+    (`stormy16`) and the branch's `cpu_type` (`xstormy16`) differ.**  No alias
+    is invented: selecting it stops the compiler with the back end named.  A
+    one-line mapping would close it and is not done here because nothing has
+    yet selected that back end.
+  * **PCH is not exercised.**  `gt_pch_nx_*` is split and dispatched the same
+    way and compiles, but no arm here writes or reads a precompiled header.
+    That is unmeasured, not clean.
+  * **Only `machine_function` and `registered_function` collide today.**  The
+    mechanism is generic over tags; whether a third appears when loongarch is
+    configured is untested.
+
+## 8. FILES
+
+    gt-conf.sh     configure any target list; asserts anchor 45 and that the
+                   build dir is named for THIS worktree
+    gt-reconf.sh   config.status --recheck IN PLACE, so before/after arms are
+                   the same directory
+    gt-build.sh    top-level make; asserts the build dir's own config.log names
+                   this tree before spending an hour on it
+    gt-specs.sh    both target-specs probes, real aarch64 binutils
+    gt-gc.sh       JOB 1: each base with and without collection forced
+    gt-gdb.sh      JOB 1 attribution: one breakpoint per run, --args
+    gt-syms.sh     nm/objdump -dr arm; refuses to score on an empty match
+    gt-gtfiles.sh  the superset assertion that found initfini-array.h

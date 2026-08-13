@@ -288,6 +288,18 @@ enum ggc_collect {
 };
 extern void ggc_collect (enum ggc_collect mode = GGC_COLLECT_HEURISTIC);
 
+/* MULTI-TARGET: point the per-back-end marker dispatchers at BASE's own
+   routines.  Returns false, and installs nothing, if BASE supplies no
+   routines -- there is no fallback, because the fallback would be another
+   back end's memory layout applied to this one's objects.
+
+   Both the dispatchers and the installer are generated into gtype-desc.cc by
+   gengtype's mt_write_dispatchers; see the comment there.  */
+extern bool gt_multi_target_install_markers (const char *base);
+
+/* Called by a dispatcher that has not been installed.  Does not return.  */
+extern void gt_multi_target_no_marker (const char *tag) ATTRIBUTE_NORETURN;
+
 /* Return unused memory pages to the system.  */
 extern void ggc_trim (void);
 

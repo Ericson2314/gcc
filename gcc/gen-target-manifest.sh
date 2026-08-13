@@ -263,6 +263,49 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # $(out_file) -- the primary target's, which is why gt-i386.h was the only
   # back-end gt- header a multi-target build produced.  Union it here too.
   gcc_mt_gtf="${gcc_mt_gtf} \$(srcdir)/config/`echo "${gcc_mt_data}" | sed -n 's/^out_file //p'`"
+  # ...AND NEITHER IS THE BACK END'S OWN tm.h CHAIN, which is where SIXTEEN of
+  # the thirty-four `struct GTY(()) machine_function' definitions live --
+  # aarch64, arm, avr, c6x, epiphany, gcn, i386, ia64, loongarch, mips, mmix,
+  # nds32, nvptx, pa, rs6000, s390.  gcc/Makefile.in reaches those through
+  # $(tm_file_list), which is the PRIMARY target's chain and nobody else's, so
+  # gengtype never saw aarch64's declaration at all.
+  #
+  # Measured before this line existed, in a two-back-end build: gtyp-input.list
+  # named config/i386/i386.h and did NOT name config/aarch64/aarch64.h, and
+  # `gt_ggc_mx_machine_function' walked i386's three fields for both bases.
+  # That is worth separating from the collision it looks like: aarch64's GC
+  # data was not being OVERWRITTEN by i386's, it was INVISIBLE.  A per-base
+  # namespace in gengtype fixes nothing for a definition gengtype never reads,
+  # which is why both halves had to land together.
+  #
+  # Only entries naming a back end's own directory are added.  The rest of a
+  # tm_file chain (elfos.h, linux.h, glibc-stdint.h) is shared and already
+  # reaches GTFILES; adding it again would list one file under two spellings.
+  # EVERY entry, not only the ones naming this back end's own directory.  The
+  # first draft added only `*/*' and left the shared ones (elfos.h, linux.h,
+  # glibc-stdint.h) to $(tm_file_list) -- and $(tm_file_list) is one target's
+  # chain, so the primary's own headers then arrived twice.  gengtype refused
+  # BY NAME, nine times: `config/i386/i386.h specified more than once for
+  # language (all)'.  That is the check working, and the answer is not to
+  # filter the duplicate out but to stop having a privileged chain at all:
+  # gcc/Makefile.in no longer lists $(tm_file_list), and this union is the
+  # single authority for which target headers gengtype reads.
+  #
+  # A `./' PREFIX MEANS THE BUILD DIRECTORY, NOT THE SOURCE TREE, and those
+  # entries are skipped.  config.gcc writes `./gcn-device-macros.h' and
+  # `./sysroot-suffix.h' into tm_file for headers a tmake_file GENERATES; they
+  # are handled a few lines below as tm_generated_headers.  Prefixing them with
+  # $(srcdir)/config/ names a file that does not exist and cannot be built, and
+  # make says so -- `No rule to make target
+  # .../gcc/config/./gcn-device-macros.h, needed by s-gtype'.  It did not show
+  # up on the two-back-end pair, because neither i386 nor aarch64 generates a
+  # tm.h fragment; it showed up the moment gcn was configured.
+  for gcc_mt_tmf in `echo "${gcc_mt_data}" | sed -n 's/^tm_file //p'`; do
+    case "${gcc_mt_tmf}" in
+      ./*) continue ;;
+    esac
+    gcc_mt_gtf="${gcc_mt_gtf} \$(srcdir)/config/${gcc_mt_tmf}"
+  done
   for gcc_mt_f in ${gcc_mt_gtf}; do
     case " ${gcc_all_target_gtfiles} " in
       *" ${gcc_mt_f} "*) ;;
