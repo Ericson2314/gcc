@@ -387,7 +387,7 @@ EnumValue
 Enum(stringop_strategy) String(vector) Value(STRATEGY_VECTOR)
 
 mstringop-strategy=
-Target RejectNegative Joined Enum(stringop_strategy) Var(stringop_strategy) Init(STRATEGY_AUTO)
+Target RejectNegative Joined Enum(stringop_strategy) Var(riscv_stringop_strategy) Init(STRATEGY_AUTO)
 Specify stringop expansion strategy.
 
 -param=memcpy-size-threshold=

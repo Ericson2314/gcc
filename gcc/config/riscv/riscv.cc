@@ -15494,7 +15494,7 @@ riscv_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
   /* For set/clear with size > UNITS_PER_WORD, by pieces uses vector broadcasts
      with UNITS_PER_WORD size pieces.  Use setmem<mode> instead which can use
      bigger chunks.  */
-  if (TARGET_VECTOR && stringop_strategy & STRATEGY_VECTOR
+  if (TARGET_VECTOR && riscv_stringop_strategy & STRATEGY_VECTOR
       && (op == CLEAR_BY_PIECES || op == SET_BY_PIECES)
       && speed_p && size > UNITS_PER_WORD)
     return false;

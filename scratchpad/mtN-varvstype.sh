@@ -34,24 +34,37 @@ for f in "$S"/config/*/*.opt; do
     | sort -u | sed "s|^|$cpu |"
 done > "$tmp".vars
 
-# Every enum TYPE name defined under config/, with its back end.
-grep -rhn "" /dev/null > /dev/null 2>&1 || true
+# Every TAG TYPE name defined under config/, with its back end.
+#
+# `enum' IS NOT ENOUGH, and the first version of this script proved it by
+# scoring 0 while the build was still failing.  i386 has
+# `const struct stringop_strategy {' and riscv has
+# `Var(stringop_strategy)' -- a struct, not an enum, and invisible to a sweep
+# that only looked for `enum'.  The macro expands inside i386's own struct
+# definition and the error lands two lines later on a member name:
+#     i386.h:97: error: `size' does not name a type; did you mean `size_t'?
+# which points at neither back end.
+#
+# So match enum, struct AND class.  An instrument that can only revoke should
+# be over-broad; this one can only add collisions to investigate.
 for f in "$S"/config/*/*.h "$S"/config/*/*.opt; do
   [ -f "$f" ] || continue
   cpu=$(basename "$(dirname "$f")")
-  sed -n 's/^[ \t]*enum[ \t]\{1,\}\([a-zA-Z_][a-zA-Z_0-9]*\)[ \t]*{.*/\1/p;s/^[ \t]*enum[ \t]\{1,\}\([a-zA-Z_][a-zA-Z_0-9]*\)[ \t]*$/\1/p' "$f" \
-    | sort -u | sed "s|^|$cpu |"
+  sed -n \
+    -e 's/^[ \t]*\(const[ \t]\{1,\}\)\?\(enum\|struct\|class\)[ \t]\{1,\}\([a-zA-Z_][a-zA-Z_0-9]*\)[ \t]*{.*/\3/p' \
+    -e 's/^[ \t]*\(enum\|struct\|class\)[ \t]\{1,\}\([a-zA-Z_][a-zA-Z_0-9]*\)[ \t]*$/\2/p' \
+    "$f" | sort -u | sed "s|^|$cpu |"
 done > "$tmp".types
 
 [ -s "$tmp".vars ]  || { echo "FATAL: no option variables read"; exit 9; }
 [ -s "$tmp".types ] || { echo "FATAL: no enum types read"; exit 9; }
 
-echo "=== identifier is an option Var() in one back end and an enum TYPE in another"
+echo "=== identifier is an option Var() in one back end and a TAG TYPE in another"
 n=0
 while read -r vcpu v; do
   owners=$(awk -v n="$v" '$2 == n {print $1}' "$tmp".types | sort -u | grep -v "^$vcpu\$" | tr '\n' ' ')
   if [ -n "$owners" ]; then
-    printf 'Var(%s) in %-10s  enum %s in: %s\n' "$v" "$vcpu" "$v" "$owners"
+    printf 'Var(%s) in %-10s  type %s in: %s\n' "$v" "$vcpu" "$v" "$owners"
     n=$((n + 1))
   fi
 done < "$tmp".vars
