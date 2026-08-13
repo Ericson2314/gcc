@@ -46,6 +46,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm_p.h"
 #include "target.h"
 #include "multi-target-reg-widths.h"
+/* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
+   booleans at the bottom of this file: `-I<base>-inc' comes ahead of `-I.' on
+   this file's command line, so the quoted include resolves to
+   `<base>-inc/insn-config.h', which is one line including
+   `insn-config-<base>.h'.  In the build root the same spelling resolves to
+   whichever base wrote the plain file, which is the bug.  */
+#include "insn-config.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
@@ -235,6 +242,27 @@ mt_base_init_expanders (void)
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
+/* THE INSN-PATTERN EXISTENCE ANSWERS; see target-insn.h.
+
+   Three `#if'-free reads of THIS base's insn-config.h.  There is deliberately
+   no `#ifdef' here even though genconfig used to emit these only when the
+   pattern was present: genconfig now emits an explicit 0, so a back end with
+   no rotate pattern SAYS so rather than being silent about it, and this file
+   does not have to distinguish "absent" from "false" -- which it could not do
+   correctly anyway, since the two mean the same thing here and only one of
+   them survives being put in a struct field.
+
+   A static_assert would be wrong on all three: every value 0 and 1 is legal,
+   so there is nothing to assert.  What makes this non-vacuous is that the two
+   bases produce DIFFERENT tables, which is checked at the object level rather
+   than here (scratchpad/t111-insn-guards.sh).  */
+static const struct target_insn_desc mt_base_insn = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  HAVE_lo_sum != 0,
+  HAVE_rotate != 0,
+  HAVE_rotatert != 0
+};
+
 /* `static', unlike the cumargs table: this one is reached only through the
    `frame' pointer in the table below, so it needs no name in the registry and
    gen-multi-target-md.awk needs no change to declare one.  */
@@ -268,5 +296,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   mt_base_init_libcall_args,
   mt_base_call_pops_args,
   mt_base_override_abi_format,
-  &mt_base_frame
+  &mt_base_frame,
+  &mt_base_insn
 };

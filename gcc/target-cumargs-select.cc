@@ -195,3 +195,39 @@ mt_init_expanders (void)
   if (f->init_expanders != NULL)
     f->init_expanders ();
 }
+
+/* ------------------------------------------------------------------------
+   THE INSN-PATTERN EXISTENCE ANSWERS; see target-insn.h.
+
+   NULL until a base is selected, like every other table here, and for the
+   same reason: the plausible default is the primary's `insn-config.h', which
+   is precisely the answer that was wrong.  */
+const struct target_insn_desc *targetm_insn;
+
+static const struct target_insn_desc *
+mt_insn (void)
+{
+  if (targetm_insn == NULL)
+    internal_error ("no back end has been selected, so which insn patterns "
+		    "exist is unknown; a target must be chosen with "
+		    "%<-ftarget-config=%> before any insn is simplified");
+  return targetm_insn;
+}
+
+bool
+mt_have_lo_sum (void)
+{
+  return mt_insn ()->have_lo_sum;
+}
+
+bool
+mt_have_rotate (void)
+{
+  return mt_insn ()->have_rotate;
+}
+
+bool
+mt_have_rotatert (void)
+{
+  return mt_insn ()->have_rotatert;
+}

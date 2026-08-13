@@ -516,6 +516,16 @@ multi_target_select (const char *target)
 			  "with no frame table attached; its objects predate "
 			  "target-frame.h and are from a different build", base);
 
+	/* Which insn patterns this back end has; see target-insn.h.  Rides on
+	   the same table, checked rather than assumed for the same reason as
+	   the frame one directly above.  */
+	targetm_insn = targetm_cumargs->insn;
+	if (targetm_insn == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no insn-pattern table attached; its objects "
+			  "predate target-insn.h and are from a different "
+			  "build", base);
+
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
 	   a link-time one rather than a design preference.  Their tables call

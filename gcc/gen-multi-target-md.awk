@@ -1840,7 +1840,14 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # c-family, which lto1 does not link.
   printf "target-cumargs-%s.o: $(srcdir)/target-cumargs.cc %s-inc/s-inc \\\n", cpu, cpu;
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) $(TREE_H) \\\n";
+  # target-frame.h and target-insn.h are named EXPLICITLY even though
+  # target-cumargs.h includes both.  make does not follow includes, and the
+  # `$(POSTCOMPILE)' .deps file only exists after a first successful compile --
+  # so on a fresh tree a change to either header would not rebuild these
+  # objects, and the symptom is a table whose layout disagrees with the
+  # selector's idea of it: silent, and indistinguishable from a stale object.
   printf "  $(TM_P_H) $(TARGET_H) $(srcdir)/target-cumargs.h \\\n";
+  printf "  $(srcdir)/target-frame.h $(srcdir)/target-insn.h \\\n";
   printf "  multi-target-reg-widths.h\n";
   printf "\t$(COMPILE) -DTARGETM_CUMARGS_SYMBOL=targetm_cumargs_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-cumargs.cc\n";

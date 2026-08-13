@@ -1,0 +1,104 @@
+/* Per-back-end insn-pattern existence facts that shared code asks for.
+   Copyright (C) 2026 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
+/* THE THREE `HAVE_<pattern>' BOOLEANS THAT SHARED CODE READS.
+
+   `genconfig' writes one `insn-config-<base>.h' per back end, and the maxima
+   in it are unioned (see the long note at the top of genconfig.cc: a maximum
+   is safe to raise, so `MAX_DUP_OPERANDS' can hold one value correct for
+   everybody).  THE BOOLEANS ARE NOT UNIONABLE and genconfig says so: a max
+   over booleans is an OR, and telling the middle end that a pattern exists
+   when the selected back end has no such pattern is a silent wrong answer,
+   not a conservative one.
+
+   So they stayed per back end -- correctly -- and shared code went on reading
+   whichever base's `insn-config.h' the build root happened to resolve to.
+   Measured in an x86_64 + aarch64 build directory:
+
+       insn-config-i386.h      HAVE_lo_sum 0   HAVE_rotate 1  HAVE_rotatert 1
+       insn-config-aarch64.h   HAVE_lo_sum 1   HAVE_rotate 1  HAVE_rotatert 1
+
+   `HAVE_lo_sum' is the live divergence, and it is SILENT in exactly the way
+   this branch keeps finding: `combine.cc:4918', `combine.cc:6101' and
+   `lra-constraints.cc:4242' all read 0, so when aarch64 is the selected
+   target two combine transformations and one LRA path that aarch64 CAN
+   express are simply never attempted.  Nothing is mis-set and nothing is
+   diagnosed; the compiler just quietly generates worse code.  There is no
+   test that fails.
+
+   `HAVE_rotate' and `HAVE_rotatert' are worse in shape though not for this
+   pair.  genconfig only ever DEFINED them (never `#define X 0'), and
+   `simplify-rtx.cc:4773' asked `#if defined(HAVE_rotate) && defined
+   (HAVE_rotatert)' -- a preprocessor line in a file the whole compiler
+   shares.  A `#if` cannot be answered per target, so genconfig grew a
+   unanimity check that STOPPED THE BUILD when the configured back ends
+   disagreed, and its message ended "This combination of targets needs that
+   use site made runtime before it can be built."  That is what this file is:
+   the use site made runtime.  The check is not relaxed, it is discharged.
+
+   WHY A TABLE AND NOT A UNION.  Per genconfig's own note, unioning is the one
+   thing that must not happen here.  Per PRINCIPLES 2 this is a HOOK, not a
+   `target-specs' capability: whether a back end has a `rotate' pattern is
+   settled by its `.md` file, ships with the compiler, and cannot differ
+   between two installations serving the same target.
+
+   WHY IT HANGS OFF `target_cumargs_desc'.  The same reason target-frame.h
+   gives: the per-base symbol declarations and the `TARGETM_*_TABLES' list are
+   emitted by `gen-multi-target-md.awk', and a further registry would be a
+   mechanical copy of the cumargs one there.  The supplying translation unit
+   is already compiled once per base with `-I<base>-inc' ahead of `-I.', which
+   is precisely what makes `#include "insn-config.h"' mean THIS base's file.
+   That include is the whole mechanism.  */
+
+#ifndef GCC_TARGET_INSN_H
+#define GCC_TARGET_INSN_H
+
+/* One back end's answers.  Plain booleans and not function pointers, unlike
+   target-frame.h: these are settled by the back end's machine description
+   before any option is decoded, they cannot vary with `cfun' or with
+   `__attribute__((target))', and there is nothing to evaluate.  The frame
+   entries pay for a call because i386's `STACK_BOUNDARY' really does read
+   `cfun'; nothing here does.  */
+struct target_insn_desc
+{
+  /* The cpu_type this describes, for diagnostics.  */
+  const char *name;
+
+  /* HAVE_lo_sum -- combine.cc:4918, combine.cc:6101, lra-constraints.cc:4242.  */
+  bool have_lo_sum;
+
+  /* HAVE_rotate and HAVE_rotatert -- simplify-rtx.cc:4773, which wants BOTH
+     before it will reverse a rotate by a constant.  Kept as two fields rather
+     than one combined flag because they are two questions with two answers;
+     a back end with `rotate' and no `rotatert' exists and the combined form
+     would silently stop being able to say so.  */
+  bool have_rotate;
+  bool have_rotatert;
+};
+
+/* The answers in force, or NULL until a target is selected.  Shared code goes
+   through the `mt_' functions below so the by-name diagnostic cannot be
+   bypassed.  */
+extern const struct target_insn_desc *targetm_insn;
+
+extern bool mt_have_lo_sum (void);
+extern bool mt_have_rotate (void);
+extern bool mt_have_rotatert (void);
+
+#endif /* GCC_TARGET_INSN_H */

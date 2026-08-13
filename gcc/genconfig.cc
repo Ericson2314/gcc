@@ -261,17 +261,32 @@ apply_union_list (int *maxv, const int *boolv)
       maxv[i] = union_max[i];
     }
 
+  /* THE UNANIMITY CHECK IS DISCHARGED, NOT RELAXED.
+     It used to stop the build here when the configured back ends disagreed
+     about HAVE_rotate or HAVE_rotatert, and its message said why: the only
+     consumer was `#if defined (HAVE_rotate) && defined (HAVE_rotatert)' at
+     simplify-rtx.cc:4773, a preprocessor line in a file the whole compiler
+     shares, and it ended "This combination of targets needs that use site
+     made runtime before it can be built."
+
+     That use site is now `mt_have_rotate () && mt_have_rotatert ()', answered
+     by the selected back end's own table (target-insn.h).  Disagreement is
+     therefore representable, which is exactly the condition the check was
+     waiting for.  Deleting it while the `#if' still stood would have been the
+     "make the measurement stop objecting" move PRINCIPLES 2a forbids; the
+     guard below is what keeps that honest.  */
   for (int i = 0; i < CB_LAST; i++)
     if (bool_yes[i] != 0 && bool_yes[i] != nbases)
-      fatal ("%s: %d of %d back ends define %s.\n"
-	     "  It is used from a #if line in a file the whole compiler\n"
-	     "  shares (simplify-rtx.cc), so there is no per-back-end answer\n"
-	     "  and no safe default: defining it enables a canonicalisation\n"
-	     "  the back ends without the pattern cannot express, and not\n"
-	     "  defining it silently disables it for the ones that can.\n"
-	     "  This combination of targets needs that use site made runtime\n"
-	     "  before it can be built.",
-	     union_file, bool_yes[i], nbases, config_bool_name[i]);
+      {
+	/* Not fatal any more, but not silent either: a divergence here is
+	   the thing target-insn.h exists to carry, and if that table ever
+	   stops being consulted this line is the only remaining trace that
+	   the back ends disagreed at all.  */
+	fprintf (stderr,
+		 "%s: %d of %d back ends define %s;"
+		 " carried at run time by target-insn.h\n",
+		 union_file, bool_yes[i], nbases, config_bool_name[i]);
+      }
 
   /* Unused today; kept so the signature says what is checked.  */
   (void) boolv;
@@ -597,11 +612,23 @@ main (int argc, const char **argv)
   else
     printf ("#define HAVE_lo_sum 0\n");
 
+  /* `0' AND NOT SILENCE, as for HAVE_lo_sum above.  These used to be emitted
+     only when the pattern was present, because the one shared consumer asked
+     `#if defined (HAVE_rotate)'.  That consumer is now a runtime read
+     (target-insn.h), and a macro that is sometimes absent cannot be read as a
+     value: `HAVE_rotate != 0' in the per-base supply file has to compile for a
+     back end that has no rotate pattern too.  Emitting the 0 is what makes the
+     absence an ANSWER rather than a silence -- which is the same distinction
+     the rest of this branch keeps turning on.  */
   if (have_rotate_flag)
     printf ("#define HAVE_rotate 1\n");
+  else
+    printf ("#define HAVE_rotate 0\n");
 
   if (have_rotatert_flag)
     printf ("#define HAVE_rotatert 1\n");
+  else
+    printf ("#define HAVE_rotatert 0\n");
 
   if (have_peephole_flag)
     printf ("#define HAVE_peephole 1\n");

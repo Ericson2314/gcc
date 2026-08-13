@@ -4239,7 +4239,7 @@ process_address_1 (int nop, bool check_only_p,
 	  rtx addr = *ad.inner;
 
 	  new_reg = lra_create_new_reg (Pmode, NULL_RTX, cl, NULL, "addr");
-	  if (HAVE_lo_sum)
+	  if (mt_have_lo_sum ())
 	    {
 	      /* addr => lo_sum (new_base, addr), case (2) above.  */
 	      insn = emit_insn (gen_rtx_SET

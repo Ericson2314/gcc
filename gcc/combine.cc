@@ -4915,8 +4915,8 @@ find_split_point (rtx *loc, rtx_insn *insn, bool set_src)
     case MEM:
       /* If we have (mem (const ..)) or (mem (symbol_ref ...)), split it
 	 using LO_SUM and HIGH.  */
-      if (HAVE_lo_sum && (GET_CODE (XEXP (x, 0)) == CONST
-			  || GET_CODE (XEXP (x, 0)) == SYMBOL_REF))
+      if (mt_have_lo_sum () && (GET_CODE (XEXP (x, 0)) == CONST
+				|| GET_CODE (XEXP (x, 0)) == SYMBOL_REF))
 	{
 	  machine_mode address_mode = get_address_mode (x);
 
@@ -6098,7 +6098,7 @@ combine_simplify_rtx (rtx x, machine_mode op0_mode, bool in_dest, bool in_cond)
       /* Convert (lo_sum (high FOO) FOO) to FOO.  This is necessary so we
 	 can add in an offset.  find_split_point will split this address up
 	 again if it doesn't match.  */
-      if (HAVE_lo_sum && GET_CODE (XEXP (x, 0)) == HIGH
+      if (mt_have_lo_sum () && GET_CODE (XEXP (x, 0)) == HIGH
 	  && rtx_equal_p (XEXP (XEXP (x, 0), 0), XEXP (x, 1)))
 	return XEXP (x, 1);
       break;

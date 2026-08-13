@@ -4770,15 +4770,21 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
 	return op0;
       /* Canonicalize rotates by constant amount.  If the condition of
 	 reversing direction is met, then reverse the direction. */
-#if defined(HAVE_rotate) && defined(HAVE_rotatert)
-      if (reverse_rotate_by_imm_p (mode, (code == ROTATE), trueop1))
+      /* Was `#if defined (HAVE_rotate) && defined (HAVE_rotatert)'.  This file
+	 is shared by the whole compiler and is compiled against ONE base, so
+	 that preprocessor line asked whether THAT base has both patterns and
+	 applied the answer to every target.  genconfig knew: it carried a
+	 unanimity check that refused to build a combination of back ends that
+	 disagreed, and said the use site had to be made runtime first.  This
+	 is that.  See target-insn.h.  */
+      if (mt_have_rotate () && mt_have_rotatert ()
+	  && reverse_rotate_by_imm_p (mode, (code == ROTATE), trueop1))
 	{
 	  int new_amount = GET_MODE_UNIT_PRECISION (mode) - INTVAL (trueop1);
 	  rtx new_amount_rtx = gen_int_shift_amount (mode, new_amount);
 	  return simplify_gen_binary (code == ROTATE ? ROTATERT : ROTATE,
 				      mode, op0, new_amount_rtx);
 	}
-#endif
       /* ROTATE/ROTATERT:HI (X:HI, 8) is BSWAP:HI (X).  Other combinations
 	 such as SImode with a count of 16 do not correspond to RTL BSWAP
 	 semantics.  */

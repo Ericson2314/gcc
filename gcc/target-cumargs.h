@@ -61,6 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "mt-cumulative-args.h"
 #include "target-frame.h"
+#include "target-insn.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -141,6 +142,12 @@ struct target_cumargs_desc
      Never null: the per-base translation unit that defines this table defines
      that one immediately above it.  */
   const struct target_frame_desc *frame;
+
+  /* THIS BASE'S INSN-PATTERN EXISTENCE ANSWERS; see target-insn.h.  Rides
+     here for the same reason `frame' does, and is never null for the same
+     reason: the per-base translation unit that defines this table defines
+     that one too.  */
+  const struct target_insn_desc *insn;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

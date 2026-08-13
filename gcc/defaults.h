@@ -2095,6 +2095,18 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    becoming per-target is a fix rather than a cost.  */
 #include "target-frame.h"
 
+/* The three `HAVE_<pattern>' booleans, for the same set of translation units
+   and by the same route.  Unlike the six below there is no `#undef'/`#define'
+   pair for these: their use sites in combine.cc, lra-constraints.cc and
+   simplify-rtx.cc were rewritten to call `mt_have_*' directly.  A redirect
+   would have been wrong here in a way it is not wrong there -- `HAVE_lo_sum'
+   is defined by `insn-config.h', which shared code includes at unpredictable
+   points relative to this header, so a `#define' here would win in some
+   translation units and lose in others with nothing to say which.  Four call
+   sites spelled out is cheaper than a macro whose value depends on include
+   order.  */
+#include "target-insn.h"
+
 #undef STACK_BOUNDARY
 #define STACK_BOUNDARY (mt_stack_boundary ())
 #undef PREFERRED_STACK_BOUNDARY
