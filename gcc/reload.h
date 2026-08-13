@@ -174,9 +174,16 @@ struct target_reload {
      enough to save the entire contents of the register.  When saving the
      register because it is live we first try to save in multi-register modes.
      If that is not possible the save is done one register at a time.  */
+  /* BOTH bounds are union widths; neither may be spelled with the plain
+     macros.  See `struct target_rtl' in rtl.h for the row count, and
+     multi-target-reg-probe.cc for the column count -- `MAX_MOVE_MAX' and
+     `MIN_UNITS_PER_WORD' are the two names defaults.h deliberately leaves
+     unredirected (they are array bounds and must stay constant expressions),
+     so shared code gets the primary's 17 columns and aarch64's own objects
+     computed 3.  */
   machine_mode (x_regno_save_mode
-		     [FIRST_PSEUDO_REGISTER]
-		     [MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1]);
+		     [MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER]
+		     [MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS]);
 
   /* Nonzero if an address (plus (reg frame_pointer) (reg ...)) is valid
      in the given mode.  */
@@ -187,8 +194,8 @@ struct target_reload {
      address is valid.  We record the INSN_CODE is those insns here since
      when we emit them, the addresses might not be valid, so they might not
      be recognized.  */
-  int x_cached_reg_save_code[FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
-  int x_cached_reg_restore_code[FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
+  int x_cached_reg_save_code[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
+  int x_cached_reg_restore_code[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
 };
 
 extern struct target_reload default_target_reload;

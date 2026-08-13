@@ -167,9 +167,9 @@ struct target_regs_desc
   const char *const *d_reg_names;
   const char *const *d_reg_class_names;
 
-  /* THE LAYOUT WITNESS.  `sizeof' of the four structures that generic code
+  /* THE LAYOUT WITNESS.  `sizeof' of the structures that generic code
      allocates and every back end reads, as computed IN THIS BACK END'S OWN
-     translation unit.  `init_reg_sets' compares them against the same four
+     translation unit.  `init_reg_sets' compares them against the same
      `sizeof's taken in a middle-end translation unit and names the one that
      disagrees.
 
@@ -180,12 +180,29 @@ struct target_regs_desc
      simply gives the back end a struct that is smaller than the one generic
      code XCNEWs.  Every read past the short field is then in someone else's
      memory, with no diagnostic anywhere -- which is the shape this branch has
-     been finding for a year.  Four numbers turn "did I miss one" from
-     vigilance into a measurement.  */
+     been finding for a year.  These numbers turn "did I miss one" from
+     vigilance into a measurement.
+
+     FOUR WAS NOT ENOUGH, AND THE THREE ADDED HERE ARE WHY THE LIST IS NOW
+     DERIVED FROM target-globals.cc RATHER THAN FROM THE HEADERS SOMEONE
+     REMEMBERED TO CHECK.  `target_rtl' (rtl.h), `target_builtins'
+     (builtins.h) and `target_reload' (reload.h) are allocated by exactly the
+     same XCNEW in target-globals.cc and were each still spelling
+     FIRST_PSEUDO_REGISTER.  `target_rtl' is not hypothetical: with i386 +
+     aarch64 + rs6000 configured, `mt-i386/i386.o' addressed
+     `x_mode_mem_attrs' 432 bytes below where `emit-rtl.o' put it, and cc1
+     segfaulted in `sched2' compiling a two-line x86_64 input.  With only
+     i386 + aarch64 the same skew is 48 bytes, which still lands inside the
+     struct, so the pair read the wrong member and said nothing.  A new
+     `target_*' struct with a register- or class-indexed field must be added
+     to this list AND to `MT_CHECK_LAYOUT' in reginfo.cc.  */
   unsigned long sizeof_target_hard_regs;
   unsigned long sizeof_target_regs;
   unsigned long sizeof_target_ira;
   unsigned long sizeof_target_ira_int;
+  unsigned long sizeof_target_rtl;
+  unsigned long sizeof_target_builtins;
+  unsigned long sizeof_target_reload;
 
   /* REGNO_REG_CLASS, FENCED.  Generic code walks 0..FIRST_PSEUDO_REGISTER,
      which is the UNION width, so it will ask about register numbers this back

@@ -11695,3 +11695,89 @@ expression, and i386 and aarch64 both declare it.
      47-back-end build and a 48-back-end one, and which currently prevents any
      48-way measurement at all.
   3. `arm.h:1378` -- arm's own conversion gap, for the per-back-end track.
+
+---
+
+# 8b RESOLVED: THE THIRD BACK END DID NOT BREAK THE ATTRIBUTE MACHINERY
+
+Worktree `agent-a193ef6f24ad07f18`, commit `e0428ceec79`.  Build dirs
+`/tmp/b-a193ef6f24ad07f18` (i386+aarch64+rs6000) and `-pair`, both COLD from
+this worktree, both `config.log`-asserted.  Anchor in this tree: 45.
+
+## 0. THE BRIEF'S PREMISE DID NOT SURVIVE
+
+The brief and STATE.md 8b read the crash as the insn-attribute length
+machinery, because it moves between `sched2` and `shorten` and both consume
+lengths.  **It is neither.**  Both passes reach
+`ix86_attr_length_address_default`, and so does the PAIR -- measured with one
+gdb breakpoint on `ix86_min_insn_size`, same stack, in the build that does not
+crash.  The attribute path is the first consumer of a corrupted struct
+layout, not the cause.  The insn-code union is also innocent:
+`insn-codes-i386.h` is BYTE-IDENTICAL pair vs triple and `NUM_INSN_CODES` is
+20512 in both.
+
+## 1. WHAT IT ACTUALLY IS
+
+`struct target_rtl` (rtl.h) sized two members with a bare
+`FIRST_PSEUDO_REGISTER`.  Back-end TUs are exempt from the defaults.h union
+override BY DESIGN, so `mt-i386/i386.o` used 92 and shared TUs used the union.
+Measured by `objdump -dr` on the address of `x_mode_mem_attrs`:
+
+| config | `emit-rtl.o` | `mt-i386/i386.o` | `mt-aarch64/aarch64.o` |
+|---|---|---|---|
+| i386+aarch64+rs6000 | 0xfe0 | **0xe30** | -- |
+| i386+aarch64        | 0xdf8 | **0xdc8** | 0xdf8 |
+
+432 = 2*(119-92) pointers; 48 = 2*(95-92).  **aarch64 was right by luck of
+agreement** -- its own 95 was the pair's union -- so only i386 was ever wrong,
+and the pair's 6-slot skew lands inside a live array and returns another
+mode's `mem_attrs` silently.  `target_builtins` and `target_reload` had the
+same defect.  All three fixed by naming `MULTI_TARGET_UNION_*`.
+
+**Why `big.c` misses it**: it never takes the null-`MEM_ATTRS` path, so it
+never indexes `mode_mem_attrs`.  12369 / `378fc33c1e70` before and after.
+
+## 2. THE LAYOUT WITNESS WAS FOUR STRUCTS AND IS NOW SEVEN
+
+`init_reg_sets` already compared `sizeof` computed in a back end's own TU
+against the middle end's, for four structs.  The three above are added.
+**Injection arm, run rather than described**: reverting rtl.h's bound turns
+the `sched2` SIGSEGV into `back end 'i386' computes 'sizeof (struct
+target_rtl)' as 5968, but target-independent code allocates 6184`.
+
+**It then fired unprompted on a SECOND divergence**: aarch64's
+`target_reload` was 250168 against 256832 -- 6664 = 119 rows * 4 * **14
+columns**.  The column count `MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1` is the
+one pair defaults.h deliberately leaves unredirected (array bounds must stay
+constant expressions): i386 64/4 -> 17, aarch64 16/8 -> 3.
+`gen-reg-widths.sh` grows a fifth width,
+`MULTI_TARGET_UNION_REGNO_SAVE_MODE_COLS` (= 17 here), consumed by
+`reload.h`, `caller-save.cc` and the `mt_move_max` guard, with a per-base
+`static_assert` in `target-regs.cc`.
+
+## 3. BARS
+
+  * both dirs cold: `make all-gcc` rc=0, `grep -c 'error:'` **0**.
+  * repro `/tmp/rs6k-y.c`: compiles; **output inspected, not just exit code**.
+    x86_64 saves r12/rbp/rbx, args edi/esi swapped for the second call, CFI
+    consistent.  aarch64 through the TRIPLE: x29/x30, w0/w1, x19/x20/x21,
+    DWARF regnums 29/30.  Triple and pair byte-identical.
+  * x86_64 `-O2` `scratchpad/big.c` (md5 `e4558c736e241860bc610c56e66f9c43`):
+    **12369 / `378fc33c1e70`** in BOTH dirs.
+  * `stock-compare.sh` vs `/tmp/b-stock`, absolute IN: **5/5 IDENTICAL**, 5
+    distinct md5s per side, negative control firing (1158 vs 804), for the
+    pair **and for the triple** -- 8b recorded the triple as 0/5 and
+    unscorable.
+  * No probe-scoreboard figure quoted; `macro-probe-run.sh` not run.
+
+## 4. WHAT IS NOT DONE
+
+  * The two silent skews were **structurally** wrong but produced identical
+    assembly on every input measured here (old pair vs fixed pair on the
+    repro: identical; old triple vs fixed triple on aarch64: identical).  A
+    caller-save-heavy input under register pressure is the case that would
+    have made `target_reload` observable and was not constructed.
+  * `gen_blockage` (8a) untouched; rs6000 supplies a THIRD `UNSPECV`
+    numbering.
+  * The remaining 15 `target_*` structs in target-globals.h were not swept
+    beyond the register/class-indexed grep that found these three.

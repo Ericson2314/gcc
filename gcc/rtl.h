@@ -4007,15 +4007,32 @@ struct GTY(()) target_rtl {
   /* Commonly used RTL for hard registers.  These objects are not
      necessarily unique, so we allocate them separately from global_rtl.
      They are initialized once per compilation unit, then copied into
-     regno_reg_rtx at the beginning of each function.  */
-  rtx x_initial_regno_reg_rtx[FIRST_PSEUDO_REGISTER];
+     regno_reg_rtx at the beginning of each function.
+
+     MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER, not FIRST_PSEUDO_REGISTER, for
+     the reason hard-reg-set.h gives at length: this struct is allocated by
+     target-independent code, which sees the union width, while a back end's
+     OWN translation unit is exempt from the defaults.h override and sees its
+     own.  Both halves compile either way, so the unqualified name does not
+     shift the ARRAY -- it shifts every FIELD AFTER IT, differently in the two
+     kinds of translation unit.  Measured, on i386 + aarch64 + rs6000:
+     `emit-rtl.o' addressed `x_mode_mem_attrs' at 0xfe0 and `mt-i386/i386.o'
+     addressed it at 0xe30, a 432-byte disagreement about the same global,
+     which is 2 * (119 - 92) pointers -- rs6000's FIRST_PSEUDO_REGISTER
+     against i386's.  `ix86_attr_length_address_default' then read
+     `mode_mem_attrs[mode]' out of the wrong member, got NULL, and segfaulted
+     in `sched2'.  On i386 + aarch64 alone the skew is only 2 * (95 - 92)
+     pointers, which lands inside a live neighbouring array, so the pair
+     returned SOMEBODY ELSE'S mem_attrs and did not crash: the two-back-end
+     build was already wrong and merely quiet about it.  */
+  rtx x_initial_regno_reg_rtx[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* A sample (mem:M stack_pointer_rtx) rtx for each mode M.  */
   rtx x_top_of_stack[MAX_MACHINE_MODE];
 
   /* Static hunks of RTL used by the aliasing code; these are treated
      as persistent to avoid unnecessary RTL allocations.  */
-  rtx x_static_reg_base_value[FIRST_PSEUDO_REGISTER];
+  rtx x_static_reg_base_value[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
   /* The default memory attributes for each mode.  */
   class mem_attrs *x_mode_mem_attrs[(int) MAX_MACHINE_MODE];
@@ -4715,7 +4732,11 @@ extern void _fatal_insn (const char *, const_rtx, const char *, int, const char 
 	_fatal_insn_not_found (insn, __FILE__, __LINE__, __FUNCTION__)
 
 /* reginfo.cc */
-extern tree GTY(()) global_regs_decl[FIRST_PSEUDO_REGISTER];
+/* Defined in the shared reginfo.cc and read from config/rs6000/rs6000-logue.cc,
+   so the two ends are a middle-end and a back-end translation unit; the bound
+   must be the union one or the declaration and the definition disagree with
+   no diagnostic.  See `struct target_rtl' above.  */
+extern tree GTY(()) global_regs_decl[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER];
 
 /* Information about the function that is propagated by the RTL backend.
    Available only for functions that has been already assembled.  */
