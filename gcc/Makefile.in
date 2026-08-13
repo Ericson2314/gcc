@@ -3716,9 +3716,18 @@ check_options_union_base = \
     echo "  targetm_common_<base>_common" >&2; \
     exit 1; }
 
+# $(MULTI_TARGET_GEN_HDRS) is the union, over every configured back end, of the
+# build-directory headers its config/<cpu>/t-<cpu>-headers fragment generates.
+# It is here and not only on <cpu>-inc/s-inc because the SHARED options.h
+# includes every back end's <cpu>-opts.h, and some of those open with an
+# #include of one of these -- config/arm/arm-opts.h needs arm-isa.h.  Without
+# it, every translation unit that reaches options.h fails, generator objects
+# included, while the rule for the missing header sits in multi-target-md.mk
+# unused.  Empty in a single-target build, and empty for the back ends that
+# generate nothing, so this adds no prerequisite where there is none.
 options.h: s-options-h ; @true
 s-options-h: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk \
-    $(srcdir)/opth-gen.awk $(MT_OPTIONS_UNION_LIST)
+    $(srcdir)/opth-gen.awk $(MT_OPTIONS_UNION_LIST) $(MULTI_TARGET_GEN_HDRS)
 	@$(check_options_union_base)
 	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \
 	       $(OPTIONS_UNION_FLAGS) \

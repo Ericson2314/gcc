@@ -822,6 +822,35 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     # scan_hdr_frag.  They are prerequisites of the stamp rather than of each
     # object because they are needed by the same sources for the same reason
     # the forwarders are, and one stamp is what the object rules depend on.
+    # THE SAME HEADERS, ALSO NEEDED BEFORE THE SHARED options.h EXISTS.
+    #
+    # <cpu>-inc/s-inc is the right place for the objects that are compiled per
+    # back end, but it is far too late for the UNION options.h: that header
+    # #includes every back end's <cpu>-opts.h through the `I' records, and
+    # config/arm/arm-opts.h opens with `#include "arm-isa.h"' -- a header
+    # generated into the build root by config/arm/t-arm-headers.  So every
+    # translation unit that reaches options.h, INCLUDING the generator
+    # objects (gencheck.cc gets there via tm.h), needs arm-isa.h to exist,
+    # and none of them has any reason to depend on arm-inc/s-inc.
+    #
+    # Measured with 47 back ends configured: build/gencheck.o failed with
+    # `arm-isa.h: No such file or directory' while the RULE for arm-isa.h was
+    # present in multi-target-md.mk the whole time.  Absence of an artefact is
+    # not absence of a rule -- a rule nothing depends on is never run -- which
+    # is the same confusion scan_hdr_frag was written to fix, met again one
+    # level up.
+    #
+    # This accumulates across back ends and is attached to s-options-h in
+    # Makefile.in.  It is deliberately the SAME hdrgen[] list rather than a
+    # second one kept here, so the two cannot drift.
+    # EMITTED BEFORE THE s-inc RULE, not after it.  A variable assignment
+    # between a target line and its recipe is not a stray line make ignores:
+    # it ENDS the rule, and the tab-indented recipe that follows then belongs
+    # to no target at all --
+    #     multi-target-md.mk:484: *** recipe commences before first target.
+    # which names the assignment's line number and says nothing about s-inc.
+    if (hdrgen[cpu] != "")
+      printf "MULTI_TARGET_GEN_HDRS +=%s\n", hdrgen[cpu];
     printf "%s-inc/s-inc: $(MULTI_TARGET_INC_HDRS_%s)%s Makefile\n",
 	   cpu, cpu, hdrgen[cpu];
     printf "\t$(mkinstalldirs) %s-inc\n", cpu;

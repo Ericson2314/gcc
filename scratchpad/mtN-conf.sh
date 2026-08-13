@@ -23,13 +23,21 @@
 # SRC is derived from $0 (this script's own tree) and the MULTI_TARGET anchor
 # is asserted, per PRINCIPLES section 4.
 #
-# usage: mtN-conf.sh <builddir> <comma-separated-triples>
+# usage: mtN-conf.sh <builddir> <comma-separated-triples | file-of-triples>
 set -e
 S=$(cd "$(dirname "$0")" && pwd)
 SRC=$(cd "$S/.." && pwd)
 D=${1:?build dir}
-LIST=${2:?comma-separated triple list}
-WANT=${WANT_ANCHOR:-43}
+LIST=${2:?comma-separated triple list, or a file with one triple per line}
+if [ -f "$LIST" ]; then
+  LIST=$(grep -v '^#' "$LIST" | grep . | tr '\n' ',' | sed 's/,$//')
+fi
+[ -n "$LIST" ] || { echo "FATAL: empty triple list"; exit 9; }
+# 45, not the 43 this branch recorded: the MULTI_TARGET_GEN_HDRS dependency
+# added to the s-options-h rule and its comment add two hits.  An EXACT value
+# is asserted, not a `>=', so that a tree missing the change fails here rather
+# than building and reporting a green for a compiler that is not this one.
+WANT=${WANT_ANCHOR:-45}
 
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 [ "$n" = "$WANT" ] || { echo "FATAL: $SRC anchor=$n, expected exactly $WANT"; exit 9; }
