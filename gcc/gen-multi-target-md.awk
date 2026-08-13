@@ -505,9 +505,27 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     # of them can become a runtime value and all of them must agree across
     # back ends.  See the long note at the top of genconfig.cc, and
     # emit_config_union below for how insn-config-union.list is built.
+    #
+    # gencodes takes the same treatment for ONE of the things it writes.  Its
+    # CODE_FOR_ enumerators are per back end and must stay so -- two back ends
+    # spell the same name for two different patterns -- but NUM_INSN_CODES is
+    # an array bound inside `struct target_recog' (recog.h:578) and in
+    # lra.cc:631, both indexed by INSN_CODE (insn) in SHARED code.  Measured
+    # in a two-target build dir: 15429 for i386 (and so for the shared header)
+    # against 20512 for aarch64, so recog.cc indexed a .bss object sized for
+    # 15429 with aarch64 codes running to 20511.  See gencodes.cc's note.
+    #
+    # Note the per-base insn-codes-<cpu>.h gets the union bound too, not just
+    # the shared one.  A per-base header keeping its own count would put two
+    # different sizes of `struct target_recog' in one link, which is the
+    # layout-disagreement bug this branch has already paid for once.
     ufl = (parts[i] == "config") \
 	  ? sprintf(" -Uinsn-config-union.list -A%s", cpu) : "";
     udep = (parts[i] == "config") ? " insn-config-union.list" : "";
+    if (parts[i] == "codes") {
+      ufl = sprintf(" -Uinsn-codes-union.list -A%s", cpu);
+      udep = " insn-codes-union.list";
+    }
 
     printf "insn-%s-%s.h: build/gen%s-%s$(build_exeext) $(srcdir)/common.md \\\n",
 	   parts[i], cpu, parts[i], cpu;
@@ -539,6 +557,37 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
 	 cpu;
   config_parts = config_parts " insn-config-" cpu ".part";
   config_bases = config_bases " " cpu;
+
+  # And the same for gencodes' one unioned value.  Written out rather than
+  # folded into a loop with the genconfig case above: the two generators take
+  # different .md inputs in principle and sharing the emitter here would be a
+  # second authority for the argument list.
+  printf "insn-codes-%s.part: build/gencodes-%s$(build_exeext) $(srcdir)/common.md \\\n",
+	 cpu, cpu;
+  printf "  $(srcdir)/config/%s insn-conditions-%s.md\n", md, cpu;
+  printf "\t$(RUN_GEN) build/gencodes-%s$(build_exeext) -l -A%s \\\n", cpu, cpu;
+  printf "\t  $(srcdir)/common.md $(srcdir)/config/%s insn-conditions-%s.md \\\n",
+	 md, cpu;
+  printf "\t  > tmp-codes-%s.part\n", cpu;
+  printf "\t@grep -q '^base %s$$' tmp-codes-%s.part || { \\\n", cpu, cpu;
+  printf "\t  echo 'insn-codes-%s.part: no \"base %s\" line;' >&2; \\\n", cpu, cpu;
+  printf "\t  echo '  the union would then be taken over the OTHER back ends' >&2; \\\n";
+  printf "\t  echo '  and this one would be sized for somebody else.' >&2; \\\n";
+  printf "\t  exit 1; }\n";
+  # ASSERT ON THE CONTENT, BY NAME.  A part file with a `base' line and no
+  # NUM_INSN_CODES line parses, contributes a base, and makes genconfig-style
+  # `seen_max != nbases' the only thing standing between here and a bound of
+  # zero.  Check the key is present rather than trusting the exit status: a
+  # generator that runs, exits 0 and writes nothing useful is this branch's
+  # most expensive recurring failure.
+  printf "\t@grep -q '^NUM_INSN_CODES [0-9]' tmp-codes-%s.part || { \\\n", cpu;
+  printf "\t  echo 'insn-codes-%s.part: no NUM_INSN_CODES line;' >&2; \\\n", cpu;
+  printf "\t  echo '  gencodes -l ran and produced no bound to union.' >&2; \\\n";
+  printf "\t  exit 1; }\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-codes-%s.part $@\n\n",
+	 cpu;
+  codes_parts = codes_parts " insn-codes-" cpu ".part";
+  codes_bases = codes_bases " " cpu;
 
   # genautomata is the one generator that needs a library the others do not.
   printf "build/genautomata-%s$(build_exeext): BUILD_LIBS += -lm\n\n", cpu;
@@ -1361,6 +1410,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_options_registry();
 		    emit_source_specs();
 		    emit_modes_union(); emit_config_union();
+		    emit_codes_union();
 		    emit_opinit_union();
 		    emit_inc_dirs() }
 
@@ -1404,6 +1454,45 @@ function emit_config_union(   nb, tmp_bases) {
   printf "\t  echo '  insn-config.h silently undersized.'; \\\n";
   printf "\t  exit 1; } >&2\n";
   printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-insn-config-union.list $@\n\n";
+}
+
+# THE SHARED `NUM_INSN_CODES' ANSWER.  Same shape as emit_config_union above.
+# NUM_INSN_CODES sizes `x_bool_attr_masks[]' and `x_op_alt[]' inside
+# `struct target_recog' (recog.h:578) and `insn_code_data[]' (lra.cc:631),
+# and shared code indexes all three with `INSN_CODE (insn)' -- i.e. with the
+# SELECTED back end's numbering, not the primary's.  Measured in a two-target
+# build dir before this: 15429 for i386, which is what the shared header said,
+# against 20512 for aarch64.  `default_target_recog' is 0x788a8 bytes of .bss
+# sized from 15429 and recog.cc:2707 writes into it at aarch64 codes up to
+# 20511.  No link error, no warning.
+#
+# Only the BOUND is unioned; the CODE_FOR_ enumerators stay per back end,
+# because a union of them is not a thing that exists -- two back ends give the
+# same name to different patterns.  Shared code spells no enumerator but
+# CODE_FOR_nothing, which is 0 everywhere.  See gencodes.cc.
+#
+# Check it is wired up against the GENERATED fragment, never against this file:
+#
+#	grep -c ' -Uinsn-codes-union.list ' multi-target-md.mk
+function emit_codes_union(   nb, tmp_bases) {
+  nb = split(codes_bases, tmp_bases, " ");
+  if (nb == 0) {
+    print "gen-multi-target-md.awk: no back ends for insn-codes-union.list" \
+	  > "/dev/stderr";
+    exit 1;
+  }
+
+  printf "# The shared NUM_INSN_CODES answer; see emit_codes_union in\n";
+  printf "# $(srcdir)/gen-multi-target-md.awk.\n";
+  printf "insn-codes-union.list:%s\n", codes_parts;
+  printf "\tcat%s > tmp-insn-codes-union.list\n", codes_parts;
+  printf "\t@test `grep -c '^base ' tmp-insn-codes-union.list` -eq %d || { \\\n", nb;
+  printf "\t  echo 'insn-codes-union.list: expected %d base lines, got' \\\n", nb;
+  printf "\t       `grep -c '^base ' tmp-insn-codes-union.list`; \\\n";
+  printf "\t  echo '  a short list makes the union too small and every'; \\\n";
+  printf "\t  echo '  insn-codes.h silently undersized.'; \\\n";
+  printf "\t  exit 1; } >&2\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-insn-codes-union.list $@\n\n";
 }
 
 # THE SHARED `NUM_OPTAB_PATTERNS' ANSWER.  Same shape as emit_config_union

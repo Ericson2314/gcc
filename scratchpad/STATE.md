@@ -6049,3 +6049,382 @@ unchanged.
     t128-sc.sh       stock-compare, ABSOLUTE big.c, tagged outdir
     t128-guards.sh   62 arms; ARM 0 generated-content-by-name and runs first,
                      ARM 3 the selection, ARM 4 the data, ARM 5 the injection
+
+# TASK #129 -- THE GENERATED-FAMILY SWEEP.  THREE OF SEVEN FAMILIES ARE
+# UNSELECTED, AND THE BOUND-VS-INDEX CHECK FOUND `NUM_INSN_CODES' 15429 vs
+# 20512
+
+Worktree came up at bare-repo HEAD `7208eca60d0` AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in` was **0**, `git reset --hard multi-target` took
+it to **37**, and there was no `scratchpad/` in the worktree at all.  That is
+now EIGHT worktrees in a row.  Build dir `/tmp/b129`, my own, cold.
+
+**The brief named no task numbers I could read and did not need to; everything
+below is measured in `/tmp/b129`.**
+
+## 0. JOB 1 -- THE WALL, VERIFIED IN MY OWN RUNNING cc1, NOT INHERITED
+
+`int g (int a) { return a + 1; }` for aarch64 **produces no assembly at all**
+-- stated that way deliberately, because a wall that "moves" has once meant a
+loud failure becoming silent wrong code:
+
+    error: insn does not satisfy its constraints:
+    (insn/f 18 4 27 (set (reg/f:DI 31 sp)
+            (plus:DI (reg/f:DI 31 sp) (const_int -16))) 157 {*adddi3_aarch64}
+    during RTL pass: final
+    internal compiler error: in final_scan_insn_1, at final.cc:2789
+
+`reg 31 sp` is **aarch64's real stack pointer**, and no `.s` file is written.
+So this is still the loud failure #128 left, not a quiet one.  x86_64 is the
+non-vacuity control on the same input and compiles (397 bytes,
+`f776a3b16e36`).
+
+#128's diagnosis is CONFIRMED and made sharper.  `scratchpad/t129-syms.sh`
+(non-vacuity floor on nm's own output first -- 152045 defined symbols -- and
+the pattern fixed to allow the `(' of a C++ signature; see section 7):
+
+    get_attr_enabled   insn-attrtab.o[bare]
+                       insn-attrtab-i386.o[insn_i386::get_attr_enabled]
+                       insn-attrtab-aarch64.o[insn_aarch64::get_attr_enabled]
+
+    ... and `recog.o' binds the BARE one, i.e. i386's.
+
+## 1. JOB 2 -- EVERY GENERATED FAMILY IN `OBJS', WITH A VERDICT, INCLUDING
+##          THE ONES I DID NOT FIX
+
+Seven generated per-back-end families are still carried un-namespaced in
+`$(OBJS)`.  The build dir confirms the list is exactly seven: classifying
+every `insn-*.o` into per-base and shared gives shared objects for
+**attrtab, automata, dfatab, emit, latencytab, opinit, preds** and for nothing
+else.  `insn-extract`, `insn-modes`, `insn-output`, `insn-peep`, `insn-enums`
+and `insn-recog` are already **per-base only**, with no shared object built.
+Those six are DONE -- a result, not silence.
+
+**(b) and (c) are scored as SEPARATE ARMS throughout** (`t129-family.sh`).
+
+| family | (a) per-base built | (b) selector exists | (c) anything calls it | verdict |
+|---|---|---|---|---|
+| `insn-opinit` | yes | yes -- `selected_raw_optab_handler` and three siblings in `multi-target-select.o` | **yes, 45 objects**; and **zero** objects still bind the bare names | **CLEAN** |
+| `insn-preds` | yes | yes -- the `mt_*` forwarders (#128) | **yes, 11 objects** (`recog.o`, `lra-constraints.o`, `ira*.o`, `reload*.o`, `cse.o`, `postreload.o`, `stmt.o`, `varasm.o`); **zero** bind `lookup_constraint_1` / `reg_class_for_constraint_1` | **CLEAN** (shared `insn-preds.o` still linked, deliberately opted out) |
+| `insn-attrtab` | yes | **NO SELECTOR AT ALL** | n/a | **LEAKING** |
+| `insn-automata` | yes | **NO SELECTOR AT ALL** | n/a | **LEAKING** |
+| `insn-dfatab` | yes | **NO SELECTOR AT ALL** | n/a | **LEAKING** |
+| `insn-latencytab` | yes | **NO SELECTOR AT ALL** | n/a | **LEAKING** |
+| `insn-emit` | yes | **NO SELECTOR** for the six bare names | n/a | **LEAKING**, and worse than recorded (below) |
+
+Arm (b) for the four attribute/scheduling families is a measured **0**:
+grepping `multi-target-select.cc`, `target-cumargs.cc`,
+`target-cumargs-select.cc` and `target-insn.h` for any of `get_attr_enabled`,
+`get_attr_length`, `insn_default_length`, `internal_dfa_insn_code`,
+`insn_default_latency`, `state_transition`, `num_delay_slots`, `bypass_p`,
+`maximal_insn_latency`, `dfa_start` gives **0 hits in all four files**.  There
+is nothing for arm (c) to be scored against, and that is the finding.
+
+**THE FULL LEAK SURFACE, BY NAME AND BY BINDER.**  Twenty-one entry points are
+bound by shared objects, all to the PRIMARY's copy:
+
+    get_attr_enabled             recog.o
+    get_attr_preferred_for_size  recog.o
+    get_attr_preferred_for_speed recog.o
+    insn_default_length          final.o
+    insn_min_length              final.o
+    insn_current_length          final.o
+    internal_dfa_insn_code       insn-automata.o
+    insn_default_latency         haifa-sched.o sel-sched-ir.o
+    bypass_p                     haifa-sched.o
+    insn_latency                 haifa-sched.o modulo-sched.o
+    maximal_insn_latency         sel-sched.o
+    state_transition             haifa-sched.o modulo-sched.o sel-sched.o
+    state_size                   haifa-sched.o
+    state_reset                  haifa-sched.o modulo-sched.o sched-rgn.o
+                                 sel-sched-ir.o sel-sched.o
+    dfa_start / dfa_finish       haifa-sched.o
+    state_dead_lock_p            haifa-sched.o modulo-sched.o
+    min_insn_conflict_delay      sched-rgn.o
+    print_reservation            haifa-sched.o sched-rgn.o
+    dfa_clear_single_insn_cache  haifa-sched.o
+    init_sched_attrs             cfgexpand.o run-rtl-passes.o
+
+`num_delay_slots`, `const_num_delay_slots`, `eligible_for_delay`,
+`min_issue_delay`, `insn_has_dfa_reservation_p` and `dfa_clean_insn_cache`
+score **0 binders** in this link.  Recorded as "reorg's delay-slot path is not
+linked in for these two back ends", NOT as clean.
+
+**`insn-emit` IS WORSE THAN THE RECORDED #51 NOTE.**  The six bare names are
+still the primary's, and this run found binders the note does not mention:
+
+    gen_blockage  defined in insn-emit-5.o (i386's), bound by
+      builtins.o explow.o function.o
+      AND BY  insn-emit-aarch64-6.o  AND  insn-output-aarch64.o
+
+i.e. **aarch64's own generated code calls i386's blockage expander**, because
+`gen_name_is_global_p ("blockage")` keeps that one name out of the namespace
+on both sides.  `gen_nop` (bound by `cfgrtl.o`, `except.o`, `varasm.o`,
+`targhooks.o`), `gen_speculation_barrier` (`targhooks.o`), `add_clobbers` and
+`added_clobbers_hard_reg_p` (`combine.o`, `recog.o`, `gcse.o`) and `gen_movxf`
+(`reg-stack.o`) are the same shape.
+
+**NO PROBE ARM EXISTS FOR ANY OF THIS.**  None of these are `tm.h` macros;
+they are generated functions, so `macro-status.txt` has never listed them and
+`tab-probe.sh` reads constants.  Recorded as **"cannot be checked by the
+scoreboard, because the scoreboard measures `tm.h` macros and these are
+generated symbols"** -- not as clean.
+
+## 2. WHAT LANDED -- `NUM_INSN_CODES` IS NOW THE UNION, NOT THE PRIMARY'S
+
+The brief said to check bound-vs-index explicitly.  Doing that outside the
+attribute family found this, and it is another instance of the shape:
+
+    insn-codes.h          NUM_INSN_CODES = 15429   <- the PRIMARY's
+    insn-codes-i386.h     NUM_INSN_CODES = 15429
+    insn-codes-aarch64.h  NUM_INSN_CODES = 20512
+
+`recog.h:578-579` sizes `x_bool_attr_masks[NUM_INSN_CODES][BA_LAST+1]` and
+`x_op_alt[NUM_INSN_CODES]` inside `struct target_recog`; `lra.cc:631` sizes
+`insn_code_data[NUM_INSN_CODES]`.  All three are indexed in **shared** code by
+`INSN_CODE (insn)`, i.e. by the **selected** back end's numbering.  Measured
+before the fix: `default_target_recog` was **0x788a8 = 493,224 bytes** of .bss
+sized from 15429, and `recog.cc:2707` writes into it at aarch64 codes running
+to **20511** -- a 163KB overrun of a shared object, with no link error and no
+warning.  `insn_data_tab` corroborates the two counts independently: i386
+617,160 bytes = 15429 x 40 exactly, aarch64 820,992.
+
+This is the fix `insn-config.h` and `insn-opinit.h` already have, so it reuses
+their mechanism rather than inventing a second one:
+
+  * **`gencodes.cc`** gains `-l` / `-U<file>` / `-A<base>`, a near-copy of
+    `genconfig.cc`'s `apply_union_list`.  Absence is never an answer: a union
+    file with no `base` line, one that does not name this base, one missing
+    the key, or one whose maximum is BELOW what this base needs are four
+    separate fatal errors, each naming what is wrong.
+  * **`gen-multi-target-md.awk`** emits an `insn-codes-<cpu>.part` rule per
+    back end and `emit_codes_union` for the concatenation, with the same
+    short-list assertion the config union carries **plus** an assertion that
+    the part file contains a `NUM_INSN_CODES` line by name -- a part file with
+    a `base` line and no key parses, is non-empty, and contributes a base.
+  * **`Makefile.in`** takes `insn-codes.h` out of `simple_rtl_generated_h`,
+    gives it an `s-codes` rule with `CODES_UNION_FLAGS`, and -- the trap
+    `insn-config.h` already paid for -- names it explicitly in
+    `$(generated_files)`, which is the order-only barrier every host object
+    waits behind.
+
+**ONLY THE BOUND IS UNIONED.**  The `CODE_FOR_<pattern>` enumerators stay per
+back end, and a union of them is not a thing that exists: two back ends spell
+one name for two patterns.  Swept to check that is safe -- over all of `gcc/`
+excluding `config/`, `testsuite/` and the `gen*` programs, the only enumerator
+shared code spells is `CODE_FOR_nothing`, which is 0 everywhere.  A guard arm
+asserts the enumerator lists still DIFFER in length per base (8978 vs 13468),
+so a future merge of them fails here.
+
+**THE PER-BASE HEADERS GET THE UNION BOUND TOO, not just the shared one.**  A
+per-base header keeping its own count would put two different sizes of
+`struct target_recog` in one link -- the layout-disagreement bug this branch
+paid for once already with `struct target_preds_desc`.
+
+## 3. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**, and again rc=0
+    after deleting `insn-codes.h`, both per-base headers, the union list, both
+    `.part` files and `s-codes` and letting the new rules rebuild them from
+    nothing.
+  * **x86_64 `-O2` big.c md5 `378fc33c1e70`, 12369 bytes -- unmoved**,
+    measured BEFORE and AFTER **in this same build dir**.
+  * **aarch64 `int x = 1;` rc=0, 373 bytes, empty stderr, md5
+    `b01d9157fdc1`** -- byte-identical before and after.
+  * **The three `t129-fn.sh` x86_64 outputs byte-identical** before and after:
+    `f776a3b16e36`, `b9716cd03194`, `e2879feb51f6`.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, **5
+    distinct md5 per side**, **negative control firing** (1158 vs 804), rc=0,
+    run after the edit and again after the regeneration round trip.  O0
+    `1c00922491f8`, O1 `4fabab94b41b`, O2 `378fc33c1e70`, O3 `d220421237bc`,
+    Os `d6787f7e281f`.  It **does** run in this build dir -- checked
+    explicitly; the log names
+    `/tmp/b129/lib/gcc/17.0.0/x86_64-pc-linux-gnu/specs-config`.
+  * **`scratchpad/t129-guards.sh`: 32 PASS / 0 FAIL.**
+  * Cold `all-gcc` before any edit: **rc=0, 776 lines / 169 `warning:`**.
+    Incremental after the edit: 513 lines / 119 `warning:`.  Near-no-op
+    incremental: **8 lines / 0 `warning:`**, all `is unchanged` -- the low end
+    of the documented 8-to-32 floor.
+
+### THE ARMS THAT MATTER
+
+  * **ARM 0 RUNS FIRST and asserts the generated content BY NAME AND BY
+    VALUE**: all three headers read 20512; the union list carries `base i386`
+    with `NUM_INSN_CODES 15429` and `base aarch64` with `NUM_INSN_CODES
+    20512`; the GENERATED `multi-target-md.mk` passes `-Uinsn-codes-union.list`
+    twice and has two `.part` rules; `gcc/Makefile` carries
+    `CODES_UNION_FLAGS`; `insn-codes.h` is out of `simple_rtl_generated_h`
+    AND named in `$(generated_files)`.
+  * **A NON-VACUITY ARM asserts the two bases DISAGREED** (15429 vs 20512).
+    Had they matched, the union would be untested by construction and every
+    other arm would pass on a change that does nothing.
+  * **ARM 1 is "what would have had to change".**  `default_target_recog`
+    493,224 -> **656,392** bytes and `insn_code_data` 123,432 -> **164,096 =
+    20512 x 8 exactly**.  The prediction (20512 x 32, plus the rest of the
+    struct) was written before the measurement and matched.
+  * **ARM 3 INJECTS EVERY FAULT THE MITIGATION NAMES and requires each refusal
+    to fire BY NAME**: missing base line (`none of them 'i386'`), missing key
+    (`given for 1 of 2 back ends`), stale values below what the base needs
+    (`the union file is stale`), and `-U` with no `-A`.  Each injection
+    asserts **the state it produced**, in both directions, before scoring --
+    and a **3a control** runs first requiring the UNMODIFIED list to be
+    accepted, so a refusal cannot be credited to the injection when it was
+    really an unrelated breakage.  A **3z restore** arm requires the reversal
+    to reverse.
+  * **ARM 4 is a RATCHET, not a pass**: it asserts the four attribute families
+    still have **zero** selector hits, so that wiring one up fails this guard
+    and has to be updated deliberately rather than landing unremarked.
+
+## 4. THE ATTRIBUTE-TABLE FAMILY IS A DESIGN FORK.  I STOPPED RATHER THAN
+##    GUESSING, AND HERE IS WHY, MEASURED
+
+The brief called Job 1 "the same shape as the predicates".  It is not, and the
+difference is a measurement rather than an opinion:
+
+    HAVE_ATTR_length              shared=1  i386=1  aarch64=1
+    HAVE_ATTR_enabled             shared=1  i386=1  aarch64=1
+    HAVE_ATTR_preferred_for_size  shared=1  i386=1  aarch64=0
+    HAVE_ATTR_preferred_for_speed shared=1  i386=1  aarch64=0
+
+**aarch64 has no `preferred_for_size` / `preferred_for_speed` attribute at
+all**, and `nm` confirms it: there is an
+`insn_i386::get_attr_preferred_for_size` and **no aarch64 definition
+anywhere**.  `recog.cc:2658` nonetheless calls it for aarch64 today, because
+the shared `insn-attr.h` publishes i386's `HAVE_ATTR_*` and
+`have_bool_attr` therefore answers yes.  Upstream's answer for a back end
+without the attribute is the preprocessor stub
+`#define get_attr_preferred_for_size hook_int_rtx_1`.
+
+So a uniform table of function pointers **cannot be filled** without first
+deciding what a base with no such attribute puts in the slot, and
+`HAVE_ATTR_*` has to stop being a `#if` before that question can even be
+asked.  That is a design decision, not a bug fix, and this branch's rules
+forbid resolving it by picking whichever makes the build succeed.
+
+**Option A -- runtime `have_bool_attr`, stub in the slot.**  Each base's
+`target_attr_desc` gets `hook_int_rtx_1` where it has no attribute, and
+`recog.cc`'s `have_bool_attr` reads a per-base boolean instead of
+`HAVE_ATTR_*`.  Cost: ~27 function-pointer fields and ~27 `mt_*` forwarders;
+one indirect call per attribute query, and `get_attr_enabled` sits in
+`get_bool_attr_mask_uncached`'s inner loop over alternatives.  Risk: the
+`HAVE_ATTR_*` macros are also spelled in `config/` (arc, arm, sh, msp430
+headers), so the `#if` form cannot simply be deleted.
+
+**Option B -- union the booleans, keep the stub decision in the generator.**
+`genattr` learns the `-U`/`-A` list like `genconfig` and emits
+`HAVE_ATTR_x 1` if ANY base has it, with each base's own table filling the
+slot with the stub when it does not.  Cheaper at the use site (no change to
+`recog.cc`), but it makes `HAVE_ATTR_*` mean "somewhere" rather than "here" --
+exactly the `HAVE_V8HFmode` failure already on this branch's books, where the
+union's answer leaked instead of the primary's.
+
+**Option C -- split the family.**  `insn-attrtab` alone (the six names
+`recog.o` and `final.o` bind) first, leaving `insn-automata` / `insn-dfatab` /
+`insn-latencytab` to a scheduling-specific task.  The scheduler entry points
+are ~15 more names and `haifa-sched.o` is their dominant consumer, so the
+split is along a real seam.  Against it: a half-converted family is exactly
+the state that reads as done.
+
+**Two further forks inside the same family, both measured:**
+
+  * `internal_dfa_insn_code` and `insn_default_latency` are function
+    **POINTERS** assigned by `init_sched_attrs ()`, not functions -- the
+    `kind mismatch` entry in the bug table.  Selecting them means selecting
+    which base's `init_sched_attrs` runs, not which function goes in a slot.
+    `cfgexpand.o` and `run-rtl-passes.o` call the bare `init_sched_attrs`.
+  * The whole DFA block only exists in `insn-attr.h` when a base has
+    `define_insn_reservation`s.  Both bases here do (`dfa_start` is declared
+    in both per-base headers), so **this pair cannot exercise the case** --
+    recorded as unmeasurable here, not as absent.  A base with no reservations
+    has no `state_transition` to put in a slot at all.
+
+**`insn-attr-common.h` is a fifth, quieter leak in the same family**: it
+publishes `INSN_SCHEDULING`, `DELAY_SLOTS` and the `enum attr_*` types.
+Measured here, both bases give `INSN_SCHEDULING` defined and `DELAY_SLOTS 0`,
+so **this pair shows no divergence** -- a two-target accident, not a clean
+bill.  The attribute sets differ badly (82 `HAVE_ATTR_` lines for i386, 47 for
+aarch64) and shared code names none of those enums, which is why nothing has
+broken yet.
+
+## 5. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard
+movement.**  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+32/0, aarch64 27/5**.
+
+Nothing in this task is in `macro-status.txt`.  `NUM_INSN_CODES` is a
+generated `const`, not a `tm.h` macro, and the attribute entry points are
+generated functions.  The correct entry for all of it is **"no probe arm
+exists, because the scoreboard measures `tm.h` macros and these are generated
+symbols"** -- unmeasurable, not clean.  The "converted but reads UNCONVERTED"
+list is unchanged at sixteen.
+
+## 6. WHAT I DID NOT DO
+
+  * **The four attribute/scheduling families are untouched**, written up in
+    section 4 rather than guessed at.  **Job 1 is therefore NOT fixed and the
+    `add` wall is unmoved** -- said plainly.
+  * **`insn-emit`'s six bare names are untouched**, and the new finding that
+    aarch64's OWN generated objects bind i386's `gen_blockage` is recorded
+    rather than acted on: `gen_name_is_global_p` exists precisely to keep that
+    name global, so changing it is the `HAVE_blockage` fork
+    `gen-target-ns.cc:134` already writes up.
+  * **The `enum insn_code` RANGE is not fixed, only the bound.**  With 15428
+    as its largest enumerator the shared `enum insn_code` has a valid range of
+    [0, 16383], so converting an aarch64 code of 20000 to it is out of range.
+    Pinning it needs a terminal enumerator in every base's header, which
+    changes `-Wswitch` behaviour for every `switch` over `enum insn_code` in
+    `config/`.  Written up in `gencodes.cc` rather than guessed at.
+  * **No gdb arm this run.**  #128's two breakpoint runs already established
+    the constraint and enabled-mask readings, `t129-state.sh` reproduces the
+    identical failure site, and re-reading the same values under a third
+    breakpoint would have added no independent evidence.  Recorded as "not
+    measured", not as "clean".
+  * **No memory measurement.**  `NUM_INSN_CODES` 15429 -> 20512 grows
+    `default_target_recog` by 163KB of .bss, and `save_target_globals`
+    allocates a `target_recog` per `__attribute__((target))` set.  That is a
+    memory question, not a correctness one, and it is unmeasured -- I am not
+    claiming it is free.  It joins `Pmode`'s 648 sites (#125) and #128's
+    constraint indirection as an open cost question.
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker
+    is unchanged.
+
+## 7. AN INSTRUMENT DEFECT THIS RUN PRODUCED, WORTH RECORDING
+
+**`nm -C` anchored on `$` scores ZERO for every function.**  My first symbol
+sweep grepped `' [TDBRVW] (insn_[a-z0-9_]+::)?get_attr_enabled$'` and reported
+**no definition anywhere** for twelve of fourteen entry points.  The only two
+that "worked" were `internal_dfa_insn_code` and `insn_default_latency`, which
+are DATA (function pointers) and so carry no `(rtx_insn*)` suffix.  A sweep
+built that way says "this family has no per-base copy", which is the opposite
+of the truth and points at "there is nothing to select" rather than "nothing
+selects it".  The tell was that exactly the two non-functions answered.
+
+This is the `nm -u` plain-name lesson in PRINCIPLES arriving from the other
+direction: there the substring matched too much, here the anchor matched too
+little.  **Both are the same rule -- a zero from a name-matching instrument is
+a claim about the pattern, not about the code.**
+
+## 8. FILES
+
+    t129-clone.sh    derives my build-dir scripts from #128's; REFUSES on a
+                     leftover `b128'
+    t129-conf.sh     two-target configure, /tmp/b129
+    t129-build.sh    make at the TOP level
+    t129-gccbuild.sh make in $B/gcc -- where cc1 actually builds
+    t129-reconf-gcc.sh  re-runs gcc/configure via the TOP LEVEL (never
+                     config.status, which target-specs overwrites), and
+                     asserts `insn-codes-union.list' reached gcc/Makefile
+    t129-specs.sh    both target-specs probes, real aarch64 binutils
+    t129-syms.sh     WHICH attribute vocabulary shared code links, by nm, with
+                     a non-vacuity floor on nm's own output
+    t129-family.sh   JOB 2: (a)/(b)/(c) scored as THREE SEPARATE ARMS for all
+                     seven families, plus the bound-vs-index and HAVE_ATTR_*
+                     readings
+    t129-state.sh    big.c site + `int x = 1;' + x86_64 -O2
+    t129-fn.sh       the three function-body inputs, both bases
+    t129-sc.sh       stock-compare, ABSOLUTE big.c, tagged outdir (/tmp/sc129-*)
+    t129-guards.sh   32 arms; ARM 0 content-by-name-and-value and runs first,
+                     ARM 1 the size prediction, ARM 3 the injection with a
+                     control and a restore, ARM 4 the leak ratchet

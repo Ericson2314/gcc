@@ -2360,6 +2360,7 @@ FULL_DRIVER_NAME=gcc-$(version)$(exeext)
 
 MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
  insn-config-union.list insn-config-*.part \
+ insn-codes-union.list insn-codes-*.part \
  insn-opinit-union.list insn-opinit-*.part \
  insn-output.cc $(INSNRECOG_SEQ_SRC) insn-recog.h \
  $(INSNEMIT_SEQ_SRC) insn-extract.cc insn-peep.cc \
@@ -3880,7 +3881,20 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
 # both succeeded.  insn-config.h is therefore named explicitly in
 # generated_files; do not assume membership of a `simple_' list is the only
 # thing that put a header there.
-simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
+# insn-codes.h is NOT in this list either, and for the same reason as
+# insn-config.h above -- its rule passes gencodes
+# `-Uinsn-codes-union.list -A$(multi_target_base)'.  Unlike insn-config.h its
+# CONTENTS still differ per back end (the CODE_FOR_ enumerators are that back
+# end's numbering); the one thing that must not is NUM_INSN_CODES, which sizes
+# arrays in `struct target_recog' and lra.cc that shared code indexes with the
+# SELECTED back end's insn code.  See the s-codes rule below and the note at
+# the top of gencodes.cc.
+#
+# And, as with insn-config.h, taking it out of this list takes it out of
+# $(generated_files); it is named there explicitly.  That is not optional
+# bookkeeping -- it is the order-only barrier every host object waits behind,
+# and without it tm_p.h's consumers race the rule that writes the header.
+simple_rtl_generated_h	= insn-attr.h insn-attr-common.h \
 			  insn-flags.h insn-target-def.h
 
 simple_rtl_generated_c	= insn-automata.cc \
@@ -3960,6 +3974,53 @@ s-config: $(MD_DEPS) insn-conditions.md build/genconfig$(build_exeext) \
 	  $(md_file) insn-conditions.md > tmp-config.h
 	$(SHELL) $(srcdir)/../move-if-change tmp-config.h insn-config.h
 	$(STAMP) s-config
+
+# THE SHARED NUM_INSN_CODES ANSWER.
+#
+# Unlike insn-config.h this header is NOT the same for every back end -- its
+# CODE_FOR_<pattern> enumerators are this back end's own numbering and cannot
+# be unioned, because two back ends spell the same name for two different
+# patterns.  Exactly one thing in it is shared, and it is a bound rather than
+# a value: NUM_INSN_CODES sizes
+#
+#     recog.h:578   alternative_mask x_bool_attr_masks[NUM_INSN_CODES][...]
+#     recog.h:579   operand_alternative *x_op_alt[NUM_INSN_CODES]
+#     lra.cc:631    struct lra_static_insn_data *insn_code_data[NUM_INSN_CODES]
+#
+# all three of which are indexed in SHARED code by `INSN_CODE (insn)', i.e.
+# by the SELECTED back end's numbering.  Measured in a two-target (i386 +
+# aarch64) build dir before this rule existed: the shared header said 15429,
+# which is i386's, while insn-codes-aarch64.h said 20512.
+# `default_target_recog' is 0x788a8 bytes of .bss sized from 15429, and
+# recog.cc:2707 writes into it at codes running to 20511.  Neither a link
+# error nor a warning -- the `bound by one, indexed by another' shape.
+#
+# So gencodes takes the union over every configured back end for that one
+# number and FAILS rather than defaulting if the list does not name this base
+# or omits the key (apply_union_list in gencodes.cc).  Grep the generated
+# multi-target-md.mk for `-Uinsn-codes-union.list', not this comment, to
+# check the per-base headers are wired up the same way.
+CODES_UNION_FLAGS = -Uinsn-codes-union.list -A$(multi_target_base)
+
+# Same check, same reason, as check_config_union_base: an empty
+# $(multi_target_base) leaves a bare `-A' whose argument is then the next
+# word, and the resulting message would point at the wrong thing.
+check_codes_union_base = \
+  test -n "$(multi_target_base)" || { \
+    echo "s-codes: multi_target_base is empty; gencodes cannot be told" >&2; \
+    echo "  which back end insn-codes.h is being generated for." >&2; \
+    echo "  common_out_symbol='$(common_out_symbol)' did not match" >&2; \
+    echo "  targetm_common_<base>_common" >&2; \
+    exit 1; }
+
+insn-codes.h: s-codes; @true
+s-codes: $(MD_DEPS) insn-conditions.md build/gencodes$(build_exeext) \
+  insn-codes-union.list
+	@$(check_codes_union_base)
+	$(RUN_GEN) build/gencodes$(build_exeext) $(CODES_UNION_FLAGS) \
+	  $(md_file) insn-conditions.md > tmp-codes.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-codes.h insn-codes.h
+	$(STAMP) s-codes
 
 # genemit splits its output into different files and doesn't write to
 # stdout. (but rather to tmp-emit-01.cc..tmp-emit-10.cc)
@@ -4462,7 +4523,7 @@ s-gtype: $(EXTRA_GTYPE_DEPS) build/gengtype$(build_exeext) \
 	$(STAMP) s-gtype
 
 generated_files = config.h tm.h $(TM_P_H) $(TM_D_H) $(TM_JIT_H) $(TM_H) \
-       multilib.h $(simple_generated_h) insn-config.h specs.h \
+       multilib.h $(simple_generated_h) insn-config.h insn-codes.h specs.h \
        tree-check.h genrtl.h insn-modes.h insn-modes-inline.h \
        tm-preds.h tm-constrs.h \
        $(ALL_GTFILES_H) gtype-desc.cc gtype-desc.h version.h \
