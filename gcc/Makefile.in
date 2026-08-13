@@ -830,10 +830,35 @@ plugin_bindir = $(libexecsubdir)/plugin
 # Directory where files for installed testing are installed
 testsuitedir = $(libsubdir)/testsuite
 # Used to produce a relative $(libsubdir_to_prefix).
+#
+# ONE `..' PER COMPONENT OF $(libsubdir) BELOW $(libdir), and this branch
+# changed that count without changing these numbers.  Upstream:
+#
+#   libsubdir = $(libdir)/gcc/$(real_target_noncanonical)/$(version)
+#
+# -- three components, hence `../../..'.  Here the target is gone, because one
+# compiler serves every target and the data below $(libdir) is not per-target:
+#
+#   libsubdir = $(libdir)/gcc/$(version)
+#
+# -- two components.  Leaving three climbed one directory too far, and because
+# `libsubdir_to_prefix' then adds one more `../' for $(libdir) itself, the
+# result ESCAPED THE PREFIX.  Measured before this fix, with
+# `--prefix=/usr/local':
+#
+#   libsubdir            /usr/local/lib/gcc/17.0.0
+#   libsubdir_to_prefix  ../../../../          -> /usr        (WRONG)
+#   after                ../../../             -> /usr/local  (the prefix)
+#
+# The visible consequence was `gcc_gxx_include_dir' resolving to
+# /usr/include/c++/$(version) rather than $(prefix)/include/c++/$(version) --
+# a compiler reading the SYSTEM's C++ headers instead of its own.  The
+# accelerator arm carries the same correction: it is upstream's five minus the
+# same one.
 ifeq ($(enable_as_accelerator),yes)
-unlibsubdir = ../../../../..
+unlibsubdir = ../../../..
 else
-unlibsubdir = ../../..
+unlibsubdir = ../..
 endif
 # $(prefix), expressed as a path relative to $(libsubdir).
 #
