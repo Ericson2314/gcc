@@ -53,6 +53,17 @@ along with GCC; see the file COPYING3.  If not see
 #define INCOMING_RETURN_ADDR_RTX  (gcc_unreachable (), NULL_RTX)
 #endif
 
+/* DEAD IN A MULTI-TARGET BUILD, AND LEFT IN PLACE ON PURPOSE.  defaults.h
+   already defines this name -- as a call to the SELECTED back end -- for every
+   translation unit that is not a back end's own, which this file is not.  The
+   fallback below is an existence question ("did this back end define its
+   own?"), and answering it here answers it with whichever base compiled this
+   file: only i386 and stormy16 define the macro at all, so what shared code
+   used to get was i386-on-linux's answer.  The question is now asked in each
+   base's own translation unit (target-cumargs.cc), which is the only place it
+   means anything.  The lines stay because they remain correct for a build
+   where defaults.h has not redirected -- deleting them would make this file
+   depend silently on that redirect existing.  */
 #ifndef DEFAULT_INCOMING_FRAME_SP_OFFSET
 #define DEFAULT_INCOMING_FRAME_SP_OFFSET INCOMING_FRAME_SP_OFFSET
 #endif

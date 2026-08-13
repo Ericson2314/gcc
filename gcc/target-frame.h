@@ -492,6 +492,57 @@ struct target_frame_desc
      silently pick a different overload, hundreds of sites away.  */
   scalar_int_mode (*pmode) (void);
 
+  /* `FUNCTION_MODE' -- the mode of the MEM that a call jumps through.  QImode
+     for i386 (i386.h:2028), `Pmode' (i.e. DImode) for aarch64
+     (aarch64.h:1450).  MACRO-LEAK.md class (b), and the diagnosed cause of the
+     `extract_insn, recog.cc:2890' wall that `int g (int a) { return f (a) +
+     f (a + 1); }' hit for aarch64.
+
+     WHAT THE ICE ACTUALLY WAS, from the insn the compiler printed rather than
+     from the site it stopped at.  `calls.cc:415' -- shared code -- builds
+
+	 funmem = gen_rtx_MEM (FUNCTION_MODE, funexp);
+
+     so with i386's tm.h in force every target's call goes through a
+     `mem:QI'.  The insn that reached `vregs' was
+
+	 (call (mem:QI (symbol_ref:DI ("f") ...) [0 f S1 A8]) (const_int 0))
+
+     -- note `S1', one byte -- while every one of aarch64's call patterns
+     (aarch64.md:1563, :1591, :1630, :1646) matches `(call (mem:DI ...))'.  So
+     aarch64's own `recog' correctly refused an insn that shared code had built
+     to i386's shape.  THIS IS A SECOND, DISTINCT PROBLEM from the attribute
+     tables #130 selected, which is what #127 warned it might be: nothing about
+     it involves `HAVE_ATTR_*', unspec numbering, or the recog dispatcher --
+     `recog' was already per-base and was already aarch64's.  It is one macro.
+
+     A CALL AND NOT A `target-cdata' CONSTANT even though both configured bases
+     spell it as a plain mode.  Eight back ends define it as `Pmode', which on
+     this branch is already a run-time call (`mt_pmode'), and arm's `Pmode' is
+     option state; a constant read once at startup would freeze it.  Measured
+     on this pair only, a constant would have been green and wrong for arm --
+     the failure mode recorded for the four pointer regnums.
+
+     `machine_mode' AND NOT `scalar_int_mode', unlike `pmode' directly above.
+     The two are not the same question: `Pmode' is required to be a scalar
+     integer and generic code calls `GET_MODE_PRECISION' on it, whereas
+     `FUNCTION_MODE' is only ever handed to `gen_rtx_MEM', `memory_address',
+     `SET_DECL_MODE' and `small_register_classes_for_mode_p', all of which take
+     a `machine_mode'.  Narrowing the type here would add an `as_a' assertion
+     no use site needs and that nothing in the vocabulary guarantees.
+
+     SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING.  Outside `config/'
+     and `testsuite/' there are eleven use sites -- calls.cc:298, :299, :300,
+     :413, :415, builtins.cc:1778, :1783, :1808, expr.cc:11656, varasm.cc:3329
+     and tree.cc:1352 -- and every one is an ordinary run-time argument.  No
+     `#if', no `#ifdef', no case label, no array bound, no static initialiser.
+     Note the eleventh: `SET_DECL_MODE (t, FUNCTION_MODE)' is executed while
+     building a FUNCTION_DECL, which is why this is a call the front end can
+     reach; `-ftarget-config' is processed during option handling, before any
+     parsing, so a target is in force by then, and if one somehow is not this
+     fails by name rather than answering QImode.  */
+  machine_mode (*function_mode) (void);
+
   /* `DEBUGGER_REGNO (N)' -- gcc register number to debugger/DWARF register
      number.  MACRO-LEAK.md class (c1).  THIS IS THE `BOUND BY ONE, INDEXED BY
      ANOTHER' DISGUISE, the sixth time it has appeared on this branch
@@ -675,6 +726,97 @@ struct target_frame_desc
   unsigned int (*arg_pointer_regnum) (void);
   bool (*hard_frame_pointer_is_frame_pointer) (void);
   bool (*hard_frame_pointer_is_arg_pointer) (void);
+
+  /* ----------------------------------------------------------------------
+     THE TWO CFA-AT-ENTRY OFFSETS.  This pair is what made the aarch64
+     prologue emit CORRECT instructions with WRONG unwind data, and it was
+     invisible until #130 produced assembly to look at:
+
+	 g:
+	 .LFB0:
+		 .cfi_startproc
+		 .cfi_def_cfa_offset 16     <-- should not be here at all
+		 sub     sp, sp, #16
+		 .cfi_def_cfa_offset 32     <-- should be 16
+		 ...
+		 add     sp, sp, 16
+		 .cfi_def_cfa_offset 16     <-- should be 0
+		 ret
+
+     The CFA is 16 too high throughout, so every unwind through such a frame
+     reads the caller's state from 16 bytes past where it is.  The compiler
+     exits 0; nothing but reading the output says so.
+
+     WHAT CARRIES IT, read in the running cc1 rather than inferred
+     (`t131-cfi-cause.sh', one breakpoint per run on `scan_trace', gdb's own
+     `^Breakpoint N, scan_trace' stop line matched, both bases):
+
+	 aarch64:  cfun->machine->func_type = TYPE_EXCEPTION, UNITS_PER_WORD = 8
+		   INCOMING_FRAME_SP_OFFSET         = 16
+		   DEFAULT_INCOMING_FRAME_SP_OFFSET =  8
+	 x86_64:   cfun->machine->func_type = TYPE_NORMAL,    UNITS_PER_WORD = 8
+		   INCOMING_FRAME_SP_OFFSET         =  8
+		   DEFAULT_INCOMING_FRAME_SP_OFFSET =  8
+
+     `16 is not UNITS_PER_WORD on its face' was the reason #130 declined to
+     name a carrier, and the resolution is that it is 2 * UNITS_PER_WORD:
+     i386.h:2177 is
+
+	 (cfun->machine->func_type == TYPE_EXCEPTION ? 2 * UNITS_PER_WORD
+						     : UNITS_PER_WORD)
+
+     and `cfun->machine' points at AARCH64's `machine_function' object while
+     dwarf2cfi.cc was compiled against I386's declaration of that struct name.
+     So the `func_type' bitfield is read out of whatever aarch64 keeps at that
+     offset, and it happened to read 3 -- TYPE_EXCEPTION.  This is the shared-
+     numbering bug in its `identity by address' disguise: one struct NAME, two
+     layouts, no diagnostic.  Nothing here fixes the type confusion in
+     general (i386.h:1650 reads the same field); it removes the one read of it
+     that reaches the emitted unwind data.
+
+     BOTH MOVE TOGETHER, and the second one is the reason the wrong value
+     becomes a wrong DIRECTIVE rather than staying internal.  dwarf2cfi.cc
+     emits the entry note only when the two DISAGREE (:2766):
+
+	 if (entry && DEFAULT_INCOMING_FRAME_SP_OFFSET != INCOMING_FRAME_SP_OFFSET)
+
+     Converting `INCOMING_FRAME_SP_OFFSET' alone would give aarch64 its own 0
+     while `DEFAULT_' stayed at i386's 8, so the two would STILL disagree, the
+     note would STILL be emitted, and it would now read `.cfi_def_cfa_offset
+     0' -- a different wrong file with the same shape.  Converting `DEFAULT_'
+     alone leaves the real offset at 16.  This is the closure failure
+     PRINCIPLES section 4 names, and here it is not hypothetical: either half
+     alone produces output that still assembles.
+
+     `DEFAULT_' IS A FIELD OF ITS OWN RATHER THAN DERIVED, for the
+     `#ifndef'-answered-by-the-primary reason that made `DWARF_FRAME_REGNUM'
+     its own field.  dwarf2cfi.cc:56 says `#ifndef DEFAULT_INCOMING_FRAME_SP_
+     OFFSET' -> `INCOMING_FRAME_SP_OFFSET', and only two back ends in the tree
+     define it at all (i386 and stormy16).  Deriving it here would bake
+     i386-on-linux's "they are equal" into all 48 and lose stormy16's
+     distinction with no diagnostic.  Asked in the base's own translation
+     unit, each back end's own `#ifndef' outcome is what gets recorded.
+
+     CALLS AND NOT `target-cdata' CONSTANTS.  i386's reads `cfun', which is
+     precisely the failure target-cdata.h's header comment records for
+     `STACK_BOUNDARY': a field is evaluated once with `cfun' null and then
+     frozen.  aarch64 defines neither macro, so its thunks compile to
+     `return 0;' -- which is what a constant costs when it is allowed to be
+     one.
+
+     `HOST_WIDE_INT' AND NOT `poly_int64', which is the tempting type because
+     `dw_cfa_location::offset' is one.  It would not compile: var-tracking.cc
+     :549 declares `HOST_WIDE_INT stack_adjust' and :10101 does `ofst -= ...'
+     on an `int', and `poly_int64' converts implicitly to neither.  A
+     `HOST_WIDE_INT' widens into the `poly_int64' at dwarf2cfi.cc:2771 and
+     narrows in a compound assignment at var-tracking.cc:10101, which is what
+     the plain macro did.  The six shared use sites are dwarf2cfi.cc:2767,
+     :2771, :3266 and var-tracking.cc:832, :834, :10101; every one is an
+     ordinary run-time expression -- no `#if', no case label, no array bound,
+     no static initialiser (swept over all of `gcc/' outside `config/' and
+     `testsuite/').  */
+  HOST_WIDE_INT (*incoming_frame_sp_offset) (void);
+  HOST_WIDE_INT (*default_incoming_frame_sp_offset) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -771,6 +913,10 @@ extern poly_int64 mt_initial_elimination_offset (int from, int to);
    units that keep the real macro).  */
 extern scalar_int_mode mt_pmode (void);
 
+/* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
+   for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */
+extern machine_mode mt_function_mode (void);
+
 /* THE DWARF REGISTER-NUMBERING FAMILY.  See the three field comments for the
    measurement, for why `DWARF_FRAME_REGNUM' is not derived from
    `DEBUGGER_REGNO', and for why `DWARF_FRAME_REGISTERS' has to move with them.
@@ -834,5 +980,14 @@ extern unsigned int mt_hard_frame_pointer_regnum (void);
 extern unsigned int mt_arg_pointer_regnum (void);
 extern bool mt_hard_frame_pointer_is_frame_pointer (void);
 extern bool mt_hard_frame_pointer_is_arg_pointer (void);
+
+/* THE TWO CFA-AT-ENTRY OFFSETS, for shared code.  See the field comments
+   above for the gdb reading that named them and for why they move as a pair.
+   Both are redirected in `defaults.h'; `DEFAULT_INCOMING_FRAME_SP_OFFSET' is
+   redirected THERE rather than left to dwarf2cfi.cc's own `#ifndef' fallback,
+   because that fallback is an existence question and it was being answered by
+   whichever base compiled dwarf2cfi.cc.  */
+extern HOST_WIDE_INT mt_incoming_frame_sp_offset (void);
+extern HOST_WIDE_INT mt_default_incoming_frame_sp_offset (void);
 
 #endif /* GCC_TARGET_FRAME_H */

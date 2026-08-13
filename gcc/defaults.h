@@ -2260,6 +2260,30 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef Pmode
 #define Pmode (mt_pmode ())
 
+/* `FUNCTION_MODE' -- the mode of the MEM a call jumps through.  QImode for
+   i386, `Pmode' for aarch64, and the diagnosed cause of the `extract_insn,
+   recog.cc:2890' wall: `calls.cc:415' built every target's call as a `mem:QI'
+   while all four of aarch64's call patterns match `(call (mem:DI ...))'.
+
+   IT MUST FOLLOW THE `Pmode' REDIRECT ABOVE, and that is not a matter of
+   tidiness.  Eight back ends define `FUNCTION_MODE' as `Pmode' outright; the
+   per-base thunk expands it in the base's own translation unit where `Pmode'
+   is still the real macro, but any shared spelling that reached this
+   definition would want the redirected `Pmode', so the two are ordered the
+   way `STACK_SAVEAREA_MODE' above is ordered against `Pmode'.
+
+   `#undef' FIRST, AND THE FIRST DRAFT DID NOT.  Unlike the names above there
+   is no defaults.h fallback for `FUNCTION_MODE' -- only `config/' defines it
+   -- which reads as "there is nothing here to displace".  There is: the
+   PRIMARY's `config/i386/i386.h:2028' has already been read by this point in
+   every shared translation unit, which is the entire bug.  Without the
+   `#undef' the compiler said so, `"FUNCTION_MODE" redefined', ~500 times, and
+   the redirect still won -- so the evidence was a warning count and not a
+   wrong answer.  Recorded because "no fallback in this file" is not the same
+   question as "not yet defined".  */
+#undef FUNCTION_MODE
+#define FUNCTION_MODE (mt_function_mode ())
+
 /* ------------------------------------------------------------------------
    THE DWARF REGISTER NUMBERING.  See target-frame.h for the gdb reading --
    `update_row_reg_save (... column=4294967294 ...)', which is
@@ -2285,6 +2309,43 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    NOT `#ifdef'-BREAKING: except.cc:2193 spells `#ifdef DWARF_FRAME_REGNUM' and
    both names remain defined, so that guard takes the same branch as today and
    both of its arms now call the SELECTED back end.  */
+/* ------------------------------------------------------------------------
+   THE TWO CFA-AT-ENTRY OFFSETS.  See target-frame.h for the gdb reading that
+   named them -- aarch64 got 16 and 8 where its own headers say 0 and 0, and
+   the 16 is `2 * UNITS_PER_WORD' because i386's macro reads
+   `cfun->machine->func_type' out of AARCH64's `machine_function' object.
+
+   BOTH, BECAUSE DISAGREEMENT IS WHAT EMITS THE DIRECTIVE.  dwarf2cfi.cc:2766
+   emits the entry note only when the two differ, so redirecting one of them
+   leaves the note being emitted with a different wrong number.
+
+   `INCOMING_FRAME_SP_OFFSET' IS `#undef'-THEN-DEFINE FROM A DEFINITION THIS
+   FILE MADE ABOVE (:1231), which is what made the leak transitive:
+   `ARG_POINTER_CFA_OFFSET' at :1219 is defined here too, and neither name
+   looks target-specific where it is written.
+
+   `DEFAULT_INCOMING_FRAME_SP_OFFSET' IS DEFINED HERE RATHER THAN LEFT TO
+   dwarf2cfi.cc:56's `#ifndef' fallback.  That fallback is an existence
+   question -- "did this back end define its own?" -- and in shared code it
+   was answered by whichever base compiled dwarf2cfi.cc.  Only two back ends
+   in the tree define it (i386 and stormy16), so the fallback taken there is
+   i386-on-linux's.  It IS `#undef'd first, and the first draft of this block
+   reasoned that it need not be, on the grounds that dwarf2cfi.cc's `#ifndef'
+   is the only other definition and sits BELOW this header.  That reasoning
+   missed the one that matters: i386.h:2183 defines it, and the primary's
+   tm.h has already been read here.  The compiler said so.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING.  Outside `config/'
+   and `testsuite/' the two have six use sites between them -- dwarf2cfi.cc
+   :2767, :2771, :3266 and var-tracking.cc:832, :834, :10101 -- and every one
+   is an ordinary run-time expression: no `#if', no case label, no array
+   bound, no static initialiser.  The one `#ifndef' is dwarf2cfi.cc:56, which
+   this block deliberately turns false.  */
+#undef INCOMING_FRAME_SP_OFFSET
+#define INCOMING_FRAME_SP_OFFSET (mt_incoming_frame_sp_offset ())
+#undef DEFAULT_INCOMING_FRAME_SP_OFFSET
+#define DEFAULT_INCOMING_FRAME_SP_OFFSET (mt_default_incoming_frame_sp_offset ())
+
 #undef DEBUGGER_REGNO
 #define DEBUGGER_REGNO(REGNO) (mt_debugger_regno ((unsigned int) (REGNO)))
 #undef DWARF_FRAME_REGNUM

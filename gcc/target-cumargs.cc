@@ -45,6 +45,12 @@ along with GCC; see the file COPYING3.  If not see
    aarch64-protos.h, which is this base's tm_p.h.  */
 #include "tm_p.h"
 #include "target.h"
+/* For `cfun'.  i386's `INCOMING_FRAME_SP_OFFSET' (i386.h:2177) reads
+   `cfun->machine->func_type', and reading it HERE -- in a translation unit
+   compiled with i386's own `machine_function' declaration AND i386's own
+   `tm.h' -- is the entire point of the thunk: shared code read that same
+   bitfield out of aarch64's object and got TYPE_EXCEPTION.  */
+#include "function.h"
 #include "multi-target-reg-widths.h"
 /* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
    booleans at the bottom of this file: `-I<base>-inc' comes ahead of `-I.' on
@@ -465,6 +471,22 @@ mt_base_pmode (void)
   return as_a <scalar_int_mode> ((machine_mode) Pmode);
 }
 
+/* `FUNCTION_MODE', read in THIS base's translation unit: QImode for i386,
+   `Pmode' -- and so DImode -- for aarch64.  Compiled once against i386's tm.h,
+   shared code built every target's call MEM as QImode, and aarch64's own
+   `recog' refused it.  See target-frame.h for the insn.
+
+   No `as_a' and no assertion, unlike `mt_base_pmode' just above: there is
+   nothing to assert.  stormy16, avr, rl78, msp430 and pdp11 all make this
+   HImode and nds32, xtensa, riscv and eight others SImode; every value a back
+   end writes here is legal, and the only thing that could be wrong is WHOSE
+   answer it is.  */
+static machine_mode
+mt_base_function_mode (void)
+{
+  return (machine_mode) FUNCTION_MODE;
+}
+
 /* THE DWARF REGISTER-NUMBERING FAMILY, evaluated in THIS base's translation
    unit.  See target-frame.h for the gdb reading that diagnosed this, for the
    half of the brief's diagnosis that measured FALSE, and for why all three
@@ -564,6 +586,37 @@ static bool
 mt_base_hard_frame_pointer_is_arg_pointer (void)
 {
   return HARD_FRAME_POINTER_IS_ARG_POINTER ? true : false;
+}
+
+/* THE TWO CFA-AT-ENTRY OFFSETS, read in THIS base's translation unit.  The
+   values this pair produces are 8 and 8 for i386 (both from i386.h:2177 and
+   :2183, with a TYPE_NORMAL function) and 0 and 0 for aarch64, which defines
+   neither macro and so gets defaults.h:1231 twice over.  Compiled once
+   against i386's tm.h, shared code read 16 and 8 for aarch64 -- see
+   target-frame.h for the gdb reading and for why 16 rather than 8.
+
+   `DEFAULT_INCOMING_FRAME_SP_OFFSET' IS ASKED HERE AND NOT DERIVED, and this
+   file is the only place the question can be asked correctly: dwarf2cfi.cc's
+   `#ifndef' fallback for it is evaluated with whichever base compiled
+   dwarf2cfi.cc, while here it is evaluated with THIS base's headers in force.
+   dwarf2cfi.cc is the only file in the tree that spells the name, so the
+   fallback has to be reproduced rather than reached -- it is written out
+   below rather than by including dwarf2cfi.cc's private `#ifndef', which is
+   not a header.  */
+static HOST_WIDE_INT
+mt_base_incoming_frame_sp_offset (void)
+{
+  return (HOST_WIDE_INT) INCOMING_FRAME_SP_OFFSET;
+}
+
+static HOST_WIDE_INT
+mt_base_default_incoming_frame_sp_offset (void)
+{
+#ifdef DEFAULT_INCOMING_FRAME_SP_OFFSET
+  return (HOST_WIDE_INT) DEFAULT_INCOMING_FRAME_SP_OFFSET;
+#else
+  return (HOST_WIDE_INT) INCOMING_FRAME_SP_OFFSET;
+#endif
 }
 
 #define MT_STR1(X) #X
@@ -843,6 +896,7 @@ static const struct target_frame_desc mt_base_frame = {
   MT_BASE_RELOAD_ELIMINABLES,
   mt_base_initial_elimination_offset,
   mt_base_pmode,
+  mt_base_function_mode,
   mt_base_debugger_regno,
   mt_base_dwarf_frame_regnum,
   mt_base_dwarf_frame_registers,
@@ -851,7 +905,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_hard_frame_pointer_regnum,
   mt_base_arg_pointer_regnum,
   mt_base_hard_frame_pointer_is_frame_pointer,
-  mt_base_hard_frame_pointer_is_arg_pointer
+  mt_base_hard_frame_pointer_is_arg_pointer,
+  mt_base_incoming_frame_sp_offset,
+  mt_base_default_incoming_frame_sp_offset
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

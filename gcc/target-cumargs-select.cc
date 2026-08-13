@@ -299,6 +299,15 @@ mt_pmode (void)
   return mt_frame ()->pmode ();
 }
 
+/* `FUNCTION_MODE'.  Uncached for the same reason as `Pmode' just above: eight
+   back ends define it AS `Pmode', which is option-dependent on i386 and on
+   arm, so a value read once at selection time would be frozen.  */
+machine_mode
+mt_function_mode (void)
+{
+  return mt_frame ()->function_mode ();
+}
+
 /* THE DWARF REGISTER-NUMBERING FAMILY.  Uncached, through `mt_frame ()', for
    the same reason as `Pmode' just above: i386's `DEBUGGER_REGNO' reads
    `TARGET_64BIT', which is option state and can move within one run of the
@@ -376,6 +385,24 @@ bool
 mt_hard_frame_pointer_is_arg_pointer (void)
 {
   return mt_frame ()->hard_frame_pointer_is_arg_pointer ();
+}
+
+/* THE TWO CFA-AT-ENTRY OFFSETS.  Uncached through `mt_frame ()' like the
+   families above, and here the reason is measured rather than hypothetical:
+   i386's `INCOMING_FRAME_SP_OFFSET' reads `cfun->machine->func_type', so it
+   is not even constant across two functions in one translation unit, let
+   alone across a run.  A value cached at selection time would be read once
+   with `cfun' null.  */
+HOST_WIDE_INT
+mt_incoming_frame_sp_offset (void)
+{
+  return mt_frame ()->incoming_frame_sp_offset ();
+}
+
+HOST_WIDE_INT
+mt_default_incoming_frame_sp_offset (void)
+{
+  return mt_frame ()->default_incoming_frame_sp_offset ();
 }
 
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
