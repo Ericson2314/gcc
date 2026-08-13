@@ -360,6 +360,24 @@ have found a design question, not a bug. Stop and report.**
 - **Adding an `#ifndef` floor / a default value / a "sensible fallback"** so a
   missing answer stops erroring. The fallback is always the primary's answer,
   which is the bug. Never let the absence of an answer be an answer.
+
+  **THE DISTINCTION THIS RULE ACTUALLY TURNS ON — and one agent got it right
+  and flagged it rather than burying it.** What is banned is a floor that
+  yields **the primary's** answer to a base that never said anything. A floor
+  on the **supply** side, giving a base *upstream's own documented value for a
+  back end that genuinely does not define the macro*, is a **real per-base
+  answer** and is fine.
+
+  Worked example, `JUMP_TABLES_IN_TEXT_SECTION`: **40 of 48 back ends define
+  it**; the consumer side is already
+  `#define … (targetm_cdata.jump_tables_in_text_section)`, so `final.cc:101`'s
+  `#ifndef` is **dead**; and the added floor supplies upstream's own `0` to the
+  8 back ends that say nothing. No base ever reads another's value.
+
+  **The test:** ask *whose* answer the fallback is. If a second configured back
+  end would change it, it is the primary's and it is banned. If it is the same
+  value upstream would give that back end standing alone, it is that back end's
+  own answer. **State which, in the commit, whenever you add one.**
 - **Deleting, relaxing, or narrowing a check that fails.** The check is usually
   the only thing standing between a silent wrong answer and a diagnostic. If
   `--enable-backends=all` reports "45 options blocks for 48 back ends", three
