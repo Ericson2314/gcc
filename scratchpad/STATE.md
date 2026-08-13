@@ -11865,8 +11865,29 @@ iq2000, loongarch 64; mcore, h8300, xtensa 32) and the rest inherit
 `BITS_PER_WORD`: m68k and visium 32, pdp11 16, avr 8.
 
 **Every base in a 2- or 3-back-end build says 64, so neither acceptance build
-can show it.**  One more instance of "two back ends cannot tell", fixed from
-the source with the divergence SUPPLIED by an injection arm.
+can show it.**  One more instance of "two back ends cannot tell".
+
+**SO A THIRD BUILD WAS MADE THAT CAN: i386 + aarch64 + xtensa**
+(`/tmp/b-ad827eb24f334c52d-xt`, INSTRUMENT ONLY, not an acceptance
+configuration -- xtensa is not among the back ends that currently build to
+completion, and only its generated headers and its own `target-regs`/probe
+objects are used).  xtensa's own `MAX_BITS_PER_WORD` is **32** against the
+shared **64**, and the probe reports BOTH SIDES:
+
+```
+                       shared      i386   aarch64    xtensa
+MAX_BITS_PER_WORD          64        64        64        32   <== DIVERGES
+target_expmed          232960    232960    232960    131584   before the fix
+target_lower_subreg       880       880       880       688   before the fix
+target_expmed          232960    232960    232960    232960   after
+target_lower_subreg       880       880       880       880   after
+```
+
+**101,376 bytes** short on `target_expmed` -- two orders of magnitude larger
+than `target_rtl`'s 432-byte skew, in a structure `config/xtensa/xtensa.cc`
+includes and target-independent code XCNEWs.  Showing xtensa AGREES after the
+fix would have proved nothing on its own; the "before" column is what makes it
+evidence.
 
 The fix is a measured union width, `MULTI_TARGET_UNION_MAX_BITS_PER_WORD`,
 because the position of use forbids a run-time call -- the same reasoning and
@@ -11960,8 +11981,12 @@ it, and it emits real aarch64 (`add w0, w0, 1`, `.arch armv8-a`).
     at 64.  An input that makes it observable needs a configured back end whose
     `MAX_BITS_PER_WORD` is not the primary's -- xtensa, m68k, pdp11, visium,
     avr -- at which point that base's own objects address `x_shift_cost` and
-    every field after it at offsets the middle end did not allocate.  The bug
-    is not downgraded on the strength of identical output.
+    every field after it at offsets the middle end did not allocate.  **The
+    LAYOUT half of that has now been measured** (section 2: xtensa's
+    `target_expmed` was 101,376 bytes short); what has NOT been constructed is
+    an input that turns it into observably different assembly, because no
+    xtensa `cc1` exists to run one through.  The bug is not downgraded on the
+    strength of identical x86_64 output.
   * The sweep covers `class target_globals` only.  Other shared structures with
     per-base bounds were not enumerated; `recog_data`'s
     `dup_loc[MAX_DUP_OPERANDS]` is the obvious neighbour and is covered by
