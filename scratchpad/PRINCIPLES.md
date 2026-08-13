@@ -569,6 +569,23 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**A fix that moves the count by ZERO has refuted your story, and that is a
+result.** Working the options-accessor leak, an agent's first draft put the
+`#undef` block at end-of-file and made things worse: 63 → **254** diagnostics,
+5 → 21 back ends. Cause: `TARGET_FDPIC` is `Mask(FDPIC)` in `arm.opt` *and*
+`Var(TARGET_FDPIC)` in `bfin.opt` — two authorities **inside the options
+generator itself** — so `options-arm.h` defines it twice and an end-of-file
+undef killed arm's own Mask macro. The reflex repair was to exclude the shared
+`options.h`, on a plausible story about which headers a TU sees. Result:
+**254 → 254.** That zero is the only reason the story was caught as false.
+Record such zeros in the generator rather than dropping them; a plausible
+mechanism that moves nothing was never the mechanism.
+
+Related, and do not inherit it untested: `f3a75a98014`'s note says a TU sees
+only one options header. **False for the per-base glue** — `arm-c.cc` reaches
+both. It did not bite in that task, but it is a stated invariant with a live
+counterexample.
+
 Generalise it: **"this artefact names the wrong path" and "this artefact was
 USED to produce a wrong result" are two claims, and the second needs its own
 instrument.** Repairing the first without measuring the second leaves you
