@@ -211,6 +211,21 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**An undefined symbol names the macro that DRAGGED IT IN, not the macro that
+caused the control flow.** `nm -uC` cleared three walls in a row and then
+pointed at the wrong macro on the fourth. `cfgexpand.o` showed
+`U ix86_incoming_stack_boundary`, and `INCOMING_STACK_BOUNDARY` really does
+leak — but the function was only *entered* because
+`SUPPORTS_STACK_ALIGNMENT` is `(MAX_STACK_ALIGNMENT > STACK_BOUNDARY)`, and
+only i386, cygming and nvptx define `MAX_STACK_ALIGNMENT`, so `defaults.h`'s
+`#ifdef` is true purely because the primary is i386. aarch64's own answer
+makes it `128 > 128` — **false** — so aarch64 should have returned two lines
+in and never reached the assert at all. Converting the named macro alone
+would have left aarch64 inside the function running i386's realignment path,
+with the assert now passing: **a loud failure turned quiet.** So: when a
+symbol names your suspect, walk the *guards* that decided you reached that
+line, and convert the closure.
+
 **Ask what would have had to change for your comparison to mean anything, then
 show it did.** Models: `nm -C` 1379 `poly_int<1u>`→0 and 0→1619 `poly_int<2u>`;
 `targetm` instructions 3060→0 with `targetm_ptr` 0→2938; `sub $0x4b8,%rsp` →
@@ -241,6 +256,14 @@ Six rules that each cost a session:
    little.** Strong-symbol sweeps hid COMDAT; the COMDAT sweep hid macros; the
    macro probe found `BYTES_BIG_ENDIAN` by failing to compile. **State your
    instrument's blind spots.**
+
+   **Including gdb.** An arm set three breakpoints in one run and narrated
+   labels between `finish` commands, assuming they fired in the order written.
+   One function is hit first and repeatedly, so all three readings were *that
+   one function's* return value under three different names — two arms
+   compared the wrong function entirely, and **the third passed**, because
+   0/1 happened to be what it was reading. One breakpoint per run, and match
+   gdb's own reported breakpoint against the function under test.
 6. **A diagnostic-driven sweep fixes exactly the copies some configured triple
    compiles.** A poly_int sweep fixed 2 sites and left 7 identical siblings,
    having demonstrably reached those files. **Sweep the source, not the build
