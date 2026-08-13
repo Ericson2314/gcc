@@ -100,9 +100,11 @@ struct mode_traits<machine_mode>
    A back end opts out by defining TARGET_POLY_AWARE, saying its sources have
    been converted and no longer want the fixed-size shorthand.  See
    coretypes.h, which carries the other half of the same switch and the
-   explanation of what the opt-in is for.  */
-#if defined (IN_TARGET_CODE) && NUM_POLY_INT_COEFFS == 1 \
-    && !defined (TARGET_POLY_AWARE)
+   explanation of what the opt-in is for -- including why `NUM_POLY_INT_COEFFS
+   == 1' is no longer a conjunct here: whether a back end wants the shorthand
+   is a per-back-end question, and this branch's build-wide constant is 2
+   while 37 of 47 back ends are still unconverted.  */
+#if defined (IN_TARGET_CODE) && !defined (TARGET_POLY_AWARE)
 #define ONLY_FIXED_SIZE_MODES 1
 #else
 #define ONLY_FIXED_SIZE_MODES 0
@@ -673,8 +675,20 @@ mode_to_nunits (machine_mode mode)
 
 /* Get the size in bytes of an object of mode MODE.  */
 
+/* The four fixed-size accessors below say `.to_constant ()' and not
+   `.coeffs[0]'.  At NUM_POLY_INT_COEFFS == 1 the two are the same expression
+   -- is_constant () is `return true' for N == 1 -- so this is free, and no
+   single-target build changes.  At 2, which is what a multi-target build
+   with aarch64 configured has, they differ in the way that matters: coeffs[0]
+   DISCARDS a non-zero coefficient 1 with no diagnostic, while to_constant ()
+   asserts is_constant () first.  Unconverted target code never legitimately
+   sees a variable-size mode -- only aarch64 and riscv have any, and both are
+   TARGET_POLY_AWARE -- so the assert is the statement of that invariant
+   rather than a cost, and if the shared mode vocabulary ever does hand one of
+   these back ends an SVE mode the build says so by name instead of quietly
+   computing with half a value.  */
 #if ONLY_FIXED_SIZE_MODES
-#define GET_MODE_SIZE(MODE) ((unsigned short) mode_to_bytes (MODE).coeffs[0])
+#define GET_MODE_SIZE(MODE) ((unsigned short) mode_to_bytes (MODE).to_constant ())
 #else
 ALWAYS_INLINE poly_uint16
 GET_MODE_SIZE (machine_mode mode)
@@ -700,7 +714,7 @@ GET_MODE_SIZE (const T &mode)
 /* Get the size in bits of an object of mode MODE.  */
 
 #if ONLY_FIXED_SIZE_MODES
-#define GET_MODE_BITSIZE(MODE) ((unsigned short) mode_to_bits (MODE).coeffs[0])
+#define GET_MODE_BITSIZE(MODE) ((unsigned short) mode_to_bits (MODE).to_constant ())
 #else
 ALWAYS_INLINE poly_uint16
 GET_MODE_BITSIZE (machine_mode mode)
@@ -727,7 +741,7 @@ GET_MODE_BITSIZE (const T &mode)
 
 #if ONLY_FIXED_SIZE_MODES
 #define GET_MODE_PRECISION(MODE) \
-  ((unsigned short) mode_to_precision (MODE).coeffs[0])
+  ((unsigned short) mode_to_precision (MODE).to_constant ())
 #else
 ALWAYS_INLINE poly_uint16
 GET_MODE_PRECISION (machine_mode mode)
@@ -823,7 +837,7 @@ extern GCC_TARGET_TABLE (CONST_MODE_MASK unsigned HOST_WIDE_INT,
    complex modes and the number of elements for vector modes.  */
 
 #if ONLY_FIXED_SIZE_MODES
-#define GET_MODE_NUNITS(MODE) (mode_to_nunits (MODE).coeffs[0])
+#define GET_MODE_NUNITS(MODE) (mode_to_nunits (MODE).to_constant ())
 #else
 ALWAYS_INLINE poly_uint16
 GET_MODE_NUNITS (machine_mode mode)

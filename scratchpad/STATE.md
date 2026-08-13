@@ -11534,3 +11534,164 @@ Non-owned residue after the five causes is under a dozen diagnostics.
         differ), and it printed
         `mt cfg : /tmp/b-a7c3dbfdb9e33dfb7-pair/...` so it is confirmed to
         have run in THIS dir.
+
+---
+
+# `poly_int` ARITY -- THE WALL WAS ONE GATE, NOT THIRTY-NINE BACK ENDS
+
+Worktree `agent-a3128a3f87f3eecee`, build dirs `/tmp/b-a3128a3f87f3eecee-47`
+(47 back ends) and `-pair` (i386 + aarch64), both named for the worktree and
+both asserted from `config.log`.  Commit `84f4e6db96d`.
+
+## 0. TWO CORRECTIONS TO THE BRIEF, BEFORE THE RESULT
+
+  * **The anchor is 45, not 43.**  `grep -c MULTI_TARGET gcc/Makefile.in` reads
+    **45** in this worktree, and `mtN-conf.sh`'s own comment explains why (the
+    `MULTI_TARGET_GEN_HDRS` dependency on the `s-options-h` rule plus its
+    comment add two hits).  Anything asserting 43 will refuse a correct tree.
+  * **A 48-back-end build cannot reach back-end compilation at all**, so the
+    "45 of 47 fail at back-end compilation" figure cannot be reproduced at 48.
+    Configured with all 48, `make -k all-gcc` dies in the GENERATORS with
+    **1024 `error:` lines, every one of them `loongarch-opts.h:107`** (1981
+    mentions), and `gengtype` never runs.  That is cause 8, another task's, and
+    it masks this wall completely.  Everything below is therefore the **47**,
+    loongarch excluded -- which is what STATE.md's own "only thing between 47
+    and 48" already implies.
+
+## 1. THE MECHANISM, WHICH ALREADY EXISTED AND ALREADY WORKED
+
+`TARGET_POLY_AWARE` is a back end's declaration that its sources say
+`known_lt`/`maybe_ne`/`to_constant ()` instead of relying on the fixed-size
+shorthand.  **Ten back ends declare it** in their own `config/<cpu>/t-<cpu>`:
+aarch64 arm avr i386 mips nds32 riscv rs6000 s390 sparc.
+
+The delivery is complete -- the "widen this when the compiler proper gets
+per-back-end objects" note in `gen-multi-target-md.awk` has already been
+actioned in `emit_base_objects`.  **Measured in the 47-back-end build's own
+generated `multi-target-md.mk`**, not argued: all 47 back ends have per-base
+objects, and the ten above are **exactly** the ones whose `$(COMPILE)` lines
+carry `-DTARGET_POLY_AWARE`.
+
+## 2. THE DEFECT: A PER-BACK-END SWITCH CONJOINED ON A BUILD-WIDE CONSTANT
+
+Two gates, one sentence apart in intent, both written
+`... && NUM_POLY_INT_COEFFS == 1 && !defined (TARGET_POLY_AWARE)`:
+
+    coretypes.h:589  POLY_INT_CONVERSION    the poly_int -> C conversion operator
+    machmode.h:104   ONLY_FIXED_SIZE_MODES  GET_MODE_{SIZE,BITSIZE,PRECISION,NUNITS}
+
+`coretypes.h`'s own comment describes a plan in which every back end is
+converted BEFORE the constant flips to 2.  **On this branch the flip landed
+first** (`genmodes` puts `NUM_POLY_INT_COEFFS` in the shared numbering;
+aarch64 being configured makes it 2 for the whole build) while **37 of 47**
+back ends are unconverted.  At 2 that conjunct withholds the shorthand from
+*everyone*: opting in selects nothing, not opting in buys nothing, and the
+migration mechanism is **inert in exactly the build that needs it**.
+
+Whether a back end wants the shorthand is a **per-back-end** question and must
+not consult a build-wide constant.  Both conjuncts dropped.
+
+**This is not the §2a shape and the distinction is the whole point.**  The
+conversion operator returns `coeffs[0]` of the `poly_int` in hand after
+`gcc_checking_assert (is_constant ())` -- the same value the back end computed
+at N == 1, and nobody else's answer.  No `#ifndef` floor, no default, no
+fallback to a primary.
+
+**And the residual risk was narrowed rather than accepted.**  The four
+`ONLY_FIXED_SIZE_MODES` accessors said `.coeffs[0]`, which DISCARDS a non-zero
+coefficient 1 silently; they now say `.to_constant ()`, which asserts first.
+At N == 1 the two are the same expression (`is_constant ()` is `return true`
+for N == 1), so **no single-target build changes**.
+
+## 3. MEASURED, BEFORE AND AFTER, IN THE SAME BUILD DIR
+
+    total `error:' lines                3060 -> 842
+    poly-class diagnostics              2224 -> 9   (upper bound, see below)
+    failing per-base back-end objects     41 -> 11
+    back ends with a failing such object  39 -> 11
+    of the 41, now BUILT on disk                30
+
+**39 back ends is confirmed; ~1800 was low -- the real figure is 2224** by an
+over-broad regex and the true poly count is higher than 1800 either way.  The
+filed note's "36 back ends, 1,034 sites" is not what this build shows.
+
+**Both halves of the object count come from two independent instruments that
+agree**, because under `make -k` an object whose prerequisite failed is never
+attempted and that reads identically to success: the log's own
+`make: *** [<obj>] Error` lines say 41 -> 11, and `scratchpad/poly-verify.sh`
+reads the **filesystem** and says 30 of the 41 now exist.  Neither number is
+taken from a count of diagnostics.
+
+**Instrument error worth recording**: attributing diagnostics to a back end by
+the nearest preceding compile line is WRONG under `-j8` -- the i386 compile
+command is followed by visium's errors, from a different job.  A first pass
+did this and produced a plausible per-CPU table with converted back ends in
+it.  Attribution must come from make's own failing-target lines.
+
+## 4. THE RESIDUE, GROUPED BY CAUSE -- 842 LINES, ALMOST NONE OF IT poly
+
+  * **733** `builtin_define` / `builtin_assert` / `builtin_define_std` not
+    declared, in `target-c-ops-<cpu>.o`, `target-cdata-<cpu>.o`,
+    `target-regs-<cpu>.o`.  **This is rs6000's "cause B" generalised**:
+    `TARGET_CPU_CPP_BUILTINS` expanded in the one TU that sees each back end's
+    own `tm.h`, without `c-family/c-common.h`.  Largest remaining class by far
+    and the obvious next task.
+  * **35** `MAX_BITS_PER_WORD` `#error`s -- that guard working, by name.
+  * **17** `base operand of '->' is not a pointer`.
+  * **9** `conflicts with a previous declaration`.
+  * **7** `common/config/arm/arm-common.cc`: `arch_option*` vs `aarch64_arch`
+    -- the name-collision family, another task's area.
+  * **5** `gt-<cpu>.h: No such file` (gengtype), **3** `REG_CLASS_NAMES` vs
+    `N_REG_CLASSES` static assertion.
+  * **2 genuinely poly**, both `arm.h:1378` `MODE_BASE_REG_CLASS`:
+    `GET_MODE_SIZE (MODE) >= 4` **on a back end that IS poly-aware**.  A gap in
+    arm's own conversion, **identical in the before and after logs (2 and 2)**,
+    so it is arm's conversion debt, not a regression here, and it belongs to
+    the per-back-end conversion track.
+
+The "9" above is from a deliberately over-broad regex: `cannot convert` and
+`no match for` also catch the name-collision family.  **9 is the upper bound,
+2 is the measured truth.**
+
+## 5. BARS -- ALL PASS, THE PAIR DOES NOT MOVE
+
+The pair is unaffected **by construction as well as by measurement**: with
+`TARGET_POLY_AWARE` defined, the old and new conditions are literally the same
+expression, and i386 and aarch64 both declare it.
+
+  * `/tmp/b-a3128a3f87f3eecee-pair`: `make all-gcc` **rc=0**, 0 `error:`;
+    `make multi-target-objs cc1 lto1` **rc=0**, 0 `error:`, log 1 line;
+    `cc1` links (88932304 bytes).
+  * `specs-config` for x86_64 is **230 lines**, against the recorded 230 --
+    checked as a value, not as `test -s`.
+  * **`stock-compare.sh` vs `/tmp/b-stock`: 5/5 IDENTICAL**, 5 distinct md5s
+    per side, negative control firing (1158 vs 804 lines, differ), stderr
+    **0 bytes**.  `/tmp/b-stock` **does exist**, has a built `cc1`, and has
+    **0** `MULTI_TARGET` hits in `gcc/Makefile` -- the earlier report that it
+    was missing was wrong.
+  * x86_64 `-O2` on `scratchpad/big.c` (md5 `e4558c736e241860bc610c56e66f9c43`):
+    **12369 bytes / `378fc33c1e70`** -- the recorded bar exactly.  Input path
+    quoted with the count; basename `big.c`, the same basename as the recorded
+    run, which is what the `.file` sensitivity actually depends on.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+
+## 6. WHAT THIS DOES NOT CLAIM
+
+  * **No back end was compiled FOR.**  Every verdict is "the objects built".
+    The `str x19, [x7, -32]!` precedent stands; nothing here is a correctness
+    claim for any of the 30 newly-building back ends.
+  * `cc1` was **not** linked with 47 back ends -- the per-base objects are
+    still outside `OBJS`, and `targetm` selection is separate work.
+  * The 11 still-failing back ends are blocked by section 4's causes; **absence
+    of their objects is not evidence they are fixed**, which is why section 3
+    reports BUILT from the filesystem.
+  * loongarch is untouched and unmeasured here.
+
+## 7. NEXT
+
+  1. **The `TARGET_CPU_CPP_BUILTINS` include class (733 of the 842).**  One
+     cause, ~15 back ends, and rs6000 already showed the fix shape.
+  2. Cause 8 (loongarch `-opts.h`), which is the only thing standing between a
+     47-back-end build and a 48-back-end one, and which currently prevents any
+     48-way measurement at all.
+  3. `arm.h:1378` -- arm's own conversion gap, for the per-back-end track.
