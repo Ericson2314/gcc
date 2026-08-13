@@ -211,6 +211,24 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**"WHERE DOES IT ICE" IS NOT THE MEASUREMENT. "IS THE OUTPUT RIGHT" IS.**
+A wall was handed between agents as *"`int g(int a){return a+1;}` fails in
+`aarch64_can_eliminate` during postreload"*. At branch HEAD it did not fail at
+all — it **compiled, exited 0, and emitted**
+
+    str  x19, [x7, -32]!
+
+with matching wrong CFI: i386's `STACK_POINTER_REGNUM` and
+`FRAME_POINTER_REGNUM` (7 and 19) used as **aarch64's** stack and frame
+pointers. The loud failure had already become a quiet one, and tracking ICEs
+would have recorded that as *progress*.
+
+So: **every wall report must state what the compiler produced, not only where
+it stopped.** A wall that "moves" may have become silent wrong code. Check the
+emitted assembly against the target's real registers before believing a
+failure went away — and treat a disappeared ICE as suspicious until the output
+is inspected.
+
 **THE SYMBOL INSTRUMENT IS BLIND TO MACROS THAT EXPAND TO OPTION STATE, AND
 THAT IS EXACTLY WHERE THE WORST LEAKS LIVE.** `nm -uC` scores them as *absent*,
 and not by bad luck: `ix86_pmode` is `global_options.x_ix86_pmode`, a struct
@@ -509,6 +527,17 @@ values** — and had the five and the two been equal, it would have said nothing
 at all while every member after the first divergence held another member's
 value. Compare bodies, offsets and names; a count is the weakest evidence
 available and is silent in exactly the case that matters.
+
+**`python3` IS NOT IN THE DEV SHELL, and a script that "runs" without it can
+score a false green.** An injection arm written in Python did **nothing** —
+`python3: command not found` — so every downstream reading was of the
+*unmodified, fixed* compiler. It was caught only because that arm asserted
+both halves of every hunk were actually gone; a "did it still build?" check
+would have passed cleanly. Use `awk`/`sed`, and **assert that your injection
+produced the state you intended** rather than that it exited. (A sibling case:
+an injection deleted a `#define` but left the matching `#undef`, so the macro
+became *undefined* rather than the primary's — the injection ran, and produced
+a third state nobody was testing.)
 
 **Your grep's `--include` list can exclude the answer.** Real case: a search for
 what invokes `gen-reg-widths.sh` used `--include='*.in' --include='*.ac'
