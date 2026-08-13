@@ -545,6 +545,22 @@ at all while every member after the first divergence held another member's
 value. Compare bodies, offsets and names; a count is the weakest evidence
 available and is silent in exactly the case that matters.
 
+**`awk '$0 ~ f'` ON A DEMANGLED C++ NAME MATCHES NOTHING.** The `()` in
+`foo(rtx_insn*)` is an **empty regex group**, so the pattern matches nothing
+and six object-level arms scored EMPTY — which reads as *"there is no per-base
+copy"*, the opposite of the truth. Use `index($0, f)`. Sibling case: an `nm -C`
+sweep anchored on `$` scored zero definitions for twelve of fourteen entry
+points, the two that "worked" being function *pointers* with no argument-list
+suffix.
+
+**"There is no fallback for this macro" is NOT "this macro is not yet
+defined."** An agent skipped the `#undef` when redirecting `FUNCTION_MODE`,
+reasoning correctly that `defaults.h` has no fallback for it — but **the
+primary's `i386.h` has already been read** by that point. `rc` stayed 0, the
+redirect still won, and **the only signal was 495 warnings**. Always `#undef`
+before redefining, and treat a warning-count change as a finding rather than
+noise.
+
 **`python3` IS NOT IN THE DEV SHELL, and a script that "runs" without it can
 score a false green.** An injection arm written in Python did **nothing** —
 `python3: command not found` — so every downstream reading was of the
