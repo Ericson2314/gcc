@@ -46,9 +46,17 @@ const struct target_cdata_entry targetm_cdata_registry[] = {
 struct target_cdata targetm_cdata = {
 #define TARGET_CDATA_STR(F, M) TARGET_CDATA_POISON_STR,
 #define TARGET_CDATA_NUM(T, F, M) (T) TARGET_CDATA_POISON_NUM,
+  /* An optional field starts with BOTH slots poisoned.  The flag's poison is
+     its own third state rather than `false': `false' is a legitimate answer
+     here -- most back ends define none of these macros -- so it must not be
+     what an unwritten slot looks like.  */
+#define TARGET_CDATA_OPTNUM(T, F, M)					\
+  TARGET_CDATA_POISON_FLAG, (T) TARGET_CDATA_POISON_NUM,
   TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+  TARGET_CDATA_OPT_FIELDS (TARGET_CDATA_OPTNUM)
 #undef TARGET_CDATA_STR
 #undef TARGET_CDATA_NUM
+#undef TARGET_CDATA_OPTNUM
 };
 
 /* NULL until a target is selected; see `init_targetm_cdata'.  */
@@ -99,7 +107,39 @@ init_targetm_cdata (void)
     internal_error ("the selected back end%'s target-cdata refresh left "	\
 		    "%<%s%> unwritten; it was compiled against the "	\
 		    "redirected macros rather than its own tm.h", #F);
+  /* AN OPTIONAL FIELD IS CHECKED IN BOTH DIRECTIONS, and that is the point of
+     the shape.  The mandatory check above can only ask "was anything
+     written", because every back end has an answer.  Here `absent' is a real
+     answer, so a one-sided check would accept the two failures that matter:
+
+       flag still poisoned      -- the refresh never ran for this field, which
+				   a plain bool would have shown as a
+				   perfectly ordinary `this target has none'.
+       absent but value written -- the back end reported no macro and yet
+				   produced a number, so something evaluated a
+				   macro it does not have.  That can only be
+				   the redirection leaking, and it is exactly
+				   the silent wrong answer the conversion
+				   exists to remove.
+
+     Both name the field.  */
+#define TARGET_CDATA_OPTNUM(T, F, M)					\
+  if (targetm_cdata.has_##F == TARGET_CDATA_POISON_FLAG)		\
+    internal_error ("the selected back end%'s target-cdata refresh left "	\
+		    "%<%s%> undecided; it did not say whether this target "	\
+		    "defines %<%s%> at all", #F, #M);			\
+  if (targetm_cdata.has_##F						\
+      && targetm_cdata.F == (T) TARGET_CDATA_POISON_NUM)		\
+    internal_error ("the selected back end reports %<%s%> present but left "	\
+		    "its value unwritten", #M);				\
+  if (!targetm_cdata.has_##F						\
+      && targetm_cdata.F != (T) TARGET_CDATA_POISON_NUM)		\
+    internal_error ("the selected back end reports %<%s%> absent and yet "	\
+		    "wrote a value for it, so a macro it does not define "	\
+		    "was evaluated", #M);
   TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+  TARGET_CDATA_OPT_FIELDS (TARGET_CDATA_OPTNUM)
 #undef TARGET_CDATA_STR
 #undef TARGET_CDATA_NUM
+#undef TARGET_CDATA_OPTNUM
 }

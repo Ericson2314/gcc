@@ -364,9 +364,13 @@ expand_builtin_init_dwarf_reg_sizes (tree address)
   if (!init_state.wrote_return_column)
     init_return_column_size (mode, mem, DWARF_FRAME_RETURN_COLUMN);
 
-#ifdef DWARF_ALT_FRAME_RETURN_COLUMN
-  init_return_column_size (mode, mem, DWARF_ALT_FRAME_RETURN_COLUMN);
-#endif
+  /* Was `#ifdef DWARF_ALT_FRAME_RETURN_COLUMN' with no `#else'.  i386, which
+     this file is compiled against, has no alternative return column, so the
+     eleven back ends that do -- aarch64 among them -- never got a size
+     recorded for it.  See target-cdata.h.  */
+  if (targetm_cdata.has_dwarf_alt_frame_return_column)
+    init_return_column_size (mode, mem,
+			     targetm_cdata.dwarf_alt_frame_return_column);
 
   targetm.init_dwarf_reg_sizes_extra (address);
 }

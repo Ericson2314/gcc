@@ -1355,16 +1355,23 @@ default_internal_arg_pointer (void)
 rtx
 default_static_chain (const_tree ARG_UNUSED (fndecl_or_type), bool incoming_p)
 {
-  if (incoming_p)
-    {
-#ifdef STATIC_CHAIN_INCOMING_REGNUM
-      return gen_rtx_REG (Pmode, STATIC_CHAIN_INCOMING_REGNUM);
-#endif
-    }
+  /* These were `#ifdef STATIC_CHAIN_INCOMING_REGNUM' / `#ifdef
+     STATIC_CHAIN_REGNUM' with no `#else'.  This file is compiled ONCE,
+     against the primary base's tm.h, so both guards were answered by that one
+     back end on behalf of every target: i386 defines neither macro, so
+     neither `return' was emitted AT ALL and all 45 back ends that do define
+     STATIC_CHAIN_REGNUM fell through to the `sorry' below.  Nested functions
+     were unsupported everywhere, silently, for a reason no diagnostic
+     mentioned.  See target-cdata.h's TARGET_CDATA_OPT_FIELDS.
 
-#ifdef STATIC_CHAIN_REGNUM
-  return gen_rtx_REG (Pmode, STATIC_CHAIN_REGNUM);
-#endif
+     The absence is still representable, and still reaches the `sorry': three
+     back ends genuinely have no static chain register, and `has_' false is
+     their real answer rather than a missing one.  */
+  if (incoming_p && targetm_cdata.has_static_chain_incoming_regnum)
+    return gen_rtx_REG (Pmode, targetm_cdata.static_chain_incoming_regnum);
+
+  if (targetm_cdata.has_static_chain_regnum)
+    return gen_rtx_REG (Pmode, targetm_cdata.static_chain_regnum);
 
   {
     static bool issued_error;

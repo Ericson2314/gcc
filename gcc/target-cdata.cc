@@ -58,6 +58,12 @@ along with GCC; see the file COPYING3.  If not see
 the real tm.h macros of that base, not the redirected ones)
 #endif
 
+/* The `MT_HAS_<macro>' / `MT_VAL_<macro>' pairs for the OPTIONAL fields.  It
+   is included here and nowhere else, and it refuses to compile without
+   MULTI_TARGET_TARGETM_BASE, because its whole content is `#ifdef's that are
+   only meaningful when asked of one particular back end.  */
+#include "target-cdata-opt.h"
+
 /* Every field, from the one list in target-cdata.h.  Written this way rather
    than as a run of assignments so that a field cannot be added to the struct
    and forgotten here -- which would leave it holding the poison in a build
@@ -67,7 +73,23 @@ TARGETM_CDATA_SYMBOL (struct target_cdata *d)
 {
 #define TARGET_CDATA_STR(F, M) d->F = (M);
 #define TARGET_CDATA_NUM(T, F, M) d->F = (T) (M);
+  /* An OPTIONAL field writes BOTH slots, and writes the poison into the value
+     when the macro is absent.  Leaving the value alone in that case would be
+     the cheaper thing to write and would defeat the check in
+     target-cdata-select.cc, which requires an absent field to still hold the
+     poison -- that is what proves the absent arm is what ran, rather than a
+     real value having been computed from a leaked macro.
+
+     `MT_HAS_##M' pastes onto the macro NAME (`##' suppresses expansion of its
+     operand), so this reaches the pair in target-cdata-opt.h and not the
+     macro's value.  A field with no pair there is a compile error naming the
+     macro.  */
+#define TARGET_CDATA_OPTNUM(T, F, M)					\
+  d->has_##F = MT_HAS_##M;						\
+  d->F = MT_HAS_##M ? (T) (MT_VAL_##M) : (T) TARGET_CDATA_POISON_NUM;
   TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+  TARGET_CDATA_OPT_FIELDS (TARGET_CDATA_OPTNUM)
 #undef TARGET_CDATA_STR
 #undef TARGET_CDATA_NUM
+#undef TARGET_CDATA_OPTNUM
 }

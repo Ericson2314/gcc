@@ -81,6 +81,15 @@ along with GCC; see the file COPYING3.  If not see
    0xdeadbeef read as a signed int.  */
 #define TARGET_CDATA_POISON_NUM (-559038737)
 
+/* And for the presence flag of an OPTIONAL slot (see TARGET_CDATA_OPT_FIELDS).
+   That flag is a THREE-state `signed char', not a `bool', and the third state
+   is the whole point: `false' is a legitimate answer -- most back ends define
+   none of these macros -- so `false' cannot double as "the refresh never ran".
+   A plain bool would make an unwritten slot indistinguishable from a back end
+   that genuinely has no answer, which is precisely the confusion this
+   mechanism exists to remove.  */
+#define TARGET_CDATA_POISON_FLAG (-1)
+
 /* THE ONE LIST.  The struct, every back end's refresh function, the poisoned
    initialiser and the post-refresh poison check are ALL generated from this,
    so a field added in one place and forgotten in another is not expressible.
@@ -186,13 +195,90 @@ along with GCC; see the file COPYING3.  If not see
   NUM (unsigned short, dwarf_frame_return_column,				\
 					DWARF_FRAME_RETURN_COLUMN)
 
+/* THE OPTIONAL SCALARS -- MACROS A BACK END MAY LEGITIMATELY NOT DEFINE.
+
+   Every macro above is defined by every back end, so a slot and a value are
+   the whole story.  These are different in kind, and the difference is the
+   bug this list exists to close.
+
+   Shared code tests them with `#ifdef' and NO `#else': absence emits no code
+   at all.  Shared code is compiled against ONE base's tm.h, so the `#ifdef'
+   is answered by that base for every target.  i386 defines none of these
+   five; aarch64 defines four of them.  The result is not a wrong value -- it
+   is NO CODE, for every configured target, with nothing to say so.  That is
+   the `INIT_EXPANDERS' shape, and it is why the failure surfaces arbitrarily
+   far from the cause.
+
+   Arm D of the #68 sweep measured the population: of 78 SILENT actionable
+   macros, ELEVEN are ones aarch64 itself defines and shared code cannot see.
+   These are four of the eleven.  (`STATIC_CHAIN_INCOMING_REGNUM' is the fifth
+   entry here and rides along because it shares a use site with
+   `STATIC_CHAIN_REGNUM' -- converting one and leaving the other would leave
+   that function half in each world.  Only one back end defines it, and
+   aarch64 is not that back end, so it is not one of the eleven.)
+
+   ELEVEN AND NOT TWELVE, AND THE DIFFERENCE IS A CHECK WORKING.  The text
+   sweep scores twelve; asking the REAL PREPROCESSOR the same question, in a
+   shared TU built with emit-rtl.o's own flags, drops
+   `INIT_ARRAY_SECTION_ASM_OP'.  aarch64 does define it -- but so does the
+   context shared code compiles in, because `config/initfini-array.h' is on
+   i386-linux's tm_file chain too.  There is no absence there and nothing to
+   fix.  A grep for which back end spells a macro cannot see a definition that
+   arrives through an included header; that is why the text sweep is an upper
+   bound and the preprocessor arm is the one that settles it.
+
+   THE SHAPE IS A PAIR, NOT A SENTINEL VALUE, for the reason `INIT_EXPANDERS'
+   is a pair: 45 of 48 back ends define `STATIC_CHAIN_REGNUM' but three do
+   not, and 32 of 48 define `EMPTY_FIELD_BOUNDARY'.  An absence is a
+   LEGITIMATE STATE for those back ends, not an error and not a missing
+   answer, so it has to be REPRESENTED.  Encoding it as an in-band value --
+   regno 0, boundary 0, `INVALID_REGNUM' -- would put "this target has no
+   static chain register" and "this target's static chain is r0" into the same
+   bit pattern, which is the shared-numbering bug in miniature.
+
+   THE VALUE SLOT OF AN ABSENT FIELD STAYS POISONED, and the post-refresh
+   check in target-cdata-select.cc requires it to be: a back end that reports
+   `has_' false and yet wrote a value has evaluated a macro it does not have,
+   which can only mean the redirection leaked.  So the check is two-sided --
+   present implies not-poison, absent implies poison -- rather than the
+   one-sided "did anything get written" that the mandatory fields need.
+
+   ONLY MEASURED-INVARIANT, REFRESH-POINT-EVALUABLE MACROS BELONG HERE, on
+   exactly the terms the header comment sets out for the mandatory list.  All
+   five are constants or enum constants on the bases that define them
+   (aarch64: `R18_REGNUM', `32', `8', `AARCH64_DWARF_V0 + AARCH64_DWARF_NUMBER_V'),
+   so neither the invariance nor the evaluability question bites.
+
+     OPTNUM (type, field, MACRO)   generates `signed char has_<field>' and
+                                   `type <field>'.
+
+   The type rules are the mandatory list's, unchanged.  `empty_field_boundary'
+   is `unsigned int' rather than `unsigned short' for reason (2) up there: its
+   use site compares it against `DECL_ALIGN (decl)', which is `unsigned int',
+   and today the comparison is silent only because the macro is a literal the
+   compiler can prove non-negative.  As `unsigned short' it would promote to
+   `int' and the comparison against an `unsigned int' would become a
+   -Wsign-compare that is not in the baseline set.  */
+#define TARGET_CDATA_OPT_FIELDS(OPTNUM)					\
+  OPTNUM (unsigned short, static_chain_regnum,	STATIC_CHAIN_REGNUM)	\
+  OPTNUM (unsigned short, static_chain_incoming_regnum,			\
+					STATIC_CHAIN_INCOMING_REGNUM)	\
+  OPTNUM (unsigned int,	  empty_field_boundary,	EMPTY_FIELD_BOUNDARY)	\
+  OPTNUM (unsigned short, structure_size_boundary,			\
+					STRUCTURE_SIZE_BOUNDARY)	\
+  OPTNUM (unsigned short, dwarf_alt_frame_return_column,		\
+					DWARF_ALT_FRAME_RETURN_COLUMN)
+
 struct target_cdata
 {
 #define TARGET_CDATA_STR(F, M) const char *F;
 #define TARGET_CDATA_NUM(T, F, M) T F;
+#define TARGET_CDATA_OPTNUM(T, F, M) signed char has_##F; T F;
   TARGET_CDATA_FIELDS (TARGET_CDATA_STR, TARGET_CDATA_NUM)
+  TARGET_CDATA_OPT_FIELDS (TARGET_CDATA_OPTNUM)
 #undef TARGET_CDATA_STR
 #undef TARGET_CDATA_NUM
+#undef TARGET_CDATA_OPTNUM
 };
 
 /* One entry per configured back end.  The entry holds a FUNCTION, not a table:
