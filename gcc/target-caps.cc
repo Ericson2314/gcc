@@ -258,6 +258,7 @@ struct target_caps targ_caps =
   .as_loongarch_tls_le_relaxation = false,
   .as_loongarch_16b_atomic = false,
   .as_loongarch_eh_frame_pcrel_encoding = false,
+  .as_ltoffx_ldxmov_relocs = false,
   .as_s390_architecture_modifiers = false,
   .as_s390_vector_loadstore_alignment_hints = false,
   .as_s390_vector_loadstore_alignment_hints_on_z13 = false,
@@ -623,6 +624,8 @@ read_target_caps (const char *file)
 	targ_caps.as_loongarch_16b_atomic = value != 0;
       else if (strcmp (name, "as_loongarch_eh_frame_pcrel_encoding") == 0)
 	targ_caps.as_loongarch_eh_frame_pcrel_encoding = value != 0;
+      else if (strcmp (name, "as_ltoffx_ldxmov_relocs") == 0)
+	targ_caps.as_ltoffx_ldxmov_relocs = value != 0;
       else if (strcmp (name, "as_s390_architecture_modifiers") == 0)
 	targ_caps.as_s390_architecture_modifiers = value != 0;
       else if (strcmp (name, "as_s390_vector_loadstore_alignment_hints") == 0)

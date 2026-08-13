@@ -3223,3 +3223,241 @@ be settled by the user rather than guessed:
                         continuations instead of silently diffing them
     t113-norm.sh        normalises a recipe to the text the shell receives,
                         with the argument for why that is legitimate
+
+# TASK #116 -- THE 45 DELETED PROBE NAMES.  THE BRIEF'S LIST OF 17 IS WRONG; THE REAL DEFECT IS ONE MISSING STRUCT FIELD
+
+Worktree came up on `prog-target-12` at the bare-repo HEAD `7208eca60d0` --
+**39,189 commits behind `multi-target`**, and 30 commits AHEAD on an unrelated
+GCC-12-era branch, so a `git rebase` would have replayed someone else's
+release-branch commits onto the tip.  `git reset --hard multi-target` was the
+right move, not a rebase.  This is another session paying the PRINCIPLES 5
+trap; the ahead-count is a new wrinkle worth recording, because "30 ahead"
+reads like local work and is not.
+
+## 1. THE PREMISE.  I WAS ASKED TO VERIFY IT AND IT DOES NOT SURVIVE
+
+The brief said 17 of the 45 deleted probe names are "not converted and still
+read by real code, which now silently takes the capability-absent arm".
+Derived rather than assumed (`scratchpad/t116-survey.sh`), the count is **not
+17**.  Twelve of the seventeen are already handled, by three different
+mechanisms, and the brief's own worst-case claim is the one that fails hardest.
+
+| macro | brief says | actually |
+|---|---|---|
+| `HAVE_AS_ARCHITECTURE_MODIFIERS` | unconverted | **converted** -- `defaults.h:1685` -> `targ_caps.as_s390_architecture_modifiers` |
+| `HAVE_AS_VECTOR_LOADSTORE_ALIGNMENT_HINTS` | unconverted | **converted** -- `defaults.h:1687` |
+| `..._ON_Z13` | unconverted | **converted** -- `defaults.h:1690` |
+| `HAVE_AS_LTOFFX_LDXMOV_RELOCS` | unconverted, blocked on #36 | reader **converted** at `defaults.h:1654`; the real defect is elsewhere, see §2 |
+| `LD64_HAS_DEMANGLE` | absent arm runs | **converted** -- `darwin.h:305`, derived from `DEF_LD64_MAJOR` |
+| `LD64_HAS_EXPORT_DYNAMIC` | absent arm runs | **converted** -- `darwin.h:306` |
+| `LD64_HAS_NO_DEDUPLICATE` | absent arm runs | **converted** -- `darwin.h:307` |
+| `LD64_HAS_PLATFORM_VERSION` | absent arm runs | **converted** -- `darwin.h:308` |
+| `LD64_HAS_MACOS_VERSION_MIN` | absent arm runs | **converted** -- `darwin.h:309` |
+| `HAVE_GOLD_NON_DEFAULT_SPLIT_STACK` | read by `gcc.cc` | **converted** to a real spec; the only two mentions left in `gcc.cc` are PROSE in comments |
+| `LD64_VERSION` | value macro, reads as **0** | **false.**  `darwin.h:1338` has `#ifndef` -> `DEF_LD64` or `"85.2.1"`.  It is a **string**, used as `Init()` of an option Var -- never in an `#if` comparison |
+| `DSYMUTIL_VERSION` | value macro, reads as **0** | **false.**  `darwin.cc:119` has `#ifndef` -> `DET_UNKNOWN,0,0,0` **plus a `#warning`**.  It is a 4-element **initialiser list**, not a scalar in an `#if` |
+
+**The "worse shape" pair is the part of the brief that was most confidently
+stated and least correct.**  Neither is a scalar in an `#if`; neither reads as
+0; both have an explicit fallback and one of them warns.  The brief asked me to
+handle them "first and separately" and to derive the classification rather than
+trust it.  Deriving it is what dissolved the item.
+
+The genuinely-open remainder is **five**, and every one already carries a
+written reason and a commented-out emission line in
+`target-specs/configure.ac`, plus a matching note in `check-target-caps.sh`'s
+backlog: `as_avr_mlink_relax`, `as_avr_mrmw`, `as_avr_mgccisr` (consumer is
+`gen-avr-mmcu-specs.cc`, a BUILD-MACHINE program that cannot read `targ_caps`),
+`as_no_mul_bug_abort` (consumer is SPEC TEXT in `cris.h`), and
+`as_s390_machine_machinemode` (`S390_USE_TARGET_ATTRIBUTE` selects
+`SWITCHABLE_TARGET` with `#if`, which changes data layout and cannot be a
+run-time answer).  **These are documented deferrals, not oversights**, and I
+left them alone.  Nothing in this task changes their status.
+
+## 2. WHAT WAS ACTUALLY WRONG, AND IT WAS NOT ON THE LIST
+
+`gcc/defaults.h:1655` reads:
+
+    #define HAVE_AS_LTOFFX_LDXMOV_RELOCS (targ_caps.as_ltoffx_ldxmov_relocs)
+
+**`struct target_caps` had no field of that name.**  Not defaulted wrongly --
+absent.  So `--enable-backends` naming ia64 would have failed to COMPILE, with
+a diagnostic pointing at `defaults.h` rather than at anything ia64.
+
+Why nothing noticed, and it is a new shape worth naming:
+
+  * the macro is only ever expanded by `ia64.h` and by the output templates of
+    `*load_symptr_high` / `*load_symptr_low` in `ia64.md`, so it is expanded
+    **only in a build that enables ia64** -- and no such build exists here.
+    A macro body naming a nonexistent struct member is not an error until
+    something expands it.
+  * **`check-target-caps.sh` could not see it from either arm.**  Its
+    read-direction arm's corpus is the config files a build produces, and a key
+    nothing emits appears in none of them.  Its declared-vs-emitted arm finds a
+    *field with no writer*.  Neither finds a **writer-to-be with no field**,
+    which is what this was.
+
+**MEASURED, BOTH-SIDED** (`scratchpad/t116-field.sh`).  The subject is
+`as_ltoffx_ldxmov_relocs`; the control is `as_s390_architecture_modifiers`, a
+field from the *same block of `defaults.h`* that does exist.  Without the
+control, a failure here is indistinguishable from "the harness cannot compile
+`target-caps.h` at all", and the script exits non-zero rather than scoring if
+the control fails.
+
+    BEFORE:  control COMPILES   subject FAILS
+             error: 'struct target_caps' has no member named 'as_ltoffx_ldxmov_relocs'
+    AFTER:   control COMPILES   subject COMPILES
+
+### It is a CAPABILITY, derived on the user's test
+
+Could "does this `as` accept `@ltoffx` and `ld8.mov`" differ between two
+installations of the same compiler serving ia64?  **Yes** -- it is a property of
+the binutils in front of you.  So: capability, `target-specs`, not a hook.
+The probe already existed (`gcc_cv_as_ia64_ltoffx_ldxmov_relocs`); only the
+carrier was missing.
+
+**And it is not a generator problem, which the brief expected it to be.**  The
+two `.md` sites are **output templates**, not insn conditions.  Templates are
+copied into `insn-output.cc`, which is ordinary `!GENERATOR_FILE` C++ inside
+`cc1` and does reach `defaults.h`.  An insn *condition* would have been the #36
+gencondmd problem; a template is not.  **#36 does not block this and was not
+touched.**
+
+### Landed as four parts together, as the backlog comment insisted
+
+  * `gcc/target-caps.h` -- the field, defaulted `false`, which is exactly what
+    ia64.h's floor supplied for every build not configured for ia64.
+  * `gcc/target-caps.cc` -- designated initialiser and `strcmp` arm.
+  * `target-specs/configure.ac` -- the emission line, uncommented.
+  * `gcc/check-target-caps.sh` -- the backlog entry retired.  It could not be
+    left: the table is self-expiring and a stale entry is fatal by design.
+
+`target-specs/configure` regenerated with **autoconf 2.69** (matching its own
+header stamp), `rc=0`, empty stderr, and the diff against the checked-in file
+is **25 lines, all inside the intended hunk**.  The emission sits in the
+UNQUOTED heredoc whose backtick trap once silently dropped all 97 keys, so that
+was checked rather than assumed: the added prose contains no backticks, and
+`as_mfcrf`, `as_pltseq` and `solaris_ld` -- all emitted AFTER the insertion --
+still appear in the generated `configure`, which they would not if the heredoc
+had been swallowed.
+
+## 3. THE CHECK CAN GO RED.  METHOD RULE 7, AND MY FIRST ATTEMPT WAS A FALSE RED
+
+`scratchpad/t116-caps-check.sh` runs `check-target-caps.sh` over a synthesised
+config file carrying **all 128 keys the emitter can write**, with a non-vacuity
+assertion that the subject key is present -- then injects two faults:
+
+    arm 1  real tree                        PASS   (want PASS)
+    arm 2  the new field deleted again      FAIL   (want FAIL)  -- and names it
+    arm 3  a bogus key in the config file   FAIL   (want FAIL)
+
+**Arm 2 was wrong the first time and it failed in the flattering direction.**
+It built the injected tree as a copy of `gcc/` alone, but the checker resolves
+its emitter as `$srcdir/../target-specs/configure.ac`, so the copy had no
+sibling and the checker died with "no emitter -- refusing to report".  That is
+`FAIL`, so the arm **scored as a passing fault injection while testing
+nothing**.  Fixed by giving the injected tree a sibling `target-specs/`, and
+the arm now additionally asserts the diagnostic **names the key**:
+
+    check-target-caps: capabilit(ies) that no target config file can ever carry
+      as_ltoffx_ldxmov_relocs
+
+A fault arm that fails for the wrong reason is a false red and is worth no more
+than a false green.  Recording it because the fix -- assert on the *content* of
+the diagnostic, not merely on the exit status -- is the same lesson as
+PRINCIPLES 4.7's "diff the artefact, never assert on its size".
+
+## 4. #46 -- MEASURED, DELIBERATELY NOT TOUCHED, AND THE COUNT IS RIGHT FOR THE WRONG REASON
+
+`scratchpad/t116-vacuous.sh` sweeps for `#ifdef` / `#ifndef` / `defined()`
+guards on the macros `defaults.h` now defines unconditionally over `targ_caps`.
+It finds **13 macros over 22 sites**, which corroborates #46's "~23" from an
+independent direction.
+
+**But they are NOT uniformly vacuous, and #46 must not be worked as one sweep.**
+`gcc/mkconfig.sh:76` is explicit: the guards in target headers "run while this
+header is being processed, **long before defaults.h**".  So an `#ifdef` in
+`rs6000/linux64.h` is the OLD floor mechanism still working, not a guard that
+cannot select.  The exception is `HAVE_LD_PIE`: `mkconfig.sh:93` pre-defines it
+to 1 *ahead of* the target headers, so `#ifdef HAVE_LD_PIE` in `alpha/linux.h`,
+`gnu.h`, `i386/gnu64.h` and `ia64/linux.h` **is** always-true today.
+
+So #46 is genuinely per-site adjudication, and its answer depends on include
+ORDER rather than on the macro.  I did not adjudicate the 22; none of them is
+among my 17, so nothing here closed any of them.  Left alone rather than
+half-done, as the brief directed.  The sweep is the useful artefact.
+
+The 13, for whoever picks up #46: `HAVE_AS_DSPR1_MULT`,
+`HAVE_AS_MMACOSX_VERSION_MIN_OPTION`, `HAVE_LD_AVR_AVRXMEGA2_FLMAP`,
+`HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH`, `HAVE_LD_AVR_AVRXMEGA4_FLMAP`,
+`HAVE_LD_CTF`, `HAVE_LD_EH_GC_SECTIONS`, `HAVE_LD_LARGE_TOC`,
+`HAVE_LD_NO_DOT_SYMS`, `HAVE_LD_PIE`, `HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE`,
+`HAVE_XCOFF_DWARF_EXTRAS`, `POWERPC64_TOC_POINTER_ALIGNMENT`.
+
+## 5. WHAT I DID NOT MEASURE, AND WHAT MY INSTRUMENTS CANNOT SEE
+
+  * **The conversion is UNVERIFIED AT RUN TIME and I am labelling it so.**
+    ia64 does not build in this tree, so nothing here executed
+    `*load_symptr_high` and observed it choose `@ltoffx` over `@ltoff`.  What is
+    verified is that the carrier now exists end to end: field, default, strcmp
+    arm, emission, and a checker that goes red by name when the field is removed.
+    The arm that is missing is exactly one: **an ia64 build emitting the two
+    spellings under a config file setting the key 1 and 0.**
+  * `t116-vacuous.sh` takes its macro list from the `!USED_FOR_TARGET` arm of
+    `defaults.h` only; a macro defined over `targ_caps` elsewhere is invisible
+    to it, and it does not search `.md` or generated files.
+  * `t116-survey.sh` deliberately does not use `grep --include` -- that filter
+    silently excludes `*.awk`, and an agent committed that trap this week after
+    citing it.  It excludes only the generated `gcc/configure` by path, and
+    asserts it can see `targ_caps` before scoring anything.
+  * I did not re-run the probe scoreboard.  Nothing here touches a probed macro,
+    so the 112 / 8-104 board should be unmoved, but that is an argument and not
+    a measurement.
+
+## 6. FILES (scratchpad)
+
+    t116-survey.sh      readers and definers of the 45/17, no --include filter
+    t116-field.sh       both-sided: the missing struct field, with a control
+    t116-caps-check.sh  check-target-caps over all 128 keys + 2 injected faults
+    t116-vacuous.sh     the #46 sweep: 13 macros, 22 sites, blind spots stated
+    t116-build.sh       /tmp/b116, this task's own build dir
+
+## 7. REGRESSION BARS, MEASURED ON /tmp/b116 (MY OWN BUILD DIR) AFTER THE CHANGE
+
+    make cc1                rc=0    cc1 = 88,694,984 bytes
+    make multi-target-objs  rc=0
+    gcc/target-caps.o       rebuilt (19,640 bytes), so the change is IN the build
+                            and not sitting behind a stale .Po
+
+**STDERR -- SAY WHICH ARM.**  Cold arm (configure + `make cc1` from empty):
+**627 lines, 98 of them `warning:`** -- nixpkgs gcc 15.2 compiling GCC, the
+documented host-compiler noise.  Incremental arm (`make multi-target-objs`
+immediately after): **0 lines**, which is below the documented 32-line floor and
+consistent with PRINCIPLES 6's note that the floor "varies with what was last
+rebuilt" -- the `.md` rules had already re-run in the cold pass.
+
+**THE ONE `error:` IN THE COLD LOG IS NOT MINE AND I CHECKED RATHER THAN
+ASSUMED.**  `collect2: error: ld returned 1 exit status` at line 18, inside the
+CONFIGURE phase, preceded by `cannot find -lgcc` from nix's unwrapped `ld.bfd`
+and followed immediately by configure's own `WARNING: I suspect your system does
+not have 32-bit development libraries`.  It is the 32-bit multilib probe failing
+as `t112-build.sh`'s header already documents, it happens before a single GCC
+source file is compiled, and `make cc1` still returned 0.  Recording it because
+"one error line in the log" is exactly the thing that gets waved through.
+
+### The key reaches the ARTEFACT, not just the source
+
+Checked at the object level, three-sided, because a name-matching instrument
+scoring 0 is a claim about the instrument:
+
+    as_ltoffx_ldxmov_relocs        in target-caps.o   1   (subject)
+    as_ltoffx_ldxmov_relocs        in cc1             1   (subject)
+    as_s390_architecture_modifiers in cc1             1   (positive control)
+    as_zzz_definitely_not_a_key    in cc1             0   (negative control)
+
+**The first attempt at this used `strings`, which is NOT ON PATH here**, so
+every arm scored 0 -- including the positive control, which is the only reason
+it was caught rather than being read as "the key never reached the binary".
+That is PRINCIPLES 5's "tool-not-found piped into `grep -c` scores 0, in the
+direction that makes the reference look correct", paid again. Redone with
+`grep -a`.

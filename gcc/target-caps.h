@@ -627,6 +627,30 @@ struct target_caps
   bool as_loongarch_16b_atomic;
   bool as_loongarch_eh_frame_pcrel_encoding;
 
+  /* ia64.  Assembler understands the @ltoffx relocation and the ld8.mov
+     spelling that goes with it.  Was HAVE_AS_LTOFFX_LDXMOV_RELOCS.
+
+     ITS TWO READERS ARE IN ia64.md, AND THAT IS WHY THIS FIELD WAS MISSING FOR
+     SO LONG.  defaults.h has defined HAVE_AS_LTOFFX_LDXMOV_RELOCS over this
+     name since the sweep, and `*load_symptr_high' and `*load_symptr_low' expand
+     it -- but they are OUTPUT TEMPLATES, compiled into insn-output.cc, so the
+     macro is only expanded in a build that enables ia64.  No such build exists
+     in this tree, so a struct with no such field compiled cleanly and the
+     defect sat behind a back end nobody configures: `--enable-backends' with
+     ia64 in it would have failed to compile, naming defaults.h rather than
+     anything ia64.  check-target-caps.sh could not see it either -- its
+     read-direction arm reads config files, and no config file carries a key
+     nothing emits.
+
+     Not an insn CONDITION, which matters: a condition would be folded by
+     gencondmd at build time and the run-time answer could never reach it.  An
+     output template is ordinary C++ in cc1, so this really is a capability.
+
+     false, like the rest of this sweep, and here the default is exactly what
+     the floor in ia64.h supplied for every build that was not configured for
+     ia64.  */
+  bool as_ltoffx_ldxmov_relocs;		/* HAVE_AS_LTOFFX_LDXMOV_RELOCS  */
+
   /* s390.  as_s390_machine_machinemode is deliberately absent: its consumer
      S390_USE_TARGET_ATTRIBUTE selects SWITCHABLE_TARGET with `#if', which
      cannot be a run-time answer.  See target-specs/configure.ac.  */

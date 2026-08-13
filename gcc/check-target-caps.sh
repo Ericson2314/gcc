@@ -641,14 +641,16 @@ target optout The configuration's own name, not a capability.  It is read throug
 #     gen-target-specs channel rather than to targ_caps.
 #   as_s390_machine_machinemode -- S390_USE_TARGET_ATTRIBUTE selects
 #     SWITCHABLE_TARGET with `#if', which cannot be a run-time answer.
-#   as_ltoffx_ldxmov_relocs -- reader is ia64.md.  THE .md HALF OF THIS IS NOW
-#     DONE: machine descriptions are in the corpus (see 3. above), so the reader
-#     is visible and this key would pass the read arm the moment it exists.
-#     What is still missing is the other three quarters -- a field in
-#     target-caps.h, a strcmp arm in target-caps.cc, and an emission line in
-#     target-specs/configure.ac -- and all three must land together.  Emitting
-#     it alone makes this check fatal on "emitted, but target-caps.h has no
-#     field", which is correct and is why it has not been done piecemeal.
+# as_ltoffx_ldxmov_relocs IS DONE and is deliberately no longer listed here.  All
+# four quarters landed together, as this comment used to insist they must: the
+# .md corpus (see 3. above) made the reader visible, and the field, the strcmp
+# arm and the emission line followed.  The field was the interesting one -- it
+# had never existed, while defaults.h had been defining
+# HAVE_AS_LTOFFX_LDXMOV_RELOCS over it for some time, so `--enable-backends'
+# naming ia64 would not have compiled.  Neither arm of this check could see
+# that: the read arm's corpus is the config files a build produces, and a key
+# nothing emits appears in none of them.  A declared-vs-emitted comparison finds
+# a field with no writer; nothing here finds a WRITER-TO-BE with no field.
 #
 # They are not listed as exemptions because they are neither declared nor
 # emitted, so there is no gap for an exemption to excuse and the stale-entry

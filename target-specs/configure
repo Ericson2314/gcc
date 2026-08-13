@@ -4988,14 +4988,21 @@ as_macos_build_version `ts_bool "$gcc_cv_as_darwin_build_version"`
 # beside asm_mrelax below rather than here -- as a spec, when someone writes
 # the cris side of it.
 #   as_no_mul_bug_abort `ts_bool "$gcc_cv_as_cris_no_mul_bug"`
-# ia64.  PROBED, NOT WRITTEN, AND THIS ONE IS A CHECKER LIMIT, NOT A DESIGN
-# GAP.  The reader exists and is correct -- defaults.h defines
-# HAVE_AS_LTOFFX_LDXMOV_RELOCS from this key and ia64.md reads it at
-# ia64.md:774 and :787 -- but check-target-caps.sh builds its reader corpus
-# from *.cc, *.h, *.c and *.def only, so an .md file is invisible to it and the
-# key reads as dead.  Uncomment this line together with adding "*.md" to that
-# find; doing it alone turns "make target-specs" red for everyone.
-#   as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
+# ia64.  WRITTEN NOW.  The reader is defaults.h defining
+# HAVE_AS_LTOFFX_LDXMOV_RELOCS from this key, expanded by the output templates
+# of "*load_symptr_high" and "*load_symptr_low" in ia64.md.  Those are templates
+# and not insn conditions, so they are ordinary C++ in insn-output.cc and a
+# run-time answer does reach them.
+#
+# This was blocked twice over and both halves are now done.  The checker could
+# not see an .md reader, which is fixed -- machine descriptions are in its
+# corpus, selected on content and calibrated two-sided.  And struct target_caps
+# had NO FIELD of this name at all, while defaults.h already defined the macro
+# over it: measured by compiling a reference to this field against a control
+# field from the same block, the control compiled and this one did not.  Nothing
+# noticed because the macro is only expanded in a build that enables ia64, and
+# no such build exists here.
+as_ltoffx_ldxmov_relocs `ts_bool "$gcc_cv_as_ia64_ltoffx_ldxmov_relocs"`
 # powerpc.
 as_mfcrf `ts_bool "$gcc_cv_as_powerpc_mfcrf"`
 as_power10_htm `ts_bool "$gcc_cv_as_power10_htm"`
