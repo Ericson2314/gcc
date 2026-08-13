@@ -181,6 +181,35 @@ covered.
     before/after table here would have two identical columns.
   * `config.log' in both dirs names this worktree; `mtb-conf.sh' asserts the
     anchor is exactly 45 and that the build dir is named for this worktree.
+
+  * **THE PAIR, `/tmp/b-a8666b938c097bb2f-pair', COLD, AND THIS IS NOT A
+    VACUOUS ARM EVEN THOUGH NO SOURCE CHANGED.**  The merge point
+    `c25ceefb5a5' had not been verified by anyone: the last recorded pair
+    green is the poly agent's, at `84f4e6db96d', two merges below it.  So this
+    is the first evidence that the merged tree still builds and still emits
+    upstream's code.
+
+      - `make -j8 all-gcc' **rc=0** (make's exit status), 0 `error:'.
+      - `make multi-target-objs cc1 lto1' **rc=0** (make's exit status), 0
+        `error:', log **1 line**.  `cc1' 88932304 bytes, `lto1' 86684488 --
+        the `cc1' size the poly agent recorded, unchanged.
+      - `specs-config' for x86_64 is **230 lines** against the recorded 230,
+        checked as a COUNT, not `test -s'.  aarch64's is also 230, probed with
+        the real aarch64 binutils on PATH.
+      - x86_64 `-O2' on
+        `.../agent-a8666b938c097bb2f/scratchpad/big.c' (md5
+        `e4558c736e241860bc610c56e66f9c43', 150 lines): **12369 bytes /
+        `378fc33c1e70'** -- the recorded bar exactly.  Input path quoted with
+        the count; basename `big.c', which is what the `.file' sensitivity
+        depends on.
+      - `stock-compare.sh' vs `/tmp/b-stock' (which DOES exist, is genuine
+        upstream at merge-base `c31b7a09eea', has a built `cc1' and **0**
+        `MULTI_TARGET' hits in `gcc/Makefile'): **5/5 IDENTICAL**, 5 distinct
+        md5s on each side, negative control firing (1158 vs 804 lines,
+        differ), stderr **0 bytes**, and it printed
+        `mt cfg : /tmp/b-a8666b938c097bb2f-pair/...' so it is confirmed to
+        have run in THIS dir.
+
   * **No probe-scoreboard figure is quoted; `macro-probe-run.sh' was not
     run.**  No aarch64 header pass is claimed.
   * "Produces objects" is not "the compiler is right for it."  Nothing here is
