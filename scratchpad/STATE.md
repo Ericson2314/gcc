@@ -8636,3 +8636,150 @@ the point: wiring it into the board changed the board, not the measurement.
     check.
   * The brief's "aarch64 8 PASS / 104 FAIL, TAB 27/5" could not be reproduced
     and was not reported against; §1 says why.
+
+---
+
+# THE `CONVERTED_NOARM` COLUMN: 33 -> 5, WITH NO COMPILER SOURCE CHANGED
+
+Successor to the section above, which closed with "the 33 `CONVERTED_NOARM`
+macros still have no arm ... it is the obvious next increment". Twenty-eight of
+the thirty-three now have one.
+
+## 1. The headline, and the number that went DOWN
+
+Run, not quoted -- `scratchpad/macro-probe-run.sh /tmp/b-a7c-t108`:
+
+    149 macros on the board = 75 unconverted + 32 TAB + 37 EXIST + 5 NO ARM
+    macros probed: 82   i386 PASS 82 FAIL 0   aarch64 PASS 3 FAIL 79
+    aarch64 PASS decomposition: 3 = 1 redirect-vs-itself (UNTRUSTED) + 2 other
+
+**The raw aarch64 header PASS fell 29 -> 3 and that is the success, not a
+regression.** The 29 was 2 trusted + 27 `UNTRUSTED-redirect-vs-itself`. The 3
+is 2 trusted + 1 untrusted. **The trusted count is unchanged at 2**, which is
+the honest statement of what happened: twenty-six untrusted greens were
+*exchanged* for arms that can fail, and nothing was banked. The one survivor is
+`ELIMINABLE_REGS`, which this shape cannot reach.
+
+## 2. What the new arms actually measure
+
+`scratchpad/exist-probe.sh`, pre-registered table extended 9 -> 37 macros:
+
+    37 examined  VALUE 12 PASS / 0 FAIL / 25 unmeasurable-or-report-only
+                 DISTINCT 37 ok / 0 FAIL, 35 DIFFER + 2 SAME
+
+  * **Nine new VALUE passes**, every prediction derived from the back ends' own
+    headers *before* any disassembly was read, and every one confirmed exactly:
+    `STACK_POINTER_REGNUM` 7/31, `FRAME_POINTER_REGNUM` 19/64,
+    `HARD_FRAME_POINTER_REGNUM` 6/29, `ARG_POINTER_REGNUM` 16/65,
+    `DWARF_FRAME_REGISTERS` 17/97, `MAX_STACK_ALIGNMENT` and
+    `MAX_SUPPORTED_STACK_ALIGNMENT` 2147483648/128, and the two
+    `HARD_FRAME_POINTER_IS_*` predicates 0/0. The derivation is written into
+    the script with file and line so it can be re-checked rather than trusted.
+  * **Nineteen scored on DISTINCTNESS only**, with the reason named per macro
+    and never smoothed into a pass. `Pmode` is the sharpest: i386's thunk
+    compiles to a read of `global_options+0x17`, which *is* `ix86_pmode` --
+    the silent-default trap, visible in the object. `MOVE_MAX`,
+    `MOVE_MAX_PIECES`, `STORE_MAX_PIECES`, `COMPARE_MAX_PIECES` are an
+    `ix86_tune_features` chain on i386 against a flat 16 on aarch64;
+    `MOVE_RATIO`/`CLEAR_RATIO`/`SET_RATIO` read `ix86_cost`.
+
+**No compiler source changed.** All twenty-eight already had a per-base thunk
+in `target-cumargs.cc`. The debt was never missing machinery; it was a missing
+measurement, exactly as the column's own definition says.
+
+## 3. Three instrument defects fixed, each fault-injected
+
+  1. **DISTINCTNESS was printed and never scored** -- so for the nineteen
+     option-state thunks, where it is the *only* proposition available, there
+     was no arm at all. It now has a sixth pre-registered field and fails on
+     disagreement. Injected by forcing `distinct=DIFFER`: 2 FAILs appear and
+     the new non-vacuity gate fires ("every scored macro came out DIFFER,
+     including the ones pre-registered SAME").
+  2. **`body ()` matched a hard-coded list of mangled argument suffixes**
+     (`sym "v>:"`, `sym "P9tree_node>:"`), so any thunk taking `bool` or `int`
+     returned an EMPTY body -- which reads as *"no per-base copy exists"*, the
+     inversion the file's own comment warns about one level up. Replaced by an
+     Itanium **length-prefix** match, `_ZL<len><name>`, which is exact and
+     suffix-agnostic at once. Measured: a naive substring match on
+     `mt_base_move_max` extracts **78** body lines because it also swallows
+     `mt_base_move_max_pieces`; the length-prefix match extracts **39**.
+     `.cold` fragments are excluded (gcc splits `mt_base_pmode`'s assert path
+     out, and the old form would have concatenated it).
+  3. **`objdump -d` lost the callee names** that distinctness depends on for a
+     dispatching thunk: i386's `FUNCTION_ARG_REGNO_P` body is
+     `jmp <ix86_...>`, aarch64's is `jmp <aarch64_...>`, and `strip_body`
+     erases both names, so the two compare EQUAL -- a **false SAME**, a red
+     for the wrong reason. Now `objdump -dr`, with the relocation lines kept
+     in the body and their offsets stripped (an offset left in would make
+     *every* macro DIFFER vacuously -- the failure `CONTROL_SAME` exists to
+     catch, reintroduced by the `-r` if done carelessly).
+
+Regression control for 2 and 3: **all nine pre-existing verdicts are
+byte-identical to the run before the change.**
+
+## 4. A GUARD THAT REFUSED A CORRECT RUN, AND THE REPAIR THAT IS NOT A LOWERED
+   THRESHOLD
+
+`macro-probe.sh` held `[ "$NMACRO" -ge 100 ]` on the header population. Moving
+28 macros onto the EXIST arm took that population to 82 and the harness
+**exited 9 on a correct run**. This is arm 0's INT-control disease in another
+place: *a control calibrated against a number this project is deliberately
+moving has an expiry date.* Lowering 100 to 80 would expire again on the next
+retirement and is indistinguishable from editing a probe to move a number.
+
+Replaced with an arithmetic identity, invariant under legitimate retirement and
+violated by what the floor was really guarding against:
+
+    NMACRO + |RETIRED intersect ALL| == |ALL|,  and NMACRO > 0
+
+**The first draft of it was wrong and firing told the truth about something
+else**, which is worth keeping: written against the *board* it reported
+`82 + 63 = 145, but the board has 149`. The four are real -- **eleven** macros
+are on the board and have never been in `macro-probe-list.txt`, because they
+never had a header arm (the register-class enumerators and the existence
+macros). The board and the header list are different populations; equating them
+is the same mistake as adding the TAB and EXIST totals. Injected on the fixed
+version (`NMACRO` decremented by one): fires with
+`81 probed + 56 retired = 137, but macro-probe-list.txt holds 138`.
+
+## 5. THE FIVE THAT REMAIN, each with the reason it could not be closed
+
+  * `ELIMINABLE_REGS`, `RELOAD_ELIMINABLE_REGS` -- `.rodata` **tables**, not
+    functions. `objdump -d` cannot see them; they need a data-section
+    comparison, a **seventh shape**. `ELIMINABLE_REGS` also carries the last
+    surviving `UNTRUSTED-redirect-vs-itself` green on the aarch64 column, and
+    since it is **poisoned** rather than redirected, what that arm compares is
+    a poison identifier against a real table -- wrong-reason shape 3. It wants
+    retiring the moment the data shape exists.
+  * `ALL_REGS`, `GENERAL_REGS`, `LIM_REG_CLASSES` -- register-class
+    **enumerators** carried by the `CONVERTED_REGS` union. No thunk exists to
+    read, and the union width is *deliberately* the same number in every
+    consumer TU, so agreement about them is evidence of nothing.
+
+## 6. Which tree was measured, and why a foreign build dir is admissible here
+
+`/tmp/b-a7c-t108` was configured from worktree `agent-a7c243ba5c0d4dfb9`
+(its `gcc/config.log` says so; anchor `MULTI_TARGET` = 39 in its `gcc/Makefile`
+and in this worktree's `gcc/Makefile.in`). Rather than assume that makes it
+equivalent, the **inputs that decide the content of
+`target-cumargs-{i386,aarch64}.o`** were compared directly and are
+**byte-identical** between the two trees: `gcc/target-cumargs.cc`,
+`gcc/target-frame.h`, `gcc/defaults.h`, `gcc/config/i386/i386.h`,
+`gcc/config/aarch64/aarch64.h`. The objects are therefore a valid reading of
+*this* tree's source. PRINCIPLES asks a harness to assert which tree it
+measures; this is that assertion as an equality of **inputs** rather than of
+paths.
+
+## 7. What I did not do
+
+  * **No compiler source changed.** The diff is three files under
+    `scratchpad/`. The codegen bars (`multi-target-objs`/`cc1`/`lto1`, the
+    x86_64 and aarch64 md5s, stock-compare 5/5) **cannot have moved**; they
+    were not run and are not claimed.
+  * `FUNCTION_MODE` is still REPORT-ONLY (i386=24, aarch64=27). A prediction
+    written after seeing the disassembly is a restatement, not a check; it
+    needs deriving from the mode union independently, which was not done.
+  * The nineteen distinctness-only macros are **not** claimed to have verified
+    values. `exist-probe.sh` says "this macro has an arm that can fail"; it
+    does not say "this macro's value has been verified", and that distinction
+    is the reason the summary prints VALUE and DISTINCT as separate lines.

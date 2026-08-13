@@ -115,18 +115,147 @@ BASES="i386 aarch64"
 # so both existence bits are 1 for i386 and 0 for aarch64.  Written down here
 # BEFORE the objects were disassembled.
 #
-# Format: <macro>:<thunk symbol>:<i386>:<aarch64>:<discriminate?>
+# Format: <macro>:<thunk symbol>:<i386>:<aarch64>:<discriminate?>:<distinctness>
 # A value of `?' means "no prediction registered -- report, do not score".
+#
+# ---------------------------------------------------------------------------
+# THE SIXTH FIELD, ADDED 2026-08-13, AND WHY IT IS NOT DECORATION.
+#
+# Before it, DISTINCTNESS was PRINTED and never SCORED: the run could not fail
+# on it.  That made it useless for exactly the macros this shape was extended
+# to cover -- the ones whose thunks read option state, where property A is
+# UNMEASURABLE and distinctness is the ONLY proposition left.  An arm that can
+# only print is not an arm (PRINCIPLES: `mechanism present but never invoked',
+# aimed at the instrument).  The field is the PRE-REGISTERED distinctness, and
+# a measured distinctness that disagrees with it is a FAIL.
+#
+# It is derivable from the headers alone, without disassembling anything:
+# if the two back ends define the macro differently, or one defines it and the
+# other falls to `defaults.h', the two thunks must compile to different
+# bodies.  If NEITHER base defines it, both get the same generic definition and
+# the bodies must be the SAME -- and that is an honest negative, recorded as
+# such, not a macro this pair can demonstrate anything about.
+#
+# ---------------------------------------------------------------------------
+# THE 2026-08-13 EXTENSION: 28 MACROS OFF THE `CONVERTED_NOARM' COLUMN.
+#
+# Twenty-eight of the macros in the table below were `CONVERTED_NOARM' --
+# converted in the compiler and measured by NOTHING.  The only arm any of them
+# had was a header arm comparing a redirect with itself.  All 28 ALREADY had a
+# per-base thunk in `target-cumargs.cc'; NO COMPILER SOURCE CHANGED to give
+# them an arm, only this instrument.  That is worth stating plainly: the debt
+# was never missing machinery, it was a missing measurement.
+#
+# THE VALUE PREDICTIONS WERE DERIVED FROM THE BACK ENDS' OWN HEADERS BEFORE ANY
+# DISASSEMBLY WAS READ, and the derivation is written out so it can be checked
+# rather than trusted:
+#
+#   i386.h:1257,1260,1263,1264   ARG_POINTER_REGNUM  = ARGP_REG
+#                                STACK_POINTER_REGNUM = SP_REG
+#                                FRAME_POINTER_REGNUM = FRAME_REG
+#                                HARD_FRAME_POINTER_REGNUM = BP_REG
+#   i386.md:435,438              ARGP_REG 16, FRAME_REG 19
+#                                (SP_REG 7 and BP_REG 6 from i386.h's reg enum)
+#   aarch64.h:766-769 + aarch64.md:74,76,110
+#                                R29_REGNUM 29, SP_REGNUM 31, SFP_REGNUM 64,
+#                                AP_REGNUM 65
+#   i386.h:997                   DWARF_FRAME_REGISTERS 17
+#   aarch64.h:819,820,827,832    AARCH64_DWARF_V0 64 + 32 V registers + 1 = 97
+#   i386.h:850                   MAX_STACK_ALIGNMENT = MAX_OFILE_ALIGNMENT,
+#   elfos.h:63                   which is ((1u << 28) * 8) = 2147483648
+#   defaults.h:1249              i386 defines MAX_STACK_ALIGNMENT, so
+#                                MAX_SUPPORTED_STACK_ALIGNMENT is the same
+#   defaults.h:1252-1253         aarch64 defines neither, so
+#                                MAX_STACK_ALIGNMENT = STACK_BOUNDARY = 128
+#                                (aarch64.h:91) and
+#                                MAX_SUPPORTED_STACK_ALIGNMENT =
+#                                PREFERRED_STACK_BOUNDARY = STACK_BOUNDARY = 128
+#                                (defaults.h:939, aarch64 defines no
+#                                PREFERRED_STACK_BOUNDARY)
+#   target-cumargs.cc:586-598    NEITHER base defines
+#                                HARD_FRAME_POINTER_IS_{FRAME,ARG}_POINTER, so
+#                                both fall to rtl.h's comparison and both are
+#                                false -> 0/0, SAME.  These two are the only
+#                                predicted-SAME entries in the table and they
+#                                are what makes SAME reachable in the SCORED
+#                                population rather than only in the control.
+#
+# The other NINETEEN are registered `?/?' ON PURPOSE and their verdict will be
+# UNMEASURABLE-BY-THIS-ARM.  That is not a gap being papered over, it is the
+# gap being named: their thunks read OPTION STATE (i386's MOVE_MAX is a chain
+# over TARGET_AVX512F / ix86_move_max / ix86_tune_features; i386's MOVE_RATIO
+# reads `ix86_cost'; `Pmode' is `ix86_pmode', the silent-default trap itself),
+# or they take arguments and dispatch to a back-end function.  For those,
+# DISTINCTNESS is the whole arm, and with the sixth field it is an arm that can
+# fail.
+#
+# WHAT THIS SHAPE STILL CANNOT REACH, stated rather than left silent:
+# `ELIMINABLE_REGS' and `RELOAD_ELIMINABLE_REGS' are `.rodata' TABLES, not
+# functions, so `objdump -d' cannot see them at all -- they need a data-section
+# comparison, a seventh shape.  `ALL_REGS', `GENERAL_REGS' and
+# `LIM_REG_CLASSES' are register-class ENUMERATORS handled by the
+# CONVERTED_REGS union and have no thunk here.  Those five stay
+# CONVERTED_NOARM, and they are the honest remainder.
+#
+# MEASURED 2026-08-13 against /tmp/b-a7c-t108: 37 macros, VALUE 12 PASS /
+# 0 FAIL / 25 unmeasurable-or-report-only, DISTINCT 37 ok / 0 FAIL,
+# 35 DIFFER + 2 SAME.  All nine pre-existing verdicts are BYTE-IDENTICAL to the
+# run before this change, which is the regression control for the rewritten
+# `body ()' and `strip_body ()'.
+#
+# ALL NINE NEW VALUE PREDICTIONS WERE CONFIRMED EXACTLY, including
+# 2147483648/128 -- the one that could most easily have been arithmetic done
+# wrong -- and none of the fourteen macros that turned out to be OPTSTATE was
+# quietly promoted to a pass.  Nineteen of the twenty-eight can be measured for
+# DISTINCTNESS ONLY, and that is what they are scored on.
+#
+# THE BUILD DIRECTORY IS NOT THIS WORKTREE'S, and that is checked rather than
+# assumed: /tmp/b-a7c-t108 was configured from worktree agent-a7c243ba5c0d4dfb9
+# (its `gcc/config.log' says so).  The four files that decide the CONTENT of
+# `target-cumargs-{i386,aarch64}.o' -- `target-cumargs.cc', `target-frame.h',
+# `defaults.h', `config/i386/i386.h' and `config/aarch64/aarch64.h' -- are
+# BYTE-IDENTICAL between that tree and this one, measured with `diff -q'.  So
+# the objects are a valid reading OF THIS TREE'S SOURCE.  PRINCIPLES says a
+# harness must assert which tree it measures; this is that assertion, and it is
+# an equality of inputs rather than an equality of paths.
 PREREG="\
-REG_PARM_STACK_SPACE:mt_base_has_reg_parm_stack_space:1:0:yes \
-PUSH_ROUNDING:mt_base_has_push_rounding:1:0:yes \
-PUSH_ARGS_REVERSED:mt_base_push_args_reversed:1:0:yes \
-FUNCTION_MODE:mt_base_function_mode:?:?:yes \
-ACCUMULATE_OUTGOING_ARGS:mt_base_accumulate_outgoing_args:?:?:yes \
-INCOMING_FRAME_SP_OFFSET:mt_base_incoming_frame_sp_offset:?:?:yes \
-DEFAULT_INCOMING_FRAME_SP_OFFSET:mt_base_default_incoming_frame_sp_offset:?:?:no \
-INCOMING_REG_PARM_STACK_SPACE:mt_base_incoming_reg_parm_stack_space:?:?:no \
-STACK_DYNAMIC_OFFSET:mt_base_stack_dynamic_offset:?:?:no"
+REG_PARM_STACK_SPACE:mt_base_has_reg_parm_stack_space:1:0:yes:DIFFER \
+PUSH_ROUNDING:mt_base_has_push_rounding:1:0:yes:DIFFER \
+PUSH_ARGS_REVERSED:mt_base_push_args_reversed:1:0:yes:DIFFER \
+FUNCTION_MODE:mt_base_function_mode:?:?:yes:DIFFER \
+ACCUMULATE_OUTGOING_ARGS:mt_base_accumulate_outgoing_args:?:?:yes:DIFFER \
+INCOMING_FRAME_SP_OFFSET:mt_base_incoming_frame_sp_offset:?:?:yes:DIFFER \
+DEFAULT_INCOMING_FRAME_SP_OFFSET:mt_base_default_incoming_frame_sp_offset:?:?:no:DIFFER \
+INCOMING_REG_PARM_STACK_SPACE:mt_base_incoming_reg_parm_stack_space:?:?:no:DIFFER \
+STACK_DYNAMIC_OFFSET:mt_base_stack_dynamic_offset:?:?:no:DIFFER \
+STACK_POINTER_REGNUM:mt_base_stack_pointer_regnum:7:31:yes:DIFFER \
+FRAME_POINTER_REGNUM:mt_base_frame_pointer_regnum:19:64:yes:DIFFER \
+HARD_FRAME_POINTER_REGNUM:mt_base_hard_frame_pointer_regnum:6:29:yes:DIFFER \
+ARG_POINTER_REGNUM:mt_base_arg_pointer_regnum:16:65:yes:DIFFER \
+DWARF_FRAME_REGISTERS:mt_base_dwarf_frame_registers:17:97:yes:DIFFER \
+MAX_STACK_ALIGNMENT:mt_base_max_stack_alignment:2147483648:128:yes:DIFFER \
+MAX_SUPPORTED_STACK_ALIGNMENT:mt_base_max_supported_stack_alignment:2147483648:128:yes:DIFFER \
+HARD_FRAME_POINTER_IS_FRAME_POINTER:mt_base_hard_frame_pointer_is_frame_pointer:0:0:no:SAME \
+HARD_FRAME_POINTER_IS_ARG_POINTER:mt_base_hard_frame_pointer_is_arg_pointer:0:0:no:SAME \
+STACK_BOUNDARY:mt_base_stack_boundary:?:?:no:DIFFER \
+PREFERRED_STACK_BOUNDARY:mt_base_preferred_stack_boundary:?:?:no:DIFFER \
+INCOMING_STACK_BOUNDARY:mt_base_incoming_stack_boundary:?:?:no:DIFFER \
+SUPPORTS_STACK_ALIGNMENT:mt_base_supports_stack_alignment:?:?:no:DIFFER \
+Pmode:mt_base_pmode:?:?:no:DIFFER \
+MOVE_MAX:mt_base_move_max:?:?:no:DIFFER \
+MOVE_MAX_PIECES:mt_base_move_max_pieces:?:?:no:DIFFER \
+STORE_MAX_PIECES:mt_base_store_max_pieces:?:?:no:DIFFER \
+COMPARE_MAX_PIECES:mt_base_compare_max_pieces:?:?:no:DIFFER \
+MOVE_RATIO:mt_base_move_ratio:?:?:no:DIFFER \
+CLEAR_RATIO:mt_base_clear_ratio:?:?:no:DIFFER \
+SET_RATIO:mt_base_set_ratio:?:?:no:DIFFER \
+MINIMUM_ALIGNMENT:mt_base_minimum_alignment:?:?:no:DIFFER \
+STACK_SLOT_ALIGNMENT:mt_base_stack_slot_alignment:?:?:no:DIFFER \
+OUTGOING_REG_PARM_STACK_SPACE:mt_base_outgoing_reg_parm_stack_space:?:?:no:DIFFER \
+FUNCTION_ARG_REGNO_P:mt_base_function_arg_regno_p:?:?:no:DIFFER \
+DEBUGGER_REGNO:mt_base_debugger_regno:?:?:no:DIFFER \
+DWARF_FRAME_REGNUM:mt_base_dwarf_frame_regnum:?:?:no:DIFFER \
+INITIAL_ELIMINATION_OFFSET:mt_base_initial_elimination_offset:?:?:no:DIFFER"
 
 # ---------------------------------------------------------------------------
 # THE MACHINE-READABLE ARM LIST, read by `macro-probe.sh'.
@@ -142,7 +271,7 @@ STACK_DYNAMIC_OFFSET:mt_base_stack_dynamic_offset:?:?:no"
 # satisfies the other's requirement.
 #
 # Read with  sed -n 's/^EXIST_MACROS="\(.*\)"$/\1/p'  -- keep it one line.
-EXIST_MACROS="REG_PARM_STACK_SPACE PUSH_ROUNDING PUSH_ARGS_REVERSED FUNCTION_MODE ACCUMULATE_OUTGOING_ARGS INCOMING_FRAME_SP_OFFSET DEFAULT_INCOMING_FRAME_SP_OFFSET INCOMING_REG_PARM_STACK_SPACE STACK_DYNAMIC_OFFSET"
+EXIST_MACROS="REG_PARM_STACK_SPACE PUSH_ROUNDING PUSH_ARGS_REVERSED FUNCTION_MODE ACCUMULATE_OUTGOING_ARGS INCOMING_FRAME_SP_OFFSET DEFAULT_INCOMING_FRAME_SP_OFFSET INCOMING_REG_PARM_STACK_SPACE STACK_DYNAMIC_OFFSET STACK_POINTER_REGNUM FRAME_POINTER_REGNUM HARD_FRAME_POINTER_REGNUM ARG_POINTER_REGNUM DWARF_FRAME_REGISTERS MAX_STACK_ALIGNMENT MAX_SUPPORTED_STACK_ALIGNMENT HARD_FRAME_POINTER_IS_FRAME_POINTER HARD_FRAME_POINTER_IS_ARG_POINTER STACK_BOUNDARY PREFERRED_STACK_BOUNDARY INCOMING_STACK_BOUNDARY SUPPORTS_STACK_ALIGNMENT Pmode MOVE_MAX MOVE_MAX_PIECES STORE_MAX_PIECES COMPARE_MAX_PIECES MOVE_RATIO CLEAR_RATIO SET_RATIO MINIMUM_ALIGNMENT STACK_SLOT_ALIGNMENT OUTGOING_REG_PARM_STACK_SPACE FUNCTION_ARG_REGNO_P DEBUGGER_REGNO DWARF_FRAME_REGNUM INITIAL_ELIMINATION_OFFSET"
 
 # DRIFT CHECK, and it is not decoration.  If EXIST_MACROS and PREREG can
 # disagree, the board can claim an arm this script does not run -- which is the
@@ -202,7 +331,7 @@ done
 # outside it (DEVSHELL.md).
 for b in $BASES; do
   nix-shell -I "nixpkgs=$NP" -p binutils --run \
-    "objdump -d '$BUILD/gcc/target-cumargs-$b.o'" > "$OUT/dis-$b.txt" 2> "$OUT/dis-$b.err" \
+    "objdump -dr '$BUILD/gcc/target-cumargs-$b.o'" > "$OUT/dis-$b.txt" 2> "$OUT/dis-$b.err" \
     || { cat "$OUT/dis-$b.err"; die "objdump failed for $b"; }
   [ -s "$OUT/dis-$b.txt" ] || die "empty disassembly for $b"
   # NON-VACUITY.  An empty or truncated disassembly makes every lookup below
@@ -218,11 +347,28 @@ done
 # via index() semantics -- `grep -F' -- never a regex over a demangled name.
 # PRINCIPLES: `awk '$0 ~ f'' on `foo(rtx_insn*)' matches NOTHING because `()'
 # is an empty group, and six arms once scored EMPTY reading as "absent".
-# ---------------------------------------------------------------------------
+#
+# MATCHED ON THE ITANIUM LENGTH PREFIX, `_ZL<len><name>', AND NOT ON A LIST OF
+# ARGUMENT SUFFIXES.  The old form spelled the mangled parameter list out
+# (`sym "v>:"', `sym "P9tree_node>:"'), which is fine for nine nullary
+# predicates and silently returns NOTHING for a thunk taking `bool' or `int' --
+# an empty body reads as "no per-base copy exists", the same inversion this
+# comment block warns about, one level up.  The length prefix is EXACT and
+# suffix-agnostic at once: `_ZL16mt_base_move_maxv' and
+# `_ZL23mt_base_move_max_pieces' cannot be confused, because the second's name
+# is 23 characters and so is never introduced by `_ZL16'.  A plain substring
+# match on `mt_base_move_max' WOULD confuse them, and that is the bug this
+# avoids rather than a hypothetical.
+#
+# `.cold' FRAGMENTS ARE EXCLUDED.  gcc splits `mt_base_pmode's assert path out
+# into `_ZL13mt_base_pmodev.cold', whose header line contains the same prefix;
+# without this the two chunks concatenate into one body and the classifier
+# reads instructions from a path that is not the function's.
 body () {                     # body <base> <symbol>
   awk -v sym="$2" '
-    /^[0-9a-f]+ </ { inf = (index ($0, sym "v>:") > 0 || index ($0, sym "P9tree_node>:") > 0) }
-    inf && /^ *[0-9a-f]+:/ { print }
+    BEGIN { pfx = "_ZL" length (sym) sym }
+    /^[0-9a-f]+ </ { inf = (index ($0, pfx) > 0 && index ($0, ".cold") == 0) }
+    inf && /^[ \t]*[0-9a-f]+:/ { print }
   ' "$OUT/dis-$1.txt"
 }
 
@@ -257,7 +403,20 @@ kind () {                     # kind <bodytext>
 # Strip the per-object noise from a body so DISTINCTNESS compares CONTENT.
 # The two objects lay functions out at different offsets, so without this
 # every macro scores DIFFER vacuously -- see CONTROL_SAME above.
-strip_body () { sed -e 's/^ *[0-9a-f]*:\t//' -e 's/#.*//' -e 's/[0-9a-f]* <.*>//'; }
+# The leading-offset strip must cover RELOCATION lines too (`objdump -dr'
+# prints them indented with tabs as `\t\t\t23: R_X86_64_PC32\tsym+0x2c'); a
+# form anchored on `^ *' leaves their offsets in, and those offsets differ
+# between the two objects, so EVERY macro would score DIFFER vacuously -- the
+# exact failure CONTROL_SAME exists to catch, reintroduced by the `-r'.
+#
+# `-r' IS WHAT MAKES DISTINCTNESS MEAN ANYTHING FOR A DISPATCHING THUNK.
+# Without it, i386's `FUNCTION_ARG_REGNO_P' body is `jmp <ix86_...>' and
+# aarch64's is `jmp <aarch64_...>'; the `<...>' strip below erases both callee
+# names and the two bodies compare EQUAL.  That is a false SAME -- a green
+# turning red for the wrong reason, which is the same disease as a red turning
+# green for the wrong reason.  With `-r' the callee's name survives on the
+# relocation line and the comparison is about content again.
+strip_body () { sed -e 's/^[ \t]*[0-9a-f]*:[ \t]*//' -e 's/#.*//' -e 's/[0-9a-f]* <.*>//'; }
 
 # ---------------------------------------------------------------------------
 # THE DISTINCTNESS CONTROL.  Runs BEFORE any verdict is issued.
@@ -281,6 +440,7 @@ fi
 # ---------------------------------------------------------------------------
 : > "$OUT/results.txt"
 n_pass=0 n_fail=0 n_unmeas=0 n_macro=0
+n_dpass=0 n_dfail=0 n_dsame=0 n_ddiff=0
 
 for e in $PREREG; do
   m=$(echo "$e" | cut -d: -f1)
@@ -288,6 +448,7 @@ for e in $PREREG; do
   w386=$(echo "$e" | cut -d: -f3)
   wa64=$(echo "$e" | cut -d: -f4)
   disc=$(echo "$e" | cut -d: -f5)
+  wdist=$(echo "$e" | cut -d: -f6)
   n_macro=$((n_macro + 1))
 
   b386=$(body i386 "$sym")
@@ -312,6 +473,16 @@ for e in $PREREG; do
   s386=$(echo "$b386" | strip_body)
   sa64=$(echo "$ba64" | strip_body)
   if [ "$s386" = "$sa64" ]; then distinct=SAME; else distinct=DIFFER; fi
+  if [ "$distinct" = SAME ]; then n_dsame=$((n_dsame + 1)); else n_ddiff=$((n_ddiff + 1)); fi
+
+  # ...AND IT IS SCORED, against the sixth field.  Printing it was not an arm.
+  dverd=
+  case "$wdist" in
+    '?') dverd="dist:REPORT-ONLY" ;;
+    "$distinct") dverd="dist:ok"; n_dpass=$((n_dpass + 1)) ;;
+    *) dverd="dist:FAIL measured $distinct, pre-registered $wdist"
+       n_dfail=$((n_dfail + 1)) ;;
+  esac
 
   # PROPERTY A -- VALUE.
   verdict=
@@ -340,14 +511,18 @@ for e in $PREREG; do
       ;;
   esac
 
-  printf '%-34s %-7s %s\n' "$m" "$distinct" "$verdict" | tee -a "$OUT/results.txt"
+  printf '%-36s %-7s %-11s %s\n' "$m" "$distinct" "$dverd" "$verdict" \
+    | tee -a "$OUT/results.txt"
 done
 
 echo "---"
-echo "macros examined            : $n_macro"
-echo "PASS (value + discrimination): $n_pass"
-echo "FAIL                       : $n_fail"
-echo "unmeasurable / report-only : $n_unmeas"
+echo "macros examined              : $n_macro"
+echo "VALUE  PASS                  : $n_pass"
+echo "VALUE  FAIL                  : $n_fail"
+echo "VALUE  unmeasurable/report   : $n_unmeas"
+echo "DISTINCT ok                  : $n_dpass"
+echo "DISTINCT FAIL                : $n_dfail"
+echo "distinctness measured        : $n_ddiff DIFFER, $n_dsame SAME"
 
 # NON-VACUITY on the scoring itself.
 [ "$n_macro" -ge 5 ] || die "only $n_macro macros scored; the table is not being read"
@@ -355,4 +530,21 @@ if [ "$n_pass" = 0 ] && [ "$n_fail" = 0 ]; then
   die "nothing was scored either way -- the classifier matched nothing.  \
 Refusing to report this as a clean run."
 fi
+
+# NON-VACUITY ON THE DISTINCTNESS ARM SPECIFICALLY, and it is the one that
+# matters most: distinctness is the ONLY proposition scored for the fourteen
+# option-state thunks, so an instrument that can only ever answer DIFFER would
+# pass all fourteen while proving nothing.  The table pre-registers two SAME
+# entries (the two HARD_FRAME_POINTER_IS_* predicates, false on both bases for
+# a reason written down in target-cumargs.cc), so a run in which SAME never
+# occurs among the scored macros means the comparison has stopped comparing
+# content -- the vacuous-DIFFER failure, now checked inside the scored
+# population and not only in the control.
+[ "$n_dsame" -gt 0 ] || die "every scored macro came out DIFFER, including the \
+ones pre-registered SAME.  The distinctness test is measuring layout, not \
+content; every DIFFER above is vacuous."
+[ "$n_ddiff" -gt 0 ] || die "every scored macro came out SAME.  The bodies are \
+not being extracted -- an empty body equals an empty body."
+[ "$n_dfail" = 0 ] || echo "NOTE: $n_dfail distinctness predictions failed; \
+re-read the headers, do not edit the table."
 exit 0

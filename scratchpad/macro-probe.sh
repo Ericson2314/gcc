@@ -431,8 +431,48 @@ NAMES=$(for n in $ALL; do
           case " $RETIRED " in *" $n "*) ;; *) echo "$n";; esac
         done)
 NMACRO=$(echo "$NAMES" | wc -l)
-[ "$NMACRO" -ge 100 ] || die "macro list has only $NMACRO entries; refusing to \
-report a result from a nearly empty set"
+
+# THE NON-VACUITY CHECK ON THE HEADER LIST, AND WHY IT IS NO LONGER A CONSTANT.
+#
+# It used to be `[ "$NMACRO" -ge 100 ]'.  That number was calibrated when the
+# retire set was small, and it is a CONTROL WITH AN EXPIRY DATE in exactly the
+# sense PRINCIPLES records for arm 0's INT control: the header population
+# shrinks every time a macro legitimately acquires a TAB or EXIST arm, so the
+# floor was guaranteed to fire eventually ON A CORRECT RUN.  It did, at 82,
+# when 28 macros moved off CONVERTED_NOARM onto the EXIST arm -- a RETIREMENT
+# WITH A REPLACEMENT, which is the shape this project wants, refused by a guard
+# that could not tell it from a collapse.
+#
+# The obvious repair -- lower 100 to 80 -- would expire again on the next
+# retirement, and would be indistinguishable from editing a probe to move a
+# number.  So the check is an ARITHMETIC IDENTITY instead, which is invariant
+# under legitimate retirement and is violated by the thing the floor was
+# actually guarding against (a parse of the board or of the retire set that
+# silently reads short):
+#
+#     NMACRO + |RETIRED intersect ALL| == |ALL|,   and NMACRO > 0.
+#
+# AGAINST |ALL| AND NOT AGAINST THE BOARD, and the first draft of this check
+# got that wrong -- which is worth keeping, because the wrong version FIRED and
+# told the truth about something else.  It reported `82 probed + 63 retired =
+# 145, but the board has 149', and the four missing are real: eleven macros are
+# on the board and have never been in `macro-probe-list.txt' at all, because
+# they never had a header arm to begin with (the register-class enumerators and
+# the existence macros).  The board and the header list are DIFFERENT
+# populations and equating them is the same mistake as adding the TAB and EXIST
+# totals.  The identity has to be within one population.
+#
+# A list that reads short now fails BY NAME with the arithmetic printed, at any
+# list size, rather than at a threshold somebody has to remember to move.
+NALL=$(echo "$ALL" | wc -l)
+NRETIRED=$(for n in $ALL; do
+             case " $RETIRED " in *" $n "*) echo "$n";; esac
+           done | wc -l)
+[ "$NMACRO" -gt 0 ] || die "the header macro list is EMPTY; refusing to report"
+[ $((NMACRO + NRETIRED)) -eq "$NALL" ] || die "header list arithmetic does \
+not close: $NMACRO probed + $NRETIRED retired = $((NMACRO + NRETIRED)), but \
+macro-probe-list.txt holds $NALL macros.  Something read short -- do NOT adjust \
+a threshold, find the entry that went missing."
 echo "probing $NMACRO macros in $BUILD"
 
 cd "$BUILD/gcc" || die "cd $BUILD/gcc"
