@@ -1,4 +1,202 @@
 ================================================================================
+SESSION: THE 733-DIAGNOSTIC `TARGET_CPU_CPP_BUILTINS' CLASS DOES NOT EXIST.
+It was already closed by `76afb178601', which is an ANCESTOR of the commit the
+733 was reported from.  Measured at merge point `c25ceefb5a5', cold, 47 back
+ends, ONE build dir:
+
+    `error:' lines total                             683   (brief said 842)
+    of them naming builtin_define/_assert/_std/...     0   (brief said 733)
+    target-c-ops-<cpu>.o built, of 47                47
+    back ends with a failing object                   12
+
+Build dirs `/tmp/b-a8666b938c097bb2f-47' and `-pair', named for worktree
+agent-a8666b938c097bb2f, anchor 45, srcdir asserted by `mtb-conf.sh'.
+NO COMPILER SOURCE WAS CHANGED THIS SESSION.  What landed is instruments and
+this record.
+================================================================================
+
+## 0. THE BRIEF'S PREMISE, AND WHY IT SURVIVED
+
+The brief: *"733 of those remaining 842 diagnostics are ONE cause --
+`TARGET_CPU_CPP_BUILTINS' is expanded without `c-family/c-common.h' in scope,
+across roughly 15 back ends."*  That is **cause B**, and it was fixed in
+`76afb178601'; `git log' puts it two commits BELOW `84f4e6db96d', the poly
+commit whose report the 733 comes from.  So the residue was quoted from a log
+taken against a tree that already contained the fix.
+
+Scored three ways, because under `make -k' "never attempted" and "passed" are
+the same silence and a zero from a name-matching instrument is a claim about
+the instrument (`scratchpad/mtb-cops-arm.sh', which runs its non-vacuity arm
+FIRST and refuses to score otherwise):
+
+  * **non-vacuity** -- the log mentions `target-c-ops' 116 times and carries
+    683 `error:' lines, so the greps below are demonstrably reading something.
+  * **the log** -- `builtin_define', `builtin_assert', `builtin_define_std',
+    `builtin_define_with_int_value', `builtin_define_with_value',
+    `preprocessing_asm_p', `preprocessing_trad_p', `c_dialect_cxx',
+    `c_dialect_objc', `c_register_addr_space', `flag_iso': **0 each**, and
+    **0** `target-c-ops' targets in make's own `*** [...] Error' lines.
+  * **the filesystem** -- `target-c-ops-<cpu>.o' present for **47 of 47**,
+    none missing.  This is the arm that distinguishes "closed" from "never
+    reached".
+
+A source sweep agrees and is independent of what got built
+(`scratchpad/ccb-vocab.sh', `ccb-decls.sh'): every identifier any in-tree
+`TARGET_CPU_CPP_BUILTINS' body names is either in `system.h', in
+`c-family/c-common.h', one of the four `pfile' macros `target-c-ops.cc'
+repeats, or a helper declared in that back end's own `<cpu>-protos.h' -- which
+is `tm_p.h', already included, already after `tree.h'.
+
+**No fallback was added, no floor, no default.  Nothing to declare against the
+`#ifndef' rule, because nothing was changed.**
+
+## 1. WHAT THE 683 ACTUALLY ARE, GROUPED BY CAUSE
+
+Attribution is from make's own failing-target lines only.  A first version of
+`mtb-residue.sh' scraped the back-end name off the end of the target path and
+reported back ends called **"3", "8" and "10"** -- `insn-recog-avr-3.o' ends
+in `-3'.  It now matches against a known cpu list and says so when it has
+none; a plausible table of nonexistent back ends is worse than no table.
+
+| n | cause | back ends | owner |
+|---|---|---|---|
+| 606 | `E_PSImode' -- the mode union emits no `E_'-prefixed alias | avr, msp430 | **owned elsewhere** |
+| 55 | **the shared `options.h' vocabulary** (section 2) | arm, gcn, nvptx | unowned |
+| 9 | `CPU_SIMPLE' in `insn-attr-common-frv.h' | frv | **owned elsewhere** |
+| 5 | `gt-<cpu>.h: No such file' | bpf cris ft32 iq2000 moxie | **owned elsewhere** (`machine_function') |
+| 3 | `mode_ibit'/`mode_fbit' read-only + `mode_*_tab' undeclared | avr | mode machinery |
+| 2 | `arm.h:1378' `MODE_BASE_REG_CLASS' poly | arm | arm's own conversion debt |
+| 1 | **`DWARF_FRAME_RETURN_COLUMN' is per-function** (section 3) | epiphany | **design fork** |
+| 1 | `gtype-desc.h' missing, a `-k' ordering artefact | -- | -- |
+
+**606 of 683 come from two back ends.**  A count is not a population, and this
+is the third time on this branch that the largest number has been the smallest
+problem.
+
+Failing back ends: **12 of 47** -- avr 13 targets, msp430 11, frv 9, nvptx 2,
+arm 2, and one each for moxie iq2000 gcn ft32 epiphany cris bpf.  All 47
+failing targets are **absent from disk**, read from the filesystem rather than
+inferred from the log.
+
+## 2. THE UNOWNED MAJORITY IS ONE CAUSE WITH TWO SPELLINGS -- PRINCIPLES 3
+
+55 of the 63 unowned diagnostics are `options.h' putting every back end's
+option vocabulary in one unqualified namespace.
+
+**(a) `loop' is an i386 enumerator.**  i386's `Enum(stringop_alg)' contributes
+a bare `loop' to the shared enum namespace.  So in any build with i386
+configured:
+
+    config/gcn/gcn-tree.cc:178   loop *loop = alloc_loop ();
+      error: lvalue required as left operand of assignment
+      error: cannot convert `stringop_alg' to `loop*'
+
+`loop * loop' parses as a MULTIPLICATION of two enumerators.  Same line shape
+in `config/nvptx/nvptx.cc:7042' and in four `arm.cc' declarations
+(`arm_mve_loop_valid_for_dlstp (loop *loop)' and friends, whose parameters
+then cascade into `vctp_insn', `vctp_reg', `vctp_step', `condconst',
+`condcount' being undeclared -- **19 diagnostics from one parameter list**).
+arm 19 + gcn 5 + nvptx 5.
+
+**(b) `options-arm.h' contains aarch64's variables.**  Literally:
+
+    options-arm.h:162  extern enum aarch64_arch selected_arch;
+    options-arm.h:165  #define selected_arch global_options.x_selected_arch
+
+so `common/config/arm/arm-common.cc:770''s `selected_arch = all_architectures
++ selected_cpu->arch;' assigns `const arch_option *' to `aarch64_arch', and
+nine more lines fail with `base operand of '->' is not a pointer'.
+arm-common 18 + `options-arm.h' 3.
+
+This is exactly the disguise table in PRINCIPLES 3 -- one name, several
+authorities, no diagnostic until a third back end arrives -- in the options
+vocabulary rather than the mode or attribute one.  `f3a75a98014' scoped the
+`<cpu>-opts.h' **macros**; option **variables and Enum value names** are still
+shared.  The fix shape is the branch's standing one (union the vocabulary,
+qualify only what collides), and it is a real change, not a patch: **left
+unstarted and handed over with this measurement**, because the namespace work
+on `E_PSImode' and `insn-attr-common-*' is live in two other worktrees and
+would collide.
+
+## 3. EPIPHANY'S `DWARF_FRAME_RETURN_COLUMN' IS NOT COMPILE-TIME DATA, AND THE
+## FIX THAT MAKES IT BUILD IS THE WRONG ONE
+
+One diagnostic, and it is the most interesting one here:
+
+    target-cdata.cc: In function `targetm_cdata_refresh_epiphany':
+    config/epiphany/epiphany.h:545: error: `current_function_decl'
+                                    was not declared in this scope
+
+because
+
+    epiphany.h:559  #define DWARF_FRAME_RETURN_COLUMN \
+                      DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO)
+    epiphany.h:544  #define EPIPHANY_RETURN_REGNO \
+                      ((current_function_decl != NULL \
+                        && epiphany_is_interrupt_p (current_function_decl)) \
+                       ? IRET_REGNUM : GPR_LR)
+
+`target-cdata.cc' runs **once**, at startup, with `current_function_decl'
+null.  `target-cdata.h''s own comment already states the rule: a macro that
+needs a DECLARATION is fine, a macro that needs per-function STATE is not,
+"however easy the include makes it to compile".
+
+**This is that rule's first live instance, and the trap is that the cheap fix
+is one include.**  Adding `tree.h' to `target-cdata.cc' compiles, evaluates
+with a null `current_function_decl', caches `GPR_LR' forever, and gives
+epiphany **the wrong DWARF return column in every interrupt handler** -- with
+no diagnostic.  The eight shared readers are all in `dwarf2cfi.cc', in
+per-function CFI generation, where upstream evaluates the macro with
+`current_function_decl' SET.  So the loud failure and a silent wrong-CFI bug
+are one include apart, in the wrong direction: the `str x19, [x7, -32]!'
+precedent exactly.  **Not fixed.  Reported as a design fork** (PRINCIPLES 2b):
+this field cannot be `target_cdata' for epiphany; it wants a hook or a
+per-function read, and choosing which is a design decision.
+
+**The sweep that found it had to be made transitive, and its first version
+scored epiphany CLEAN** -- the reassuring direction.  Matching only each cdata
+macro's own body finds `INIT_EXPANDERS' in ia64 and sparc (both `crtl->', and
+both irrelevant -- `INIT_EXPANDERS' is not a cdata field; that was an
+over-broad name parse) and **misses** epiphany, whose body names only
+`DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO)'.
+`scratchpad/cdata-perfn-sweep.sh' now expands through macros defined in the
+same back end's directory to depth 4, prints the chain it travelled, takes the
+field list from `target-cdata.h' itself (28 fields, asserted, after a
+one-entry-per-line parse silently dropped the wrapped entries), and **refuses
+to report a zero**, since a zero from this instrument is indistinguishable
+from it being broken -- which it demonstrably was.
+
+Result over ALL of `gcc/config/', not just the 47 configured: **exactly one**
+(macro, file) pair.  Source sweep, so the ~186 never-built targets are
+covered.
+
+## 4. BARS
+
+  * 47-back-end dir `/tmp/b-a8666b938c097bb2f-47', COLD, `make -k -j8
+    all-gcc' rc=**2** read from make's exit status.  683 `error:', 12/47 back
+    ends failing, 47/47 `target-c-ops-<cpu>.o' on disk.
+  * **There is no before/after pair, and that is stated rather than
+    manufactured**: the class the brief asked to close was already zero on
+    arrival, so there was nothing to change and no second arm to run.  A
+    before/after table here would have two identical columns.
+  * `config.log' in both dirs names this worktree; `mtb-conf.sh' asserts the
+    anchor is exactly 45 and that the build dir is named for this worktree.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh' was not
+    run.**  No aarch64 header pass is claimed.
+  * "Produces objects" is not "the compiler is right for it."  Nothing here is
+    a correctness claim for any back end.
+
+## 5. NEXT
+
+  1. **The `options.h' vocabulary (section 2)** -- 55 diagnostics, one cause,
+     the largest unowned group, and the same shape the branch has landed
+     eight times.
+  2. **Epiphany's `DWARF_FRAME_RETURN_COLUMN' (section 3)** -- a decision, not
+     a patch, and worth taking before someone adds the include.
+  3. Re-run `cdata-perfn-sweep.sh' whenever a field joins `target-cdata.h';
+     the field-count assertion will refuse a stale parse.
+
+================================================================================
 SESSION: CAUSE 8 IS CLOSED, AND IT WAS NOT "THE ONE THING BETWEEN 47 AND 48".
 It was the thing between 0 and 48.  Measured in ONE build dir, before/after:
 
