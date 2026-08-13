@@ -16,12 +16,46 @@ in one session and were right every time.
 One compiler binary serving all back ends, with **zero target-specific
 information baked in at compile time**.
 
-**Terminal state: no SHARED translation unit includes `tm.h`** — the singular
-`gcc/tm.h` that `mkconfig.sh` generates from one target's header chain goes
-away; only `libgcc` may possibly keep one. **A per-base file including its own
-`tm.h` is correct and stays.** Say it in the shared/per-base form, not as "no
-`tm.h` anywhere": the stronger phrasing has been in this file and an agent
+**THERE IS NO NON-ARCH-SPECIFIC `tm.h`, AND THERE NEVER WAS ONE.** This is the
+whole bug in one artefact, and it is worth reading the file before reasoning
+about it. The bare `gcc/tm.h` in a two-backend build is 1578 bytes whose
+business end is:
+
+```c
+#ifdef IN_GCC
+# include "config/i386/biarch64.h"
+# include "config/i386/i386.h"
+# include "config/i386/unix.h"
+# include "config/i386/att.h"
+# include "config/i386/x86-64.h"
+# include "config/i386/gnu-user-common.h"
+# include "config/i386/gnu-user64.h"
+# include "config/i386/linux-common.h"
+# include "config/i386/linux64.h"
+#endif
+```
+
+i386's **entire header chain, under a target-neutral filename**. It is not a
+generic `tm.h` missing its per-target parts — **it is the i386 `tm.h` wearing
+a name that does not say so.** 248 shared TUs write `#include "tm.h"`
+believing they get something generic and get x86. `Pmode`, `ELIMINABLE_REGS`,
+`INIT_EXPANDERS`, `ACCUMULATE_OUTGOING_ARGS` were each a file reading that
+list and not knowing it.
+
+By contrast `<base>-inc/tm.h` is a 62-byte shim that **says which base it is**:
+`#include "tm-i386.h"`.
+
+**Terminal state: no SHARED translation unit includes `tm.h`.** Not "delete
+the generic one" — **delete the one that lies**. A per-base file including its
+own `tm.h` is correct and stays. Say it in the shared/per-base form; the
+stronger "no `tm.h` anywhere" phrasing has been in this file and an agent
 could act on it wrongly.
+
+Two things not to lose when it goes: its **top half is genuinely
+target-neutral** (`DEFAULT_LIBC`, `HAVE_LD_PIE`, `TARGET_HAS_IFUNC` fallbacks)
+and must land somewhere, not simply vanish; and it ends with
+`#include "defaults.h"`, which is where the per-base redirects live — so the
+machinery replacing it is currently reached *through* it.
 
 Currently **248 files outside `config/` include `tm.h`**, plus 101 under it.
 Those 248 are the channel: `INIT_EXPANDERS`, `Pmode`, `ELIMINABLE_REGS`,
