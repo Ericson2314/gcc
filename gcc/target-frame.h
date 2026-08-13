@@ -866,6 +866,54 @@ struct target_frame_desc
      which is the definition and not a use.  That is what makes this one
      convertible where `FRAME_POINTER_CFA_OFFSET' is not; see defaults.h.  */
   bool (*accumulate_outgoing_args) (void);
+
+  /* `STACK_DYNAMIC_OFFSET' -- AND THIS ONE LEAKS IN THE OPPOSITE DIRECTION
+     FROM EVERY ENTRY ABOVE IT.  The others are "the primary's answer reaches
+     everyone".  Here **aarch64 defines the macro** (aarch64.h:1688, the
+     `-fstack-clash-protection' outgoing-args reservation) and **i386 does
+     not**, so `function.cc:1411' asked `#ifndef STACK_DYNAMIC_OFFSET', got
+     the PRIMARY's answer -- undefined -- and used function.cc's own generic
+     ladder for every target.  aarch64's definition was DISCARDED, including
+     for aarch64 itself.
+
+     Same shape as `has_init_expanders' above, where i386 defined nothing and
+     aarch64's `init_machine_status' was therefore never installed, and the
+     same family as `HAVE_V8HFmode': one authority answering an existence
+     question for many.  It is the reason this class keeps being found by
+     accident rather than by instrument -- **an absence produces no code at
+     all**, so no sweep looking for a wrong symbol or a wrong value can see
+     it.  `nm' scores a discarded definition exactly as it scores a correct
+     one: nothing.
+
+     WHAT WAS DISCARDED.  aarch64's body reserves
+     `STACK_CLASH_MIN_BYTES_OUTGOING_ARGS' of outgoing-argument space when
+     `flag_stack_clash_protection && cfun->calls_alloca' and the real outgoing
+     args are smaller, which is what lets `alloca' skip a probe.  Under the
+     generic ladder that reservation never happened, so
+     `-fstack-clash-protection' code with `alloca' was built without the space
+     its probing strategy assumes.
+
+     NO `has_' FLAG IS NEEDED HERE, unlike `INIT_EXPANDERS'.  The generic
+     ladder is a real, correct answer for a base that defines nothing -- 42 of
+     the 51 back ends are in that case -- so the `#ifndef' is reproduced
+     INSIDE the per-base thunk, where it is a fact about that base rather than
+     about whichever base compiled `function.cc'.  That is not the `#ifndef'
+     floor PRINCIPLES forbids: the floor is forbidden because it makes a
+     MISSING answer look like an answer, whereas here the base genuinely has
+     an answer and the ladder is how the base's own headers spell it.
+
+     `poly_int64' AND NOT `HOST_WIDE_INT', unlike the two sp offsets above:
+     `crtl->outgoing_args_size' is a `poly_int64', aarch64's arm is a
+     `ROUND_UP' of one, and `get_stack_dynamic_offset' returns one.
+
+     A CALL AT EVERY USE, and there is only one use to make: upstream already
+     funnels the macro through `get_stack_dynamic_offset ()' in function.cc
+     (added 2023, precisely so the macro "sees a predictable set of included
+     files").  That wrapper is now the only evaluation point in the tree, and
+     the macro is no longer defined in shared code at all -- so a future
+     shared spelling of the name fails BY NAME rather than silently picking up
+     a generic ladder.  */
+  poly_int64 (*stack_dynamic_offset) (tree fndecl);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1039,5 +1087,13 @@ extern bool mt_hard_frame_pointer_is_arg_pointer (void);
 extern HOST_WIDE_INT mt_incoming_frame_sp_offset (void);
 extern HOST_WIDE_INT mt_default_incoming_frame_sp_offset (void);
 extern bool mt_accumulate_outgoing_args (void);
+
+/* `STACK_DYNAMIC_OFFSET', for shared code.  NOT redirected in `defaults.h',
+   and deliberately so: `function.cc''s `get_stack_dynamic_offset ()' is the
+   only place in the tree that evaluated the macro, so the call goes there
+   directly and the shared definition is gone entirely -- the same treatment
+   `mt_init_expanders' gave `#ifdef INIT_EXPANDERS' rather than redirecting a
+   name that would then still be spellable.  */
+extern poly_int64 mt_stack_dynamic_offset (tree fndecl);
 
 #endif /* GCC_TARGET_FRAME_H */

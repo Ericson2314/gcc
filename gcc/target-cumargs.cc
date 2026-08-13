@@ -653,6 +653,63 @@ mt_base_accumulate_outgoing_args (void)
   return ACCUMULATE_OUTGOING_ARGS ? true : false;
 }
 
+/* `STACK_DYNAMIC_OFFSET', read in THIS base's translation unit -- and the
+   first entry in this file where the LEAK RAN THE OTHER WAY.  Everything
+   above closes "the primary's answer reached everyone".  This one closes
+   "the NON-primary's answer reached no one, itself included": aarch64
+   defines the macro (aarch64.h:1688), i386 does not, and `function.cc:1411'
+   asked `#ifndef STACK_DYNAMIC_OFFSET' in a translation unit compiled with
+   i386's `tm.h'.  The `#ifndef' was therefore true, aarch64's definition was
+   thrown away, and function.cc's generic ladder was used for every target.
+
+   THE LADDER IS REPRODUCED HERE RATHER THAN REACHED, for the same reason
+   `mt_base_default_incoming_frame_sp_offset' above reproduces dwarf2cfi.cc's:
+   it lives in a `.cc' file's private preprocessor block, not in a header, so
+   there is nothing to include.  It is copied verbatim from function.cc
+   :1413-1432 -- both arms, and the `INCOMING_REG_PARM_STACK_SPACE' derivation
+   from `REG_PARM_STACK_SPACE' at :1403 that decides which arm applies.  Those
+   two lines are function.cc's, and they were being decided by the primary as
+   well; here every name in them is THIS base's.
+
+   Note that `ACCUMULATE_OUTGOING_ARGS' inside the ladder is this base's real
+   macro, not the `mt_accumulate_outgoing_args ()' redirect -- this file is
+   compiled with `MULTI_TARGET_TARGETM_BASE' defined, so `defaults.h' leaves
+   the name alone.  Evaluating the ladder here and the redirect there would
+   have given the same answer for the SELECTED base and different answers for
+   every other; getting the real macro is what makes this a fact about this
+   base rather than about the current selection.  */
+#ifndef STACK_DYNAMIC_OFFSET
+
+# if defined (REG_PARM_STACK_SPACE) && !defined (INCOMING_REG_PARM_STACK_SPACE)
+#  define MT_BASE_INCOMING_REG_PARM_STACK_SPACE REG_PARM_STACK_SPACE
+# elif defined (INCOMING_REG_PARM_STACK_SPACE)
+#  define MT_BASE_INCOMING_REG_PARM_STACK_SPACE INCOMING_REG_PARM_STACK_SPACE
+# endif
+
+# ifdef MT_BASE_INCOMING_REG_PARM_STACK_SPACE
+#  define STACK_DYNAMIC_OFFSET(FNDECL)					\
+  ((ACCUMULATE_OUTGOING_ARGS						\
+    ? (crtl->outgoing_args_size						\
+       + (OUTGOING_REG_PARM_STACK_SPACE ((!(FNDECL) ? NULL_TREE	  	\
+					  : TREE_TYPE (FNDECL)))	\
+	  ? 0								\
+	  : MT_BASE_INCOMING_REG_PARM_STACK_SPACE (FNDECL)))		\
+    : 0) + (STACK_POINTER_OFFSET))
+# else
+#  define STACK_DYNAMIC_OFFSET(FNDECL)					\
+  ((ACCUMULATE_OUTGOING_ARGS ? crtl->outgoing_args_size			\
+    : poly_int64 (0))							\
+   + (STACK_POINTER_OFFSET))
+# endif
+
+#endif
+
+static poly_int64
+mt_base_stack_dynamic_offset (tree fndecl ATTRIBUTE_UNUSED)
+{
+  return STACK_DYNAMIC_OFFSET (fndecl);
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -942,7 +999,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_hard_frame_pointer_is_arg_pointer,
   mt_base_incoming_frame_sp_offset,
   mt_base_default_incoming_frame_sp_offset,
-  mt_base_accumulate_outgoing_args
+  mt_base_accumulate_outgoing_args,
+  mt_base_stack_dynamic_offset
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

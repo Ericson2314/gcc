@@ -2434,7 +2434,92 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    then reads `fs' out of whichever base is selected.  There is no macro to
    redirect -- shared code names a back-end-private struct field -- so the fix
    is a target hook, i.e. a design decision, and it is recorded rather than
-   taken.  */
+   taken.
+
+   ------------------------------------------------------------------------
+   `PUSH_ROUNDING' -- ALL 19 PREPROCESSOR SITES CLASSIFIED, NONE CONVERTED
+   (#133; `scratchpad/t133-push-sites.sh' re-derives the list).  i386 defines
+   it (i386.h:1621, `ix86_push_rounding'), aarch64 does not, 13 of 51 back
+   ends do -- so every `#ifdef PUSH_ROUNDING' below is answered by i386 for
+   every target, and `calls.o' carries `U ix86_push_rounding(poly_int<2u,
+   long>)' as well, i.e. it leaks as a VALUE and as an EXISTENCE question
+   both.  The classification is written down BEFORE any conversion because a
+   macro on a `#if' line cannot always become a runtime value, and two
+   `#if HAVE_ATTR_length' gates once would have evaluated a call-valued macro
+   to 0 and turned both passes off for every target.
+
+   SHAPE 1 -- ordinary statements under the guard.  `#ifdef' becomes
+   `if (mt_has_push_rounding ())', `PUSH_ROUNDING (x)' becomes
+   `mt_push_rounding (x)'.  Mechanical.
+       calls.cc:5181   function.cc:4151  lra-eliminations.cc:798
+       reload1.cc:3030 recog.cc:1835     rtlanal.cc:4914
+       expr.cc:4300    expr.cc:4354      expr.cc:1639     cse.cc:5628
+       targhooks.cc:912
+   Note targhooks.cc:912 is `return !ACCUMULATE_OUTGOING_ARGS;' under the
+   guard, i.e. `default_push_argument' -- the DEFAULT OF AN EXISTING TARGET
+   HOOK.  Several SHAPE-1 sites already test `targetm.calls.push_argument (0)'
+   INSIDE the `#ifdef', so for them the existence question is already answered
+   at run time and the `#ifdef' is only a compile-time short circuit on top of
+   it.  Converting targhooks.cc:912 alone would close more of this family than
+   its single line suggests.
+
+   SHAPE 2 -- `#ifndef' over ordinary statements.  Becomes
+   `if (!mt_has_push_rounding ())'.
+       expr.cc:1679             (a `gcc_unreachable' precondition)
+       combine-stack-adj.cc:841 (the pass gate)
+   combine-stack-adj.cc:841 IS COMPILED OUT FOR EVERY TARGET TODAY, because
+   i386 defines the macro.  That is a measured finding (#132), not a
+   measurement failure, and it is why `combine-stack-adj.o' binds
+   `mt_accumulate_outgoing_args' zero times.  Converting it TURNS A GATE ON
+   for the 38 back ends that define no `PUSH_ROUNDING', so it is the one site
+   in this family whose conversion changes pass behaviour rather than a value,
+   and it wants its own before/after.
+
+   SHAPE 3 -- guard over a DECLARATION or DEFINITION.  Cannot become an `if',
+   but needs no flag either: drop the guard and declare/define
+   unconditionally, since the bodies convert under SHAPE 1.
+       expr.cc:108   (forward declaration of `emit_single_push_insn')
+       expr.cc:5149  (definitions of `emit_single_push_insn_1' and
+                      `emit_single_push_insn')
+
+   SHAPE 4 -- guard over a MACRO definition.  Fold the existence test into the
+   macro body, which is already a run-time expression.
+       expr.cc:1595   `PUSHG_P' ->  `(mt_has_push_rounding () && (to) == 0)'
+       defaults.h:916 `PUSH_ARGS_REVERSED' -- see the separate note below.
+
+   SHAPE 5 -- `#ifdef' whose `#endif' sits between an `if' and its `else'.
+   Convertible, but it is a RESTRUCTURE of the if/else, not a substitution,
+   and reviewing it as if it were one is how a dropped `else' arm gets missed.
+       expr.cc:5384/:5424   expr.cc:5620/:5624
+
+   AND ONE TYPE TRAP THAT MAKES THIS NON-MECHANICAL.  recog.cc:1836 spells
+   `PUSH_ROUNDING (MACRO_INT (rounded_size))', where `MACRO_INT' is
+   `.to_constant ()` when `NUM_POLY_INT_COEFFS > 1'.  That wrapper exists
+   because some back ends' macros are not poly-safe.  A single
+   `poly_int64 mt_push_rounding (poly_int64)' makes the wrapper unnecessary at
+   the SHARED sites, but the PER-BASE thunk must keep it for those back ends
+   -- so the signature is a decision, not a transcription, and it should be
+   made once for all 12 value sites rather than site by site.
+
+   `PUSH_ARGS_REVERSED' -- FOUND IN THIS CLOSURE, AND IT IS A LEAK IN ITS OWN
+   RIGHT.  i386.h:1658 defines it to 1; aarch64 does not; bpf and nvptx do.
+   Its shared use is gimplify.cc:4791-4793, three ordinary run-time
+   expressions in one `for' header -- so **argument gimplification runs
+   last-to-first for every target**, because the primary says so.  No
+   preprocessor use anywhere, so it is SHAPE 1 with a one-file blast radius,
+   and it is the cheapest item in this family.  Not converted here; recorded
+   by name.
+
+   `REG_PARM_STACK_SPACE' -- i386 defines it (i386.h:1672), aarch64 does not,
+   13 back-end headers do.  Still leaking: `function.o' binds
+   `U ix86_reg_parm_stack_space(tree_node const*)' even after #133, because
+   function.cc:2327 spells `INCOMING_REG_PARM_STACK_SPACE' separately from the
+   `STACK_DYNAMIC_OFFSET' ladder that #133 moved out.  That is PRINCIPLES'
+   "one symbol can have several macro paths" measured again: closing the path
+   you found does not close the symbol.  `INCOMING_REG_PARM_STACK_SPACE'
+   itself is defined by exactly one back-end header and by neither base; it is
+   derived from `REG_PARM_STACK_SPACE' at calls.cc and (still) function.cc
+   :1403, and both derivations are the primary's.  Named, not converted.  */
 
 #undef DEBUGGER_REGNO
 #define DEBUGGER_REGNO(REGNO) (mt_debugger_regno ((unsigned int) (REGNO)))

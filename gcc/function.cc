@@ -1404,33 +1404,25 @@ static poly_int64 cfa_offset;
 #define INCOMING_REG_PARM_STACK_SPACE REG_PARM_STACK_SPACE
 #endif
 
-/* If not defined, pick an appropriate default for the offset of dynamically
-   allocated memory depending on the value of ACCUMULATE_OUTGOING_ARGS,
-   INCOMING_REG_PARM_STACK_SPACE, and OUTGOING_REG_PARM_STACK_SPACE.  */
+/* `STACK_DYNAMIC_OFFSET' USED TO BE DEFINED HERE, and the `#ifndef' that
+   guarded it was answered by whichever back end compiled this file.  That is
+   a leak running the OPPOSITE way from the usual one: aarch64 DEFINES the
+   macro (aarch64.h:1688, the `-fstack-clash-protection' outgoing-args
+   reservation) and i386 does not, so with i386 as the base the `#ifndef' was
+   true, aarch64's definition was discarded, and the generic ladder below was
+   used for every target INCLUDING aarch64.  An absence produces no code, so
+   no symbol- or value-based instrument could see it.
 
-#ifndef STACK_DYNAMIC_OFFSET
+   Both arms of that ladder, and the `INCOMING_REG_PARM_STACK_SPACE'
+   derivation above that chose between them, now live in `target-cumargs.cc',
+   which is compiled once per back end with that back end's `tm.h'.  There the
+   `#ifndef' is a fact about that base.  `get_stack_dynamic_offset' below --
+   already the single evaluation point in the tree -- asks the selected base
+   through `mt_stack_dynamic_offset'.  See target-frame.h.
 
-/* The bottom of the stack points to the actual arguments.  If
-   REG_PARM_STACK_SPACE is defined, this includes the space for the register
-   parameters.  However, if OUTGOING_REG_PARM_STACK space is not defined,
-   stack space for register parameters is not pushed by the caller, but
-   rather part of the fixed stack areas and hence not included in
-   `crtl->outgoing_args_size'.  Nevertheless, we must allow
-   for it when allocating stack dynamic objects.  */
-
-#ifdef INCOMING_REG_PARM_STACK_SPACE
-#define STACK_DYNAMIC_OFFSET(FNDECL)	\
-((ACCUMULATE_OUTGOING_ARGS						      \
-  ? (crtl->outgoing_args_size				      \
-     + (OUTGOING_REG_PARM_STACK_SPACE ((!(FNDECL) ? NULL_TREE : TREE_TYPE (FNDECL))) ? 0 \
-					       : INCOMING_REG_PARM_STACK_SPACE (FNDECL))) \
-  : 0) + (STACK_POINTER_OFFSET))
-#else
-#define STACK_DYNAMIC_OFFSET(FNDECL)	\
-  ((ACCUMULATE_OUTGOING_ARGS ? crtl->outgoing_args_size : poly_int64 (0)) \
- + (STACK_POINTER_OFFSET))
-#endif
-#endif
+   The name is deliberately left UNDEFINED in shared code rather than
+   redirected in `defaults.h', so that a future shared use fails by name
+   instead of quietly picking up a generic answer.  */
 
 
 /* Given a piece of RTX and a pointer to a HOST_WIDE_INT, if the RTX
@@ -1942,13 +1934,16 @@ instantiate_decls (tree fndecl)
 }
 
 /* Return the value of STACK_DYNAMIC_OFFSET for the current function.
-   This is done through a function wrapper so that the macro sees a
-   predictable set of included files.  */
+   Upstream made this a function wrapper "so that the macro sees a predictable
+   set of included files"; the set of included files was the problem, since it
+   was the PRIMARY's.  The wrapper is kept -- it is the single evaluation
+   point, which is what makes the conversion one call -- and now asks the
+   selected back end.  */
 
 poly_int64
 get_stack_dynamic_offset ()
 {
-  return STACK_DYNAMIC_OFFSET (current_function_decl);
+  return mt_stack_dynamic_offset (current_function_decl);
 }
 
 /* Pass through the INSNS of function FNDECL and convert virtual register

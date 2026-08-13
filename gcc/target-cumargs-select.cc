@@ -415,6 +415,22 @@ mt_accumulate_outgoing_args (void)
   return mt_frame ()->accumulate_outgoing_args ();
 }
 
+/* `STACK_DYNAMIC_OFFSET'.  Uncached for the same reasons again and one that
+   is specific to it: the generic arm reads `crtl->outgoing_args_size', which
+   is not known until after argument-block layout, and aarch64's arm reads
+   `cfun->calls_alloca' and `flag_stack_clash_protection'.  There is no point
+   in a run at which this has a single value.
+
+   The `fndecl' is forwarded rather than being taken from
+   `current_function_decl' here: function.cc's wrapper passes the latter
+   today, but the macro's documented interface takes a decl and two back ends
+   (pa, rs6000) actually read it.  */
+poly_int64
+mt_stack_dynamic_offset (tree fndecl)
+{
+  return mt_frame ()->stack_dynamic_offset (fndecl);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 
