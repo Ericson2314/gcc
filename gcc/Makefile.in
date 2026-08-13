@@ -1008,7 +1008,22 @@ EXTRA_OBJS = @extra_objs@
 
 # List of extra object files that should be compiled and linked with
 # the gcc driver.
-EXTRA_GCC_OBJS =@extra_gcc_objs@
+#
+# @extra_gcc_objs@ is the HOST half alone -- config.host's host_extra_gcc_objs,
+# i.e. driver-i386.o on an x86_64 host, which answers -march=native about the
+# machine the driver is RUNNING on.  The TARGET half is per back end and comes
+# from multi-target-md.mk as $(MT_GCC_OBJS); see emit_gcc_driver_objs in
+# gen-multi-target-md.awk.  Recursive `=', so the reference resolves after that
+# fragment is included some 450 lines below.
+#
+# MT_GCC_OBJS is declared empty here rather than left undefined, because an
+# undefined make variable expands to the empty string and a fragment that
+# stopped emitting it would be indistinguishable from a back end that needs
+# nothing.  multi-target-md.mk appends with `+=', so this assignment must stay
+# ABOVE the include -- the same trap the back-end object list documents just
+# above that include, from the other side.
+MT_GCC_OBJS =
+EXTRA_GCC_OBJS =@extra_gcc_objs@ $(MT_GCC_OBJS)
 
 # List of extra libraries that should be linked with the gcc driver.
 EXTRA_GCC_LIBS = @EXTRA_GCC_LIBS@

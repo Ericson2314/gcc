@@ -23,7 +23,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* Compiled once per configured back end -- it is in loongarch's
+   extra_gcc_objs, and the driver serves every back end -- so name loongarch's
+   own tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "obstack.h"
 #include "diagnostic-core.h"
 #include "opts.h"

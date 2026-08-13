@@ -119,6 +119,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     tm_defines= cpu_type= target_cpu_default=
     tm_file= tm_p_file= tmake_file=
     extra_objs= extra_options= extra_headers= c_target_objs=
+    extra_gcc_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
     TM_MULTILIB_CONFIG=
@@ -153,6 +154,15 @@ for gcc_mt in ${gcc_manifest_targets}; do
     done
     echo "tmake_file_present ${mt_tmake_present}"
     echo "extra_objs ${extra_objs}"
+    # The objects this target needs linked into the DRIVER rather than into
+    # cc1: config/<cpu>/driver-<cpu>.cc and friends.  gcc/configure substitutes
+    # @extra_gcc_objs@ from config.host alone -- the HOST's driver-<cpu>.o for
+    # -march=native -- because gcc/configure.ac no longer runs config.gcc for a
+    # target, so the target side of this variable was reaching the build as the
+    # empty string for every back end.  A driver holding N back ends needs the
+    # UNION of their extra_gcc_objs, and only a per-target record can supply
+    # it; see gen-multi-target-md.awk's MT_GCC_OBJS_<cpu>.
+    echo "extra_gcc_objs ${extra_gcc_objs}"
     # The C-family target objects.  NOTE FOR ANYONE EDITING THIS BLOCK: it is
     # inside a command substitution, so an apostrophe here truncates the whole
     # stanza and the manifest comes out EMPTY, with configure still exiting 0.

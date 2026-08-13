@@ -24,7 +24,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic.h"
-#include "tm.h"
+/* Compiled once per configured back end -- it is in avr's extra_gcc_objs, and
+   the driver serves every back end -- so name avr's own tm.h rather than
+   relying on -I<base>-inc.  See multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 
 // Remove -nodevicelib and -nodevicespecs from the command line if not needed.
 #define X_NODEVLIB "%<nodevicelib %<nodevicespecs"

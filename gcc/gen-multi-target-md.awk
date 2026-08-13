@@ -38,7 +38,7 @@
 
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
-  tmk = ""; tmkp = ""; outf = ""; xobjs = "";
+  tmk = ""; tmkp = ""; outf = ""; xobjs = ""; xgobjs = "";
 }
 
 # Record the build-directory headers a t-<...>-headers fragment generates, so
@@ -260,6 +260,20 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     mt_base_of[trg] = cpu;
     mt_targets = mt_targets " " trg;
   }
+
+  # The DRIVER's extra objects for this back end, accumulated over EVERY record
+  # and not just the first for a cpu_type, because `extra_gcc_objs' is set by
+  # triple and not by back end: config.gcc gives `x86_64-*-darwin*'
+  # darwin-driver.o and `x86_64-*-linux*' nothing, and both are cpu_type i386.
+  # Taking the first record's value would make the driver's contents depend on
+  # the order the targets were named on the command line -- one name, several
+  # authorities, no diagnostic.  So it is a union, keyed by back end, built
+  # here and emitted by emit_gcc_driver_objs at END.
+  #
+  # The tmake fragments are unioned along with it for the same reason: the rule
+  # that says which source builds `driver-avr.o' lives in avr/t-avr, which is in
+  # avr-elf's tmake_file and need not be in the first avr record seen.
+  accumulate_gcc_driver_objs();
 
   # Every record gets its per-triple conditions rules; only the first record
   # for a back end gets the per-back-end ones.  The per-triple rules name
@@ -1445,6 +1459,7 @@ $1 == "md_file"   { md = $2 }
 $1 == "out_file"  { outf = $2 }
 $1 == "extra_objs" { xobjs = ""; for (i = 2; i <= NF; i++) xobjs = xobjs $i " " }
 $1 == "c_target_objs" { cobjs = ""; for (i = 2; i <= NF; i++) cobjs = cobjs $i " " }
+$1 == "extra_gcc_objs" { xgobjs = ""; for (i = 2; i <= NF; i++) xgobjs = xgobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
@@ -1463,6 +1478,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_modes_union(); emit_config_union();
 		    emit_codes_union();
 		    emit_opinit_union();
+		    emit_gcc_driver_objs();
 		    emit_inc_dirs() }
 
 # THE SHARED insn-config ANSWER.  Same shape as the mode numbering below, and
@@ -2158,6 +2174,128 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # build, and that arm cannot be expressed without building one base alone.
   printf ".PHONY: multi-target-objs-%s\n", cpu;
   printf "multi-target-objs-%s: $(MULTI_TARGET_OBJS_%s)\n\n", cpu, cpu;
+}
+
+# Record one manifest record's `extra_gcc_objs' against its back end, unioning
+# both the object list and the tmake fragments that hold the rules naming their
+# sources.  Called for EVERY record; see the comment at the call site in
+# flush() for why the first record for a cpu_type is not enough.
+function accumulate_gcc_driver_objs(	i, n, parts, j, m, fp) {
+  n = split(xgobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "")
+      continue;
+    if (index(" " mtgcc_objs[cpu] " ", " " parts[i] " ") == 0) {
+      mtgcc_objs[cpu] = mtgcc_objs[cpu] parts[i] " ";
+      if (index(" " mtgcc_bases " ", " " cpu " ") == 0)
+	mtgcc_bases = mtgcc_bases cpu " ";
+    }
+  }
+  # Field 1 of a manifest line is its key, which frag_source_for skips, so the
+  # accumulated list is re-given that shape at the point of use rather than
+  # carrying a stray token here.
+  m = split(tmkp, fp, " ");
+  for (j = 2; j <= m; j++)
+    if (index(" " mtgcc_frags[cpu] " ", " " fp[j] " ") == 0)
+      mtgcc_frags[cpu] = mtgcc_frags[cpu] fp[j] " ";
+}
+
+# THE DRIVER'S PER-BACK-END OBJECTS.
+#
+# `extra_gcc_objs' is config.gcc's list of objects that must be linked into the
+# DRIVER rather than into cc1 -- config/avr/driver-avr.cc, which defines the
+# `double-lib' and `device-specs-file' spec functions, config/arc/driver-arc.cc,
+# which defines `cpu_to_as', and so on.  Six back ends or OS shims set it.
+#
+# gcc/Makefile.in gets `@extra_gcc_objs@' from gcc/configure, and on this branch
+# that substitution carries the HOST half alone -- config.host's
+# `host_extra_gcc_objs', i.e. driver-i386.o on an x86_64 host, for -march=native.
+# The target half comes from config.gcc, which gcc/configure.ac no longer runs
+# for a target, so it reached the build as the empty string for every configured
+# back end.  A multi-target driver needs the UNION over the back ends it serves:
+# spec-functions-<base>.o expands that base's EXTRA_SPEC_FUNCTIONS and therefore
+# names those functions, and nothing else in the link defines them.
+#
+# ONE OBJECT PER BACK END, in mtd-<cpu>/, and NOT the mt-<cpu>/ object of the
+# same name where one exists.  avr-devices.o and msp430-devices.o are in BOTH
+# `extra_objs' and `extra_gcc_objs' -- upstream compiles them once and links the
+# one object into cc1 and into the driver -- but on this branch the mt-<cpu>/
+# copy is compiled with MULTI_TARGET_RENAMES, so it refers to `targetm_avr',
+# which exists only in libbackend.a.  Linking that object into the driver would
+# be an undefined reference; recompiling it for the driver without the renames
+# is the honest answer, because these really are two different links.
+#
+# No MULTI_TARGET_RENAMES and no -DMULTI_TARGET_TARGETM_BASE for the same
+# reason: the driver holds no hook table at all, so a marker saying "this
+# translation unit is a back end's own" would be false here.
+function emit_gcc_driver_objs(	n, bases, i, b, m, parts, j, obj, src, list) {
+  n = split(mtgcc_bases, bases, " ");
+  for (i = 1; i <= n; i++) {
+    b = bases[i];
+    list = "";
+    m = split(mtgcc_objs[b], parts, " ");
+    for (j = 1; j <= m; j++) {
+      obj = parts[j];
+      sub(/\.o$/, "", obj);
+      src = frag_source_for(obj, "tmake_file_present " mtgcc_frags[b]);
+      if (src == "") {
+	# Refuse rather than guess, in the one-line no-comma form $(error)
+	# requires; see the identical refusal in the extra_objs loop for why a
+	# newline here would suppress the message it exists to print.
+	printf "$(error multi-target: nothing in %s's tmake_file claims a rule for %s.o" \
+	       " -- gen-multi-target-md.awk cannot tell which source builds it;" \
+	       " it is in %s's extra_gcc_objs)\n\n", b, obj, b;
+	continue;
+      }
+      # THE OS-SIDE HALF IS A DESIGN FORK AND IS NOT EMITTED.
+      #
+      # Four of the six `extra_gcc_objs' settings are on a CPU case in
+      # config.gcc -- loongarch, arc, avr, msp430 -- and their sources live in
+      # config/<cpu>/.  For those, "the back end's own tm.h" is exactly the
+      # right header and the per-base rule below is correct.
+      #
+      # The other two are on an OS case: `*-*-darwin*' sets darwin-driver.o and
+      # `*vxworks*' sets vxworks-driver.o, and both sources live directly in
+      # config/.  Those objects want the TARGET's header chain, not the back
+      # end's: darwin-driver.cc spells DEF_MIN_OSX_VERSION and switches on
+      # `#if DARWIN_X86', names that x86_64-linux's tm-i386.h does not have --
+      # and `#if' on an undefined name does not error, it quietly evaluates
+      # false.  This branch has a tm-<base>.h per back end and no tm-<target>.h
+      # at all, so there is no per-base answer to give here and inventing one
+      # would be a primary by another name.
+      #
+      # Emitting nothing for them preserves exactly today's behaviour -- the
+      # target half of @extra_gcc_objs@ is empty, so these are not linked now
+      # either -- while naming the gap so it is greppable rather than absent.
+      # See STATE.md.
+      if (src !~ ("^\\$\\(srcdir\\)/config/" b "/")) {
+	printf "# MT_GCC_OBJS_UNHANDLED: %s needs %s.o (%s), which wants its\n", b, obj, src;
+	printf "# TARGET's headers and not this back end's.  Design fork; not emitted.\n";
+	printf "MT_GCC_OBJS_UNHANDLED += %s:%s.o\n\n", b, obj;
+	continue;
+      }
+      printf "mtd-%s/%s.o: %s %s-inc/s-inc s-gtype\n", b, obj, src, b;
+      printf "\t@$(mkinstalldirs) mtd-%s/$(DEPDIR)\n", b;
+      # -DMULTI_TARGET_SUPPLY_TU, exactly as spec-functions.cc is compiled and
+      # for the identical reason.  Without it defaults.h treats this as a
+      # CONSUMER translation unit and redirects the (c-DATA) macros to
+      # `targetm_cdata' and `targetm_regs' -- objects that live in
+      # libbackend.a, which the driver does not link.  The marker is true here
+      # rather than convenient: this object IS compiled against one back end's
+      # own tm.h, so the real macros are the right ones.  On arc the missing
+      # marker fails by name -- defaults.h:2045 on MAX_BITS_PER_WORD -- rather
+      # than at the link, which is the only reason it is stated here and not
+      # discovered later as an undefined `targetm_cdata' in xgcc.
+      printf "\t$(COMPILE) -DMULTI_TARGET_SUPPLY_TU=1 $<\n\t$(POSTCOMPILE)\n\n";
+      list = list " mtd-" b "/" obj ".o";
+    }
+    if (list == "")
+      continue;
+    printf "MT_GCC_OBJS_%s =%s\n", b, list;
+    printf "$(MT_GCC_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", b, b;
+    printf "$(MT_GCC_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", b, b;
+    printf "MT_GCC_OBJS += $(MT_GCC_OBJS_%s)\n\n", b;
+  }
 }
 
 # One target that materialises every back end's forwarding-header directory, so

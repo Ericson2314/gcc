@@ -24,7 +24,11 @@
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic.h"
-#include "tm.h"
+/* Compiled once per configured back end -- it is in msp430's extra_gcc_objs,
+   and the driver serves every back end -- so name msp430's own tm.h rather
+   than relying on -I<base>-inc.  See multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "msp430-devices.h"
 
 /* This spec function is called if the user has provided an -mmcu option without
