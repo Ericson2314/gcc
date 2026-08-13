@@ -402,6 +402,20 @@ answer is still wrong is worse than the failure.**
 
 ## 7. Reporting
 
+**A TASK NUMBER IN YOUR BRIEF IS NOT SOMETHING YOU CAN READ.** The task list
+lives in the coordinator's tooling; it is not in the worktree, and `STATE.md`
+has sections for only some of it. A brief saying "read tasks #59, #56, #53"
+is asking for something you do not have. **This is the coordinator's error,
+not yours.** Say so plainly in your report, work from the measured evidence
+and from `STATE.md`, and do **not** report against numbers you could not read
+— an agent that quietly writes "#56: done" because the brief mentioned it is
+manufacturing a green. One agent hit exactly this, said "these six are not in
+this worktree", and worked from the wall it could measure instead. That was
+the right response.
+
+Coordinator's side of the same rule: **inline the content, not the pointer.**
+If a task's finding matters to the brief, quote the finding.
+
 **COMMIT YOUR WORK BEFORE REPORTING IT DONE.** Twice now an agent has reported
 a change as "landed" and left it uncommitted in its worktree — once 65 lines,
 once 15 files and +881/−332. The coordinator then has to read the diff and
