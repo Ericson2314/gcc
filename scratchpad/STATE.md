@@ -8003,3 +8003,210 @@ The other two names in #134's `PUSH_ARGS_REVERSED' ladder.
     t135-obj.sh          object-level both-sided symbol evidence
     t135-gate.sh         THE BEHAVIOURAL ARM -- csa pass gate, via the dump
     t135-gate-inject.sh  off/on for the gate, state asserted both ways
+
+# TASK -- THE GUARD CORPUS REPAIRED AND MADE AUDITABLE, AND THE
+# EXISTENCE-MACRO PROBE SHAPE DESIGNED, BUILT, CONTROLLED AND RUN.
+
+Worktree came up at bare-repo HEAD `7208eca60d0' AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in' **0**, `git reset --hard multi-target' took it
+to **39**, no `scratchpad/'.  FIFTEEN in a row.  **The brief named no task
+numbers I could read**; per PRINCIPLES section 7 that is the coordinator's
+error and everything below is measured.  Build dir `/tmp/b-a7c-t108', my own,
+cold.
+
+## 1. JOB 1 -- THE BRIEF DESCRIBED THE SMALLER OF TWO DEFECTS
+
+The brief said the `tNNN-build.sh' family passes only `--enable-backends' and
+is broken by the flag day.  True, and repaired.  But auditing the corpus
+mechanically rather than by eye found a SECOND defect in almost exactly the
+same set of files, and it is the DANGEROUS one:
+
+  MISSING-TARGETS  a top-level configure with no `--enable-targets'.  Fails
+                   LOUDLY, by name (`--enable-targets=LIST is required',
+                   configure.ac:157).  Annoying; self-announcing.
+
+  FOREIGN-SRC      `SRC=' hardcoded to ANOTHER agent's worktree.  **Configures
+                   and builds somebody else's tree, and SUCCEEDS.**  Measured:
+                   this worktree has 39 `MULTI_TARGET' hits in
+                   `gcc/Makefile.in'; the trees these scripts point at have
+                   **27, 28 or 39**.  A script pointing at a 28 builds a
+                   compiler missing eleven landed changes and reports a clean
+                   green for it.  **There is no diagnostic at all.**
+
+So the loud break was masking a silent one, and repairing only the flag would
+have left every repaired script still measuring the wrong compiler.  This is
+the absent-artefact/absent-mechanism shape: a script that fails to configure
+LOOKS like a failing guard, and one that builds the wrong tree looks like a
+pass.
+
+**SCRIPTS FOUND vs SCRIPTS REPAIRED, which the brief asked for:**
+
+    configure-invoking scripts in scratchpad/   38
+    already correct before this task            15   (t113b, t119..t134 -conf)
+    BAD                                         23
+    repaired                                    23
+    NOT repaired                                 0
+
+`scratchpad/conf-audit.sh' is the durable half: it scores every script and
+exits non-zero, so this cannot silently rot again.  Final state **38/38 OK**.
+
+**A THIRD CLASS THE BRIEF'S "REPAIR THEM ALL" WOULD HAVE BROKEN.**  Three
+scripts (`eb-conf.sh', `eb-reconf.sh', `eb-reconf-ctl.sh') invoke
+`$SRC/gcc/configure', not the top level.  **`gcc/configure.ac' contains ZERO
+occurrences of `enable-targets'** (measured) -- gcc/ takes `--enable-backends'
+and knows nothing about targets, which is the host-not-target ruling itself.
+Adding `--enable-targets' there would be an unrecognised option.  They are
+classified GCC-level, given the SRC fix only, and reported OK rather than
+silently omitted.  `eb-reconf-ctl.sh' deliberately spells the OLD name -- that
+IS the control isolating the rename -- and carries a written
+`CONF-AUDIT-EXEMPT:' marker rather than being listed in an allowlist inside the
+auditor, so the excuse lives where the next reader of that script will see it.
+
+`t45-all.sh' is the one script where the two lists MUST differ:
+`--enable-backends=all' is legal and is its whole point, `--enable-targets=all'
+is not (every element goes through config.sub).  Hand-written, with the reason
+recorded in the file.
+
+**VERIFICATION -- NOT ASSUMED, AND THE STATIC AUDIT IS EXPLICITLY NOT THE
+EVIDENCE.**  "The flag is present" and "the tree configures" are different
+claims, and PRINCIPLES is explicit that existence checks are the shape that
+passes on the corrupted artefact.  So:
+
+  * FAULT INJECTION, both defect classes, into a real repaired script
+    (`t108-build.sh'), each restored and the restore asserted:
+        remove `--enable-targets'  -> `BAD t108-build.sh TOP MISSING-TARGETS'
+        restore the foreign SRC    -> `BAD ... FOREIGN-SRC MISSING-TARGETS'
+    An uninjected mitigation is indistinguishable from an absent one.
+  * LIVE ARM: `D=/tmp/b-a7c-t108 sh t108-build.sh multi-target-objs' -- the
+    OLDEST and most-copied of the broken lineage.  **rc=0**; `config.status'
+    and `gcc/Makefile' exist; **13 per-base objects in `mt-i386/', 23 in
+    `mt-aarch64/'**, and both `target-cumargs-i386.o' and
+    `target-cumargs-aarch64.o' built.  Every compile line names
+    `-I.../agent-a7c243ba5c0d4dfb9/gcc' -- **MY worktree**, which is the
+    positive evidence that the self-relative SRC took effect rather than the
+    absence of an error.
+  * The one `collect2: error: ld returned 1 exit status' in that build's stderr
+    is the `-m32' multilib CONFIGURE PROBE (#119's recorded blocker), which
+    prints `configuring will continue' and does.  Checked rather than reported
+    as a build failure.
+
+**WHAT I DID NOT VERIFY:** I ran ONE of the 23 repaired scripts end to end.
+The other 22 are verified STATICALLY only.  That is an upper bound on the
+evidence and I am not quoting it as more -- 23 cold GCC builds was not
+affordable here.  The single live run does cover the exact lineage 10 of them
+are byte-identical copies of.
+
+## 2. JOB 2 -- THE EXISTENCE PROBE SHAPE: `scratchpad/exist-probe.sh'
+
+**The blocker was real and is now gone.**  The design does NOT extend
+`tab-probe.sh', and deliberately not: that harness reads constants out of slots
+in the running `cc1' via a plugin, and its plugin runs inside ONE base
+selection, so the UNSELECTED base's thunks read the SELECTED base's option
+storage.  That is the recorded `CDATA_NUM_OPTSTATE' blindness which keeps six
+endianness arms FAIL, and **anything built on that plugin inherits it**.
+
+**THE INSIGHT: THE TWO ANSWERS ARE ALREADY SIDE BY SIDE, IN OBJECT FILES.**
+`target-cumargs.cc' is compiled ONCE PER BACK END with that back end's `tm.h'
+and `MULTI_TARGET_TARGETM_BASE' defined.  So `target-cumargs-i386.o' and
+`target-cumargs-aarch64.o' exist SIMULTANEOUSLY in one tree, and both bases'
+answers can be read **with neither base selected and no `*_option_override'
+having run**.  There is no unselected base.  That is exactly the property the
+plugin cannot have, and it is why this shape works where that one does not.
+
+An existence predicate is the best-behaved case there is -- nullary,
+`#ifdef'-derived, reading no option variable:
+
+    static bool mt_base_has_push_rounding (void)
+    { #ifdef PUSH_ROUNDING  return true; #else return false; #endif }
+
+It compiles to a constant return, and the two constants are **1 and 0**.
+
+**AND THAT IS PRECISELY WHERE THE VALUE ARM HAS NOTHING.**  The carried honest
+negative says a value arm on `REG_PARM_STACK_SPACE' /
+`INCOMING_REG_PARM_STACK_SPACE' cannot discriminate on this pair, because
+`ix86_reg_parm_stack_space' returns 0 for SysV and aarch64's absence also
+produces 0 -- correct by luck.  **1 vs 0 is not luck.**  That is the whole
+argument for the shape.
+
+TWO properties are scored, and the second is the general answer:
+  A. VALUE, only when BOTH thunks compiled to a constant return, against a
+     PRE-REGISTERED table hand-derived from the headers
+     (`grep -l "define PUSH_ROUNDING" config/{i386,aarch64}/*.h' -> i386 only)
+     BEFORE anything was disassembled.
+  B. DISTINCTNESS, the two compiled bodies differ.  Scoreable for ALL of them,
+     including the six property A cannot reach.
+
+**MEASURED, in /tmp/b-a7c-t108 -- 9 macros, 3 PASS, 0 FAIL, 6
+unmeasurable/report-only, all 9 DIFFER:**
+
+    REG_PARM_STACK_SPACE    i386=1  aarch64=0   PASS   (predicted 1/0)
+    PUSH_ROUNDING           i386=1  aarch64=0   PASS   (predicted 1/0)
+    PUSH_ARGS_REVERSED      i386=1  aarch64=0   PASS   (predicted 1/0)
+    FUNCTION_MODE           i386=24 aarch64=27  REPORT-ONLY (no prediction)
+    ACCUMULATE_OUTGOING_ARGS         i386=OPTSTATE aarch64=CONST 1
+    INCOMING_FRAME_SP_OFFSET         i386=OPTSTATE aarch64=CONST 0
+    DEFAULT_INCOMING_FRAME_SP_OFFSET i386=OPTSTATE aarch64=CONST 0
+    INCOMING_REG_PARM_STACK_SPACE    i386=OPTSTATE aarch64=CONST 0
+    STACK_DYNAMIC_OFFSET             i386=OPTSTATE aarch64=OPTSTATE
+
+The six are scored **UNMEASURABLE-BY-THIS-ARM, never PASS**, with the reason
+named.  Their DIFFER verdict is still real evidence: one base reading option
+state while the other returns a constant IS a demonstrated difference between
+the two compiled copies.
+
+**THE DISTINCTNESS CONTROL CAUGHT MY OWN PREDICTION, WHICH IS THE POINT OF
+HAVING IT.**  Every macro in the table scores DIFFER, and an instrument that
+has only ever returned one of its two answers has not been shown able to return
+the other.  Worse, the two objects lay functions out at DIFFERENT OFFSETS, so
+without address stripping **everything scores DIFFER vacuously**.  The first
+control chosen was `mt_base_stack_boundary', on my belief that STACK_BOUNDARY
+is 128 on both bases.  It scored DIFFER and the run **aborted**.  Re-reading
+rather than editing the check: i386's STACK_BOUNDARY is OPTION-DEPENDENT
+(`testb $0x2,...' then 0x20/0x40/0x80) against aarch64's flat `mov $0x80'.
+**The prediction was wrong; the instrument was right.**  The control actually
+used is `HARD_FRAME_POINTER_IS_FRAME_POINTER', whose justification was already
+written in `target-cumargs.cc:586-588' -- neither base defines it, both fall to
+rtl.h's comparison, both false -- and it scores SAME.
+
+**FAULT INJECTION on the value arm**: flipping `PUSH_ROUNDING's pre-registered
+1/0 to 0/1 produces
+`FAIL measured 1/0 but PRE-REGISTERED 0/1 -- re-read the header, do not edit
+the table'.  Restored, and the restore asserted.
+
+## 3. WHAT I DID NOT DO
+
+  * **THE SCOREBOARD WAS NOT RUN AND I CLAIM NO MOVEMENT.**  Carrying the
+    recorded line unchanged: header **i386 112 PASS / 0 FAIL, aarch64 8 PASS /
+    104 FAIL of which only 2 are TRUSTED**; TAB **i386 32/0, aarch64 27/5**.
+    `exist-probe.sh' is a SEPARATE harness with its own list and its numbers
+    are NOT added to those totals.
+  * **NO MACRO WAS MOVED TO A `CONVERTED_*' STATUS.**  Three now have a
+    trustworthy arm, but the standing rule keys `CONVERTED_*' to
+    `tab-probe.sh's `TAB_MACROS' line, which `macro-probe.sh' checks
+    mechanically.  Wiring `exist-probe.sh' into that mechanical check is a
+    separate, deliberate change -- doing it as a side effect here would be
+    exactly the "banking" the rule exists to prevent.  **This is the next
+    increment and it is small.**
+  * **No macro was converted.**  This task was infrastructure, per the brief.
+  * `FUNCTION_MODE' has no pre-registered prediction; 24 vs 27 is reported,
+    not scored.
+  * The six OPTSTATE macros remain genuinely unmeasured for value.  The fix is
+    a second reading under each base's own option override, which is the same
+    blocker `tab-probe.sh' records.
+  * `insn-emit' untouched; `#undef PUSH_ROUNDING' still blocked on the
+    `gen_movxf' ruling.  No `stock-compare' / `big.c' / `int x = 1;' bars
+    re-run -- **no compiler source was changed by this task**, only scratchpad
+    harnesses, so those bars cannot have moved and re-running them would have
+    been a claim rather than a measurement.
+
+## 4. FILES
+
+    conf-audit.sh    scores every configure-invoking script; exits non-zero.
+                     Self-excluding, per-CLASS non-vacuity assertion, in-file
+                     `CONF-AUDIT-EXEMPT:' markers instead of an allowlist.
+    conf-repair.sh   the two mechanical repairs, idempotent, every
+                     substitution ASSERTS ITS END STATE (a sed that matches
+                     nothing exits 0).  awk not sed for the SRC rewrite --
+                     the replacement contains `||'.  Not python3.
+    exist-probe.sh   THE FIFTH PROBE SHAPE.  Pre-registered table, distinctness
+                     control asserted FIRST and fatal, blind spots stated.

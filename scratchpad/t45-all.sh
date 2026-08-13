@@ -15,9 +15,31 @@
 #    stanza count is asserted to be plausible, and a small count is fatal.
 #  * `| head' once hid a rule from two people.  Nothing here is piped to head.
 #  * never 2>/dev/null: stderr goes to a file and is reported.
+#
+# THE TWO LISTS ARE DELIBERATELY DIFFERENT HERE, AND THIS IS THE ONE SCRIPT IN
+# THE CORPUS WHERE THAT IS TRUE.  Everywhere else `--enable-targets' and
+# `--enable-backends' carry the same list and conf-repair.sh asserts they do.
+# Here they cannot: `--enable-backends=all' is legal and is the entire point of
+# this script (source config.gcc once per back end, i.e. the blast radius),
+# but `--enable-targets=all' is NOT legal -- the top level runs every element
+# through config.sub and fails by name on anything that is not a real triple
+# (configure.ac:143).  The two flags mean different things: backends is which
+# back ends go INTO the binary, targets is which per-target trees to
+# instantiate.  So: all back ends compiled in, two target trees instantiated.
+# That is coherent, and it is what this script needs -- the artefact it scores
+# is the per-target makefile fragment, which only exists for instantiated
+# targets.
 set -u
 NP="$HOME/src/nixos-configuration/dep/nixpkgs"
-SRC=/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-add93fb43c802e701
+S=$(cd "$(dirname "$0")" && pwd)
+SRC=$(cd "$S/.." && pwd)
+# REFUSE THE WRONG TREE.  This line used to name ANOTHER agent's
+# worktree; those trees measure 27-28 `MULTI_TARGET' hits in
+# gcc/Makefile.in against this one's 39, so the script configured and
+# built a STALE compiler and reported a clean green for it, with no
+# diagnostic.  0 hits is the documented bare-repo-HEAD case
+# (PRINCIPLES section 5).
+grep -q MULTI_TARGET "$SRC/gcc/Makefile.in" || { echo "FATAL: $SRC is not a multi-target tree"; exit 9; }
 D=${D:-/tmp/b45all}
 export NIX_HARDENING_ENABLE="fortify stackprotector pic strictoverflow relro bindnow"
 PKGS="-p gcc gnumake perl flex bison gmp.dev mpfr.dev libmpc texinfo"
@@ -26,6 +48,7 @@ rm -rf "$D"; mkdir -p "$D" || exit 9
 
 nix-shell -I "nixpkgs=$NP" $PKGS --substituters 'https://cache.nixos.org/' --run \
   "cd $D && $SRC/configure --disable-werror --enable-backends=all \
+      --enable-targets=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu \
       --disable-bootstrap --disable-nls \
       --with-native-system-header-dir=/nix/store/q5wv2ldpcv5w8yb2wmsngsygvlxb73fk-glibc-2.42-67-dev/include \
       CC=gcc CFLAGS='-O1 -g0 -Wno-error=format-security' \

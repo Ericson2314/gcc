@@ -160,6 +160,63 @@
 # INCOMING_FRAME_SP_OFFSET, DEFAULT_INCOMING_FRAME_SP_OFFSET, FUNCTION_MODE,
 # ACCUMULATE_OUTGOING_ARGS, STACK_DYNAMIC_OFFSET, PUSH_ARGS_REVERSED (which at
 # least has a header arm to retire) and INCOMING_REG_PARM_STACK_SPACE.
+#
+# ---------------------------------------------------------------------------
+# THE EXISTENCE-MACRO PROBE SHAPE NOW EXISTS: `scratchpad/exist-probe.sh'.
+#
+# It is the FIFTH shape, and it is what the nine-macro converted-without-an-arm
+# backlog was blocked on.  It does NOT read the running cc1.  It reads the two
+# per-base OBJECTS -- `target-cumargs-i386.o' and `target-cumargs-aarch64.o' --
+# which exist SIMULTANEOUSLY in one build tree because target-cumargs.cc is
+# compiled once per back end with that back end's `tm.h'.  So both bases'
+# answers come out side by side with NEITHER base selected and no
+# `*_option_override' having run.  That is precisely the property tab-probe.sh's
+# plugin cannot have, and it is why six endianness arms are stuck FAIL there:
+# the plugin runs inside ONE selection, so the unselected base's thunks read the
+# selected base's option storage.
+#
+# It scores TWO properties, and the second is the general answer:
+#   A. VALUE, only when both bases' thunks compiled to a constant return,
+#      against a PRE-REGISTERED table.
+#   B. DISTINCTNESS, the two compiled bodies differ.  Scoreable for ALL of them,
+#      including the ones property A cannot reach.
+#
+# MEASURED 2026-08-13 in /tmp/b-a7c-t108: 9 macros examined, 3 PASS, 0 FAIL,
+# 6 unmeasurable/report-only; all 9 score DIFFER on distinctness, with the
+# distinctness control scoring SAME.
+#
+#   REG_PARM_STACK_SPACE   i386=1 aarch64=0   PASS, predicted 1/0
+#   PUSH_ROUNDING          i386=1 aarch64=0   PASS, predicted 1/0
+#   PUSH_ARGS_REVERSED     i386=1 aarch64=0   PASS, predicted 1/0
+#
+# THE EXISTENCE BIT DISCRIMINATES EXACTLY WHERE THE VALUE ARM CANNOT.  STATE.md
+# records the honest negative that a VALUE arm on REG_PARM_STACK_SPACE /
+# INCOMING_REG_PARM_STACK_SPACE cannot tell the two bases apart on this pair,
+# because `ix86_reg_parm_stack_space' returns 0 for SysV and aarch64's absence
+# also produces 0 -- "correct by luck".  1 vs 0 is not luck.  That is the whole
+# argument for the shape.
+#
+# STILL UNMEASURABLE, AND THE REASON IS NAMED RATHER THAN EXCUSED: the other six
+# thunks are not constant returns.  i386's ACCUMULATE_OUTGOING_ARGS,
+# INCOMING_FRAME_SP_OFFSET, DEFAULT_INCOMING_FRAME_SP_OFFSET and
+# INCOMING_REG_PARM_STACK_SPACE all compile to option reads, and
+# STACK_DYNAMIC_OFFSET is an option read on BOTH bases.  They are scored
+# UNMEASURABLE-BY-THIS-ARM, never PASS.  Their distinctness verdict is still
+# real evidence: one base reading option state while the other returns a
+# constant IS a demonstrated difference between the two compiled copies.
+#
+# FUNCTION_MODE comes out i386=24 aarch64=27 and is REPORT-ONLY -- both are
+# constants and they differ, but no prediction was pre-registered for it, so it
+# is reported and not scored.  Registering one is the obvious next increment.
+#
+# NOTHING HAS BEEN MOVED TO A `CONVERTED_*' STATUS BY THIS.  The standing rule
+# is that a macro moves only in the change that adds its arm to
+# `tab-probe.sh's TAB_MACROS line, which macro-probe.sh checks mechanically.
+# This is a DIFFERENT harness with a different list, and wiring it into that
+# mechanical check is a separate change that should be made deliberately rather
+# than as a side effect.  Three macros now HAVE a trustworthy arm; they are
+# still recorded UNCONVERTED here, and that is the rule working, not an
+# oversight.
 # ---------------------------------------------------------------------------
 ACCUMULATE_OUTGOING_ARGS UNCONVERTED
 ADDITIONAL_REGISTER_NAMES UNCONVERTED

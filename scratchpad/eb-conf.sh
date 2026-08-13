@@ -2,7 +2,15 @@
 # Run gcc/configure in a fresh dir with a given back-end-list flag.
 # $1 = build dir, $2... = the flag(s) under test
 set -e
-SRC=/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-a6bf09d706bf026f0/gcc
+S=$(cd "$(dirname "$0")" && pwd)
+SRC=$(cd "$S/../gcc" && pwd)
+# REFUSE THE WRONG TREE.  This line used to name ANOTHER agent's
+# worktree; those trees measure 27-28 `MULTI_TARGET' hits in
+# gcc/Makefile.in against this one's 39, so the script configured and
+# built a STALE compiler and reported a clean green for it, with no
+# diagnostic.  0 hits is the documented bare-repo-HEAD case
+# (PRINCIPLES section 5).
+grep -q MULTI_TARGET "$SRC/gcc/Makefile.in" || { echo "FATAL: $SRC is not a multi-target tree"; exit 9; }
 D=$1; shift
 rm -rf "$D"; mkdir -p "$D"
 cd "$D"

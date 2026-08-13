@@ -8,7 +8,15 @@
 # Use a separate shell for `nm'.
 set -u
 NP="$HOME/src/nixos-configuration/dep/nixpkgs"
-SRC=/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-ab8de4ba7cc574176
+S=$(cd "$(dirname "$0")" && pwd)
+SRC=$(cd "$S/.." && pwd)
+# REFUSE THE WRONG TREE.  This line used to name ANOTHER agent's
+# worktree; those trees measure 27-28 `MULTI_TARGET' hits in
+# gcc/Makefile.in against this one's 39, so the script configured and
+# built a STALE compiler and reported a clean green for it, with no
+# diagnostic.  0 hits is the documented bare-repo-HEAD case
+# (PRINCIPLES section 5).
+grep -q MULTI_TARGET "$SRC/gcc/Makefile.in" || { echo "FATAL: $SRC is not a multi-target tree"; exit 9; }
 D=${D:-/tmp/b135}
 SUB=${SUB:-gcc}
 export NIX_HARDENING_ENABLE="fortify stackprotector pic strictoverflow relro bindnow"

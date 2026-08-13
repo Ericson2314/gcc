@@ -3,7 +3,15 @@
 # Copied from t111-build.sh with SRC repointed at this worktree.
 set -u
 NP="$HOME/src/nixos-configuration/dep/nixpkgs"
-SRC=/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-a4f7386f72ea30a8c
+S=$(cd "$(dirname "$0")" && pwd)
+SRC=$(cd "$S/.." && pwd)
+# REFUSE THE WRONG TREE.  This line used to name ANOTHER agent's
+# worktree; those trees measure 27-28 `MULTI_TARGET' hits in
+# gcc/Makefile.in against this one's 39, so the script configured and
+# built a STALE compiler and reported a clean green for it, with no
+# diagnostic.  0 hits is the documented bare-repo-HEAD case
+# (PRINCIPLES section 5).
+grep -q MULTI_TARGET "$SRC/gcc/Makefile.in" || { echo "FATAL: $SRC is not a multi-target tree"; exit 9; }
 D=${D:-/tmp/b78}
 SUB=${SUB:-gcc}
 export NIX_HARDENING_ENABLE="fortify stackprotector pic strictoverflow relro bindnow"
@@ -19,6 +27,7 @@ if [ ! -f "$D/config.status" ]; then
   n=$(find "$D" -mindepth 1 | wc -l)
   [ "$n" = 0 ] || { echo "FATAL: $D not empty ($n entries) and not configured"; exit 9; }
   sh_run "cd $D && $SRC/configure --disable-werror \
+      --enable-targets=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu \
       --enable-backends=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu \
       --disable-bootstrap --disable-nls \
       --with-native-system-header-dir=/nix/store/q5wv2ldpcv5w8yb2wmsngsygvlxb73fk-glibc-2.42-67-dev/include \

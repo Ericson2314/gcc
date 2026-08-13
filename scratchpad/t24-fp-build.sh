@@ -28,6 +28,7 @@ if [ ! -f "$D/config.status" ]; then
   n=$(find "$D" -mindepth 1 | wc -l)
   [ "$n" = 0 ] || { echo "FATAL: $D not empty ($n entries) and not configured"; exit 9; }
   sh_run "cd $D && $SRC/configure --disable-werror --prefix=$PREFIX \
+      --enable-targets=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu \
       --enable-backends=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu \
       --disable-bootstrap --disable-nls \
       --with-native-system-header-dir=/nix/store/q5wv2ldpcv5w8yb2wmsngsygvlxb73fk-glibc-2.42-67-dev/include \
