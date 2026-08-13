@@ -236,6 +236,20 @@ shape in a new location. Mitigation is mandatory and cheap: after the
 on `gcc/Makefile.in:2649-2651`, which already refuses to link when
 `MULTI_TARGET_OBJS` is empty and says why.
 
+> ⚠️ **CORRECTED BY #113 — THE MITIGATION IN THIS PARAGRAPH DOES NOT WORK.**
+> The probe was run (§8 item 1) and the route is confirmed to exist: 4/4 arms,
+> N=2, `$(eval)` reproduces the shipped recipe text exactly. But the failure
+> mode measured is **silently WRONG, not silently EMPTY**. Dropping one level
+> of quoting on `$$(srcdir)` yields a complete, non-empty, plausible recipe
+> with the *call-time* value baked in where a deferred `$(srcdir)` belonged.
+> **A non-emptiness assertion scores that as a pass.** The check must diff
+> rule text against a literal control, not measure its length. See
+> `scratchpad/t113-eval-probe.sh` (arm 4) and the #113 entry in STATE.md.
+> Two further measured facts land there: `$(call)`/`$(eval)` **collapses
+> backslash-newline continuations**, so a raw text diff goes red on a correct
+> change; and **`make -n` executes recipe lines containing `$(MAKE)`**, which
+> disqualifies `--dry-run` as the instrument for §6.3's permutation harness.
+
 **Revised estimate: 2 weeks** (down from 2–3), because the AutoGen structure
 survives rather than being rewritten.
 
@@ -1069,8 +1083,12 @@ upper bound on the edit list, not the edit list.
 
 ## 8. WHAT MUST HAPPEN BEFORE THIS DESIGN IS APPROVED
 
-1. **Run the one-module `$(eval)` probe** (§7(3)). One day, `libgcc` only,
-   N=2. It decides whether the recommended route exists. **Highest priority.**
+1. ~~**Run the one-module `$(eval)` probe** (§7(3)). One day, `libgcc` only,
+   N=2. It decides whether the recommended route exists. **Highest
+   priority.**~~ **DONE — #113. The route exists**: 4/4 arms, both-sided,
+   with an empty list failing by name and the comparison demonstrably
+   sensitive to the quoting error. Two corrections to this document came out
+   of it; see the annotation in §2.2. Bootstrap staging remains unprobed.
 2. **Run the `config.gcc` split probe** (§3.3, §7(1)). Half a day. It decides
    Stage 4's cost and whether "gcc/ is host-and-build only" survives.
 3. **Decide #62's status.** If a cold build cannot be made to work, Stage 3 is
