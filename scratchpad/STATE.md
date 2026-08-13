@@ -248,12 +248,36 @@ reports the syntax error several lines later.
     the recorded AIX breakage.  The `config.gcc` defect around xtensa did not
     appear -- `xtensa-elf` configured and built like any other; that is a
     negative result about this triple, not a refutation of the report.
-  * **THE CODEGEN BARS WERE NOT RE-RUN, AND I CANNOT SAY THEY DID NOT MOVE.**
-    `opth-gen.awk` changed, and that changes `options.h` for every build
-    including the two-back-end one.  The x86_64 `-O2 scratchpad/big.c` bar
-    (12369 / `378fc33c1e70`) and `stock-compare` **must be re-run** before this
-    work is treated as settled.  Saying "no compiler source was touched, so
-    the bars cannot have moved" would be false this session.
+  * **THE x86_64 CODEGEN BAR WAS RE-RUN AND HOLDS.**  This mattered because
+    `opth-gen.awk` changed, which changes `options.h` for EVERY build including
+    the two-back-end one, so "no compiler source was touched" would have been
+    false.  In `/tmp/b-a0e67dff8d4a6fbbd-pair` (48-back-end fixes applied,
+    pair configured):
+
+        make multi-target-objs cc1 lto1     rc=0, grep -c 'error:' = 0
+        ./x86_64-pc-linux-gnu-gcc -S -O2 -nostdinc  <builddir>/big.c
+        rc=0   12369 bytes   md5 378fc33c1e70   stderr 0 bytes
+
+    Input quoted with the count, per the filename-sensitivity lesson:
+    `scratchpad/big.c`, 150 lines, md5 `e4558c736e241860bc610c56e66f9c43`,
+    copied to `<builddir>/big.c` because the recorded bar was measured through
+    that path.  **Matches the recorded bar exactly.**
+  * **`stock-compare` was NOT run**: it needs `/tmp/b-stock` (genuine upstream
+    at merge-base `c31b7a09eea`), which does not exist on this host and is its
+    own build.  So the x86_64 identity is against this branch's own recorded
+    figure, not against unmodified GCC -- the weaker of the two arms, and the
+    one that cannot see a change that moves branch and reference together.
+  * **The aarch64 codegen arm was NOT run.**  Only x86_64 was measured.
+  * Getting to the bar at all needed three things worth recording, none of
+    them a compiler problem: `all-zlib` had never been built in this dir and
+    `cc1` failed to link with `cannot find -lz` (**which reads exactly like a
+    change having broken the baseline, and is not**); the per-target drivers
+    `$(MULTI_TARGET_DRIVERS)` are not built by `multi-target-objs cc1 lto1`;
+    and the driver then refuses by name until `specs-config` exists, which
+    needs `make configure-target-specs-<triple>
+    TOOLS_DIR_FOR_<triple>=/tmp/t141-bin`.  The resulting `specs-config` is
+    **230 lines** -- checked, because a truncated one is non-empty and has
+    passed guards here before.
   * **No back end was compiled FOR.**  Every verdict here is "the objects
     built", which this branch has repeatedly shown is not "the compiler is
     right for that target".  The `str x19, [x7, -32]!` precedent stands.
@@ -265,9 +289,11 @@ reports the syntax error several lines later.
 
 ## 7. WHAT THE NEXT SESSION SHOULD DO, IN ORDER
 
-  1. **Re-run the codegen bars and `stock-compare`.**  `opth-gen.awk` is the
-     only landed change touching a shared generated header and it is
-     unmeasured.  Do this before anything else.
+  1. **Run `stock-compare` and the aarch64 arm.**  The x86_64 bar was re-run
+     and holds (12369 / `378fc33c1e70`), which is the arm that most directly
+     covers the `opth-gen.awk` change -- but it compares against this branch's
+     own figure, and `/tmp/b-stock` does not exist on this host, so the arm
+     that can see branch and reference moving together has NOT been run.
   2. **The `poly_int` debt is now the critical path** and it is far larger
      than anything else in the census (~1800 diagnostics, 39 back ends).
      Nothing downstream -- `cc1` linking, `EXTRA_GCC_OBJS`, rs6000/AIX -- can
