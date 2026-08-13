@@ -33,7 +33,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* This source is compiled once per configured back end, so it names the back
+   end's headers rather than relying on -I<base>-inc.  See
+   multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 /* Some of these macros are not self-contained arithmetic on option variables:
    aarch64's `DWARF_FRAME_RETURN_COLUMN' is `DWARF_FRAME_REGNUM (LR_REGNUM)',
    which calls `aarch64_debugger_regno ()'.  tm_p.h is this base's own
@@ -46,7 +50,7 @@ along with GCC; see the file COPYING3.  If not see
    `PIC_OFFSET_TABLE_REGNUM' notes in target-cdata.h.  This file runs once,
    with `cfun' null.  */
 #include "rtl.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "target-cdata.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE

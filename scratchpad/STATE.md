@@ -9443,3 +9443,140 @@ Neither was expanded into, per the brief.
   * **`gcc/Makefile.in:4421` still lists `reg-stack.cc` in `GTFILES`.**
     Neither the old nor the new file contains a `GTY` marker (grepped, zero),
     so this is stale rather than wrong, and was already stale.
+
+---
+
+# #140 -- THE BASE IS NAMED AT THE POINT OF INCLUSION, NOT LEFT TO AN `-I`
+
+User ruling: *"I think it would be good to do `#include "<base>/tm.h"` ...
+that way we don't rely on -I shadowing"*, refined to
+`#define BASE_HEADER(f) <BASE/f>` with the base passed as one `-D`.
+
+## 1. WHAT WAS WRONG
+
+A source compiled once per back end got `-I<base>-inc` ahead of `-I.` and
+spelled `#include "tm.h"`.  If that flag is missing or ordered after `-I.`,
+the same text compiles perfectly against the build root's `tm.h` -- the
+PRIMARY target's -- with no diagnostic.  It has fired once already:
+`d7a12b9d5c4`, *"the include directory did not reach them"*.
+
+Worse, and this is the part the `-I` scheme could never see: with two back
+ends configured, **every base's directory holds the same sixteen names**, so a
+`-I` pointing at the WRONG base is a completely successful compilation of
+another target's headers.
+
+## 2. THE SHAPE
+
+`gcc/multi-target-base.h`, new.  `#define BASE_HEADER(f) <MT_BASE/f>` -- plain
+parameter substitution into the angle-bracket form, no `#`, no `##` (`##`
+cannot express it: a paste must yield ONE token and a path is many).  One
+`-DMT_BASE=<cpu>-inc` per object serves every header.
+
+Converted, the seven sources that are ONE file compiled N times:
+`target-addr.cc`, `target-cdata.cc`, `target-c-ops.cc`, `target-regs.cc`,
+`target-cumargs.cc`, `target-regstack.cc`, `multi-target-reg-probe.cc` --
+`tm.h`, `tm_p.h`, `insn-config.h`, `insn-attr.h` between them.
+
+`-DMT_BASE` is a SECOND make variable (`MULTI_TARGET_BASE_DEF`), not an
+addition to `MULTI_TARGET_INC`.  Deliberate: the whole value of `-DMT_BASE` is
+what it says when the `-I` is gone, and folding them together would make the
+injection that tests this delete its own instrument.
+
+**NOT reusing `-DMULTI_TARGET_TARGETM_BASE=<cpu>`**, which is already on most
+of these objects.  It is contractually paired with `-Dtargetm=` (target.h
+errors if either appears alone), it means *"this TU is a back end's own"*
+rather than *"this is where my headers are"*, and `mt-<cpu>/reg-probe.o` needs
+the include path while it must NOT be renamed.
+
+## 3. THE WITNESS -- BECAUSE `BASE_HEADER` ALONE DOES NOT CLOSE IT
+
+Naming the base fixes the headers a source spells ITSELF.  Everything reached
+transitively (`rtl.h` -> `insn-modes.h`) is still resolved by the `-I`.  So
+`-DMT_BASE` and `-I<base>-inc` are two authorities for one fact -- this
+branch's own bug -- and two generated files make them check each other:
+
+    <base>-inc/mt-inc-witness.h    reachable ONLY through -I<base>-inc, and
+                                   containing
+                                   #include BASE_HEADER (mt-inc-tag-<base>.h)
+    <base>-inc/mt-inc-tag-<base>.h the tag it names, held by that base ONLY
+
+## 4. THE ACCEPTANCE ARM -- `scratchpad/t140-inject.sh`, 6/6, `OVERALL rc=0`
+
+A green build is not evidence here; it was green before.  Injections override
+the make variable from the command line, so no file is edited.  Each arm
+removes the object first and asserts the removal, because *"make did nothing"*
+and *"make failed"* are otherwise the same picture.  Run against
+`target-cumargs-i386.o`:
+
+    ARM 0  control                    PASS rc=0
+    ARM 1  MT_BASE undefined          PASS  #error "MT_BASE is not defined..."
+    ARM 2  MT_BASE = the other base    PASS  fatal: aarch64-inc/mt-inc-tag-i386.h
+    ARM 3  -I<base>-inc removed        PASS  fatal: mt-inc-witness.h
+    ARM 4  -I = the other base         PASS  fatal: i386-inc/mt-inc-tag-aarch64.h
+    ARM 5  restored                   PASS rc=0
+
+ARMs 2 and 4 are **new capability, not a regression guard**: nothing in the
+build could previously distinguish a wrong base from success.
+
+The generated artefacts are asserted BY NAME AND CONTENT and that arm runs
+FIRST, per the `gen-reg-widths.sh` lesson -- a generator that runs, exits 0 and
+changes nothing is invisible behind `move-if-change`.
+
+**ARM 1's needle had to be measured, not predicted.**  It was first written
+against `MT_BASE/tm.h` and reported FAIL on correct behaviour: with `MT_BASE`
+undefined the FIRST diagnostic is the `#error`, which names the flag, and the
+path failure that follows is the witness (reached before `tm.h`).
+
+## 5. THE NAME `BASE` DOES NOT WORK, AND THE GREP THAT CLEARED IT WAS WRONG
+
+`-DBASE=<cpu>-inc` goes on every one of a back end's objects, and `BASE` is
+already a template parameter at
+`config/aarch64/aarch64-sve-builtins-shapes.cc:1154` and a macro parameter at
+`aarch64-builtins.cc:1447` and `aarch64-acle-builtins.cc:129`.  The build fails
+with `<command-line>: error: expected nested-name-specifier before 'aarch64'`,
+naming neither the flag nor the file.
+
+**A `grep -rnw BASE` was run before choosing the name and it DID contain these
+lines -- they were below `head -30`.**  Same shape as the `--include` lesson in
+PRINCIPLES, committed with a different truncating tool.  `MT_BASE` and
+`BASE_HEADER` were then both counted with `wc -l`, no `head`: **0 collisions
+each**.  `BASE_HEADER` is kept, so the include sites read as the user asked.
+
+## 6. BARS -- `/tmp/b140`, configured from this worktree and asserted so
+
+  * `make multi-target-objs cc1 lto1` in `$D/gcc` -- **rc=0**.
+  * **x86_64 `-O2 scratchpad/big.c`: 12369 bytes, md5 `378fc33c1e70`** --
+    matches the recorded bar exactly.
+  * **aarch64 `-O2` `int x = 1;` as `one.c`: 371 bytes, md5 `84b06d9df5d2`**
+    -- input basename quoted with it, per #137.  Driver stderr 0 lines both.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, confirmed
+    running against `/tmp/b140` (`mt cfg : /tmp/b140/lib/gcc/17.0.0/
+    x86_64-pc-linux-gnu/specs-config`), 5 distinct md5s per side, negative
+    control firing, `OVERALL rc=0`.
+  * `target-specs` run for both targets with real aarch64 binutils, rc=0.
+  * The anchor moved: `grep -c MULTI_TARGET gcc/Makefile.in` is now **43**, not
+    39 (four `MULTI_TARGET_BASE_DEF` lines).  `t140-conf.sh` asserts the count
+    AND the content, since a count is the weakest evidence available.
+
+## 7. WHAT IS NOT DONE, MEASURED
+
+  * **`#include "tm.h"` count: 248 TUs outside `config/`, 101 under it.**  The
+    brief's last figure was 256 outside; 101 under is unchanged.  Not fixed
+    here, per the brief.
+  * **The `config/` population is UNCONVERTED and is the larger exposure.**
+    Those are upstream sources this project does not edit, and many
+    (`config/linux.cc`, `config/gnu-user.cc`) are themselves one file compiled
+    for N back ends, so a literal `<base>/tm.h` would be wrong in them anyway.
+    They keep plain `#include "tm.h"` + the `-I`.  **What they DO now get is
+    ARMs 3 and 4's protection** for any of them reaching
+    `multi-target-base.h` -- which today is none of them.  Extending the
+    witness to that population means putting it somewhere every per-base TU
+    reaches after `tm.h` (`defaults.h` is the candidate); designed, not built.
+  * **`target-asm-ops.cc` was left on `-DTM_H_FILE='"tm-<base>.h"'`.**  It is a
+    third category: built for all 45 bases, against `tm-<base>.h` directly with
+    no `<base>-inc/` directory at all, so there is no `MT_BASE` for it to have.
+  * `target-regstack.cc` has no direct `tm.h`; it arrives through `backend.h`
+    and is still resolved by the `-I`.  Only its `insn-config.h` is named.
+  * Rebuild stderr was not classified against the 32-line incremental floor:
+    this was a near-cold arm (`Makefile.in` changed, so everything rebuilt),
+    which is not comparable with it.

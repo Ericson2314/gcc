@@ -33,8 +33,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
-#include "tm_p.h"
+/* This source is compiled once per configured back end, so it names the back
+   end's headers rather than relying on -I<base>-inc.  See
+   multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
+#include BASE_HEADER (tm_p.h)
 
 #include "target-c-ops.h"
 

@@ -31,7 +31,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* This source is compiled once per configured back end, so it names the back
+   end's headers rather than relying on -I<base>-inc.  See
+   multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 /* REGNO_REG_CLASS is not arithmetic on every back end: aarch64's is
    `aarch64_regno_regclass (REGNO)', declared in aarch64-protos.h, which is
    this base's own tm_p.h.  rtl.h first, exactly as target-addr.cc has it.  */
@@ -41,8 +45,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
-#include "insn-config.h"
+#include BASE_HEADER (tm_p.h)
+#include BASE_HEADER (insn-config.h)
 /* For the four `sizeof's that witness the shared layout.  This include list is
    reginfo.cc's, deliberately: the CONSUMER side of the layout check computes
    its four `sizeof's after exactly these headers, and a witness taken after a

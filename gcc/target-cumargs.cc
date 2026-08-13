@@ -36,14 +36,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* This source is compiled once per configured back end, so it names the back
+   end's headers rather than relying on -I<base>-inc.  See
+   multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
 /* For the back end's own declaration of whatever INIT_CUMULATIVE_ARGS
    expands to -- `aarch64_init_cumulative_args' is declared in
    aarch64-protos.h, which is this base's tm_p.h.  */
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "target.h"
 /* For `cfun'.  i386's `INCOMING_FRAME_SP_OFFSET' (i386.h:2177) reads
    `cfun->machine->func_type', and reading it HERE -- in a translation unit
@@ -63,19 +67,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "multi-target-reg-widths.h"
 /* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
-   booleans at the bottom of this file: `-I<base>-inc' comes ahead of `-I.' on
-   this file's command line, so the quoted include resolves to
-   `<base>-inc/insn-config.h', which is one line including
-   `insn-config-<base>.h'.  In the build root the same spelling resolves to
-   whichever base wrote the plain file, which is the bug.  */
-#include "insn-config.h"
-/* THIS BASE'S insn-attr.h, by the same `-I<base>-inc' mechanism and for the
-   same reason.  It is what makes `get_attr_preferred_for_size' below mean
+   booleans at the bottom of this file.  It used to be spelled
+   `#include "insn-config.h"' and resolved by `-I<base>-inc' coming ahead of
+   `-I.' -- which worked, and which resolved to whichever base wrote the plain
+   file in the build root the moment that flag was missing or mis-ordered,
+   silently.  The base is now named here instead; see multi-target-base.h.  */
+#include BASE_HEADER (insn-config.h)
+/* THIS BASE'S insn-attr.h, named the same way and for the same reason.  It is what makes `get_attr_preferred_for_size' below mean
    `insn_aarch64::get_attr_preferred_for_size' where the attribute exists and
    `hook_int_rtx_1' where it does not -- the generated header carries both
    answers already, and this file simply gets compiled once per base so that
    it picks up each.  See target-attr.h.  */
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a

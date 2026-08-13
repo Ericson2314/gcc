@@ -867,6 +867,32 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
     printf "\tdone\n";
+    # THE WITNESS PAIR.  See multi-target-base.h for the whole argument; in
+    # short, `-DMT_BASE=<cpu>-inc' and `-I<cpu>-inc' are two statements of one
+    # fact, and these two files make them check each other rather than leaving
+    # a disagreement to compile silently against another target's headers.
+    #
+    #   mt-inc-witness.h	reachable ONLY through -I<cpu>-inc, and naming
+    #			mt-inc-tag-<cpu>.h through BASE_HEADER, i.e.
+    #			through -DMT_BASE
+    #   mt-inc-tag-<cpu>.h	the tag it names, and the ONLY base whose
+    #			directory holds it
+    #
+    # A missing -I loses the first file; a wrong -I or a wrong BASE makes the
+    # first file ask the wrong directory for the second.  All three are a
+    # fatal error naming a path.
+    #
+    # Written through move-if-change like the forwarders, and for the same
+    # reason: their content never changes once written, only their timestamps
+    # would, and the stamp below is what every object rule depends on.
+    printf "\techo \"/* Generated; see gcc/multi-target-base.h.  */\" \\\n";
+    printf "\t  > tmp-inc-%s.h\n", cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
+    printf "\t  %s-inc/mt-inc-tag-%s.h\n", cpu, cpu;
+    printf "\techo \"#include BASE_HEADER (mt-inc-tag-%s.h)\" \\\n", cpu;
+    printf "\t  > tmp-inc-%s.h\n", cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
+    printf "\t  %s-inc/mt-inc-witness.h\n", cpu;
     printf "\t$(STAMP) %s-inc/s-inc\n\n", cpu;
 
     emit_base_objects();
@@ -1942,7 +1968,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # `#include "tm.h"' already resolves to this back end's.  Naming the file
   # twice would be a second authority for the same fact.
   printf "target-addr-%s.o: $(srcdir)/target-addr.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) $(REGS_H) \\\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(RTL_H) $(REGS_H) \\\n";
   printf "  $(srcdir)/target-addr.h\n";
   printf "\t$(COMPILE) -DTARGETM_ADDR_SYMBOL=targetm_addr_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-addr.cc\n";
@@ -1956,7 +1982,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # supplies) so that defaults.h leaves it the REAL macros rather than the
   # redirected ones it exists to fill.
   printf "target-cdata-%s.o: $(srcdir)/target-cdata.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-cdata.h\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(srcdir)/target-cdata.h\n";
   printf "\t$(COMPILE) -DTARGETM_CDATA_SYMBOL=targetm_cdata_refresh_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-cdata.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
@@ -1971,7 +1997,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # It needs tm_p.h, not just tm.h: the expansion is a call, and the prototype
   # for it is in config/<cpu>/<cpu>-protos.h, which tm_p.h is what includes.
   printf "target-c-ops-%s.o: $(srcdir)/target-c-ops.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-c-ops.h\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(srcdir)/target-c-ops.h\n";
   printf "\t$(COMPILE) -DTARGET_C_OPS_SYMBOL=targetm_c_ops_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-c-ops.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
@@ -1987,7 +2013,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # ALL_REGS and REGNO_REG_CLASS in the one file whose job is to supply them:
   # without it this table would report the poison back to itself.
   printf "target-regs-%s.o: $(srcdir)/target-regs.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) \\\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(RTL_H) \\\n";
   printf "  $(srcdir)/target-regs.h multi-target-reg-widths.h\n";
   printf "\t$(COMPILE) -DTARGETM_REGS_SYMBOL=targetm_regs_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-regs.cc\n";
@@ -2013,7 +2039,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # was right for target-c-ops-<cpu>.o only because THAT table calls into
   # c-family, which lto1 does not link.
   printf "target-cumargs-%s.o: $(srcdir)/target-cumargs.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(RTL_H) $(TREE_H) \\\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(RTL_H) $(TREE_H) \\\n";
   # target-frame.h and target-insn.h are named EXPLICITLY even though
   # target-cumargs.h includes both.  make does not follow includes, and the
   # `$(POSTCOMPILE)' .deps file only exists after a first successful compile --
@@ -2044,7 +2070,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # own insn-flags has it -- which is why no forwarder for `gen_movxf' is
   # needed here, or anywhere.
   printf "target-regstack-%s.o: $(srcdir)/target-regstack.cc %s-inc/s-inc \\\n", cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(BACKEND_H) $(RTL_H) \\\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(BACKEND_H) $(RTL_H) \\\n";
   printf "  $(TREE_H) $(DF_H) $(TM_P_H) $(TARGET_H) $(RECOG_H) $(REGS_H) \\\n";
   # Named by PATH, not through a `$(FOO_H)' variable, for the ones Makefile.in
   # has no variable for.  An undefined make variable expands to the empty
@@ -2068,15 +2094,26 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # See multi-target-reg-probe.cc for why this is not a generator.
   printf "mt-%s/reg-probe.o: $(srcdir)/multi-target-reg-probe.cc %s-inc/s-inc \\\n",
 	 cpu, cpu;
-  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H)\n";
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h\n";
   printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
   printf "\t$(COMPILE) -DMULTI_TARGET_REG_PROBE $<\n";
   printf "\t$(POSTCOMPILE)\n";
-  printf "mt-%s/reg-probe.o: MULTI_TARGET_INC = -I%s-inc\n\n", cpu, cpu;
+  printf "mt-%s/reg-probe.o: MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  # ...and the base by NAME; see multi-target-base.h.  A SEPARATE variable
+  # from MULTI_TARGET_INC on purpose: the two must be independently
+  # removable, because the whole value of -DMT_BASE is what it says when the -I
+  # is gone.  Folding them together would make the injection that tests this
+  # delete its own instrument.
+  printf "mt-%s/reg-probe.o: MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n\n",
+	 cpu, cpu;
   printf "MULTI_TARGET_REG_PROBES += mt-%s/reg-probe.o\n\n", cpu;
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  # The base by NAME, in its own variable; see mt-<cpu>/reg-probe.o above and
+  # multi-target-base.h for why it is not folded into MULTI_TARGET_INC.
+  printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n",
+	 cpu, cpu;
   # The bare names this back end's HAND-WRITTEN sources define; see
   # MULTI_TARGET_RENAME_NAMES in Makefile.in for the list and why it exists.
   # The list lives there, not here, so that the names have one authority.
@@ -2108,6 +2145,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   # differently.
   printf "MT_C_OBJS_%s =%s\n", cpu, cobjs_this;
   printf "$(MT_C_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
+  printf "$(MT_C_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", cpu, cpu;
   printf "$(MT_C_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", cpu;
   printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
   printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", cpu;

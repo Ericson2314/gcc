@@ -46,7 +46,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+/* This source is compiled once per configured back end, so it names the back
+   end's headers rather than relying on -I<base>-inc.  See
+   multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 
 #ifndef MULTI_TARGET_REG_PROBE
 #error multi-target-reg-probe.cc must be compiled with -DMULTI_TARGET_REG_PROBE \

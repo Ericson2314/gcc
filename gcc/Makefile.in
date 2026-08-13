@@ -1333,7 +1333,7 @@ MULTI_TARGET_OPT_TABLES = \
   $(if $(multi_target_base),-DMULTI_TARGET_OPTION_TABLES)
 
 ALL_CPPFLAGS = $(INCLUDES) $(MULTI_TARGET_RENAMES) $(MULTI_TARGET_OPT_TABLES) \
-  $(CPPFLAGS)
+  $(MULTI_TARGET_BASE_DEF) $(CPPFLAGS)
 
 # This is the variable to use when using $(COMPILER).
 ALL_COMPILERFLAGS = $(ALL_CXXFLAGS) $(PICFLAG)
@@ -1514,6 +1514,19 @@ MULTI_TARGET_RENAME_NAMES = \
   linux_fortify_source_default_level
 
 MULTI_TARGET_RENAMES =
+
+# The back end a source is being compiled FOR, named so that its own headers
+# can be spelled `#include BASE_HEADER (tm.h)' rather than left to the -I
+# above.  Empty for every object that is not compiled for a particular back
+# end; set by the same rules that set MULTI_TARGET_INC, as
+# `-DMT_BASE=<cpu>-inc'.  See gcc/multi-target-base.h for the whole argument.
+#
+# DELIBERATELY A SECOND VARIABLE rather than an addition to MULTI_TARGET_INC.
+# The point of -DMT_BASE is what it says when the -I is missing or points at
+# another base; if the two travelled together, deleting the -I would delete
+# the thing that reports it, and the check would pass on the broken build --
+# a mitigation that cannot fire is indistinguishable from an absent one.
+MULTI_TARGET_BASE_DEF =
 
 INCLUDES = $(MULTI_TARGET_INC) -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 	   -I$(srcdir)/../include $(INCINTL) \
