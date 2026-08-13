@@ -16,6 +16,33 @@ in one session and were right every time.
 One compiler binary serving all back ends, with **zero target-specific
 information baked in at compile time**.
 
+**THE BUILD CENSUS — several partially-overlapping figures are in circulation,
+so re-measure rather than quote, and say which build you measured.**
+
+Chronological, each true when taken:
+
+| measurement | figure | caveat |
+|---|---|---|
+| 48 configured, before the opts fix | **0** back ends produce objects | 974 diagnostics, all `loongarch-opts.h`, **in `build/gen*.o`** — nothing downstream attempted, and `make -k` silence read as success |
+| 47 (loongarch dropped), before poly | 4 → **8** clean | i386, aarch64, riscv, rs6000 + mips, nds32, s390, sparc |
+| 48, after the opts fix | **48** produce objects | one defect, 974 diagnostics — the largest amplification recorded |
+| 47, after the poly fix | errors 3060 → **842**; failing back ends 39 → **11** | poly-class 2224 → 2 real |
+
+**No figure yet exists with BOTH the opts fix and the poly fix merged.** Anyone
+building multi-back-end should report it.
+
+**Amplification is the reason counts mislead here**: single defects have
+produced **974**, **725**, **606** (from only *two* back ends) and **94**
+diagnostics. **Report causes, not lines**, and say how many back ends a cause
+covers.
+
+**Two attribution rules, both learned by getting them wrong today:**
+- **Never attribute a diagnostic to a back end by the nearest preceding compile
+  line** — invalid under `-j8`; i386's command is followed by visium's errors
+  from another job. Use make's **failing-target** lines.
+- Under `-k`, **"never attempted" and "passed" are the same silence.** Read the
+  filesystem as a second instrument.
+
 **PREFER THE LOUDEST AVAILABLE SIGNAL, AND CHECK WHETHER YOU CAN MANUFACTURE
 ONE.** The user, after a day of this: *"the obvious thing to do is enable all
 backends and then grind fixing build failures … build failures are the easiest
