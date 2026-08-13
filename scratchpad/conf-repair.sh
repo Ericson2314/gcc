@@ -47,6 +47,13 @@ fix_src () {           # $1 = file, $2 = "top" | "gcc"
     }
     { print }
   ' "$f" > "$f.tmp" || return 1
+  # PRESERVE THE MODE.  `awk > tmp && mv' creates a FRESH file with the
+  # umask's mode, silently dropping the executable bit -- it did, on 15
+  # scripts, and the only reason it was noticed is that `git commit' printed
+  # `mode change 100755 => 100644'.  A non-executable guard script fails with
+  # `Permission denied', which reads as an environment problem rather than as
+  # damage done by the repair.
+  [ -x "$f" ] && chmod +x "$f.tmp"
   mv "$f.tmp" "$f" || return 1
   # ASSERT THE END STATE.  Not "sed exited 0" -- it does that on no match.
   grep -q '^SRC=$(cd' "$f" || { echo "FAIL: $f -- SRC not self-relative after edit"; return 1; }
