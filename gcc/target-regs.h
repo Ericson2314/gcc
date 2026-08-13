@@ -132,6 +132,33 @@ struct target_regs_desc
      pointer that may be null rather than a flag plus an array.  */
   const int *d_reg_alloc_order;
 
+  /* ADJUST_REG_ALLOC_ORDER, wrapped in a function, or NULL if this back end
+     defines none.
+
+     THIS IS THE SLOT THAT WAS MISSING, AND IT COST AN ICE WITH NO NAME ON IT.
+     `ira.cc:517' used to be a bare `#ifdef ADJUST_REG_ALLOC_ORDER' in a
+     MIDDLE-END translation unit, i.e. it tested the PRIMARY's headers and
+     then called the PRIMARY's function for every base.  Measured on the
+     linked `cc1': `ira.o' carried an undefined reference to
+     `x86_order_regs_for_local_alloc ()' and to nothing else, while
+     `aarch64_adjust_reg_alloc_order ()' was DEFINED in the same binary and
+     referenced by no object at all.
+
+     That is not a cosmetic leak, because `ADJUST_REG_ALLOC_ORDER' is not an
+     optional tweak for every back end.  aarch64's `REG_ALLOC_ORDER' is `{}' --
+     an EMPTY initialiser (aarch64.h:1699) -- so the static table is 95 zeros
+     and the adjust hook is the ONLY thing that ever makes it a permutation.
+     With i386's function called in its place, `reg_alloc_order' held i386's
+     92-entry order under an aarch64 selection: registers 92, 93 and 94 were
+     absent from it entirely, `setup_class_hard_regs' never visited them, and
+     its ordered count disagreed with its set-iterator count.  The symptom was
+     `ira_assert (ira_class_hard_regs_num[cl] == n)' at ira.cc:507, which names
+     neither the order, nor the base, nor the macro.
+
+     A function pointer rather than a flag, for the reason `d_reg_alloc_order'
+     is one: a flag and a body can disagree, a pointer cannot.  */
+  void (*adjust_reg_alloc_order) (void);
+
   /* REG_CLASS_CONTENTS, flattened: row CL starts at [CL * n_reg_ints].  */
   const unsigned *d_reg_class_contents;
 
@@ -201,5 +228,23 @@ extern const struct target_regs_desc *target_regs_for (const char *base);
    without an assert to say so.  */
 #define MT_N_REG_CLASSES (targetm_regs->n_reg_classes)
 #define MT_FIRST_PSEUDO_REGISTER (targetm_regs->first_pseudo_register)
+
+/* `#ifdef REG_ALLOC_ORDER', asked of the SELECTED base instead of of the
+   primary's headers.
+
+   The nullness of `d_reg_alloc_order' is not a second, independent fact that
+   could drift out of step with the `#ifdef': target-regs.cc sets that pointer
+   under exactly that `#ifdef' and nothing else, so the two are one fact with
+   one authority.  It is spelled as a macro here because five middle-end sites
+   ask the question and a reader should be able to see they are asking the same
+   one.
+
+   This distinction is load-bearing rather than tidy.  The `#else' arms at
+   ira-color.cc:5243 and reload1.cc:1910 are not "the same thing without the
+   ordering" -- they are a DIFFERENT tie-break (prefer call-clobbered
+   registers).  Making the sites unconditional would therefore not merely
+   generalise them; it would silently give a back end that defines no
+   REG_ALLOC_ORDER a tie-break it never asked for.  */
+#define MT_HAVE_REG_ALLOC_ORDER (targetm_regs->d_reg_alloc_order != NULL)
 
 #endif /* GCC_TARGET_REGS_H */

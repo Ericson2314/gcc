@@ -4555,3 +4555,213 @@ the strict tools check refuses aarch64 on this machine; it does not have to.
 The matching headers are that same package set's glibc dev output, and passing
 each target its OWN header directory is what makes ARM 3 a real both-sided
 test instead of one machine's answer served twice.
+
+# TASK #122 -- `ADJUST_REG_ALLOC_ORDER` WAS THE PRIMARY'S. THE aarch64 WALL MOVED OFF `ira_init` ENTIRELY
+
+Branched from `c7859768dd8`.  Worktree came up at the bare-repo HEAD
+`7208eca60d0` AGAIN -- `grep -c MULTI_TARGET gcc/Makefile.in` was **0** --
+`git reset --hard multi-target` took it to **37**.  Build dir `/tmp/b122`, my
+own, cold.
+
+## 0. A BRIEF ITEM I COULD NOT READ
+
+The brief asked me to read tasks **#59, #56, #53, #85, #121, #114**.  There is
+no task backlog in this worktree: `STATE.md` has `# TASK` sections for #77,
+#106, #107, #92, #99/#86/#109, #108, #111, #45/#98, #78/#51, #112, #113, #116,
+#113b, #117, #119 and now #122, and **none of those six numbers is among
+them** (`#114` appears once, in passing, at STATE.md:3066).  I worked from the
+measured wall and from #92's section, which is the register-vocabulary one.  If
+those descriptions live outside the worktree they were not available to me and
+I did not report against them.
+
+## 1. THE WALL, DIAGNOSED STATICALLY BEFORE ANYTHING WAS EDITED
+
+`big.c` ICEd at `setup_class_hard_regs, at ira.cc:507`, reproduced exactly.
+Line 507 is `ira_assert (ira_class_hard_regs_num[cl] == n)` -- the same set of
+hard registers counted two ways, by walking `reg_alloc_order` and by iterating
+the class's own hard-reg set.
+
+**The cause is two compile-time `#ifdef`s in MIDDLE-END translation units**,
+i.e. the primary's headers answering for every base.  Not inferred -- read off
+the linked `cc1` with `nm`:
+
+  * `ira.o` carried `U x86_order_regs_for_local_alloc()` and **no other**
+    order-related undefined symbol.  That is i386's `ADJUST_REG_ALLOC_ORDER`,
+    called unconditionally from `setup_alloc_regs`, for every base.
+  * `aarch64_adjust_reg_alloc_order()` was **defined in the same binary** (`T`,
+    `0xe10fab`) and **referenced by no object at all** -- the branch's
+    "mechanism present but never invoked" shape, exactly.
+  * aarch64's static table `mt_reg_alloc_order` in `target-regs-aarch64.o` is
+    `0x17c` = 380 bytes = 95 ints and, dumped, **all 95 are zero**.  That is
+    correct: `aarch64.h:1699` is `#define REG_ALLOC_ORDER {}`, an EMPTY
+    initialiser, and `ADJUST_REG_ALLOC_ORDER` is the ONLY thing that ever makes
+    it an order.
+
+So under an aarch64 selection the allocation order was **i386's**, and the
+registers aarch64 allocates but i386 does not were never visited.
+
+**MY PREDICTION OF WHICH REGISTERS WAS WRONG, AND THE DIAGNOSTIC CORRECTED IT.**
+I expected 92, 93, 94 -- the three above i386's `FIRST_PSEUDO_REGISTER`.  The
+measured answer, printed by the new diagnostic under injection, is
+**16, 17, 18, 19**: i386's own adjust function omits the registers i386 never
+allocates, and aarch64 allocates those numbers.  Recorded because it is the
+argument for printing the set rather than asserting on a count.
+
+## 2. WHAT LANDED
+
+  * **`target-regs.h` / `target-regs.cc`** -- a new
+    `void (*adjust_reg_alloc_order) (void)` slot, NULL if the base defines
+    none, supplied per base under `#ifdef ADJUST_REG_ALLOC_ORDER`.  The macro
+    is a STATEMENT (`x86_order_regs_for_local_alloc ()`), not a function name,
+    so it is wrapped.  Same shape as the existing `regno_reg_class` slot; no
+    `target.def` entry, no back end edited.
+  * **`MT_HAVE_REG_ALLOC_ORDER`** in `target-regs.h` -- `#ifdef
+    REG_ALLOC_ORDER` asked of the SELECTED base.  It reads
+    `d_reg_alloc_order != NULL`, which is not a second fact that could drift:
+    `target-regs.cc` sets that pointer under exactly that `#ifdef`.
+  * **Five middle-end sites converted** -- `ira.cc:484`, `ira-color.cc:5243`,
+    `recog.cc:3830`, `reload1.cc:1847`, `reload1.cc:1910`; `reginfo.cc:327`
+    re-spelled to the same macro so all six read alike.
+    **The `#else` arms are NOT dead code and were not dropped.**  At
+    ira-color.cc and reload1.cc:1910 they are a DIFFERENT tie-break (prefer
+    call-clobbered registers), so making the sites unconditional would have
+    handed a back end that defines no REG_ALLOC_ORDER a tie-break it never
+    asked for.  Both arms are kept and selected at run time.
+  * **`ira.cc:507`'s bare `ira_assert` became a named diagnostic.**  Same
+    condition, unchanged; what it SAYS is not.  It now prints the base, the
+    class name, both counts and the missing register numbers, and says the
+    order and the classes come from different back ends.
+    **It is NOT a permutation check, deliberately** -- i386's own adjust pads
+    its tail with zeros on purpose (i386.cc:24003), so `reg_alloc_order` is
+    legitimately not a permutation and a check demanding one would have failed
+    on the arm that must not move.  I nearly wrote that check; reading i386.cc
+    first is the only reason I did not.
+
+Two further sites, found by sweeping rather than by the diagnostic:
+
+  * **`ira.cc:1492/1496`** -- `targetm.class_max_nregs` walked
+    `N_REG_CLASSES` (the union, 34) and asked `aarch64_class_max_nregs` about
+    classes 20..33, whose `gcc_unreachable ()` fired.  Bounded by
+    `MT_N_REG_CLASSES`, exactly as `reginfo.cc:546` already was.
+  * **`ira.cc:624`** -- `memory_move_cost` over the same union width, likewise
+    bounded.  **Its phantom rows are pre-filled with `SHRT_MAX`, not left at
+    the `XCNEW` zero**: a zero there reads as a move cost of "free", i.e. the
+    most attractive answer in every comparison that might reach it.  An absent
+    class must not be the cheapest class.
+
+The other ~30 `N_REG_CLASSES` walks in `ira.cc` were examined and left alone
+**with a reason, not by omission**: they are either declarations/allocations
+(the union IS the layout) or already inert on phantom classes, being guarded by
+`ira_class_hard_regs_num[cl] == 0` or by an empty-set test.  That is why the
+ICE surfaced at the two unguarded hook queries and nowhere else.
+
+## 3. WHERE `big.c` GETS TO NOW, AND WHAT THE NEXT WALL IS
+
+**Past `ira_init` and past all of `backend_init_target`.**  It now stops in a
+different phase entirely -- RTL expand:
+
+    during RTL pass: expand
+    internal compiler error: in expand_stack_alignment, at cfgexpand.cc:6941
+
+Line 6941 is `gcc_assert (targetm.calls.get_drap_rtx != NULL)`, reached because
+`crtl->stack_realign_needed` came out true from
+`INCOMING_STACK_BOUNDARY < crtl->stack_alignment_estimated`.
+
+**Cause identified by name, same instrument, same shape as the one just
+fixed:** `nm -uC cfgexpand.o` shows `U ix86_incoming_stack_boundary` and
+nothing else.  `i386.h:803` is
+`#define INCOMING_STACK_BOUNDARY ix86_incoming_stack_boundary`; aarch64 defines
+no such macro, so `defaults.h:945` should give it `PREFERRED_STACK_BOUNDARY` --
+but a middle-end TU sees the primary's spelling and reads **i386's global
+variable** for every base.  DRAP is an i386 concept and aarch64 supplies no
+`get_drap_rtx`, so the assert is the correct response to a wrong input.
+
+It is **already filed**: `macro-status.txt:114` has
+`INCOMING_STACK_BOUNDARY UNCONVERTED` and MACRO-LEAK.md:205 lists it.  So the
+next wall is a known, tracked macro leak, not a new mystery.
+
+## 4. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**.
+  * **x86_64 `-O2` md5 `378fc33c1e70`, unmoved.**
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`,
+    **5 distinct md5 per side**, **negative control firing** (1158 vs 804),
+    rc=0.  All five: O0 `1c00922491f8`, O1 `4fabab94b41b`, O2 `378fc33c1e70`,
+    O3 `d220421237bc`, Os `d6787f7e281f`.
+  * **`scratchpad/t122-guards.sh`: 9 PASS / 0 FAIL**, four of them the
+    injection.  ARM 2 is TAB-shaped -- gdb breakpoints on the two adjust
+    bodies IN THE RUNNING `cc1`, addresses asserted DISTINCT first, and each
+    base must enter its own body AND NOT the other's.  ARM 4 reverts
+    `ira.cc`'s dispatch to the `#ifdef`, rebuilds, and requires the primary's
+    symbol to REAPPEAR in `ira.o` (0 -> 1) and the ICE to come back; then
+    restores and requires both to reverse (1 -> 0, and `big.c` back to its new
+    stopping place).
+  * **`int x = 1;` for aarch64 still rc=0**, 373 bytes, **empty stderr**.
+  * Cold `all-gcc` before any edit: **rc=0, 745 lines / 126 `warning:`** --
+    matching #119's recorded cold arm exactly.
+
+### STDERR -- WHICH ARM
+
+Incremental `multi-target-objs cc1 lto1` after the final edit: **97 lines / 8
+`warning:`**; after the code-only edit it was **9 lines / 1 warning**, a single
+`-Wsign-compare` on `SUPPORTS_STACK_ALIGNMENT` at `ira.cc:2556`.  **That
+warning is PRE-EXISTING, not mine**: it occurs **48 times in the cold log taken
+before any edit**, and I merely caused one TU to rebuild.  It is a real
+signedness defect in `defaults.h:1256` for whoever owns `STACK_BOUNDARY`.
+Not comparable with the 32-line incremental floor.
+
+## 5. THREE INSTRUMENT FAILURES, ALL CAUGHT BY THEIR OWN GUARDS
+
+  1. **The gdb probe read nothing, twice, for two different reasons.**  First
+     because the build is `-g0` (`'targetm_regs' has unknown type`), then
+     because I probed with `int x = 1;` -- a translation unit with **no
+     function** never reaches `ira_init`, so no breakpoint could ever hit.  An
+     input chosen to be trivial was trivial in the one way that mattered.  Both
+     were caught only by the non-vacuity FATAL that refuses to score when the
+     probe cannot show it read anything; without it, "no breakpoint hit" would
+     have been indistinguishable from "the dispatch is fine".
+  2. **My own ICE-site matcher reported the injected run as "no ICE at all".**
+     It matched only `internal compiler error: in <fn>, at <file>` -- and the
+     entire point of the ira.cc:507 rewrite is that the failure no longer has
+     that shape.  **The instrument was written against the old shape of the
+     thing under test**, and scored the mitigation firing as the mitigation
+     being absent.  Now matches both forms and requires the named one.
+  3. **`stock-compare.sh` could not run in any build dir made since #119** and
+     failed in the direction that looks like a compiler bug.  It passed
+     `-ftarget-config=specs-x86_64-pc-linux-gnu-config`, a relative name in
+     `gcc/`; #119 deliberately stopped linking the config there.  All five
+     levels died with `no target configuration was selected` -- **the driverless
+     `cc1` refusing CORRECTLY, reported as five compiler failures.**  Fixed:
+     the path is absolute, overridable via `MTCFG`, and checked by name before
+     anything runs.  (Its "UNSCORABLE counts as failure" rule is why this was
+     never a false green.)
+
+## 6. WHAT I DID NOT DO
+
+  * **`HONOR_REG_ALLOC_ORDER` is NOT converted.**  Same family, and
+    `ira-color.cc:2249` reads it.  Left because **neither configured base
+    defines it** (only arm, arc, xtensa and nds32 do), so with i386+aarch64 it
+    is 0 on both sides and any arm I wrote would be one-sided and unfalsifiable
+    on this machine.  It is a real latent leak for an arm-or-arc build.
+  * **`inv_reg_alloc_order` is computed before `ADJUST_REG_ALLOC_ORDER` runs**
+    and is therefore stale for both bases -- identical upstream.  Its two
+    consumers read it after the adjustment.  I corrected the FALSE COMMENT at
+    `reginfo.cc:324` that asserted the order is "a permutation over the union
+    width" at that point (it is not, for either base, for two different
+    reasons) rather than changing when it is computed, which would move code
+    generation on the arm that must not move.
+  * **Probe scoreboard NOT run and NOT moved.**  Nothing here touches a probed
+    macro.  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+    FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+    32/0, aarch64 27/5**.
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker
+    is unchanged.
+
+## 7. FILES
+
+    t122-conf.sh      two-target configure, /tmp/b122
+    t122-build.sh     make at the TOP level
+    t122-gccbuild.sh  make in $B/gcc -- where cc1 actually builds
+    t122-specs.sh     both target-specs probes, real aarch64 binutils
+    t122-diag.sh      the gdb diagnosis, with the non-vacuity FATAL that fired
+    t122-guards.sh    9 arms; ARM 2 both-sided on the running cc1, ARM 4 the injection

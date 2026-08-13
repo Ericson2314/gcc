@@ -3827,11 +3827,12 @@ peep2_find_free_register (int from, int to, const char *class_str,
       raw_regno = search_ofs + i;
       if (raw_regno >= FIRST_PSEUDO_REGISTER)
 	raw_regno -= FIRST_PSEUDO_REGISTER;
-#ifdef REG_ALLOC_ORDER
-      regno = reg_alloc_order[raw_regno];
-#else
-      regno = raw_regno;
-#endif
+      /* Was `#ifdef REG_ALLOC_ORDER' -- the primary's headers, for every
+	 base.  See MT_HAVE_REG_ALLOC_ORDER in target-regs.h.  */
+      if (MT_HAVE_REG_ALLOC_ORDER)
+	regno = reg_alloc_order[raw_regno];
+      else
+	regno = raw_regno;
 
       /* Can it support the mode we need?  */
       if (!targetm.hard_regno_mode_ok (regno, mode))

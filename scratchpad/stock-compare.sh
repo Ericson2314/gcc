@@ -79,10 +79,31 @@ nix-shell -I "nixpkgs=$NP" -p coreutils diffutils --substituters 'https://cache.
  [ -x "$MT/gcc/cc1" ] || { echo "FATAL: no multi-target cc1 at $MT/gcc/cc1"; exit 9; }
  [ -x "$ST/gcc/cc1" ] || { echo "FATAL: no stock cc1 at $ST/gcc/cc1"; exit 9; }
  rm -rf "$OUT"; mkdir -p "$OUT" || { echo "FATAL: cannot recreate $OUT"; exit 9; }
+ # THE CONFIG FILE MOVED, AND ITS ABSENCE LOOKED LIKE A COMPILER BUG.
+ #
+ # This was `-ftarget-config=specs-x86_64-pc-linux-gnu-config', a RELATIVE name
+ # in $MT/gcc.  #119 deliberately stopped linking the config file into gcc/
+ # (only the spec file is linked; see Makefile.tpl), so in any build dir made
+ # since, all five levels died with
+ #
+ #   internal compiler error: no target configuration was selected, so there
+ #   is no register vocabulary to initialise
+ #
+ # -- which is the driver-less cc1 REFUSING CORRECTLY, i.e. the compiler
+ # working, reported as five compiler failures.  Absolute, overridable, and
+ # checked BY NAME before anything runs, so a missing config can never again
+ # be read as a code defect.
+ MTCFG=${MTCFG:-$(ls -1 $MT/lib/gcc/*/x86_64-pc-linux-gnu/specs-config 2>/dev/null | head -1)}
+ [ -n "$MTCFG" ] && [ -s "$MTCFG" ] || {
+   echo "FATAL: no x86_64 target config for the multi-target build."
+   echo "       looked for $MT/lib/gcc/*/x86_64-pc-linux-gnu/specs-config"
+   echo "       run target-specs' configure for x86_64 first, or set MTCFG."
+   exit 9; }
+ echo "mt cfg : $MTCFG"
  rc=0
  for O in 0 1 2 3 s; do
    (cd $MT/gcc && ./cc1 -quiet -nostdinc -O$O \
-      -ftarget-config=specs-x86_64-pc-linux-gnu-config "$IN" -o $OUT/mt-O$O.s) \
+      -ftarget-config="$MTCFG" "$IN" -o $OUT/mt-O$O.s) \
       > $OUT/mt-O$O.log 2>&1 || { echo "mt -O$O FAILED"; cat $OUT/mt-O$O.log; rc=1; }
    (cd $ST/gcc && ./cc1 -quiet -nostdinc -O$O "$IN" -o $OUT/stock-O$O.s) \
       > $OUT/stock-O$O.log 2>&1 || { echo "stock -O$O FAILED"; cat $OUT/stock-O$O.log; rc=1; }

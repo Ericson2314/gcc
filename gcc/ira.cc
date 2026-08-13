@@ -481,11 +481,12 @@ setup_class_hard_regs (void)
 	}
       for (n = 0, i = 0; i < FIRST_PSEUDO_REGISTER; i++)
 	{
-#ifdef REG_ALLOC_ORDER
-	  hard_regno = reg_alloc_order[i];
-#else
-	  hard_regno = i;
-#endif
+	  /* Was `#ifdef REG_ALLOC_ORDER', i.e. the PRIMARY's headers deciding
+	     for every base.  See MT_HAVE_REG_ALLOC_ORDER in target-regs.h.  */
+	  if (MT_HAVE_REG_ALLOC_ORDER)
+	    hard_regno = reg_alloc_order[i];
+	  else
+	    hard_regno = i;
 	  if (TEST_HARD_REG_BIT (processed_hard_reg_set, hard_regno))
 	    continue;
 	  SET_HARD_REG_BIT (processed_hard_reg_set, hard_regno);
@@ -504,7 +505,44 @@ setup_class_hard_regs (void)
       EXECUTE_IF_SET_IN_HARD_REG_SET (temp_hard_regset, 0, j, hrsi)
 	ira_non_ordered_class_hard_regs[cl][n++] = j;
 
-      ira_assert (ira_class_hard_regs_num[cl] == n);
+      /* Was a bare `ira_assert (ira_class_hard_regs_num[cl] == n)'.  The
+	 condition is unchanged; what it SAYS when it fails is not.
+
+	 The two counts are the same set of hard registers reached two ways:
+	 `ira_class_hard_regs_num[cl]' by walking the allocation order, and
+	 `n' by iterating the class's own hard-reg set.  They can only differ
+	 if some register of this class never appears in `reg_alloc_order' --
+	 which is exactly what happens when the allocation order belongs to a
+	 DIFFERENT back end from the register classes.  That was this branch's
+	 state until the ADJUST_REG_ALLOC_ORDER dispatch above became run-time,
+	 and the assertion reported it as a line number in ira.cc, naming
+	 neither the base, nor the class, nor the registers.
+
+	 NOT a permutation check, deliberately.  i386's own
+	 `x86_order_regs_for_local_alloc' pads its tail with zeros on purpose
+	 ("we do not allocate some registers at all", i386.cc:24003), so
+	 `reg_alloc_order' is legitimately not a permutation and a check
+	 demanding one would fail on the arm that must not move.  The real
+	 invariant is the weaker one already being tested: every ALLOCATABLE
+	 register of a class must be reachable through the order.  */
+      if (ira_class_hard_regs_num[cl] != n)
+	{
+	  char missing[256];
+	  size_t off = 0;
+	  missing[0] = '\0';
+	  EXECUTE_IF_SET_IN_HARD_REG_SET (temp_hard_regset, 0, j, hrsi)
+	    if (ira_class_hard_reg_index[cl][j] < 0 && off + 8 < sizeof missing)
+	      off += snprintf (missing + off, sizeof missing - off, "%s%u",
+			       off ? ", " : "", j);
+	  internal_error ("back end %qs: register class %qs has %d allocatable "
+			  "hard register(s), but only %d of them occur in "
+			  "%<reg_alloc_order%>; missing: %s.  The allocation "
+			  "order and the register classes come from different "
+			  "back ends",
+			  targetm_regs->name, reg_class_names[cl], n,
+			  ira_class_hard_regs_num[cl],
+			  missing[0] ? missing : "(none found)");
+	}
     }
 }
 
@@ -514,9 +552,16 @@ setup_class_hard_regs (void)
 static void
 setup_alloc_regs (bool use_hard_frame_p)
 {
-#ifdef ADJUST_REG_ALLOC_ORDER
-  ADJUST_REG_ALLOC_ORDER;
-#endif
+  /* Was `#ifdef ADJUST_REG_ALLOC_ORDER' with the macro spelled out below it.
+     This is a MIDDLE-END translation unit, so that tested the PRIMARY's
+     headers and then called the PRIMARY's function -- for every base.
+     Measured on the linked cc1 before this change: `ira.o' held an undefined
+     reference to `x86_order_regs_for_local_alloc ()' and to nothing else,
+     and `aarch64_adjust_reg_alloc_order ()' was defined in the same binary
+     and referenced by no object at all.  See target-regs.h for what that
+     cost.  */
+  if (targetm_regs->adjust_reg_alloc_order != NULL)
+    targetm_regs->adjust_reg_alloc_order ();
   no_unit_alloc_regs = fixed_nonglobal_reg_set;
   if (! use_hard_frame_p)
     add_to_hard_reg_set (&no_unit_alloc_regs, Pmode,
@@ -576,7 +621,26 @@ setup_class_subset_and_memory_move_costs (void)
   for (mode = 0; mode < MAX_MACHINE_MODE; mode++)
     ira_memory_move_cost[mode][NO_REGS][0]
       = ira_memory_move_cost[mode][NO_REGS][1] = SHRT_MAX;
-  for (cl = (int) N_REG_CLASSES - 1; cl >= 0; cl--)
+  /* THE PHANTOM ROWS FIRST, AND NOT WITH ZERO.
+
+     The tables are the UNION width and the walk below is the selected base's
+     own class count, so rows MT_N_REG_CLASSES .. N_REG_CLASSES-1 are classes
+     this base does not have.  Left as `XCNEW' zeroed them, those rows would
+     read as a move cost of ZERO -- i.e. "free", the most attractive answer in
+     every comparison that reaches them, and the one a cost-minimising walk
+     will pick.  An absent class must not be the cheapest class.  SHRT_MAX is
+     what this function already uses for "no".  */
+  for (cl = MT_N_REG_CLASSES; cl < N_REG_CLASSES; cl++)
+    for (mode = 0; mode < MAX_MACHINE_MODE; mode++)
+      ira_max_memory_move_cost[mode][cl][0]
+	= ira_max_memory_move_cost[mode][cl][1]
+	= ira_memory_move_cost[mode][cl][0]
+	= ira_memory_move_cost[mode][cl][1] = SHRT_MAX;
+
+  /* Was `N_REG_CLASSES', the UNION width -- so with i386 primary this asked
+     `targetm.memory_move_cost' about aarch64's classes 20..33, which that
+     back end does not have.  Same shape and same reason as reginfo.cc:546.  */
+  for (cl = (int) MT_N_REG_CLASSES - 1; cl >= 0; cl--)
     {
       if (cl != (int) NO_REGS)
 	for (mode = 0; mode < MAX_MACHINE_MODE; mode++)
@@ -1444,11 +1508,19 @@ setup_reg_class_nregs (void)
 
   for (m = 0; m < MAX_MACHINE_MODE; m++)
     {
-      for (cl = 0; cl < N_REG_CLASSES; cl++)
+      /* Was `N_REG_CLASSES', the UNION width.  This is the loop that ICEd:
+	 with i386 primary it asked `aarch64_class_max_nregs' about classes
+	 20..33 and that back end's `gcc_unreachable ()' fired
+	 (aarch64.cc:14331).  Rows this base has no class for keep the zero
+	 `XCNEW' gave them, which is what "needs no registers" already means
+	 here and is the inert value: `ira_init_register_move_cost' compares
+	 `ira_reg_class_max_nregs[cl][mode] > ira_class_hard_regs_num[cl]',
+	 and 0 > 0 is false for exactly the phantom rows.  */
+      for (cl = 0; cl < MT_N_REG_CLASSES; cl++)
 	ira_reg_class_max_nregs[cl][m]
 	  = ira_reg_class_min_nregs[cl][m]
 	  = targetm.class_max_nregs ((reg_class_t) cl, (machine_mode) m);
-      for (cl = 0; cl < N_REG_CLASSES; cl++)
+      for (cl = 0; cl < MT_N_REG_CLASSES; cl++)
 	for (i = 0;
 	     (cl2 = alloc_reg_class_subclasses[cl][i]) != LIM_REG_CLASSES;
 	     i++)

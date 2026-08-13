@@ -118,6 +118,19 @@ static const int mt_reg_alloc_order[OWN_FIRST_PSEUDO_REGISTER]
   = REG_ALLOC_ORDER;
 #endif
 
+/* ADJUST_REG_ALLOC_ORDER is a STATEMENT, not a function name -- i386 spells it
+   `x86_order_regs_for_local_alloc ()' and nds32 spells it
+   `nds32_adjust_reg_alloc_order ()' -- so it is wrapped rather than named.
+   Evaluating it here is the whole point: this translation unit has THIS back
+   end's headers, so the statement is this back end's.  */
+#ifdef ADJUST_REG_ALLOC_ORDER
+static void
+mt_adjust_reg_alloc_order (void)
+{
+  ADJUST_REG_ALLOC_ORDER;
+}
+#endif
+
 /* REG_CLASS_CONTENTS is written as `{ {..}, {..} }' with a row per class, and
    the row width is the back end's own N_REG_INTS -- 32 bits per element, hard
    coded at 32 rather than HOST_BITS_PER_INT, exactly as reginfo.cc has always
@@ -193,6 +206,11 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
   mt_call_used_regs,
 #ifdef REG_ALLOC_ORDER
   mt_reg_alloc_order,
+#else
+  NULL,
+#endif
+#ifdef ADJUST_REG_ALLOC_ORDER
+  mt_adjust_reg_alloc_order,
 #else
   NULL,
 #endif

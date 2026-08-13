@@ -1844,11 +1844,9 @@ find_reg (class insn_chain *chain, int order)
 
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     {
-#ifdef REG_ALLOC_ORDER
-      unsigned int regno = reg_alloc_order[i];
-#else
-      unsigned int regno = i;
-#endif
+      /* Was `#ifdef REG_ALLOC_ORDER' -- the primary's headers, for every
+	 base.  See MT_HAVE_REG_ALLOC_ORDER in target-regs.h.  */
+      unsigned int regno = MT_HAVE_REG_ALLOC_ORDER ? reg_alloc_order[i] : i;
 
       if (! TEST_HARD_REG_BIT (not_usable, regno)
 	  && ! TEST_HARD_REG_BIT (used_by_other_reload, regno)
@@ -1906,15 +1904,16 @@ find_reg (class insn_chain *chain, int order)
 	  if (this_cost < best_cost
 	      /* Among registers with equal cost, prefer caller-saved ones, or
 		 use REG_ALLOC_ORDER if it is defined.  */
+	      /* Was `#ifdef REG_ALLOC_ORDER' -- the primary's headers choosing
+		 the tie-break for every base.  The two arms are DIFFERENT
+		 tie-breaks, so this stays a choice, made by the selected
+		 base.  See MT_HAVE_REG_ALLOC_ORDER in target-regs.h.  */
 	      || (this_cost == best_cost
-#ifdef REG_ALLOC_ORDER
-		  && (inv_reg_alloc_order[regno]
-		      < inv_reg_alloc_order[best_reg])
-#else
-		  && crtl->abi->clobbers_full_reg_p (regno)
-		  && !crtl->abi->clobbers_full_reg_p (best_reg)
-#endif
-		  ))
+		  && (MT_HAVE_REG_ALLOC_ORDER
+		      ? (inv_reg_alloc_order[regno]
+			 < inv_reg_alloc_order[best_reg])
+		      : (crtl->abi->clobbers_full_reg_p (regno)
+			 && !crtl->abi->clobbers_full_reg_p (best_reg)))))
 	    {
 	      best_reg = regno;
 	      best_cost = this_cost;

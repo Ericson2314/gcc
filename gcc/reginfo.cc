@@ -322,9 +322,29 @@ init_reg_sets_1 (void)
   restore_register_info ();
 
   /* Was `#ifdef REG_ALLOC_ORDER', i.e. the PRIMARY's headers deciding for
-     every base.  The tail fence in `init_reg_sets' made the order a
-     permutation over the UNION width, so this stays a full-width loop.  */
-  if (targetm_regs->d_reg_alloc_order != NULL)
+     every base.  Stays a full-width loop: the tail fence in `init_reg_sets'
+     gives every phantom register its own identity entry.
+
+     THE OLD COMMENT HERE CLAIMED THE ORDER IS "A PERMUTATION OVER THE UNION
+     WIDTH" AT THIS POINT.  Measured, it is not, in two separate ways, and
+     neither is introduced by this branch:
+
+       * aarch64's REG_ALLOC_ORDER is `{}' (aarch64.h:1699), so at THIS point
+	 the array is 95 zeros and `inv_reg_alloc_order[0]' is simply assigned
+	 95 times.  What makes it an order is ADJUST_REG_ALLOC_ORDER, and that
+	 runs later, from `ira_init'.
+       * i386's `x86_order_regs_for_local_alloc' deliberately pads its tail
+	 with zeros (i386.cc:24003), so after IT runs the order is not a
+	 permutation either.
+
+     So `inv_reg_alloc_order' is stale with respect to the adjusted order for
+     BOTH bases, exactly as upstream, and its two consumers
+     (ira-color.cc:5247, reload1.cc:1910) are tie-breaks that read it after
+     the adjustment.  Left alone deliberately: changing when this is computed
+     would move code generation on the arm that must not move, and it is not
+     what stopped aarch64.  Recorded so the next reader does not trust the
+     sentence that was here.  */
+  if (MT_HAVE_REG_ALLOC_ORDER)
     for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
       inv_reg_alloc_order[reg_alloc_order[i]] = i;
 

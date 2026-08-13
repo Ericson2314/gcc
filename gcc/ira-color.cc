@@ -5240,14 +5240,18 @@ ira_better_spill_reload_regno_p (int *regnos, int *other_regnos,
     return cost < other_cost;
   if (length != other_length)
     return length > other_length;
-#ifdef REG_ALLOC_ORDER
-  if (hard_regno >= 0 && other_hard_regno >= 0)
-    return (inv_reg_alloc_order[hard_regno]
-	    < inv_reg_alloc_order[other_hard_regno]);
-#else
-  if (call_used_count != other_call_used_count)
+  /* Was `#ifdef REG_ALLOC_ORDER', i.e. the PRIMARY's headers choosing the
+     tie-break for every base.  The two arms are DIFFERENT tie-breaks, not one
+     with and without an ordering, so this has to stay a choice -- it just has
+     to be the selected base's choice.  See MT_HAVE_REG_ALLOC_ORDER.  */
+  if (MT_HAVE_REG_ALLOC_ORDER)
+    {
+      if (hard_regno >= 0 && other_hard_regno >= 0)
+	return (inv_reg_alloc_order[hard_regno]
+		< inv_reg_alloc_order[other_hard_regno]);
+    }
+  else if (call_used_count != other_call_used_count)
     return call_used_count > other_call_used_count;
-#endif
   return false;
 }
 
