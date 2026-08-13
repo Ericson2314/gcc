@@ -372,6 +372,24 @@ build to FAIL naming it. **An injection that does not fire is a finding** — on
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
 936-byte empty `collect2-aix.o` silently built for weeks.
 
+**"IT STILL COMPILES" IS NOT SUFFICIENT EVIDENCE THAT AN INCLUDE IS UNUSED.**
+`#if FOO` on an **undefined** `FOO` does not error — it silently evaluates to
+**false**. So a file that uses a `tm.h` macro *only inside a conditional*
+compiles cleanly with the include removed, scores "vestigial", and has its
+behaviour changed with **no diagnostic**. Three of twenty-nine candidates were
+exactly that shape (`i386-jit.cc` on `#if TARGET_64BIT_DEFAULT`,
+`mingw/msformat-c.cc` on `#ifdef TARGET_OVERRIDES_FORMAT_INIT`,
+`avr/avr-devices.cc`).
+
+**And the instrument written to catch that missed one of them.** It derived
+`tm.h`'s macro set by `-dM` difference — rigorous, 12,689 names, and *i386
+-linux's* 12,689 names. `TARGET_OVERRIDES_FORMAT_INIT` lives in
+`config/mingw/mingw32.h` and was invisible to it. The version that works asks
+whether the identifier is `#define`d **anywhere under `config/`** —
+deliberately over-broad, because it can only *revoke* a deletion, never
+authorise one. **When an instrument can only take away, make it too eager;
+when it can grant, make it exact.**
+
 **A GUARD SCRIPT CAN BUILD SOMEBODY ELSE'S TREE AND REPORT A CLEAN GREEN.**
 Twenty-three `tNNN-build.sh` scripts had `SRC=` hardcoded to **another agent's
 worktree**. They configure, build and pass — against a compiler that is not
