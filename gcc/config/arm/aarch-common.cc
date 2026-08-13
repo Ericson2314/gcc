@@ -27,7 +27,10 @@
 #include "system.h"
 #include "coretypes.h"
 #include "insn-modes.h"
-#include "tm.h"
+/* Compiled once per configured back end: name the back end's own
+   tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "rtl.h"
 #include "rtl-iter.h"
 #include "memmodel.h"

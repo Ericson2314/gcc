@@ -22,7 +22,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-#include "tm.h"
+/* Compiled once per configured back end: name the back end's own
+   tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "tm_jit.h"
 #include "jit/jit-target.h"
 #include "jit/jit-target-def.h"
