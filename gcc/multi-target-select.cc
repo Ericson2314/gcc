@@ -83,6 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-cdata.h"
 #include "target-regs.h"
 #include "target-cumargs.h"
+#include "target-regstack.h"
 #include "multi-target-reg-widths.h"
 /* For `optab', `struct target_optabs' and the four optab entry points below.
    `insn-opinit.h' is safe to include HERE, from a shared translation unit,
@@ -601,6 +602,27 @@ multi_target_select (const char *target)
 			  "with no insn-attribute table attached; its objects "
 			  "predate target-attr.h and are from a different "
 			  "build", base);
+
+	/* Whether this back end has a REGISTER STACK; see target-regstack.h.
+
+	   A separate registry rather than a field riding on the cumargs table,
+	   unlike `frame', `insn', `preds' and `attr' above: those four are
+	   defined by the same translation unit that defines the cumargs table,
+	   and this one is not -- it is target-regstack-<cpu>.o, a whole pass
+	   body compiled against this base's headers.
+
+	   CHECKED BY NAME, and that check is the point.  A missing table here
+	   makes `targetm_regstack' null, which makes the `*stack_regs' pass
+	   gate false, which is a compiler that silently does not run x87
+	   register-stack conversion for i386 -- correct-looking output on every
+	   test that does not use long double, and no diagnostic anywhere.  The
+	   other tables in this function fail loudly when absent; this one fails
+	   QUIETLY, so it needs the by-name check more than they do, not less. */
+	targetm_regstack = target_regstack_for (base);
+	if (targetm_regstack == NULL)
+	  internal_error ("back end %qs has no register-stack table; "
+			  "gen-multi-target-md.awk emits one for every back "
+			  "end that has objects, so this is a build bug", base);
 
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is

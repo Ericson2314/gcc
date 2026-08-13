@@ -1242,6 +1242,30 @@ function emit_cumargs_registry(	i, n, parts) {
   printf "target-cumargs-select.o: multi-target-cumargs.h\n\n";
 }
 
+# And the same for the register stack; see target-regstack.h.  A table per
+# base for a reason the other registries do not have: what varies here is not
+# a VALUE but whether a whole 3,265-line pass body EXISTS at all.  `STACK_REGS'
+# is defined by two back ends of ~50, so the shared compilation of
+# reg-stack.cc answered "does this target have a register stack" with i386's
+# yes, for every target.
+function emit_regstack_registry(	i, n, parts) {
+  n = split(mt_bases, parts, " ");
+
+  printf "multi-target-regstack.h: multi-target.manifest\n";
+  printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo 'extern const struct target_regstack_desc targetm_regstack_%s;'; \\\n",
+	   parts[i];
+  printf "\t  echo '#define TARGETM_REGSTACK_TABLES \\'; \\\n";
+  for (i = 1; i <= n; i++)
+    printf "\t  echo '  TARGETM_REGSTACK_ENTRY (\"%s\", targetm_regstack_%s) \\'; \\\n",
+	   parts[i], parts[i];
+  printf "\t  echo ''; \\\n";
+  printf "\t} > tmp-multi-target-regstack.h\n";
+  printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-regstack.h $@\n\n";
+  printf "target-regstack-select.o: multi-target-regstack.h\n\n";
+}
+
 # The registry multi-target-select.cc includes: every back end that has
 # objects, and the triple-to-back-end map.
 #
@@ -1406,6 +1430,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_c_ops_registry();
 		    emit_regs_registry();
 		    emit_cumargs_registry();
+		    emit_regstack_registry();
 		    emit_backend_registry();
 		    emit_options_registry();
 		    emit_source_specs();
@@ -2003,6 +2028,38 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   printf "\t  $(srcdir)/target-cumargs.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-cumargs-" cpu ".o";
+
+  # This back end's REGISTER STACK; see target-regstack.h.  Not a table of
+  # values like the four above but a whole pass body, compiled per base
+  # because the question it answers -- `#ifdef STACK_REGS' -- is one only this
+  # back end's headers can answer, and answering it once for everybody gave
+  # every target i386's yes.
+  #
+  # It needs the same prerequisites as any middle-end object because it IS
+  # one: the body calls into df, cfgrtl, recog and emit-rtl.  What it also
+  # needs, and what shared compilation could not give it, is THIS base's
+  # insn-flags-<cpu>.h: reg-stack.cc:1170 spells `gen_movxf', and only a back
+  # end with an XFmode move pattern has it.  Compiled per base the name is
+  # inside `#ifdef STACK_REGS' and therefore only in a translation unit whose
+  # own insn-flags has it -- which is why no forwarder for `gen_movxf' is
+  # needed here, or anywhere.
+  printf "target-regstack-%s.o: $(srcdir)/target-regstack.cc %s-inc/s-inc \\\n", cpu, cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(BACKEND_H) $(RTL_H) \\\n";
+  printf "  $(TREE_H) $(DF_H) $(TM_P_H) $(TARGET_H) $(RECOG_H) $(REGS_H) \\\n";
+  # Named by PATH, not through a `$(FOO_H)' variable, for the ones Makefile.in
+  # has no variable for.  An undefined make variable expands to the empty
+  # string, so `$(CFGRTL_H)' would be a dependency silently not taken -- the
+  # stale-object failure target-cumargs-<cpu>.o's comment describes, with no
+  # diagnostic at all.
+  printf "  $(EMIT_RTL_H) insn-config.h $(srcdir)/rtl-error.h \\\n";
+  printf "  $(srcdir)/cfgrtl.h $(srcdir)/cfganal.h $(srcdir)/cfgbuild.h \\\n";
+  printf "  $(srcdir)/cfgcleanup.h $(srcdir)/reload.h $(srcdir)/varasm.h \\\n";
+  printf "  $(srcdir)/rtl-iter.h $(srcdir)/function-abi.h \\\n";
+  printf "  $(TREE_PASS_H) $(srcdir)/target-regstack.h\n";
+  printf "\t$(COMPILE) -DTARGETM_REGSTACK_SYMBOL=targetm_regstack_%s \\\n", cpu;
+  printf "\t  $(srcdir)/target-regstack.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-regstack-" cpu ".o";
 
   # And this back end's WIDTH PROBE.  Deliberately NOT in
   # MULTI_TARGET_OBJS_<cpu>: it is never linked, it is compiled so that `nm -S'

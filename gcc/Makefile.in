@@ -2222,6 +2222,7 @@ OBJS = \
 	target-cdata-select.o \
 	target-regs-select.o \
 	target-cumargs-select.o \
+	target-regstack-select.o \
 	$(ANALYZER_OBJS) \
 	$(host_hook_obj)
 
@@ -3823,6 +3824,14 @@ target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
 target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
   $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h $(srcdir)/target-insn.h \
   $(srcdir)/target-preds.h $(srcdir)/target-attr.h
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+# The register-stack selector; see target-regstack.h.  IN OBJS, not the
+# c-family list: it defines `stack_regs_mentioned', which cfgcleanup.o calls,
+# and cfgcleanup.o is in libbackend.a and therefore in lto1 as well as cc1.
+target-regstack-select.o: $(srcdir)/target-regstack-select.cc \
+  $(srcdir)/target-regstack.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 

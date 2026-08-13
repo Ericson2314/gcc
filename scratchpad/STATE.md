@@ -9070,3 +9070,178 @@ because `scratchpad/big.c` is a fixed file everyone passes by the same name.
   * **The ranking cannot see value divergence**, only use, position, sizing and
     definedness. `MACRO-LEAK.md`'s measurement is still the authority on values,
     and its ~1049 unclassified identical-text macros remain unclassified.
+
+---
+
+# #138 -- reg-stack.cc WAS NOT SHARED CODE, AND THE PASS GATED TRUE EVERYWHERE
+
+The user ruling that unblocked this: *"yeah if it is not for all targets,
+moving to a different file sounds good."*
+
+## 1. WHAT WAS WRONG, MEASURED RATHER THAN ARGUED
+
+`gcc/reg-stack.cc` was 3,557 lines of which **3,265 sat inside
+`#ifdef STACK_REGS`** (line 184 to the `#endif` at 3449).  `STACK_REGS` is
+defined by exactly **two back ends of ~50** -- `config/i386/i386.h` and
+`config/frv/frv.h` -- so compiled once against the primary headers that guard
+was **i386 answering for every target**.
+
+The pass gate was literally
+
+    bool gate (function *) { #ifdef STACK_REGS return true; #else return false; #endif }
+
+so the `*stack_regs` pass returned **true on every target the compiler
+served**.  That is not an inference: `t138-inject.sh <build> old` restores
+exactly that gate and the aarch64 dump file `a64ld.c.354r.stack` **appears**.
+A gated-off pass writes no dump, so the file existing IS the gate saying yes.
+
+## 2. THE SHAPE, AND WHY NOT `config/i386/`
+
+TWO back ends define `STACK_REGS`, so relocating the file into `config/i386/`
+would have been wrong.  What was wanted is **per-base compilation**, the shape
+`target-cumargs.cc` already uses:
+
+  * `gcc/target-regstack.cc` -- the whole former `#ifdef STACK_REGS` body,
+    compiled **once per configured back end** as `target-regstack-<cpu>.o`
+    against that back end own headers, ending in a two-armed table.  The
+    i386 copy gets the pass; a copy for a base with no register stack gets
+    `has_stack_regs = false` and two null hooks.
+  * `gcc/target-regstack.h` -- the descriptor, the registry, `targetm_regstack`
+    (NULL until selection), and the enumeration in section 3 below.
+  * `gcc/target-regstack-select.cc` -- shared.  Registry, by-name lookup, and
+    **the one external definition of `stack_regs_mentioned`** in the compiler.
+  * `gcc/reg-stack.cc` -- 154 lines: `regstack_completed`, the two passes named
+    by `passes.def`, and a gate that reads
+    `targetm_regstack->has_stack_regs`.
+  * `gen-multi-target-md.awk` -- `emit_regstack_registry()` (generates
+    `multi-target-regstack.h`) and a `target-regstack-<cpu>.o` rule added to
+    `MULTI_TARGET_OBJS_<cpu>`; `Makefile.in` gains
+    `target-regstack-select.o` in `OBJS`; `multi-target-select.cc` installs the
+    table with a by-name `internal_error`.
+
+**`gen_movxf` DISSOLVED RATHER THAN BEING ANSWERED, which was the point of the
+ruling.**  `reg-stack.cc:1170` spelled `gen_movxf`; as shared code that is a
+link-time reference the primary happened to satisfy, and a forwarder or a
+`HAVE_movxf` guard would have been one more shared answer to a per-base
+question.  Compiled per base the name occurs only inside `#ifdef STACK_REGS`,
+i.e. only in a TU whose own `insn-flags-<cpu>.h` has it.  **No forwarder was
+built.**
+
+## 3. THE FAILURE MODE THE FILE ITSELF WARNED ABOUT -- ENUMERATED
+
+The old `#ifndef STACK_REGS` arm said `stack_regs_mentioned` had to live
+outside the guard because *"a run-time test cannot elide a link-time
+reference, so the symbol has to exist wherever its caller does."*  The complete
+export list, grepped rather than recalled (`--include` deliberately not used):
+
+    regstack_completed        rtl.h:4283; final.cc:4519, regrename.cc:1776,
+                              df-problems.cc:3215    -> stays shared
+    stack_regs_mentioned      rtl.h:4651; cfgcleanup.cc:1246
+                              -> ONE definition, in the shared selector
+    make_pass_stack_regs      tree-pass.h:648, passes.def:548  -> stays shared
+    make_pass_stack_regs_run  tree-pass.h:649, passes.def:551  -> stays shared
+    reg_to_stack              already `static`; reached through the table
+
+Nothing else.  Inside the per-base TU `stack_regs_mentioned` is renamed to a
+`static mt_stack_regs_mentioned`, because the old external name would otherwise
+be defined once per back end and rtl.h declares it `extern` (a `static`
+redeclaration is ill-formed).
+
+**Two link-level defects were hit and are recorded because neither is
+guessable.**  A namespace-scope `const` object has **internal linkage** in
+C++, so the table needed the same redundant-looking `extern` declaration
+`target-cumargs.cc` carries -- without it the link fails with
+`undefined reference to targetm_regstack_i386`.  And the shared selector needs
+`tm.h` before `rtl.h`, like every other `*-select.cc`.
+
+## 4. ARMS -- `scratchpad/t138-gate.sh`, BOTH INJECTIONS FIRE
+
+    ARM A  x86_64 runs `*stack_regs`, aarch64 does not   (dump-file presence)
+    ARM B  x86_64 long double still emits fldt/fmul/faddp/%st(1)
+    ARM C  aarch64 still emits `add w0, w0, 1`
+
+ARM A carries a **non-vacuity FATAL**: if x86_64 produced no dump either, it
+refuses to score, because *"correctly gated off"* and *"the pass is dead
+everywhere"* are the same picture and the second is the likelier way to get a
+green here.  `scratchpad/t138-inject.sh`:
+
+    inject=old   gate returns true unconditionally (the pre-change bug)
+                 -> ARM A: FAIL: aarch64 still runs the pass       (fires)
+    inject=dead  i386 table says has_stack_regs=false
+                 -> ARM A: FATAL-VACUOUS, rc=9                     (fires)
+
+Both injections assert they produced the intended state before building.
+
+**Two harness defects were caught by the arms and are the PRINCIPLES classics.**
+ARM C first used `add[ \t]*w0` -- `\t` in an ERE bracket is backslash-and-t,
+never a tab -- and reported FAIL on correct aarch64 output.  ARM B first
+asserted *"at least 3 lines mentioning %st"* and failed on correct output,
+which has exactly two: a threshold calibrated on a number nobody measured.  It
+now asserts CONTENT by name (`%st(1)` is stack-relative numbering, which only
+the pass can produce).
+
+## 5. A DEFECT IN THE ACCEPTANCE BAR ITSELF -- `stock-compare.sh`
+
+`stock-compare.sh` was printing a **nix evaluation error on every run** and
+continuing.  Cause: the entire compile loop is one single-quoted `--run`
+argument, and two GCC-style closing quote characters **inside comments** ended
+it -- so the words after them (`a RELATIVE name`) became extra `nix-shell -p`
+packages, nix-shell died with `undefined variable a`, and **the rest of the
+script then ran in the OUTER shell, outside nix-shell entirely.**
+
+It still printed `5/5 IDENTICAL` with the negative control firing.  The defect
+was invisible in the result and visible only on stderr.  Fixed; stderr is now
+**0 lines** and the figures are unchanged, so **past stock-compare greens
+stand** -- the two cc1 binaries compared were always the right ones, only the
+shell they were compared in was wrong.  (A first attempt to document the fix
+re-broke it the same way, with the words "closing quote".  The comment now
+forbids the character and says to assert on empty stderr rather than eyeball.)
+
+## 6. BARS -- `/tmp/b138`, my own build dir
+
+  * `make multi-target-objs cc1 lto1` -- **rc=0**.
+  * **x86_64 `-O2` `scratchpad/big.c`: 12369 bytes, md5 `378fc33c1e70`** --
+    matches the recorded bar exactly.  x86_64 is the base that HAS the
+    register stack, so this is the bar that mattered most here.
+  * **aarch64 `-O2` `int x = 1;` as `one.c`: 371 bytes, md5 `84b06d9df5d2`**
+    -- the input basename is quoted with it, per #137.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, run
+    against `/tmp/b138` (`mt cfg : /tmp/b138/lib/gcc/17.0.0/x86_64-pc-linux-gnu/
+    specs-config`), 5 distinct md5s per side, negative control firing,
+    **stderr 0 lines**, `OVERALL rc=0`.
+  * `t138-gate.sh` **OVERALL rc=0**, both injections firing by name.
+  * `target-specs` run for both targets with real aarch64 binutils, rc=0.
+  * Rebuild stderr: **28 lines**, 0 `error:` -- a partial-cold arm
+    (`multi-target-select.cc` and the new headers are widely included), NOT
+    comparable with the 32-line incremental floor.
+
+## 7. THE TWO THINGS THE BRIEF ASKED ME TO CHECK -- BOTH STILL BLOCKED
+
+  * **aarch64 `alloca` + `-fstack-clash-protection` is NOT unblocked.**  It
+    still dies in pass `vregs`:
+    `unrecognizable insn: (unspec_volatile [(const_int 0)] UNSPECV_GET_FPCR)`,
+    `internal compiler error: in extract_insn, at recog.cc:2892`.  Note the
+    first probe I wrote came out as a bare `ret` and looked FIXED -- the
+    `alloca` was dead and optimised away.  A test where the pointer escapes
+    reproduces the wall unchanged.  That is the disappeared-ICE trap and it
+    took one extra test to avoid banking it.  The blocker is per-base **recog**
+    selection, not reg-stack.
+  * **`PUSH_ROUNDING` is NOT unblocked.**  `reg-stack.cc` never spelled it
+    (grepped, zero hits in both the old and the new files); the four i386 `.md`
+    `define_split` preparation statements compiled into `insn-emit-*.o` are
+    untouched by this change.
+
+Neither was expanded into, per the brief.
+
+## 8. WHAT I DID NOT DO
+
+  * **No probe-scoreboard figure is quoted.**  `macro-probe-run.sh` was not
+    run; `STACK_REGS` is not on that board.
+  * **The `frv` back end was not built.**  Both configured bases are i386 and
+    aarch64, so the arm that would show a SECOND `STACK_REGS` back end getting
+    its own copy does not exist here.  What is shown is one base with the pass
+    and one without -- both-sided for the question being asked, but silent on
+    whether two `STACK_REGS` bases coexist.
+  * **`gcc/Makefile.in:4421` still lists `reg-stack.cc` in `GTFILES`.**
+    Neither the old nor the new file contains a `GTY` marker (grepped, zero),
+    so this is stale rather than wrong, and was already stale.
