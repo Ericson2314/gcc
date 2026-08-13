@@ -442,6 +442,22 @@ mt_base_initial_elimination_offset (int from, int to)
   return offset;
 }
 
+/* `Pmode', evaluated in THIS base's translation unit.  See target-frame.h for
+   the gdb reading that starts this and for why i386's answer in shared code is
+   its unconfigured SImode default rather than x86_64's DImode.
+
+   The cast through `machine_mode' and back is not ceremony.  Most back ends'
+   `Pmode' is built from a `scalar_int_mode' object and would convert
+   implicitly, but some spell a raw `E_*mode' enumerator, which would not; and
+   `as_a' asserts that the mode really is a scalar integer, so a back end whose
+   `Pmode' is not one fails HERE, by name, in its own translation unit, rather
+   than at one of the 648 shared use sites.  */
+static scalar_int_mode
+mt_base_pmode (void)
+{
+  return as_a <scalar_int_mode> ((machine_mode) Pmode);
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -499,7 +515,8 @@ static const struct target_frame_desc mt_base_frame = {
   &mt_base_eliminables[0][0],
   MT_BASE_N_RELOAD_ELIMINABLES,
   MT_BASE_RELOAD_ELIMINABLES,
-  mt_base_initial_elimination_offset
+  mt_base_initial_elimination_offset,
+  mt_base_pmode
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

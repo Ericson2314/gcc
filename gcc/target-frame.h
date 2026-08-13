@@ -449,6 +449,48 @@ struct target_frame_desc
      this field would be an ABI mismatch rather than a fix, which is why it is
      recorded.  */
   poly_int64 (*initial_elimination_offset) (int from, int to);
+
+  /* `Pmode' -- the mode of an address.  MACRO-LEAK.md class (c4).
+
+     THIS ONE IS THE SILENT-DEFAULT VARIANT OF THE LEAK, AND THAT IS WHY IT IS
+     WORSE THAN THE USUAL SHAPE.  i386 spells it
+
+         #define Pmode (ix86_pmode == PMODE_DI ? DImode : SImode)   i386.h:2001
+
+     and `ix86_pmode' is an OPTION variable, `Init (PMODE_SI)' at
+     i386.opt:314, set to PMODE_DI by `ix86_option_override' -- which runs
+     only when i386 is the SELECTED target.  So in a shared translation unit
+     compiling FOR AARCH64 the expression is not "the primary's answer" in the
+     usual sense of x86_64's DImode; it is the primary's UNCONFIGURED DEFAULT,
+     SImode, which is not the right answer for either configured base.  A leak
+     that at least served the primary's real value would have produced DImode
+     here by luck and hidden this for another release.
+
+     MEASURED, NOT INFERRED (scratchpad/t125-cause.sh, gdb on the running cc1,
+     one breakpoint per run, the frame gdb reports matched against the ICE's
+     own backtrace).  At the failing call, frame #1 = `aarch64_expand_prologue':
+
+         mode_arg = 27 = DImode   <- aarch64's own Pmode, from aarch64.h:1441
+         mode_of_x = 26 = SImode  <- stack_pointer_rtx, built in emit-rtl.cc
+
+     `stack_pointer_rtx' is `gen_raw_REG (Pmode, STACK_POINTER_REGNUM)' at
+     emit-rtl.cc:6266 -- a SHARED translation unit, so it took i386's default
+     -- and `explow.cc:102' asserts `GET_MODE (x) == mode'.  On the x86_64 side
+     the same instrument reads 27 and 27 and finds no mismatching call
+     anywhere, so this is a divergence and not "everyone got the same answer".
+
+     A FUNCTION AND NOT A CONSTANT, for the reason the whole struct is
+     functions: i386's answer varies with option state within one compilation.
+     Freezing it at startup is the bug this header's opening comment
+     describes.
+
+     `scalar_int_mode' AND NOT `machine_mode' is deliberate.  `Pmode' today
+     yields a `scalar_int_mode' in C++ (both bases' definitions are built from
+     `DImode' / `SImode', which are `scalar_int_mode' objects), and generic
+     code relies on that type at sites such as `GET_MODE_PRECISION (Pmode)'.
+     Returning `machine_mode' would compile at the definition and fail, or
+     silently pick a different overload, hundreds of sites away.  */
+  scalar_int_mode (*pmode) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -534,5 +576,15 @@ extern int mt_reload_eliminable_from (int i);
 extern int mt_reload_eliminable_to (int i);
 
 extern poly_int64 mt_initial_elimination_offset (int from, int to);
+
+/* `Pmode'.  648 use sites outside `config/', `testsuite/' and
+   `ada/gcc-interface/' -- and every one of them is an ordinary run-time
+   expression.  Swept before redirecting, because a redirect to a call is only
+   possible if no site needs a constant: no `#if'/`#elif' line in shared code
+   names it, no `case' label, no array bound, no static initialiser, and no
+   `#ifdef Pmode' anywhere outside two back ends' own headers
+   (`mips.h:2751', `loongarch.h:855', both `#ifndef', both in translation
+   units that keep the real macro).  */
+extern scalar_int_mode mt_pmode (void);
 
 #endif /* GCC_TARGET_FRAME_H */

@@ -290,6 +290,15 @@ mt_initial_elimination_offset (int from, int to)
   return mt_elim_frame ()->initial_elimination_offset (from, to);
 }
 
+/* `Pmode'.  Goes through `mt_frame ()' rather than caching, for the reason
+   in target-frame.h: i386's is an option-dependent expression, so a value
+   read once at startup would be frozen at whatever the options said then.  */
+scalar_int_mode
+mt_pmode (void)
+{
+  return mt_frame ()->pmode ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

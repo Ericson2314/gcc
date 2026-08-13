@@ -2232,10 +2232,33 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef INITIAL_ELIMINATION_OFFSET
 #define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
   ((OFFSET) = mt_initial_elimination_offset ((int) (FROM), (int) (TO)))
+
 #undef ELIMINABLE_REGS
 #define ELIMINABLE_REGS \
   MULTI_TARGET_ELIMINABLE_REGS_IS_PER_BASE_call_mt_num_eliminable_regs_instead
 #undef RELOAD_ELIMINABLE_REGS
+
+/* ------------------------------------------------------------------------
+   `Pmode' -- THE MODE OF AN ADDRESS.  See target-frame.h for the gdb reading
+   that diagnosed this: at the failing `plus_constant' call, with frame #1 the
+   ICE's own `aarch64_expand_prologue', the mode ARGUMENT is DImode (27,
+   aarch64's own `Pmode') and the mode of the rtx is SImode (26), because
+   `stack_pointer_rtx' was built in emit-rtl.cc -- shared code -- from i386's
+   `(ix86_pmode == PMODE_DI ? DImode : SImode)' with `ix86_pmode' still at its
+   `Init (PMODE_SI)' default.  x86_64 reads 27 and 27 and has no mismatching
+   call at all.
+
+   REDIRECTED RATHER THAN POISONED, unlike `ELIMINABLE_REGS' just above,
+   because there is something to redirect it TO: it denotes a single value,
+   and all 648 shared use sites want it as a run-time expression.  The sweep
+   that establishes that is recorded at `mt_pmode''s declaration.
+
+   `STACK_SAVEAREA_MODE' above expands to `Pmode' for a base that defines no
+   such macro, and is defined EARLIER in this file, so it picks this up by
+   ordinary macro expansion -- the redirect being last is what makes that
+   work rather than a coincidence.  */
+#undef Pmode
+#define Pmode (mt_pmode ())
 
 /* ------------------------------------------------------------------------
    THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault

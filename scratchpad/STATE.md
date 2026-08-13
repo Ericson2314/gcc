@@ -5241,3 +5241,262 @@ wrong-reason shape; retire on sight.**
     t124-guards.sh    13 arms; ARM 0 the generated-header check the
                       silent-no-op cost me, ARM 2 gdb on the running cc1,
                       ARM 4 the injection
+
+# TASK #125 -- `Pmode'.  THE EIGHTH WALL, AND THE FIRST ONE `nm -uC' CANNOT SEE
+
+Worktree came up at bare-repo HEAD `7208eca60d0` AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in` was **0** -- `git reset --hard multi-target` took
+it to **37**.  That is now four worktrees in a row.  Build dir `/tmp/b125`, my
+own, cold.
+
+## 0. THE BRIEF SAID `Pmode' WAS A SUSPECT, NOT A FINDING.  IT IS THE CAUSE.
+
+#124 located `ICE: in plus_constant, at explow.cc:102` and deliberately
+declined to name a cause.  Diagnosed here, by reading the RUNNING cc1
+(`scratchpad/t125-cause.sh`), one breakpoint per run:
+
+At the failing call, with frame #1 exactly the `aarch64_expand_prologue` from
+the ICE's own backtrace:
+
+    mode_arg  = 27 = DImode    <- aarch64's own Pmode (aarch64.h:1441)
+    mode_of_x = 26 = SImode    <- stack_pointer_rtx, built in emit-rtl.cc:6266
+
+and on the x86_64 side the same instrument reads **27 and 27** and finds **no
+mismatching call anywhere**, in a run that really compiled (19949 bytes of
+asm), so this is a divergence and not "everyone got the same answer".
+
+`explow.cc:102` is `gcc_assert (GET_MODE (x) == VOIDmode || GET_MODE (x) ==
+mode)`.  `stack_pointer_rtx` is `gen_raw_REG (Pmode, STACK_POINTER_REGNUM)` in
+`emit-rtl.cc` -- a SHARED translation unit -- so it took i386's `Pmode`.
+
+## 1. THIS IS THE *SILENT-DEFAULT* VARIANT, AND IT IS WORSE THAN THE USUAL LEAK
+
+i386's is `#define Pmode (ix86_pmode == PMODE_DI ? DImode : SImode)`
+(i386.h:2001), and `ix86_pmode` is an OPTION variable, `Init (PMODE_SI)` at
+i386.opt:314, promoted to `PMODE_DI` by `ix86_option_override` -- which runs
+only when i386 is the SELECTED target.
+
+So shared code compiling for aarch64 did not get "x86_64's answer".  It got
+**the primary's unconfigured default, SImode**, which is the right answer for
+NEITHER configured base.  A leak that served the primary's real value would
+have produced DImode here by luck and hidden this indefinitely.
+
+**Both configured bases' `Pmode` is DImode.**  Every value-equality arm --
+including the header probe's -- therefore passes on this leak and always has.
+Recorded in `macro-status.txt` as a FOURTH wrong-reason shape, distinct from
+the base-B redirect one.
+
+## 2. AND `nm -uC' SCORES THIS LEAK AS ABSENT.  STATE THE BLIND SPOT.
+
+Seven walls were cleared by `nm -uC <obj>` naming a leaked `ix86_*` symbol.
+It cannot name this one, and not by bad luck: `ix86_pmode` is an option
+variable, i.e. `global_options.x_ix86_pmode` -- a member of a struct shared
+code legitimately links against.  It is not a function and not a distinct
+symbol, so **no object anywhere carries an undefined reference naming it**
+(`nm | grep -w ix86_pmode` on `cc1` is empty; checked, with the tool asserted
+non-empty first).  A macro can leak with a completely clean `nm`.
+
+The general form, for the next agent: **the symbol instrument sees macros that
+expand to CODE.  It is blind to macros that expand to OPTION STATE**, and
+option state is exactly where the silent-default leaks live.
+
+## 3. WHAT LANDED
+
+Same mechanism as #108's six, #123's four and #124's two -- no new registry, no
+back end edited, no `target.def` entry.  Four files, ~90 lines, mostly comment:
+
+  * **`target-frame.h`** -- `scalar_int_mode (*pmode) (void)` on
+    `target_frame_desc`, plus `extern scalar_int_mode mt_pmode (void)`.
+    `scalar_int_mode` and not `machine_mode` on purpose: `Pmode` yields a
+    `scalar_int_mode` today and generic code relies on that type, so the
+    weaker return type would compile at the definition and fail (or pick a
+    different overload) hundreds of sites away.
+  * **`target-cumargs.cc`** -- `mt_base_pmode`, evaluating `Pmode` in THIS
+    base's TU, through `as_a <scalar_int_mode>` so a back end whose `Pmode` is
+    not a scalar integer fails by name in its own TU rather than at one of the
+    648 shared sites.
+  * **`target-cumargs-select.cc`** -- `mt_pmode`, through `mt_frame ()` and not
+    cached, because i386's answer varies with option state.
+  * **`defaults.h`** -- `#undef Pmode` / `#define Pmode (mt_pmode ())` in the
+    existing shared-code block.
+
+**THE SWEEP THAT MADE A CALL-REDIRECT LEGAL**, done before writing it, because
+a redirect to a function is only possible if no site wants a constant.
+`Pmode` has **648** use sites outside `config/`, `testsuite/` and
+`ada/gcc-interface/`, and among them: no `#if`/`#elif` line names it, no
+`case` label, no array bound, no static initialiser, and no `#ifdef Pmode`.
+The only `#ifndef Pmode` in the tree is `mips.h:2751` and
+`loongarch.h:855` -- back ends' own headers, in translation units that keep
+the real macro.  So this is **not** MACRO-LEAK class (d) and needs no `#if`
+arithmetic decision.
+
+`STACK_SAVEAREA_MODE` (defaults.h:1479) expands to `Pmode` and is defined
+EARLIER in the file; it picks the redirect up by ordinary macro expansion
+because the redirect block is last.  That is the block's design, not luck.
+
+## 4. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**, first try.
+  * **x86_64 `-O2` big.c md5 `378fc33c1e70`, 12369 bytes -- unmoved**,
+    measured BEFORE and AFTER in this same build dir.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`,
+    **5 distinct md5 per side**, **negative control firing** (1158 vs 804),
+    rc=0.  All five match the recorded values: O0 `1c00922491f8`,
+    O1 `4fabab94b41b`, O2 `378fc33c1e70`, O3 `d220421237bc`,
+    Os `d6787f7e281f`.  It does run in this build dir -- checked.
+  * **`scratchpad/t125-guards.sh`: 14 PASS / 0 FAIL.**
+  * **aarch64 `int x = 1;` still rc=0, 373 bytes, empty stderr, md5
+    `b01d9157fdc1`** -- byte-identical before, after, and after the injection
+    round trip.
+  * Cold `all-gcc` before any edit: **rc=0, 639 lines / 114 `warning:`**.
+
+### THE ARMS THAT MATTER
+
+  * **ARM 1 is CONSISTENCY, NOT EVIDENCE, and says so in its own output.**
+    `mt_pmode` returns 27 for both bases, because both bases' `Pmode` is
+    DImode.  Equal readings here cannot distinguish a fix from a leak.  It
+    earns its place as a NON-VACUITY arm instead: it proves the redirect is
+    INVOKED, which is the "complete mechanism that nothing calls" failure.
+  * **ARM 2 carries the divergence, asymmetrically on purpose.**  It scores
+    the existence of a `plus_constant` call whose mode argument disagrees with
+    its rtx's mode.  That existed on the aarch64 side only.  The x86_64 arm
+    additionally asserts the run produced asm, so "no hit" cannot be "never
+    got there".
+  * **ARM 4 is the injection**: removes ONLY the `defaults.h` redirect --
+    thunk, field and selector stay compiled -- rebuilds, and requires the OLD
+    ICE back **by name** (`in plus_constant, at explow.cc:102`) AND the mode
+    mismatch back (0 -> 1).  Both fired.  Restore requires both to reverse and
+    `int x = 1;` to be byte-identical again.  All four scored.
+
+## 5. THREE INSTRUMENT DEFECTS THIS RUN PRODUCED, ALL FOUND BY THE GUARDS
+
+**(a) The rtx mode is at BIT 0, not byte 2.**  My first reading used the
+classic `code:16, mode:8` layout and read byte 2.  This tree has
+`machine_mode mode : MACHINE_MODE_BITSIZE` **first**, with
+`MACHINE_MODE_BITSIZE` **16** (machmode.h:281) -- widened by the mode union --
+and `rtx_code` after it.  The wrong read produced `mode_arg=26 mode_of_x=42`
+in a frame that was not even the failing one, and 42 is a perfectly plausible
+mode number.  A garbage reading that looks like a reading.  What caught it was
+matching the frame against the ICE's own backtrace, which did not agree.
+
+**(b) A guard FAILED because of the INPUT FILE'S NAME.**  ARM 3b reported
+aarch64 `int x = 1;` as moved: 375 bytes, md5 `361954469d74`.  Nothing had
+moved.  The guard wrote its input to `$B/g-small.c` where `t125-state.sh`
+uses `$B/small.c`, and the two extra characters land in the `.file` directive.
+A byte-exact invariant is only exact if the INPUT is identical too, filename
+included.
+
+**(c) An injection that removed only half of a two-line hunk.**  The first
+ARM 4 deleted the `#define` and left the `#undef`, which makes `Pmode` an
+undefined identifier rather than i386's macro; the injected build died in
+`gimple-match-*.o`.  A build that does not compile cannot tell you which back
+end answers a question.  The arm now asserts BOTH lines are gone.
+
+**(d) And one operator error worth writing down**: `make multi-target-objs`
+reported `No rule to make target` for twenty minutes because I ran it through
+`t125-build.sh`, which is the TOP level.  `cc1` and everything in
+`multi-target-md.mk` live in `$B/gcc` -- `t125-gccbuild.sh`.  PRINCIPLES
+section 5 names this exact trap; I still walked into it, and the tell was that
+`make -f` with `include Makefile` from the same directory found all 104
+objects.  `t125-mkq.sh` is that check, kept.
+
+## 6. THE NEXT WALL -- DIAGNOSED, NOT MERELY LOCATED
+
+`big.c` now gets **past the prologue expander** and dies later, and the new
+failure does not look like a compiler bug at first:
+
+    aarch64-...-gcc: fatal error: cc1 terminated by signal 9 (Killed)
+
+A 150-line input, SIGKILL, no message.  Under a 4 GB `ulimit -v` it becomes
+`virtual memory exhausted` from **`ggc-page.cc:735`**, and with a breakpoint
+there the backtrace is
+
+    update_row_reg_save        dwarf2cfi.cc:539
+    dwarf2out_flush_queued_reg_saves
+    scan_trace
+    pass_dwarf2_frame::execute
+
+`update_row_reg_save` does `vec_safe_grow_cleared (row->reg_save, column + 1)`.
+**Measured `column` = 4294967294**, i.e. `(unsigned) -2`, so it tries to grow a
+vector to four billion entries.
+
+The cause is the branch's own bug, in its **bound-vs-index** disguise --
+the sixth time.  `dwf_regno` is `DWARF_FRAME_REGNUM (REGNO (reg))`, which is
+`DEBUGGER_REGNO`, which for i386 (i386.h:2154) is
+
+    (TARGET_64BIT ? debugger64_register_map[(N)] : debugger_register_map[(N)])
+
+with those arrays declared `[FIRST_PSEUDO_REGISTER]` -- and
+`FIRST_PSEUDO_REGISTER` in shared code is now the **UNION** width.  So shared
+code indexes an array sized by i386's own register count with aarch64's
+register numbers, and gets i386's "no DWARF number" sentinel back.  aarch64's
+own answer is `aarch64_debugger_regno` (aarch64.h:835), a function.
+
+Note `TARGET_64BIT` in that expression is **also** i386 option state, so it is
+the same silent-default shape as `Pmode`: while compiling for aarch64 it is
+false, selecting the **32-bit** map.  Two leaks in one macro.
+
+`DEBUGGER_REGNO` is `UNCONVERTED` in `macro-status.txt` (line 124) and is the
+natural next task.  It is register-vocabulary shaped, i.e. #92/#122/#124
+territory, and the `*_POINTER_REGNUM` design fork in section 8 sits next to it.
+
+## 7. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard
+movement.**  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+32/0, aarch64 27/5**.
+
+`Pmode` stays **`UNCONVERTED`**, bringing the "converted but reads
+UNCONVERTED" list to **thirteen**.  Its header arm has never been able to see
+this leak (section 1) and must be retired rather than banked.
+
+## 8. WHAT I DID NOT DO
+
+  * **No TAB arm for `Pmode`**, for the reason in section 7 -- the same debt
+    the other twelve carry.
+  * **`CASE_VECTOR_MODE` and `STACK_SIZE_MODE` are NOT converted.**  They are
+    the other two members of MACRO-LEAK class (c4) and aarch64's
+    `CASE_VECTOR_MODE` is literally `Pmode` (aarch64.h:1366), so in a base TU
+    it is now correct for free and in shared code it is still i386's.  They
+    did not stop `big.c` and I did not widen the change to reach them.
+  * **The `*_POINTER_REGNUM` design fork is untouched**, exactly as #124 left
+    it.  It is adjacent to the `DEBUGGER_REGNO` work above and will have to be
+    faced there.
+  * **No `nm` arm on `Pmode`**, because there is nothing for it to see
+    (section 2).  Recorded as a measured "cannot be checked, because X".
+  * **`Pmode` is now a CALL at 648 shared sites**, some of them hot.  I did not
+    measure compile-time cost, and I am not claiming it is free.  The x86_64
+    output is byte-identical, so it is a throughput question and not a
+    correctness one; it wants a measurement before anyone calls this settled.
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker
+    is unchanged.
+
+### STDERR -- WHICH ARM
+
+  * Cold `all-gcc`, before any edit: **639 lines / 114 `warning:`**.
+  * Incremental `multi-target-objs cc1 lto1` after the edit: **322 lines / 56
+    `warning:`** (defaults.h reaches ~520 TUs).
+  * A second, near-no-op incremental: **38 lines / 3 `warning:`**, composed of
+    4 `is unchanged`, 24 `'@' is redundant` from unmodified aarch64 `.md`
+    files, and one 3-warning `lto-common.cc` block.  Same shape as the
+    documented ~32-line floor.
+
+## 9. FILES
+
+    t125-clone.sh     derives my build-dir scripts from #124's, and REFUSES if
+                      the substitution left a `b124' behind
+    t125-conf.sh      two-target configure, /tmp/b125
+    t125-build.sh     make at the TOP level
+    t125-gccbuild.sh  make in $B/gcc -- where cc1 actually builds
+    t125-specs.sh     both target-specs probes, real aarch64 binutils
+    t125-cause.sh     THE DIAGNOSIS: gdb on the running cc1, one breakpoint per
+                      run, with the x86_64 positive control that stops "no
+                      mismatch" from meaning "the breakpoint never fired"
+    t125-hang.sh      the SIGKILL, resolved to ggc-page.cc:735 and to the
+                      4294967294 column (section 6)
+    t125-mkq.sh       asks make what it read, instead of reading the Makefile
+    t125-state.sh     big.c site + `int x = 1;` + x86_64 -O2
+    t125-sc.sh        stock-compare with an ABSOLUTE big.c and a tagged outdir
+    t125-guards.sh    14 arms; ARM 1 non-vacuity, ARM 2 the divergence,
+                      ARM 4 the injection
