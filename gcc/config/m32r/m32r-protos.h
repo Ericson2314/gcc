@@ -55,7 +55,6 @@ extern int    addr24_operand (rtx, machine_mode);
 extern int    addr32_operand (rtx, machine_mode);
 extern int    call26_operand (rtx, machine_mode);
 extern bool    memreg_operand (rtx, machine_mode);
-extern bool    small_insn_p (rtx, machine_mode);
 
 #endif /* HAVE_MACHINE_MODES */
 

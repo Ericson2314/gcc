@@ -825,7 +825,7 @@ bpf_output_move (rtx *operands, const char *templ)
 static void
 bpf_print_register (FILE *file, rtx op, int code)
 {
-  if(asm_dialect == ASM_NORMAL)
+  if(bpf_asm_dialect_var == ASM_NORMAL)
     fprintf (file, "%s", reg_names[REGNO (op)]);
   else
     {
@@ -908,8 +908,8 @@ bpf_print_operand (FILE *file, rtx op, int code)
     }
 }
 
-#define PAREN_OPEN  (asm_dialect == ASM_NORMAL ? "[" : no_parentheses_mem_operand ? "" : "(")
-#define PAREN_CLOSE (asm_dialect == ASM_NORMAL ? "]" : no_parentheses_mem_operand ? "" : ")")
+#define PAREN_OPEN  (bpf_asm_dialect_var == ASM_NORMAL ? "[" : no_parentheses_mem_operand ? "" : "(")
+#define PAREN_CLOSE (bpf_asm_dialect_var == ASM_NORMAL ? "]" : no_parentheses_mem_operand ? "" : ")")
 
 /* Print an operand which is an address.  This function should handle
    any legit address, as accepted by bpf_legitimate_address_p, and

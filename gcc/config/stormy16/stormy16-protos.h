@@ -54,7 +54,6 @@ extern void xstormy16_expand_andqi3 (rtx *);
 #if defined (HAVE_MACHINE_MODES) && defined (RTX_CODE)
 extern void xstormy16_split_cbranch (machine_mode, rtx, rtx, rtx);
 extern int  short_memory_operand (rtx, machine_mode);
-extern bool  nonimmediate_nonstack_operand (rtx, machine_mode);
 extern enum reg_class xstormy16_secondary_reload_class
  (enum reg_class, machine_mode, rtx);
 extern void xstormy16_split_move (machine_mode, rtx, rtx);

@@ -524,7 +524,7 @@ enum reg_class
 #define DO_GLOBAL_DTORS_BODY			\
   do { } while (0)
 
-#define ASSEMBLER_DIALECT ((int) asm_dialect)
+#define ASSEMBLER_DIALECT ((int) bpf_asm_dialect_var)
 
 /*** Utilitiy/helpers.  */
 
