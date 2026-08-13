@@ -1,4 +1,210 @@
 ================================================================================
+SESSION: CAUSE 8 IS CLOSED, AND IT WAS NOT "THE ONE THING BETWEEN 47 AND 48".
+It was the thing between 0 and 48.  Measured in ONE build dir, before/after:
+
+    back ends with at least one mt-<cpu>/*.o          0  ->  48
+    `error:' lines from loongarch-opts.h            974  ->   0
+
+Build dirs: /tmp/b-a5d68220b57a0d95a-all (48), -pair.  Named for worktree
+agent-a5d68220b57a0d95a.  Commit f3a75a98014.
+================================================================================
+
+## 1. THE PREVIOUS SESSION'S FRAMING OF CAUSE 8 WAS WRONG IN TWO PLACES
+
+Section 4 below says cause 8 "confines loongarch alone" and that with the
+other seven fixed "all 47 back ends get through the manifest, the options
+union, gengtype and every generator".  **Measured here: not one of the 48
+reached its first object.**  The 974 diagnostics all land in
+`build/gen*.o` -- gencheck, genmodes, genattr, the whole generator stage --
+so nothing downstream of them was ever attempted, and `make -k` silence read
+as success.  The earlier figure of 958 came from a build that excluded
+loongarch from the list; the number for the full 48 is **974**.
+
+Second correction: the brief handed to this session said "the anchor is 43".
+`grep -c MULTI_TARGET gcc/Makefile.in` is **45** in this tree, which is what
+`mtN-conf.sh` already asserts.  43 is stale.
+
+## 2. IT IS THE SAME BUG AS CAUSES 1-3 AND 7, ONE LAYER DOWN
+
+All 974 diagnostics are one line:
+
+    config/loongarch/loongarch-opts.h:107: error: expected ')' before '.' token
+      #define TARGET_DOUBLE_FLOAT (la_target.isa.fpu == ISA_EXT_FPU64)
+    ./options.h:10805: note: in expansion of macro `TARGET_DOUBLE_FLOAT'
+      extern int TARGET_DOUBLE_FLOAT;
+
+`TARGET_DOUBLE_FLOAT` is an option `Var()` in `config/csky/csky.opt` and a
+MACRO in `config/loongarch/loongarch-opts.h`.  Cause 7 was `Var()` against a
+TYPE; this is `Var()` against a MACRO.  Same family, same remedy.
+`mtO-varvsmacro.sh` sweeps it and finds **exactly one** collision in the whole
+tree -- so 974 diagnostics, one defect, which is the amplification lesson
+again and larger than the 725 and 94 already recorded.
+
+## 3. THE QUIET HALF, WHICH IS WHY A RENAME OF TEN NAMES WAS THE WRONG FIX
+
+The `HeaderInclude` (`I`) headers contribute **184 macros from 35 files**.
+Not 32, and not `*-opts.h`: `arm/aarch-common.h`, `csky/csky_opts.h` and
+`loongarch/loongarch-str.h` are `I` records too, and loongarch-str.h alone
+carries 48.  A census keyed on the `-opts.h` spelling misses all three.  Of
+the 35, **19 are types only** and 13 carry macros (gcn 33, loongarch 32, arc
+25, m32r 13, riscv 11, csky 6, aarch64 4, then twos).
+
+Ten names collide with another back end.  Classified by what the OTHER back
+end does -- and only the first class produces a diagnostic:
+
+    LOUD           19 pairs  redefinition, different text: a warning, and every
+                             use BEFORE the redefinition was still wrong
+    SILENT-UNDEF    9 pairs  `#undef' first; correct after that point only
+    SILENT-IFNDEF   2 pairs  config/pa/pa.h TARGET_64BIT,
+                             config/frv/frv.h SDATA_DEFAULT_SIZE.  The back
+                             end's OWN answer is discarded and there is no
+                             diagnostic.  pa.h's `#define TARGET_64BIT 0'
+                             never fires; pa reads
+                             `(la_target.isa.base == ISA_BASE_LA64)', which
+                             PARSES, because loongarch-opts.h also declares
+                             `extern struct loongarch_target la_target'.
+                             (The 48-back-end census uses hppa64-linux-gnu,
+                             whose pa64-start.h defines it first, so this one
+                             is loud for THAT triple and silent for hppa-*.)
+    SILENT-IDENT    1 pair   rs6000/sysv4.h SDATA_DEFAULT_SIZE, textually
+                             identical to m32r's, so not even a warning exists
+
+**`HAVE_AS_TLS` looked like six more SILENT-IFNDEF and is not.**  alpha, frv,
+mips, rs6000, sparc and xtensa all guard it with `#ifndef`, and loongarch-opts.h
+still carries a floor for it -- but `gcc/configure.ac` `AC_DEFINE`s it
+unconditionally, so `auto-host.h` settles it before either header is read and
+no floor fires.  A classifier that reads only `config/` cannot see that and
+**fails in the alarming direction**: it reports TLS silently off in six back
+ends.  `mtO-optsquiet.sh` has that arm now.  Generalise it: when scoring an
+`#ifndef` floor, ask who else defines the name OUTSIDE the tree you are
+searching.
+
+## 4. THE FIX, AND WHY NOT ANY OF THE THREE OPTIONS RECORDED BELOW
+
+Section 4 of the previous session offered (a) split types from macros across
+32 files, (b) forward-declare in the shared header, (c) qualify the ten names.
+None was taken.
+
+(c) expires: it treats the ten that collide today and the next `-opts.h` macro
+reopens it silently.  (a) is 32 files of back-end surgery for a defect whose
+authority is one generator.  (b) cannot work -- `cl_target_option` needs
+complete types.
+
+What landed is in `opth-gen.awk`: list mode records what each `I` header
+DEFINES (`M` records), and every generated options header `#undef`s the macros
+contributed by bases OTHER than its own.  183 undefs in `options-i386.h`, 104
+in `options-loongarch.h` (184 minus loongarch's own 80).  No back-end file
+moves, and it does not expire: a macro added to any `-opts.h` tomorrow is
+scoped by construction.
+
+Three properties worth keeping when this is read again:
+
+  * **Order-independent, so there is no marker and no `#error`.**  The block
+    only undefines names this base does not contribute; the `I` headers are
+    include-guarded, so a second options header in the same TU adds no
+    definitions and removes the same foreign set again.  A draft that also
+    undefined the CURRENT base's macros in the shared `options.h` is
+    order-dependent, and its failure mode is a target macro silently
+    evaluating to 0 in an `#if` -- the shape PRINCIPLES section 4 warns about.
+  * **`M0` is emitted unconditionally, before any `M`.**  "This base defines
+    no macros" (sparc: types only) and "this base was never scanned" (a stale
+    `.part` from before this change) are otherwise the same record set and
+    mean opposite things.  `read_union` refuses a list where any base lacks
+    it.  There is deliberately NO count threshold: 19 of the 35 headers really
+    are types only, so a threshold would be a number that expires -- the same
+    mistake as `[ NMACRO -ge 100 ]`.
+  * An unopenable `I` header is fatal, not scored as "defines nothing".
+
+That closes 47 of 48.  It cannot close loongarch's own header, where the macro
+is legitimately in scope, so csky's option is `csky_target_double_float` and
+`csky.h` -- csky's tm.h header, NOT the `HeaderInclude` -- carries
+`#define TARGET_DOUBLE_FLOAT csky_target_double_float`.  It stays an
+assignable lvalue, which the four uses in csky.cc need.
+
+**Residual, stated rather than hidden:** the shared `options.h` is generated
+with `-v union_base=$(multi_target_base)`, so that one base's macros survive
+in it.  For an i386-based build that is one function-like macro, `DEF_ALG`.
+Reducing it to zero means giving the shared header no base at all, which
+belongs with deleting the shared `tm.h`.
+
+## 5. THE WALL AFTER IT -- ALL OF IT SOMEBODY ELSE'S
+
+With cause 8 gone the 48-back-end build reaches section 3a's second wall and
+stops there.  3404 diagnostics, and the distribution is:
+
+    606  E_PSImode was not declared in this scope        (avr, msp430)
+   ~2400 poly_int arity, in a dozen phrasings           (39 back ends)
+     28  TUNE_GENERIC conflicts with a previous declaration
+      2  CPU_SIMPLE conflicts with a previous declaration
+     17  JUMP_TABLES_IN_TEXT_SECTION was not declared
+
+**The `insn-attr-common-<cpu>.h` collisions are NEW** and are not in the
+eight-cause census: `./insn-attr-common-aarch64.h` and
+`./insn-attr-common-riscv.h` both declare `TUNE_GENERIC`, and
+`insn-attr-common-frv.h` declares `CPU_SIMPLE`.  One name, several
+authorities, in the genattr family this time.  Narrow, and probably the same
+one-line-per-back-end remedy.
+
+## 6. WHAT WAS AND WAS NOT MEASURED
+
+  * **The regression pair holds, and this change DOES touch every build**, so
+    "no compiler source was touched" was never available.  In
+    /tmp/b-a5d68220b57a0d95a-pair (x86_64 + aarch64, cold):
+        make multi-target-objs cc1 lto1        rc=0, `error:` count 0
+        ./x86_64-pc-linux-gnu-gcc -S -O2 -nostdinc big.c
+        rc=0   12369 bytes   md5 378fc33c1e70   -- matches the recorded bar
+        input: scratchpad/big.c, 150 lines, md5 e4558c736e241860bc610c56e66f9c43
+        specs-config 230 lines, as recorded
+  * **stock-compare RAN this time, against a REAL /tmp/b-stock** (it does
+    exist on this host; section 6 below saying it does not is stale):
+        5/5 IDENTICAL; 5 distinct md5 among the 5 mt outputs and 5 among the
+        5 stock outputs; negative control fired naming two real, non-empty,
+        distinct artefacts.
+  * **The aarch64 codegen arm was NOT run.**
+  * **The probe scoreboard was NOT run.**  No figure is quoted from it.
+  * **No back end was compiled FOR.**  "48 back ends now produce objects" is
+    not "the compiler is right for those 48".  The `str x19, [x7, -32]!`
+    precedent stands.
+  * The before/after pair is the same build dir, reconfigured in place with
+    `config.status --recheck && config.status` between the arms (needed
+    because `gen-target-manifest.sh` changed).  Objects were not deleted
+    between arms; the "before" arm produced none, so there was nothing stale
+    to carry.
+
+## 7. INSTRUMENTS ADDED
+
+  * `mtO-optsmacro2.sh` -- macros a `<cpu>-opts.h` leaks, minus the include
+    guard.  The guard rule is narrow on purpose: `#ifndef X` / `#define X 8`
+    is NOT a guard, and a looser draft scored three of m32r's leaks
+    (SDATA_DEFAULT_SIZE, M32R_MODEL_DEFAULT, M32R_SDATA_DEFAULT) as guards.
+  * `mtO-allI.sh` -- the same over ALL `HeaderInclude` headers.  130 -> 184.
+  * `mtO-optsquiet.sh` -- the four silent shapes, with the AUTOHOST arm.
+  * `mtO-optsuse.sh` -- OWN / FOREIGN / SHARED uses.  Note its blind spot:
+    ChangeLogs dominate the SHARED column.  The real shared users of
+    `TARGET_64BIT` are collect2.cc, defaults.h, dwarf2codeview.cc,
+    target-cdata.h, target-frame.h, target-regstack.cc,
+    target-cumargs-select.cc and two ada/gcc-interface files -- pre-existing
+    macro-conversion debt, not created or removed here.
+  * `mtO-varvsmacro.sh` -- option `Var()` against leaked MACRO.  Sibling of
+    mtN-varvstype.sh.
+  * `mtO-score.sh` -- objects built per back end.  With `make -k`, log silence
+    is not a pass, so this counts `mt-<cpu>/*.o` and asserts the build dir's
+    config.log names this worktree.
+  * `mtO-conf.sh` -- mtN-conf.sh with this worktree's build-dir assertion.
+
+**An instrument failure worth recording, because it is in PRINCIPLES and was
+committed anyway:** `mtO-optsmacro2.sh`'s first draft had an apostrophe inside
+a comment inside a single-quoted awk program, and the shell reported a syntax
+error several lines later.  And `mtO-varvsmacro.sh`'s first draft read a fixed
+field count from a two-field input, so every macro name came out empty and it
+printed `collisions: 0` -- a zero from the instrument, not from the code.
+
+**And a harness trap that cost real time here:** `pgrep -f multi-target-objs`
+in a polling loop matches the loop's OWN command line, so the loop never
+exits.  PRINCIPLES already says `pgrep -f` matches itself; it applies to
+`until` loops as much as to counts.  Poll on the make PID.
+
+================================================================================
 SESSION: ALL BACK ENDS ON.  The two-back-end habit was never a property of the
 environment.  48 of 48 back ends CONFIGURE.  The build failures sort into
 EIGHT causes, not fifty; seven are fixed and one is a design fork.
