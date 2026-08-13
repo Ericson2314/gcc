@@ -38,6 +38,39 @@ along with GCC; see the file COPYING3.  If not see
    multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
+
+/* WHAT `REGISTER_TARGET_PRAGMAS' IS ALLOWED TO NAME, and why these three
+   includes are not decoration AND WHY THEY SIT BEFORE `tm_p.h'.
+
+   This function used to be expanded in `c-family/c-pragma.cc', which includes
+   `tree.h', `target.h' and `c-pragma.h'.  Moving the expansion here without
+   them worked for i386 and aarch64 only because BOTH of those back ends
+   expand to a single call to a function their own `tm_p.h' declares
+   (`ix86_register_pragmas ()', `aarch64_register_pragmas ()').  rs6000's
+   expansion is a four-statement body, and every one of its four names came
+   from somewhere else:
+
+     c_register_pragma			c-family/c-pragma.h
+     targetm				target.h  (spelled targetm_<base> here)
+     rs6000_pragma_target_parse		rs6000-protos.h, but only #ifdef TREE_CODE
+     altivec_resolve_overloaded_builtin	likewise
+
+   The last two are the interesting pair, and they are why ORDER is
+   load-bearing rather than a matter of taste: `tm_p.h' WAS included, and
+   still declared neither, because the declarations sit behind
+   `#ifdef TREE_CODE' and nothing had included `tree.h' YET.  Adding
+   `#include "tree.h"' *after* `tm_p.h' changed nothing at all -- the guard
+   had already been evaluated and taken the false arm, silently, because
+   `#ifdef' on an undefined name does not error.  A guarded declaration
+   quietly absent is the `rs6000_gnu_attr' shape.
+
+   Nine other in-tree back ends have multi-statement expansions of this macro,
+   so this is not an rs6000 peculiarity -- it is the general case, which a
+   two-back-end build could not show.  */
+#include "tree.h"
+#include "target.h"
+#include "c-family/c-pragma.h"
+
 #include BASE_HEADER (tm_p.h)
 
 #include "target-c-ops.h"

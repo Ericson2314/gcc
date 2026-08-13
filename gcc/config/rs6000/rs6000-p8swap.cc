@@ -38,6 +38,33 @@
 #include "tree-pass.h"
 #include "rtx-vector-builder.h"
 
+/* WHETHER THIS BACK END HAS V8HF ALTIVEC LOADS AND STORES -- which is NOT
+   `#ifdef HAVE_V8HFmode', and the difference is a live bug rather than a
+   nicety.
+
+   Upstream rs6000 declares no HFmode, so `VECTOR_MODES (FLOAT, 16)' produces
+   no V8HF, `HAVE_V8HFmode' is undefined and the three blocks below are dead
+   code.  In a multi-target build the MODE VOCABULARY IS UNIONED -- deliberately,
+   so that a mode name means the same number to every back end -- and
+   `insn-modes-rs6000.h' therefore carries an `E_V8HFmode' entry whose comment
+   is the union's own marker for a mode this base did not declare -- the
+   source reference reads `<unknown>:0' -- together with a
+   `#define HAVE_V8HFmode'.  The
+   blocks come alive and call `gen_altivec_stvx_v8hf', which does not exist:
+   rs6000's `VM2' iterator has no V8HF, so no such pattern is generated.  Two
+   hard errors in `mt-rs6000/rs6000-p8swap.o'.
+
+   That is the union's answer leaking: "V8HF exists somewhere" is not "V8HF
+   exists here".  The fix is downstream of the union, not a retreat from it --
+   the question this code means to ask is about a PATTERN, and the per-base
+   authority for that is `insn-flags-<base>.h', generated from this back end's
+   own machine description.  For rs6000 it is undefined, restoring exactly the
+   upstream behaviour; for a back end that grows the pattern it comes alive by
+   itself.  */
+#ifdef HAVE_altivec_stvx_v8hf
+#define RS6000_HAVE_V8HF_ALTIVEC 1
+#endif
+
 /* Analyze vector computations and remove unnecessary doubleword
    swaps (xxswapdi instructions).  This pass is performed only
    for little-endian VSX code generation.
@@ -1598,7 +1625,7 @@ rs6000_gen_stvx (enum machine_mode mode, rtx dest_exp, rtx src_exp)
     stvx = gen_altivec_stvx_v16qi (src_exp, dest_exp);
   else if (mode == V8HImode)
     stvx = gen_altivec_stvx_v8hi (src_exp, dest_exp);
-#ifdef HAVE_V8HFmode
+#ifdef RS6000_HAVE_V8HF_ALTIVEC
   else if (mode == V8HFmode)
     stvx = gen_altivec_stvx_v8hf (src_exp, dest_exp);
 #endif
@@ -1722,7 +1749,7 @@ rs6000_gen_lvx (enum machine_mode mode, rtx dest_exp, rtx src_exp)
     lvx = gen_altivec_lvx_v16qi (dest_exp, src_exp);
   else if (mode == V8HImode)
     lvx = gen_altivec_lvx_v8hi (dest_exp, src_exp);
-#ifdef HAVE_V8HFmode
+#ifdef RS6000_HAVE_V8HF_ALTIVEC
   else if (mode == V8HFmode)
     lvx = gen_altivec_lvx_v8hf (dest_exp, src_exp);
 #endif
@@ -1931,7 +1958,7 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       new_mem = force_const_mem (mode, new_const_vector);
     }
   else if ((mode == V8HImode)
-#ifdef HAVE_V8HFmode
+#ifdef RS6000_HAVE_V8HF_ALTIVEC
 	   || (mode == V8HFmode)
 #endif
 	   )

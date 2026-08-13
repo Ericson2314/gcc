@@ -10778,3 +10778,282 @@ question `EXTRA_GCC_OBJS` answers.
     with the all-back-ends grind.
   * No full `xgcc` link with a back end that actually sets `extra_gcc_objs`,
     for the reason in section 5.
+
+---
+
+# rs6000 AS A THIRD BACK END -- THE FAILURE DISTRIBUTION
+
+Worktree `agent-a5fb19dec8368eaf6`, build dir `/tmp/b-a5fb19dec8368eaf6`
+(named for the worktree, never a task number), anchor 43, srcdir asserted from
+`config.log`.  Configured **i386 + aarch64 + rs6000**
+(`x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu,powerpc64le-unknown-linux-gnu`),
+`--enable-backends` passed explicitly to the top level because the
+`--enable-targets` -> `--enable-backends` mapping is broken at HEAD.  No task
+number is cited: the list is not in the worktree.
+
+## 0. THE SHAPE OF THE RESULT, WHICH IS THE USEFUL PART
+
+`make -k all-gcc` produced **43 `error:` lines over 37 failing objects, and
+EVERY failing object is an rs6000 one.**  i386 and aarch64 built clean
+alongside it.  Four causes, and the ratio is the finding:
+
+| cause | errors | objects |
+|---|---|---|
+| A `mt-cumulative-args.h` alignment assertion | 36 | all 36 rs6000 TUs |
+| B `target-c-ops.cc` missing includes | 4 | 1 |
+| C `HAVE_V8HFmode` union leak | 2 | 1 |
+| D `plus_constant` given an rtx, N=2 | 1 | 1 |
+
+**One cause accounts for 36 of 43.**  Reporting this as "37 broken objects"
+would have been forty times the work of reporting it as four bugs.
+
+## 1. CAUSE A -- THE ALIGNMENT ASSERTION WAS RIGHT TO FIRE AND WRONG IN ITS DEMAND
+
+    mt-cumulative-args.h:155: static assertion failed: ...
+    note: the comparison reduces to `(8 <= 4)'
+
+`alignof (CUMULATIVE_ARGS)` is **8 for i386 and aarch64 and 4 for rs6000** --
+rs6000's is a struct of `int`s.  The header asserted
+`UNION_ALIGN <= alignof (CUMULATIVE_ARGS)`, i.e. *every base must be at least
+as strict as the maximum*, which is satisfiable only when all bases agree.
+It held on the i386+aarch64 pair **by luck of agreement**, exactly the
+`ARG_POINTER_CFA_OFFSET` shape PRINCIPLES 1 lists, and the third base
+destroyed it.
+
+The real defect it was pointing at: `incoming_args::info` keeps its per-base
+`CUMULATIVE_ARGS` type, so **its OFFSET was chosen by whichever base compiled
+the translation unit**.  An rs6000 object would place `info` -- and everything
+after it in `rtl_data` -- four bytes earlier than the shared middle end did.
+The existing `MT_INCOMING_ARGS_PAD` fixes the FOOTPRINT and cannot fix the
+OFFSET.
+
+Fixed at the declaration, not by relaxing the check:
+`alignas (MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN)` on `incoming_args::info`.
+That value is the **measured maximum over the configured bases** from
+`multi-target-reg-widths.h`, so over-aligning is valid for every base and is
+nobody's private answer -- it is not an `#ifndef` floor and not a default.
+The surviving assertion is inverted to the one that can still catch a real
+gap (`alignof (CUMULATIVE_ARGS) <= UNION_ALIGN`: a base needing MORE than the
+measured maximum means `gen-reg-widths.sh` did not see it), mirroring the size
+assertion beside it.
+
+Note the pair does not move: i386 and aarch64 already wanted 8, so `info` was
+already 8-aligned in their objects and `alignas (8)` changes nothing there.
+
+## 2. CAUSE B -- A GUARDED DECLARATION SILENTLY ABSENT, IN `target-c-ops.cc`
+
+`target-c-ops.cc` expands `REGISTER_TARGET_PRAGMAS ()` in the one translation
+unit that sees each back end's own `tm.h`.  It compiled for two years' worth
+of this branch because **i386 and aarch64 both expand it to a single call to
+one function their own `tm_p.h` declares**.  rs6000's expansion is a
+four-statement body and all four names were missing:
+
+    c_register_pragma                    c-family/c-pragma.h  -- not included
+    targetm                              target.h             -- not included
+    rs6000_pragma_target_parse           rs6000-protos.h, behind #ifdef TREE_CODE
+    altivec_resolve_overloaded_builtin   likewise
+
+The last two are the `rs6000_gnu_attr` shape in PRINCIPLES 3: `tm_p.h` **was**
+included and declared neither, because the declarations sit behind
+`#ifdef TREE_CODE` and nothing had included `tree.h`.  `#ifdef` on an
+undefined name does not error.
+
+Fixed by including `tree.h`, `target.h` and `c-family/c-pragma.h` -- the three
+headers the original call site `c-family/c-pragma.cc` has.  **Nine other
+in-tree back ends have multi-statement expansions of this macro**, so this is
+the general case and not an rs6000 peculiarity; a two-back-end build could not
+have shown it.
+
+## 3. CAUSE C -- `HAVE_V8HFmode`, THE UNION'S ANSWER LEAKING, NOW LOUD
+
+PRINCIPLES 3 lists `HAVE_V8HFmode` as the one disguise that runs opposite to
+the others.  It is live, and measured rather than recalled:
+
+    grep -c HAVE_V8HFmode  rs6000-inc/insn-modes.h   -> 0   (a 1-line shim)
+                           insn-modes-rs6000.h       -> 1   at `E_V8HFmode, /* <unknown>:0 */'
+                           i386-inc/insn-modes.h     -> 0
+
+`<unknown>:0` is the union's own marker for a mode this base did not declare.
+rs6000 declares no `HFmode` at all, so upstream `VECTOR_MODES (FLOAT, 16)`
+gives it no V8HF, `HAVE_V8HFmode` is undefined, and the three
+`#ifdef HAVE_V8HFmode` blocks in `rs6000-p8swap.cc` are **dead code
+upstream**.  The mode union defines the macro for every base, the blocks come
+alive, and they call `gen_altivec_stvx_v8hf` / `gen_altivec_lvx_v8hf`, which
+do not exist: rs6000's `VM2` iterator (`altivec.md:216`) has no V8HF, so
+`insn-flags-rs6000.h` contains **zero** occurrences of `v8hf`.
+
+Fixed downstream of the union, per PRINCIPLES 2a -- not by retreating from it.
+The question the code means to ask is about a **pattern**, and the per-base
+authority for that is `insn-flags-<base>.h`, generated from this back end's
+own machine description.  A file-local
+`#ifdef HAVE_altivec_stvx_v8hf -> RS6000_HAVE_V8HF_ALTIVEC` restores exactly
+upstream's answer for rs6000 and comes alive by itself for a back end that
+grows the pattern.
+
+## 4. CAUSE D -- AN UPSTREAM rs6000 BUG THAT ONLY N == 2 CAN SEE
+
+`rs6000.cc:13897` (`rs6000_redzone_clobber`) passes `GEN_INT (-red_zone_size)`
+-- an **rtx** -- as `plus_constant`'s `poly_int64` third argument.  With
+`NUM_POLY_INT_COEFFS == 1` that compiles: `poly_int<1, long>`'s constructor
+casts its single argument, so **the rtx pointer value becomes the constant**.
+With the branch's `TARGET_POLY_AWARE` (N == 2) it is a hard error at
+`poly-int.h:464`.
+
+**Verbatim at `c31b7a09eea`** -- checked with `git show`, not recalled -- so
+this is an upstream bug, in the same category as the libcall-decl regression
+already recorded here, and worth reporting.  Fixed by dropping the `GEN_INT`.
+Sibling of PRINCIPLES 4 rule 6: a diagnostic-driven poly_int sweep fixes only
+the copies some configured triple compiles, and rs6000 was not compiled.
+
+## 5. THE TWO CAUSES THE BRIEF NAMED, CHECKED BEFORE ASSUMING A NEW ONE
+
+Neither is live.
+
+  * `gen-multi-target-md.awk`'s multi-line `$(error)` -- **fixed**; the
+    comment at `:1902` now records the one-line requirement and the emission
+    at `:1910` obeys it.  No rs6000 build was blocked by it here.
+  * `rs6000_gnu_attr` -- it is an option variable
+    (`rs6000.opt:702, Target Var(rs6000_gnu_attr) Init(1) Save`) and produced
+    no diagnostic in this build.  Its *shape* recurred, in cause B, in
+    different names.
+
+Also recorded in that awk and **not** reproduced: the note at `:916` predicting
+2394 errors from `options-<base>.h` being generated from the FIRST triple's
+`extra_options` (rs6000's being the Darwin one, so no `TARGET_LITTLE_ENDIAN`).
+Zero such errors here.  Not claimed fixed -- this build configures exactly one
+rs6000 triple, `powerpc64le-unknown-linux-gnu`, so the first triple IS the
+triple and the divergence has nothing to express.  **The prediction is
+untested by this build, not refuted by it.**
+
+## 6. AFTER THE FOUR: rs6000 BUILDS, AND WHAT "BUILDS" MEANS
+
+`make multi-target-objs cc1 lto1` in the three-back-end dir: **rc=0, 0
+`error:`, stderr 0 lines**, `cc1` 94508744 bytes with three back ends linked.
+That is objects and link.  It is NOT the whole story, and the next two
+sections are why.
+
+**rs6000 EMITS REAL POWERPC.**  `/tmp/rs6k-leaf.c` (`mt_leaf`, `mt_mem`) at
+`-O2` through the powerpc64le `specs-config`:
+
+    .machine power8 / .abiversion 2
+    addi 3,3,1 ; extsw 3,3 ; blr
+    sldi 4,4,3 ; add 9,3,4 ; ldx 3,3,4 ; ld 9,8(9) ; add 3,3,9 ; blr
+
+ELFv2, arguments and return in r3/r4, `blr`.  Stated because PRINCIPLES 4 is
+explicit that "where does it ICE" is not the measurement: this is the output,
+not the stopping point, and it is not i386's register numbers wearing ppc
+mnemonics.
+
+The specs were probed with the **real** `powerpc64le-unknown-linux-gnu`
+binutils (`pkgsCross.powernv.buildPackages.binutils`), not the host's --
+`configure: 120 capabilities, all expected` -- because #113b measured that
+without them the file NAMES one target and DESCRIBES another and every
+name-based check passes.
+
+## 7. THE FIFTH CAUSE, WHICH IS A GROUP OF SEVEN AND WAS PREDICTED BEFORE IT FIRED
+
+With the four build causes fixed, rs6000 ICEd at
+`default_function_value_regno_p, targhooks.cc:1153`.  `targhooks.cc` is
+compiled ONCE and its defaults have the shape
+`#ifdef <tm.h macro> ... #else gcc_unreachable ()`, resolved against the
+PRIMARY's `tm.h`.
+
+`scratchpad/rs6k-targhook-sweep.sh` reads the sixteen such macros out of
+`targhooks.cc` and asks which back ends define each.  **Seven are defined by
+rs6000 and by NEITHER i386 nor aarch64**, and rs6000 supplies no hook for any
+of them:
+
+    #else gcc_unreachable ()   PRINT_OPERAND, PRINT_OPERAND_ADDRESS,
+                               LIBCALL_VALUE, FUNCTION_VALUE_REGNO_P
+    #else A WRONG ANSWER       PRINT_OPERAND_PUNCT_VALID_P  -> false
+                               PROFILE_BEFORE_PROLOGUE      -> false
+                               PREFERRED_RELOAD_CLASS       -> rclass
+                               CLASS_MAX_NREGS              -> generic formula
+
+**The second group is the important half.**  It does not ICE.  It compiles,
+exits 0, and gives rs6000 somebody else's answer -- `&` silently not a valid
+punctuation character, profiling silently after the prologue, register classes
+silently generic.  Invisible without a third back end, because neither of the
+first two defines the macros.
+
+The sweep earned its keep immediately: after supplying
+`TARGET_FUNCTION_VALUE_REGNO_P`, the next ICE was
+`default_print_operand, targhooks.cc:456` -- the next macro on its list.  All
+seven are now supplied in `rs6000.cc`, each expanding rs6000's own macro in
+rs6000's own translation unit, which is what a single-target rs6000 build
+computes.  Not a fallback.
+
+**Two more macros run the OTHER way** and were left alone: i386 and aarch64
+define `ASM_OUTPUT_EXTERNAL_LIBCALL` and `MOVE_RATIO`, rs6000 does not, so
+today rs6000 silently gets the primary's.  Same shape, opposite direction; the
+sweep lists them and nothing here fixes them.
+
+## 8. THE TWO WALLS BEYOND, BOTH ATTRIBUTED WITH A CONTROL
+
+### 8a. `gen_blockage` -- ALREADY RECORDED, NOT MINE TO LAND
+
+rs6000 now reaches the epilogue and stops with
+
+    error: unrecognizable insn:
+    (insn/f 45 44 46 2 (unspec_volatile [(const_int 0)] UNSPECV_LL) ...
+       (expr_list:REG_CFA_RESTORE (reg:DI 31 31) ...
+
+**Read the name.**  rs6000's epilogue asked for a BLOCKAGE and the insn came
+back holding unspec code **1**, which is `UNSPECV_BLOCKAGE` in
+`insn-constants-i386.h` and `UNSPECV_LL` in rs6000's.  That is the shared
+numbering bug printing its own diagnosis: `::gen_blockage` is i386's, from
+`insn-emit-*.o`, and rs6000's epilogue binds it.
+
+This is the recorded "gen_blockage -- INVESTIGATED, NOT LANDED. IT IS SIX
+BUGS, NOT ONE" item, WIP at `scratchpad/gen-blockage-WIP.patch`.  Not touched:
+it is a design fork with an owner, and the brief says breadth over depth.
+**What is new is that rs6000 supplies a THIRD numbering** (i386 1, aarch64 5,
+rs6000 something else), so a fix that makes two agree is not a fix.
+
+### 8b. THE THIRD BACK END BREAKS THE PRIMARY'S CODEGEN -- A REAL REGRESSION, NOT MINE
+
+Two lines are enough:
+
+    int callee(int,int);
+    int g(int a,int b){int t=callee(a,b);return t+callee(b,a);}
+
+    i386 + aarch64            -> 627 bytes, compiles
+    i386 + aarch64 + rs6000   -> Segmentation fault
+
+        during RTL pass: sched2   (and `shorten' with -fno-schedule-insns2)
+        ix86_attr_length_address_default(rtx_insn*)
+        insn_i386::insn_default_length(rtx_insn*)
+
+**Attributed by a both-sided control, not by argument**: the SAME tree with
+the SAME changes, configured for the established pair only
+(`/tmp/b-a5fb19dec8368eaf6-pair`), gives **12369 bytes / `378fc33c1e70`** on
+`scratchpad/big.c` -- the recorded bar exactly -- and **stock-compare 5/5
+IDENTICAL** against `/tmp/b-stock` with the negative control firing.  So the
+fault is the PRESENCE OF A THIRD BACK END, not this task's changes.
+
+It needs a call and a real frame: a leaf and a tail call both compile.  In the
+three-back-end dir `stock-compare` scores **4/5 comparable, 0/5 identical**
+and refuses to report, because every level is truncated by the ICE -- the
+harness declining to score an unscorable run, which is it working.
+
+Not diagnosed further.  The shape (a per-base attribute table reached with an
+insn code, wrong once a third numbering exists) is the family that produced
+the 163KB `.bss` overrun, and it is the obvious next task.  Minimal repro
+preserved at `/tmp/rs6k-y.c`; it reproduces from a fresh build in seconds.
+
+## 9. BARS
+
+  * three-back-end `/tmp/b-a5fb19dec8368eaf6`: `make multi-target-objs cc1
+    lto1` **rc=0**, `grep -c 'error:'` **0**, stderr **0 lines**.
+  * pair control `/tmp/b-a5fb19dec8368eaf6-pair`, SAME tree: x86_64 `-O2`
+    `scratchpad/big.c` **12369 bytes / `378fc33c1e70`** (input path quoted
+    with the count), and `stock-compare.sh` vs `/tmp/b-stock`
+    **5/5 IDENTICAL**, 5 distinct md5s per side, negative control firing
+    (1158 vs 804 lines, differ).
+  * **A before/after IN THE SAME THREE-BACK-END DIR IS NOT AVAILABLE, and the
+    reason matters**: before these changes that configuration produced no
+    `cc1` at all, so there is no "before" to read.  The pair dir is the
+    control that can be taken both ways, and it is.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+  * Both build dirs' `config.log` name this worktree; every script asserts it
+    and refuses otherwise.
