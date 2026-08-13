@@ -3980,3 +3980,272 @@ is genuine upstream and does not have this option.
 
     t113b-conf.sh   arms A-E, the configure side
     t113b-make.sh   arms F-I, the make side; H is the false-green control
+
+# TASK #117 -- THE OPTAB TABLE WAS THE PRIMARY'S.  THE aarch64 WALL MOVED OFF `emit_move_insn_1`
+
+Branched from `3aa9e0e46f1`.  Build dir `/tmp/b117` (x86_64 + aarch64, mine).
+My worktree came up on the bare-repo HEAD `7208eca60d0` -- the PRINCIPLES 5
+check caught it, as it has for #111, #112, #113 and #116.  `grep -c
+MULTI_TARGET gcc/Makefile.in` was **0**; after `git reset --hard multi-target`
+it is 28.
+
+## 1. THE CAUSE, NAMED, AND IT WAS NOT `insn-flags.h`
+
+The brief routed this as #51's Class B -- "`HAVE_blockage` out of the singular
+`insn-flags.h`".  **That is not what stopped aarch64, and the premise was
+checkable and wrong.**  `insn-flags.h` is already per base
+(`aarch64-inc/insn-flags.h` forwards to `insn-flags-aarch64.h`), and none of
+the six #51 names is on the path to the fault.
+
+The wall was `optab_handler`, and it is a clean instance of PRINCIPLES 3.
+Measured under gdb on the linked `cc1` with aarch64 selected
+(`scratchpad/t117-cause.sh`):
+
+    bare (primary/i386) raw_optab_handler (mov_optab, SImode)  ->  11383
+    insn_aarch64::insn_data[11383].name    ->  *while_wrdivnx8bi_acle_cc
+    insn_aarch64::insn_data[11383].genfun  ->  0x0
+    insn_aarch64::raw_optab_handler (same scode)               ->  0
+
+11383 is an i386 insn code.  Read against aarch64's `insn_data` -- which IS
+already selected per base -- it names **an SVE predicate pattern**, whose
+`genfun` is null.  `emit_move_insn_1` called it.  That is the null PC #113
+recorded.  The wrong answer was not a plausible one; it was a different
+machine's instruction, and nothing diagnosed it.
+
+Why: `raw_optab_handler` and `init_all_optabs` are emitted by genopinit into
+`namespace insn_<base>`, but the un-namespaced `insn-opinit.o` -- the
+PRIMARY's -- is in `$(OBJS)` (gcc/Makefile.in, the `insn-opinit.o` line), and
+shared code reached that.  Breakpoints on all four candidates showed the bare
+`init_all_optabs` running and `insn_aarch64::init_all_optabs` **never reached
+at all**, so aarch64's `pat_enable[]` stayed all-false and i386's pattern set
+was installed in its place.
+
+### THE FUNNEL EXISTED AND SELECTED NOTHING
+
+`optabs-query.cc` already had `selected_raw_optab_handler`, and
+`optabs-query.h` already carried a long, correct comment saying it was there so
+COMDAT could not keep an arbitrary one of N inline bodies, and to leave
+"exactly one place for a multi-target compiler to select in".  **Its body was
+`return raw_optab_handler (scode);`** -- the bare name, i.e. the primary's.
+Complete, documented, and inert: PRINCIPLES 4 rule 2, and the third time on
+this branch that a mechanism has read as done because its comment described
+what it was FOR rather than what it DID.
+
+## 2. THE SECOND HALF, WHICH THE FIRST HALF WOULD HAVE MADE WORSE
+
+`NUM_OPTAB_PATTERNS` sizes `pat_enable[]` inside `struct target_optabs`, and
+`default_target_optabs` is ONE object in `optabs-query.cc`.  The number is per
+back end.  Measured before:
+
+    insn-opinit-i386.h      2975
+    insn-opinit-aarch64.h   3328
+    insn-opinit.h (shared)  2975      <- the primary's
+    sizeof default_target_optabs      3465 bytes  (0xd89)
+
+So `insn_aarch64::init_all_optabs` writes `pat_enable[0..3327]`: **353 bools
+past the end of the object**, through `supports_vec_gather_load` and
+`supports_vec_scatter_store` and out the other side.  Sized by one, indexed by
+another, with no link error.
+
+**Routing the selection without unioning the bound would have swapped a null
+dereference for a silent buffer overflow** -- a loud bug for a quiet one, which
+is the wrong direction.  Both had to land together; that is why they are one
+commit.
+
+`genopinit` therefore grows `-l` / `-U<file>` / `-A<base>`, a near-copy of
+genconfig's, with the same refusals: a union file that does not name this base,
+or omits the macro, or reports a value below what this base needs, is fatal.
+After: 3328 everywhere, and `sizeof default_target_optabs` 3465 -> **3818**
+(0xeea = 3328 + 245 + 245), which is the arithmetic closing.
+
+### THE TRAP INSIDE THE UNION, AND IT IS NOT THEORETICAL
+
+`NUM_OPTAB_PATTERNS` was ALSO the bound of genopinit's own `pats[]`, the sorted
+scode table that `lookup_handler` **binary-searches** with
+`h = ARRAY_SIZE (pats)`.  Sizing that by the union appends
+`{ 0, CODE_FOR_nothing }` entries -- zero sorts below every real scode while
+sitting at the END, so the table stops being sorted, and a binary search over
+an unsorted table does not fail: it returns a wrong element for arbitrary
+inputs.  On i386 (2975 of 3328) that would be optab queries silently answering
+wrongly -- exactly the class of bug being fixed, reintroduced by the fix.
+
+So the name is split: the union raises the SHARED struct bound, and `pats[]`
+keeps this back end's own count, emitted as a literal.  Verified in the
+artefacts -- shared 3328, `pats[2975]` for i386, `pats[3328]` for aarch64 --
+and guard arm 6 requires the injection to leave `pats[]` unmoved.
+
+## 3. WHAT LANDED
+
+  * `gcc/genopinit.cc` -- `-l`/`-U`/`-A`, the union, and the split bound.
+    Output files are now opened AFTER the md is read: in `-l` mode opening them
+    first truncated the real `insn-opinit.h` to its two-line banner, i.e. a
+    file that exists, is non-empty, and contains no optab at all.
+  * `gcc/gen-multi-target-md.awk` -- `insn-opinit-<base>.part`, the
+    `insn-opinit-union.list` rule, and `-U`/`-A` on every per-base run.
+  * `gcc/Makefile.in` -- the same flags on the shared `s-opinit`,
+    `check_opinit_union_base`, MOSTLYCLEANFILES, and the `insn-opinit.h`
+    dependency for `multi-target-select.o`.
+  * `gcc/multi-target-select.cc` -- the four optab entry points join the
+    per-base table, and `selected_raw_optab_handler` /
+    `selected_init_all_optabs` / `selected_swap_optab_enable` /
+    `selected_partial_vectors_supported_p` dispatch through it.
+  * four call sites moved onto the funnels (`optabs-libfuncs.cc`,
+    `optabs-tree.cc`, `optabs.cc` x2, `tree-vect-loop.cc`).
+
+### WHY `insn-opinit.o` STAYS IN $(OBJS), AND WHY THAT IS NOT A LEAK
+
+It also defines four rodata tables shared code references bare:
+`code_to_optab_` (dojump.o, ifcvt.o, optabs.o), `optab_to_code_` (optabs.o),
+`convlib_def` and `normlib_def` (optabs-libfuncs.o).  Those are generated from
+`optabs.def`, not from the `.md`.  **Checked rather than assumed**
+(`scratchpad/t117-vocab.sh`): their BODIES are byte-identical across both
+configured back ends.  A size comparison would not have settled it -- all four
+are the same size on both bases, which is what a first look reported, and two
+equal-length tables with different contents is precisely the case a size test
+cannot see.  The whole shared prefix of `insn-opinit-<base>.h` (518 lines)
+differs in exactly one line, `NUM_OPTAB_PATTERNS`, now unioned.
+
+So the object's four FUNCTIONS are now dead and its four TABLES are genuine
+shared vocabulary.  Guard arm 2 asserts nothing in the link references the four
+bare functions; that is what stops them quietly becoming the answer again.
+
+## 4. THE WALL MOVED, AND THE NEW PLACE IS NAMED
+
+    BEFORE  aarch64 big.c: SIGSEGV, null PC, #1 emit_move_insn_1
+                           <- init_set_costs <- initialize_rtl
+    AFTER   aarch64 big.c: rc=4, internal compiler error:
+                           in setup_class_hard_regs, at ira.cc:507
+                           <- ira_init <- initialize_rtl
+
+`backend_init_target` runs `init_set_costs ()`, then `init_expr_target ()`,
+then `ira_init ()`.  The old stop was inside the first; the new one is in the
+third, so **both `init_set_costs` and `init_expr_target` now complete** -- and
+both are heavy `emit_move_insn`/`optab_handler` users, which is the point.  A
+segfault with no diagnostic became a named assert.
+
+The new wall is `ira_assert (ira_class_hard_regs_num[cl] == n)`: two walks over
+one register class disagreeing on how many hard registers it has.  That is the
+**register-class vocabulary**, not the optab one -- `N_REG_CLASSES` 34 for i386
+against 20 for aarch64, the `CONVERTED_REGS` group #92 retired.  Whoever takes
+aarch64 next should take that; it is not #51, not #36, and not this.
+
+**Same input, same claim discipline as #113: `int x = 1;` still works, `big.c`
+still does not, and I claim the move and nothing more.**
+
+## 5. AN INCIDENTAL DEFECT FOUND AND FIXED: TRUNCATED SPEC FILES
+
+`target-specs/configure` exited 1 for **every** target on this branch:
+
+    configure: error: specs-<t>-config carries capabilit(ies) that are not in
+    the expected list in configure.ac:as_ltoffx_ldxmov_relocs
+
+#116 added the key to the emitter and to `check-target-caps`, but not to
+`ts_expected`.  The check was working exactly as designed; the fix is to
+complete the list, not relax it, and that is what the diagnostic instructs.
+
+**It was not cosmetic.**  The abort happened partway through, so
+`specs-<target>` was left TRUNCATED at 39 lines.  After the fix: 101 lines for
+x86_64 and 96 for aarch64.  Every aarch64 measurement taken on this branch
+since #116 was taken against a truncated spec file, and nothing said so --
+`t113-ts.sh`-shaped scripts assert the file is non-empty, and 39 lines is
+non-empty.  Recorded because "checks the artefact exists" is not "checks the
+artefact is complete".
+
+`scratchpad/t117-reconf-ts.sh` regenerates `configure` and asserts the key
+reaches the GENERATED file, with four control keys emitted before and after it
+that must survive -- the unquoted-heredoc trap that once silently dropped all
+97 keys.
+
+## 6. INSTRUMENT FAILURES PAID FOR THIS TASK
+
+  1. **My scode used a shift of 16; the code uses 20.**  Both handlers then
+     answered `CODE_FOR_nothing`, and the probe printed a tidy, symmetric,
+     entirely meaningless "neither back end has a SImode move" -- absurd on its
+     face, and nothing in the harness objected, because 0 is a legal answer.
+     Fixed by reading the shift out of `optabs-query.h` and by a non-vacuity
+     arm that refuses to score when both sides answer nothing.
+  2. **`grep -q` scored a match as a miss.**  My first symbol survey used
+     `grep -q` in a loop; `optabs.o`'s reference to `code_to_optab_` came back
+     0 while `nm` showed it plainly.  Nothing in the harness uses `grep -q`
+     now; every arm counts lines.
+  3. **Substring matching inflated the leak count 1 -> 40.**
+     `selected_raw_optab_handler` CONTAINS `raw_optab_handler`.  Both numbers
+     are printed side by side in `t117-optab-syms.sh` so they cannot be
+     confused again.  Measured: EXACT=1, SUBSTR=52.
+  4. **An enum walker that trimmed with `gsub(/[ ,].*/,"")` deleted every
+     line**, because each entry begins with the indent.  Caught only by a `-n`
+     guard; now cross-checked by requiring `E_VOIDmode` and `unknown_optab` to
+     come out as 0.
+  5. **`insn_data_tab / NUM_INSN_CODES` looked like 40.02** on a misread hex
+     size, which would have put `genfun` at the wrong offset and made every
+     null read as confirmation.  Solved from BOTH bases instead: exactly 40 on
+     each, and the stride check is an arm.
+
+## 7. REGRESSION BARS, ALL ON /tmp/b117, MY OWN BUILD DIR
+
+  * `make multi-target-objs cc1 lto1` **rc=0**; cc1 88,832,400 bytes, lto1
+    links.
+  * x86_64 `-O2` md5 **`378fc33c1e70`** -- the recorded baseline, unmoved,
+    re-checked after the guard harness relinked.
+  * `stock-compare.sh`, `IN` **absolute**, `MT=/tmp/b117`, `ST=/tmp/b-stock`:
+    **5/5 IDENTICAL**, 5 distinct md5 per side, **negative control firing**
+    (1158 vs 804 lines), rc=0.
+  * `scratchpad/t117-guards.sh`: **10/10**, three of them injections.
+    Arm 6 removes `-U` and requires 3328 -> 2975, i.e. the primary's own count
+    back, AND requires `pats[]` not to move.  Arm 7 hands genopinit a union
+    list with aarch64 deleted and requires a FATAL that NAMES aarch64.  Arm 8
+    is the one the brief asked for: it puts `selected_raw_optab_handler` back
+    to `return raw_optab_handler (scode);`, rebuilds only that object, and
+    **requires the bare symbol to reappear** (0 -> 1), then restores and
+    verifies the restore (1 -> 0).
+  * `scratchpad/t117-tab.sh`: **both-sided, on the RUNNING cc1.**  Breakpoints
+    on all three `init_all_optabs` addresses; x86_64 enters `insn_i386`,
+    aarch64 enters `insn_aarch64`, the bare one is entered by neither, and the
+    three addresses are asserted distinct before anything is scored.  Before
+    this change the same arm entered the BARE one under aarch64.
+
+### STDERR -- WHICH ARM
+
+  * **cold** `multi-target-objs cc1 lto1`: **460 lines**, host-compiler noise.
+  * **incremental** relink after the guard harness: **8 lines**, all
+    `is unchanged`, with the 24 `'@' is redundant` absent -- the documented low
+    composition of the 32-line floor, because the `.md` rules had already
+    re-run.
+
+### SCOREBOARD: NOT RUN, NOT BANKED
+
+Nothing here touches a probed macro and no arm is added, so the honest figure
+is unchanged and is carried, not re-derived: header **i386 112 PASS / 0 FAIL,
+aarch64 8 PASS / 104 FAIL of which only 2 passes are TRUSTED** (the other 6
+compare a redirect with itself); TAB **i386 32/0, aarch64 27/5**.  I did not
+run `macro-probe-run.sh`.
+
+## 8. WHAT I DID NOT DO, AND WHY
+
+  * **#51's `gen_movxf` (Class C) is untouched and still filed.**  It needs the
+    user's ruling on whether `reg-stack.o` moves per-base, and nothing here
+    depends on that ruling.
+  * **#51's Class A/B forwarders are untouched.**  They are blocked on removing
+    `$(INSNEMIT_SEQ_O)` from `$(OBJS)`, which is another owner's hunk, and --
+    now measured -- they are not what stopped aarch64.
+  * **#36 was not reached.**  Nothing here needed a generator to read
+    `targ_caps`; the union file is the existing `-l`/`-U`/`-A` channel that
+    genconfig and genmodes already use.
+  * The other primary-only objects still in `$(OBJS)` -- `insn-attrtab.o`,
+    `insn-automata.o`, `insn-dfatab.o`, `insn-latencytab.o`, `insn-preds.o`,
+    `$(INSNEMIT_SEQ_O)` -- are each the same shape `insn-opinit.o` was and are
+    **unmeasured**.  `t117-optab-syms.sh` generalises in one variable if
+    someone wants the next one.
+
+## 9. FILES (scratchpad)
+
+    t117-build.sh       /tmp/b117, derived from t113-build.sh
+    t117-ts.sh          target-specs configure, both targets
+    t117-reconf-gcc.sh  gcc/Makefile.in -> build dir
+    t117-reconf-ts.sh   autoconf for target-specs, with heredoc controls
+    t117-optab-syms.sh  who references the primary's insn-opinit.o; exact vs substring
+    t117-vocab.sh       are the four rodata tables shared vocabulary?  (yes, by BODY)
+    t117-cause.sh       gdb: the i386 icode read against aarch64's insn_data
+    t117-wall.sh        where aarch64 stops now
+    t117-guards.sh      10 arms, three injections
+    t117-tab.sh         both-sided, on the running cc1

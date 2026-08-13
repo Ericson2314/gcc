@@ -3101,7 +3101,7 @@ vect_analyze_loop (class loop *loop, gimple *loop_vectorized_call,
   bool supports_partial_vectors = (param_vect_partial_vector_usage != 0
 				   || masked_p == 1);
   if (supports_partial_vectors
-      && !partial_vectors_supported_p ()
+      && !selected_partial_vectors_supported_p ()
       && !LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (first_loop_vinfo))
     supports_partial_vectors = false;
   poly_uint64 first_vinfo_vf = LOOP_VINFO_VECT_FACTOR (first_loop_vinfo);

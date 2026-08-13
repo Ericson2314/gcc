@@ -2372,7 +2372,7 @@ sign_expand_binop (machine_mode mode, optab uoptab, optab soptab,
 
   /* Try widening to a signed int.  Disable any direct use of any
      signed insn in the current mode.  */
-  save_enable = swap_optab_enable (soptab, mode, false);
+  save_enable = selected_swap_optab_enable (soptab, mode, false);
 
   temp = expand_binop (mode, soptab, op0, op1, target,
 		       unsignedp, OPTAB_WIDEN);
@@ -2400,7 +2400,7 @@ sign_expand_binop (machine_mode mode, optab uoptab, optab soptab,
  egress:
   /* Undo the fiddling above.  */
   if (save_enable)
-    swap_optab_enable (soptab, mode, true);
+    selected_swap_optab_enable (soptab, mode, true);
   return temp;
 }
 

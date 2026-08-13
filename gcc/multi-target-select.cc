@@ -84,6 +84,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-regs.h"
 #include "target-cumargs.h"
 #include "multi-target-reg-widths.h"
+/* For `optab', `struct target_optabs' and the four optab entry points below.
+   `insn-opinit.h' is safe to include HERE, from a shared translation unit,
+   only because everything in it that this file names is target-independent
+   vocabulary: `enum optab_tag' and the `code_to_optab_'/`optab_to_code_'/
+   `convlib_def'/`normlib_def' tables are generated from optabs.def, and were
+   measured byte-identical across both configured back ends
+   (scratchpad/t117-vocab.sh diffs the bodies, not the sizes).  The ONE thing
+   in that header that genuinely differed per back end was
+   `NUM_OPTAB_PATTERNS', and it is now unioned -- see genopinit.cc.  */
+#include "insn-opinit.h"
 
 /* Defines MT_BACKENDS -- one MT_BACKEND (<base>, insn_<base>) per configured
    back end -- and MT_TARGET_BASES, which maps each configured triple to the
@@ -170,6 +180,25 @@ tree ms_va_list_type_node;
 # define MT_ENTRY_VERIFY_NULL
 #endif
 
+/* THE OPTAB ENTRY POINTS.  genopinit emits all four into
+   insn-opinit-<base>.cc inside namespace insn_<base>, and until this list
+   named them, shared code reached the PRIMARY's un-namespaced copies out of
+   the `insn-opinit.o' that gcc/Makefile.in still puts in $(OBJS).
+
+   Measured, on an x86_64 + aarch64 cc1 compiling scratchpad/big.c with
+   aarch64 selected (scratchpad/t117-cause.sh, under gdb):
+
+     * `init_all_optabs' -- the BARE one ran; `insn_aarch64::init_all_optabs'
+       was never reached, so aarch64's `pat_enable[]' stayed all-false and
+       i386's pattern set was installed in its place.
+     * `raw_optab_handler (mov_optab, SImode)' -- the bare one answered icode
+       11383, an i386 number.  Read against `insn_aarch64::insn_data', 11383 is
+       `*while_wrdivnx8bi_acle_cc', an SVE predicate pattern, whose `genfun' is
+       NULL.  `emit_move_insn_1' then called it: a null PC, which is where
+       aarch64 stopped.
+
+   One name, two authorities, no diagnostic -- and the wrong answer was not
+   even a plausible one, it was a different machine's instruction.  */
 #define MT_DECLARE_FUNCS(NS)						\
   extern int recog (rtx, rtx_insn *, int *);				\
   extern rtx_insn *split_insns (rtx, rtx_insn *);			\
@@ -178,6 +207,10 @@ tree ms_va_list_type_node;
   extern const char *get_insn_name (int);				\
   extern rtx_insn *peephole (rtx_insn *);				\
   extern void init_adjust_machine_modes (void);				\
+  extern enum insn_code raw_optab_handler (unsigned);			\
+  extern void init_all_optabs (struct target_optabs *);			\
+  extern bool swap_optab_enable (optab, machine_mode, bool);		\
+  extern bool partial_vectors_supported_p (void);			\
   MT_DECLARE_VERIFY
 
 /* The data tables.  One list, used three times: to declare them per back end,
@@ -271,6 +304,10 @@ struct mt_backend
   const char *(*get_insn_name) (int);
   rtx_insn *(*peephole) (rtx_insn *);
   void (*init_adjust_machine_modes) (void);
+  enum insn_code (*raw_optab_handler) (unsigned);
+  void (*init_all_optabs) (struct target_optabs *);
+  bool (*swap_optab_enable) (optab, machine_mode, bool);
+  bool (*partial_vectors_supported_p) (void);
 #if CHECKING_P
   void (*verify_reg_names_in_constraints) (void);
 #endif
@@ -323,11 +360,14 @@ MT_BACKENDS
   { #BASE, NS::recog, NS::split_insns, NS::peephole2_insns,		\
     NS::insn_extract,							\
     NS::get_insn_name, NS::peephole, NS::init_adjust_machine_modes,	\
+    NS::raw_optab_handler, NS::init_all_optabs,				\
+    NS::swap_optab_enable, NS::partial_vectors_supported_p,		\
     MT_ENTRY_VERIFY (NS)						\
     mt_install_ ## BASE },
 static const struct mt_backend mt_backends[] = {
   MT_BACKENDS
   { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL,
     MT_ENTRY_VERIFY_NULL NULL }
 };
 #undef MT_BACKEND
@@ -612,6 +652,64 @@ void
 init_adjust_machine_modes (void)
 {
   mt_in_force ("init_adjust_machine_modes")->init_adjust_machine_modes ();
+}
+
+
+/* THE FOUR OPTAB ENTRY POINTS, AND WHY THEY ARE `selected_'-PREFIXED WHILE
+   EVERYTHING ABOVE IS BARE.
+
+   The forwarders above take the bare name because nothing else in the link
+   defines it: the primary's un-namespaced insn-recog and insn-extract objects
+   are not in $(OBJS).  `insn-opinit.o' IS, and it cannot simply come out,
+   because it also supplies four rodata tables that shared code references
+   bare -- `code_to_optab_' (dojump.o, ifcvt.o, optabs.o), `optab_to_code_'
+   (optabs.o), `convlib_def' and `normlib_def' (optabs-libfuncs.o).
+
+   Those four ARE genuinely shared vocabulary and not a leak: they are
+   generated from optabs.def rather than from the .md, and their bodies were
+   diffed -- not their sizes -- across both configured back ends and found
+   identical (scratchpad/t117-vocab.sh; a size comparison cannot tell two
+   equal-length tables with different contents apart, and equal sizes is what
+   a first look reported).  So the object stays, its four FUNCTIONS become
+   dead, and the middle end is routed to these instead.
+
+   `selected_raw_optab_handler' already existed, in optabs-query.cc, with a
+   comment saying it was there to leave "exactly one place for a multi-target
+   compiler to select in".  Nothing selected in it: its body called the bare
+   -- i.e. the primary's -- `raw_optab_handler'.  The mechanism was complete,
+   documented, and inert; PRINCIPLES 4 rule 2.  It is defined here now, beside
+   the table it has to consult, and optabs-query.cc points at this file.
+
+   The three others get funnels of the same shape, and their callers (four
+   call sites in total: optabs-libfuncs.cc, optabs-tree.cc, optabs.cc x2,
+   tree-vect-loop.cc) are changed to name them.  A guard arm asserts that no
+   object in the link references the bare four any more, because a definition
+   that is still present and merely unreferenced is one accidental call away
+   from being the primary's answer again.  */
+
+enum insn_code
+selected_raw_optab_handler (unsigned scode)
+{
+  return mt_in_force ("raw_optab_handler")->raw_optab_handler (scode);
+}
+
+void
+selected_init_all_optabs (struct target_optabs *optabs)
+{
+  mt_in_force ("init_all_optabs")->init_all_optabs (optabs);
+}
+
+bool
+selected_swap_optab_enable (optab op, machine_mode mode, bool set)
+{
+  return mt_in_force ("swap_optab_enable")->swap_optab_enable (op, mode, set);
+}
+
+bool
+selected_partial_vectors_supported_p (void)
+{
+  return mt_in_force ("partial_vectors_supported_p")
+	   ->partial_vectors_supported_p ();
 }
 
 
