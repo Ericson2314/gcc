@@ -7776,3 +7776,230 @@ other way, which is why the evidence is the tail-jmp and the symbol count.
     t134-rpss.sh       JOB 2 -- object-level both-sided evidence AND the
                        enumeration of every REG_PARM_STACK_SPACE path with a
                        verdict for each, derived from the source
+
+# TASK #135 -- `REG_PARM_STACK_SPACE' CLOSED IN FULL (all four paths), AND
+# `PUSH_ROUNDING' CONVERTED IN FULL (19 preprocessor + 12 value sites), WITH A
+# BEHAVIOURAL ARM ON THE ONE SITE THAT IS A PASS GATE.
+
+Worktree came up at bare-repo HEAD `7208eca60d0' AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in' **0**, `git reset --hard multi-target' took it
+to **39**, no `scratchpad/'.  FOURTEEN in a row.  Build dir `/tmp/b135', my
+own, cold.  **The brief named no task numbers I could read**; per PRINCIPLES
+section 7 that is the coordinator's error and everything below is measured.
+
+A SECOND CONFIGURE FACT, which cost one full build: `--enable-backends'
+alone is no longer enough.  The top level now REFUSES with
+`--enable-targets=LIST is required', by name, which is the refusal working --
+but #111's build script (which every later `tNNN-build.sh' is a copy of)
+passes only `--enable-backends' and therefore cannot configure this tree any
+more.  `scratchpad/t135-build.sh' passes both plus `--prefix=$D' (the last is
+what puts `specs-config' where `stock-compare.sh' looks for it).
+
+## 1. JOB 1 -- `REG_PARM_STACK_SPACE', LAST TWO PATHS, CLOSED
+
+`calls.cc' (11 `#ifdef' + 2 value) and `expr.cc:2192/:2198'.  All thirteen
+were classified before any was converted, and they are NOT one shape:
+
+  * :174, :1096, :1194 -- guard over a DECLARATION / DEFINITION.  Dropped.
+  * :2793, :4257 -- guard over LOCAL VARIABLES.  Now unconditional, with
+    `low_to_save'/`high_to_save' INITIALISED: with the guard gone the
+    compiler can no longer see they are written before read.
+  * :2885/:2886, :4272/:4273 -- value.  `mt_reg_parm_stack_space (...)'.
+  * :3568, :4597 -- `if (mt_has_reg_parm_stack_space () && ...)'.
+  * :4014, :4945 -- NO test added: `save_area' is non-null only if the save
+    ran, so the value already answers the existence question.
+
+**TWO SLOTS, NOT ONE, AND THE REASON IS A BEHAVIOUR DIFFERENCE THIS PAIR
+CANNOT SHOW.**  `save_fixed_argument_area' does `high = reg_parm_stack_space;
+if (ARGS_GROW_DOWNWARD) high += 1;', so on an args-grow-downward back end a
+ZERO value still inspects `stack_usage_map[0]' whereas an undefined macro
+never calls the function at all.  Collapsing "defined and 0" into "absent"
+would have changed behaviour for pa/gcn/stormy16 silently.  Neither
+configured base grows args downward -- **found by reading the callee, not by
+measuring**, which is the only way it could have been found here.
+
+Evidence, both-sided (`t135-obj.sh'):
+  `calls.o' `U ix86_reg_parm_stack_space' **1 -> 0**
+  `expr.o'  same **1 -> 0**
+  and in the SAME run `ix86_push_rounding' still scored 1 in seven objects,
+  so the zeroes are findings and not demangling failures.
+  Thunks: i386 `mt_base_has_reg_parm_stack_space' = `mov $0x1,%eax; ret',
+  value = `call ix86_reg_parm_stack_space' (R_X86_64_PLT32); aarch64 =
+  `mov $0x0,%eax; ret' twice.  **The EXISTENCE answer is what differs**; the
+  value is 0 on both sides, which is #134's carried honest negative
+  re-confirmed rather than re-derived.
+
+`#undef REG_PARM_STACK_SPACE' added to `defaults.h', and recorded there as
+WEAKER THAN A REDIRECT: a re-introduced value use fails by name, a
+re-introduced `#ifdef' silently reads FALSE for every target.
+
+## 2. JOB 2 -- `PUSH_ROUNDING', ALL 31 SITES
+
+Signature decided once: `poly_int64 mt_push_rounding (poly_int64)', with
+`MACRO_INT' moved INTO the per-base thunk.  **Seven live definitions, not
+thirteen** -- sh's is in `#if 0', six more are commented out; five of the
+seven already take/return `poly_int64', two are the identity.  The rejected
+alternative (`HOST_WIDE_INT') would have put `.to_constant ()' into shared
+code at four sites.
+
+`function.cc:4151' is the one value site kept non-poly on purpose: it feeds
+`size_int' from `TREE_INT_CST_LOW' and was never poly.
+
+**THE PASS GATE, AND BOTH HALVES OF THE READING MATTER**
+(`t135-gate.sh' / `t135-gate-inject.sh'; `-fdump-rtl-csa', i.e. THE
+COMPILER'S OWN report the pass ran, injected off and back on in ONE dir):
+
+                    OFF (pre-#135)        ON (#135)
+    aarch64         csa dump, 273 lines   NO csa dump        CHANGED
+    x86_64          csa dump, 233 lines   csa dump, 233      unchanged
+
+    assembly        aarch64 `be8a7f14b637', x86_64 `0b156589647b'
+                    -- BYTE-IDENTICAL on both bases, both ways.
+
+So: the gate moved, and the code did not.  aarch64 now skips
+`combine_stack_adjustments', which is what an aarch64-only GCC does
+(`#ifndef PUSH_ROUNDING' is true there), so the conversion RESTORES upstream
+behaviour for 38 back ends.  **No codegen claim is made** -- on this input
+the pass found nothing, and calling the dump difference a codegen difference
+would be the overclaim this project keeps catching.
+
+Object level: `ix86_push_rounding' **1 -> 0** in all seven objects that bound
+it; `mt_has_push_rounding' bound by ten.  i386 thunk `mov $0x1,%eax' +
+`call ix86_push_rounding'; aarch64 `mov $0x0,%eax' + identity.
+
+**THE `#undef' THAT COULD NOT BE DONE -- A NEW SHAPE, AND THE MAIN FINDING OF
+THIS TASK.**  `#undef PUSH_ROUNDING' builds `libbackend' clean and then fails
+with 15 errors in `insn-emit-1.cc' / `insn-emit-5.cc':
+
+    config/i386/mmx.md:430, :641;  config/i386/i386.md:2221, :2313, :3884
+    error: 'PUSH_ROUNDING' was not declared in this scope
+
+Those are `define_split' preparation statements -- BACK-END code -- but the
+`insn-emit-*.o' family is the un-namespaced one: compiled once, shared,
+without `MULTI_TARGET_TARGETM_BASE', with every back end's patterns in it.
+**Every macro retired before this one was spelled only by files under
+`gcc/'.  `PUSH_ROUNDING' is the first whose consumers are all converted while
+its NAME must stay defined for a supply-side file compiled as if it were
+shared.**  Recorded in `defaults.h' rather than worked around; the
+`insn-emit' forwarder scheme needs the `gen_movxf' ruling.
+`REG_PARM_STACK_SPACE' CAN be `#undef'ed and is -- measured in the same
+build, which is what makes this a property of `PUSH_ROUNDING' rather than of
+the `#undef'.
+
+## 3. `STACK_GROWS_DOWNWARD' / `ARGS_GROW_DOWNWARD' -- REPORTED, NOT TAKEN
+
+The other two names in #134's `PUSH_ARGS_REVERSED' ladder.
+
+  * `#if'-TESTED, not `#ifdef'-tested, at THIRTEEN shared sites (explow.cc
+    :1786; builtins.cc :5477, :5610, :5700, :5735; recog.cc:48; rtlanal.cc
+    :372, :582, :586, :594, :606, :610, :618, :629), several NESTED.  A
+    call-valued macro evaluates to 0 in `#if' -- the `#if HAVE_ATTR_length'
+    failure, and the same verdict `FRAME_POINTER_CFA_OFFSET' carries.
+  * Genuinely per-base: 46 headers define `STACK_GROWS_DOWNWARD 1' (pa's is
+    commented out); exactly three define `ARGS_GROW_DOWNWARD 1' (pa, gcn,
+    stormy16).
+  * **BUT THEY AGREE ON THIS PAIR** -- i386 and aarch64 are both
+    down/up -- so no arm built here could distinguish a conversion from the
+    status quo.  UNMEASURABLE WITH THIS PAIR, like `ARG_POINTER_CFA_OFFSET'.
+  * `defaults.h:533' mixes the spellings (`#ifdef' for
+    `DWARF_CIE_DATA_ALIGNMENT' where everything else uses `#if').  Checked:
+    no back end defines the name to 0, so the two do not currently disagree.
+    Fragile, not wrong -- stated because the obvious reading is that it is a
+    bug.
+
+## 4. THE BARS -- ALL IN `/tmp/b135', ON THE FINAL BINARY
+
+  * `make all-gcc' -- rc=0.
+  * **x86_64 `-O2' big.c md5 `378fc33c1e70', 12369 bytes -- UNMOVED.**
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock', ABSOLUTE `IN', 5
+    distinct md5 per side, **negative control firing (1158 vs 804)**, in THIS
+    build dir (`mt cfg : /tmp/b135/lib/gcc/17.0.0/x86_64-pc-linux-gnu/
+    specs-config').  O0 `1c00922491f8', O1 `4fabab94b41b', O2 `378fc33c1e70',
+    O3 `d220421237bc', Os `d6787f7e281f'.  Run twice: after JOB 1 and again
+    after JOB 2.
+  * **aarch64 `int x = 1;' rc=0, 373 bytes, empty stderr, `b01d9157fdc1'.**
+  * `fn-add'/`fn-call'/`fn-data' byte-identical on BOTH bases, all six md5s
+    equal to #134's.
+  * `big.c' reports **`extract_insn, recog.cc:2892'** where #134 recorded
+    `:2890'.  **SAME SITE** -- this task added a two-line comment above it in
+    `recog.cc'.  A "wall moved" that is a line number, checked rather than
+    reported as movement.
+  * Both `specs-config' 230 lines; `check-spec-refs: 2 spec file(s)',
+    `check-target-caps: 2 config file(s)',
+    `check-multi-target-specs: 2 spec file(s) ... 0 rejected'.
+  * Stderr on the final incremental `all-gcc': **24 "'@' is redundant" from
+    unmodified aarch64 `.md' files, 0 `is unchanged', 0 `warning:', 0
+    errors** -- within the documented 32-line incremental floor and matching
+    its composition.  NOTE the driver merges stdout and stderr, so that is a
+    count over the combined stream.
+
+## 5. WHAT I DID NOT DO
+
+  * **The scoreboard was NOT run and I claim NO movement.**  Carrying the
+    recorded line unchanged: header **i386 112 PASS / 0 FAIL, aarch64 8 PASS
+    / 104 FAIL of which only 2 are TRUSTED**; TAB **i386 32/0, aarch64
+    27/5**.  `PUSH_ROUNDING' and `REG_PARM_STACK_SPACE' are both `#ifdef'-
+    shaped and therefore not on the board as ordinary value arms; neither is
+    `INCOMING_REG_PARM_STACK_SPACE'.  **The converted-without-an-arm backlog
+    is now NINE** (`INCOMING_FRAME_SP_OFFSET',
+    `DEFAULT_INCOMING_FRAME_SP_OFFSET', `FUNCTION_MODE',
+    `ACCUMULATE_OUTGOING_ARGS', `STACK_DYNAMIC_OFFSET', `PUSH_ARGS_REVERSED',
+    `INCOMING_REG_PARM_STACK_SPACE', `REG_PARM_STACK_SPACE',
+    `PUSH_ROUNDING') and is well past being a footnote.  A probe shape for
+    EXISTENCE macros does not exist yet and is the thing to design.
+  * **`insn-emit' NOT TOUCHED**, and this task now has a concrete reason to
+    want it fixed rather than a general one: it is what blocks
+    `#undef PUSH_ROUNDING'.
+  * `STACK_GROWS_DOWNWARD' / `ARGS_GROW_DOWNWARD' not converted (section 3).
+  * `dwarf2out.cc:21505' CODEVIEW hook -- design decision, untouched.
+  * No compile-time or memory measurement.  `mt_has_push_rounding ()' is now
+    called on paths as hot as `push_operand' (recog) and
+    `nonzero_bits' (rtlanal); the artefacts are byte-identical so this is
+    throughput, not correctness, and it is UNMEASURED.
+  * `make all-target-libgcc' not re-run; #119's `-m32' blocker unchanged.
+  * No `alloca' / `-fstack-clash-protection' arm: #133's `UNSPECV_GET_FPCR'
+    wall is unchanged and this task's inputs do not reach it.
+
+## 6. INSTRUMENT NOTES
+
+  * **MY SED INJECTION MARKED ITS LINE WITH A C COMMENT AND THE RESTORE THEN
+    COULD NOT FIND IT.**  Backslash-slash-star in a sed REGEX is "zero or
+    more slashes", so `off' applied cleanly and `on' failed to match its own
+    marker.  The refusal caught it -- but only because the restore ASSERTS
+    its result; a restore that checked nothing would have left the pre-#135
+    state in the tree and every later reading would have been of the wrong
+    compiler.  The marker is now `// INJECTED pre-135'.
+  * **`-fdump-rtl-csa' IS THE RIGHT INSTRUMENT FOR A PASS GATE AND THE
+    ASSEMBLY IS NOT.**  The assembly is byte-identical on both sides here; an
+    assembly-only arm would have scored the gate change as "no difference",
+    which reads as "the conversion did nothing".  The dump file's EXISTENCE
+    is the compiler saying whether the pass ran.
+  * **THE DRIVER MUST RUN FROM `$B/gcc'.**  Run from the dump directory it
+    says `cannot execute cc1: posix_spawn: No such file or directory', which
+    reads as a broken build rather than a wrong cwd.  `-dumpdir' does the
+    rest.
+  * **A `-Wcomment' PAIR I INTRODUCED MYSELF**, by writing a slash-star glob
+    inside a block comment in `defaults.h'.  Caught by watching the warning
+    count -- the same lesson `FUNCTION_MODE' left: a warning count was the
+    only signal there too.
+  * **`nm -C' scored the aarch64 `push_rounding' thunk as the identity in
+    x86-64 opcodes (`mov %rdi,%rax; mov %rsi,%rdx'), correctly** -- two
+    registers because a `poly_int64' with `NUM_POLY_INT_COEFFS == 2' is two
+    words.  That two-register return is itself evidence the union width
+    reached the thunk.
+  * `stock-compare.sh' prints a nix evaluation error (`undefined variable
+    a') when env vars are exported into the `nix-shell' invocation; the run
+    still proceeds and scores.  Noted, not fixed -- but it means the
+    coreutils in that arm may be the ambient ones rather than the pinned
+    ones.
+
+## 7. FILES
+
+    t135-build.sh        the build driver -- NOTE `--enable-targets' AND
+                         `--enable-backends' AND `--prefix=$D'
+    t135-specs.sh        per-target target-specs with real aarch64 binutils
+    t135-state.sh        big.c wall + `int x = 1;' + x86_64 -O2 invariant
+    t135-fn.sh           the three function-body artefacts, both bases
+    t135-obj.sh          object-level both-sided symbol evidence
+    t135-gate.sh         THE BEHAVIOURAL ARM -- csa pass gate, via the dump
+    t135-gate-inject.sh  off/on for the gate, state asserted both ways
