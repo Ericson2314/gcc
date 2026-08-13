@@ -275,23 +275,24 @@ struct elim_table
 
 static struct elim_table *reg_eliminate = 0;
 
-/* This is an intermediate structure to initialize the table.  It has
-   exactly the members provided by ELIMINABLE_REGS.  */
-static const struct elim_table_1
-{
-  const int from;
-  const int to;
-} reg_eliminate_1[] =
+/* THE TABLE IS THE SELECTED BACK END'S, AND SO IS ITS LENGTH.
 
-  /* Reload and LRA don't agree on how a multi-register frame pointer
-     is represented for elimination.  See avr.h for a use case.  */
-#ifdef RELOAD_ELIMINABLE_REGS
-  RELOAD_ELIMINABLE_REGS;
-#else
-  ELIMINABLE_REGS;
-#endif
+   This used to be a file-scope array initialised from RELOAD_ELIMINABLE_REGS
+   or ELIMINABLE_REGS, with NUM_ELIMINABLE_REGS its ARRAY_SIZE -- all of it
+   evaluated in a shared translation unit, i.e. against whichever base
+   compiled the middle end.  Reload and LRA don't agree on how a
+   multi-register frame pointer is represented for elimination (see avr.h for
+   a use case), and that `#ifdef' is a question about the SELECTED base; it is
+   now answered in the per-base translation unit and recorded as
+   `n_reload_eliminables'.  See target-frame.h.
 
-#define NUM_ELIMINABLE_REGS ARRAY_SIZE (reg_eliminate_1)
+   TWO DIFFERENT NUMBERS, SPELLED DIFFERENTLY ON PURPOSE.
+   NUM_ELIMINABLE_REGS is the run-time count and bounds every LOOP.
+   MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS is the compile-time maximum over the
+   configured back ends and is the LAYOUT of `offsets_at' below, which is a
+   pointer-to-array type and cannot hold a call.  Making one name mean both is
+   PRINCIPLES 3's `sized by one authority, indexed by another'.  */
+#define NUM_ELIMINABLE_REGS (mt_num_reload_eliminable_regs ())
 
 /* Record the number of pending eliminations that have an offset not equal
    to their initial offset.  If nonzero, we use a new copy of each
@@ -315,7 +316,13 @@ static int num_eliminable_invariants;
 
 static int first_label_num;
 static char *offsets_known_at;
-static poly_int64 (*offsets_at)[NUM_ELIMINABLE_REGS];
+/* THE UNION WIDTH, not NUM_ELIMINABLE_REGS: this is a pointer-to-ARRAY type,
+   so its bound is part of the type and must be a constant expression.  Rows
+   are therefore the maximum over the configured back ends and the selected
+   base uses a prefix of each row.  target-cumargs.cc static_asserts every
+   base's own count against this bound, so a base that outgrows it is a
+   compile error naming that base rather than a write past the end of a row.  */
+static poly_int64 (*offsets_at)[MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS];
 
 vec<reg_equivs_t, va_gc> *reg_equivs;
 
@@ -3968,18 +3975,25 @@ static void
 init_elim_table (void)
 {
   struct elim_table *ep;
-  const struct elim_table_1 *ep1;
+  int i;
 
+  /* ALLOCATED AT THE UNION WIDTH, walked at the selected base's count.
+     `reg_eliminate' is allocated ONCE and cached across functions, and a
+     multi-target compiler can be asked for a different target between two
+     calls; sizing it by the current selection would leave a shorter array
+     behind for a wider base.  The walks below are bounded by
+     NUM_ELIMINABLE_REGS, so the tail is never read.  */
   if (!reg_eliminate)
-    reg_eliminate = XCNEWVEC (struct elim_table, NUM_ELIMINABLE_REGS);
+    reg_eliminate = XCNEWVEC (struct elim_table,
+			      MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS);
 
   num_eliminable = 0;
 
-  for (ep = reg_eliminate, ep1 = reg_eliminate_1;
-       ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++, ep1++)
+  for (ep = reg_eliminate, i = 0;
+       ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++, i++)
     {
-      ep->from = ep1->from;
-      ep->to = ep1->to;
+      ep->from = mt_reload_eliminable_from (i);
+      ep->to = mt_reload_eliminable_to (i);
       ep->can_eliminate = ep->can_eliminate_previous
 	= (targetm.can_eliminate (ep->from, ep->to)
 	   && ! (ep->to == STACK_POINTER_REGNUM
@@ -4029,8 +4043,14 @@ init_eliminable_invariants (rtx_insn *first, bool do_subregs)
 
   /* Allocate the tables used to store offset information at labels.  */
   offsets_known_at = XNEWVEC (char, num_labels);
-  offsets_at = (poly_int64 (*)[NUM_ELIMINABLE_REGS])
-    xmalloc (num_labels * NUM_ELIMINABLE_REGS * sizeof (poly_int64));
+  /* The STRIDE must match the pointer-to-array type above, i.e. the union
+     width; only the loops that fill and read the rows use the selected base's
+     count.  Allocating `num_labels * NUM_ELIMINABLE_REGS' here while indexing
+     with the wider type is exactly the overrun this pairing exists to make
+     impossible.  */
+  offsets_at = (poly_int64 (*)[MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS])
+    xmalloc (num_labels * MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS
+	     * sizeof (poly_int64));
 
 /* Look for REG_EQUIV notes; record what each pseudo is equivalent
    to.  If DO_SUBREGS is true, also find all paradoxical subregs and

@@ -952,15 +952,16 @@ expand_builtin_setjmp_receiver (rtx receiver_label)
 	 that if such an elimination is present, it can always be used.
 	 This is the case on all known machines; if we don't make this
 	 assumption, we do unnecessary saving on many machines.  */
-      size_t i;
-      static const struct elims {const int from, to;} elim_regs[] = ELIMINABLE_REGS;
+      /* The SELECTED back end's pairs, not the primary's; see
+	 target-frame.h.  */
+      int i, n = mt_num_eliminable_regs ();
 
-      for (i = 0; i < ARRAY_SIZE (elim_regs); i++)
-	if (elim_regs[i].from == ARG_POINTER_REGNUM
-	    && elim_regs[i].to == HARD_FRAME_POINTER_REGNUM)
+      for (i = 0; i < n; i++)
+	if (mt_eliminable_from (i) == ARG_POINTER_REGNUM
+	    && mt_eliminable_to (i) == HARD_FRAME_POINTER_REGNUM)
 	  break;
 
-      if (i == ARRAY_SIZE (elim_regs))
+      if (i == n)
 	{
 	  /* Now restore our arg pointer from the address at which it
 	     was saved in our stack frame.  */

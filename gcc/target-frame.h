@@ -369,6 +369,86 @@ struct target_frame_desc
   unsigned int (*max_stack_alignment) (void);
   unsigned int (*max_supported_stack_alignment) (void);
   bool (*supports_stack_alignment) (void);
+
+  /* ------------------------------------------------------------------
+     THE ELIMINATION TABLE -- A LIST WHOSE LENGTH AND WHOSE CONTENTS ARE BOTH
+     THE PRIMARY'S, AND WHOSE CONTENTS ARE REGISTER NUMBERS.
+
+     `ELIMINABLE_REGS' is a brace initialiser, so no macro carries its length:
+     `reload1.cc:280', `lra-eliminations.cc:107', `ira.cc:2535', `rtlanal.cc:352',
+     `varasm.cc:1460', `stmt.cc:208', `df-scan.cc:3819' and `builtins.cc:956'
+     each recover it by declaring a file-scope array from the macro and taking
+     `ARRAY_SIZE'.  All eight are shared translation units, so all eight hold
+     the PRIMARY's pairs.
+
+     `nm -uC' names `ix86_initial_elimination_offset' in `ira.o', `reload1.o'
+     and `rtlanal.o'.  As always that is the symbol INITIAL_ELIMINATION_OFFSET
+     drags in, not the whole fault: the numbers handed to it come from this
+     table, and
+
+	 ARG_POINTER_REGNUM         i386 16   aarch64 65
+	 FRAME_POINTER_REGNUM       i386 19   aarch64 64
+	 STACK_POINTER_REGNUM       i386  7   aarch64 31
+	 HARD_FRAME_POINTER_REGNUM  i386  6   aarch64 29
+
+     so `ira_setup_eliminable_regset' asks `targetm.can_eliminate (16, 7)' of
+     aarch64, whose `aarch64_can_eliminate' asserts the FROM is one of its own
+     two -- `aarch64.cc:14153', the wall this converts.  BOTH BASES HAVE FOUR
+     PAIRS, so a length check alone would have scored this leak as absent;
+     `vax.h:314' has one pair and `rs6000.h:1614' six, so the length is a real
+     variable and not a constant nobody happened to vary.
+
+     THE LOOPS TAKE THE COUNT BELOW; THE LAYOUT TAKES THE UNION.
+     `reload1.cc:318' is `static poly_int64 (*offsets_at)[NUM_ELIMINABLE_REGS]'
+     -- a pointer-to-ARRAY type, which cannot hold a run-time count -- and
+     `reload1.cc:4032' allocates with the same stride.  That is PRINCIPLES 3's
+     "sized by one authority, indexed by another" again, so those two spell
+     `MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS' (measured per base by
+     `multi-target-reg-probe.cc' and maximised by `gen-reg-widths.sh', exactly
+     as the register and class widths are) while every loop bound spells
+     `mt_num_eliminable_regs ()'.  The two are cross-checked: target-cumargs.cc
+     static_asserts this base's own count against the union bound, so a base
+     that outgrows it is a compile error naming that base rather than a write
+     past the end of `offsets_at'.
+
+     WHY TWO TABLES.  `reload1.cc' uses `RELOAD_ELIMINABLE_REGS' when a back
+     end defines one and `ELIMINABLE_REGS' otherwise -- reload and LRA disagree
+     about multi-register frame pointers (see the comment at reload1.cc:285) --
+     while every other consumer uses `ELIMINABLE_REGS'.  That `#ifdef' is a
+     question about the SELECTED base, so it is answered in the per-base
+     translation unit and its result recorded here, rather than being asked
+     of the primary's headers in `reload1.cc'.  No in-tree back end currently
+     defines `RELOAD_ELIMINABLE_REGS' (checked by grep over all of `config/'),
+     so `d_reload_eliminables' equals `d_eliminables' for both configured
+     bases today; it is a separate field because the day one does define it is
+     the day a single field silently gives reload LRA's table.
+
+     FLATTENED, `{from, to}' PER PAIR: pair I is `d_eliminables[2 * I]' ->
+     `d_eliminables[2 * I + 1]'.  `n_eliminables' counts PAIRS, not ints --
+     stated because a count that could be read either way is the shape that
+     produced `NUM_UNSPECV_VALUES'.  Shared code never indexes these directly;
+     it goes through `mt_eliminable_from' / `mt_eliminable_to', which range
+     check.  */
+  int n_eliminables;
+  const int *d_eliminables;
+  int n_reload_eliminables;
+  const int *d_reload_eliminables;
+
+  /* INITIAL_ELIMINATION_OFFSET (FROM, TO, OFFSET), as a function returning the
+     offset.  Every back end's is a statement that assigns through its third
+     argument, so it is wrapped rather than named -- the same reason
+     `ADJUST_REG_ALLOC_ORDER' is wrapped in target-regs.cc.
+
+     `poly_int64' is nameable here because this header is reached from
+     `defaults.h' only in C++ translation units that already have
+     `coretypes.h' -- the same property that lets the fields above take `tree'
+     and `machine_mode'.  It is ONE type across the whole compiler:
+     `NUM_POLY_INT_COEFFS' is a UNION quantity (genmodes.cc:2206 emits
+     `union_poly_int_coeffs'), measured 2 in this build, so a back end's own
+     object and a shared object agree on the layout.  Were it still per base
+     this field would be an ABI mismatch rather than a fix, which is why it is
+     recorded.  */
+  poly_int64 (*initial_elimination_offset) (int from, int to);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -427,5 +507,32 @@ extern unsigned int mt_incoming_stack_boundary (void);
 extern unsigned int mt_max_stack_alignment (void);
 extern unsigned int mt_max_supported_stack_alignment (void);
 extern bool mt_supports_stack_alignment (void);
+
+/* THE ELIMINATION TABLE, for shared code.  `INITIAL_ELIMINATION_OFFSET' IS
+   redirected in `defaults.h' -- its 14 shared uses are all ordinary
+   assignments through the third argument, with no `#if', no case label, no
+   array bound and no `#ifdef' guard, so a call-valued redirect is legal.
+
+   `ELIMINABLE_REGS' IS NOT REDIRECTED AND CANNOT BE: it is a brace
+   initialiser, and there is no run-time spelling of a brace initialiser to
+   point it at.  Its eight consumers are rewritten to walk these accessors
+   instead, and `defaults.h' then POISONS the name for shared translation
+   units, so a ninth consumer added later is a compile error naming the
+   replacement rather than one more copy of the primary's four pairs.
+
+   The two `from'/`to' readers range check and fail by name.  An out-of-range
+   index here would read whatever int follows the table, and a register number
+   is exactly the kind of value that stays plausible while being wrong.  */
+extern int mt_num_eliminable_regs (void);
+extern int mt_eliminable_from (int i);
+extern int mt_eliminable_to (int i);
+
+/* reload's own table.  Separate from the three above because a back end may
+   define `RELOAD_ELIMINABLE_REGS'; see target-frame.h's field comment.  */
+extern int mt_num_reload_eliminable_regs (void);
+extern int mt_reload_eliminable_from (int i);
+extern int mt_reload_eliminable_to (int i);
+
+extern poly_int64 mt_initial_elimination_offset (int from, int to);
 
 #endif /* GCC_TARGET_FRAME_H */

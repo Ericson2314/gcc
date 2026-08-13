@@ -3816,17 +3816,19 @@ void
 df_hard_reg_init (void)
 {
   int i;
-  static const struct {const int from, to; } eliminables[] = ELIMINABLE_REGS;
 
   if (initialized)
     return;
 
   /* Record which registers will be eliminated.  We use this in
-     mark_used_regs.  */
+     mark_used_regs.  The pairs come from the SELECTED back end (see
+     target-frame.h); this used to be a file-scope array initialised from
+     ELIMINABLE_REGS, so `elim_reg_set' held i386's registers 16 and 19 while
+     compiling for a back end whose are 65 and 64.  */
   CLEAR_HARD_REG_SET (elim_reg_set);
 
-  for (i = 0; i < (int) ARRAY_SIZE (eliminables); i++)
-    SET_HARD_REG_BIT (elim_reg_set, eliminables[i].from);
+  for (i = 0; i < mt_num_eliminable_regs (); i++)
+    SET_HARD_REG_BIT (elim_reg_set, mt_eliminable_from (i));
 
   initialized = true;
 }

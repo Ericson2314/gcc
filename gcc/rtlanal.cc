@@ -350,11 +350,13 @@ rtx_varies_p (const_rtx x, bool for_alias)
 static poly_int64
 get_initial_register_offset (int from, int to)
 {
-  static const struct elim_table_t
-  {
-    const int from;
-    const int to;
-  } table[] = ELIMINABLE_REGS;
+  /* The SELECTED back end's elimination pairs; this was a file-scope array
+     initialised from ELIMINABLE_REGS, i.e. the primary's, in a shared
+     translation unit.  See target-frame.h.  Spelled through two local lambdas
+     so the eleven INITIAL_ELIMINATION_OFFSET calls below read as they did.  */
+  auto e_from = [] (unsigned int k) { return mt_eliminable_from ((int) k); };
+  auto e_to = [] (unsigned int k) { return mt_eliminable_to ((int) k); };
+  const unsigned int n_table = (unsigned int) mt_num_eliminable_regs ();
   poly_int64 offset1, offset2;
   unsigned int i, j;
 
@@ -378,62 +380,62 @@ get_initial_register_offset (int from, int to)
 	return 0;
      }
 
-  for (i = 0; i < ARRAY_SIZE (table); i++)
-      if (table[i].from == from)
+  for (i = 0; i < n_table; i++)
+      if (e_from (i) == from)
 	{
-	  if (table[i].to == to)
+	  if (e_to (i) == to)
 	    {
-	      INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+	      INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					  offset1);
 	      return offset1;
 	    }
-	  for (j = 0; j < ARRAY_SIZE (table); j++)
+	  for (j = 0; j < n_table; j++)
 	    {
-	      if (table[j].to == to
-		  && table[j].from == table[i].to)
+	      if (e_to (j) == to
+		  && e_from (j) == e_to (i))
 		{
-		  INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					      offset1);
-		  INITIAL_ELIMINATION_OFFSET (table[j].from, table[j].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (j), e_to (j),
 					      offset2);
 		  return offset1 + offset2;
 		}
-	      if (table[j].from == to
-		  && table[j].to == table[i].to)
+	      if (e_from (j) == to
+		  && e_to (j) == e_to (i))
 		{
-		  INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					      offset1);
-		  INITIAL_ELIMINATION_OFFSET (table[j].from, table[j].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (j), e_to (j),
 					      offset2);
 		  return offset1 - offset2;
 		}
 	    }
 	}
-      else if (table[i].to == from)
+      else if (e_to (i) == from)
 	{
-	  if (table[i].from == to)
+	  if (e_from (i) == to)
 	    {
-	      INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+	      INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					  offset1);
 	      return - offset1;
 	    }
-	  for (j = 0; j < ARRAY_SIZE (table); j++)
+	  for (j = 0; j < n_table; j++)
 	    {
-	      if (table[j].to == to
-		  && table[j].from == table[i].from)
+	      if (e_to (j) == to
+		  && e_from (j) == e_from (i))
 		{
-		  INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					      offset1);
-		  INITIAL_ELIMINATION_OFFSET (table[j].from, table[j].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (j), e_to (j),
 					      offset2);
 		  return - offset1 + offset2;
 		}
-	      if (table[j].from == to
-		  && table[j].to == table[i].from)
+	      if (e_from (j) == to
+		  && e_to (j) == e_from (i))
 		{
-		  INITIAL_ELIMINATION_OFFSET (table[i].from, table[i].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (i), e_to (i),
 					      offset1);
-		  INITIAL_ELIMINATION_OFFSET (table[j].from, table[j].to,
+		  INITIAL_ELIMINATION_OFFSET (e_from (j), e_to (j),
 					      offset2);
 		  return - offset1 - offset2;
 		}

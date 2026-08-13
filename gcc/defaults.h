@@ -2192,6 +2192,52 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define SUPPORTS_STACK_ALIGNMENT (mt_supports_stack_alignment ())
 
 /* ------------------------------------------------------------------------
+   THE REGISTER-ELIMINATION TABLE.  See target-frame.h for the four register
+   numbers that diverge and for why the LIST matters more than the offset
+   function whose symbol `nm -uC ira.o' actually names.
+
+   `INITIAL_ELIMINATION_OFFSET' IS REDIRECTED.  Outside `config/' it has 14
+   uses -- rtlanal.cc has 11, reload1.cc 2, lra-eliminations.cc 1 -- and every
+   one assigns through the third argument in an ordinary statement.  No `#if',
+   no case label, no array bound, no static initialiser, and (swept) no
+   `#ifdef INITIAL_ELIMINATION_OFFSET' anywhere in shared code, so there is no
+   guard a redirect could leave answered by a different back end than the body.
+
+   `ELIMINABLE_REGS' IS POISONED RATHER THAN REDIRECTED, because there is
+   nothing to redirect it TO: it is a brace initialiser and a run-time table
+   has no such spelling.  Its eight shared consumers now walk
+   `mt_num_eliminable_regs ()' / `mt_eliminable_from' / `mt_eliminable_to'.
+   Leaving the name alone would have been the quiet option and the wrong one:
+   the macro would stay defined, expanding to the primary's four pairs, and
+   the ninth consumer -- or a rebased upstream one -- would compile clean and
+   be wrong in exactly the way this change is fixing.  Poisoned, it is an
+   error naming the replacement.  A `#pragma GCC poison' is not usable here:
+   this file is read by the compiler that is BEING BUILT as well as by the one
+   building it, and the name is legitimately defined in every back end's own
+   translation unit, which this block already excludes by other means.
+
+   THE POISON IS A `#define' FOR ONE AND A BARE `#undef' FOR THE OTHER, and
+   the asymmetry is deliberate.  A poison `#define' makes `#ifdef' TRUE, which
+   is the wrong answer for a name whose whole content is an existence
+   question.  `ELIMINABLE_REGS' is never `#ifdef'd -- swept over all of `gcc/'
+   and `libgcc/'; the only hit is a 2007 ChangeLog entry -- so a `#define'
+   there can only ever be reached as a use, which is what it must catch.
+   `RELOAD_ELIMINABLE_REGS' WAS `#ifdef'd, at reload1.cc:288, and that site is
+   half the reason this family is being converted: it asked the PRIMARY's
+   headers whether the SELECTED base has a reload-specific table.  That
+   question is now answered in target-cumargs.cc, in the base's own
+   translation unit, and recorded as `n_reload_eliminables'.  So the name is
+   simply undefined here -- a poison `#define' would resurrect exactly the
+   `#ifdef'-answered-by-the-primary bug in any site that asked again.  */
+#undef INITIAL_ELIMINATION_OFFSET
+#define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
+  ((OFFSET) = mt_initial_elimination_offset ((int) (FROM), (int) (TO)))
+#undef ELIMINABLE_REGS
+#define ELIMINABLE_REGS \
+  MULTI_TARGET_ELIMINABLE_REGS_IS_PER_BASE_call_mt_num_eliminable_regs_instead
+#undef RELOAD_ELIMINABLE_REGS
+
+/* ------------------------------------------------------------------------
    THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault
    that starts this (`ix86_cost' null, `si_addr == 0xf4'), for why all seven
    move together rather than just the one that crashes, and for why

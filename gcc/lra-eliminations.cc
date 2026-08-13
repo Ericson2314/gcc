@@ -102,17 +102,14 @@ public:
    preferred should be specified first.	 */
 static class lra_elim_table *reg_eliminate = 0;
 
-/* This is an intermediate structure to initialize the table.  It has
-   exactly the members provided by ELIMINABLE_REGS.  */
-static const struct elim_table_1
-{
-  const int from;
-  const int to;
-} reg_eliminate_1[] =
-
-  ELIMINABLE_REGS;
-
-#define NUM_ELIMINABLE_REGS ARRAY_SIZE (reg_eliminate_1)
+/* THE TABLE IS THE SELECTED BACK END'S, AND SO IS ITS LENGTH.  This was a
+   file-scope array initialised from ELIMINABLE_REGS with NUM_ELIMINABLE_REGS
+   its ARRAY_SIZE, both evaluated in a shared translation unit -- i.e. the
+   primary's pairs and the primary's register numbers, for every target.  See
+   target-frame.h.  Unlike reload1.cc, LRA always wants ELIMINABLE_REGS and
+   never RELOAD_ELIMINABLE_REGS, and that distinction is now carried by which
+   accessor is called rather than by an `#ifdef' asked of the wrong base.  */
+#define NUM_ELIMINABLE_REGS (mt_num_eliminable_regs ())
 
 /* Print info about elimination table to file F.  */
 static void
@@ -1313,22 +1310,28 @@ init_elim_table (void)
 {
   class lra_elim_table *ep;
   bool value_p;
-  const struct elim_table_1 *ep1;
+  int i;
 
+  /* ALLOCATED AT THE UNION WIDTH, walked at the selected base's count:
+     `reg_eliminate' is allocated once and cached across functions, and a
+     multi-target compiler can be asked for a different target in between, so
+     sizing it by the current selection would leave a short array behind for a
+     wider base.  Every walk below is bounded by NUM_ELIMINABLE_REGS.  */
   if (!reg_eliminate)
-    reg_eliminate = XCNEWVEC (class lra_elim_table, NUM_ELIMINABLE_REGS);
+    reg_eliminate = XCNEWVEC (class lra_elim_table,
+			      MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS);
 
   memset (self_elim_offsets, 0, sizeof (self_elim_offsets));
   /* Initiate member values which will be never changed.  */
   self_elim_table.can_eliminate = self_elim_table.prev_can_eliminate = true;
   self_elim_table.previous_offset = 0;
 
-  for (ep = reg_eliminate, ep1 = reg_eliminate_1;
-       ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++, ep1++)
+  for (ep = reg_eliminate, i = 0;
+       ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++, i++)
     {
       ep->offset = ep->previous_offset = -1;
-      ep->from = ep1->from;
-      ep->to = ep1->to;
+      ep->from = mt_eliminable_from (i);
+      ep->to = mt_eliminable_to (i);
       value_p = (targetm.can_eliminate (ep->from, ep->to)
 		 && ! (ep->to == STACK_POINTER_REGNUM
 		       && frame_pointer_needed

@@ -2532,7 +2532,6 @@ void
 ira_setup_eliminable_regset (void)
 {
   int i;
-  static const struct {const int from, to; } eliminables[] = ELIMINABLE_REGS;
   int fp_reg_count = hard_regno_nregs (HARD_FRAME_POINTER_REGNUM, Pmode);
 
   /* Setup is_leaf as frame_pointer_required may use it.  This function
@@ -2571,25 +2570,34 @@ ira_setup_eliminable_regset (void)
   compute_regs_asm_clobbered ();
 
   /* Build the regset of all eliminable registers and show we can't
-     use those that we already know won't be eliminated.  */
-  for (i = 0; i < (int) ARRAY_SIZE (eliminables); i++)
-    {
-      bool cannot_elim
-	= (! targetm.can_eliminate (eliminables[i].from, eliminables[i].to)
-	   || (eliminables[i].to == STACK_POINTER_REGNUM && frame_pointer_needed));
+     use those that we already know won't be eliminated.
 
-      if (!TEST_HARD_REG_BIT (crtl->asm_clobbers, eliminables[i].from))
+     THE PAIRS ARE THE SELECTED BACK END'S.  This loop used to walk a
+     file-scope array initialised from ELIMINABLE_REGS in a shared translation
+     unit, i.e. the PRIMARY's, and hand its register numbers to
+     `targetm.can_eliminate' -- which is the selected back end's hook.  With
+     i386 as the primary and aarch64 selected it asked `aarch64_can_eliminate
+     (16, 7)', and aarch64.cc:14153 asserts the FROM is one of ITS
+     ARG_POINTER_REGNUM (65) or FRAME_POINTER_REGNUM (64).  See
+     target-frame.h.  */
+  for (i = 0; i < mt_num_eliminable_regs (); i++)
+    {
+      int from = mt_eliminable_from (i), to = mt_eliminable_to (i);
+      bool cannot_elim
+	= (! targetm.can_eliminate (from, to)
+	   || (to == STACK_POINTER_REGNUM && frame_pointer_needed));
+
+      if (!TEST_HARD_REG_BIT (crtl->asm_clobbers, from))
 	{
-	    SET_HARD_REG_BIT (eliminable_regset, eliminables[i].from);
+	    SET_HARD_REG_BIT (eliminable_regset, from);
 
 	    if (cannot_elim)
-	      SET_HARD_REG_BIT (ira_no_alloc_regs, eliminables[i].from);
+	      SET_HARD_REG_BIT (ira_no_alloc_regs, from);
 	}
       else if (cannot_elim)
-	error ("%s cannot be used in %<asm%> here",
-	       reg_names[eliminables[i].from]);
+	error ("%s cannot be used in %<asm%> here", reg_names[from]);
       else
-	df_set_regs_ever_live (eliminables[i].from, true);
+	df_set_regs_ever_live (from, true);
     }
   if (!HARD_FRAME_POINTER_IS_FRAME_POINTER)
     {

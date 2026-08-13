@@ -204,16 +204,14 @@ decode_hard_reg_constraint (const char *begin)
   return regno;
 }
 
+/* The selected back end's elimination table, not the primary's; the identical
+   copy in varasm.cc carries the argument.  */
+
 static bool
 eliminable_regno_p (int regnum)
 {
-  static const struct
-  {
-    const int from;
-    const int to;
-  } eliminables[] = ELIMINABLE_REGS;
-  for (size_t i = 0; i < ARRAY_SIZE (eliminables); i++)
-    if (regnum == eliminables[i].from)
+  for (int i = 0; i < mt_num_eliminable_regs (); i++)
+    if (regnum == mt_eliminable_from (i))
       return true;
   return false;
 }

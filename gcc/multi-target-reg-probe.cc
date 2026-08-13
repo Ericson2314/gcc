@@ -57,9 +57,45 @@ and the union becomes the maximum of itself)
 /* `extern "C"' so the names `gen-reg-widths.sh' greps for are the names in
    the object file.  They are definitions, not declarations, so they have a
    size for `nm -S' to report.  */
+/* THE ELIMINATION TABLE'S LENGTH, WHICH IS A THIRD KIND OF NUMBER AGAIN.
+
+   `ELIMINABLE_REGS' is a brace initialiser, so its LENGTH is not a macro
+   anybody can read: `reload1.cc' and `lra-eliminations.cc' both recover it by
+   declaring a file-scope array from it and taking `ARRAY_SIZE'.  Compiled
+   once against the primary's tm.h, that length -- and every register number
+   in it -- is the primary's.  aarch64 and i386 happen to agree on FOUR pairs
+   and disagree on all eight numbers (i386 arg/frame/stack/hard-frame are
+   16/19/7/6, aarch64's are 65/64/31/29), so a length check alone would have
+   scored the leak as absent; `vax.h:314' has ONE pair and `rs6000' has six,
+   so the length genuinely varies.
+
+   reload1.cc:318 declares `static poly_int64 (*offsets_at)[NUM_ELIMINABLE_REGS]'
+   -- a pointer-to-ARRAY type, which cannot hold a run-time count.  That is the
+   `sized by one authority, indexed by another' shape a fourth time, so the
+   LAYOUT gets the union maximum measured here and the LOOPS get the selected
+   base's own count from `target_frame_desc'.
+
+   THE MAXIMUM OF BOTH TABLES.  `reload1.cc' uses `RELOAD_ELIMINABLE_REGS' when
+   a back end defines one (no in-tree back end currently does, checked) and
+   `ELIMINABLE_REGS' otherwise, while `lra-eliminations.cc' always uses
+   `ELIMINABLE_REGS'.  Two tables, one array bound, so the bound is the larger
+   -- taken here, in the translation unit where the `#ifdef' means this base.  */
+static const struct { const int from, to; } mt_probe_elim[] = ELIMINABLE_REGS;
+#ifdef RELOAD_ELIMINABLE_REGS
+static const struct { const int from, to; } mt_probe_reload_elim[]
+  = RELOAD_ELIMINABLE_REGS;
+#define MT_PROBE_RELOAD_ELIM_N ((int) ARRAY_SIZE (mt_probe_reload_elim))
+#else
+#define MT_PROBE_RELOAD_ELIM_N ((int) ARRAY_SIZE (mt_probe_elim))
+#endif
+#define MT_PROBE_ELIM_N ((int) ARRAY_SIZE (mt_probe_elim))
+
 extern "C" {
 char mt_probe_first_pseudo_register[FIRST_PSEUDO_REGISTER + 1];
 char mt_probe_n_reg_classes[N_REG_CLASSES + 1];
+char mt_probe_num_eliminable_regs[(MT_PROBE_ELIM_N > MT_PROBE_RELOAD_ELIM_N
+				   ? MT_PROBE_ELIM_N
+				   : MT_PROBE_RELOAD_ELIM_N) + 1];
 
 /* CUMULATIVE_ARGS IS MEASURED THE SAME WAY AND FOR THE SAME REASON.
 

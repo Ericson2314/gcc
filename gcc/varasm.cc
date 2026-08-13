@@ -1451,19 +1451,16 @@ ultimate_transparent_alias_target (tree *alias)
   return target;
 }
 
-/* Return true if REGNUM is mentioned in ELIMINABLE_REGS as a from
-   register number.  */
+/* Return true if REGNUM is mentioned in the SELECTED back end's elimination
+   table as a from register number.  The table used to be a file-scope array
+   initialised from ELIMINABLE_REGS, i.e. the primary's four pairs and the
+   primary's register numbers, for every target; see target-frame.h.  */
 
 static bool
 eliminable_regno_p (int regnum)
 {
-  static const struct
-  {
-    const int from;
-    const int to;
-  } eliminables[] = ELIMINABLE_REGS;
-  for (size_t i = 0; i < ARRAY_SIZE (eliminables); i++)
-    if (regnum == eliminables[i].from)
+  for (int i = 0; i < mt_num_eliminable_regs (); i++)
+    if (regnum == mt_eliminable_from (i))
       return true;
   return false;
 }

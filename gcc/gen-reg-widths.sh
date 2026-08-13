@@ -26,6 +26,7 @@ max_fpr=0
 max_nrc=0
 max_cas=0
 max_caa=0
+max_ner=0
 
 # One line per (object, symbol) so that a failure names both.  `nm -S' prints
 # `<value> <size> <type> <name>'; the size is field 2 and is hexadecimal.
@@ -45,7 +46,8 @@ for obj in "$@"; do
     exit 1
   }
   for sym in mt_probe_first_pseudo_register mt_probe_n_reg_classes \
-	     mt_probe_cumulative_args_size mt_probe_cumulative_args_align; do
+	     mt_probe_cumulative_args_size mt_probe_cumulative_args_align \
+	     mt_probe_num_eliminable_regs; do
     # Anchor on the END of the line: `nm' prints the name last, and an
     # unanchored match would also accept a longer name that contains this one.
     line=`echo "$syms" | grep " $sym\$"` || line=
@@ -82,14 +84,17 @@ for obj in "$@"; do
 	[ "$val" -gt "$max_cas" ] && max_cas=$val;;
       mt_probe_cumulative_args_align)
 	[ "$val" -gt "$max_caa" ] && max_caa=$val;;
+      mt_probe_num_eliminable_regs)
+	[ "$val" -gt "$max_ner" ] && max_ner=$val;;
     esac
   done
 done
 
 if [ "$max_fpr" -le 0 ] || [ "$max_nrc" -le 0 ] \
-   || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ]; then
+   || [ "$max_cas" -le 0 ] || [ "$max_caa" -le 0 ] || [ "$max_ner" -le 0 ]; then
   echo "gen-reg-widths.sh: ended with fpr=$max_fpr nrc=$max_nrc" \
-       "cumargs_size=$max_cas cumargs_align=$max_caa; refusing" >&2
+       "cumargs_size=$max_cas cumargs_align=$max_caa" \
+       "num_eliminable_regs=$max_ner; refusing" >&2
   exit 1
 fi
 
@@ -126,6 +131,16 @@ cat > "$OUT".tmp <<EOF
    of somebody's stack frame.  */
 #define MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE $max_cas
 #define MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN $max_caa
+
+/* The bound on the register-ELIMINATION table, in PAIRS.  \`ELIMINABLE_REGS'
+   is a brace initialiser with no length macro, and its length is per back end
+   (\`vax.h' has one pair, \`rs6000.h' six, i386 and aarch64 four each), so this
+   is measured the same way as the widths above.  It is the LAYOUT of
+   reload1.cc's \`offsets_at', which is a pointer-to-ARRAY type and cannot hold
+   a run-time count; the loops take the selected base's own count from
+   \`target_frame_desc'.  target-cumargs.cc static_asserts each base's own count
+   against this bound.  */
+#define MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS $max_ner
 
 #endif /* GCC_MULTI_TARGET_REG_WIDTHS_H */
 EOF

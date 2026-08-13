@@ -49,7 +49,7 @@
 # tab-probe.sh's TAB_MACROS line; it is not an invariant anyone has to remember.
 #
 # ---------------------------------------------------------------------------
-# TEN MACROS BELOW SAY `UNCONVERTED' AND HAVE ALREADY BEEN CONVERTED.  READ
+# TWELVE MACROS BELOW SAY `UNCONVERTED' AND HAVE ALREADY BEEN CONVERTED.  READ
 # THIS BEFORE CONVERTING ANY OF THEM AGAIN.
 #
 # #108's six  STACK_BOUNDARY  PREFERRED_STACK_BOUNDARY  STACK_SLOT_ALIGNMENT
@@ -57,6 +57,19 @@
 #             FUNCTION_ARG_REGNO_P
 # #123's four INCOMING_STACK_BOUNDARY  MAX_STACK_ALIGNMENT
 #             MAX_SUPPORTED_STACK_ALIGNMENT  SUPPORTS_STACK_ALIGNMENT
+# #124's two  ELIMINABLE_REGS  INITIAL_ELIMINATION_OFFSET
+#
+# #124's PAIR IS NOT LIKE THE OTHER TEN AND MUST NOT BE READ AS ONE OF THEM.
+# `INITIAL_ELIMINATION_OFFSET' is redirected in the usual way and is
+# unreadable by the header probe for the usual reason.  `ELIMINABLE_REGS' is
+# POISONED, not redirected -- it is a brace initialiser, so there is no
+# run-time spelling to point it at, and its eight consumers were rewritten to
+# walk `mt_num_eliminable_regs ()' / `mt_eliminable_from' / `mt_eliminable_to'
+# instead.  A header arm on it therefore reads a poison identifier in shared
+# context and its own real table in a base context; if the next probe run
+# reports anything at all for it, that is the poison being compared, never a
+# value.  It is a THIRD wrong-reason shape, distinct from the redirect-vs-
+# itself one, and it wants retiring on sight.
 #
 # All ten are redirected by `defaults.h' to `mt_*' calls and supplied per base
 # from `target-cumargs.cc' (see `target-frame.h').  They are still recorded
@@ -77,6 +90,9 @@
 # The real both-sided evidence for all ten is at run time on the linked `cc1':
 #   #108  scratchpad/t108-evidence.sh   (object level)
 #   #123  scratchpad/t123-guards.sh     (gdb on the running cc1, ARM 2)
+#   #124  scratchpad/t124-guards.sh     (gdb on the running cc1, ARM 2:
+#                                        pair 0 is 65 -> 31 for aarch64 and
+#                                        16 -> 7 for x86_64)
 # ---------------------------------------------------------------------------
 ACCUMULATE_OUTGOING_ARGS UNCONVERTED
 ADDITIONAL_REGISTER_NAMES UNCONVERTED

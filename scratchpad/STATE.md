@@ -5002,3 +5002,242 @@ than silencing it.
     eb-shell-gdb.sh   the build shell PLUS gdb -- gdb is not in the plain
                       DEVSHELL set, and a missing tool scores 0 in the
                       direction that makes the reference look correct
+
+# TASK #124 -- THE REGISTER-ELIMINATION TABLE.  THE LIST, NOT THE FUNCTION THE SYMBOL NAMES
+
+Branched from `1ed6e523c48`.  Worktree came up at the bare-repo HEAD
+`7208eca60d0` AGAIN -- `grep -c MULTI_TARGET gcc/Makefile.in` was **0** --
+`git reset --hard multi-target` took it to **37**.  Build dir `/tmp/b124`, my
+own, cold.
+
+## 0. WHAT THE INSTRUMENT NAMED, AND WHAT IT MISSED
+
+The brief handed me `nm -uC ira.o -> U ix86_initial_elimination_offset` and
+`ICE: aarch64_can_eliminate, at aarch64.cc:14153`.  Both reproduced exactly,
+and the symbol is in **three** consumer objects, not one: `ira.o`,
+`reload1.o`, `rtlanal.o`.
+
+**`ira.cc` NEVER SPELLS `INITIAL_ELIMINATION_OFFSET`.**  What it holds is the
+TABLE -- `static const struct {const int from, to;} eliminables[] =
+ELIMINABLE_REGS;` at ira.cc:2535, evaluated in a shared translation unit, i.e.
+the primary's four pairs and the primary's register numbers:
+
+    ARG_POINTER_REGNUM         i386 16   aarch64 65
+    FRAME_POINTER_REGNUM       i386 19   aarch64 64
+    STACK_POINTER_REGNUM       i386  7   aarch64 31
+    HARD_FRAME_POINTER_REGNUM  i386  6   aarch64 29
+
+so `ira_setup_eliminable_regset` asks `targetm.can_eliminate (16, 7)` of
+aarch64, whose `aarch64_can_eliminate` asserts the FROM is one of ITS two.
+The offset function is dragged in *alongside*, from `reload1.cc` and
+`rtlanal.cc`, by the same table's numbers.  **The named macro is a member of
+the closure, not its cause** -- the same shape as #123, arriving by a
+different route.
+
+**BOTH BASES HAVE FOUR PAIRS.**  A length check would have scored the leak as
+absent.  `vax.h:314` has one pair and `rs6000.h:1614` six, so the length is a
+real variable that these two configured bases happen to agree on -- the
+argument for printing the CONTENTS rather than asserting on a count, made
+again.
+
+**THE `#ifdef` NOBODY WOULD HAVE LOOKED AT.**  reload1.cc:288 is
+`#ifdef RELOAD_ELIMINABLE_REGS`, asked of the PRIMARY's headers about the
+SELECTED base.  No in-tree back end defines it (grepped over all of
+`config/`), so it is false today for the right answer by accident.
+
+## 1. WHAT LANDED
+
+Same mechanism as #108's six and #123's four -- no new registry, no back end
+edited, no `target.def` entry:
+
+  * **`multi-target-reg-probe.cc` + `gen-reg-widths.sh`** -- a fifth measured
+    union quantity, `MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS` (**4** here),
+    taken as the max of this base's `ELIMINABLE_REGS` and
+    `RELOAD_ELIMINABLE_REGS` lengths.  Needed because reload1.cc:318 is
+    `static poly_int64 (*offsets_at)[NUM_ELIMINABLE_REGS]` -- a
+    pointer-to-ARRAY type, which cannot hold a call.
+  * **`target-frame.h`** -- five new fields on `target_frame_desc`:
+    `n_eliminables` / `d_eliminables` (flattened `{from,to}` pairs),
+    `n_reload_eliminables` / `d_reload_eliminables`, and
+    `poly_int64 (*initial_elimination_offset) (int, int)`.
+  * **`target-cumargs.cc`** -- the tables from `[][2] = ELIMINABLE_REGS` in
+    the base's own TU, the `#ifdef RELOAD_ELIMINABLE_REGS` answered there, a
+    thunk wrapping the offset statement, and static_asserts of each base's own
+    count against the union bound.
+  * **`target-cumargs-select.cc`** -- seven `mt_*` entry points.  The two
+    index readers RANGE CHECK and fail by name: an unchecked read returns
+    whatever `int` follows the table, and a register number stays plausible
+    while being wrong.
+  * **`defaults.h`** -- `INITIAL_ELIMINATION_OFFSET` redirected;
+    `ELIMINABLE_REGS` **POISONED**.
+  * **Eight consumers rewritten**: `ira.cc`, `reload1.cc`,
+    `lra-eliminations.cc`, `rtlanal.cc`, `varasm.cc`, `stmt.cc`, `df-scan.cc`,
+    `builtins.cc`.
+
+**WHY `ELIMINABLE_REGS` IS POISONED AND NOT REDIRECTED.**  It is a brace
+initialiser; there is no run-time spelling to point it at.  Leaving the name
+alone was the quiet option and the wrong one -- it would stay defined,
+expanding to the primary's four pairs, and a ninth consumer (or a rebased
+upstream one) would compile clean and be wrong in exactly the way this fixes.
+
+**THE POISON IS A `#define` FOR ONE AND A BARE `#undef` FOR THE OTHER.**  A
+poison `#define` makes `#ifdef` TRUE, which is the wrong answer for a name
+whose whole content is an existence question.  `ELIMINABLE_REGS` is never
+`#ifdef`'d (swept over `gcc/` and `libgcc/`; the only hit is a 2007 ChangeLog
+line), so a `#define` there can only be reached as a use.
+`RELOAD_ELIMINABLE_REGS` **was** `#ifdef`'d, so it is only `#undef`'d.
+
+**BOUND-VS-INDEX, DONE EXPLICITLY, BECAUSE IT IS THE FIFTH TIME.**
+`NUM_ELIMINABLE_REGS` now means the run-time count and bounds every LOOP;
+`MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS` means the compile-time maximum and is
+the LAYOUT of `offsets_at` and its `xmalloc` stride.  `reg_eliminate` in both
+reload1.cc and lra-eliminations.cc is **allocated at the union width**, not at
+the current selection: it is allocated once and cached across functions, and a
+multi-target compiler can be asked for a different target in between, which
+would leave a short array behind for a wider base.
+
+## 2. WHERE `big.c` GETS TO NOW, AND THE NEXT WALL
+
+**Past `ira`, past reload/LRA, and into a later pass entirely:**
+
+    during RTL pass: pro_and_epilogue
+    internal compiler error: in plus_constant, at explow.cc:102
+    ... aarch64_expand_prologue -> insn_aarch64::gen_prologue
+
+Line 102 is `gcc_assert (GET_MODE (x) == VOIDmode || GET_MODE (x) == mode)`.
+The caller is **aarch64's own prologue expander**, so this is a mode carried
+INTO aarch64 from shared code rather than a table aarch64 was handed.
+`nm -uC explow.o` shows `U ix86_tune_features` and nothing else in this
+family, which is NOT the cause -- the shape points at `Pmode`
+(MACRO-LEAK.md class (c4), `(ix86_pmode == PMODE_DI ? DImode : SImode)` on
+i386, a plain constant on aarch64) or at another mode-valued macro.  **I did
+not chase it and I am not claiming to know which**; recorded as measured
+symptom plus a named suspect, for the next task to diagnose properly.
+
+## 3. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**.
+  * **x86_64 `-O2` big.c md5 `378fc33c1e70`, 12369 bytes -- unmoved**,
+    measured BEFORE and AFTER in this same build dir.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`,
+    **5 distinct md5 per side**, **negative control firing** (1158 vs 804),
+    rc=0, run both before and after.  All five match the recorded values:
+    O0 `1c00922491f8`, O1 `4fabab94b41b`, O2 `378fc33c1e70`,
+    O3 `d220421237bc`, Os `d6787f7e281f`.  **It does run in this build dir** --
+    checked explicitly, given #122 found it had been scoring the driverless
+    `cc1`'s correct refusal as five compiler failures.
+  * **`scratchpad/t124-guards.sh`: 13 PASS / 0 FAIL.**
+  * **aarch64 `int x = 1;` still rc=0, 373 bytes, empty stderr, and
+    byte-identical (md5 `b01d9157fdc1`) to the pre-edit output.**
+  * Cold `all-gcc` before any edit: **rc=0, 624 lines / 110 `warning:`**.
+
+### THE ARMS THAT MATTER
+
+  * **ARM 2 is TAB-shaped**: gdb on the RUNNING `cc1`, one breakpoint per run,
+    and the breakpoint gdb REPORTS matched against the function under test
+    before any value is scored.  Both sides read the SAME slot -- pair 0,
+    which is `{ARG_POINTER_REGNUM, STACK_POINTER_REGNUM}` in both back ends'
+    own headers -- and get **aarch64 65 -> 31 vs x86_64 16 -> 7**.  Four
+    diverging numbers, so it cannot be "everyone got the same new answer".
+  * **ARM 2c is labelled CONSISTENCY, NOT EVIDENCE**, in the arm's own text:
+    both bases report 4 pairs, which cannot distinguish a fix from a leak.
+  * **ARM 4 is the injection**: reverse-applies the whole conversion except
+    the two pure-measurement files (825 lines over 12 files), rebuilds, and
+    requires **`ix86_initial_elimination_offset` back in the consumers
+    (0 -> 3)** and the **OLD ICE back by name**.  Both fired.  Restore
+    requires both to reverse (3 -> 0, and `big.c` back to explow.cc:102),
+    verified.
+
+## 4. THE INSTRUMENT FAILURE THIS RUN PRODUCED
+
+**`gen-reg-widths.sh` ran, exited 0, and changed nothing.**  I added the new
+symbol to the probe, added it to the script's symbol loop and to its refusal
+check, rebuilt -- and `target-cumargs.cc` still failed with
+`MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS was not declared`.  The header was
+byte-identical, so `move-if-change` kept the old one and make reported success.
+
+The cause: **I never added the `#define` to the script's heredoc.**  Every
+part of the mechanism worked -- the probe object really did carry
+`mt_probe_num_eliminable_regs` with size 5, `nm -S` really did read it, the
+maximum really was computed -- and the artefact was the old one.  This is
+PRINCIPLES section 4 rule 7 verbatim: **the failure was silently WRONG, not
+silently EMPTY**, and every check on the script's exit status, on the header
+existing, and on it being non-empty passes on it.  What caught it was the
+compile error two steps later; what SHOULD catch it is ARM 0, which now reads
+the `#define` out of the generated header **by name and by value** and is the
+first arm to run.
+
+## 5. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard
+movement.**  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+32/0, aarch64 27/5**.
+
+`ELIMINABLE_REGS` and `INITIAL_ELIMINATION_OFFSET` stay **`UNCONVERTED`** in
+`macro-status.txt`, which is the rule working: a macro moves to `CONVERTED_*`
+only in the change that adds its TAB arm, and `tab-probe.sh`'s harness reads
+CONSTANTS out of the running `cc1`.  The pair now brings the "converted but
+reads UNCONVERTED" list to **twelve**, and the header note names all twelve.
+
+**Predicted so it is caught rather than banked, and it is a NEW shape.**
+`INITIAL_ELIMINATION_OFFSET` will flip for the familiar reason (base-B lacks
+`MULTI_TARGET_TARGETM_BASE`, so both sides read the redirect).
+`ELIMINABLE_REGS` is different: it is POISONED, so a header arm compares a
+poison identifier in shared context against the real table in a base context.
+Whatever it reports is about the poison, never a value.  **A third
+wrong-reason shape; retire on sight.**
+
+## 6. WHAT I DID NOT DO
+
+  * **No TAB arms for the two**, for the reason in section 5 -- the same debt
+    the other ten carry.
+  * **The `*_POINTER_REGNUM` macros are NOT converted.**  `ARG_POINTER_REGNUM`
+    and `FRAME_POINTER_REGNUM` are MACRO-LEAK.md class (d): `rtl.h:3936/3944`
+    use them on `#if` arithmetic lines, and making them run-time makes the
+    preprocessor see undefined identifiers and evaluate `0 == 0` as true,
+    collapsing `GR_ARG_POINTER` onto `GR_FRAME_POINTER` in
+    `enum global_rtl_index`.  **That is a design fork, not an oversight**, and
+    it is untouched here: this change converts the TABLE that carries those
+    numbers between back ends, not the names themselves.  Consumers still
+    compare against the primary's `STACK_POINTER_REGNUM` etc. in several
+    places (ira.cc, reload1.cc, lra-eliminations.cc, builtins.cc), and those
+    comparisons are still wrong for a non-primary base.  They did not stop
+    `big.c` and I did not widen the change to reach them.
+  * **`df-scan.cc`'s `static bool initialized` still caches `elim_reg_set`
+    across target selections.**  Pre-existing upstream, and now more visible
+    because the set it caches is per base.  Left alone deliberately -- fixing
+    it is a lifetime question about `df_hard_reg_init`, not this conversion.
+  * **`RELOAD_ELIMINABLE_REGS` has no both-sided arm and cannot have one
+    here**: no in-tree back end defines it, so both configured bases take the
+    same branch and any arm would be one-sided and unfalsifiable on this
+    machine.  Same situation as #122's `HONOR_REG_ALLOC_ORDER`.  It is a real
+    latent leak for an avr-shaped build.
+  * **`plus_constant` at explow.cc:102 is not diagnosed**, only located
+    (section 2).
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker
+    is unchanged.
+
+### STDERR -- WHICH ARM
+
+  * Cold `all-gcc`, before any edit: **624 lines / 110 `warning:`**.
+  * Incremental `multi-target-objs cc1 lto1` after the edit: **285 lines / 49
+    `warning:`** (defaults.h reaches ~520 TUs).
+  * A second, near-no-op incremental: **38 lines / 3 `warning:`**, composed of
+    **4 `is unchanged`**, **24 `'@' is redundant`** from unmodified aarch64
+    `.md` files, and one 3-warning `lto-common.cc` block.  Same shape as the
+    documented ~32-line floor, which PRINCIPLES records as varying with what
+    was last rebuilt.
+
+## 7. FILES
+
+    t124-conf.sh      two-target configure, /tmp/b124
+    t124-build.sh     make at the TOP level
+    t124-gccbuild.sh  make in $B/gcc -- where cc1 actually builds
+    t124-specs.sh     both target-specs probes, real aarch64 binutils
+    t124-state.sh     big.c site + `int x = 1;` + x86_64 -O2, taken the SAME
+                      way before and after so the two readings are comparable
+    t124-sc.sh        stock-compare with an ABSOLUTE big.c and a tagged outdir
+    t124-guards.sh    13 arms; ARM 0 the generated-header check the
+                      silent-no-op cost me, ARM 2 gdb on the running cc1,
+                      ARM 4 the injection

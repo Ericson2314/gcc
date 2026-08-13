@@ -384,6 +384,64 @@ mt_base_supports_stack_alignment (void)
   return SUPPORTS_STACK_ALIGNMENT;
 }
 
+/* THE ELIMINATION TABLE, EVALUATED WHERE IT MEANS THIS BASE.  See
+   target-frame.h for why the list and not only the offset function, and for
+   the four register numbers that diverge.
+
+   `[][2]' rather than a struct: the middle end's eight copies each declare
+   their own `{const int from, to;}' struct, and the initialiser is nested
+   braces either way.  Flattening to `&[0][0]' lets target-frame.h carry a
+   plain `const int *' with no layout of its own.
+
+   UNSIZED, so the initialiser decides the length and the static_assert below
+   compares that length against the union bound.  Writing the bound in would
+   silently zero-fill a base whose table is shorter, and a `{0, 0}' pair is an
+   elimination FROM register 0 TO register 0 -- a plausible-looking entry that
+   nothing downstream would reject.  */
+static const int mt_base_eliminables[][2] = ELIMINABLE_REGS;
+#define MT_BASE_N_ELIMINABLES ((int) ARRAY_SIZE (mt_base_eliminables))
+
+#ifdef RELOAD_ELIMINABLE_REGS
+static const int mt_base_reload_eliminables[][2] = RELOAD_ELIMINABLE_REGS;
+#define MT_BASE_N_RELOAD_ELIMINABLES \
+  ((int) ARRAY_SIZE (mt_base_reload_eliminables))
+#define MT_BASE_RELOAD_ELIMINABLES (&mt_base_reload_eliminables[0][0])
+#else
+#define MT_BASE_N_RELOAD_ELIMINABLES MT_BASE_N_ELIMINABLES
+#define MT_BASE_RELOAD_ELIMINABLES (&mt_base_eliminables[0][0])
+#endif
+
+/* WHAT THE UNION COSTS, CHECKED RATHER THAN ASSUMED, in both directions that
+   matter.  `reload1.cc' declares `poly_int64 (*offsets_at)[MULTI_TARGET_UNION_
+   NUM_ELIMINABLE_REGS]' and indexes it with this base's count; a base above
+   the bound would write past the end of every row.  `<=' and not `==': the
+   bound is the maximum over the configured bases, so all but the largest are
+   strictly under it.  */
+static_assert (MT_BASE_N_ELIMINABLES
+	       <= MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS,
+	       "this back end has more ELIMINABLE_REGS pairs than the union "
+	       "bound; multi-target-reg-probe.cc did not see it");
+static_assert (MT_BASE_N_RELOAD_ELIMINABLES
+	       <= MULTI_TARGET_UNION_NUM_ELIMINABLE_REGS,
+	       "this back end has more RELOAD_ELIMINABLE_REGS pairs than the "
+	       "union bound; multi-target-reg-probe.cc did not see it");
+static_assert (MT_BASE_N_ELIMINABLES > 0,
+	       "this back end has an empty ELIMINABLE_REGS");
+
+/* INITIAL_ELIMINATION_OFFSET is a STATEMENT that assigns through its third
+   argument -- i386's is `((OFFSET) = ix86_initial_elimination_offset (...))'
+   and aarch64's is the same without the outer parentheses -- so it is wrapped
+   rather than named, exactly as `ADJUST_REG_ALLOC_ORDER' is in
+   target-regs.cc.  Expanding it here is the whole fix: this translation unit
+   has THIS base's tm.h, so the function called is this base's.  */
+static poly_int64
+mt_base_initial_elimination_offset (int from, int to)
+{
+  poly_int64 offset = 0;
+  INITIAL_ELIMINATION_OFFSET (from, to, offset);
+  return offset;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -436,7 +494,12 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_incoming_stack_boundary,
   mt_base_max_stack_alignment,
   mt_base_max_supported_stack_alignment,
-  mt_base_supports_stack_alignment
+  mt_base_supports_stack_alignment,
+  MT_BASE_N_ELIMINABLES,
+  &mt_base_eliminables[0][0],
+  MT_BASE_N_RELOAD_ELIMINABLES,
+  MT_BASE_RELOAD_ELIMINABLES,
+  mt_base_initial_elimination_offset
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

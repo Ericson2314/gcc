@@ -193,6 +193,103 @@ mt_supports_stack_alignment (void)
   return mt_frame ()->supports_stack_alignment ();
 }
 
+/* ------------------------------------------------------------------------
+   THE ELIMINATION TABLE; see target-frame.h.
+
+   The two readers RANGE CHECK, and that is the reason they exist rather than
+   shared code taking `targetm_frame->d_eliminables' and indexing it.  Every
+   consumer bounds its loop by `mt_num_eliminable_regs ()', so an out-of-range
+   index means a caller whose bound and whose index came from different
+   authorities -- the exact fault this change is fixing, one level up.  Read
+   unchecked it would return whatever `int' follows the table, and a register
+   number is precisely the kind of value that stays plausible while being
+   wrong; there is no downstream check that would object to it.
+
+   The count is also asserted positive, so a table that never got supplied
+   fails by name here instead of turning every consumer's loop into a no-op --
+   `no eliminable registers at all' is a legal-looking answer that would make
+   `ira_setup_eliminable_regset' silently do nothing.  */
+
+static const struct target_frame_desc *
+mt_elim_frame (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->n_eliminables <= 0 || f->d_eliminables == NULL
+      || f->n_reload_eliminables <= 0 || f->d_reload_eliminables == NULL
+      || f->initial_elimination_offset == NULL)
+    internal_error ("back end %qs supplies no register-elimination table; its "
+		    "objects and %<target-frame.h%> are from different builds",
+		    f->name);
+  return f;
+}
+
+int
+mt_num_eliminable_regs (void)
+{
+  return mt_elim_frame ()->n_eliminables;
+}
+
+int
+mt_num_reload_eliminable_regs (void)
+{
+  return mt_elim_frame ()->n_reload_eliminables;
+}
+
+int
+mt_eliminable_from (int i)
+{
+  const struct target_frame_desc *f = mt_elim_frame ();
+
+  if (i < 0 || i >= f->n_eliminables)
+    internal_error ("elimination pair %d asked of back end %qs, which has %d "
+		    "of them; the bound and the index come from different back "
+		    "ends", i, f->name, f->n_eliminables);
+  return f->d_eliminables[2 * i];
+}
+
+int
+mt_eliminable_to (int i)
+{
+  const struct target_frame_desc *f = mt_elim_frame ();
+
+  if (i < 0 || i >= f->n_eliminables)
+    internal_error ("elimination pair %d asked of back end %qs, which has %d "
+		    "of them; the bound and the index come from different back "
+		    "ends", i, f->name, f->n_eliminables);
+  return f->d_eliminables[2 * i + 1];
+}
+
+int
+mt_reload_eliminable_from (int i)
+{
+  const struct target_frame_desc *f = mt_elim_frame ();
+
+  if (i < 0 || i >= f->n_reload_eliminables)
+    internal_error ("reload elimination pair %d asked of back end %qs, which "
+		    "has %d of them; the bound and the index come from "
+		    "different back ends", i, f->name, f->n_reload_eliminables);
+  return f->d_reload_eliminables[2 * i];
+}
+
+int
+mt_reload_eliminable_to (int i)
+{
+  const struct target_frame_desc *f = mt_elim_frame ();
+
+  if (i < 0 || i >= f->n_reload_eliminables)
+    internal_error ("reload elimination pair %d asked of back end %qs, which "
+		    "has %d of them; the bound and the index come from "
+		    "different back ends", i, f->name, f->n_reload_eliminables);
+  return f->d_reload_eliminables[2 * i + 1];
+}
+
+poly_int64
+mt_initial_elimination_offset (int from, int to)
+{
+  return mt_elim_frame ()->initial_elimination_offset (from, to);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 
