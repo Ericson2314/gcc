@@ -2983,3 +2983,91 @@ both do, and collect2 has since `fa93fd08c8f`. A written invariant, false.
     t24-perTarget.sh   absent / verbatim / searched + cross-target control
     t17-tools.sh       which tool NAMES collect2 searches, both targets
     t17-real.sh        real_nm_file_name: good / bad / control, both targets
+
+## 2026-08-12 -- main-tree session: merges, scoreboard re-measurement, `config.in`
+
+Merged three agent branches: `eda508f4d88` (LTO forwarding, #78),
+`aa0b6da0fbac13315` (silent macros / arm E discovery), `ad79a17e47a430c73`
+(#17 collect2 tool paths, #24 `TOOL_INCLUDE_DIR`).
+
+`gcc/configure` conflicted on the last merge.  `gcc/configure.ac` itself
+merged **cleanly**, so the generated file was resolved by regenerating it
+with **autoconf 2.69** (matching the version stamped in the checked-in
+header), not by hand-picking hunks.  The new capability keys correctly do
+**not** appear in `gcc/configure` -- they live in `target-specs/configure.ac`;
+the three matches left in `gcc/configure.ac` are all `dnl` comments.
+
+### Probe scoreboard re-measured, and two documents reconciled
+
+An agent flagged that PRINCIPLES 6 said aarch64 **2 PASS / 110 FAIL** while
+STATE.md said **5 / 104 + 6 retired-pending**, and correctly declined to pick
+one.  Both were partly right about the *same* board, each having applied one
+of two retirements and not the other (`5 - 3 = 2`, `104 + 6 = 110`).
+
+The arithmetic closes from both directions, which is exactly why it was
+settled by **running** `scratchpad/macro-probe-run.sh` instead: closing
+arithmetic is how a wrong shared number survives, the same root pattern this
+branch exists to fix.
+
+    macros probed: 112   i386: PASS 112 FAIL 0   aarch64: PASS 8 FAIL 104
+
+**Never quote the raw 8.**  It is 2 trusted (`MAX_BITS_PER_WORD`,
+`MAX_BITSIZE_MODE_ANY_MODE`) + 6 retired-pending -- #108's stack/arg-boundary
+set, green only because the probe's base-B context omits
+`MULTI_TARGET_TARGETM_BASE`, so `defaults.h` redirects both sides and the arm
+compares the redirect with itself.  Independently corroborated: the
+tool-paths agent measured 8/104 too, **and got the same 8/104 in its
+pre-change build** `/tmp/b111`, so the three are someone else's landed work
+and not that agent's.  PRINCIPLES updated at `44027e85f2f`.
+
+### `config.in` regenerated (#112), and the task's premise was half wrong
+
+`autoheader` gives **-277/+0**: 45 dead `HAVE_AS_*` / `HAVE_GAS_*` / `LD64_*`
+entries.  Landed alone at `45fc4417a1c` so the noise cannot ride along with a
+behavioural change.
+
+The task said the 45 were "defined by nothing and **read by nothing**".  The
+second half is **false -- all 45 are still read.**  28 are already converted
+to `target-caps` and are fine.  The other **17** are read by s390, avr, ia64,
+cris, darwin and `gcc.cc`, which now silently take the capability-absent arm.
+Filed as **#116**.  `LD64_VERSION` and `DSYMUTIL_VERSION` are the worst: they
+are *value* macros used in `#if` comparisons, so absence reads as **0** --
+"older than everything" rather than "unknown".
+
+The regeneration is still inert, for a reason worth keeping: **a name
+`configure` never defines and a name absent from `config.in` are identical to
+the preprocessor.**
+
+**Both-sided check on the regeneration** -- the risk was a regenerated
+`configure` silently dropping a probe, so "configure ran, rc=0" would have
+proved nothing.  Configured a fresh tree from the **top level**
+(`/tmp/cfgchk`, two backends) and diffed `gcc/auto-host.h` against the
+pre-regen build `/tmp/b111`:
+
+    lines only in b111: 45   -- all 45 are `/* #undef X */` comments
+    real #define lost:   0
+    lines only in mine:  0
+
+Exactly the 45, nothing else, in either direction.  The same output
+corroborates #116 from the other side: those names were **already** undefined
+in a working build, so the 17 unconverted readers take the absent arm today.
+
+  * A first attempt at this check failed for an unrelated reason worth
+    recording: running `gcc/configure` **directly** with short backend names
+    (`--enable-backends=i386,aarch64`) dies with `*** Configuration  not
+    supported` and an *empty* triple in the message.  `gcc/` must be
+    configured through the top level, and backends want full triples.
+
+### Spun out
+
+  * **#113** collect2's `%(link_target_config)` is user-replaceable via
+    `-specs=` and then fails **silently** -- needs a ruling, `gcc.cc`
+    documents it as a deliberately independent knob.
+  * **#114** arm E: macros expanding to a **dereference of back-end mutable
+    state**.  Not the baked-in-constant suspicion; invisible to all four
+    existing sweep arms.  This is the aarch64 IPA wall.
+  * **#115** `libsubdir_to_prefix` off-by-one in its own right;
+    `GPLUSPLUS_INCLUDE_DIR` likely one directory too high.  Unmeasured.
+  * **#116** the 17 above.
+  * **#51 corrected**: `gen_speculation_barrier` is **not** arm-only (i386 and
+    aarch64 both define it), so the fork is **one** name, `gen_movxf`.
