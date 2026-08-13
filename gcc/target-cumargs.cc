@@ -484,6 +484,41 @@ mt_base_pmode (void)
   return as_a <scalar_int_mode> ((machine_mode) Pmode);
 }
 
+/* THE OPTION-STATE FAMILY -- `UNITS_PER_WORD', `POINTER_SIZE',
+   `BIGGEST_ALIGNMENT' -- evaluated in THIS base's translation unit.  See
+   target-frame.h for the bodies, for the position sweep that establishes a
+   call is legal at every shared site, and for the `MIN_UNITS_PER_WORD'
+   closure.
+
+   THE CASTS ARE LOAD-BEARING IN ONE DIRECTION ONLY.  Every back end spells
+   these as arithmetic on `int'-typed option state, so the value converts
+   cleanly; the casts exist so that a back end spelling `POINTER_SIZE' as a
+   `long' or an enumerator is narrowed HERE, in its own translation unit,
+   rather than at one of the 268 shared use sites.
+
+   NO `has_' FLAG AND NO SENTINEL, and that was checked rather than assumed:
+   `defaults.h' floors `POINTER_SIZE' from `BITS_PER_WORD' and `BITS_PER_WORD'
+   from `UNITS_PER_WORD', and those floors are evaluated HERE, in the base's
+   own translation unit, so a base that defines none of them still gets its
+   OWN answer and not the primary's.  There is no absence to record.  */
+static int
+mt_base_units_per_word (void)
+{
+  return (int) UNITS_PER_WORD;
+}
+
+static unsigned int
+mt_base_pointer_size (void)
+{
+  return (unsigned int) POINTER_SIZE;
+}
+
+static unsigned int
+mt_base_biggest_alignment (void)
+{
+  return (unsigned int) BIGGEST_ALIGNMENT;
+}
+
 /* `FUNCTION_MODE', read in THIS base's translation unit: QImode for i386,
    `Pmode' -- and so DImode -- for aarch64.  Compiled once against i386's tm.h,
    shared code built every target's call MEM as QImode, and aarch64's own
@@ -1081,6 +1116,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_clear_ratio,
   mt_base_set_ratio,
   (int) MAX_MOVE_MAX,
+  mt_base_units_per_word,
+  mt_base_pointer_size,
+  mt_base_biggest_alignment,
   MT_BASE_HAS_DATA_ALIGNMENT,
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,

@@ -299,6 +299,44 @@ mt_pmode (void)
   return mt_frame ()->pmode ();
 }
 
+/* THE OPTION-STATE FAMILY.  Uncached, through `mt_frame ()', and here the
+   uncachedness is not merely consistent with `Pmode' -- it is REQUIRED, which
+   is why the design was settled on correctness rather than on speed.
+
+   `mavx' and `mavx512f' are `Save' options in `i386.opt', so
+   `BIGGEST_ALIGNMENT' changes value WITHIN ONE COMPILATION when a function
+   carries `__attribute__((target("avx512f")))'.  `stor-layout.cc' reads it
+   during parsing, with no current function to key an invalidation on, so
+   there is no point at which a cache could correctly be dropped.  A cached
+   value would be frozen at whatever the command line said and would be wrong
+   for exactly the translation units that use the attribute -- silently, and
+   in a way no arm on a single-attribute-free test file could see.  The same
+   argument applies to `UNITS_PER_WORD' and `POINTER_SIZE' through
+   `TARGET_64BIT' / `TARGET_ILP32'.
+
+   The measured cost of not caching is at the noise floor; see target-frame.h.
+   No null check on the three pointers: `mt_move_max' above already fails by
+   name on a table built against an older `target-frame.h', and repeating that
+   test here would add three branches to the hottest accessors in the family
+   to catch a condition one call already catches.  */
+int
+mt_units_per_word (void)
+{
+  return mt_frame ()->units_per_word ();
+}
+
+unsigned int
+mt_pointer_size (void)
+{
+  return mt_frame ()->pointer_size ();
+}
+
+unsigned int
+mt_biggest_alignment (void)
+{
+  return mt_frame ()->biggest_alignment ();
+}
+
 /* `FUNCTION_MODE'.  Uncached for the same reason as `Pmode' just above: eight
    back ends define it AS `Pmode', which is option-dependent on i386 and on
    arm, so a value read once at selection time would be frozen.  */
@@ -555,6 +593,23 @@ static_assert (MAX_MOVE_MAX > 0,
 	       "back end has stopped defining it and defaults.h has derived "
 	       "it from the redirected MOVE_MAX");
 
+/* `MIN_UNITS_PER_WORD' MUST STILL BE A CONSTANT HERE, FOR THE SAME REASON AND
+   BY THE SAME MECHANISM.  `defaults.h:1120' is
+   `#define MIN_UNITS_PER_WORD UNITS_PER_WORD' for a back end that defines no
+   `MIN_UNITS_PER_WORD' of its own, and `UNITS_PER_WORD' is now redirected to
+   a call.  Today's primary, i386, defines it as a literal 4 (i386.h:770), so
+   the floor does not fire -- but that is a fact about which back end happens
+   to be the primary.  If it ever changes, this line fails the build by name,
+   ahead of `caller-save.cc:55' and `reload.h:179' failing with a
+   non-constant array bound and no mention of the macro that caused it.
+
+   The two asserts are separate rather than one conjunction so that the
+   message names the macro that actually stopped being constant.  */
+static_assert (MIN_UNITS_PER_WORD > 0,
+	       "MIN_UNITS_PER_WORD is no longer a constant expression: the "
+	       "primary back end has stopped defining it and defaults.h has "
+	       "derived it from the redirected UNITS_PER_WORD");
+
 int
 mt_move_max (void)
 {
@@ -577,11 +632,40 @@ mt_move_max (void)
 		    "%<target-frame.h%> are from different builds", f->name);
 
   int mm = f->move_max ();
-  if (mm > MAX_MOVE_MAX)
-    internal_error ("back end %qs moves %d bytes at a time but this compiler "
-		    "was built with %<MAX_MOVE_MAX%> of %d; the caller-save "
-		    "tables are sized by the latter and indexed by the "
-		    "former", f->name, mm, (int) MAX_MOVE_MAX);
+
+  /* THE GUARD IS ON THE INDEX, NOT ON THE NUMERATOR, AND THAT CHANGED WITH
+     THE `UNITS_PER_WORD' CONVERSION.  `caller-save.cc:55' and `reload.h:179'
+     size `regno_save_mem[][MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1]' from
+     constants, and index it with `MOVE_MAX_WORDS', i.e.
+     `MOVE_MAX / UNITS_PER_WORD'.  Both halves of that quotient are now the
+     SELECTED base's, so testing `mm > MAX_MOVE_MAX' alone is no longer
+     sufficient: a base with a large `MOVE_MAX' and a small `UNITS_PER_WORD'
+     produces an index the numerator test passes.  Comparing the quantities
+     that are actually computed -- the index against the bound -- has no such
+     gap, and it subsumes the old test rather than replacing it, since a
+     larger numerator over an unchanged denominator still trips it.
+
+     `mt_units_per_word' is called rather than spelling `UNITS_PER_WORD'
+     because this file is shared and the macro is redirected here anyway; the
+     call makes it obvious that the denominator is per-base and not a
+     constant, which is the entire content of this check.  A zero or negative
+     answer is refused separately: it would divide by zero here, and a back
+     end reporting one is broken in a way worth naming.  */
+  int upw = mt_units_per_word ();
+  if (upw <= 0)
+    internal_error ("back end %qs reports %<UNITS_PER_WORD%> of %d",
+		    f->name, upw);
+
+  const int bound = MAX_MOVE_MAX / MIN_UNITS_PER_WORD + 1;
+  if (mm / upw >= bound)
+    internal_error ("back end %qs moves %d bytes at a time with "
+		    "%<UNITS_PER_WORD%> of %d, so shared code indexes the "
+		    "caller-save tables at %d, but this compiler sized them "
+		    "at %d from %<MAX_MOVE_MAX%> %d and "
+		    "%<MIN_UNITS_PER_WORD%> %d; the bound and the index come "
+		    "from different back ends",
+		    f->name, mm, upw, mm / upw, bound,
+		    (int) MAX_MOVE_MAX, (int) MIN_UNITS_PER_WORD);
   return mm;
 }
 
