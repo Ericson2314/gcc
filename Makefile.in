@@ -323,6 +323,67 @@ tree exists.  This tree has no default target and no primary.  Re-run \
 configure with --enable-targets=LIST)
 endif
 
+# ---------------------------------------------------------------------------
+# WHERE A TARGET'S CONFIGURATION LIVES
+# ---------------------------------------------------------------------------
+#
+# The driver looks for its target's capability file at
+#
+#     <exec-prefix>/<version>/<target>/specs-config
+#
+# where <exec-prefix> is $(libdir)/gcc/ (STANDARD_EXEC_PREFIX in gcc/Makefile.in)
+# and <version> is gcc's BASE-VER.  That is #96's ruling -- lib not share,
+# version before target -- and gcc/gcc.cc's find_target_config implements it.
+# These variables are the SAME path spelled by the producer's side, so that
+# target-specs writes where the driver reads instead of writing somewhere and
+# hoping.  This is the connection that did not exist: gcc/gcc.cc read the file
+# and nothing in the tree wrote it.
+MT_GCC_VERSION := $(shell cat $(srcdir)/gcc/BASE-VER)
+ifeq ($(strip $(MT_GCC_VERSION)),)
+$(error could not read $(srcdir)/gcc/BASE-VER, so the per-target config \
+directory cannot be named; the driver looks under <libdir>/gcc/<version>/ and \
+guessing the version would put the file where nothing reads it)
+endif
+
+# The installed location.  $(DESTDIR) is added by the install goals only.
+MT_INSTALL_CONFIGDIR = $(libdir)/gcc/$(MT_GCC_VERSION)
+
+# The build tree's mirror of it.
+#
+# An uninstalled driver finds its own files by RELATIVE POSITION, not by the
+# configured paths: make_relative_prefix(argv0, $(bindir)/, $(libdir)/gcc/)
+# maps the directory the binary is in through the bindir -> libdir/gcc
+# relation.  So a driver at <objdir>/gcc/<triple>-gcc looks under
+# <objdir>/gcc/<bindir-to-libdir-gcc>/<version>/<target>/.  Reproduce that
+# relation here rather than hard-coding `../lib/gcc', which is only correct for
+# the default --bindir/--libdir.
+#
+# NOT TRUSTED ON ITS OWN.  Getting this path wrong writes a perfectly good file
+# somewhere nothing looks, which is the exact failure this rule exists to fix,
+# reproduced one directory over.  The per-target recipe therefore COMPILES
+# something with the plain build-tree driver and no -B afterwards, and fails if
+# the driver did not find what was just written.
+mt_bindir_tail := $(patsubst $(exec_prefix)/%,%,$(patsubst %/,%,$(bindir)))
+ifeq ($(mt_bindir_tail),$(patsubst %/,%,$(bindir)))
+$(error $(bindir) is not under $(exec_prefix), so the bindir -> libdir/gcc \
+relation the driver uses to find its own files cannot be reproduced in the \
+build tree)
+endif
+mt_libdir_tail := $(patsubst $(exec_prefix)/%,%,$(patsubst %/,%,$(libdir)))
+ifeq ($(mt_libdir_tail),$(patsubst %/,%,$(libdir)))
+$(error $(libdir) is not under $(exec_prefix), so the bindir -> libdir/gcc \
+relation the driver uses to find its own files cannot be reproduced in the \
+build tree)
+endif
+# One `..' per component of the bindir tail.
+mt_empty :=
+mt_space := $(mt_empty) $(mt_empty)
+mt_bindir_up := $(subst $(mt_space),/,$(strip \
+  $(foreach c,$(subst /,$(mt_space),$(mt_bindir_tail)),..)))
+# Relative to the top of the BUILD tree; the recipes compose it with $$r, which
+# is the only spelling of "this build directory" available at this level.
+MT_BUILD_CONFIGDIR_REL = gcc/$(mt_bindir_up)/$(mt_libdir_tail)/gcc/$(MT_GCC_VERSION)
+
 # Target libraries are put under this directory:
 TARGET_SUBDIR = @target_subdir@
 # This is set by the configure script to the arguments to use when configuring
@@ -70259,6 +70320,50 @@ install-gdb: $(INSTALL_GDB_TK)
 # deployment machine, and a compiler serving N targets has no single answer to
 # bake anyway, so these goals exist to be invoked by the user after install --
 # never as a build-time prerequisite of gcc.
+#
+# TWO PER-TARGET KNOBS, both named after the target so that nothing one target
+# is given can reach another:
+#
+#   TOOLS_DIR_FOR_<triple>            where that target's binutils are
+#   TARGET_SPECS_FLAGS_FOR_<triple>   anything else its probe needs, e.g.
+#                                     --with-native-system-header-dir=
+#
+# The second exists because target-specs is a configure script with its own
+# options and the set a given target needs is not knowable here.  gcc/ used to
+# run it with a FIXED argument list, and every option not on that list could be
+# supplied by hand exactly once before the next `make' truncated it away (see
+# gcc/Makefile.in's multi-target-specs).  A pass-through avoids re-inventing
+# that: this makefile never enumerates target-specs' options.
+#
+# WRITING THE FILE IS NOT THE FIX; WRITING IT WHERE THE DRIVER LOOKS IS.  Both
+# are `rc=0' from the producer's side, and getting the directory wrong leaves a
+# correct file one directory from anything that reads it, which is the bug this
+# rule exists to remove, moved.  So the recipe ends by asking the CONSUMER --
+# see mt-config-found.sh, which runs the driver under its per-target name with
+# no -B and also requires it to FAIL when the file is taken away.
+#
+# THE SYMLINK INTO gcc/ IS NOT A SECOND COPY.  gcc/ already had a convention
+# for the spec file -- `specs-<target>' in its own build directory -- and the
+# `$(SPECS)' rule reads it; writing only to the driver's search path would have
+# left that rule permanently taking its `-dumpspecs' fallback branch.  A link
+# rather than a copy, so there is still exactly one file and it cannot go stale
+# against itself.
+#
+# THE CONFIG FILE IS DELIBERATELY *NOT* LINKED HERE, AND THAT IS A FINDING
+# RATHER THAN A GAP.  `gcc/Makefile.in' has
+# `SELFTEST_TARGET_CONFIG = $(wildcard specs-$(TEST_TARGET)-config)', so
+# linking it turns cc1's selftests from "run with NO target selected" -- which
+# is what every build on this branch has done -- into "run with one".  Measured
+# by doing it: they then FAIL, in `simplify-rtx.cc:9121 test_scalar_int_ops',
+# `ASSERT_RTX_EQ (op0, simplify_gen_binary (PLUS, CImode, op0, const0_rtx))'.
+# `CImode' is aarch64's 768-bit tuple mode; i386 has none, and the union puts
+# it in the scalar-int loop, where the constant-folding paths bail out above
+# `MAX_BITSIZE_MODE_ANY_INT'.  That is the mode union, not this rule, and it
+# needs its own task.  Linking the file here would land a red `all-gcc' on
+# everyone; leaving it unlinked keeps the selftests exactly as they have been
+# and does not pretend the problem is absent.  To reproduce:
+#     ln -s <libdir>/gcc/<version>/<t>/specs-config gcc/specs-<t>-config
+#     make all-gcc
 define mt_target_specs_rules
 MT_SPECS_EMITTED += $(1)
 .PHONY: configure-target-specs-$(1)
@@ -70285,8 +70390,15 @@ configure-target-specs-$(1):
 	  fi; \
 	  mt_tools=`dirname "$$$$mt_as"`; \
 	fi; \
+	mt_dest="$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)"; \
+	mt_src=; \
+	for f in gcc/specs-src-$(1) gcc/mlib-specs-$(1); do \
+	  test -f "$$$$r/$$$$f" && mt_src="$$$$mt_src $$$$r/$$$$f"; \
+	done; \
 	$$(SHELL) $$(srcdir)/mkinstalldirs $(1)/target-specs; \
+	$$(SHELL) $$(srcdir)/mkinstalldirs "$$$$mt_dest"; \
 	echo Configuring target-specs for $(1) in $(1)/target-specs; \
+	echo "  writing its spec file and config to $$$$mt_dest"; \
 	cd "$(1)/target-specs" || exit 1; \
 	case $$(srcdir) in \
 	  /* | [A-Za-z]:[\\/]*) topdir=$$(srcdir) ;; \
@@ -70299,7 +70411,32 @@ configure-target-specs-$(1):
 	  --srcdir=$$$${topdir}/target-specs \
 	  --build=$${build_alias} --host=$(1) --with-target=$(1) \
 	  --with-tools-dir="$$$$mt_tools" \
-	  || exit 1
+	  --with-specs-file="$$$$mt_dest/specs" \
+	  $$$${mt_src:+--with-source-specs="$$$$mt_src"} \
+	  $$(TARGET_SPECS_FLAGS_FOR_$(1)) \
+	  || exit 1; \
+	cd "$$$$r" || exit 1; \
+	test -f "$$$$mt_dest/specs-config" || { \
+	  echo "*** target-specs for $(1) exited 0 but wrote no" >&2; \
+	  echo "*** $$$$mt_dest/specs-config." >&2; \
+	  echo "*** A configure script that fails and exits 0 is this branch's" >&2; \
+	  echo "*** signature; the file is checked rather than the status." >&2; \
+	  exit 1; }; \
+	if test -f "$$$$mt_dest/specs"; then \
+	  rm -f "$$$$r/gcc/specs-$(1)"; \
+	  ln -s "$$$$mt_dest/specs" "$$$$r/gcc/specs-$(1)" || exit 1; \
+	fi; \
+	$$(SHELL) $$(srcdir)/mt-config-found.sh "$$$$r/gcc" "$(1)" \
+	  "$$$$mt_dest/specs-config" || exit 1
+
+.PHONY: install-target-specs-$(1)
+install-target-specs-$(1):
+	@r=`$${PWD_COMMAND}`; export r; \
+	$$(SHELL) $$(srcdir)/mt-install-config.sh \
+	  "$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)" \
+	  "$$(DESTDIR)$$(MT_INSTALL_CONFIGDIR)/$(1)" \
+	  "$$(MT_INSTALL_CONFIGDIR)/$(1)" \
+	  "$(1)"
 endef
 
 $(foreach mt_t,$(MT_TARGET_SUBDIRS),\
@@ -70309,6 +70446,15 @@ $(foreach mt_t,$(MT_TARGET_SUBDIRS),\
 # NOT a build-time dependency of anything.
 .PHONY: configure-target-specs
 configure-target-specs: $(foreach mt_t,$(MT_TARGET_SUBDIRS),configure-target-specs-$(mt_t))
+
+# Installing what was probed.  DELIBERATELY NOT PART OF `install', for the same
+# reason configure-target-specs is not part of `all': the probe is the user's
+# to run, against the toolchain of the target they care about, and `install'
+# must not silently install a stale or absent answer.  An installation with no
+# per-target config is a compiler that says so by name; that is the designed
+# behaviour, not a gap to paper over.
+.PHONY: install-target-specs
+install-target-specs: $(foreach mt_t,$(MT_TARGET_SUBDIRS),install-target-specs-$(mt_t))
 
 # NON-VACUITY GUARD ON THE LOOP ITSELF.
 #

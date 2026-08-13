@@ -4249,3 +4249,309 @@ run `macro-probe-run.sh`.
     t117-wall.sh        where aarch64 stops now
     t117-guards.sh      10 arms, three injections
     t117-tab.sh         both-sided, on the running cc1
+
+# TASK #119 -- THE CONNECTING RULE: `specs-config` REACHES THE DRIVER, AND `libgcc.a` BUILDS
+
+Branched from `8bd43122139`.  Worktree came up at the bare-repo HEAD
+`7208eca60d0` AGAIN; `git reset --hard multi-target` and a CONTENT anchor
+(`grep -c MULTI_TARGET gcc/Makefile.in` -> 28) before anything else.
+
+## 1. THE BRIEF'S PREMISE, CONFIRMED AND THEN OVERTAKEN
+
+Confirmed exactly as stated: `specs-config` occurs in **`gcc/gcc.cc` only**
+(:8609 defines the basename, :8646 documents the layout) and **nowhere in
+`gcc/Makefile.in`**, and a whole-tree grep excluding nothing finds no other
+producer.  A mechanism reading a file no rule writes.
+
+It was **half** the disconnection, and the other half runs the opposite way.
+Wiring only the half in the brief would have produced a file that is written,
+found, and then still ignored:
+
+  * `find_target_config` looks under `<exec-prefix>/<version>/<target>/` --
+    #96's layout -- and finds `specs-config` there.
+  * `set_up_specs` looks for the SPEC FILE at
+    `exec_prefix + just_machine_suffix + "specs"`, and this driver sets
+    `just_machine_suffix = ""` (:9242), because a compiler serving every
+    target has no machine name of its own.  That path is
+    **`$(libdir)/gcc/specs`: ONE spec file for every target.**
+
+So there was no per-target spec-file lookup at all.  `gcc.cc`'s own comment on
+`TARGET_CONFIG_BASENAME` says "#96 fixes the spec file at
+`$(libdir)/gcc/$(version)/<target>/specs`" -- the intent was **written down in
+the consumer and only half implemented**, and the implemented half is the one
+the brief named.
+
+**The measured symptom, found by building rather than by reading.**  With only
+the config wired, libgcc's `-m32` multilib assembled `config/i386/morestack.S`
+with no `--32`:
+
+    morestack.S:372: Error: invalid instruction suffix for `push'
+
+`pushl` rejected because the assembler was in 64-bit mode.  The correct
+`*asm: %{m16|m32:--32} %{m16|m32|mx32:;:--64} %{mx32:--x32}` was sitting in the
+per-target spec file, unread.  After the `set_up_specs` fix: **zero assembler
+errors**.
+
+## 2. WHAT LANDED
+
+**`Makefile.tpl` / `Makefile.in` (regenerated with `autogen`, +140 each, and
+the two diffs are the same size -- the edit, no tool noise).**
+
+  * `MT_GCC_VERSION` from `gcc/BASE-VER`, `MT_INSTALL_CONFIGDIR` =
+    `$(libdir)/gcc/$(version)`, and `MT_BUILD_CONFIGDIR_REL`, the BUILD TREE's
+    mirror of it.  The mirror is derived by reproducing the driver's own
+    `bindir -> libdir/gcc` relation arithmetically rather than hard-coding
+    `../lib/gcc`, and both `patsubst`es fail by name if `$(bindir)` or
+    `$(libdir)` is not under `$(exec_prefix)`.
+  * `configure-target-specs-<t>` now passes `--with-specs-file=<mirror>/specs`,
+    so `target-specs` writes `specs` and `specs-config` where the driver looks.
+  * It also passes `--with-source-specs` when `gcc/`'s `specs-src-<t>` and
+    `mlib-specs-<t>` exist.  **Those were produced and handed to nobody**;
+    `gcc/Makefile.in`'s `multi-target-specs` prints instructions telling a
+    human to pass them, and nothing did.  That is where `*asm`, `*link`,
+    `*startfile` and the multilib tables come from.
+  * `TARGET_SPECS_FLAGS_FOR_<t>`, a pass-through, beside the existing
+    `TOOLS_DIR_FOR_<t>`.  `target-specs` has its own options and the set a
+    target needs is not knowable at this level; `gcc/` previously ran it with a
+    FIXED list and truncated everything else away on the next `make`.
+  * One symlink per target into `gcc/`: `specs-<t>` -> the per-target spec
+    file.  A LINK, not a copy -- there is still one file.  `gcc/Makefile.in`'s
+    `$(SPECS)` rule reads that name and had been taking its `-dumpspecs`
+    fallback branch in every build.  **The config file is deliberately NOT
+    linked**; see section 4b, which is the sharpest finding of this task.
+  * `install-target-specs-<t>` / `install-target-specs`, deliberately NOT part
+    of `install`, for the same reason `configure-target-specs` is not part of
+    `all`.
+
+**`gcc/Makefile.in`.**
+
+  * `MULTI_TARGET_DRIVERS` -- a `<triple>-gcc` copy **per configured target**,
+    replacing the single `$(BUILD_DRIVER_NAME)` rule (which is now one of them,
+    so no duplicate recipe).  The driver's NAME is the only thing that tells it
+    which target it is, so a build tree with one copy could exercise the
+    installed mechanism for exactly one target and had to reach every other
+    with an explicit `-ftarget-config=` -- a different code path.  That made
+    the one target with a copy privileged **in the place the design is
+    verified**.
+  * `MULTI_TARGET_CONFIGDIR`, defaulting to `$(objdir)/../lib/gcc/$(version)`,
+    and `check-multi-target-specs` now takes its config corpus from there as
+    well as from `gcc/`.  A wrong value cannot make that check pass -- it can
+    only make it decline to run and say so.
+  * `install-driver` installs those names too.  The comment there already said
+    "per-target `<triple>-gcc` spellings are install aliases and belong with
+    the per-target manifest"; nothing installed them, so an installed tree had
+    a `gcc` that correctly refuses and **no name under which any configured
+    target could be asked for at all**.
+
+**`gcc/gcc.cc`.**  `set_up_specs` reads `<dirname(found_target_config)>/specs`
+last, so it overrides both target-neutral files.  Derived from
+`found_target_config` rather than composed again, so the spec file and the
+config cannot come from different directories, and a driver that found no
+config reads no per-target spec file either.
+
+**`gcc/defaults.h`.**  `!defined (__cplusplus)` added to the existing
+"keep the real macros" guard, as a fourth arm beside
+`MULTI_TARGET_TARGETM_BASE`, `GENERATOR_FILE` and `MULTI_TARGET_SUPPLY_TU`.
+`libgcc` compiles C and reaches `defaults.h` through `tconfig.h` -> `tm.h`;
+`target-frame.h` declares `mt_minimum_alignment (tree, machine_mode, ...)`, and
+a C TU has neither type, so **every libgcc object including `libgcov.h` or
+`generic-morestack.c` failed with `unknown type name 'machine_mode'`.**
+
+  **This is not the leak reopened, and it was measured before being relied on.**
+  No C source under `libgcc/` spells any of the thirteen redirected names; the
+  only grep hits are `X86_64_SAVE_NEW_STACK_BOUNDARY` in a `.S` file (a
+  different identifier) and `__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__`.  So the arm
+  changes no value anything reads.  And a runtime library is single-target by
+  ruling, so the one `tm.h` it compiles against is legitimately its own
+  target's.  That the `tm.h` it is handed today is `gcc/`'s build-directory one
+  is `libgcc/Makefile.in`'s `-I$(gcc_objdir)` -- Stage 3a, real, separate, and
+  not fixable by converting these macros.
+
+## 3. THE BARS
+
+  * **`libgcc.a` BUILDS.**  Cold, objects deleted first:
+    `/tmp/b119/x86_64-pc-linux-gnu/libgcc/libgcc.a`, **1197082 bytes, 157
+    members, 0 `error:` in stderr**, and `_muldi3.o` extracted from it is
+    `ELF64 / Advanced Micro Devices X86-64` -- not an empty archive and not
+    somebody else's ISA.  `libgcc_s.so.1` also links.
+  * **`make all-target-libgcc` still exits 2**, and the reason is now
+    ENVIRONMENTAL, not the tree: the `-m32` multilib dies on
+    `gnu/stubs-32.h: No such file or directory`, 12 times, which is the
+    32-bit glibc this host does not have and which top-level configure warns
+    about at the start.  **0 assembler errors**, where before the `set_up_specs`
+    fix there were dozens.  Multilib is mandatory here, so the aggregate goal
+    cannot go green on this machine; the archive the bar names does build.
+  * **Installed compiler, no `-B`** (`scratchpad/t119-guards.sh`, 5 arms, all
+    pass, `GCC_EXEC_PREFIX` unset, cwd outside the build tree):
+    - ARM 1 BOTH-SIDED: `/tmp/b119-inst/bin/<t>-gcc -### -c c.c` passes
+      `-ftarget-config=/tmp/b119-inst/lib/gcc/17.0.0/<t>/specs-config` for BOTH
+      targets, and neither driver names the other's directory.
+    - ARM 2 NEGATIVE and ASYMMETRIC: with aarch64's config removed, aarch64
+      fails naming it (rc=1) and **x86_64 is unaffected (rc=0)**.  A control in
+      which both broke would prove nothing about per-target files.
+    - ARM 3 CONTENT: 28 differing lines, **6 name-or-path and 22 PROBED
+      capability lines** (`as_aarch64_mabi` 1/0, `as_ix86_sahf` 0/1,
+      `as_r_x86_64_code_6_gottpoff` 0/1).  #113b's false green was 6 differing
+      lines and ALL SIX were the name; the arm fails below 4 probed differences.
+    - ARM 4: 0 build-tree paths and 2 installed paths in each installed spec
+      file (both directions, so neither can pass vacuously).
+    - ARM 5: `cc1` defines `targetm_i386` AND `targetm_aarch64`.
+  * **x86_64 `-O2` md5 `378fc33c1e70`, 12369 bytes** -- unmoved.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`,
+    5 distinct md5 per side, **negative control firing** (1158 vs 804 lines),
+    rc=0.
+  * aarch64 still ICEs on `big.c` at line 24 -- #113's recorded wall
+    (`init_set_costs` / null `GEN_FCN`), unchanged and not touched here.
+
+  * cold two-backend `all-gcc` from an EMPTY directory (`/tmp/b119c`):
+    **rc=0**, and both `x86_64-pc-linux-gnu-gcc` and
+    `aarch64-unknown-linux-gnu-gcc` are present in `gcc/`.
+
+### THE CHECK THAT HAD NEVER RUN NOW RUNS
+
+`check-multi-target-specs` reported `NOTHING CHECKED ... This is a SKIP, not a
+pass` in **every build on this branch**, because its corpus is
+`gcc/specs-<t>*` and nothing produced any.  Now:
+
+    check-spec-refs: 2 spec file(s), every name consulted by the driver
+    check-target-caps: 2 config file(s), every capability read by something
+    check-multi-target-specs: 2 spec file(s) handed to read_specs, 0 rejected
+
+Its `read_specs` arm also had to learn where the config lives, or every spec
+file would have been reported `NOT USABLE -- no target selected`, which blames
+the spec file for the harness's own missing argument.  Measured: it did exactly
+that for one iteration.
+
+## 4. MY OWN NEGATIVE CONTROL FIRED TWICE, AND BOTH TIMES IT WAS RIGHT
+
+`mt-config-found.sh` runs at the END of every `configure-target-specs-<t>`.
+It asks the CONSUMER, because writing the file and writing it where the driver
+looks are both `rc=0` from the producer's side.
+
+  1. **The spec file was answering.**  The moment the `gcc/specs-<t>` symlink
+     was added, the arm reported NEGATIVE CONTROL DID NOT FIRE.  Correct:
+     `carry_target_config_as_switch` falls back to `*cc1_target_config` from a
+     spec file, that route produces the SAME path string, and **it never checks
+     the file exists** -- so it answered happily with the file deleted.
+     Everything the affirmative arm had been scoring could have come from
+     there.  Fixed by stashing `gcc/specs`, `gcc/specs-<t>` and
+     `gcc/specs-<t>-config` for the duration of both arms and restoring them
+     from a `trap`.
+  2. **The INSTALLED tree was answering.**  After `make install`,
+     `find_target_config`'s third authority (`STANDARD_EXEC_PREFIX`) is a real
+     answer, so the build-tree driver exits 0 pointing at
+     `/tmp/b119-inst/...`.  Requiring a hard failure would have made the check
+     pass only on machines where this compiler had never been installed -- a
+     check that stops working the moment the thing it checks starts being used.
+     The bar is now **the answer must CHANGE**: fail naming the path, or
+     succeed naming a DIFFERENT one.  Refused: the answer staying the same.
+
+## 4b. cc1's SELFTESTS HAVE NEVER RUN WITH A TARGET, AND WHEN THEY DO THEY FAIL
+
+This is the finding to give somebody next.
+
+`gcc/Makefile.in` has `SELFTEST_TARGET_CONFIG = $(wildcard specs-$(TEST_TARGET)-config)`
+-- and nothing has ever produced that file, so **every `make all-gcc` on this
+branch has run cc1's selftests with NO target selected**, i.e. against the
+empty back end, and they passed.
+
+Linking the config there is a one-line change and I made it first.  The
+selftests then run for real and **FAIL**:
+
+    simplify-rtx.cc:9121 test_scalar_int_ops:
+      FAIL: ASSERT_RTX_EQ (op0, simplify_gen_binary (PLUS, mode, op0, const0_rtx))
+        expected: (reg:CI 113)
+        actual:   (plus:CI (reg:CI 113) (const_int 0))
+    cc1: internal compiler error: in assert_rtx_eq_at, at selftest-rtl.cc:57
+
+`CImode` is **aarch64's** 768-bit tuple mode; i386 has none.  `test_scalar_ops`
+walks `0 .. NUM_MACHINE_MODES` and tests everything `SCALAR_INT_MODE_P`, so the
+union hands it a mode from the other back end, and the constant-folding paths
+bail out above `MAX_BITSIZE_MODE_ANY_INT` (simplify-rtx.cc:2115, :2299).  That
+is the mode union -- #51 / Stage 4 -- not this rule.
+
+**I did not land the link**, because it turns `all-gcc` red for every agent on
+the branch, and I cannot fix the mode union inside this task.  I also did not
+quietly drop the subject: the reason is written at the point of the decision in
+`Makefile.tpl`, with the exact reproduction
+
+    ln -s <libdir>/gcc/<version>/<t>/specs-config gcc/specs-<t>-config
+    make all-gcc
+
+and `check-multi-target-specs` was given the config directory directly instead,
+so the checks that CAN run now do.  **Do not read "selftests pass" on this
+branch as evidence about any target until this is done.**
+
+## 5. #64's REMAINING HALF: NOT BUILT, AND ON PURPOSE
+
+The brief asked for the `default-target` install rule "together with" this.
+**I did not write it, because the ruling has changed since TOPLEVEL-DESIGN
+section 6.5 was written and section 6.5 is now stale.**  `64d8d28b30a`
+(2026-08-12 11:56, later than that document) says in its commit message and in
+`gcc/gcc.cc:8548`:
+
+> Nothing in this compiler's build or installation writes that file, by design.
+
+and the file's whole comment argues the point: it is a statement by an
+INSTALLER about a machine, not something the build may decide.  PRINCIPLES 2a
+lists "an install rule that bakes one target into `gcc/`" among the changes
+that look like fixes and undo the project.  **Writing that rule would
+contradict both.**  #64 is therefore not "half fixed"; it is fixed for the two
+routes that exist and deliberately unfixed for the third.  Section 6.5 item 6
+of TOPLEVEL-DESIGN should be struck.
+
+What WAS missing on the installed side, and is now fixed, is different and
+carries no default: `install-driver` installed **no `<triple>-gcc` at all**, so
+route 2 -- select the target by the name you invoke -- was unreachable in an
+installed tree.
+
+## 6. WHAT I DID NOT DO
+
+  * **No dependency from `libgcc` to `configure-target-specs-<t>`.**  Adding
+    one would make the probe a build-time prerequisite of `all`.  The driver
+    already fails by name and names the fix ("A target's configuration is
+    written by target-specs' configure, which is run after this compiler is
+    built"), so the ordering is the user's.  **This is a fork I am reporting
+    rather than taking**: (a) leave it, `make all` fails with a diagnostic that
+    names the goal to run; (b) make `configure-target-libgcc` depend on it,
+    which costs every `make all` a probe and requires the target toolchain at
+    build time.
+  * `libgcc` is still a single-target `target_modules` entry on
+    `TARGET_SUBDIR` (= `x86_64-pc-linux-gnu` here).  Unchanged.
+  * The `-m32` multilib is unproven on this host for want of 32-bit glibc.
+  * `accel_dir_suffix` sits inside the driver's composition of this path; the
+    offload-vs-target axis question is still #96's and is untouched.
+  * Probe scoreboard NOT run and NOT moved; carrying the recorded line
+    unchanged.
+
+## 7. STDERR -- WHICH ARM
+
+  * cold `all-gcc` (`/tmp/b119`, empty dir, `-j8`): **745 lines / 126
+    `warning:`**.
+  * incremental `all-gcc` after the `gcc.cc` edit: **59 lines**.
+  * `install-target-specs`: **0 lines**.
+  Not comparable with the 32-line incremental floor; classify against the cold
+  baseline.
+
+## 8. FILES
+
+    mt-config-found.sh    the consumer-side check, run by every
+                          configure-target-specs-<t>; two arms, self-restoring
+    mt-install-config.sh  the install copy + path rewrite, counted in BOTH
+                          directions so neither can pass vacuously
+    scratchpad/t119-conf.sh      two-target configure
+    scratchpad/t119-build.sh     make driver, reports rc and stderr composition
+    scratchpad/t119-specs.sh     both probes, with REAL aarch64 binutils and
+                                 each target's OWN glibc headers
+    scratchpad/t119-guards.sh    the 5 acceptance arms
+    scratchpad/t119-evidence.sh  libgcc.a: members, and the ISA of a member
+    scratchpad/t119-stock.sh     stock-compare with an absolute IN
+    scratchpad/t119-cold.sh      cold two-backend all-gcc
+    scratchpad/t119-regen.sh     config.status after a Makefile.in edit
+
+**Getting a real aarch64 assembler is one nix-shell argument**:
+`-p pkgsCross.aarch64-multiplatform.buildPackages.binutils`.  #113b concluded
+the strict tools check refuses aarch64 on this machine; it does not have to.
+The matching headers are that same package set's glibc dev output, and passing
+each target its OWN header directory is what makes ARM 3 a real both-sided
+test instead of one machine's answer served twice.

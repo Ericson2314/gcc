@@ -9285,6 +9285,50 @@ driver::set_up_specs () const
   if (access (specs_file, R_OK) == 0)
     read_specs (specs_file, true, false);
 
+  /* THE SELECTED TARGET'S OWN SPEC FILE, from the directory its configuration
+     was found in.  Last, so it overrides both of the target-neutral files
+     above.
+
+     Both lookups above are target-neutral and neither can be made to serve
+     here.  `find_a_file (startfile_prefixes, "specs")' finds a file by the
+     fixed name `specs' -- one name, however many targets -- and in practice
+     only ever finds one through a -B.  The second is
+     `exec_prefix + just_machine_suffix + "specs"', and just_machine_suffix is
+     "" in this compiler (a driver serving every target has no machine name of
+     its own), so that path is `<libdir>/gcc/specs': ONE spec file for every
+     target.  That is a site-wide override, which is a legitimate thing to
+     have, but it cannot be a target's spec file, and there was no other
+     lookup.
+
+     So target-specs could write a per-target spec file and NOTHING READ IT.
+     The comment on TARGET_CONFIG_BASENAME already says #96 fixes that file at
+     $(libdir)/gcc/$(version)/<target>/specs -- the intent was recorded here
+     and only half implemented, the half that reads `specs-config'.  Measured
+     symptom: an in-tree libgcc built its `-m32' multilib with the *asm spec
+     from a -dumpspecs fallback rather than from the target's own file, so the
+     assembler was never given `--32' and every 64-bit-only mnemonic in
+     config/i386/morestack.S was rejected -- `invalid instruction suffix for
+     push'.  The correct *asm was sitting in the per-target file, unread.
+
+     Derived from found_target_config rather than composed again, so the two
+     files cannot come from different directories.  A driver that found no
+     configuration reads no per-target spec file either, which is right: there
+     is no target whose file it could be.  */
+  if (found_target_config != NULL)
+    {
+      const char *slash = strrchr (found_target_config, '/');
+      if (slash != NULL)
+	{
+	  char *dir = xstrndup (found_target_config,
+				slash - found_target_config + 1);
+	  char *tspecs = concat (dir, "specs", NULL);
+	  free (dir);
+	  if (access (tspecs, R_OK) == 0)
+	    read_specs (tspecs, true, false);
+	  free (tspecs);
+	}
+    }
+
   /* The target's configure-time option defaults, supplied as data by the spec
      file read just above.  This has to happen here, before driver_self_specs:
      user -specs= files are not read until much later, so they cannot serve.  */

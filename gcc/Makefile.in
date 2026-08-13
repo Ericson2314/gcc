@@ -1025,7 +1025,7 @@ COMPILERS = @all_compilers@
 
 # List of things which should already be built whenever we try to use xgcc
 # to compile anything (without linking).
-GCC_PASSES=xgcc$(exeext) $(BUILD_DRIVER_NAME) specs
+GCC_PASSES=xgcc$(exeext) $(MULTI_TARGET_DRIVERS) specs
 
 # Directory to link to, when using the target `maketest'.
 DIR = ../gcc
@@ -3027,9 +3027,53 @@ gcc-cross$(exeext): xgcc$(exeext)
 # reached the same way, so the in-tree build of libgcc and friends exercises
 # the mechanism the installed compiler uses rather than a second one that only
 # the build tree has.
-$(BUILD_DRIVER_NAME): xgcc$(exeext)
+#
+# ONE PER CONFIGURED TARGET, not one for $(build_target_triple).  The name is
+# the ONLY thing that tells this driver which target it is (gcc.cc's
+# target_from_progname), so a build tree carrying a single <triple>-gcc can
+# exercise the installed mechanism for exactly one of the targets it was
+# configured for, and every other target has to be reached with an explicit
+# -ftarget-config= -- which is a different code path from the one an installed
+# compiler takes.  That made the one target with a copy the privileged one, in
+# the one place the whole design is verified.
+#
+# $(BUILD_DRIVER_NAME) is one of these names, so it is NOT given a rule of its
+# own here: two rules for the same file is an "overriding recipe" warning and
+# an arbitrary winner.
+MULTI_TARGET_DRIVERS = $(foreach t,$(enabled_targets),$(t)-gcc$(exeext))
+
+# Where the per-target configurations live in this build tree.
+#
+# The driver finds them by relative position from its own argv[0]:
+# make_relative_prefix through the $(bindir) -> $(libdir)/gcc relation.  The TOP
+# LEVEL owns that arithmetic -- it is what runs target-specs and knows where it
+# wrote -- and overrides this on the command line.  The default below is that
+# same relation for the default --bindir/--libdir, so a standalone `make -C gcc
+# check-multi-target-specs' finds them too.
+#
+# NOT A FALLBACK THAT ANSWERS.  If this directory does not exist, or holds no
+# specs-config, the check that reads it reports "NOTHING CHECKED ... This is a
+# SKIP, not a pass" exactly as it always has.  A wrong value here cannot make a
+# check pass; it can only make it decline to run.
+MULTI_TARGET_CONFIGDIR = $(objdir)/../lib/gcc/$(version)
+
+$(MULTI_TARGET_DRIVERS): xgcc$(exeext)
 	-rm -f $@
 	cp xgcc$(exeext) $@
+
+# Fail by name rather than silently building none of them.  An empty
+# $(enabled_targets) leaves this list empty, $(GCC_PASSES) then names no driver
+# at all, and the build exits 0 having produced nothing that can be invoked --
+# a loop that ran zero times scoring as a build.
+#
+# A MAKE-LEVEL CHECK, not a recipe in a .PHONY goal.  A goal nothing depends on
+# is a check that never runs, which reads as protection and is not; this one is
+# evaluated every time the makefile is parsed, whatever the goal.
+ifeq ($(strip $(MULTI_TARGET_DRIVERS)),)
+$(error $$(enabled_targets) is empty, so no <triple>-gcc would be built.  The \
+driver's own name is the only thing that tells it which target it is, so this \
+compiler would have no name to be reached under for any target)
+endif
 
 checksum-options:
 	echo "$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS)" > checksum-options.tmp \
@@ -3344,6 +3388,10 @@ check-multi-target-specs: multi-target-specs xgcc$(exeext)
 	@set -e; \
 	find . -maxdepth 1 -name 'specs-*' ! -name '*-config' ! -name 'specs-src-*' -print > tmp-specfiles; \
 	find . -maxdepth 1 -name 'specs-*-config' -print > tmp-cfgfiles; \
+	if test -d "$(MULTI_TARGET_CONFIGDIR)"; then \
+	  find "$(MULTI_TARGET_CONFIGDIR)" -maxdepth 2 -name 'specs-config' -print \
+	    >> tmp-cfgfiles; \
+	fi; \
 	if test ! -s tmp-specfiles && test ! -s tmp-cfgfiles; then \
 	  rm -f tmp-specfiles tmp-cfgfiles; \
 	  echo "check-multi-target-specs: NOTHING CHECKED -- no specs-<target> and no" \
@@ -3373,7 +3421,14 @@ check-multi-target-specs: multi-target-specs xgcc$(exeext)
 	for f in `cat tmp-specfiles`; do \
 	  t=`echo $$f | sed 's|^\./||; s|^specs-||'`; \
 	  tcfg=; \
-	  if test -f specs-$$t-config; then tcfg=-ftarget-config=specs-$$t-config; fi; \
+	  if test -f specs-$$t-config; then tcfg=-ftarget-config=specs-$$t-config; \
+	  elif test -f "$(MULTI_TARGET_CONFIGDIR)/$$t/specs-config"; then \
+	    tcfg=-ftarget-config=$(MULTI_TARGET_CONFIGDIR)/$$t/specs-config; \
+	  else \
+	    echo "check-multi-target-specs: no config file for $$t; read_specs" \
+		 "would be run with no target and every spec file would be" \
+		 "reported unusable for that reason rather than its own" >&2; \
+	  fi; \
 	  checked=`expr $$checked + 1`; \
 	  why=`./xgcc$(exeext) $$tcfg -specs=$$f --version 2>&1 >/dev/null` || { \
 	    echo "check-multi-target-specs: $$t NOT USABLE -- $$why"; \
@@ -5525,6 +5580,30 @@ install-driver: installdirs xgcc$(exeext)
 	      $(LN) $(GCC_INSTALL_NAME)$(exeext) $(FULL_DRIVER_NAME) ); \
 	  fi; \
 	fi
+# THE PER-TARGET NAMES, one per configured target.  These are what the comment
+# above called "install aliases": the driver is built once and serves them all,
+# and the NAME is the only thing an installed compiler has to tell it which
+# target it is for.  Without them an installation has a `gcc' that refuses
+# (correctly -- it has no default target) and no name under which it can be
+# asked for any of the targets it was configured with, so the compiler is
+# unreachable for every one of them.  Linked to $(GCC_INSTALL_NAME), which is
+# the binary that was just installed, but the triple-prefixed name itself does
+# NOT go through program_transform_name: it has to be the exact string the
+# target registry holds, or target_from_progname will not match it, and
+# `--program-prefix=' would silently rename the target.
+#
+# Fails by name if the list is empty, rather than installing nothing quietly.
+	@test -n "$(enabled_targets)" || { \
+	  echo "install-driver: \$$(enabled_targets) is empty, so no <triple>-gcc" \
+	       "was installed and this installation cannot be told which target" \
+	       "to be." >&2; exit 1; }
+	@n=0; for t in $(enabled_targets); do \
+	  rm -f $(DESTDIR)$(bindir)/$$t-gcc$(exeext); \
+	  ( cd $(DESTDIR)$(bindir) && \
+	    $(LN) $(GCC_INSTALL_NAME)$(exeext) $$t-gcc$(exeext) ) || exit 1; \
+	  n=`expr $$n + 1`; \
+	done; \
+	echo "install-driver: installed $$n per-target driver name(s): $(enabled_targets)"
 
 libgdiagnostics.install-headers: installdirs
 	$(INSTALL_DATA) $(srcdir)/libgdiagnostics.h \
