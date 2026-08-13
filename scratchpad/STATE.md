@@ -9070,3 +9070,201 @@ because `scratchpad/big.c` is a fixed file everyone passes by the same name.
   * **The ranking cannot see value divergence**, only use, position, sizing and
     definedness. `MACRO-LEAK.md`'s measurement is still the authority on values,
     and its ~1049 unclassified identical-text macros remain unclassified.
+
+---
+
+# #139 -- WHAT THE LANDED CONVERSIONS COST, AND THE ROUTE FOR CLASS (c)
+
+Brief: measure what the conversions already landed actually cost (`Pmode` is a
+call at 648 shared sites and nobody had claimed it was free), then cost the
+routes for the class-(c) option-state family and recommend one.  Measurement
+and a costed proposal, **not a conversion**.
+
+Full document: `scratchpad/CLASS-C-COSTING.md`.  This is the summary.
+
+**NO COMPILER SOURCE WAS CHANGED.**  The diff is `scratchpad/` only.  The
+codegen bars (x86_64 `big.c` md5, the aarch64 one-liner, stock-compare 5/5)
+**cannot have moved**; they were not re-run and nothing is claimed about them.
+Four throw-away measurement compilers were built under `/tmp/a3ab/` and are not
+part of the branch.
+
+The worktree arrived at bare-repo HEAD `7208eca60d0` with **0** `MULTI_TARGET`
+hits in `gcc/Makefile.in`, exactly as PRINCIPLES section 5 predicts.  Reset to
+`multi-target`, **39**.
+
+## 1. THE HEADLINE: THE PER-SITE CALL IS AFFORDABLE, MEASURED
+
+`Pmode` as a per-base call -- 648 source sites, **715 `call <mt_pmode>` sites
+in the linked `cc1`** -- costs **<= 0.3 % of compile time, and by the
+least-noisy estimator nothing measurable at all.**
+
+Measured against a compiler differing from HEAD in **exactly one line**
+(`defaults.h`, `#define Pmode (mt_pmode ())` -> `(DImode)`; both configured
+bases have `Pmode == DImode`, so it must produce identical output while paying
+none of the call cost).  The injection was asserted **in the artefact**:
+715 `mt_pmode` call sites in HEAD's `cc1`, **0** in the instrument's.
+
+    x86_64   Pmode-const  min 9.826  median 9.883  sd 0.44%
+             HEAD         min 9.826  median 9.903  sd 0.50%
+             ratio        by min 1.0000 (-0.00%)   by median 1.0021 (+0.21%)
+             output       identical 19/19 TUs
+
+    aarch64  ratio        by min 1.0021   by median 1.0032
+             output       identical 15/15 scored (4 TUs unscorable in BOTH arms)
+
+Corpus: **19 real C TUs, 73,444 lines** (zlib, libbacktrace DWARF,
+libdecnumber, six libbid 128-bit-decimal TUs, libffi dlmalloc), preprocessed
+once so both compilers eat identical bytes.  **11 scored runs, arms interleaved
+A,B,A,B within each run**, one discarded warm-up, min and median both reported.
+Each datum is ~10 s of work.  `scratchpad/t139-time.sh`, `t139-corpus.sh`.
+
+**The equal-work check is what makes it an overhead measurement**: the two
+arms' `.s` compared file by file, and the script refuses to call the delta an
+overhead when they differ.
+
+**`scratchpad/big.c` is the wrong input for this question and the recorded
+"+3.07 %" in `CLASS-C-DESIGN.md` section 3b is superseded.**  It is 150 lines;
+a run of it is dominated by `cc1` start-up, which is exactly the part a
+per-site call cost does not scale with, and it was measured between two
+differently configured builds.
+
+**Also measured, against the pre-conversion commit** (`86627699062`, parent of
+`395b23226a7`; anchor 37 vs HEAD's 39, no `#define Pmode` in its `defaults.h`,
+both asserted before configuring): HEAD is **+1.0 %** (min +0.91 %, median
++1.03 %, output identical 19/19).  That is an **upper bound over 11 conversion
+commits**, not a `Pmode` figure -- two of them change table selection rather
+than adding calls.
+
+**There is no aarch64 pre-conversion arm, and the reason is the point:** that
+compiler does not compile the corpus for aarch64 at all (`ICE in
+aarch64_can_eliminate, aarch64.cc:14153`).  On that base the conversion is not
+a throughput trade.
+
+Scale anchor from the linked `cc1`: **83 distinct `mt_*` selectors, 1,667
+machine call sites**, `Pmode` alone being 715 of them (43 %).
+
+## 2. THE POPULATION IS NOT UNIFORMLY HOT -- MEASURED, NOT ASSUMED
+
+A fourth compiler counts each macro's evaluations per source file
+(`t139-count-inject.sh`, counter inside the existing shared-consumer guard in
+`defaults.h` so back-end TUs, generators and libgcc keep the real macros).
+**Asserted value-identical to HEAD: 19/19 byte-identical `.s`**, with every run
+checked to have emitted a dump (`t139-count-ident.sh`).
+
+    UNITS_PER_WORD   4,313,946 evaluations   18 files    top 5 = 98.4%
+      rtlanal.cc        3,629,852   84.1%   <- SEVEN static sites
+      lower-subreg.cc     237,188    5.5%
+      combine.cc          162,324    3.8%
+    Pmode            3,531,256 evaluations   28 files    top 5 = 93.1%
+      rtlanal.cc        1,991,503   56.4%
+      cselib.cc         1,066,881   30.2%
+
+**Static site count predicts cost badly, and here it points the wrong way.**
+`UNITS_PER_WORD` has 41 % as many static sites as `Pmode` (267 vs 648) and is
+evaluated **1.22 times as often**.  The brief's worry is framed on the 267; the
+quantity that decides the cost is the 4.3 M.
+
+**Side result: the counting build compiles.**  Making `UNITS_PER_WORD` a comma
+expression makes it non-constant at every site, and every TU in a `c,lto` build
+still built -- `CLASS-C-DESIGN.md` section 2b's "no constant-expression
+blocker", re-measured for this macro by a method that could only fail loudly.
+It does not cover the front ends this configuration does not build.
+
+## 3. THE ROUTES, AND THE RECOMMENDATION
+
+**Recommend R1: plain per-base calls, the shape `Pmode` already has.  No new
+mechanism, no cache, no per-base duplication of consumers, nothing special for
+the hot subset.**
+
+  * **R1 plain call** -- measured <= 0.3 % for 715 sites.  The new population
+    is *smaller* statically (267 + 74 + 68) and 1.22x dynamically, projecting
+    to **<= 0.4 %** for `UNITS_PER_WORD`.  That is a projection from two
+    measurements; the direct A/B is one more build and should be run first.
+  * **R2 caching -- rejected on CORRECTNESS, not speed.**  `mavx`/`mavx512f`
+    are `Target Mask(...) Var(ix86_isa_flags) Save` in `i386.opt`, so
+    `BIGGEST_ALIGNMENT` = `(TARGET_AVX512F ? 512 : TARGET_AVX ? 256 : 128)`
+    moves **within one compilation** under `__attribute__((target(...)))`;
+    `ix86_pmode` and `m64` are likewise in the saved set.  A refresh point
+    exists (`invoke_set_current_function_hook`, `function.cc:4697`) but is not
+    the only writer -- `c-pragma.cc:1275` restores directly, and
+    `stor-layout.cc` reads `BIGGEST_ALIGNMENT` during parsing with no current
+    function.  A stale cache is this branch's own bug reinvented, bought to
+    save a cost at the noise floor.
+  * **R3 per-base consumer TUs -- costed and rejected for consumers.**
+    `t139-dupcost.sh` against the real build dir: the 42 built shared `.cc`
+    consumers of `UNITS_PER_WORD` total **11,157,584 bytes of object text**,
+    i.e. ~11 MB **per additional back end for one macro**, on the largest files
+    in the compiler (`tree-vect-loop.cc` 531 KB, `varasm.cc` 410 KB).  Right
+    for suppliers, where it already is.
+  * **R4 narrow the hot subset -- available, small, and not recommended now.**
+    7 sites in one file would do it.  It saves 84 % of a cost at the noise
+    floor and costs a **second spelling of one name**, which is the branch's
+    subject.  Kept as the contingency with the map, not as a plan.
+
+Sequencing: run the direct `UNITS_PER_WORD` A/B **first**; convert
+`BIGGEST_ALIGNMENT` first of the three (the only one whose value moves per
+function on a configured base, so a wrong mechanism shows as a wrong answer
+rather than as luck); `POINTER_SIZE` must lose its `#ifndef` floor
+(`defaults.h:863`) in the same change that converts it; `UNITS_PER_WORD` last.
+
+**On this base pair `UNITS_PER_WORD` is 8 for both**, so its conversion will
+move no value and no byte of output -- correct today by luck, like
+`MAX_MOVE_MAX`/`MIN_UNITS_PER_WORD`.  Its arm must be structural; an
+output-unchanged arm is green before and after and measures nothing.
+
+## 4. INCIDENTAL FINDING WITH A REPRODUCER: THE x87 PASS RUNS FOR aarch64
+
+Four corpus TUs ICE on the aarch64 base in **both** arm-B compilers, so nothing
+measured here caused them:
+
+    libbacktrace_dwarf.i:3599   ICE in replace_reg,          reg-stack.cc:728
+    libdecnumber_bid_bid2dpd..  ICE in subst_stack_regs_pat, reg-stack.cc:2138
+    libdecnumber_decContext.i   ICE: Segmentation fault
+    libdecnumber_decNumber.i    ICE in subst_stack_regs_pat, reg-stack.cc:2138
+
+`pass_stack_regs::gate` is `#ifdef STACK_REGS return true; #else return false;`
+and only `config/i386/i386.h:969` defines `STACK_REGS`.  The gate is therefore
+`true` for every target and **aarch64 runs the x87 stack-register pass**.
+`rest_of_handle_stack_regs` is `#ifdef`-bracketed the same way, so it does work
+rather than being a no-op.  Class (d), the absence channel, with named
+reproducible victims.  Not converted here.  `stack_regs_mentioned` at
+`reg-stack.cc:3451` is already the branch's model for the fix.
+
+## 5. WHAT IS A RULING, NOT ENGINEERING
+
+  * **Hooks (`targetm`) vs the branch's `mt_*` thunks for class (c).**  An
+    upstreaming-shape decision (`CLASS-C-DESIGN.md` section 1 measured ~86 new
+    `target.def` entries for the hook route).  **The cost figure above is the
+    same either way** -- both are an indirect call through a per-base pointer
+    -- so the measurement does not decide it and neither do I.
+  * **Whether a cached target answer is admissible anywhere.**  Recommended
+    against on correctness; if the answer is "never", that belongs in
+    PRINCIPLES rather than being re-decided per macro.
+  * **NOT DECIDED HERE AND UNTOUCHED:** `gen_movxf` / what any `insn-emit`
+    forwarder implies, and what a triple-less installed `gcc` resolves to with
+    no default target.  Named only so it is on the record they were left alone.
+
+## 6. WHAT I DID NOT MEASURE
+
+  * **No conversion; no compiler source changed; bars not re-run and not
+    claimed.**
+  * **<= 0.3 % is an upper bound, not a value.**  The effect sits at or below a
+    0.3-0.5 % run-to-run standard deviation.  "Not distinguishable from zero on
+    this corpus" is the correct reading; "0.21 %" is not.
+  * **The aarch64 arm is weaker evidence than the x86_64 one** -- 3.5 s of work
+    against 9.9 s and 148 KB of asm against 1.9 MB, because four TUs die early
+    (section 4).  Corroboration, not a second independent result.
+  * **Do not compare absolute times across sessions** (9.68 s vs 9.83 s for the
+    same corpus, same compiler, two sessions).  The drift is larger than the
+    effect; interleaving within a session is the only reason either arm means
+    anything.
+  * **`POINTER_SIZE` and `BIGGEST_ALIGNMENT` were not counted.**  Only
+    `UNITS_PER_WORD` and `Pmode` carry counters.  That they are colder is a
+    suggestion from their consumers, not a measurement.
+  * **`UNITS_PER_WORD`'s cost was not measured directly** -- it is still a
+    macro.  Section 3's <= 0.4 % is arithmetic on two measurements.
+  * **One host, one corpus, one optimisation level** (`-O2`, C, one x86_64
+    machine).
+  * **Site counts here are 268 / 75 / 68 against `t137-ranking.txt`'s
+    267 / 74 / 68** -- different file filters, one line apiece.  Neither figure
+    should be quoted as the other's.
