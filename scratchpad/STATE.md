@@ -10431,3 +10431,136 @@ Zero such errors here.  Not claimed fixed -- this build configures exactly one
 rs6000 triple, `powerpc64le-unknown-linux-gnu`, so the first triple IS the
 triple and the divergence has nothing to express.  **The prediction is
 untested by this build, not refuted by it.**
+
+## 6. AFTER THE FOUR: rs6000 BUILDS, AND WHAT "BUILDS" MEANS
+
+`make multi-target-objs cc1 lto1` in the three-back-end dir: **rc=0, 0
+`error:`, stderr 0 lines**, `cc1` 94508744 bytes with three back ends linked.
+That is objects and link.  It is NOT the whole story, and the next two
+sections are why.
+
+**rs6000 EMITS REAL POWERPC.**  `/tmp/rs6k-leaf.c` (`mt_leaf`, `mt_mem`) at
+`-O2` through the powerpc64le `specs-config`:
+
+    .machine power8 / .abiversion 2
+    addi 3,3,1 ; extsw 3,3 ; blr
+    sldi 4,4,3 ; add 9,3,4 ; ldx 3,3,4 ; ld 9,8(9) ; add 3,3,9 ; blr
+
+ELFv2, arguments and return in r3/r4, `blr`.  Stated because PRINCIPLES 4 is
+explicit that "where does it ICE" is not the measurement: this is the output,
+not the stopping point, and it is not i386's register numbers wearing ppc
+mnemonics.
+
+The specs were probed with the **real** `powerpc64le-unknown-linux-gnu`
+binutils (`pkgsCross.powernv.buildPackages.binutils`), not the host's --
+`configure: 120 capabilities, all expected` -- because #113b measured that
+without them the file NAMES one target and DESCRIBES another and every
+name-based check passes.
+
+## 7. THE FIFTH CAUSE, WHICH IS A GROUP OF SEVEN AND WAS PREDICTED BEFORE IT FIRED
+
+With the four build causes fixed, rs6000 ICEd at
+`default_function_value_regno_p, targhooks.cc:1153`.  `targhooks.cc` is
+compiled ONCE and its defaults have the shape
+`#ifdef <tm.h macro> ... #else gcc_unreachable ()`, resolved against the
+PRIMARY's `tm.h`.
+
+`scratchpad/rs6k-targhook-sweep.sh` reads the sixteen such macros out of
+`targhooks.cc` and asks which back ends define each.  **Seven are defined by
+rs6000 and by NEITHER i386 nor aarch64**, and rs6000 supplies no hook for any
+of them:
+
+    #else gcc_unreachable ()   PRINT_OPERAND, PRINT_OPERAND_ADDRESS,
+                               LIBCALL_VALUE, FUNCTION_VALUE_REGNO_P
+    #else A WRONG ANSWER       PRINT_OPERAND_PUNCT_VALID_P  -> false
+                               PROFILE_BEFORE_PROLOGUE      -> false
+                               PREFERRED_RELOAD_CLASS       -> rclass
+                               CLASS_MAX_NREGS              -> generic formula
+
+**The second group is the important half.**  It does not ICE.  It compiles,
+exits 0, and gives rs6000 somebody else's answer -- `&` silently not a valid
+punctuation character, profiling silently after the prologue, register classes
+silently generic.  Invisible without a third back end, because neither of the
+first two defines the macros.
+
+The sweep earned its keep immediately: after supplying
+`TARGET_FUNCTION_VALUE_REGNO_P`, the next ICE was
+`default_print_operand, targhooks.cc:456` -- the next macro on its list.  All
+seven are now supplied in `rs6000.cc`, each expanding rs6000's own macro in
+rs6000's own translation unit, which is what a single-target rs6000 build
+computes.  Not a fallback.
+
+**Two more macros run the OTHER way** and were left alone: i386 and aarch64
+define `ASM_OUTPUT_EXTERNAL_LIBCALL` and `MOVE_RATIO`, rs6000 does not, so
+today rs6000 silently gets the primary's.  Same shape, opposite direction; the
+sweep lists them and nothing here fixes them.
+
+## 8. THE TWO WALLS BEYOND, BOTH ATTRIBUTED WITH A CONTROL
+
+### 8a. `gen_blockage` -- ALREADY RECORDED, NOT MINE TO LAND
+
+rs6000 now reaches the epilogue and stops with
+
+    error: unrecognizable insn:
+    (insn/f 45 44 46 2 (unspec_volatile [(const_int 0)] UNSPECV_LL) ...
+       (expr_list:REG_CFA_RESTORE (reg:DI 31 31) ...
+
+**Read the name.**  rs6000's epilogue asked for a BLOCKAGE and the insn came
+back holding unspec code **1**, which is `UNSPECV_BLOCKAGE` in
+`insn-constants-i386.h` and `UNSPECV_LL` in rs6000's.  That is the shared
+numbering bug printing its own diagnosis: `::gen_blockage` is i386's, from
+`insn-emit-*.o`, and rs6000's epilogue binds it.
+
+This is the recorded "gen_blockage -- INVESTIGATED, NOT LANDED. IT IS SIX
+BUGS, NOT ONE" item, WIP at `scratchpad/gen-blockage-WIP.patch`.  Not touched:
+it is a design fork with an owner, and the brief says breadth over depth.
+**What is new is that rs6000 supplies a THIRD numbering** (i386 1, aarch64 5,
+rs6000 something else), so a fix that makes two agree is not a fix.
+
+### 8b. THE THIRD BACK END BREAKS THE PRIMARY'S CODEGEN -- A REAL REGRESSION, NOT MINE
+
+Two lines are enough:
+
+    int callee(int,int);
+    int g(int a,int b){int t=callee(a,b);return t+callee(b,a);}
+
+    i386 + aarch64            -> 627 bytes, compiles
+    i386 + aarch64 + rs6000   -> Segmentation fault
+
+        during RTL pass: sched2   (and `shorten' with -fno-schedule-insns2)
+        ix86_attr_length_address_default(rtx_insn*)
+        insn_i386::insn_default_length(rtx_insn*)
+
+**Attributed by a both-sided control, not by argument**: the SAME tree with
+the SAME changes, configured for the established pair only
+(`/tmp/b-a5fb19dec8368eaf6-pair`), gives **12369 bytes / `378fc33c1e70`** on
+`scratchpad/big.c` -- the recorded bar exactly -- and **stock-compare 5/5
+IDENTICAL** against `/tmp/b-stock` with the negative control firing.  So the
+fault is the PRESENCE OF A THIRD BACK END, not this task's changes.
+
+It needs a call and a real frame: a leaf and a tail call both compile.  In the
+three-back-end dir `stock-compare` scores **4/5 comparable, 0/5 identical**
+and refuses to report, because every level is truncated by the ICE -- the
+harness declining to score an unscorable run, which is it working.
+
+Not diagnosed further.  The shape (a per-base attribute table reached with an
+insn code, wrong once a third numbering exists) is the family that produced
+the 163KB `.bss` overrun, and it is the obvious next task.  Minimal repro
+preserved at `/tmp/rs6k-y.c`; it reproduces from a fresh build in seconds.
+
+## 9. BARS
+
+  * three-back-end `/tmp/b-a5fb19dec8368eaf6`: `make multi-target-objs cc1
+    lto1` **rc=0**, `grep -c 'error:'` **0**, stderr **0 lines**.
+  * pair control `/tmp/b-a5fb19dec8368eaf6-pair`, SAME tree: x86_64 `-O2`
+    `scratchpad/big.c` **12369 bytes / `378fc33c1e70`** (input path quoted
+    with the count), and `stock-compare.sh` vs `/tmp/b-stock`
+    **5/5 IDENTICAL**, 5 distinct md5s per side, negative control firing
+    (1158 vs 804 lines, differ).
+  * **A before/after IN THE SAME THREE-BACK-END DIR IS NOT AVAILABLE, and the
+    reason matters**: before these changes that configuration produced no
+    `cc1` at all, so there is no "before" to read.  The pair dir is the
+    control that can be taken both ways, and it is.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+  * Both build dirs' `config.log` name this worktree; every script asserts it
+    and refuses otherwise.

@@ -1662,6 +1662,28 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 #undef TARGET_FUNCTION_VALUE
 #define TARGET_FUNCTION_VALUE rs6000_function_value
 
+#undef TARGET_FUNCTION_VALUE_REGNO_P
+#define TARGET_FUNCTION_VALUE_REGNO_P rs6000_function_value_regno_p
+
+/* See the block comment on rs6000_print_operand: seven `targhooks.cc'
+   defaults read rs6000's tm.h macros through an `#ifdef' resolved in a SHARED
+   translation unit, so in a multi-target binary they are answered by the
+   primary.  Four ICE and three answer wrongly in silence.  */
+#undef TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND rs6000_print_operand
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS rs6000_print_operand_address
+#undef TARGET_PRINT_OPERAND_PUNCT_VALID_P
+#define TARGET_PRINT_OPERAND_PUNCT_VALID_P rs6000_print_operand_punct_valid_p
+#undef TARGET_LIBCALL_VALUE
+#define TARGET_LIBCALL_VALUE rs6000_libcall_value_hook
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS rs6000_class_max_nregs_hook
+#undef TARGET_PREFERRED_RELOAD_CLASS
+#define TARGET_PREFERRED_RELOAD_CLASS rs6000_preferred_reload_class_hook
+#undef TARGET_PROFILE_BEFORE_PROLOGUE
+#define TARGET_PROFILE_BEFORE_PROLOGUE rs6000_profile_before_prologue_hook
+
 #undef TARGET_OPTION_VALID_ATTRIBUTE_P
 #define TARGET_OPTION_VALID_ATTRIBUTE_P rs6000_valid_attribute_p
 
@@ -24255,6 +24277,105 @@ rs6000_function_value (const_tree valtype,
     regno = GP_ARG_RETURN;
 
   return gen_rtx_REG (mode, regno);
+}
+
+/* Target hook for TARGET_FUNCTION_VALUE_REGNO_P.
+
+   WHY THIS EXISTS HERE AND NOT UPSTREAM.  rs6000 answers this question with
+   the `tm.h' MACRO `FUNCTION_VALUE_REGNO_P' and supplies no hook, so the
+   generic `default_function_value_regno_p' answers for it -- and that function
+   lives in `targhooks.cc', a SHARED translation unit compiled ONCE.  Its body
+   is `#ifdef FUNCTION_VALUE_REGNO_P ... #else gcc_unreachable ()', resolved
+   against whichever `tm.h' the shared build read.  i386 defines no such macro
+   (it supplies the hook), so in an i386-primary multi-target build the `#ifdef'
+   is silently FALSE and every rs6000 compilation ICEs in combine at
+   `targhooks.cc:1153'.
+
+   Supplying the hook here is the per-base answer rather than a fallback: the
+   macro is expanded in rs6000's OWN translation unit, against rs6000's own
+   `tm.h', which is exactly what a single-target rs6000 build computes.  i386
+   and aarch64 already do this; rs6000 is one of the back ends that never
+   needed to.  */
+
+static bool
+rs6000_function_value_regno_p (const unsigned int regno)
+{
+  return FUNCTION_VALUE_REGNO_P (regno);
+}
+
+/* THE SAME SHAPE, SIX MORE TIMES, and the group is the finding rather than
+   any one member.  `scratchpad/rs6k-targhook-sweep.sh' reads the
+   `#ifdef <MACRO>' defaults out of `targhooks.cc' and asks which back ends
+   define each macro.  Seven of the sixteen are defined by rs6000 and by
+   NEITHER i386 nor aarch64, so in this pair's world the shared `targhooks.cc'
+   compiles the `#else' arm every time and rs6000's answers are unreachable.
+
+   The seven split into two kinds, and the second kind is the dangerous one:
+
+     PRINT_OPERAND, PRINT_OPERAND_ADDRESS, LIBCALL_VALUE,
+     FUNCTION_VALUE_REGNO_P            `#else gcc_unreachable ()' -- an ICE
+                                       that does not mention rs6000
+
+     PRINT_OPERAND_PUNCT_VALID_P       `#else return false'
+     PROFILE_BEFORE_PROLOGUE           `#else return false'
+     PREFERRED_RELOAD_CLASS            `#else return rclass'
+     CLASS_MAX_NREGS                   `#else' a generic size formula
+
+   The second group does not ICE.  It compiles, exits 0, and gives rs6000
+   somebody else's answer -- `&' silently not a valid punctuation character,
+   profiling silently after the prologue, register classes silently generic.
+   That is this branch's signature failure, and it is invisible without a
+   third back end because the macros are defined by neither of the first two.
+
+   Each wrapper below expands rs6000's OWN macro in rs6000's OWN translation
+   unit against rs6000's OWN tm.h.  That is a per-base answer, not a
+   fallback: it is exactly what a single-target rs6000 build computes.  */
+
+static void
+rs6000_print_operand (FILE *stream, rtx x, int code)
+{
+  PRINT_OPERAND (stream, x, code);
+}
+
+static void
+rs6000_print_operand_address (FILE *stream, machine_mode /*mode*/, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}
+
+static bool
+rs6000_print_operand_punct_valid_p (unsigned char code)
+{
+  return PRINT_OPERAND_PUNCT_VALID_P (code);
+}
+
+static rtx
+rs6000_libcall_value_hook (machine_mode mode, const_rtx fun ATTRIBUTE_UNUSED)
+{
+  return LIBCALL_VALUE (MACRO_MODE (mode));
+}
+
+static unsigned char
+rs6000_class_max_nregs_hook (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+static reg_class_t
+rs6000_preferred_reload_class_hook (rtx x, reg_class_t rclass)
+{
+  return (reg_class_t) PREFERRED_RELOAD_CLASS (x, (enum reg_class) rclass);
+}
+
+static bool
+rs6000_profile_before_prologue_hook (void)
+{
+#ifdef PROFILE_BEFORE_PROLOGUE
+  return true;
+#else
+  return false;
+#endif
 }
 
 /* Define how to find the value returned by a library function
