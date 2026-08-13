@@ -79,7 +79,7 @@ never reaching the check.
 | 4 | `x_aarch_ra_sign_scope` emitted twice into `cl_target_option` | **725** | two authorities, one member | FIXED in `opth-gen.awk` |
 | 5 | `t-<cpu>-headers` has rules but no `generated_files +=` | arm + loongarch, 31 | rule nothing depends on | FIXED — family swept + guard |
 | 6 | back end hand-declares its own generated predicates | frv 59, m32r 1, stormy16 1 | cost of the namespacing | FIXED — swept |
-| 7 | `asm_dialect`: a `Var()` in bpf, an enum TYPE in i386 | **94, all 47 back ends** | one name, two kinds | FIXED — `bpf_asm_dialect_var` |
+| 7 | an option `Var()` in one back end, a TYPE in another — `asm_dialect` (bpf vs i386 `enum`), `stringop_strategy` (riscv vs i386 `struct`) | **94 + 2, all 47 back ends** | one name, two kinds | FIXED — `bpf_asm_dialect_var`, `riscv_stringop_strategy` |
 | 8 | `<cpu>-opts.h` macros leak through the shared `options.h` | **958** | the union answering for everyone | **DESIGN FORK — not fixed** |
 
 Read the shape, not the list: **four of the eight are the same bug** (one
@@ -164,6 +164,16 @@ IS the primary's answer, arriving by a different route.
     after the first physical line.**  `scan_hdr_frag` reads one line.  A
     four-name result is indistinguishable from a complete list.  No other
     fragment uses a continuation -- checked, not assumed.
+  * **AN INSTRUMENT THAT SCORED 0 WHILE THE BUILD STILL FAILED.**
+    `mtN-varvstype.sh` compared option `Var()` names against `enum` type names
+    and reported **0 collisions** -- with `stringop_strategy` (riscv `Var()`,
+    i386 `const struct`) still breaking every build.  It looked for `enum` and
+    the collision was a `struct`.  Broadening it to `enum|struct|class` took
+    the type population **336 -> 481** and found it.  A zero from a
+    name-matching instrument is a claim about the instrument.  Note also where
+    the diagnostic landed: two lines past the macro, on a member name --
+    `i386.h:97: error: 'size' does not name a type` -- naming neither back end,
+    neither the macro, nor the option.
   * **A sweep keyed on a name suffix deletes live code.**  m32r's
     `addr24_operand`, `addr32_operand`, `call26_operand`, `call_operand`,
     `memreg_operand`, `small_data_operand` are declared in `m32r-protos.h` and
