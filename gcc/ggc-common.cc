@@ -87,6 +87,28 @@ ggc_zero_rtab_roots (const_ggc_root_tab_t rt)
       (*(void **) ((char *)rt->base + rt->stride * i)) = (void*)0;
 }
 
+/* MULTI-TARGET.  A per-back-end marker dispatcher was called with no back
+   end's routine installed.
+
+   This is deliberately fatal rather than a no-op or a walk of some default
+   layout.  `struct machine_function' is one NAME with 34 different sets of
+   fields, one per back end; walking it with the wrong back end's routine
+   reads pointers out of whatever that back end keeps at those offsets and
+   leaves that back end's real pointers unmarked.  Neither half produces a
+   diagnostic on its own -- the first crashes somewhere else much later, the
+   second frees live memory -- so the only useful thing to do at the point
+   where the answer is known to be missing is to say so and name the type.  */
+
+void
+gt_multi_target_no_marker (const char *tag)
+{
+  internal_error ("no garbage-collection marker is installed for %qs: the "
+		  "selected back end supplies none, or no back end has been "
+		  "selected.  Each back end defines its own %qs, and there is "
+		  "deliberately no default -- another back end's routine would "
+		  "walk this one's objects at the wrong offsets", tag, tag);
+}
+
 /* Iterate through all registered roots and mark each element.  */
 
 void

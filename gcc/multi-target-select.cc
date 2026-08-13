@@ -624,6 +624,30 @@ multi_target_select (const char *target)
 			  "gen-multi-target-md.awk emits one for every back "
 			  "end that has objects, so this is a build bug", base);
 
+	/* The GARBAGE COLLECTOR's view of this back end's own types; see
+	   gengtype's mt_write_dispatchers.
+
+	   34 back ends define `struct GTY(()) machine_function', each with
+	   different fields, and gengtype had one global namespace, so it kept
+	   ONE -- `gt_ggc_mx_machine_function' was a single definition in the
+	   whole build directory, called from the shared `rtl_data' walk for
+	   every back end.  This is that family's selection, and it is the same
+	   shape as the six above: the per-base routines were the missing half,
+	   and this line is the half that chooses between them.
+
+	   It fails BY NAME when the back end supplies no routines.  The name
+	   this looks up is the back end's `cpu_type', while gengtype names its
+	   routines after the SOURCE DIRECTORY the definition came from; those
+	   agree for every in-tree back end except `stormy16', whose cpu_type
+	   is `xstormy16'.  A mismatch therefore stops the compiler here with
+	   the back end named, rather than leaving a dispatcher pointing at
+	   whichever back end was selected before.  */
+	if (!gt_multi_target_install_markers (base))
+	  internal_error ("back end %qs installs no garbage-collection markers "
+			  "for the types it defines; gengtype names them after "
+			  "the back end's source directory under config/, which "
+			  "differs from this back end's cpu_type", base);
+
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is
 	   a link-time one rather than a design preference.  Their tables call

@@ -746,6 +746,79 @@ void add_subclass (type_p base, type_p subclass)
   base->u.s.first_subclass = subclass;
 }
 
+/* MULTI-TARGET.  The back end a definition came from, or NULL.
+
+   Returns the directory component D of a path containing `config/D/', which
+   is one back end's source directory -- "i386", "aarch64", "xtensa".  Every
+   other file (shared code, a front end, a generated file) returns NULL.
+
+   This is the ONE place gengtype learns that a definition belongs to a back
+   end rather than to the compiler.  Without it gengtype has a single global
+   namespace, and 34 back ends defining `struct GTY(()) machine_function'
+   -- each with different fields -- collapse to whichever definition was
+   parsed last, with no diagnostic anywhere.  Measured before this change:
+   `gt_ggc_mx_machine_function' had exactly ONE definition in the whole build
+   directory, walking i386's three fields, and it was called from the shared
+   `rtl_data' walk for every configured back end.  With i386 + aarch64
+   configured, an aarch64 compile with collection forced faulted inside
+   `ggc_set_mark', reached from `gt_ggc_mx_stack_local_entry' reached from
+   `gt_ggc_mx_machine_function' -- i386's `stack_locals' read out of the
+   `poly_int64 reg_offset[0]' that aarch64 keeps at that offset.
+
+   Note this deliberately keys on the SOURCE DIRECTORY and not on the back
+   end's `cpu_type'.  gengtype has no access to config.gcc and cannot know a
+   cpu_type; the directory is what it can see, and it is what names the
+   `gt-<dir>.h' file the per-base routines are emitted into.  The two agree
+   for every back end but `stormy16' (whose cpu_type is `xstormy16'), and the
+   installer below fails BY NAME rather than silently when they do not.  */
+
+const char *
+mt_config_dir_of_file (const input_file *inpf)
+{
+  const char *name, *p, *q;
+
+  if (inpf == NULL)
+    return NULL;
+  name = get_input_file_name (const_cast<input_file *> (inpf));
+  if (name == NULL)
+    return NULL;
+  p = strstr (name, "config/");
+  if (p == NULL)
+    return NULL;
+  /* Require a directory boundary before `config/', so that a file whose own
+     name ends in `config/' -- or a path component such as `myconfig/' --
+     does not match.  */
+  if (p != name && p[-1] != '/')
+    return NULL;
+  p += strlen ("config/");
+  q = strchr (p, '/');
+  if (q == NULL || q == p)
+    return NULL;
+  return xstrndup (p, q - p);
+}
+
+/* The back end structure S was defined by, or NULL if it is not a back end's
+   own type.  */
+
+const char *
+mt_config_dir_of_type (const_type_p s)
+{
+  if (!union_or_struct_p (s))
+    return NULL;
+  return mt_config_dir_of_file (s->u.s.line.file);
+}
+
+/* Whether two results of mt_config_dir_of_* name the same back end.  NULL
+   (shared code) is its own distinct answer and never equals a back end.  */
+
+static bool
+mt_same_base_p (const char *a, const char *b)
+{
+  if (a == NULL || b == NULL)
+    return a == b;
+  return strcmp (a, b) == 0;
+}
+
 /* Create and return a new structure with tag NAME at POS with fields
    FIELDS and options O.  The KIND of structure must be one of
    TYPE_STRUCT, TYPE_UNION or TYPE_USER_STRUCT.  */
@@ -759,6 +832,12 @@ new_structure (const char *name, enum typekind kind, struct fileloc *pos,
   lang_bitmap bitmap = get_lang_bitmap (pos->file);
   bool isunion = (kind == TYPE_UNION);
   type_p *p = &structures;
+  /* MULTI-TARGET: which back end, if any, is defining this tag now.  Two
+     definitions with the same lang bitmap but from DIFFERENT back ends are
+     distinct types that happen to share a name, and must not overwrite one
+     another -- see mt_config_dir_of_file.  */
+  const char *newbase = mt_config_dir_of_file (pos->file);
+  bool base_variant = false;
 
   gcc_assert (union_or_struct_p (kind));
 
@@ -771,11 +850,20 @@ new_structure (const char *name, enum typekind kind, struct fileloc *pos,
 	    ls = si;
 
 	    for (si = ls->u.s.lang_struct; si != NULL; si = si->next)
-	      if (si->u.s.bitmap == bitmap)
+	      if (si->u.s.bitmap == bitmap
+		  && mt_same_base_p (mt_config_dir_of_type (si), newbase))
 		s = si;
+	    /* Reaching the chain without finding our own base means this is a
+	       further back end's definition of an already-split tag.  */
+	    if (s == NULL && newbase != NULL)
+	      base_variant = true;
 	  }
-	else if (si->u.s.line.file != NULL && si->u.s.bitmap != bitmap)
+	else if (si->u.s.line.file != NULL
+		 && (si->u.s.bitmap != bitmap
+		     || !mt_same_base_p (mt_config_dir_of_type (si), newbase)))
 	  {
+	    if (si->u.s.bitmap == bitmap)
+	      base_variant = true;
 	    ls = si;
 	    type_count++;
 	    si = XCNEW (struct type);
@@ -811,7 +899,13 @@ new_structure (const char *name, enum typekind kind, struct fileloc *pos,
       *p = s;
     }
 
-  if (s->u.s.lang_struct && (s->u.s.lang_struct->u.s.bitmap & bitmap))
+  /* The duplicate-definition check is keyed on the lang bitmap, and every
+     back end shares one bitmap.  So it must NOT fire for a per-back-end
+     variant: 34 legitimate definitions of `machine_function' are 34 distinct
+     types, not 33 duplicates.  It still fires for a genuine redefinition
+     within one back end, and for the front-end case it was written for.  */
+  if (!base_variant
+      && s->u.s.lang_struct && (s->u.s.lang_struct->u.s.bitmap & bitmap))
     {
       error_at_line (pos, "duplicate definition of '%s %s'",
 		     isunion ? "union" : "struct", s->u.s.tag);
@@ -2024,6 +2118,48 @@ header_dot_h_frul (input_file* inpf, char**poutname,
   DBGPRINTF ("inpf %p inpname %s outname %s forname %s",
 	     (void*) inpf, get_input_file_name (inpf),
 	     *poutname, *pforname);
+
+  /* MULTI-TARGET: `config/<D>/<D>.h' is a back end's tm.h fragment, and its
+     GTY declarations belong in that back end's own `gt-<D>.h'.
+
+     Upstream sends every non-front-end header to `gtype-desc.cc', which is
+     compiled once and includes exactly one `tm.h'.  With one back end that is
+     right; with several it is not even self-consistent, because a tm.h
+     fragment CANNOT BE INCLUDED ON ITS OWN -- gtype-desc.cc emitting root
+     tables for `aarch64_fp16_type_node' out of `aarch64.h' failed to compile
+     with ten `was not declared in this scope', naming each root.  The file
+     that can see these declarations is `config/<D>/<D>.cc', compiled per base
+     with that base's headers in force, and it already includes `gt-<D>.h'.
+
+     Deliberately narrow: ONLY the `<D>/<D>.h' fragment, not every header
+     under config/<D>/.  A back end's other headers (`aarch64-sve-builtins.h')
+     are ordinary self-contained headers whose types belong with their own
+     source file, and moving those into `gt-<D>.h' put them in a translation
+     unit where they are incomplete -- twenty errors naming
+     `registered_function'.  All sixteen back ends that declare GTY types in
+     their tm.h chain do so in `<D>/<D>.h', so this covers them; any other
+     file that ever needs it will fail to compile by name, as these two did,
+     rather than silently landing in shared code.  */
+  {
+    const char *nm = get_input_file_name (inpf);
+    const char *d = mt_config_dir_of_file (inpf);
+    if (d != NULL)
+      {
+	char *want = xasprintf ("/%s/%s.h", d, d);
+	size_t nl = strlen (nm), wl = strlen (want);
+	bool hit = nl >= wl && strcmp (nm + nl - wl, want) == 0;
+	free (want);
+	if (hit)
+	  {
+	    char *cc = xasprintf ("%.*s.cc", (int) (nl - 2), nm);
+	    outf_p o = get_output_file_with_visibility (input_file_by_name (cc));
+	    free (cc);
+	    if (o != NULL)
+	      return o;
+	  }
+      }
+  }
+
   basename = get_file_basename (inpf);
   lang_index = get_prefix_langdir_index (basename);
   DBGPRINTF ("basename %s lang_index %d", basename, lang_index);
@@ -3361,17 +3497,44 @@ write_type_decl (outf_p out, type_p ty)
    is the prefix to use (to distinguish ggc from pch markers).  */
 
 static void
-write_marker_function_name (outf_p of, type_p s, const char *prefix)
+write_marker_function_name (outf_p of, type_p s, const char *prefix,
+			    const char *base = NULL)
 {
   if (union_or_struct_p (s))
     {
       const char *id_for_tag = filter_type_name (s->u.s.tag);
       oprintf (of, "gt_%sx_%s", prefix, id_for_tag);
+      /* MULTI-TARGET: a per-back-end variant carries its back end in its
+	 name.  Qualify only what actually collides -- a type only one back
+	 end defines keeps the plain name and no dispatch.  */
+      if (base != NULL)
+	oprintf (of, "_%s", base);
       if (id_for_tag != s->u.s.tag)
 	free (const_cast<char *> (id_for_tag));
     }
   else
     gcc_unreachable ();
+}
+
+/* MULTI-TARGET: the back end suffix for one variant S of the homonymous
+   group ORIG_S, or NULL when S is not a per-back-end variant and keeps the
+   plain unqualified name.  */
+
+static const char *
+mt_variant_base (const_type_p orig_s, const_type_p s)
+{
+  if (orig_s == s)
+    return NULL;
+  return mt_config_dir_of_type (s);
+}
+
+/* Append the back end suffix, if there is one, to a name already begun.  */
+
+static void
+mt_emit_base_suffix (outf_p of, const char *base)
+{
+  if (base != NULL)
+    oprintf (of, "_%s", base);
 }
 
 /* Write on OF a user-callable routine to act as an entry point for
@@ -3507,6 +3670,8 @@ write_func_for_structure (type_p orig_s, type_p s,
       return;
     }
 
+  const char *mtbase = mt_variant_base (orig_s, s);
+
   memset (&d, 0, sizeof (d));
   d.of = get_output_file_for_structure (s);
 
@@ -3544,7 +3709,7 @@ write_func_for_structure (type_p orig_s, type_p s,
 
   oprintf (d.of, "\n");
   oprintf (d.of, "void\n");
-  write_marker_function_name (d.of, orig_s, wtd->prefix);
+  write_marker_function_name (d.of, orig_s, wtd->prefix, mtbase);
   oprintf (d.of, " (void *x_p)\n");
   oprintf (d.of, "{\n  ");
   write_type_decl (d.of, s);
@@ -3568,6 +3733,7 @@ write_func_for_structure (type_p orig_s, type_p s,
 	{
 	  oprintf (d.of, ", x, gt_%s_", wtd->param_prefix);
 	  output_mangled_typename (d.of, orig_s);
+	  mt_emit_base_suffix (d.of, mtbase);
 	}
       oprintf (d.of, "))\n");
     }
@@ -3581,6 +3747,7 @@ write_func_for_structure (type_p orig_s, type_p s,
 	{
 	  oprintf (d.of, ", xlimit, gt_%s_", wtd->param_prefix);
 	  output_mangled_typename (d.of, orig_s);
+	  mt_emit_base_suffix (d.of, mtbase);
 	}
       oprintf (d.of, "))\n");
       if (chain_circular != NULL)
@@ -3608,6 +3775,7 @@ write_func_for_structure (type_p orig_s, type_p s,
 	    {
 	      oprintf (d.of, ", xprev, gt_%s_", wtd->param_prefix);
 	      output_mangled_typename (d.of, orig_s);
+	      mt_emit_base_suffix (d.of, mtbase);
 	    }
 	  oprintf (d.of, ");\n");
 	  oprintf (d.of, "      }\n");
@@ -3619,6 +3787,7 @@ write_func_for_structure (type_p orig_s, type_p s,
 	    {
 	      oprintf (d.of, ", xlimit, gt_%s_", wtd->param_prefix);
 	      output_mangled_typename (d.of, orig_s);
+	      mt_emit_base_suffix (d.of, mtbase);
 	    }
 	  oprintf (d.of, "));\n");
 	  oprintf (d.of, "  do\n");
@@ -3724,6 +3893,17 @@ write_types (outf_p output_header, type_p structures,
 	oprintf (output_header,
 		 "extern void gt_%sx_%s (void *);\n",
 		 wtd->prefix, s_id_for_tag);
+
+	/* MULTI-TARGET: and one declaration per back end that defines this
+	   tag.  The unsuffixed name above stays exactly as it was -- it is
+	   what shared code calls -- but it is now a DISPATCHER emitted by
+	   mt_write_dispatchers, not one back end's walk serving everybody.  */
+	if (s->kind == TYPE_LANG_STRUCT)
+	  for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
+	    if (mt_variant_base (s, ss) != NULL)
+	      oprintf (output_header,
+		       "extern void gt_%sx_%s_%s (void *);\n",
+		       wtd->prefix, s_id_for_tag, mt_variant_base (s, ss));
 
 	if (s_id_for_tag != s->u.s.tag)
 	  free (const_cast<char *> (s_id_for_tag));
@@ -3957,6 +4137,8 @@ write_local_func_for_structure (const_type_p orig_s, type_p s)
   if (s->u.s.base_class)
     return;
 
+  const char *mtbase = mt_variant_base (orig_s, s);
+
   memset (&d, 0, sizeof (d));
   d.of = get_output_file_for_structure (s);
   d.process_field = write_types_local_process_field;
@@ -3973,6 +4155,7 @@ write_local_func_for_structure (const_type_p orig_s, type_p s)
   oprintf (d.of, "void\n");
   oprintf (d.of, "gt_pch_p_");
   output_mangled_typename (d.of, orig_s);
+  mt_emit_base_suffix (d.of, mtbase);
   oprintf (d.of, " (ATTRIBUTE_UNUSED void *this_obj,\n"
 	   "\tvoid *x_p,\n"
 	   "\tATTRIBUTE_UNUSED gt_pointer_operator op,\n"
@@ -4059,12 +4242,149 @@ write_local (outf_p output_header, type_p structures)
 	if (s->kind == TYPE_LANG_STRUCT)
 	  {
 	    type_p ss;
+	    /* MULTI-TARGET: each per-back-end variant defines its own
+	       suffixed walker, so each needs its own declaration.  The
+	       unsuffixed one above is then declared and never defined, which
+	       is harmless: nothing references it.  */
+	    for (ss = s->u.s.lang_struct; ss; ss = ss->next)
+	      if (mt_variant_base (s, ss) != NULL)
+		{
+		  oprintf (output_header, "extern void gt_pch_p_");
+		  output_mangled_typename (output_header, s);
+		  mt_emit_base_suffix (output_header, mt_variant_base (s, ss));
+		  oprintf (output_header,
+			   "\n    (void *, void *, gt_pointer_operator,"
+			   " void *);\n");
+		}
 	    for (ss = s->u.s.lang_struct; ss; ss = ss->next)
 	      write_local_func_for_structure (s, ss);
 	  }
 	else
 	  write_local_func_for_structure (s, s);
       }
+}
+
+/* MULTI-TARGET.  Emit, into the shared gtype-desc.cc, one DISPATCHER per tag
+   that more than one back end defines, and the single installer that points
+   the dispatchers at the selected back end's routines.
+
+   The shape is the one the rest of this branch already uses -- union the
+   vocabulary, keep the data per configuration, select at run time, qualify
+   only what collides.  Shared code goes on calling `gt_ggc_mx_machine_function
+   (x)' exactly as before; what changes is that the name now resolves to a
+   dispatch rather than to whichever back end gengtype happened to keep.
+
+   THERE IS NO FALLBACK, DELIBERATELY.  An uninstalled dispatcher does not
+   walk "the first back end" or "the primary" -- it fails by name.  A default
+   here would be the whole bug back again, and would be correct on the build
+   machine and silently wrong everywhere else.  Nor is it unreachable in
+   practice: `crtl->machine' is null until a back end allocates it, and the
+   caller macro already tests for null, so a live pointer implies a selected
+   back end.  If that ever stops being true we get a diagnostic naming the
+   type instead of a walk of the wrong layout.  */
+
+static void
+mt_write_dispatchers (type_p structures)
+{
+  outf_p of = get_output_file_with_visibility (NULL);
+  type_p s;
+  int ndispatch = 0;
+
+  if (of == NULL)
+    return;
+
+  oprintf (of, "\n/* MULTI-TARGET: per-back-end marker dispatch.  */\n");
+
+  for (s = structures; s; s = s->next)
+    {
+      bool have_variant = false;
+
+      if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
+	continue;
+      if (s->gc_used != GC_POINTED_TO && s->gc_used != GC_MAYBE_POINTED_TO)
+	continue;
+      for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
+	if (mt_variant_base (s, ss) != NULL)
+	  have_variant = true;
+      if (!have_variant)
+	continue;
+
+      const char *tag = filter_type_name (s->u.s.tag);
+      ndispatch++;
+
+      for (int k = 0; k < 2; k++)
+	{
+	  const char *pfx = k == 0 ? "ggc_m" : "pch_n";
+	  oprintf (of, "\nstatic void (*gt_%sx_%s_sel) (void *);\n", pfx, tag);
+	  oprintf (of, "void\ngt_%sx_%s (void *x_p)\n{\n", pfx, tag);
+	  oprintf (of, "  if (gt_%sx_%s_sel == NULL)\n", pfx, tag);
+	  oprintf (of, "    gt_multi_target_no_marker (\"%s\");\n", s->u.s.tag);
+	  oprintf (of, "  gt_%sx_%s_sel (x_p);\n}\n", pfx, tag);
+	}
+    }
+
+  /* The installer is emitted even when there is nothing to install, so that
+     multi-target-select.cc links either way and a build with one back end is
+     not a different program from a build with several.  */
+  oprintf (of, "\nbool\ngt_multi_target_install_markers "
+	   "(const char *base ATTRIBUTE_UNUSED)\n{\n");
+  if (ndispatch == 0)
+    oprintf (of, "  /* No tag is defined by more than one back end.  */\n"
+	     "  return true;\n}\n");
+  else
+    {
+      /* Collect the set of back ends over all dispatched tags.  A back end
+	 must supply a routine for EVERY dispatched tag or it is not installed
+	 at all: a partial install would leave some dispatcher holding the
+	 previously selected back end's routine, which is the same silent
+	 wrong-layout walk in a subtler form.  */
+      for (s = structures; s; s = s->next)
+	{
+	  if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
+	    continue;
+	  if (s->gc_used != GC_POINTED_TO && s->gc_used != GC_MAYBE_POINTED_TO)
+	    continue;
+	  for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
+	    {
+	      const char *b = mt_variant_base (s, ss);
+	      if (b == NULL)
+		continue;
+	      const char *tag = filter_type_name (s->u.s.tag);
+	      oprintf (of, "  if (strcmp (base, \"%s\") == 0)\n    {\n", b);
+	      oprintf (of, "      gt_ggc_mx_%s_sel = gt_ggc_mx_%s_%s;\n",
+		       tag, tag, b);
+	      oprintf (of, "      gt_pch_nx_%s_sel = gt_pch_nx_%s_%s;\n",
+		       tag, tag, b);
+	      oprintf (of, "    }\n");
+	    }
+	}
+      /* Report whether every dispatcher now has a routine.  The caller turns
+	 a false into a diagnostic naming the back end; see
+	 multi_target_select.  */
+      oprintf (of, "  return");
+      {
+	bool first = true;
+	for (s = structures; s; s = s->next)
+	  {
+	    bool have_variant = false;
+	    if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
+	      continue;
+	    if (s->gc_used != GC_POINTED_TO
+		&& s->gc_used != GC_MAYBE_POINTED_TO)
+	      continue;
+	    for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
+	      if (mt_variant_base (s, ss) != NULL)
+		have_variant = true;
+	    if (!have_variant)
+	      continue;
+	    const char *tag = filter_type_name (s->u.s.tag);
+	    oprintf (of, "%s gt_ggc_mx_%s_sel != NULL",
+		     first ? "" : "\n	 &&", tag);
+	    first = false;
+	  }
+      }
+      oprintf (of, ";\n}\n");
+    }
 }
 
 /* Nonzero if S is a type for which typed GC allocators should be output.  */
@@ -5383,6 +5703,10 @@ main (int argc, char **argv)
 			   structures);
       write_types (header_file, structures, &pch_wtd);
       write_local (header_file, structures);
+      /* MULTI-TARGET: after BOTH marker families exist, since a dispatcher
+	 needs the ggc and the pch routine of the same back end.  Not emitted
+	 in plugin mode, which has neither.  */
+      mt_write_dispatchers (structures);
     }
   write_roots (variables, plugin_files == NULL);
   write_rtx_next ();
