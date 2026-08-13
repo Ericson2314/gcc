@@ -8406,3 +8406,233 @@ Recorded so the next reader does not mistake the grep for a full anchor check.
                          Blind spots written in the file: deleted build dirs
                          are invisible, and gcc-level srcdirs print GONE for
                          the anchor by path construction, not by defect.
+
+# THE EXISTENCE PROBE IS ON THE BOARD, AND THE BOARD WAS MISSING 42 MACROS
+
+Two jobs were asked for. Both are done, and a third thing was found on the way
+that mattered more than either: **the header probe had been dead since
+`STACK_POINTER_REGNUM` was converted, and could not run at all.**
+
+## 1. THE HARNESS WAS NOT DEGRADED, IT WAS DEAD -- SO THE CIRCULATING FIGURES ARE NOT A CURRENT READING
+
+`macro-probe-run.sh` exits **rc=9** on this tree before probing anything:
+
+    defaults.h:2799:55: error: size of array 'cq' is not an integral
+    constant-expression
+     2799 | #define STACK_POINTER_REGNUM (mt_stack_pointer_regnum ())
+
+Arm 0's INT control was re-anchored to `STACK_POINTER_REGNUM` on 2026-08-12.
+`STACK_POINTER_REGNUM` has since been converted to a run-time call, and a call
+is not an integral constant expression, so `char cq[STACK_POINTER_REGNUM]` does
+not compile in **any** of the three contexts. No `results.txt`, no summary.
+
+The comment sitting directly above the control had predicted exactly this, about
+a different macro: *"It stays a control only while it stays UNCONVERTED; when it
+is converted, the right move is another independent differing witness, not this
+one weakened."* Nobody applied that sentence to arm 0's own witness.
+
+**So the figures in circulation -- 224 header arms, i386 112/0, aarch64 8/104 --
+are the last successful run's, not something this tree can reproduce.** Anyone
+quoting them today is quoting a stale artefact of a harness that now refuses to
+start. That is the good failure mode (it refused to score rather than scoring
+nothing as clean) but it is not a measurement.
+
+Re-anchored to **`MIN_UNITS_PER_WORD`** (i386 4, aarch64 8, mt 4), measured in
+all three contexts before adoption. Criteria, written into the script:
+
+  * not in the frame/stack/argument/register families the programme is
+    currently converting, so the family that just killed the control cannot
+    kill it again;
+  * distinct from the STR control (`GLOBAL_ASM_OP`) and the EXP control
+    (`SELECT_CC_MODE`) -- three controls, three macros, three families;
+  * a real numeric spread. `SLOW_BYTE_ACCESS` (0/1), `CASE_VECTOR_PC_RELATIVE`
+    (0/1) and `DEFAULT_SIGNED_CHAR` (1/0) were **measured and rejected**: a
+    probe bug yielding a defaulted 0 is indistinguishable from a correct
+    reading on a 0/1 macro. `FUNCTION_BOUNDARY` (8/32) was rejected on the
+    first criterion -- `STACK_BOUNDARY` and `PARM_BOUNDARY` are already gone.
+
+This is a **repair of a control that cannot run**, not the retirement of an arm
+that fails. Leaving it dead reports nothing; it does not report less.
+
+## 2. JOB 2 FIRST, BECAUSE IT REFRAMES JOB 1: 42 CONVERTED MACROS HAD NO HONEST STATUS
+
+The brief named five macros as "converted and entirely absent" and said not to
+trust the list. It should not be trusted. Derived from `gcc/defaults.h` rather
+than from any list -- every `#undef` at column 0 after `#include
+"target-cdata.h"`, which is how a converted macro is redirected:
+
+    67 macros are converted.
+    11 were ABSENT from macro-status.txt entirely.
+    31 more were PRESENT and said UNCONVERTED.
+    -> 42 with no honest status, against a brief that named 5.
+
+Of the brief's five, **three were already on the board** (`INCOMING_FRAME_SP_
+OFFSET`, `FUNCTION_MODE`, `ACCUMULATE_OUTGOING_ARGS`, all saying `UNCONVERTED`);
+only `DEFAULT_INCOMING_FRAME_SP_OFFSET` and `STACK_DYNAMIC_OFFSET` were absent.
+
+`macro-status.txt`'s own header note said **sixteen** macros say `UNCONVERTED`
+and are converted. It was thirty. The fourteen nobody had written down are two
+whole families:
+
+  * the cost macros `MOVE_MAX`, `MOVE_MAX_PIECES`, `STORE_MAX_PIECES`,
+    `COMPARE_MAX_PIECES`, `MOVE_RATIO`, `CLEAR_RATIO`, `SET_RATIO`;
+  * the frame registers `STACK_POINTER_REGNUM`, `FRAME_POINTER_REGNUM`,
+    `HARD_FRAME_POINTER_REGNUM`, `ARG_POINTER_REGNUM`
+    -- one of which is the macro that killed the harness in §1.
+
+**A hand-maintained note is not a check.** That is the whole finding.
+
+## 3. `CONVERTED_NOARM` -- THE DEBT GETS A COLUMN INSTEAD OF A SILENCE
+
+The brief's requirement was that an absent macro and a failing macro must not
+look alike in any total. They did not look alike -- an absent macro looked like
+*nothing*, counted in no column at all, which is worse. It is the branch's root
+pattern (one name, several authorities, no diagnostic) aimed at the instrument.
+
+Two statuses were needed, because the two existing shapes are both lies for a
+converted-but-unmeasured macro: `UNCONVERTED` says the work has not happened
+(and has already sent agents to convert converted macros), while any
+`CONVERTED_*` claims an arm nobody ran.
+
+  * **`CONVERTED_NOARM`** -- converted, no arm. The measurement debt, on the
+    board, countable, in its own column. It **retires nothing**: the macro
+    keeps whatever header arm it had, because retiring an arm without a
+    replacement is the disappearance the anti-floor gate exists to prevent.
+    A `CONVERTED_NOARM` entry is a TODO with a name.
+  * **`CONVERTED_EXIST`** -- covered by `exist-probe.sh`. Header arm retired.
+
+## 4. JOB 1 -- WIRED, WITH THE TWO POPULATIONS KEPT APART
+
+`exist-probe.sh` now exports `EXIST_MACROS` on one line, exactly as
+`tab-probe.sh` exports `TAB_MACROS`, and `macro-probe.sh` reads **both, into
+two variables, checked against two statuses, printed as two totals**.
+
+**A name in `TAB_MACROS` does not satisfy `CONVERTED_EXIST`, and a name in
+`EXIST_MACROS` does not satisfy `CONVERTED_CDATA`.** Accepting "covered by
+something" would be one check satisfied by the wrong evidence -- the same defect
+`macro-status.txt` already records as the reason `CONVERTED_REGS` is separate
+from `CONVERTED_CDATA`. An existence bit is not a value reading and the board
+must not let one be quoted as the other. The summary line says so in words:
+
+    status: an EXIST arm is NOT a value arm.  Do not add 32 and 9.
+
+All nine exist-probe macros moved to `CONVERTED_EXIST` **in this change**, which
+is the standing rule satisfied rather than waived. `exist-probe.sh` also gained
+a drift check: `EXIST_MACROS` and the `PREREG` table are compared as sets, both
+directions, and disagreement is fatal -- otherwise the board could advertise an
+arm the script does not run.
+
+## 5. THE COMPLETENESS GATE, AND ITS ONE HAND-WRITTEN WEAKNESS
+
+`macro-probe.sh` now derives the converted set from `defaults.h` and refuses to
+run if any converted macro is absent from the board or present saying
+`UNCONVERTED`. Both directions of the converse are checked too: a
+`CONVERTED_NOARM` entry must be genuinely converted (or the status becomes an
+excuse never to grow an arm) and must genuinely have no arm (or the debt column
+overstates while the coverage column understates).
+
+**Blind spot, stated rather than papered over.** A macro converted by rewriting
+its *consumers* instead of redirecting its *name* never appears in `defaults.h`.
+Three are known -- `PUSH_ROUNDING`, `STACK_DYNAMIC_OFFSET`,
+`INCOMING_REG_PARM_STACK_SPACE` -- and they are declared by hand in
+`CONVERTED_NO_REDIRECT`, which is the weakness this gate removes, reintroduced
+in the small. Bounded two ways: each declared name must be **absent** from the
+derived set (so a name that later acquires a redirect stops being special-cased
+silently) and must have an `mt_` declaration in `target-frame.h` (so it cannot
+be a typo or a fiction). There is also a non-vacuity FATAL: fewer than 40
+derived names means the anchor moved and every check below would pass trivially.
+
+**Five faults injected, five fired**, by name:
+
+    absent from board (not in probe list)     -> named ALL_REGS
+    converted macro relabelled UNCONVERTED    -> named Pmode
+    CONVERTED_EXIST dropped from EXIST_MACROS -> named REG_PARM_STACK_SPACE
+    EXIST_MACROS vs PREREG drift              -> exist-probe.sh rc=9
+    TAB-covered macro marked CONVERTED_NOARM  -> named BYTES_BIG_ENDIAN
+
+A sixth fired **unplanned and correctly**: the membership idiom
+`case " $SET " in *" $n "*` matches on spaces while the derived set is one name
+per line, so the first run accused `ALL_REGS` falsely. Worth recording because
+the failure direction was the lucky one -- the same bug in the `missing` loop
+would have reported everything absent, and written the other way round would
+have reported everything present.
+
+## 6. THE NEW READING, AND WHY THE PASS COLUMN ROSE FOR NO GOOD REASON
+
+    status: 149 macros on the board = 75 unconverted
+            + 32 converted with a TAB (value) arm
+            + 9  converted with an EXIST (existence/distinctness) arm
+            + 33 converted with NO ARM AT ALL (the measurement debt)
+
+Header probe, `/tmp/b-a7c-t108`, rc=0 (it runs again):
+
+    macros probed: 108 (was 112) -- 216 arms, was 224
+    i386:    PASS 108  FAIL 0
+    aarch64: PASS 29   FAIL 79
+
+**NEVER QUOTE THE RAW 29.** It decomposes, mechanically, as
+**2 trusted + 27 untrusted by construction**:
+
+  * 2 trusted: `MAX_BITS_PER_WORD`, `MAX_BITSIZE_MODE_ANY_MODE` -- the same two
+    PRINCIPLES already names, both INT.
+  * 27 are exactly the `CONVERTED_NOARM` macros that remain in the probe list.
+    Each is redirected by `defaults.h`, and the probe's base-B context does not
+    define `MULTI_TARGET_TARGETM_BASE`, so both sides expand to the same `mt_*`
+    call and **the arm compares a redirect with itself**. Wrong-reason shape 2,
+    27 times.
+
+The correspondence is exact and is not a coincidence: 27 in the probe list + 6
+not in it = the 33 `CONVERTED_NOARM` macros.
+
+**This caveat is now computed and printed where the number is printed**, not
+kept in prose in another file:
+
+    aarch64 PASS decomposition: 29 total = 27 redirect-vs-itself
+      (CONVERTED_NOARM, UNTRUSTED BY CONSTRUCTION) + 2 other.
+      NEVER QUOTE THE RAW 29.
+
+and every such line in the PASS listing is tagged `UNTRUSTED-redirect-vs-itself`.
+PRINCIPLES had to explain the old raw 8 in prose in a second file, and the raw
+number was quoted anyway at least twice. A caveat that lives somewhere else gets
+dropped.
+
+**Delta against the last successful run, with a reason per changed arm:**
+
+  * 224 -> 216 arms. Four macros with header arms moved to `CONVERTED_EXIST`
+    and their eight arms are **retired, not banked**: `ACCUMULATE_OUTGOING_ARGS`,
+    `FUNCTION_MODE`, `INCOMING_FRAME_SP_OFFSET`, `PUSH_ARGS_REVERSED`. The last
+    is the one the brief predicted would flip FAIL -> PASS for shape 5 on the
+    next run; it does not get the chance.
+  * aarch64 8 -> 29 is **not progress and must not be read as any**. The old 8
+    was 2 trusted + 6 retired-pending; the new 29 is 2 trusted + 27
+    redirect-vs-itself. The *trusted* count is unchanged at 2. The 21-arm rise
+    is 21 more macros having been converted since that run, each turning its own
+    arm green by becoming target-neutral in both contexts.
+  * i386 112 -> 108 PASS / 0 FAIL: the four retirements, nothing else.
+  * The 6 `#108` retired-pending arms named in PRINCIPLES are now visible as
+    `CONVERTED_NOARM` entries in the untrusted 27 rather than as an unexplained
+    remainder inside a raw total.
+
+`exist-probe.sh` re-run after the changes: 9 examined, **3 PASS, 0 FAIL, 6
+unmeasurable/report-only**, all 9 DIFFER, control SAME -- unchanged, which is
+the point: wiring it into the board changed the board, not the measurement.
+
+## 7. WHAT I DID NOT DO
+
+  * **No compiler source was changed** -- the diff is three files under
+    `scratchpad/`. So the codegen bars (`multi-target-objs`/`cc1`/`lto1`, the
+    x86_64 and aarch64 md5s, stock-compare 5/5) **cannot have moved**, and
+    re-running them would have been theatre rather than measurement. They were
+    not run and are not claimed.
+  * The 33 `CONVERTED_NOARM` macros still have **no arm**. That is the debt,
+    now countable, and it is the obvious next increment: they are mostly calls
+    and option reads, so `tab-probe.sh` (constants out of the running `cc1`)
+    cannot take them and `exist-probe.sh` can only take the ones with an
+    existence bit or a constant-return thunk.
+  * `FUNCTION_MODE` is still REPORT-ONLY (i386=24, aarch64=27, both constants,
+    differing, no prediction registered). Registering a prediction is a
+    one-line increment and was left rather than done as a side effect, since a
+    prediction written *after* seeing the disassembly is a restatement, not a
+    check.
+  * The brief's "aarch64 8 PASS / 104 FAIL, TAB 27/5" could not be reproduced
+    and was not reported against; §1 says why.

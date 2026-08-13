@@ -157,6 +157,20 @@ TAB_COVERED=$(sed -n 's/^TAB_MACROS="\(.*\)"$/\1/p' "$TABSH")
 [ -n "$TAB_COVERED" ] || die "could not read TAB_MACROS from $TABSH -- the \
 coverage check would pass vacuously, which is worse than no check"
 
+# THE FIFTH SHAPE'S LIST, read the same way and kept deliberately SEPARATE.
+#
+# `exist-probe.sh' reads the two per-base OBJECTS side by side with neither
+# base selected.  Its arms are EXISTENCE bits and distinctness verdicts, not
+# values, and a board that added its coverage into TAB's would let "this macro
+# exists in one base and not the other" be read as "this macro's value has been
+# verified in both".  Those are different propositions and this script keeps
+# two variables, checks them against two statuses, and prints two totals.
+EXISTSH=${EXISTSH:-$HERE/exist-probe.sh}
+[ -s "$EXISTSH" ] || die "no $EXISTSH; a CONVERTED_EXIST macro could not be covered"
+EXIST_COVERED=$(sed -n 's/^EXIST_MACROS="\(.*\)"$/\1/p' "$EXISTSH")
+[ -n "$EXIST_COVERED" ] || die "could not read EXIST_MACROS from $EXISTSH -- \
+the coverage check would pass vacuously, which is worse than no check"
+
 ALL=$(grep -v '^#' "$MACROS" | awk 'NF{print $1}' | sort -u)
 for n in $ALL; do
   awk -v m="$n" '$1 !~ /^#/ && $1==m{f=1} END{exit !f}' "$STATUS" \
@@ -171,6 +185,7 @@ done
 for st in $(awk '$1 !~ /^#/ && NF{print $2}' "$STATUS" | sort -u); do
   case $st in
     UNCONVERTED|CONVERTED_SUPPLY|CONVERTED_CDATA|CONVERTED_REGS|CONVERTED_GONE) ;;
+    CONVERTED_EXIST|CONVERTED_NOARM) ;;
     *) die "unknown status word [$st] in $STATUS.  An unrecognised status is \
 treated as UNCONVERTED by every test below, so the macro would keep a header \
 arm it can no longer measure and would never be required to have a TAB arm." ;;
@@ -235,10 +250,182 @@ it.  A macro may only move UNCONVERTED -> CONVERTED together with its TAB arm; \
 without one it would simply disappear from the score." ;;
   esac
 done
-for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
-echo "status: $(awk '$1 !~ /^#/ && $2=="UNCONVERTED"' "$STATUS" | wc -l) unconverted, \
-$(awk '$1 !~ /^#/ && $2 ~ /^CONVERTED/' "$STATUS" | wc -l) converted (all covered by TAB); \
-retiring from the header probe:${RETIRED:- none}"
+
+# CONVERTED_EXIST -- A FIFTH STATUS, CHECKED AGAINST A SECOND LIST.
+#
+# Same mechanical rule, different list, and the separation is the point: a name
+# in TAB_MACROS does NOT satisfy CONVERTED_EXIST and a name in EXIST_MACROS
+# does NOT satisfy CONVERTED_CDATA.  Accepting "covered by either" would be one
+# check satisfied by the wrong evidence -- the same defect macro-status.txt
+# already records as the reason CONVERTED_REGS is separate from
+# CONVERTED_CDATA.
+for n in $(awk '$1 !~ /^#/ && $2=="CONVERTED_EXIST" {print $1}' "$STATUS"); do
+  case " $EXIST_COVERED " in
+    *" $n "*) ;;
+    *) die "$n is marked CONVERTED_EXIST in $STATUS but exist-probe.sh's \
+EXIST_MACROS does not cover it.  A macro may only move to CONVERTED_EXIST \
+together with its EXIST arm.  Note that a TAB arm does NOT satisfy this: the \
+two shapes measure different propositions." ;;
+  esac
+done
+# ... and the converse, which is the one that would otherwise rot silently: a
+# name in EXIST_MACROS that the board does not record as CONVERTED_EXIST means
+# an arm is being run and reported by exist-probe.sh while the board still
+# scores the macro some other way.  That is two authorities for one name, which
+# is the bug this whole branch is hunting.
+for n in $EXIST_COVERED; do
+  st=$(awk -v m="$n" '$1 !~ /^#/ && $1==m{print $2}' "$STATUS")
+  [ -n "$st" ] || die "exist-probe.sh scores $n but it has no status in \
+$STATUS.  A macro measured by a harness and absent from the board is counted \
+in no column at all."
+  [ "$st" = CONVERTED_EXIST ] || die "exist-probe.sh scores $n but $STATUS \
+says [$st].  Two authorities for one name.  Either the arm is real, in which \
+case the status is CONVERTED_EXIST, or the arm should be removed from \
+EXIST_MACROS."
+done
+
+for n in $(awk '$1 !~ /^#/ && ($2=="CONVERTED_GONE" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS" || $2=="CONVERTED_EXIST") {print $1}' "$STATUS"); do RETIRED="$RETIRED $n"; done
+
+########################################################################
+# THE COMPLETENESS GATE -- "ABSENT" MUST NOT BE A THIRD, INVISIBLE VERDICT.
+#
+# Everything above scores over the macros that happen to be LISTED.  A macro
+# that was converted and never added to macro-status.txt was therefore counted
+# in NO column -- not passing, not failing, not converted, not unconverted.  It
+# is the branch's root pattern (one name, several authorities, no diagnostic)
+# applied to the instrument, and PRINCIPLES already names the shape twice:
+# "absence of an artefact is not absence of a mechanism", and "an absent
+# control is not a passing control".
+#
+# Measured the first time this gate ran, 2026-08-13: 67 macros are converted;
+# 11 were absent from the board entirely and 31 more were present saying
+# UNCONVERTED.  A hand-written note in macro-status.txt claimed sixteen.  The
+# fourteen it missed were two whole families (the MOVE_*/RATIO cost macros and
+# the four frame-pointer register numbers), converted with nobody recording it.
+#
+# THE SET IS DERIVED, NOT LISTED, because a list is exactly what failed.
+# `defaults.h' redirects a converted macro by `#undef'ing the name inside the
+# multi-target block and redefining it as an `mt_*' call (or, for
+# ELIMINABLE_REGS, a poison identifier, or, for REG_PARM_STACK_SPACE and
+# RELOAD_ELIMINABLE_REGS, leaving it undefined).  Every one of those is an
+# `#undef' at column 0 after `#include "target-cdata.h"', so that is the
+# derivation.  It is a property of the compiler source, which is the authority.
+#
+# ITS ONE BLIND SPOT, STATED RATHER THAN PAPERED OVER: a macro converted by
+# REWRITING ITS CONSUMERS instead of redirecting its name never appears in
+# defaults.h at all.  Three are known -- PUSH_ROUNDING, STACK_DYNAMIC_OFFSET
+# and INCOMING_REG_PARM_STACK_SPACE -- and they are declared below by hand,
+# which is the weakness this gate was written to remove, reintroduced in the
+# small.  It is bounded two ways: each declared name must be ABSENT from the
+# derived set (so a name that later acquires a redirect stops being special-
+# cased silently) and must have an `mt_' declaration in target-frame.h (so it
+# cannot be a typo or a fiction).
+CONVERTED_NO_REDIRECT="PUSH_ROUNDING STACK_DYNAMIC_OFFSET INCOMING_REG_PARM_STACK_SPACE"
+
+DEFAULTS_H=$SRC/defaults.h
+FRAME_H=$SRC/target-frame.h
+[ -s "$DEFAULTS_H" ] || die "no $DEFAULTS_H -- the converted set cannot be derived"
+[ -s "$FRAME_H" ] || die "no $FRAME_H -- the no-redirect list cannot be checked"
+
+DERIVED=$(awk '/^#include "target-cdata.h"/{on=1} on && /^#undef /{print $2}' \
+            "$DEFAULTS_H" | sort -u)
+# NON-VACUITY.  If the anchor line ever moves or is renamed, this awk yields
+# nothing and every check below passes trivially -- an all-empty read that is
+# indistinguishable from "everything is on the board".  PRINCIPLES: the harness
+# must refuse to score when it cannot show it read anything.
+NDERIVED=$(echo "$DERIVED" | awk 'NF' | wc -l)
+[ "$NDERIVED" -ge 40 ] || die "only $NDERIVED converted macros derived from \
+$DEFAULTS_H (expected 60+).  The anchor '#include \"target-cdata.h\"' or the \
+'#undef' shape has changed, and every completeness check below would pass \
+vacuously.  Fix the derivation; do not lower this bound."
+
+DERIVED_SP=$(echo $DERIVED)
+for n in $CONVERTED_NO_REDIRECT; do
+  case " $DERIVED_SP " in
+    *" $n "*) die "$n is in CONVERTED_NO_REDIRECT but defaults.h DOES redirect it now. \
+Remove it from the hand-written list: it is derived, and keeping it in both \
+places is a second authority for the same fact." ;;
+  esac
+  lc=$(echo "$n" | tr 'A-Z' 'a-z')
+  # Reading a FILE, not a pipe: no SIGPIPE, so `grep -q' is safe here.  It
+  # would not be on the receiving end of a pipeline under `set -o pipefail',
+  # which PRINCIPLES records as turning a match into a miss (rc 141).
+  grep -q "^extern .*[^a-z_]mt_$lc *(" "$FRAME_H" \
+    || die "$n is declared converted-without-redirect but target-frame.h \
+declares no mt_ entry point for it.  An unbacked name here would exempt a \
+macro from the board on nothing but an assertion."
+done
+
+# NEWLINE-NORMALISED ON PURPOSE.  `$DERIVED' is one name per LINE, and the
+# `case " $SET " in *" $n "*' membership idiom below matches on SPACES.  Left
+# unnormalised the idiom silently never matches, and every membership test
+# reports "not a member" -- which fired immediately, as a false accusation
+# against ALL_REGS.  Recorded because the failure direction was the lucky one:
+# the same bug in the `missing'/`lying' loops above would have reported
+# everything absent, and in a check written the other way round it would have
+# reported everything present.
+CONVERTED_SET="$DERIVED_SP $CONVERTED_NO_REDIRECT"
+
+missing= ; lying=
+for n in $CONVERTED_SET; do
+  st=$(awk -v m="$n" '$1 !~ /^#/ && $1==m{print $2}' "$STATUS")
+  if [ -z "$st" ]; then missing="$missing $n"
+  elif [ "$st" = UNCONVERTED ]; then lying="$lying $n"
+  fi
+done
+[ -z "$missing" ] || die "these macros are CONVERTED in gcc/defaults.h and are \
+ABSENT from $STATUS, so they are counted in no column of any total:$missing.  \
+Add them.  If a converted macro has no arm yet, its status is CONVERTED_NOARM \
+-- the debt, on the board, countable -- never absence and never UNCONVERTED."
+[ -z "$lying" ] || die "these macros are CONVERTED in gcc/defaults.h and \
+$STATUS says UNCONVERTED:$lying.  That reading has already sent agents to \
+convert macros that were already converted.  Use CONVERTED_NOARM if there is \
+no arm yet."
+
+# And the converse direction.  A CONVERTED_NOARM entry must be genuinely
+# converted (otherwise it is UNCONVERTED wearing a status that excuses it from
+# ever growing an arm) and must genuinely have no arm (otherwise the debt
+# column overstates and the coverage columns understate).
+for n in $(awk '$1 !~ /^#/ && $2=="CONVERTED_NOARM" {print $1}' "$STATUS"); do
+  case " $CONVERTED_SET " in
+    *" $n "*) ;;
+    *) die "$n is marked CONVERTED_NOARM but is not in the derived converted \
+set.  CONVERTED_NOARM excuses a macro from needing an arm; it must not be \
+reachable for a macro that is simply unconverted." ;;
+  esac
+  case " $TAB_COVERED $EXIST_COVERED " in
+    *" $n "*) die "$n is marked CONVERTED_NOARM but IS covered by a probe \
+list.  The debt column would overstate and the coverage column understate. \
+Give it the status of the arm it actually has." ;;
+    *) ;;
+  esac
+done
+
+########################################################################
+# THE SUMMARY, WITH THE POPULATIONS KEPT APART.
+#
+# One total a reader can trust means one total that does not silently add
+# unlike things.  Four numbers, and the fourth is the one that used to be
+# invisible.
+n_unconv=$(awk '$1 !~ /^#/ && $2=="UNCONVERTED"' "$STATUS" | wc -l)
+n_tab=$(awk '$1 !~ /^#/ && ($2=="CONVERTED_SUPPLY" || $2=="CONVERTED_CDATA" || $2=="CONVERTED_REGS" || $2=="CONVERTED_GONE")' "$STATUS" | wc -l)
+n_exist=$(awk '$1 !~ /^#/ && $2=="CONVERTED_EXIST"' "$STATUS" | wc -l)
+n_noarm=$(awk '$1 !~ /^#/ && $2=="CONVERTED_NOARM"' "$STATUS" | wc -l)
+NOARM_LIST=$(awk '$1 !~ /^#/ && $2=="CONVERTED_NOARM" {printf "%s ", $1}' "$STATUS")
+[ -n "$NOARM_LIST" ] || die "CONVERTED_NOARM list read empty while the count \
+says $n_noarm -- the aarch64 PASS decomposition below would report every pass \
+as trusted, which is the exact inversion this branch keeps paying for"
+n_board=$(awk '$1 !~ /^#/ && NF' "$STATUS" | wc -l)
+echo "status: $n_board macros on the board = \
+$n_unconv unconverted \
++ $n_tab converted with a TAB (value) arm \
++ $n_exist converted with an EXIST (existence/distinctness) arm \
++ $n_noarm converted with NO ARM AT ALL (the measurement debt)"
+echo "status: completeness -- $NDERIVED converted macros derived from \
+gcc/defaults.h plus $(echo $CONVERTED_NO_REDIRECT | wc -w) declared \
+converted-without-redirect; all present on the board and none saying UNCONVERTED"
+echo "status: an EXIST arm is NOT a value arm.  Do not add $n_tab and $n_exist."
+echo "status: retiring from the header probe:${RETIRED:- none}"
 
 NAMES=$(for n in $ALL; do
           case " $RETIRED " in *" $n "*) ;; *) echo "$n";; esac
@@ -281,25 +468,82 @@ cd "$BUILD/gcc" || die "cd $BUILD/gcc"
 #     and still proves exactly that.  Changing the control to something that
 #     agreed would have been green-washing; changing it to something that still
 #     differs is keeping it alive.
+#
+# RE-ANCHORED 2026-08-13 (third time), FROM `STACK_POINTER_REGNUM' TO
+# `MIN_UNITS_PER_WORD', AND THE COMMENT ABOVE PREDICTED THIS EXACT DEATH.
+#
+# The re-anchor of 2026-08-12 wrote, of SELECT_CC_MODE: "It stays a control
+# only while it stays UNCONVERTED; when it is converted, the right move is
+# another independent differing witness, not this one weakened."  The same
+# sentence applied to arm 0's own witness and nobody applied it.
+# `STACK_POINTER_REGNUM' was converted -- `defaults.h:2799' now redirects it to
+# `(mt_stack_pointer_regnum ())' -- and a run-time call is not an integral
+# constant expression, so the control's `char cq[STACK_POINTER_REGNUM]' does
+# not compile in ANY context.
+#
+# THE WHOLE HARNESS WAS DEAD, NOT DEGRADED, and that is worth being exact
+# about because it changes what past numbers mean.  Arm 0 runs before anything
+# is probed, and it `die's with rc=9.  Measured on this tree before any change
+# in this commit: `macro-probe-run.sh /tmp/b-a7c-t108' exits 9 after printing
+# the status line, with
+#
+#   defaults.h:2799:55: error: size of array 'cq' is not an integral
+#   constant-expression
+#
+# and produces NO results.txt and NO summary.  So the scoreboard figures in
+# circulation (224 header arms, i386 112/0, aarch64 8/104) cannot be
+# reproduced by running this script today; they are the last successful run's,
+# not a current reading.  This is the good failure mode -- the control refused
+# to score rather than scoring nothing as clean -- but a control that cannot
+# COMPILE is one step from a harness whose summary prints anyway, which is
+# what arm 0b exists to catch.
+#
+# `MIN_UNITS_PER_WORD' is chosen on the independence criterion the previous
+# re-anchor wrote down, and measured in all three contexts before being
+# adopted (i386 4, aarch64 8, mt 4):
+#   * it is NOT in the frame/stack/argument/register-vocabulary families that
+#     the conversion programme is currently working through, so no member of
+#     the family that just killed this control can kill it again;
+#   * it is not the EXP control (`SELECT_CC_MODE') nor the STR control
+#     (`GLOBAL_ASM_OP'), so the three controls rest on three macros in three
+#     different families -- the property the second re-anchor was written to
+#     restore and which lasted one day;
+#   * 4 vs 8 is a real numeric spread, not a 0/1 bit.  Several candidates
+#     measured 0/1 (`SLOW_BYTE_ACCESS' 0/1, `CASE_VECTOR_PC_RELATIVE' 0/1,
+#     `DEFAULT_SIGNED_CHAR' 1/0) and were rejected: a probe bug that yields a
+#     defaulted 0 is indistinguishable from a correct reading on those.
+#     `FUNCTION_BOUNDARY' (8/32) was rejected for the first criterion -- it is
+#     a `*_BOUNDARY', and `STACK_BOUNDARY' and `PARM_BOUNDARY' are already
+#     converted.
+#
+# This is a REPAIR of a control that cannot run, not the retirement of an arm
+# that fails.  The distinction is the test-harness floor, and it cuts the
+# other way here: leaving the control dead leaves the entire header probe
+# unrunnable, which reports nothing rather than reporting less.
 ########################################################################
+CTLMACRO=MIN_UNITS_PER_WORD
 control () {
   local ctx inc v
   for ctx in $CTXS; do
     inc=$(ctx_inc $ctx)
     { echo "$PRE"
-      echo "char cq[STACK_POINTER_REGNUM];"
+      echo "char cq[$CTLMACRO];"
     } > "$OUT/ctl.cc"
     g++ -c -o "$OUT/ctl.o" "$OUT/ctl.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/err-ctl-$ctx.txt" 2>&1 \
-      || { cat "$OUT/err-ctl-$ctx.txt"; die "control probe did not compile in $ctx"; }
+      || { cat "$OUT/err-ctl-$ctx.txt"; die "control probe ($CTLMACRO) did not \
+compile in $ctx.  If this macro has just been CONVERTED it is no longer an \
+integral constant expression and the control is dead: re-anchor arm 0 on \
+another INDEPENDENT DIFFERING witness -- see the three criteria above -- and \
+do NOT anchor it on anything the EXP or STR control already uses."; }
     v=$(nm -S --defined-only "$OUT/ctl.o" | awk '$4=="cq"{print strtonum("0x" $2)}')
     [ -n "$v" ] || die "control: nm produced nothing for $ctx (tool present but silent)"
-    echo "control $ctx STACK_POINTER_REGNUM=$v"
+    echo "control $ctx $CTLMACRO=$v"
     eval "CTL_$ctx=$v"
   done
-  [ "$CTL_i386" = 7 ] || die "control: i386 STACK_POINTER_REGNUM=$CTL_i386, expected 7"
-  [ "$CTL_aarch64" = 31 ] || die "control: aarch64 STACK_POINTER_REGNUM=$CTL_aarch64, expected 31"
-  [ "$CTL_mt" = 7 ] || die "control: mt STACK_POINTER_REGNUM=$CTL_mt, expected 7 (mt == primary)"
+  [ "$CTL_i386" = 4 ] || die "control: i386 $CTLMACRO=$CTL_i386, expected 4"
+  [ "$CTL_aarch64" = 8 ] || die "control: aarch64 $CTLMACRO=$CTL_aarch64, expected 8"
+  [ "$CTL_mt" = 4 ] || die "control: mt $CTLMACRO=$CTL_mt, expected 4 (mt == primary)"
   echo "control: OK -- the three contexts are distinguishable and mt == i386"
 }
 control
@@ -756,8 +1000,29 @@ FAIL $(awk -v b=$b '$1==b && $4=="FAIL"' "$OUT/results.txt" | wc -l)"
   awk '{print $3}' "$OUT/results.txt" | sort | uniq -c
   echo "aarch64 failures by shape:"
   awk '$1=="aarch64" && $4=="FAIL" {print $3}' "$OUT/results.txt" | sort | uniq -c
+  # THE AARCH64 PASS COLUMN, DECOMPOSED WHERE IT IS PRINTED, SO THE RAW NUMBER
+  # CANNOT BE QUOTED ON ITS OWN.
+  #
+  # PRINCIPLES says "never quote the raw 8" and then has to explain, in
+  # prose, in another file, that the 8 was 2 trusted plus 6 wrong-reason
+  # flips.  A caveat that lives somewhere else is a caveat that gets dropped:
+  # the raw number has been quoted at least twice after being warned about.
+  #
+  # A CONVERTED_NOARM macro is redirected by `defaults.h', and the probe's
+  # base-B context does not define MULTI_TARGET_TARGETM_BASE, so BOTH sides
+  # expand to the same `mt_*' call and the arm compares a redirect with
+  # itself.  Every such PASS is untrusted BY CONSTRUCTION -- not suspected,
+  # derived -- so the split can be computed rather than remembered.
+  np_all=$(awk '$1=="aarch64" && $4=="PASS"' "$OUT/results.txt" | wc -l)
+  np_noarm=$(awk -v L="$NOARM_LIST" 'BEGIN{n=split(L,a," "); for(i=1;i<=n;i++) s[a[i]]=1}
+                $1=="aarch64" && $4=="PASS" && s[$2]' "$OUT/results.txt" | wc -l)
+  echo "aarch64 PASS decomposition: $np_all total = \
+$np_noarm redirect-vs-itself (CONVERTED_NOARM, UNTRUSTED BY CONSTRUCTION) \
++ $((np_all - np_noarm)) other.  NEVER QUOTE THE RAW $np_all."
   echo "PASS for aarch64 (expected to be rare -- each needs a reason):"
-  awk '$1=="aarch64" && $4=="PASS" {print "  " $2 " " $3}' "$OUT/results.txt"
+  awk -v L="$NOARM_LIST" 'BEGIN{n=split(L,a," "); for(i=1;i<=n;i++) s[a[i]]=1}
+       $1=="aarch64" && $4=="PASS" {print "  " $2 " " $3 (s[$2] ? "  UNTRUSTED-redirect-vs-itself (CONVERTED_NOARM)" : "")}' \
+    "$OUT/results.txt"
   echo "FAIL for i386 (expected NONE -- mt is the i386 header set today):"
   awk '$1=="i386" && $4=="FAIL" {print "  " $2 " " $3}' "$OUT/results.txt"
 } > "$OUT/summary.txt"

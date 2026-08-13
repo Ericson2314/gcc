@@ -128,6 +128,36 @@ DEFAULT_INCOMING_FRAME_SP_OFFSET:mt_base_default_incoming_frame_sp_offset:?:?:no
 INCOMING_REG_PARM_STACK_SPACE:mt_base_incoming_reg_parm_stack_space:?:?:no \
 STACK_DYNAMIC_OFFSET:mt_base_stack_dynamic_offset:?:?:no"
 
+# ---------------------------------------------------------------------------
+# THE MACHINE-READABLE ARM LIST, read by `macro-probe.sh'.
+#
+# `tab-probe.sh' exports `TAB_MACROS' on one line so that macro-probe.sh's
+# anti-floor gate can check, mechanically, that no macro moved to a
+# CONVERTED_* status without acquiring an arm.  This line is the same contract
+# for the EXIST shape, and it is deliberately a SEPARATE name from TAB_MACROS:
+# the two shapes measure different propositions, and a board that added them
+# into one number would let an EXISTENCE arm be read as a VALUE arm.  A macro
+# marked CONVERTED_EXIST in macro-status.txt must appear here; one marked
+# CONVERTED_{GONE,SUPPLY,CDATA,REGS} must appear in TAB_MACROS.  Neither list
+# satisfies the other's requirement.
+#
+# Read with  sed -n 's/^EXIST_MACROS="\(.*\)"$/\1/p'  -- keep it one line.
+EXIST_MACROS="REG_PARM_STACK_SPACE PUSH_ROUNDING PUSH_ARGS_REVERSED FUNCTION_MODE ACCUMULATE_OUTGOING_ARGS INCOMING_FRAME_SP_OFFSET DEFAULT_INCOMING_FRAME_SP_OFFSET INCOMING_REG_PARM_STACK_SPACE STACK_DYNAMIC_OFFSET"
+
+# DRIFT CHECK, and it is not decoration.  If EXIST_MACROS and PREREG can
+# disagree, the board can claim an arm this script does not run -- which is the
+# `mechanism present but never invoked' shape, aimed at the instrument itself.
+# Compared as SETS, by name, in both directions.
+_pre=$(for e in $PREREG; do echo "$e" | cut -d: -f1; done | sort)
+_exp=$(for m in $EXIST_MACROS; do echo "$m"; done | sort)
+if [ "$_pre" != "$_exp" ]; then
+  echo "PREREG: $_pre" >&2
+  echo "EXIST_MACROS: $_exp" >&2
+  die "EXIST_MACROS and the PREREG table name different macros.  The board \
+would then advertise an arm that is not scored here, or score an arm the \
+board does not know about.  Fix the list, do not silence this."
+fi
+
 # THE DISTINCTNESS CONTROL, and it is not optional.
 #
 # Every macro in the table above scores DIFFER.  An instrument that has only

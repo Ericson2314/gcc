@@ -43,14 +43,92 @@
 #   CONVERTED_GONE     routed through a hook and the macro is deleted from the
 #                      back ends.  The header arm is retired and a TAB arm
 #                      MUST exist in tab-probe.sh, or macro-probe.sh aborts.
+#   CONVERTED_EXIST    covered by the FIFTH probe shape, `exist-probe.sh',
+#                      which reads the two per-base OBJECTS side by side with
+#                      NEITHER base selected.  The macro MUST appear in
+#                      exist-probe.sh's EXIST_MACROS line -- a name in
+#                      tab-probe.sh's TAB_MACROS does NOT satisfy this, and
+#                      vice versa, because the two shapes measure different
+#                      propositions.  Header arm RETIRED, for the usual reason:
+#                      these are all `defaults.h' redirects, so in the probe's
+#                      base-B context (which does not define
+#                      MULTI_TARGET_TARGETM_BASE) BOTH sides expand to the same
+#                      `mt_*' call and the arm compares a redirect with itself.
+#                        AN EXIST ARM IS NOT A VALUE ARM AND MUST NEVER BE
+#                      TOTALLED WITH ONE.  exist-probe.sh scores two separate
+#                      properties: VALUE, only when both bases' thunks compiled
+#                      to a constant return and only against a PRE-REGISTERED
+#                      table; and DISTINCTNESS, which is scoreable for all of
+#                      them.  Six of the nine are UNMEASURABLE-BY-THIS-ARM for
+#                      value -- their thunks read option state -- and that is
+#                      recorded as a verdict, not smoothed into a pass.  The
+#                      status says "this macro has an arm that can fail"; it
+#                      does not say "this macro's value has been verified".
+#   CONVERTED_NOARM    CONVERTED IN THE COMPILER AND NOT MEASURED BY ANYTHING.
+#                      This status exists because the alternative shapes are
+#                      both lies:
+#                        * marking it UNCONVERTED says the conversion has not
+#                          happened, which sent at least two agents to convert
+#                          a macro that was already converted; and
+#                        * marking it CONVERTED_* claims an arm, which is
+#                          banking a pass that nobody measured.
+#                      It is the MEASUREMENT DEBT, on the board, countable, in
+#                      its own column.  It retires NOTHING: a CONVERTED_NOARM
+#                      macro keeps whatever header arm it had, because retiring
+#                      an arm without supplying a replacement is exactly the
+#                      disappearance the anti-floor gate exists to prevent --
+#                      even though that header arm is, for a redirected macro,
+#                      a redirect-vs-itself comparison and must not be read as
+#                      evidence.  It is kept so the number does not silently
+#                      shrink, not because it means anything.
+#                      A CONVERTED_NOARM entry is a TODO with a name.
 #
-# A macro may move UNCONVERTED -> CONVERTED_* only in the same change that adds
-# its TAB arm.  macro-probe.sh enforces that mechanically against
-# tab-probe.sh's TAB_MACROS line; it is not an invariant anyone has to remember.
+# A macro may move UNCONVERTED -> CONVERTED_{SUPPLY,CDATA,REGS,GONE} only in the
+# same change that adds its TAB arm, and -> CONVERTED_EXIST only in the same
+# change that adds its EXIST arm.  macro-probe.sh enforces both mechanically
+# against tab-probe.sh's TAB_MACROS and exist-probe.sh's EXIST_MACROS; it is
+# not an invariant anyone has to remember.
 #
 # ---------------------------------------------------------------------------
-# SIXTEEN MACROS BELOW SAY `UNCONVERTED' AND HAVE ALREADY BEEN CONVERTED.
-# READ THIS BEFORE CONVERTING ANY OF THEM AGAIN.
+# AN ABSENT MACRO AND A FAILING MACRO MUST NOT LOOK ALIKE IN ANY TOTAL, AND
+# UNTIL 2026-08-13 THEY DID -- BY BEING INVISIBLE.
+#
+# The board scored over the macros that happened to be listed on it.  A macro
+# that was converted and never added simply was not counted, anywhere, in any
+# column.  That is the branch's own root pattern -- one name, several
+# authorities, no diagnostic -- turned on the instrument that is supposed to
+# find it, and it is how macros stayed converted with no arm for weeks.
+#
+# It is now checked mechanically rather than remembered.  macro-probe.sh
+# DERIVES the converted set from `gcc/defaults.h' itself -- every `#undef' in
+# the multi-target redirect block, plus a short declared list of the macros
+# converted by rewriting their consumers instead of redirecting the name -- and
+# refuses to run if any of them is absent from this file, or is present here
+# saying UNCONVERTED.  So "not on the board" is now a hard failure by name
+# instead of a silence.
+#
+# WHAT THAT CHECK FOUND WHEN IT WAS FIRST RUN, 2026-08-13, and the numbers are
+# the point:
+#
+#   67 macros are converted, derived from defaults.h.
+#   11 of them were ABSENT from this file entirely.
+#   31 more were PRESENT and said UNCONVERTED.
+#
+# So 42 converted macros had no honest status, against a brief that named
+# five.  The header note below said SIXTEEN; the sixteen were the ones somebody
+# wrote down.  Fourteen others -- the MOVE_MAX / MOVE_RATIO / CLEAR_RATIO /
+# SET_RATIO / STORE_MAX_PIECES / COMPARE_MAX_PIECES / MOVE_MAX_PIECES cost
+# family and the STACK_POINTER_REGNUM / FRAME_POINTER_REGNUM /
+# HARD_FRAME_POINTER_REGNUM / ARG_POINTER_REGNUM frame-register family -- had
+# been converted with nobody recording it here at all.  A hand-maintained note
+# is not a check; this is the difference.
+#
+# ---------------------------------------------------------------------------
+# THE NOTE BELOW IS KEPT FOR ITS PER-MACRO REASONING, WHICH IS STILL TRUE AND
+# IS THE MOST VALUABLE THING ON THIS PAGE.  ITS HEADLINE IS NOT: the sixteen
+# no longer say `UNCONVERTED', they say `CONVERTED_NOARM', and they were never
+# sixteen -- they were thirty.  Read it as "why each of these is hard to
+# measure", not as a census.
 #
 # #108's six  STACK_BOUNDARY  PREFERRED_STACK_BOUNDARY  STACK_SLOT_ALIGNMENT
 #             MINIMUM_ALIGNMENT  OUTGOING_REG_PARM_STACK_SPACE
@@ -209,19 +287,33 @@
 # constants and they differ, but no prediction was pre-registered for it, so it
 # is reported and not scored.  Registering one is the obvious next increment.
 #
-# NOTHING HAS BEEN MOVED TO A `CONVERTED_*' STATUS BY THIS.  The standing rule
-# is that a macro moves only in the change that adds its arm to
-# `tab-probe.sh's TAB_MACROS line, which macro-probe.sh checks mechanically.
-# This is a DIFFERENT harness with a different list, and wiring it into that
-# mechanical check is a separate change that should be made deliberately rather
-# than as a side effect.  Three macros now HAVE a trustworthy arm; they are
-# still recorded UNCONVERTED here, and that is the rule working, not an
-# oversight.
+# WIRED INTO THE BOARD 2026-08-13, WHICH IS THE SEPARATE DELIBERATE CHANGE THE
+# PARAGRAPH THAT STOOD HERE SAID WAS OWED.  exist-probe.sh now exports
+# EXIST_MACROS on one line, exactly as tab-probe.sh exports TAB_MACROS, and
+# macro-probe.sh reads BOTH.  All nine moved UNCONVERTED (or absent) ->
+# CONVERTED_EXIST in that same change, which is the standing rule satisfied
+# rather than waived.
+#
+# THE TWO LISTS ARE NOT INTERCHANGEABLE AND THE CHECK REFUSES TO TREAT THEM SO.
+# A name in TAB_MACROS does not satisfy CONVERTED_EXIST and a name in
+# EXIST_MACROS does not satisfy CONVERTED_CDATA.  Collapsing them into "is it
+# covered by something" would have made an existence bit indistinguishable from
+# a value reading in the only place a reader looks -- the total.  The summary
+# prints the two populations separately for the same reason.
+#
+# WHAT THIS DID AND DID NOT MOVE.  Four of the nine had header arms
+# (ACCUMULATE_OUTGOING_ARGS, FUNCTION_MODE, INCOMING_FRAME_SP_OFFSET,
+# PUSH_ARGS_REVERSED), so eight header arms are retired: 224 -> 216.  Every one
+# of those eight was about to become, or already was, a wrong-reason green --
+# PUSH_ARGS_REVERSED is the redirect-landing-on-both-sides shape the brief
+# predicted would flip FAIL -> PASS on the next run.  They are retired, not
+# banked, and they are replaced by an arm rather than deleted.
 # ---------------------------------------------------------------------------
-ACCUMULATE_OUTGOING_ARGS UNCONVERTED
+ACCUMULATE_OUTGOING_ARGS CONVERTED_EXIST
 ADDITIONAL_REGISTER_NAMES UNCONVERTED
 ADJUST_REG_ALLOC_ORDER UNCONVERTED
-ARG_POINTER_REGNUM UNCONVERTED
+ALL_REGS CONVERTED_NOARM
+ARG_POINTER_REGNUM CONVERTED_NOARM
 ASM_COMMENT_START CONVERTED_CDATA
 ASM_DECLARE_FUNCTION_NAME UNCONVERTED
 ASM_OUTPUT_ADDR_DIFF_ELT UNCONVERTED
@@ -239,36 +331,40 @@ BRANCH_COST UNCONVERTED
 BYTES_BIG_ENDIAN CONVERTED_CDATA
 CASE_VECTOR_MODE UNCONVERTED
 CASE_VECTOR_PC_RELATIVE UNCONVERTED
-CLEAR_RATIO UNCONVERTED
+CLEAR_RATIO CONVERTED_NOARM
 CLZ_DEFINED_VALUE_AT_ZERO UNCONVERTED
-COMPARE_MAX_PIECES UNCONVERTED
+COMPARE_MAX_PIECES CONVERTED_NOARM
 CONSTANT_ADDRESS_P UNCONVERTED
 CTZ_DEFINED_VALUE_AT_ZERO UNCONVERTED
 DATA_ALIGNMENT UNCONVERTED
-DEBUGGER_REGNO UNCONVERTED
+DEBUGGER_REGNO CONVERTED_NOARM
+DEFAULT_INCOMING_FRAME_SP_OFFSET CONVERTED_EXIST
 DEFAULT_PCC_STRUCT_RETURN UNCONVERTED
 DEFAULT_SIGNED_CHAR UNCONVERTED
 DWARF_CIE_DATA_ALIGNMENT CONVERTED_CDATA
-DWARF_FRAME_REGISTERS UNCONVERTED
-DWARF_FRAME_REGNUM UNCONVERTED
+DWARF_FRAME_REGISTERS CONVERTED_NOARM
+DWARF_FRAME_REGNUM CONVERTED_NOARM
 DWARF_FRAME_RETURN_COLUMN CONVERTED_CDATA
 EH_RETURN_DATA_REGNO UNCONVERTED
 EH_RETURN_HANDLER_RTX UNCONVERTED
 EH_RETURN_STACKADJ_RTX UNCONVERTED
-ELIMINABLE_REGS UNCONVERTED
+ELIMINABLE_REGS CONVERTED_NOARM
 ENABLE_X86_64_MFENTRY UNCONVERTED
 EPILOGUE_USES UNCONVERTED
 EXIT_IGNORE_STACK UNCONVERTED
 FIRST_PSEUDO_REGISTER CONVERTED_REGS
 FIXED_REGISTERS UNCONVERTED
 FLOAT_WORDS_BIG_ENDIAN CONVERTED_CDATA
-FRAME_POINTER_REGNUM UNCONVERTED
-FUNCTION_ARG_REGNO_P UNCONVERTED
+FRAME_POINTER_REGNUM CONVERTED_NOARM
+FUNCTION_ARG_REGNO_P CONVERTED_NOARM
 FUNCTION_BOUNDARY UNCONVERTED
-FUNCTION_MODE UNCONVERTED
+FUNCTION_MODE CONVERTED_EXIST
 FUNCTION_PROFILER UNCONVERTED
+GENERAL_REGS CONVERTED_NOARM
 GLOBAL_ASM_OP CONVERTED_SUPPLY
-HARD_FRAME_POINTER_REGNUM UNCONVERTED
+HARD_FRAME_POINTER_IS_ARG_POINTER CONVERTED_NOARM
+HARD_FRAME_POINTER_IS_FRAME_POINTER CONVERTED_NOARM
+HARD_FRAME_POINTER_REGNUM CONVERTED_NOARM
 HARD_REGNO_CALLER_SAVE_MODE UNCONVERTED
 HARD_REGNO_NREGS_HAS_PADDING UNCONVERTED
 HARD_REGNO_NREGS_WITH_PADDING UNCONVERTED
@@ -280,15 +376,17 @@ HAVE_atomic_compare_and_swapdi UNCONVERTED
 HAVE_atomic_compare_and_swapsi UNCONVERTED
 HAVE_cpymemdi UNCONVERTED
 HAVE_setmemdi UNCONVERTED
-INCOMING_FRAME_SP_OFFSET UNCONVERTED
+INCOMING_FRAME_SP_OFFSET CONVERTED_EXIST
+INCOMING_REG_PARM_STACK_SPACE CONVERTED_EXIST
 INCOMING_RETURN_ADDR_RTX UNCONVERTED
-INCOMING_STACK_BOUNDARY UNCONVERTED
+INCOMING_STACK_BOUNDARY CONVERTED_NOARM
 INDEX_REG_CLASS CONVERTED_SUPPLY
 INIT_CUMULATIVE_ARGS UNCONVERTED
-INITIAL_ELIMINATION_OFFSET UNCONVERTED
+INITIAL_ELIMINATION_OFFSET CONVERTED_NOARM
 JUMP_TABLES_IN_TEXT_SECTION CONVERTED_CDATA
 LEGITIMATE_PIC_OPERAND_P UNCONVERTED
 LIBCALL_VALUE CONVERTED_GONE
+LIM_REG_CLASSES CONVERTED_NOARM
 LOAD_EXTEND_OP UNCONVERTED
 LOCAL_ALIGNMENT UNCONVERTED
 LOCAL_DECL_ALIGNMENT UNCONVERTED
@@ -298,27 +396,28 @@ MAX_BITSIZE_MODE_ANY_MODE UNCONVERTED
 MAX_BITS_PER_WORD UNCONVERTED
 MAX_FIXED_MODE_SIZE CONVERTED_CDATA
 MAX_MOVE_MAX UNCONVERTED
-MAX_STACK_ALIGNMENT UNCONVERTED
-MAX_SUPPORTED_STACK_ALIGNMENT UNCONVERTED
-MINIMUM_ALIGNMENT UNCONVERTED
+MAX_STACK_ALIGNMENT CONVERTED_NOARM
+MAX_SUPPORTED_STACK_ALIGNMENT CONVERTED_NOARM
+MINIMUM_ALIGNMENT CONVERTED_NOARM
 MIN_UNITS_PER_WORD UNCONVERTED
-MOVE_MAX UNCONVERTED
-MOVE_MAX_PIECES UNCONVERTED
-MOVE_RATIO UNCONVERTED
+MOVE_MAX CONVERTED_NOARM
+MOVE_MAX_PIECES CONVERTED_NOARM
+MOVE_RATIO CONVERTED_NOARM
 N_REG_CLASSES CONVERTED_REGS
 NUM_MODES_FOR_MODE_SWITCHING UNCONVERTED
 NUM_UNSPEC_VALUES UNCONVERTED
 NUM_UNSPECV_VALUES UNCONVERTED
 OPTIMIZE_MODE_SWITCHING UNCONVERTED
-OUTGOING_REG_PARM_STACK_SPACE UNCONVERTED
+OUTGOING_REG_PARM_STACK_SPACE CONVERTED_NOARM
 PARM_BOUNDARY CONVERTED_CDATA
 PIC_OFFSET_TABLE_REGNUM UNCONVERTED
-Pmode UNCONVERTED
+Pmode CONVERTED_NOARM
 POINTER_SIZE UNCONVERTED
-PREFERRED_STACK_BOUNDARY UNCONVERTED
+PREFERRED_STACK_BOUNDARY CONVERTED_NOARM
 PROMOTE_MODE UNCONVERTED
 PTRDIFF_TYPE CONVERTED_CDATA
-PUSH_ARGS_REVERSED UNCONVERTED
+PUSH_ARGS_REVERSED CONVERTED_EXIST
+PUSH_ROUNDING CONVERTED_EXIST
 REG_ALLOC_ORDER UNCONVERTED
 REG_CLASS_CONTENTS UNCONVERTED
 REG_CLASS_NAMES UNCONVERTED
@@ -327,27 +426,30 @@ REGMODE_NATURAL_SIZE UNCONVERTED
 REGNO_OK_FOR_BASE_P CONVERTED_SUPPLY
 REGNO_OK_FOR_INDEX_P CONVERTED_SUPPLY
 REGNO_REG_CLASS CONVERTED_REGS
+REG_PARM_STACK_SPACE CONVERTED_EXIST
 REG_WORDS_BIG_ENDIAN CONVERTED_CDATA
+RELOAD_ELIMINABLE_REGS CONVERTED_NOARM
 RETURN_ADDR_RTX UNCONVERTED
 REVERSE_CONDITION UNCONVERTED
 REVERSIBLE_CC_MODE UNCONVERTED
 SELECT_CC_MODE UNCONVERTED
-SET_RATIO UNCONVERTED
+SET_RATIO CONVERTED_NOARM
 SETUP_FRAME_ADDRESSES UNCONVERTED
 SHIFT_COUNT_TRUNCATED CONVERTED_CDATA
 SIZE_TYPE CONVERTED_CDATA
 SLOW_BYTE_ACCESS UNCONVERTED
-STACK_BOUNDARY UNCONVERTED
+STACK_BOUNDARY CONVERTED_NOARM
 STACK_CHECK_FIXED_FRAME_SIZE CONVERTED_CDATA
 STACK_CHECK_MAX_FRAME_SIZE CONVERTED_CDATA
 STACK_CHECK_MOVING_SP UNCONVERTED
-STACK_POINTER_REGNUM UNCONVERTED
+STACK_DYNAMIC_OFFSET CONVERTED_EXIST
+STACK_POINTER_REGNUM CONVERTED_NOARM
 STACK_SAVEAREA_MODE UNCONVERTED
 STACK_SIZE_MODE UNCONVERTED
-STACK_SLOT_ALIGNMENT UNCONVERTED
-STORE_MAX_PIECES UNCONVERTED
+STACK_SLOT_ALIGNMENT CONVERTED_NOARM
+STORE_MAX_PIECES CONVERTED_NOARM
 STRICT_ALIGNMENT CONVERTED_CDATA
-SUPPORTS_STACK_ALIGNMENT UNCONVERTED
+SUPPORTS_STACK_ALIGNMENT CONVERTED_NOARM
 TARGET_HAS_FMV_TARGET_ATTRIBUTE UNCONVERTED
 TARGET_PTRMEMFUNC_VBIT_LOCATION UNCONVERTED
 TRAMPOLINE_ALIGNMENT UNCONVERTED
