@@ -49,12 +49,33 @@ literally. A **shared source compiled N times** (one file → `foo-i386.o` and
 **The landed form** is `gcc/multi-target-base.h`:
 
 ```c
-#define BASE_HEADER(f) <MT_BASE/f>      /* -DMT_BASE=<cpu>-inc per object */
-#include BASE_HEADER (tm.h)
+#define MT_HDR_STR(f) #f
+#define MT_HDR_XSTR(f) MT_HDR_STR (f)
+#define BASE_HEADER(f) MT_HDR_XSTR (MT_BASE/f)  /* -DMT_BASE=<cpu>-inc */
+#include BASE_HEADER (tm.h)                     /* "i386-inc/tm.h" */
 ```
 
-Plain parameter substitution into the angle-bracket form — **no `#`, no `##`**,
-one `-D` serving every header. Everything else was measured and fails:
+**It yields the QUOTED include, not the angle-bracket one**, per the user:
+*"I like the version that results in `"..."` not `<...>` better."* An earlier
+form was plain substitution into `<MT_BASE/f>`; that also worked, and this
+file recorded it as the landed shape. Only the expansion changed — the call
+sites still read `BASE_HEADER (tm.h)`, argument unquoted.
+
+**The double indirection is mandatory.** `MT_HDR_STR`'s parameter is adjacent
+to `#`, so its argument is **not** macro-expanded; `MT_HDR_XSTR` exists solely
+to force one expansion first. Without it you get `"MT_BASE/tm.h"` — a
+*plausible-looking wrong path*, which is the exact silent-failure shape this
+whole change removes. Measured: the witness catches its removal too, with
+`fatal error: MT_BASE/mt-inc-tag-i386.h`. `t140-inject.sh` **ARM 6** reads the
+expansion and carries its own negative control.
+
+Two consequences of `"..."` over `<...>`, both **checked, not assumed**:
+`"..."` searches the including file's own directory first (**zero** directories
+named `*-inc` anywhere in the source tree, so nothing can shadow), and the
+twenty `.deps` entries for these objects are **byte-identical** before and
+after.
+
+One `-D` serves every header. Everything else was measured and fails:
 
 ```
 #include BASE "/tm.h"                 warning only, silently drops "/tm.h"
@@ -532,6 +553,18 @@ answer is still wrong is worse than the failure.**
 - **Build your own build dir.** Sharing `/tmp/b-objs` produces meaningless
   verdicts and spurious `mv: cannot stat tmp-*` failures; it has killed runs.
   **In a shared build dir, a file you did not write is not a fixture.**
+
+  **AND `/tmp/b<task number>` IS NOT YOUR OWN.** Measured live: an agent
+  configured `/tmp/b141`, built it, took a full green set — and mid-task
+  `$D/gcc/Makefile` vanished and `config.log` came back naming *another*
+  worktree, because a second agent had reconfigured the same path. The srcdir
+  assertion caught it by name, which is that guard finally firing on a live
+  event rather than a historical one. Task numbers are handed out in
+  neighbouring blocks, so they collide by construction. **Name the build dir
+  after your worktree** (`/tmp/b-<worktree suffix>`), and re-run anything you
+  measured before the collision: the readings were in fact identical, and were
+  still discarded, because you cannot show the other agent was not building in
+  that tree while you measured.
 - **A generator or configure script can fail and exit 0** — four times. One `'`
   in a comment truncated a block out of a generated makefile; a backtick in a
   heredoc comment wrote nothing and silently defaulted all 97 capability keys.

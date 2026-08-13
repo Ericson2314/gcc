@@ -9580,3 +9580,163 @@ each**.  `BASE_HEADER` is kept, so the include sites read as the user asked.
   * Rebuild stderr was not classified against the 32-line incremental floor:
     this was a near-cold arm (`Makefile.in` changed, so everything rebuilt),
     which is not comparable with it.
+
+---
+
+# #141 -- `BASE_HEADER` NOW YIELDS `"..."`, NOT `<...>`
+
+A **user preference**, and a small contained change: *"I like the version that
+results in `"..."` not `<...>` better."*  It is also the spelling of the
+original ruling, `#include "<base>/tm.h"`.
+
+## 1. THE CHANGE -- ONE MACRO, NO CALL SITE TOUCHED
+
+`gcc/multi-target-base.h` only:
+
+```c
+#define MT_HDR_STR(f) #f
+#define MT_HDR_XSTR(f) MT_HDR_STR (f)
+#define BASE_HEADER(f) MT_HDR_XSTR (MT_BASE/f)
+```
+
+All **fifteen** call sites across seven sources are unchanged and still read
+`BASE_HEADER (tm.h)`, argument unquoted -- the user likes how they read.  Only
+the expansion moved, `<MT_BASE/tm.h>` -> `"i386-inc/tm.h"`.  `MT_BASE` stays
+the `-D`; `BASE` still collides (a template parameter in
+`aarch64-sve-builtins-shapes.cc:1154` and macro parameters in two more files).
+
+The names are `MT_HDR_STR`/`MT_HDR_XSTR`, **not** the `STR`/`XSTR` of the
+user's `temp.c` sketch.  `XSTR` is a real GCC macro -- the `rtl.h` accessor --
+and `MT_STR` is **already defined**, differently, in `target-cumargs.cc:822`
+and `target-regs.cc:190`, both AFTER this header is included.  Either name
+would have been a redefinition.  Measured with `wc -l`, no `head`:
+`MT_HDR_STR` and `MT_HDR_XSTR` are **0 hits each** in the tree.
+
+## 2. THE DOUBLE INDIRECTION IS LOAD-BEARING, AND HAS AN ARM
+
+`#` does not expand its operand, so the one-level spelling yields the literal
+`"MT_BASE/tm.h"` -- not a diagnostic, a **plausible-looking wrong path**, which
+is the shape this whole change exists to remove.
+
+**`t140-inject.sh` ARM 6** is new and reads the EXPANSION rather than the exit
+status, because the other five arms cannot see this: a wrong path merely fails
+to compile, so a "did it fail?" arm goes green for the wrong reason.  It
+carries its **own negative control** -- the mistake is spelt out in the same
+TU, and the arm refuses to score unless that control reproduces
+`"MT_BASE/tm.h"`.  Plus a non-vacuity FATAL, since an empty read looks exactly
+like a pass.
+
+**Confirmed to fire, by injecting the exact fault** into a copy of the header:
+the WITNESS catches it too, and first --
+`mt-inc-witness.h:1:40: fatal error: MT_BASE/mt-inc-tag-i386.h: No such file`.
+So the mistake is fatal and names the flag; ARM 6 is kept because it is what
+says WHICH way it went wrong.
+
+## 3. THE TWO `"..."`-vs-`<...>` CONSEQUENCES -- HANDLED, NOT DISCOVERED
+
+  * **Shadowing.**  `"..."` searches the including file's own directory before
+    any `-I`.  Measured: **zero** directories named `*-inc` anywhere in the
+    source tree (`find`, not `ls`, and not filtered).  The directive lives in
+    `gcc/`, so a shadow would need `gcc/i386-inc/`; there is none, and the
+    fall-through to `-I` is graceful anyway.  The build root's `i386-inc/` is
+    still reached through `-I.`, exactly as before.
+  * **Dependency generation.**  The **twenty** `.deps` entries for every object
+    that reaches this header (`target-{addr,cumargs,c-ops,cdata,regs,regstack}
+    -{i386,aarch64,select}`, `mt-*/reg-probe`) were snapshotted before the
+    change and diffed after: **byte-identical**, and their mtimes confirm they
+    were regenerated rather than left alone.
+
+## 4. ALL SIX EXISTING ARMS STILL FIRE, WITH UNCHANGED MEANING -- `/tmp/b-adacdd`
+
+    ARM 0  control, unmodified          PASS rc=0
+    ARM 1  MT_BASE undefined            PASS  #error "MT_BASE is not defined..."
+    ARM 2  MT_BASE = the other base     PASS  fatal: aarch64-inc/mt-inc-tag-i386.h
+    ARM 3  -I<base>-inc removed         PASS  fatal: mt-inc-witness.h
+    ARM 4  -I = the other back end      PASS  fatal: i386-inc/mt-inc-tag-aarch64.h
+    ARM 5  restored                     PASS rc=0
+    ARM 6  BASE_HEADER expansion        PASS  "i386-inc/tm.h" (broken form gives
+                                              "MT_BASE/tm.h")
+    OVERALL rc=0
+
+**No arm's meaning changed.**  Every needle is the same string it was, because
+every one of them is a *path in a diagnostic*, and the paths did not move --
+only the punctuation around them in the source did.  Walked case by case:
+ARM 2 and ARM 4 still resolve the tag relative to the witness's own directory
+first (`i386-inc/i386-inc/...`, absent) and then through `-I`, so they still
+fail naming the cross-base tag.  Run against the REAL two-base build, not a
+scratch directory holding one base.
+
+## 5. BARS -- `/tmp/b-adacdd`, configured from this worktree and asserted so
+
+  * `make multi-target-objs cc1 lto1` in `$D/gcc` -- **rc=0**.
+  * **x86_64 `-O2 scratchpad/big.c`: 12369 bytes, md5 `378fc33c1e70`** --
+    measured **before AND after in the same build dir**, identical, and equal
+    to the recorded bar.
+  * **aarch64 `-O2` `int x = 1;` as `one.c`: 371 bytes, md5 `84b06d9df5d2`** --
+    before and after, identical.  Input basename quoted per #137; `-S` emits a
+    `.file`, so the number is meaningless without it.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, confirmed
+    running against `/tmp/b-adacdd` (`mt cfg : /tmp/b-adacdd/lib/gcc/17.0.0/
+    x86_64-pc-linux-gnu/specs-config`), 5 distinct md5s per side, negative
+    control firing, **stderr 0 lines**, `OVERALL rc=0`.
+  * `target-specs` run for both targets with real aarch64 binutils, rc=0.
+  * Rebuild stderr: **6 lines, 0 `error:`** -- and all six are the SAME two
+    pre-existing `missing terminating ' character` warnings from
+    `target-regs.cc:69`, present in the baseline build too.  Not the 32-line
+    incremental floor; this is a narrow rebuild of the ~20 objects that include
+    this header.
+  * Anchor unchanged at **43** (`gcc/Makefile.in` was not touched).
+
+**ARM 6 IS CONFIRMED ABLE TO FAIL, not merely observed green.**  Two ways.
+Its own in-TU negative control must reproduce `"MT_BASE/tm.h"` or it refuses to
+score.  And run against the OLD header (the `<>` form, restored into the same
+build dir for the before-half of the A/B) it reports
+**`FAIL: BASE_HEADER (tm.h) gave <i386-inc/tm.h>`, `OVERALL rc=1`** -- while
+ARMs 0-5 stay green, which is exactly the point: the other five cannot see the
+form of the expansion at all.
+
+**ONE DIAGNOSTIC LOCATION MOVED, and it moved the right way.**  ARM 4's needle
+and outcome are unchanged, but the file the compiler blames differs: under
+`<>` it was `multi-target-base.h:95` (the include line itself), under `"..."`
+it is `aarch64-inc/mt-inc-witness.h:1:43` -- the witness that actually named
+the missing tag.  Reported because "same needle" is not "same message", and
+the newer one points at the file that made the wrong claim.
+
+## 5a. A BUILD DIR WAS CLOBBERED MID-TASK, AND THE FIRST RUN IS DISCARDED
+
+I first used `/tmp/b141` and got a complete green set there.  Partway through,
+`/tmp/b141/gcc/Makefile` **vanished** and its `config.log` came back naming
+`/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-a7a476335e5ac72b2` --
+another agent had reconfigured the same path underneath me.  Both guards
+caught it by name (`t137-bars.sh`: *"FATAL: stale build dir"*;
+`t140-inject.sh`: *"was configured from '...a7a476...', not ...adacdd..."*),
+which is the srcdir assertion in PRINCIPLES section 4 doing precisely its job
+against a live event rather than a historical one.
+
+**Every figure in this section is from the re-run in `/tmp/b-adacdd`**, a path
+named after this worktree so it cannot collide.  The `/tmp/b141` readings are
+discarded, not quoted -- not because they looked wrong (they were identical)
+but because I cannot show the other agent was not building in that tree while
+I measured.  Concretely: **`/tmp/b141` is not a safe name.**  `b<task number>`
+collides whenever two agents are handed neighbouring numbers, and this is the
+second-order form of *"build your own build dir"* -- it is not enough to have
+your own, it must have a name nobody else will pick.
+
+## 6. ONE THING I BROKE AND CAUGHT
+
+The first version of my own comment contained the text `.deps/*.Po`, whose
+`/*` inside a C comment produced **14 `-Wcomment` warnings**.  Reworded.  Noted
+because it is the small form of this project's own rule: a diagnostic appeared,
+and the fix was to change the thing it was objecting to, not to stop looking.
+
+## 7. WHAT I DID NOT DO
+
+  * **`temp.c` is not in this worktree.**  The brief quotes it as being at the
+    tree root; it is untracked in the user's main checkout and did not survive
+    `git reset --hard`.  I worked from the form quoted in the brief.
+  * **No task number is reported against.**  The brief cites none, and the task
+    list is not in the worktree.
+  * **No probe-scoreboard figure is quoted.**  `macro-probe-run.sh` was not
+    run; nothing here touches that board.
+  * The `config/` population still uses plain `#include "tm.h"` plus the `-I`,
+    unchanged by this task, as does `target-asm-ops.cc` on `-DTM_H_FILE`.
