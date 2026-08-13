@@ -139,24 +139,38 @@ struct mt_cumulative_args
    to be the largest base, which is legal in GNU C++ but is not something to
    depend on; one byte is not worth a conditional.
 
-   ALIGNMENT IS THE HALF A PAD CANNOT FIX, so it is asserted instead.  The
-   offset of `info' is chosen by the primary's alignment, and a base needing
-   MORE would be misaligned however much tail follows.  Today every configured
-   base wants 8 and the assertion is exactly at the limit -- 8 <= 8, no slack,
-   like the `9 <= 9' pair in `52fa9e763c5' -- which is the point: the first
-   base that disagrees is a compile error naming this, not a misaligned store.
-   The assertion lives in a header reached by BOTH shared and per-back-end
-   translation units, so it is checked once per base as well as once for the
-   primary.  */
+   ALIGNMENT IS THE HALF A PAD CANNOT FIX, and it is fixed at the DECLARATION
+   instead: `incoming_args::info' carries
+   `alignas (MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN)'.  Without it the
+   offset of `info' is whatever `alignof (CUMULATIVE_ARGS)' happens to be in
+   the translation unit doing the compiling, and that is genuinely per-base:
+   i386 and aarch64 both want 8, but **rs6000 wants 4** -- its
+   `CUMULATIVE_ARGS' is a struct of `int's.  In an i386 + aarch64 + rs6000
+   build the rs6000 objects would put `info' four bytes earlier than the
+   shared middle end did, and everything after it in `rtl_data' with it.
+
+   An EARLIER version of this header asserted
+   `UNION_ALIGN <= alignof (CUMULATIVE_ARGS)' instead, i.e. it demanded that
+   every base be at least as strict as the maximum.  That is only satisfiable
+   when all the bases agree, so it held for the i386 + aarch64 pair by luck
+   and failed by name on all 36 rs6000 translation units the moment a third
+   base was configured -- which is the assertion doing its job, but the
+   remedy is to stop letting the per-base alignment choose the offset, not to
+   demand that the bases agree.  The surviving assertion is the one that can
+   still catch a real gap: a base needing MORE than the measured maximum means
+   gen-reg-widths.sh did not see it, exactly as for the size.
+
+   Over-aligning is safe for every base and is chosen by none of them: the
+   value is the measured max over the configured bases, not a floor.  */
 #define MT_INCOMING_ARGS_PAD \
   (MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE - (int) sizeof (CUMULATIVE_ARGS) + 1)
 
-static_assert (MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN
-	       <= (int) alignof (CUMULATIVE_ARGS),
-	       "some configured back end's CUMULATIVE_ARGS needs stricter "
-	       "alignment than this one's, so the offset of "
-	       "incoming_args::info -- chosen by THIS translation unit -- is "
-	       "not good enough for it; MT_INCOMING_ARGS_PAD only fixes size");
+static_assert ((int) alignof (CUMULATIVE_ARGS)
+	       <= MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN,
+	       "this back end's CUMULATIVE_ARGS needs stricter alignment than "
+	       "the union bound in multi-target-reg-widths.h, so the "
+	       "alignas on incoming_args::info is not good enough for it; "
+	       "gen-reg-widths.sh did not see this base");
 
 static_assert ((int) sizeof (CUMULATIVE_ARGS)
 	       <= MULTI_TARGET_UNION_CUMULATIVE_ARGS_SIZE,

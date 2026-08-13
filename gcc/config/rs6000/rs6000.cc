@@ -13893,8 +13893,14 @@ rs6000_redzone_clobber ()
   if (DEFAULT_ABI != ABI_V4)
     {
       int red_zone_size = TARGET_32BIT ? 220 : 288;
-      rtx base = plus_constant (Pmode, stack_pointer_rtx,
-				GEN_INT (-red_zone_size));
+      /* plus_constant's third argument is a poly_int64, not an rtx.  With
+	 NUM_POLY_INT_COEFFS == 1 the GEN_INT that used to be here compiled --
+	 poly_int<1, long>'s constructor casts its single argument, so the
+	 rtx POINTER became the constant -- and it is an upstream rs6000 bug,
+	 present at c31b7a09eea.  A multi-target build is poly-aware
+	 (NUM_POLY_INT_COEFFS == 2), where the same expression is a hard
+	 error, which is how it was found.  */
+      rtx base = plus_constant (Pmode, stack_pointer_rtx, -red_zone_size);
       rtx mem = gen_rtx_MEM (BLKmode, base);
       set_mem_size (mem, red_zone_size);
       return mem;

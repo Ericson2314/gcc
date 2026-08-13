@@ -52,8 +52,17 @@ struct GTY(()) incoming_args {
   rtx arg_offset_rtx;
 
   /* Quantities of various kinds of registers
-     used for the current function's args.  */
-  CUMULATIVE_ARGS info;
+     used for the current function's args.
+
+     THE `alignas' IS WHAT MAKES THE OFFSET UNIFORM, and it is the other half
+     of the pad below.  `alignof (CUMULATIVE_ARGS)' is per-base -- 8 for i386
+     and aarch64, 4 for rs6000 -- so without it the offset of this member is
+     whatever the base that compiled the translation unit wanted, and a build
+     configured with both would place `info' at two different offsets in two
+     translation units that must agree.  The union alignment is the MEASURED
+     maximum over the configured bases (multi-target-reg-widths.h), so
+     over-aligning here is valid for every base and chosen by none of them.  */
+  alignas (MULTI_TARGET_UNION_CUMULATIVE_ARGS_ALIGN) CUMULATIVE_ARGS info;
 
   /* AND THE ROOM THE OTHER CONFIGURED BACK ENDS NEED FOR IT.
 
