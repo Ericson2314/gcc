@@ -318,19 +318,33 @@ answer is still wrong is worse than the failure.**
   reported "ok, differs" while comparing two nonexistent files) —
   **5/5 IDENTICAL** vs `/tmp/b-stock` (genuine upstream at merge-base
   `c31b7a09eea`), distinct md5s per side, negative control firing.
-- **Probe scoreboard** (verified, quote these): **224 header arms — i386 112
-  PASS / 0 FAIL, aarch64 2 PASS / 110 FAIL; 64 TAB arms — i386 32 PASS / 0
-  FAIL, aarch64 27 PASS / 5 FAIL.** **Diff verdicts and probe shapes, never
-  totals.**
+- **Probe scoreboard** (re-measured 2026-08-12 by running
+  `scratchpad/macro-probe-run.sh`, not by reconciling on paper — quote these):
+  **224 header arms over 112 macros — i386 112 PASS / 0 FAIL, aarch64 8 PASS /
+  104 FAIL, of which only 2 of the 8 passes are TRUSTED; 64 TAB arms — i386 32
+  PASS / 0 FAIL, aarch64 27 PASS / 5 FAIL.** **Diff verdicts and probe shapes,
+  never totals.**
 
-  Changed 2026-08-12 by task #92, and the aarch64 header column went **DOWN**,
-  5 → 2. That is a **correction, not a regression**: `FIRST_PSEUDO_REGISTER`,
-  `N_REG_CLASSES` and `REGNO_REG_CLASS` had flipped green in `ecad6abf6ae`
-  because both bases' headers now expand them to the same target-neutral text
-  — the wrong-reason flip this file warns about, caught rather than banked.
-  They are `CONVERTED_REGS` and carry TAB arms that read the running `cc1`
-  against each base's own headers. The aarch64 FAIL count did not move (110
-  both sides): nothing was taken out of the red column.
+  **Never quote the raw 8.** It is 2 trusted (`MAX_BITS_PER_WORD`,
+  `MAX_BITSIZE_MODE_ANY_MODE`) + **6 retired-pending** — #108's stack/arg
+  boundary set (`FUNCTION_ARG_REGNO_P`, `MINIMUM_ALIGNMENT`,
+  `OUTGOING_REG_PARM_STACK_SPACE`, `PREFERRED_STACK_BOUNDARY`,
+  `STACK_BOUNDARY`, `STACK_SLOT_ALIGNMENT`), which are green because the
+  probe's base-B context does not define `MULTI_TARGET_TARGETM_BASE`, so
+  `defaults.h` redirects both sides and **the arm compares the redirect with
+  itself**. Their real both-sided evidence is at the object level
+  (`scratchpad/t108-evidence.sh`); they need TAB arms before any of it counts.
+
+  This line was reconciled after two documents disagreed, and **both were
+  partly right on the same board**: this file had #92's retire-3 but not
+  #108's six (2 / 110); STATE.md had #108's six but not #92's retire-3
+  (5 / 104 + 6). `5 − 3 = 2` and `104 + 6 = 110` — the arithmetic closes, but
+  it was settled by re-running the harness, because closing arithmetic is
+  exactly how a wrong shared number survives. #92's retire-3
+  (`FIRST_PSEUDO_REGISTER`, `N_REG_CLASSES`, `REGNO_REG_CLASS`) was a
+  **correction, not a regression** — same wrong-reason flip as the six, caught
+  rather than banked; they are `CONVERTED_REGS` and carry TAB arms that read
+  the running `cc1` against each base's own headers.
 
   Earlier figures, kept because each was quoted after it stopped being true.
   230/58 with aarch64 5/110 and 24/5 is the pre-#92 state and is now stale.
