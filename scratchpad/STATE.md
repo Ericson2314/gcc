@@ -1862,3 +1862,197 @@ per-base `build/gencondmd-<triple>.o` objects still have no dependency on
 `multi-target-reg-widths.h` -- harmless now the cycle is cut, but if anyone
 re-introduces that edge it must go in the awk, since no triple-id list
 variable is visible from `Makefile.in`.
+
+# TASK #111 -- THE EXISTENCE-PREDICATE ARM MEASURED; TWO CONVERSIONS LANDED
+
+Branched from `9d270fff765` ("PRINCIPLES: two corrections to yesterday's
+corrections").  Commits `b4fe5b14cd2` (INIT_EXPANDERS) and `44f80bb9228`
+(HAVE_lo_sum / HAVE_rotate / HAVE_rotatert).  Build dirs `/tmp/b111`
+(x86_64 + aarch64, mine) and `/tmp/b111m` (x86_64 + msp430, for the rotate
+gate).  My worktree started at the bare-repo HEAD and needed the documented
+`git reset --hard multi-target`; the check in PRINCIPLES 5 caught it.
+
+## 1. THE POPULATION -- ARM D OF THE #68 SWEEP
+
+The hole was real.  Arms B and C find UNDEFINED SYMBOLS; arm A finds
+DIVERGENT MACRO TEXT.  Neither can see "back end P defines nothing, back end
+Q defines X, shared code says #ifdef X": there is no undefined symbol (no
+code is emitted at all) and no divergent text (one side has no text).
+
+`scratchpad/t111-armD2.sh` (text sweep) + `t111-armD-verify.sh` (the same
+question asked of the REAL preprocessor, using emit-rtl.o's exact flags):
+
+    shared TUs scanned                                          2524
+    population (config macro, existence-tested in a shared TU)    213
+      i386 -- the base shared code compiles against -- has it      88
+    ACTIONABLE (>=1 back end has it, i386 does not, no floor)      111
+      SILENT (no #else: absence produces NO CODE)                   79
+      WRONG  (#else: absence produces a wrong answer)               32
+    of the 79 SILENT, confirmed absent by the preprocessor          71
+      text false positives (arrive via an included header)           8
+    of the 71, macros AARCH64 ITSELF DEFINES                        12
+
+THE SILENT/WRONG SPLIT IS THE FINDING, NOT THE COUNT.  An `#ifdef` with an
+`#else` degrades to a wrong answer that tends to fail near the cause.  One
+with NO `#else` degrades to no code at all -- nothing is mis-set, and the
+failure surfaces arbitrarily far away.  That is exactly why INIT_EXPANDERS
+presented as a null dereference inside aarch64_set_current_function.
+
+The 12 that bite aarch64, highest first:
+
+    STATIC_CHAIN_REGNUM 45   EMPTY_FIELD_BOUNDARY 32
+    STRUCTURE_SIZE_BOUNDARY 24   FINAL_PRESCAN_INSN 14
+    INIT_EXPANDERS 13 (DONE)   ADJUST_INSN_LENGTH 13
+    DWARF_ALT_FRAME_RETURN_COLUMN 11   CASE_VECTOR_SHORTEN_MODE 7
+    BLOCK_REG_PADDING 6   ASM_OUTPUT_POOL_EPILOGUE 1
+    EH_RETURN_TAKEN_RTX 1   HARDREG_PRE_REGNOS 1
+
+### BLIND SPOTS OF THIS ARM -- stated, per PRINCIPLES 4 rule 5
+
+  * `#if X` / `#if X > 0` VALUE tests are NOT in the population.  A macro
+    used only that way is invisible here; that is arm A's job.
+  * Macros `#define`d in a back end's `.cc` rather than its `.h` are not in
+    the defining set.
+  * Conditions are not evaluated: a macro defined inside its back end's own
+    `#ifdef` counts as defined.  UPPER bound on "back ends defining".
+  * SECOND-ORDER LEAKS ARE INVISIBLE.  If shared code is `#ifdef A`, every
+    back end defines A, but A expands to something only Q has, this arm is
+    silent.  That is the `HAVE_V8HFmode` shape -- direction 1 -- and it is
+    NOT covered.
+  * v1 of the arm (`t111-armD.sh`, kept) scored 196 actionable because its
+    "shared" set WRONGLY INCLUDED SEVEN PER-BASE FILES (target-{addr,asm-ops,
+    cdata,c-ops,cumargs,regs}.cc, multi-target-reg-probe.cc) plus target-def.h,
+    target-asm-ops.h and `gcc/common/config/`.  Those are correct by
+    construction.  v2 asserts the exclusion list is not stale (every name must
+    exist AND still have a per-base rule in the awk) precisely so it cannot
+    rot into hiding rows.
+
+## 2. WHAT I FIXED
+
+### INIT_EXPANDERS (`b4fe5b14cd2`) -- THE aarch64 WALL
+
+13 back ends define it; i386 does not; `emit-rtl.cc` is shared.  So the
+`#ifdef` was false for EVERY target and 13 back ends never got their
+`init_machine_status` installed.  Moved to `target-cumargs.cc` (per base,
+`-I<base>-inc`) as a `(bool has_init_expanders, void (*init_expanders)())`
+PAIR on `target_frame_desc`.  The pair, not a bare pointer: a NULL alone is
+indistinguishable from a stale object, and 35 of 48 back ends legitimately
+have none, so NULL cannot simply be an error.  They are cross-checked at
+selection and disagree by name.
+
+### HAVE_lo_sum / HAVE_rotate / HAVE_rotatert (`44f80bb9228`)
+
+New `target-insn.h`, same supply route.  `HAVE_lo_sum` was the live silent
+divergence for my pair (i386 0, aarch64 1) -- two combine transformations and
+one LRA path aarch64 CAN express were never attempted, with no diagnostic.
+
+genconfig's unanimity check is DISCHARGED, NOT RELAXED.  Its own message said
+"needs that use site made runtime before it can be built"; simplify-rtx.cc
+:4773 is now `mt_have_rotate () && mt_have_rotatert ()`, so disagreement is
+representable and the check has nothing left to guard.  It is a notice now.
+genconfig also emits an explicit `0` so absence is an ANSWER, not a silence.
+
+## 3. WHERE AARCH64 STOPS NOW -- SCORED ON rc
+
+BEFORE (reconstructed in this tree: four files stashed, objects deleted,
+rebuilt -- not remembered):
+
+    rc=4, big.c:22 (PARSING), crash_signal -> aarch64_set_current_function
+          -> invoke_set_current_function_hook -> allocate_struct_function
+          -> store_parm_decls
+
+AFTER: **past it.**  Two distinct further walls, both much later:
+
+    rc=4, big.c:90, gimplify_init_constructor <- gimplify_modify_expr
+          <- ... <- cgraph_node::analyze          (whole-file gimplify)
+    rc=4, on a MINIMAL input (`int f (int a) { return a + 1; }`),
+          during GIMPLE pass local-fnsummary:
+          estimate_move_cost <- ipa_populate_param_decls
+          <- analyze_function_body <- compute_fn_summary
+
+Not deep recursion -- the traces are short.  `estimate_move_cost` on a
+trivial function is the next thing to look at and is a MOVE_RATIO/mode-shaped
+read, i.e. plausibly direction 1 rather than this arm.
+
+**aarch64 does NOT emit a complete `.s`** (30 bytes, 2 lines).  I am not
+claiming the acceptance arm and there is still no single-target aarch64
+reference; `STACK_POINTER_REGNUM` is still 7.
+
+## 4. THE ROTATE GATE IS LIFTED -- MEASURED ON A PAIR THAT DIVERGES
+
+    /tmp/b111m, x86_64 + msp430:
+      insn-config-i386.h    HAVE_rotate 1  HAVE_rotatert 1
+      insn-config-msp430.h  HAVE_rotate 0  HAVE_rotatert 0
+
+The notice FIRES (so the divergence is real and the check was reached) and
+the build continues, past genconfig and the union list, into compiling
+msp430's own insn objects.  It stops much later and elsewhere:
+
+    mt-cumulative-args.h:155: static assertion failed ... alignof
+    (CUMULATIVE_ARGS); the comparison reduces to (8 <= 1)
+
+msp430 wants alignment 1, another configured base wants 8.  A DIFFERENT wall,
+that assertion working, untouched by me.  **That is the next thing gating
+cross-back-end pairs**, in place of HAVE_rotate.
+
+## 5. SCOREBOARD -- NOT BANKED
+
+I did not run the header/TAB probe harness and did not edit it.  Neither
+conversion adds a probe arm, and per the standing rule the honest aarch64
+figure remains **5 PASS / 104 FAIL + 6 retired-pending** (#108's six), TAB
+27/5.  Nothing here should be read as moving those.  `INIT_EXPANDERS`,
+`HAVE_lo_sum`, `HAVE_rotate` and `HAVE_rotatert` are not on the probe list at
+all; if arms are wanted for them they must be TAB arms (the header probe's
+per-base context lacks `MULTI_TARGET_TARGETM_BASE`, so both sides would read
+the same redirect text -- the vacuous shape #108 correctly refused).
+
+## 6. REGRESSION BARS, ALL MEASURED ON /tmp/b111
+
+  * `make multi-target-objs cc1 lto1` rc=0; **`lto1` links** (86 MB).
+  * x86_64: rc=0, 12369 bytes, md5 `378fc33c1e70` -- byte-identical to the
+    reference, after BOTH commits.
+  * `stock-compare.sh`, `IN` absolute, `MT=/tmp/b111`: **5/5 IDENTICAL** vs
+    /tmp/b-stock, 5 distinct md5 per side, negative control firing, rc=0.
+    Run after each commit.
+  * Guards: `t111-guards.sh` 4/4, `t111-insn-guards.sh` all arms.
+
+### STDERR: THE SAME DIRECTORY GAVE 0 AND 32 ON THE SAME DAY
+
+Incremental no-op `make multi-target-objs cc1 lto1` in `/tmp/b111` measured
+**0 lines** at one point and **32** later -- 8 `is unchanged` + 24
+`'@' is redundant` from aarch64 `.md` -- differing only by what had last
+rebuilt.  Cold `multi-target-objs cc1 lto1` here was **354 lines / 58
+warning:** with `-O1 -g0`, and 546/85 on a rebuild that re-ran the generators.
+So: 0, 32, 354, 546 are all from ONE build directory.  **The floor is a
+composition, not a number, and quoting one without saying which arm and what
+last rebuilt is worthless.**  Add these to the 4 / 8 / 32 / 593 / 664 / 698 /
+867 already on record.
+
+## 7. TRAPS PAID FOR THIS TASK
+
+  1. **An apostrophe inside a single-quoted awk body ended the shell quote**
+     and produced a syntax error 40 lines further down, in code that looked
+     fine.  PRINCIPLES has an entry on apostrophes; it is about `#error`
+     messages, and this is the same trap in a shell script.
+  2. **My own guard matched its own comment prose.**  Arm 2 of t111-guards
+     grepped `ifdef INIT_EXPANDERS` and FAILED -- on the two comments in
+     emit-rtl.cc that quote the guard they replaced.  Anchor existence checks
+     on a directive, not on the text.
+  3. **`nm` without `-C` shows `_ZL12mt_base_insn`**, so an exact field match
+     finds nothing.  It failed BY NAME rather than scoring 0, which is the
+     only reason it cost minutes.  PRINCIPLES 7 is right that the lesson is
+     the pattern, not the tool -- but an anchored match needs `nm -C`.
+  4. `gcc/Makefile` still has no dependency on `gcc/Makefile.in` (#108).
+     `t111-reconf-gcc.sh` is the #108 script repointed; it is required after
+     any `Makefile.in` edit and asserts the new object reached the Makefile.
+
+## 8. FILES (scratchpad)
+
+    t111-armD.sh         arm D v1 -- KEPT so its two corrections are auditable
+    t111-armD2.sh        arm D v2 -- the population; per-base exclusion list is
+                         self-checking, SILENT/WRONG classified
+    t111-armD-verify.sh  the same question asked of the real preprocessor
+    t111-guards.sh       INIT_EXPANDERS, 4 arms, both-sided
+    t111-insn-guards.sh  target-insn.h, reads mt_base_insn out of .rodata for
+                         both bases and requires the two tables to DIFFER
+    t111-build/go/run/ts.sh, t111-reconf-gcc.sh, t111m-build.sh
