@@ -2846,6 +2846,64 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define CLEAR_RATIO(SPEED) (mt_clear_ratio ((bool) (SPEED)))
 #undef SET_RATIO
 #define SET_RATIO(SPEED) (mt_set_ratio ((bool) (SPEED)))
+
+/* ------------------------------------------------------------------------
+   THE OPTION-STATE FAMILY -- `UNITS_PER_WORD', `POINTER_SIZE',
+   `BIGGEST_ALIGNMENT'.  See target-frame.h for the bodies, for why all three
+   are calls rather than cached values, and for the closure note.
+
+   THIS BLOCK MUST BE LAST IN THE FILE, and that is a correctness constraint
+   rather than tidiness -- the same one that orders `FUNCTION_MODE' after
+   `Pmode' above, but with a much larger blast radius.  Eleven definitions
+   EARLIER in this file, and one in `regs.h', spell these three names in their
+   BODIES:
+
+       :534/:536  DWARF_CIE_DATA_ALIGNMENT      (UNITS_PER_WORD)
+       :582       DWARF2_ADDR_SIZE              (POINTER_SIZE)
+       :603       BITS_PER_WORD                 (UNITS_PER_WORD)
+       :616       SHORT_TYPE_SIZE               (UNITS_PER_WORD)
+       :864       POINTER_SIZE                  (BITS_PER_WORD)
+       :867       POINTER_SIZE_UNITS            (POINTER_SIZE)
+       :957       TARGET_VTABLE_ENTRY_ALIGN     (POINTER_SIZE)
+       :1120      MIN_UNITS_PER_WORD            (UNITS_PER_WORD)
+       :1206      MAX_OFILE_ALIGNMENT           (BIGGEST_ALIGNMENT)
+       :1278      ATTRIBUTE_ALIGNED_VALUE       (BIGGEST_ALIGNMENT)
+       :1835      STACK_CHECK_FIXED_FRAME_SIZE  (UNITS_PER_WORD)
+       regs.h:31  REGMODE_NATURAL_SIZE          (UNITS_PER_WORD)
+
+   A macro BODY is expanded at the use site, not where it is written, so each
+   of those picks up the redirect automatically and correctly -- 354 further
+   shared sites for `BITS_PER_WORD' alone, 181 for `DWARF2_ADDR_SIZE'.  Put
+   this block ABOVE them and the `#ifndef's at :602, :863 and :1119 would test
+   a name this block had already redefined, and :864's `POINTER_SIZE
+   BITS_PER_WORD' would be a redefinition of the call rather than of the
+   macro: the fallback ladder would answer a different question than the one
+   it is written to answer.  Being last is what makes the inheritance work.
+
+   `MIN_UNITS_PER_WORD' IS THE ONE MEMBER OF THAT LIST THAT MUST NOT BECOME A
+   CALL -- `caller-save.cc:55' and `reload.h:179' use it as an ARRAY BOUND.
+   It does not become one today, because the primary defines it as a literal
+   4 rather than leaving it to :1120; `target-cumargs-select.cc' carries a
+   `static_assert' so the day that stops being true is a diagnostic naming the
+   macro rather than a non-constant-bound error naming neither.  The INDEX
+   side of that same array -- `MOVE_MAX / UNITS_PER_WORD' -- does become the
+   selected base's here, and `mt_move_max''s guard was moved onto the computed
+   index in the same change.  Converting this family and leaving that guard on
+   the numerator would have been the "one member of a closure" failure.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE REDIRECTING, over the three
+   names AND all twelve derived ones (scratchpad/t141-pos.sh, t141-const.sh):
+   no `#if'/`#elif' line in shared code names any of them, no `case' label, no
+   `static_assert', no enumerator, no namespace-scope initialiser, and no
+   `#ifdef' outside the `#ifndef' fallbacks listed above -- which this block
+   follows and therefore cannot disturb.  Every bracketed spelling is a
+   subscript of a run-time array.  */
+#undef UNITS_PER_WORD
+#define UNITS_PER_WORD (mt_units_per_word ())
+#undef POINTER_SIZE
+#define POINTER_SIZE (mt_pointer_size ())
+#undef BIGGEST_ALIGNMENT
+#define BIGGEST_ALIGNMENT (mt_biggest_alignment ())
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

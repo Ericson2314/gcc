@@ -256,6 +256,96 @@ struct target_frame_desc
   int max_move_max;
 
   /* ------------------------------------------------------------------
+     THE OPTION-STATE FAMILY: `UNITS_PER_WORD', `POINTER_SIZE',
+     `BIGGEST_ALIGNMENT'.  MACRO-LEAK.md class (c2); the main body of the
+     remaining "no shared TU includes tm.h" work by evaluation count.
+
+     ALL THREE ARE OPTION STATE ON THE PRIMARY, which is what makes them the
+     `Pmode' shape rather than the register shape:
+
+	 i386.h:770   UNITS_PER_WORD     (TARGET_64BIT ? 8 : 4)
+	 i386.h:766   POINTER_SIZE       (TARGET_64BIT ? 64 : 32)
+	 i386.h:812   BIGGEST_ALIGNMENT  (TARGET_IAMCU ? 32 : ix86_biggest_alignment)
+	 aarch64.h    UNITS_PER_WORD 8, POINTER_SIZE (TARGET_ILP32 ? 32 : 64),
+		      BIGGEST_ALIGNMENT 128
+
+     CALLS, NOT CACHED VALUES, AND THE REASON IS CORRECTNESS RATHER THAN
+     TASTE.  `mavx' and `mavx512f' are `Save' in i386.opt, so
+     `BIGGEST_ALIGNMENT' MOVES WITHIN ONE COMPILATION under
+     `__attribute__((target("avx512f")))' -- and `stor-layout.cc' reads it
+     while parsing, with no current function to hang a cache invalidation on.
+     A value read once at selection time would be frozen at whatever the
+     command line said, which is the exact failure `target-cdata.h' records
+     for `STACK_BOUNDARY' and `target-cumargs-select.cc' records for `Pmode'.
+     Caching here would be this branch's own bug, bought to save an overhead
+     measured at the noise floor (see below).
+
+     THE OVERHEAD WAS MEASURED, NOT ASSUMED.  `Pmode' has the identical shape
+     and 648 shared sites; an isolation arm (one line changed, 715
+     `call <mt_pmode>' sites -> 0, output identical on 19/19 TUs, 11
+     interleaved runs) put its cost at <= 0.3%, at the noise floor.  This
+     family is projected at <= 0.4%.  Static site count is the WRONG axis and
+     has misled once: `UNITS_PER_WORD' has 41% as many static sites as `Pmode'
+     and is evaluated 1.22x as often (4.31M vs 3.53M), with seven sites in
+     `rtlanal.cc' carrying 84% of all evaluations.
+
+     THE DERIVED CLOSURE IS LARGE AND IS PICKED UP BY ORDINARY MACRO
+     EXPANSION, because `defaults.h' spells these names in the BODIES of
+     eleven other definitions and a body is expanded at the use site, not at
+     the point of definition.  Redirecting the three therefore also converts
+
+	 BITS_PER_WORD  DWARF2_ADDR_SIZE  POINTER_SIZE_UNITS  SHORT_TYPE_SIZE
+	 DWARF_CIE_DATA_ALIGNMENT  MAX_OFILE_ALIGNMENT  ATTRIBUTE_ALIGNED_VALUE
+	 TARGET_VTABLE_ENTRY_ALIGN  STACK_CHECK_FIXED_FRAME_SIZE
+	 REGMODE_NATURAL_SIZE (regs.h:31)  MIN_UNITS_PER_WORD
+
+     -- 354 further shared sites for `BITS_PER_WORD' alone.  That is a
+     benefit, not a hazard, EXCEPT for the last name; see the closure note.
+
+     SWEPT FOR POSITION BEFORE REDIRECTING (scratchpad/t141-pos.sh and
+     t141-const.sh, over all of `gcc/' outside `config/', `testsuite/' and
+     `ada/gcc-interface/'), across the three names AND every derived name
+     above.  Result: not one `#if'/`#elif'/`#ifdef' line in shared code names
+     any of them except the `#ifndef' fallbacks in `defaults.h' and `regs.h'
+     that define them in the first place, and which this redirect follows.  No
+     `case' label, no `static_assert', no enumerator, no namespace-scope
+     initialiser.  The bracket sweep returns nine hits and all nine are
+     subscripts of RUN-TIME arrays or prose inside comments -- `dst_words[
+     xbitpos / BITS_PER_WORD]' (expr.cc), `splitting[...]' (lower-subreg.cc),
+     `integer_types[...]' (cp/rtti.cc) -- which a call-valued macro serves
+     correctly.  There are exactly TWO real array bounds in the whole closure
+     and they are the closure note below.
+
+     THE CLOSURE, AND IT IS THE `MAX_MOVE_MAX' ONE ALREADY DOCUMENTED ABOVE.
+     `defaults.h:1120' is `#define MIN_UNITS_PER_WORD UNITS_PER_WORD', and
+     `caller-save.cc:55' / `reload.h:179' use `MIN_UNITS_PER_WORD' as an ARRAY
+     BOUND, which cannot hold a call.  Today the redirect cannot reach those
+     two sites -- i386.h:770 defines `MIN_UNITS_PER_WORD' as a literal 4, so
+     `defaults.h''s `#ifndef' does not fire in shared code and the bound stays
+     a constant.  THAT IS A FACT ABOUT WHICH BACK END IS THE PRIMARY, which is
+     the thing this project exists to stop depending on, so it is asserted
+     rather than relied on: `target-cumargs-select.cc' carries a
+     `static_assert' beside the existing `MAX_MOVE_MAX' one, and the day the
+     primary stops defining `MIN_UNITS_PER_WORD' the build fails BY NAME
+     instead of `caller-save.cc' failing with "call to non-constexpr".
+
+     AND THE INDEX SIDE MOVES WITH IT, WHICH IS WHY THIS IS A CLOSURE AND NOT
+     A LONE ASSERT.  That array is indexed by `MOVE_MAX_WORDS', i.e.
+     `MOVE_MAX / UNITS_PER_WORD' -- and this change makes the DENOMINATOR the
+     selected base's.  The existing guard in `mt_move_max' checks only the
+     numerator (`mm > MAX_MOVE_MAX'), which was sufficient while the
+     denominator was the primary's constant and is NOT sufficient now: a base
+     with a large `MOVE_MAX' and a small `UNITS_PER_WORD' produces an index
+     the numerator test passes.  `mt_move_max' therefore now checks the
+     computed INDEX against the computed BOUND.  Converting `UNITS_PER_WORD'
+     and leaving that guard on the numerator is precisely the "convert one
+     member of a closure" failure PRINCIPLES section 4 names -- it would have
+     left the overrun possible while looking guarded.  */
+  int (*units_per_word) (void);
+  unsigned int (*pointer_size) (void);
+  unsigned int (*biggest_alignment) (void);
+
+  /* ------------------------------------------------------------------
      `DATA_ALIGNMENT' AND `DATA_ABI_ALIGNMENT' -- THE PAIR THAT IS BOTH AN
      EXISTENCE PREDICATE AND A STATE LEAK AT ONCE.
 
@@ -1175,6 +1265,26 @@ extern poly_int64 mt_initial_elimination_offset (int from, int to);
    (`mips.h:2751', `loongarch.h:855', both `#ifndef', both in translation
    units that keep the real macro).  */
 extern scalar_int_mode mt_pmode (void);
+
+/* THE OPTION-STATE FAMILY, for shared code.  See the field comments above for
+   the values, for why all three are calls rather than cached constants
+   (`BIGGEST_ALIGNMENT' moves within one compilation under
+   `__attribute__((target("avx512f")))'), for the eleven `defaults.h' names
+   that inherit the redirect by ordinary macro expansion, and for the
+   `MIN_UNITS_PER_WORD' array bound that is the closure.
+
+   THE RETURN TYPES ARE NOT ARBITRARY.  `UNITS_PER_WORD' is signed because
+   shared code divides and subtracts with it freely and an unsigned answer
+   would turn `x - UNITS_PER_WORD' into a huge positive number at every site
+   that goes negative; the other two are unsigned because they are widths and
+   alignments compared against unsigned quantities, and because a call is not
+   a constant expression -- `-Wsign-compare' stays quiet on a signed CONSTANT
+   known to be non-negative and does not stay quiet on a signed CALL, so the
+   signedness that was invisible while these were macros becomes visible the
+   moment they are functions.  */
+extern int mt_units_per_word (void);
+extern unsigned int mt_pointer_size (void);
+extern unsigned int mt_biggest_alignment (void);
 
 /* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
    for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */

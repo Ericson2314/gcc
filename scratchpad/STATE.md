@@ -9580,3 +9580,198 @@ each**.  `BASE_HEADER` is kept, so the include sites read as the user asked.
   * Rebuild stderr was not classified against the 32-line incremental floor:
     this was a near-cold arm (`Makefile.in` changed, so everything rebuilt),
     which is not comparable with it.
+
+---
+
+# #141 -- THE OPTION-STATE FAMILY: `UNITS_PER_WORD`, `POINTER_SIZE`, `BIGGEST_ALIGNMENT`
+
+MACRO-LEAK.md class (c2).  Converted by plain per-base call, the shape `Pmode`
+already has, into the existing `target_frame_desc` table.  Three fields, three
+per-base thunks in `target-cumargs.cc`, three selectors in
+`target-cumargs-select.cc`, three redirects at the end of `defaults.h`.
+
+## 1. THE DERIVED CLOSURE IS MOST OF THE VALUE, AND IT IS FREE
+
+`defaults.h` spells these three names in the BODIES of eleven other
+definitions, and `regs.h` in a twelfth.  A macro body is expanded at the use
+site, so each inherits the redirect automatically:
+
+    BITS_PER_WORD (354 shared sites)   DWARF2_ADDR_SIZE (181)
+    SHORT_TYPE_SIZE  POINTER_SIZE_UNITS  TARGET_VTABLE_ENTRY_ALIGN
+    MAX_OFILE_ALIGNMENT  ATTRIBUTE_ALIGNED_VALUE  DWARF_CIE_DATA_ALIGNMENT
+    STACK_CHECK_FIXED_FRAME_SIZE  REGMODE_NATURAL_SIZE  MIN_UNITS_PER_WORD
+
+`BITS_PER_WORD` is the one MACRO-LEAK.md singles out as "not a constant on the
+primary" and spelled all over the middle end; it is fixed here without being
+named in the redirect.  **This is why the block must be LAST in the file** --
+above the `#ifndef` ladder those fallbacks would test a name already
+redefined.  Being last is what makes the inheritance work rather than a
+coincidence.
+
+## 2. POSITION WAS CLASSIFIED BEFORE ANYTHING WAS CONVERTED
+
+`scratchpad/t141-pos.sh` (preprocessor lines, case labels) and
+`t141-const.sh` (array bounds, static/enum/`static_assert` contexts), over the
+three names AND all twelve derived ones.  Result: **no `#if`/`#elif`/`#ifdef`
+line in shared code names any of them** except the `#ifndef` fallbacks that
+define them, which the redirect follows.  No case label, no enumerator, no
+namespace-scope initialiser.  Nine bracketed spellings, all subscripts of
+run-time arrays or prose inside comments.
+
+**`t141-pos.sh`'s first classifier control FIRED, and it was right to.**  It
+was anchored on `FIRST_PSEUDO_REGISTER` having a `#if` site at
+`hard-reg-set.h:45`.  That site now reads
+`MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER`, so **0 is the true reading** -- the
+control had an expiry date, exactly the dead-control failure PRINCIPLES
+section 6 records.  It is re-anchored to a **self-generated fixture**: four
+lines the script prints itself, three of which must match and one must not.
+A fixture cannot expire.
+
+## 3. THE CLOSURE, WHICH IS THE `MAX_MOVE_MAX` ONE ALREADY ON RECORD
+
+`defaults.h:1120` is `#define MIN_UNITS_PER_WORD UNITS_PER_WORD`, and
+`caller-save.cc:55` / `reload.h:179` use `MIN_UNITS_PER_WORD` as an **array
+bound**, which cannot hold a call.  Two independent things were needed:
+
+  * **The bound side.**  The redirect does not reach those two sites today,
+    because i386 defines `MIN_UNITS_PER_WORD` as a literal 4 and `defaults.h`'s
+    `#ifndef` does not fire.  That is a fact about which back end is primary,
+    so it is now **asserted**: a `static_assert` beside the existing
+    `MAX_MOVE_MAX` one, failing by name the day the primary stops defining it,
+    ahead of `caller-save.cc` failing with a non-constant bound and naming
+    neither.
+  * **The index side, and this is the half that would have been missed.**  That
+    array is indexed by `MOVE_MAX / UNITS_PER_WORD`, and this change makes the
+    **denominator** the selected base's.  `mt_move_max`'s existing guard tested
+    only the numerator (`mm > MAX_MOVE_MAX`), which was sufficient while the
+    denominator was the primary's constant and is **not** sufficient now.  It
+    now compares the **computed index against the computed bound**.  Converting
+    `UNITS_PER_WORD` and leaving that guard on the numerator would have left
+    the overrun possible while looking guarded -- the one-member-of-a-closure
+    failure, in the same family that already documents it.
+
+## 4. THE ARM IS A THIRD PROBE SHAPE, AS THE BRIEF PREDICTED
+
+`exist-probe.sh` cannot ask anything (all three exist on every base).
+`tab-probe.sh` cannot either: its plugin runs inside one base selection, so the
+unselected base's reading comes out of the **selected** base's option storage --
+for an option-state macro that is not a marginal blind spot, it is the whole
+quantity.  So `scratchpad/t141-arm.sh` is **behavioural**: inject the redirect
+off and on **in the same build dir**, require the non-primary to change and the
+primary to stay byte-identical.
+
+**THE DISCRIMINATOR IS NOT THE OBVIOUS ONE AND HAD TO BE MEASURED.**  At
+default options the two configured bases **agree on all three macros** --
+`UNITS_PER_WORD` 8/8, `POINTER_SIZE` 64/64, `BIGGEST_ALIGNMENT` 128/128 -- so a
+default-options arm is green whether or not the redirect is present.  That is
+the wrong-reason green PRINCIPLES forbids banking, and it would have been very
+easy to bank.  The one option that separates them is aarch64 `-mabi=ilp32`,
+which makes aarch64's `POINTER_SIZE` 32 while the leaked i386 macro still says
+64.  ARM 0 asserts the discriminator actually discriminates before scoring.
+
+Both directions are asserted **by content, not only by md5**: with the redirect
+on, ilp32 must emit `sizeof (struct S)` as 20 in a 4-byte object; with it off,
+as 8 bytes.  "Differs" alone is satisfied by being wrong in a new way.
+
+`big.c` cannot be used for the aarch64 arms: under `-mabi=ilp32` it ICEs in
+`add_clobbers, at config/i386/sync.md:2483` -- **i386's recog matching an
+aarch64 compilation**, the per-base recog blocker from #138, a different
+conversion.  `scratchpad/t141-ptr.c` is the small probe used instead.
+
+## 5. WHAT THE ARM MEASURED, AND ONE THING IT MEASURED BY ACCIDENT
+
+`ARM B` was written expecting the leaked **8-byte layout** -- aarch64 quietly
+using i386's 64-bit `POINTER_SIZE`.  What actually happens without the redirect
+is louder:
+
+    internal compiler error: in aarch64_function_arg_alignment,
+                             at config/aarch64/aarch64.cc:7704
+
+**aarch64's own code**, in aarch64's own translation unit where these names
+mean aarch64's answers, rejecting an alignment shared code computed from
+**i386's** macros.  Same shape as the `aarch64_can_eliminate` assert.  So the
+conversion fixes an ICE, not merely wrong output, and ARM B now scores either
+shape -- but requires the ICE to name aarch64's own file, so that an
+unexplained third state cannot pass.
+
+Note this runs OPPOSITE to the usual caution.  PRINCIPLES says a disappeared
+ICE is suspicious until the output is inspected; here the output **was**
+inspected on the other side of the arm (20 in a 4-byte object, correct for
+ilp32), so the pair is both-sided rather than an ICE-tracking result.
+
+## 6. TWO INSTRUMENT DEFECTS, BOTH SCORING 0 IN THE FLATTERING DIRECTION
+
+Both were caught only because a 0 was checked against a positive control:
+
+  * **`nm` and `objdump` are not on PATH outside the nix-shell.**  `nm -C cc1 |
+    grep -c mt_units_per_word` returned **0** -- which reads as *"the redirect
+    reached nothing"*, the exact opposite of the truth.  Inside `eb-shell.sh`
+    the same command returns 3.
+  * **`objdump -dr` prints MANGLED names.**  `grep -c 'call.*<mt_units_per_word>'`
+    returned **0**; the actual text is `<_Z17mt_units_per_wordv>`.  Counted with
+    the Itanium length-prefixed name, which cannot swallow a longer sibling:
+
+        _Z17mt_units_per_wordv      295 call sites
+        _Z15mt_pointer_sizev        244
+        _Z20mt_biggest_alignmentv    85
+        _Z8mt_pmodev                715   (the measured-cost precedent)
+
+**A third defect was self-inflicted and is worth recording: DO NOT EDIT A
+SHELL SCRIPT WHILE IT IS RUNNING.**  `sh` reads the file incrementally by byte
+offset, so widening ARM B mid-run produced a run that printed **both**
+`ARM B PASS` and `ARM B FAIL`.  Incoherent rather than merely wrong -- and had
+the edit shifted fewer bytes it could have produced a coherent, wrong verdict.
+The arm was re-run from scratch on the unmodified script.
+
+## 7. BARS -- `/tmp/b-a7a476335e5ac72b2`, and THE BUILD DIR IS NAMED FOR THE WORKTREE
+
+  * `make multi-target-objs cc1 lto1` -- **rc=0**, `grep -c 'error:'` **0**.
+  * **x86_64 `-O2 scratchpad/big.c`: 12369 bytes, md5 `378fc33c1e70`** --
+    matches the recorded bar exactly, and matches it **on both sides of the
+    injection**, which is the stronger statement: 624 new indirect call sites
+    in the middle end perturb the primary's output not at all.
+  * aarch64: `scratchpad/t141-ptr.c` lp64 1123 bytes `b0b7bf393adb`, ilp32 1120
+    bytes `89ea644ec6f9` -- **input path quoted with every byte count**, per the
+    `.file`-directive lesson.
+  * **`-Wsign-compare` delta: 85 with the redirect, 77 without, same object
+    set -- so this change adds 8.**  Not noise and not hidden: as int-valued
+    CONSTANTS these macros were exempt from `-Wsign-compare`, and as calls they
+    are not.  The other 77 are pre-existing, from the `*_POINTER_REGNUM`
+    conversions, which return `unsigned int` for the same reason.
+
+## 8. THE COLLISION I CAUSED, AND THE RULE THAT COMES OUT OF IT
+
+This task first built in **`/tmp/b141`**, named after its task number.
+`t139-conf.sh` begins `rm -rf "$D"`, so configuring there **destroyed another
+agent's build dir underneath it mid-measurement**; that agent's guards caught
+it (its `config.log` came back naming THIS worktree) and it discarded a whole
+green set.  `/tmp/b<task number>` collides **by construction** -- task numbers
+are handed out in neighbouring blocks.
+
+Every figure in section 7 was **re-measured from scratch** in
+`/tmp/b-a7a476335e5ac72b2`, named for the worktree, whose `config.log` names
+this worktree.  Nothing from `/tmp/b141` is quoted.  The earlier dir's
+`config.log` also named this worktree, so its figures were probably fine -- but
+"probably fine" is not a standard, and exclusivity could not be shown.
+
+**Rule: name the build dir after the worktree, never after a task number.**
+
+## 9. WHAT IS NOT DONE
+
+  * **`MIN_UNITS_PER_WORD` is still a compile-time constant supplied by the
+    PRIMARY**, and so is `MAX_MOVE_MAX`.  Both are array bounds; both are now
+    asserted rather than assumed.  Making them true unions (max/min across
+    configured bases) is the remaining work on that closure and is unchanged by
+    this task.
+  * **`rv-specs.sh` is STALE and silently so.**  It runs `make target-specs` in
+    `$D/gcc`; that target no longer exists, and the top level now refuses
+    `all-target-specs` as ambiguous, by name, listing the per-target targets.
+    Spec files now land in `$D/lib/gcc/<ver>/<target>/specs-config`, not in
+    `$D/gcc`.  Not repaired here -- flagged.
+  * `/tmp/mt-fakebin` has no `x86_64-pc-linux-gnu-as`/`-ld`, so
+    `configure-target-specs-x86_64-pc-linux-gnu` fails by name.
+    `/tmp/t141-bin` adds them as wrappers around the REAL native tools (the
+    build machine genuinely is that triple) alongside the aarch64 stubs.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+  * The x86_64 identity is against this branch's own reference, not stock GCC;
+    `stock-compare.sh` was not run in this dir.
