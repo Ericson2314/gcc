@@ -458,6 +458,51 @@ mt_base_pmode (void)
   return as_a <scalar_int_mode> ((machine_mode) Pmode);
 }
 
+/* THE DWARF REGISTER-NUMBERING FAMILY, evaluated in THIS base's translation
+   unit.  See target-frame.h for the gdb reading that diagnosed this, for the
+   half of the brief's diagnosis that measured FALSE, and for why all three
+   move together.
+
+   THE BOUND CHECK IS THE POINT OF THESE TWO FUNCTIONS, not decoration.  i386's
+   macro is a bare subscript into an array declared `[FIRST_PSEUDO_REGISTER]',
+   and that name is 92 HERE -- in i386's own translation unit, which this block
+   is exempt from defaults.h's union override precisely so that a back end's
+   declarations and definitions agree.  Shared code spells the same name at the
+   union width, 95, and `expand_builtin_init_dwarf_reg_sizes' really does walk
+   `0 .. FIRST_PSEUDO_REGISTER' (dwarf2cfi.cc:334), so with i386 selected it
+   asks about 92, 93 and 94.  Without this test that is an out-of-bounds read
+   of a const array -- no fault, no diagnostic, a plausible number.
+
+   `INVALID_REGNUM' AND NOT 0 for the out-of-range answer; the reasoning is in
+   target-frame.h and the short version is that DWARF register 0 is %rax on one
+   base and x0 on the other, so zero is a real register on both.
+
+   Written as a wrapper rather than a named function pointer because both
+   macros are function-LIKE and a back end may spell either as a table
+   subscript, a call, or a conditional over both -- the same reason
+   `INITIAL_ELIMINATION_OFFSET' above is wrapped.  */
+static unsigned int
+mt_base_debugger_regno (unsigned int regno)
+{
+  if (regno >= (unsigned int) FIRST_PSEUDO_REGISTER)
+    return INVALID_REGNUM;
+  return (unsigned int) DEBUGGER_REGNO (regno);
+}
+
+static unsigned int
+mt_base_dwarf_frame_regnum (unsigned int regno)
+{
+  if (regno >= (unsigned int) FIRST_PSEUDO_REGISTER)
+    return INVALID_REGNUM;
+  return (unsigned int) DWARF_FRAME_REGNUM (regno);
+}
+
+static unsigned int
+mt_base_dwarf_frame_registers (void)
+{
+  return (unsigned int) DWARF_FRAME_REGISTERS;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -516,7 +561,10 @@ static const struct target_frame_desc mt_base_frame = {
   MT_BASE_N_RELOAD_ELIMINABLES,
   MT_BASE_RELOAD_ELIMINABLES,
   mt_base_initial_elimination_offset,
-  mt_base_pmode
+  mt_base_pmode,
+  mt_base_debugger_regno,
+  mt_base_dwarf_frame_regnum,
+  mt_base_dwarf_frame_registers
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

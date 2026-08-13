@@ -5500,3 +5500,286 @@ this leak (section 1) and must be retired rather than banked.
     t125-sc.sh        stock-compare with an ABSOLUTE big.c and a tagged outdir
     t125-guards.sh    14 arms; ARM 1 non-vacuity, ARM 2 the divergence,
                       ARM 4 the injection
+
+# TASK #126 -- `DEBUGGER_REGNO'.  THE NINTH WALL, AND HALF THE BRIEF'S
+# DIAGNOSIS MEASURED FALSE
+
+Worktree came up at bare-repo HEAD `7208eca60d0` AGAIN -- `grep -c
+MULTI_TARGET gcc/Makefile.in` was **0** -- `git reset --hard multi-target` took
+it to **37**.  That is now five worktrees in a row.  Build dir `/tmp/b126`, my
+own, cold.
+
+## 0. THE BRIEF ARRIVED PRE-DIAGNOSED.  ONE HALF HELD, ONE HALF DID NOT.
+
+The brief said `DEBUGGER_REGNO' carries TWO leaks and that they must be taken
+together.  Verified in the running `cc1` rather than inherited
+(`scratchpad/t126-cause.sh`, ONE BREAKPOINT PER RUN, and the breakpoint gdb
+ITSELF reports printed and matched against the function under test).
+
+**HALF (1), BOUND-VS-INDEX -- CONFIRMED, and it is the whole cause.**
+
+    Breakpoint 1, update_row_reg_save (row=..., column=column@entry=4294967294,
+                  cfi=...) at gcc/dwarf2cfi.cc:540
+    MT126 column=4294967294
+
+4294967294 is `IGNORED_DWARF_REGNUM` (rtl.h:4172, `INVALID_REGNUM - 1`), which
+is what BOTH i386 maps hold at indices 16..19 -- i386's arg, flags, fpsr and
+frame pseudo-registers.  aarch64's x16..x19 are ordinary registers a prologue
+saves, so `dwf_regno` returned `-2` and `vec_safe_grow_cleared` was asked for
+four billion entries.  The x86_64 arm of the same instrument finds no column
+over 1000 **in a run that reaches exit**, so "no hit" is not "never got there".
+
+**HALF (2), THE OPTION-STATE SILENT DEFAULT -- MEASURED FALSE.  SAYING SO.**
+
+The brief predicted the `Pmode` shape again: that `TARGET_64BIT` is i386 option
+state and so, unpromoted, selects the **32-bit** map.  At the same breakpoint:
+
+    MT126 isa_flags=18
+    MT126 TARGET_64BIT=1
+
+18 is `OPTION_MASK_ISA_64BIT | OPTION_MASK_ABI_64`, i.e. exactly
+`TARGET_64BIT_DEFAULT` from `config/i386/biarch64.h:28`, which is the `Init` of
+`ix86_isa_flags` at i386.opt:26.  So unlike `ix86_pmode` -- `Init (PMODE_SI)`,
+promoted only by `ix86_option_override` -- this option's **unconfigured default
+is already the 64-bit one**, and `debugger64_register_map` is the map being
+read.  The macro is still option-dependent (which is why the new field is a
+CALL and not a `target-cdata` constant, and why a `-m32` would move it), but
+the silent-default variant is **not** present here.  **One leak in this macro,
+not two.**  Recorded rather than quietly dropped: PRINCIPLES says a brief's
+number that cannot be reconciled must be reported, not reported against.
+
+Also worth naming, because the two differ and only one runs: the effective
+i386 definition for an ELF/linux host is **`gnu-user.h:30`**, not `i386.h:2154`.
+
+## 1. WHAT LANDED
+
+Same mechanism as #108's six, #123's four, #124's two and #125's one -- no new
+registry, no back end edited, no `target.def` entry.  Four files, +258 lines,
+mostly comment:
+
+  * **`target-frame.h`** -- three fields on `target_frame_desc`
+    (`debugger_regno`, `dwarf_frame_regnum`, `dwarf_frame_registers`) and three
+    `extern` selectors.
+  * **`target-cumargs.cc`** -- `mt_base_debugger_regno`,
+    `mt_base_dwarf_frame_regnum`, `mt_base_dwarf_frame_registers`, evaluating
+    the macros in THIS base's TU.
+  * **`target-cumargs-select.cc`** -- the three `mt_*` selectors, uncached.
+  * **`defaults.h`** -- three `#undef`/`#define` pairs in the shared block.
+
+**ALL THREE MOVE TOGETHER, AND THAT IS THE POINT.**
+`DWARF_FRAME_REGISTERS` (17 for i386, 97 for aarch64) is the BOUND that
+`dwarf2cfi.cc:302` tests the numbering against.  Converting the numbering alone
+would have left aarch64's correct 0..96 measured against i386's 17 and silently
+dropped every register above 16 -- **a quieter version of the bug, produced by
+the fix**.  It also feeds `__LIBGCC_DWARF_FRAME_REGISTERS__`
+(c-cppbuiltin.cc:1630), so i386's 17 was being compiled into every target's
+unwinder.  `DWARF_FRAME_REGNUM` is separate rather than derived because
+defaults.h:560's `#ifndef` is answered by the PRIMARY, and cygming.h:89 defines
+it DIFFERENTLY from its `DEBUGGER_REGNO` while aarch64.h:840 defines them the
+same.
+
+**THE BOUND CHECK, AND WHAT FILLS THE NEW SLOTS.**  The per-base thunk tests
+`regno >= FIRST_PSEUDO_REGISTER` -- a name that means the BASE's own count in
+that TU (92 for i386) while shared code spells it at the union width (95).
+`expand_builtin_init_dwarf_reg_sizes` (dwarf2cfi.cc:334) really does walk
+`0 .. FIRST_PSEUDO_REGISTER`, so with i386 selected it asks about 92, 93, 94.
+Out of range answers **`INVALID_REGNUM`**, the vocabulary's own "no DWARF
+register" sentinel, which `dwarf2cfi.cc:302` already filters.  **Zero would
+have been the attractive wrong answer for the third time on this branch** --
+DWARF register 0 is `%rax` on one base and `x0` on the other, so a zero fill
+would silently attribute every nonexistent register's unwind info to the first
+real one.  The check is in the THUNK and deliberately not in the selector,
+where `FIRST_PSEUDO_REGISTER` is the union width and would pass on exactly the
+inputs the real test must reject.
+
+**SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE REDIRECTING.**  Over all of
+`gcc/` outside `config/`, `testsuite/` and `ada/gcc-interface/`: 5 + 4 + 2
+shared use sites, every one an ordinary run-time expression.  No `#if`, no case
+label, no array bound, no static initialiser.  The one `#ifdef` is
+`except.cc:2193` (`#ifdef DWARF_FRAME_REGNUM`); both names stay DEFINED so it
+takes the same branch as today, and after the redirect **both of its arms call
+the selected back end**, so unlike `DATA_ALIGNMENT` there is no guard answered
+by one base and body by another.
+
+## 2. THE DESIGN FORK NEXT DOOR -- DECIDED EXPLICITLY, NOT DRIFTED INTO
+
+**`*_POINTER_REGNUM` MUST MOVE AS A SET, AND THREE OF THE FOUR CANNOT MOVE WITH
+THE LANDED MECHANISM.  I DID NOT TOUCH THEM, AND HERE IS THE WRITE-UP THE BRIEF
+ASKED FOR RATHER THAN A GUESS.**
+
+The connection to this task is real and specific.  `dwarf2cfi.cc:3250/3309` do
+
+    dw_stack_pointer_regnum = dwf_cfa_reg (stack_pointer_rtx);
+    dw_frame_pointer_regnum = dwf_cfa_reg (hard_frame_pointer_rtx);
+
+and those two rtxes are built in `emit-rtl.cc:6266-6268` -- SHARED code -- as
+`gen_raw_REG (Pmode, STACK_POINTER_REGNUM)` etc.  `Pmode` is now per base
+(#125); the **regnum is not**, so they carry i386's 7 and 6 for every target.
+After this change aarch64's `aarch64_debugger_regno (7)` answers **7**, a
+perfectly valid GP register, where aarch64's SP is DWARF 31.  Today that is
+unreachable (aarch64 dies earlier); it becomes a **quiet** wrong answer the
+moment aarch64 reaches the dwarf2 frame pass.
+
+**WHY IT IS A FORK AND NOT A ONE-LINER.**  Of the four:
+
+    STACK_POINTER_REGNUM        i386 7   aarch64 31   -- NOT on any `#if' line
+    HARD_FRAME_POINTER_REGNUM   i386 6   aarch64 29   -- class (d), rtl.h:3939/3945
+    FRAME_POINTER_REGNUM        i386 19  aarch64 64   -- class (d), rtl.h:3936/3944
+    ARG_POINTER_REGNUM          i386 16  aarch64 65   -- class (d), rtl.h:3936/3944
+
+Only `STACK_POINTER_REGNUM` is free of `#if` arithmetic.  The other three
+decide the layout of `enum global_rtl_index` (`GR_ARG_POINTER` aliasing
+`GR_FRAME_POINTER`, `GR_HARD_FRAME_POINTER` aliasing either), which a run-time
+value cannot do.  **Converting the one that is easy and leaving the three that
+are hard is precisely the "one member of a closure" failure PRINCIPLES records
+as having nearly happened three times** -- it would leave
+`hard_frame_pointer_rtx` still i386's 6 while `stack_pointer_rtx` became
+correct, i.e. a half-right CFA.
+
+So: **the set must move together, the enum-layout question has to be answered
+first, and that is a design decision this task had no mandate to make.**
+Stopped, written up, not guessed.  The residual wrong comparisons against the
+primary's `STACK_POINTER_REGNUM` in `ira.cc`, `reload1.cc`,
+`lra-eliminations.cc` and `builtins.cc` (#124 section 6) are unchanged and are
+part of the same fork.
+
+Also unchanged and recorded: `DWARF2_FRAME_REG_OUT` and
+`DWARF_REG_TO_UNWIND_COLUMN` are `#ifndef`-defaulted to the identity in
+defaults.h, and that `#ifndef` is answered by the PRIMARY.  Neither of the two
+configured bases overrides them, so **no arm here could distinguish a fix from
+a leak** -- one-sided and unfalsifiable on this machine, the same situation as
+`RELOAD_ELIMINABLE_REGS` (#124) and `HONOR_REG_ALLOC_ORDER` (#122).  It is a
+real latent leak for cygming, which does override them.
+
+## 3. THE BARS
+
+  * `make multi-target-objs cc1 lto1` in `$B/gcc` -- **rc=0**, first try.
+  * **x86_64 `-O2` big.c md5 `378fc33c1e70`, 12369 bytes -- unmoved**, measured
+    BEFORE and AFTER **in this same build dir**.
+  * **stock-compare 5/5 IDENTICAL** vs `/tmp/b-stock`, absolute `IN`, **5
+    distinct md5 per side**, **negative control firing** (1158 vs 804), rc=0,
+    run before and after.  O0 `1c00922491f8`, O1 `4fabab94b41b`,
+    O2 `378fc33c1e70`, O3 `d220421237bc`, Os `d6787f7e281f`.  **It does run in
+    this build dir** -- checked explicitly.
+  * **`scratchpad/t126-guards.sh`: 43 PASS / 0 FAIL.**
+  * **aarch64 `int x = 1;` still rc=0, 373 bytes, empty stderr, md5
+    `b01d9157fdc1`** -- byte-identical before, after, and after the injection
+    round trip.
+  * Cold `all-gcc` before any edit: **rc=0, 639 lines / 114 `warning:`**.
+
+### THE ARMS THAT MATTER
+
+  * **ARM 0 runs FIRST and asserts the redirect BY NAME AND BY VALUE**, both
+    the `#define` (matched verbatim, `grep -F`) and its `#undef`, for all three
+    macros -- plus that each thunk is not merely compiled but **installed in
+    `mt_base_frame`**, which is the "complete mechanism nothing invokes"
+    failure.
+  * **ARM 2 carries the divergence**, gdb on the running `cc1`, one breakpoint
+    per run, the breakpoint gdb reports matched before any value is scored.
+    Breakpoint is `mt_pmode` and not anything in `dwarf2cfi.cc` **on purpose**:
+    aarch64 no longer reaches the dwarf2 frame pass, so a breakpoint there
+    would never fire and "no reading" would read as "no divergence".
+
+        aarch64  registers=97  regno(16)=16          frame_regnum(30)=30  regno(94)=97
+        x86_64   registers=17  regno(16)=4294967294  frame_regnum(30)=43  regno(94)=4294967295
+
+    Eight readings, all four pairs diverging, so it cannot be "everyone got the
+    same new answer".  `regno(94)` is the union-width probe: past i386's 92 it
+    answers `INVALID_REGNUM` instead of reading off the end of the array; for
+    aarch64 94 is in range and answers 97, aarch64's own "no equivalent".
+  * **ARM 4 is the injection**: removes ONLY the three `defaults.h` hunks --
+    thunks, fields and selectors stay compiled -- and requires **the old
+    failure back BY NAME** (`cc1 terminated by signal 9`) **and the column back
+    BY VALUE** (4294967294).  Both fired.  It also asserts the injection
+    produced the state intended: **both** lines of each hunk gone, because
+    #125's first injection deleted a `#define` and left its `#undef`, making
+    the macro undefined rather than the primary's.  Restore requires both to
+    reverse and both byte-invariants to hold.
+
+## 4. TWO INSTRUMENT DEFECTS THIS RUN PRODUCED, BOTH CAUGHT BY THE GUARDS
+
+**(a) A guard that could not tell code from prose.**  ARM 1's check "the
+selector must not test `FIRST_PSEUDO_REGISTER`" was a bare `grep` and matched
+**the comment explaining why the test is not there**.  It reported FAIL on
+correct code.  Now it matches an actual `if (... FIRST_PSEUDO_REGISTER`.
+
+**(b) `-g0` made an arm fail for a reason unrelated to the code.**  `cc1` here
+is built `-O1 -g0`, so `break f if local > N` errors with *"No symbol table is
+loaded"*, and the first ARM 4 scored that as "the column did not return".  Two
+fixes, both kept: `scratchpad/t126-dbg.sh` rebuilds **only** `dwarf2cfi.o` and
+`target-cumargs-select.o` with `-g` and relinks (changing no source), and the
+ARM 4 reading was moved back to `$esi` so it needs no debug info at all.  ARM 2
+re-runs `t126-dbg.sh` itself, because ARM 4's rebuild strips the debug info
+again and a second run of the script would otherwise find ARM 2 vacuous for a
+reason belonging to the previous run.
+
+Also worth recording as a near-miss: **ARM 4 of `t126-cause.sh` printed
+"ok: no absurd column on x86_64" while gdb had never started** (same `-g0`
+error).  The separate NON-VACUITY check -- "did the run reach exit?" -- is what
+caught it.  Without it that was a clean false green.
+
+## 5. THE SCOREBOARD -- NOT RUN, NOT MOVED, AND DELIBERATELY NOT BANKED
+
+**I did not run `macro-probe-run.sh` and I am claiming no scoreboard
+movement.**  Carrying the recorded line unchanged: header **i386 112 PASS / 0
+FAIL, aarch64 8 PASS / 104 FAIL of which only 2 are TRUSTED**; TAB **i386
+32/0, aarch64 27/5**.
+
+All three macros stay **`UNCONVERTED`**, bringing the "converted but reads
+UNCONVERTED" list to **sixteen**; `macro-status.txt`'s header names all
+sixteen.  `DEBUGGER_REGNO` and `DWARF_FRAME_REGNUM` are function-like, so their
+header arms were never value comparisons and there is no flip to predict.
+`DWARF_FRAME_REGISTERS` **is** a plain constant (17 vs 97) and is expected to
+flip green for the familiar base-B redirect reason -- retire it, do not bank it.
+
+## 6. WHAT I DID NOT DO
+
+  * **No TAB arms for the three** -- all are calls, and `tab-probe.sh` reads
+    constants.  Same debt the other thirteen carry.
+  * **The `*_POINTER_REGNUM` fork is untouched and written up** (section 2).
+  * **`DWARF2_FRAME_REG_OUT` / `DWARF_REG_TO_UNWIND_COLUMN` untouched**, with
+    the reason measured rather than assumed (section 2).
+  * **No `nm` arm.**  `DEBUGGER_REGNO`'s i386 body names `debugger64_register_map`
+    and `svr4_debugger_register_map`, which ARE data symbols, so unlike `Pmode`
+    an `nm` arm is not impossible here -- but the maps are `const` and were
+    already linked into shared objects before this change for other reasons, so
+    a disappearance would not be attributable.  Recorded as "not measured",
+    not as "clean".
+  * **`Pmode`'s 648-site call cost is still unmeasured** (#125 section 8) and
+    this change adds ~11 more call sites; still a throughput question, not a
+    correctness one.
+  * `make all-target-libgcc` not re-run; #119's environmental `-m32` blocker is
+    unchanged.
+
+## 7. THE NEXT WALL -- LOCATED, NOT DIAGNOSED
+
+`big.c` for aarch64 is past the SIGKILL and now dies as
+
+    internal compiler error: in extract_insn, at recog.cc:2890
+
+i.e. **unrecognizable insn**.  It reproduces on inputs far smaller than
+`big.c`: `int g(int a){ return f(a)+f(a+1); }` fails in `during RTL pass: vregs`
+on the `call_insn`, and even `int g(int a){ return a+1; }` fails as
+`in aarch64_can_eliminate, at config/aarch64/aarch64.cc:14153` during
+`postreload`.  **No function body compiles for aarch64 yet** -- only file-scope
+data does, which is why `int x = 1;` is the byte-invariant.  I located these
+and did **not** diagnose them; the `aarch64_can_eliminate` one sits directly on
+the `*_POINTER_REGNUM` fork in section 2 and is the obvious place to look.
+
+## 8. FILES
+
+    t126-clone.sh    derives my build-dir scripts from #125's; REFUSES on a
+                     leftover `b125'
+    t126-conf.sh     two-target configure, /tmp/b126
+    t126-build.sh    make at the TOP level
+    t126-gccbuild.sh make in $B/gcc -- where cc1 actually builds
+    t126-specs.sh    both target-specs probes, real aarch64 binutils
+    t126-dbg.sh      rebuilds TWO objects with `-g' and relinks, so the
+                     diagnosis can be read by NAME instead of off %esi
+    t126-cause.sh    THE VERIFICATION: confirms half (1) of the brief and
+                     measures half (2) FALSE, with an x86_64 non-vacuity arm
+    t126-state.sh    big.c site + `int x = 1;` + x86_64 -O2
+    t126-sc.sh       stock-compare, ABSOLUTE big.c, tagged outdir (/tmp/sc126-*)
+    t126-guards.sh   43 arms; ARM 0 content-by-name-and-value and runs first,
+                     ARM 2 the divergence on the running cc1, ARM 4 the
+                     injection

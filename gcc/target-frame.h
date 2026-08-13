@@ -491,6 +491,119 @@ struct target_frame_desc
      Returning `machine_mode' would compile at the definition and fail, or
      silently pick a different overload, hundreds of sites away.  */
   scalar_int_mode (*pmode) (void);
+
+  /* `DEBUGGER_REGNO (N)' -- gcc register number to debugger/DWARF register
+     number.  MACRO-LEAK.md class (c1).  THIS IS THE `BOUND BY ONE, INDEXED BY
+     ANOTHER' DISGUISE, the sixth time it has appeared on this branch
+     (`NUM_OPTAB_PATTERNS' 2975 vs 3328, `N_REG_CLASSES' 34 vs 20, the
+     allocation-order table, the eliminables table, `NUM_UNSPECV_VALUES').
+
+     The effective i386 definition for an ELF/linux host is gnu-user.h:30, not
+     i386.h:2154 -- worth naming, because the two differ and only one of them
+     is the one that runs:
+
+         #define DEBUGGER_REGNO(n) \
+           (TARGET_64BIT ? debugger64_register_map[n] : svr4_debugger_register_map[n])
+
+     with both arrays declared `[FIRST_PSEUDO_REGISTER]' at i386.h:2157-2159 --
+     i.e. dimensioned in i386's OWN translation unit, where that name is 92.
+     Shared code spells the same name at the UNION width, 95
+     (`multi-target-reg-widths.h'), and hands it the SELECTED back end's
+     register numbers.  aarch64's own answer is a function,
+     `aarch64_debugger_regno' (aarch64.h:835, aarch64.cc:1550).
+
+     MEASURED (scratchpad/t126-cause.sh, gdb on the running cc1, one breakpoint
+     per run, and the breakpoint gdb ITSELF reports matched against the
+     function under test):
+
+         Breakpoint 1, update_row_reg_save (... column=4294967294 ...)
+                       at dwarf2cfi.cc:540
+
+     4294967294 is `IGNORED_DWARF_REGNUM' (rtl.h:4172, `INVALID_REGNUM - 1'),
+     which is what BOTH i386 maps hold at indices 16..19 -- i386's arg, flags,
+     fpsr and frame pseudo-registers.  aarch64 x16..x19 are ordinary
+     callee-clobbered/callee-saved registers that a prologue really does save,
+     so `dwf_regno' returned -2 and `update_row_reg_save' tried to
+     `vec_safe_grow_cleared' to four billion entries: `cc1 terminated by signal
+     9' on a 150-line input.  The x86_64 arm of the same instrument finds no
+     column over 1000 in a run that reaches exit, so this is a divergence and
+     not "everyone got the same answer".
+
+     THE BRIEF FOR THIS CHANGE ALSO CLAIMED A SECOND, OPTION-STATE LEAK HERE --
+     that `TARGET_64BIT' is i386 option state and so, like `Pmode' before it,
+     silently selects the 32-BIT map while compiling for aarch64.  MEASURED
+     FALSE, and recorded rather than quietly dropped.  At the same breakpoint:
+
+         global_options.x_ix86_isa_flags = 18
+         TARGET_64BIT                    = 1
+
+     18 is `OPTION_MASK_ISA_64BIT | OPTION_MASK_ABI_64', which is exactly
+     `TARGET_64BIT_DEFAULT' from `config/i386/biarch64.h:28' -- the `Init' of
+     `ix86_isa_flags' at i386.opt:26.  So unlike `ix86_pmode', whose `Init' is
+     `PMODE_SI' and which only `ix86_option_override' promotes, this option's
+     unconfigured default is ALREADY the 64-bit one, and the 64-bit map is the
+     one being read.  The macro is still option-dependent -- which is why this
+     field is a CALL and not a `target-cdata' constant, and why a `-m32' on the
+     command line would move it -- but the silent-default shape that made
+     `Pmode' worse than an ordinary leak is NOT present here.  One leak in this
+     macro, not two.
+
+     WHAT THE OUT-OF-RANGE ANSWER IS, AND WHY IT IS NOT ZERO.  Shared code
+     legitimately asks about register numbers the selected back end does not
+     have: `expand_builtin_init_dwarf_reg_sizes' (dwarf2cfi.cc:334) walks
+     `0 .. FIRST_PSEUDO_REGISTER' at the UNION width, so with i386 selected it
+     asks about 92, 93 and 94.  The per-base thunk answers `INVALID_REGNUM'
+     there -- the vocabulary's own "this has no DWARF register" sentinel,
+     which `init_one_dwarf_reg_size' already filters at dwarf2cfi.cc:302 with
+     `if (rnum >= DWARF_FRAME_REGISTERS) return;'.
+
+     ZERO WOULD HAVE BEEN THE ATTRACTIVE WRONG ANSWER, for the third time on
+     this branch (it read as "free" in a cost table and "no registers" in a
+     class table).  DWARF register 0 is a REAL register on both bases -- %rax
+     and x0 -- so a zero fill would have silently attributed every nonexistent
+     register's unwind information to the first one.  */
+  unsigned int (*debugger_regno) (unsigned int regno);
+
+  /* `DWARF_FRAME_REGNUM (N)'.  A SEPARATE FIELD RATHER THAN DERIVED FROM THE
+     ONE ABOVE, and the reason is the failure mode this branch keeps meeting:
+     a `#ifndef' answered by the primary.
+
+     defaults.h:560 says `#ifndef DWARF_FRAME_REGNUM' -> `DEBUGGER_REGNO', and
+     in shared code that `#ifndef' is answered by i386's headers, which do not
+     define it.  But it is a question each back end answers for itself, and
+     they do not all answer the same way: `config/i386/cygming.h:89' defines a
+     DWARF_FRAME_REGNUM that is deliberately DIFFERENT from its DEBUGGER_REGNO
+     (always the svr4 map, whatever the debug format), and aarch64.h:840
+     defines one that is the same.  Deriving it here would bake i386-on-linux's
+     "they are the same" into every back end and lose cygming's distinction
+     with no diagnostic -- the `unsupplied hook' disguise.  Asked in the base's
+     own translation unit, each back end's own `#ifndef' answer is the one that
+     is recorded.  */
+  unsigned int (*dwarf_frame_regnum) (unsigned int regno);
+
+  /* `DWARF_FRAME_REGISTERS' -- one past the last valid DWARF frame register,
+     i.e. the BOUND against which the two above are checked.  17 for i386
+     (i386.h:997), 97 for aarch64 (aarch64.h:832).  MACRO-LEAK.md class (b).
+
+     IN THE CLOSURE, AND THAT IS THE WHOLE REASON IT IS HERE.  Converting only
+     `DEBUGGER_REGNO' would leave dwarf2cfi.cc:302
+
+         if (rnum >= DWARF_FRAME_REGISTERS) return;
+
+     comparing aarch64's correct DWARF numbers (0..96) against i386's 17, so
+     every aarch64 register above 16 would be dropped from the register-size
+     table -- a QUIETER wrong answer than the one being fixed, produced BY the
+     fix.  PRINCIPLES section 4 names that shape ("a loud failure turned
+     quiet") and records that it has nearly happened three times.
+
+     Only two shared sites spell it -- dwarf2cfi.cc:302 and
+     c-family/c-cppbuiltin.cc:1630, which defines
+     `__LIBGCC_DWARF_FRAME_REGISTERS__' -- and neither is a constant-expression
+     context, so a call is legal here.  Note the second one: it is the value
+     libgcc's unwinder is compiled with, so leaving it as i386's 17 would have
+     shipped a wrong bound into every target's `libgcc_eh'.  A function and not
+     a constant because cygming.h:96 makes it `(TARGET_64BIT ? 33 : 17)'.  */
+  unsigned int (*dwarf_frame_registers) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -586,5 +699,38 @@ extern poly_int64 mt_initial_elimination_offset (int from, int to);
    (`mips.h:2751', `loongarch.h:855', both `#ifndef', both in translation
    units that keep the real macro).  */
 extern scalar_int_mode mt_pmode (void);
+
+/* THE DWARF REGISTER-NUMBERING FAMILY.  See the three field comments for the
+   measurement, for why `DWARF_FRAME_REGNUM' is not derived from
+   `DEBUGGER_REGNO', and for why `DWARF_FRAME_REGISTERS' has to move with them.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE REDIRECTING, over all of
+   `gcc/' outside `config/', `testsuite/' and `ada/gcc-interface/'.  The three
+   have 5, 4 and 2 shared use sites respectively (`DEBUGGER_REGNO' in
+   dwarf2out.cc x4 and except.cc x1; `DWARF_FRAME_REGNUM' in dwarf2cfi.cc x3
+   and dwarf2out.cc x2 plus defaults.h's own derivations;
+   `DWARF_FRAME_REGISTERS' in dwarf2cfi.cc:302 and c-cppbuiltin.cc:1630), and
+   every one is an ordinary run-time expression: no `#if', no case label, no
+   array bound, no static initialiser.
+
+   ONE `#ifdef' EXISTS AND IS DELIBERATELY LEFT WORKING.  except.cc:2193 is
+
+       #ifdef DWARF_FRAME_REGNUM
+         iwhich = DWARF_FRAME_REGNUM (iwhich);
+       #else
+         iwhich = DEBUGGER_REGNO (iwhich);
+       #endif
+
+   Both names stay DEFINED by the redirect, so that guard keeps taking the
+   branch it takes today, and -- unlike `DATA_ALIGNMENT' -- there is no risk of
+   the guard being answered by one back end and the body by another, because
+   after the redirect both arms call the same selected back end.  Note that
+   the `#ifdef' itself is still answered by whichever base compiled except.cc;
+   that is a residual class-(d)-adjacent fact recorded in STATE.md, not
+   something this change can fix, and it is harmless HERE only because the two
+   arms now agree.  */
+extern unsigned int mt_debugger_regno (unsigned int regno);
+extern unsigned int mt_dwarf_frame_regnum (unsigned int regno);
+extern unsigned int mt_dwarf_frame_registers (void);
 
 #endif /* GCC_TARGET_FRAME_H */

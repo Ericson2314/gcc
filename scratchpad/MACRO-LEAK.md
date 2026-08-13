@@ -305,6 +305,24 @@ Two of these are worse than "a `#if` I must not break":
     undefined identifiers and evaluate `0 == 0` as **true**, collapsing
     `GR_ARG_POINTER` onto `GR_FRAME_POINTER` in `enum global_rtl_index`.
 
+**THE `*_POINTER_REGNUM` SET IS A CLOSURE AND ONLY ONE OF ITS FOUR MEMBERS IS
+FREE OF `#if` ARITHMETIC.** Established by #126 while converting
+`DEBUGGER_REGNO`, which is downstream of them (`dwarf2cfi.cc:3250/3309` feed it
+`stack_pointer_rtx` / `hard_frame_pointer_rtx`, built in shared code at
+`emit-rtl.cc:6266-6268` and therefore still carrying **i386's** 7 and 6):
+
+    STACK_POINTER_REGNUM        i386 7   aarch64 31   -- NOT on any `#if' line
+    HARD_FRAME_POINTER_REGNUM   i386 6   aarch64 29   -- rtl.h:3939/3945
+    FRAME_POINTER_REGNUM        i386 19  aarch64 64   -- rtl.h:3936/3944
+    ARG_POINTER_REGNUM          i386 16  aarch64 65   -- rtl.h:3936/3944
+
+So `STACK_POINTER_REGNUM` alone looks convertible with the landed mechanism.
+**It is not, and taking it would be the "one member of a closure" failure**: it
+would make `stack_pointer_rtx` correct while `hard_frame_pointer_rtx` stayed at
+i386's 6, i.e. a half-right CFA — a quieter wrong answer than the one being
+fixed. The enum-layout question at `rtl.h:3936-3949` has to be answered first,
+and it is a **design fork**, not a conversion. See STATE.md #126 section 2.
+
 ### (e) SIZES AN ALLOCATION -- the `cl_optimization` shape, 11 names
 
 Mismatch here is a **buffer overflow**, not a mis-read.

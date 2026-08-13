@@ -299,6 +299,37 @@ mt_pmode (void)
   return mt_frame ()->pmode ();
 }
 
+/* THE DWARF REGISTER-NUMBERING FAMILY.  Uncached, through `mt_frame ()', for
+   the same reason as `Pmode' just above: i386's `DEBUGGER_REGNO' reads
+   `TARGET_64BIT', which is option state and can move within one run of the
+   compiler, and cygming's `DWARF_FRAME_REGISTERS' is `(TARGET_64BIT ? 33 : 17)'
+   outright.  A value cached at selection time would be frozen at whatever the
+   options said then -- the failure target-cdata.h's header comment records for
+   `STACK_BOUNDARY'.
+
+   No range check here, deliberately: the bound that matters is the SELECTED
+   back end's `FIRST_PSEUDO_REGISTER', which only the base's own translation
+   unit knows, so the test lives in `mt_base_debugger_regno' where that name
+   means the right thing.  A second test here against the union width would
+   pass on exactly the inputs the real one rejects.  */
+unsigned int
+mt_debugger_regno (unsigned int regno)
+{
+  return mt_frame ()->debugger_regno (regno);
+}
+
+unsigned int
+mt_dwarf_frame_regnum (unsigned int regno)
+{
+  return mt_frame ()->dwarf_frame_regnum (regno);
+}
+
+unsigned int
+mt_dwarf_frame_registers (void)
+{
+  return mt_frame ()->dwarf_frame_registers ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

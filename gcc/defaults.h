@@ -2261,6 +2261,38 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define Pmode (mt_pmode ())
 
 /* ------------------------------------------------------------------------
+   THE DWARF REGISTER NUMBERING.  See target-frame.h for the gdb reading --
+   `update_row_reg_save (... column=4294967294 ...)', which is
+   `IGNORED_DWARF_REGNUM' read out of i386's map at one of its indices 16..19
+   while the register being asked about was one of aarch64's x16..x19 -- and
+   for the half of the brief's diagnosis (`TARGET_64BIT' silently selecting the
+   32-bit map) that MEASURED FALSE: `ix86_isa_flags' is `Init'ed to
+   `TARGET_64BIT_DEFAULT', which biarch64.h makes 64-bit already.
+
+   ALL THREE MOVE TOGETHER.  `DWARF_FRAME_REGISTERS' is the BOUND that
+   dwarf2cfi.cc:302 checks the other two against; redirecting the numbering
+   without the bound would leave aarch64's correct 0..96 measured against
+   i386's 17 and silently drop every register above 16 -- a quieter version of
+   the bug, produced by the fix.  That is the closure failure PRINCIPLES
+   section 4 names.
+
+   `DWARF_FRAME_REGNUM' IS REDIRECTED IN ITS OWN RIGHT even though defaults.h
+   above derives it from `DEBUGGER_REGNO'.  That derivation is a `#ifndef'
+   answered by the PRIMARY's headers; cygming defines the two differently and
+   aarch64 defines them the same, and only the base's own translation unit can
+   say which.  Deriving it here would bake i386-on-linux's answer into all 48.
+
+   NOT `#ifdef'-BREAKING: except.cc:2193 spells `#ifdef DWARF_FRAME_REGNUM' and
+   both names remain defined, so that guard takes the same branch as today and
+   both of its arms now call the SELECTED back end.  */
+#undef DEBUGGER_REGNO
+#define DEBUGGER_REGNO(REGNO) (mt_debugger_regno ((unsigned int) (REGNO)))
+#undef DWARF_FRAME_REGNUM
+#define DWARF_FRAME_REGNUM(REG) (mt_dwarf_frame_regnum ((unsigned int) (REG)))
+#undef DWARF_FRAME_REGISTERS
+#define DWARF_FRAME_REGISTERS (mt_dwarf_frame_registers ())
+
+/* ------------------------------------------------------------------------
    THE MOVE/CLEAR FAMILY.  See target-frame.h for the gdb-confirmed fault
    that starts this (`ix86_cost' null, `si_addr == 0xf4'), for why all seven
    move together rather than just the one that crashes, and for why
