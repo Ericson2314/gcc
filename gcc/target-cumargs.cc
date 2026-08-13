@@ -710,6 +710,54 @@ mt_base_stack_dynamic_offset (tree fndecl ATTRIBUTE_UNUSED)
   return STACK_DYNAMIC_OFFSET (fndecl);
 }
 
+/* `PUSH_ARGS_REVERSED', read in THIS base's translation unit.  See
+   target-frame.h for what it decides (the order gimplify.cc evaluates every
+   call's arguments in) and for why no ladder is reproduced here: this file is
+   compiled with `MULTI_TARGET_TARGETM_BASE' defined, so `defaults.h' has
+   already run its `PUSH_ROUNDING' / `STACK_GROWS_DOWNWARD' /
+   `ARGS_GROW_DOWNWARD' ladder against THIS base's headers by the time this
+   line is reached, and the macro below is that base's own answer.
+
+   All three of those names are per-base, so the ladder was three leaks and
+   not one; evaluating it here closes all three at once.
+
+   The `? true : false' normalises i386's `1', the fallback's `0' and the
+   ladder's `targetm.calls.push_argument (0)' -- an `int', an `int' and a
+   `bool' -- to the field's two values.  */
+static bool
+mt_base_push_args_reversed (void)
+{
+  return PUSH_ARGS_REVERSED ? true : false;
+}
+
+/* `INCOMING_REG_PARM_STACK_SPACE', read in THIS base's translation unit --
+   `REG_PARM_STACK_SPACE''s second path, the one #133's conversion did not
+   cover.  See target-frame.h.
+
+   THE DERIVATION IS REPRODUCED, not reached, for the same reason the
+   `STACK_DYNAMIC_OFFSET' ladder above is: it lives in `function.cc''s private
+   preprocessor block (`:1403'), not in a header.  It is the same two lines,
+   and here every name in them is THIS base's rather than the primary's.
+
+   A base defining neither macro returns 0, which is exactly the state
+   `assign_parms_initialize_all''s `memset' has already established -- the
+   `#ifdef' arm is preserved, not floored over.  */
+#if defined (REG_PARM_STACK_SPACE) && !defined (INCOMING_REG_PARM_STACK_SPACE)
+# define MT_BASE_INCOMING_RPSS REG_PARM_STACK_SPACE
+#elif defined (INCOMING_REG_PARM_STACK_SPACE)
+# define MT_BASE_INCOMING_RPSS INCOMING_REG_PARM_STACK_SPACE
+#endif
+
+static int
+mt_base_incoming_reg_parm_stack_space (tree fndecl ATTRIBUTE_UNUSED)
+{
+#ifdef MT_BASE_INCOMING_RPSS
+  return MT_BASE_INCOMING_RPSS (fndecl);
+#else
+  return 0;
+#endif
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -1000,7 +1048,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_incoming_frame_sp_offset,
   mt_base_default_incoming_frame_sp_offset,
   mt_base_accumulate_outgoing_args,
-  mt_base_stack_dynamic_offset
+  mt_base_stack_dynamic_offset,
+  mt_base_push_args_reversed,
+  mt_base_incoming_reg_parm_stack_space
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

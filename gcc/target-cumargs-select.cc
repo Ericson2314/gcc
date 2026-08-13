@@ -431,6 +431,29 @@ mt_stack_dynamic_offset (tree fndecl)
   return mt_frame ()->stack_dynamic_offset (fndecl);
 }
 
+/* `PUSH_ARGS_REVERSED'.  Uncached, and here that is not merely conservative:
+   the ladder's third arm is `targetm.calls.push_argument (0)', a target hook,
+   and hooks are reachable only once a target is selected -- so there is no
+   earlier point at which this HAS a value.  gimplify.cc evaluates it three
+   times per call expression; that is the same shape as the ~40 sites
+   `ACCUMULATE_OUTGOING_ARGS' already has.  */
+bool
+mt_push_args_reversed (void)
+{
+  return mt_frame ()->push_args_reversed ();
+}
+
+/* `INCOMING_REG_PARM_STACK_SPACE'.  Called once per function, from
+   `assign_parms_initialize_all'.  The `fndecl' is forwarded rather than read
+   from `current_function_decl' inside the thunk for the reason
+   `mt_stack_dynamic_offset' records: the macro's interface takes a decl and
+   several back ends read it.  */
+int
+mt_incoming_reg_parm_stack_space (tree fndecl)
+{
+  return mt_frame ()->incoming_reg_parm_stack_space (fndecl);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 

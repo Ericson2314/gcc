@@ -133,6 +133,33 @@
 #   #124  scratchpad/t124-guards.sh     (gdb on the running cc1, ARM 2:
 #                                        pair 0 is 65 -> 31 for aarch64 and
 #                                        16 -> 7 for x86_64)
+#
+# #134 ADDS `PUSH_ARGS_REVERSED' TO THAT LIST, AND ITS WRONG-REASON FLIP IS THE
+# FAMILIAR base-B-redirect ONE.  It is on the board (line below says
+# UNCONVERTED) and it is now redirected by `defaults.h' to
+# `(mt_push_args_reversed ())'.  In the probe's base-B context
+# MULTI_TARGET_TARGETM_BASE is not defined, so BOTH sides expand to that same
+# text and the aarch64 arm will flip FAIL -> PASS saying only "both header
+# contexts agree the name is target-neutral".  RETIRE IT; DO NOT BANK IT.  It
+# stays UNCONVERTED because it is a CALL and `tab-probe.sh' reads constants.
+#
+# Its real both-sided evidence is BEHAVIOURAL rather than object-level, which
+# is a first for this family: the macro decides the order gimplify.cc walks a
+# call's arguments, so it is visible in the emitted code.
+# `scratchpad/t134-order.sh' on `h (f (), g ())' at -O0, with the redirect
+# injected OFF and back ON in the same build dir:
+#     aarch64  OFF `bl g; bl f' (md5 0cbc679b3ec0) -> ON `bl f; bl g'
+#              (md5 364bcdc7b2fc)   CHANGED
+#     x86_64   OFF and ON both md5 7f363194d339   BYTE-IDENTICAL
+# The x86_64 column is what separates "fixed" from "everyone now gets the same
+# new answer".
+#
+# `INCOMING_REG_PARM_STACK_SPACE' (#134's other half) is NOT on this board at
+# all -- it has no probe arm, which is UNMEASURABLE and not clean.  It joins
+# the backlog of converted-without-an-arm macros, now SEVEN:
+# INCOMING_FRAME_SP_OFFSET, DEFAULT_INCOMING_FRAME_SP_OFFSET, FUNCTION_MODE,
+# ACCUMULATE_OUTGOING_ARGS, STACK_DYNAMIC_OFFSET, PUSH_ARGS_REVERSED (which at
+# least has a header arm to retire) and INCOMING_REG_PARM_STACK_SPACE.
 # ---------------------------------------------------------------------------
 ACCUMULATE_OUTGOING_ARGS UNCONVERTED
 ADDITIONAL_REGISTER_NAMES UNCONVERTED

@@ -914,6 +914,79 @@ struct target_frame_desc
      shared spelling of the name fails BY NAME rather than silently picking up
      a generic ladder.  */
   poly_int64 (*stack_dynamic_offset) (tree fndecl);
+
+  /* `PUSH_ARGS_REVERSED' -- the cheapest leak in the `PUSH_ROUNDING' closure
+     and the one with the widest consequence per line of code.  i386.h:1658
+     defines it to `1'; aarch64 does not; bpf and nvptx do.  Its ONLY shared
+     use is `gimplify.cc:4791-4793', three run-time expressions in one `for'
+     header, and they decide **the order in which every call's arguments are
+     gimplified**.  So argument gimplification ran last-to-first for every
+     target because the primary says so.
+
+     THIS IS OBSERVABLE IN THE OUTPUT, which is what makes it different from
+     most of the fields above.  Argument evaluation order is unspecified in C
+     but not unobservable: two arguments that are side-effecting calls are
+     emitted in whichever order this decides, and the emitted code differs.
+     A value-only arm would therefore not have been enough here; the
+     behavioural arm is `scratchpad/t134-order.sh'.
+
+     THE DEFAULT IS A LADDER, NOT A CONSTANT, AND IT IS PER-BASE THROUGHOUT.
+     `defaults.h:915-928' reads:
+
+         #ifdef PUSH_ROUNDING
+         # if defined (STACK_GROWS_DOWNWARD) != defined (ARGS_GROW_DOWNWARD)
+         #  define PUSH_ARGS_REVERSED targetm.calls.push_argument (0)
+         # endif
+         #endif
+         #ifndef PUSH_ARGS_REVERSED
+         # define PUSH_ARGS_REVERSED 0
+         #endif
+
+     Every name in it -- `PUSH_ROUNDING', `STACK_GROWS_DOWNWARD',
+     `ARGS_GROW_DOWNWARD' -- is the BASE's, so the ladder had three leaks in
+     it rather than one.  It is not reproduced in the thunk: `defaults.h' is
+     included by `target-cumargs.cc' with `MULTI_TARGET_TARGETM_BASE' defined,
+     so the ladder is already evaluated there against that base's headers and
+     the thunk simply reads the resulting macro.  That is the difference from
+     `stack_dynamic_offset' above, whose ladder lived in a `.cc' file's
+     private preprocessor block and had to be copied.
+
+     `? true : false' AND NOT A CAST, for the reason
+     `accumulate_outgoing_args' records: three back ends spell it `1' and the
+     fallback spells it `0', but the third arm is a HOOK CALL returning
+     `bool', and normalising here is what makes all three arrive as the same
+     two values.
+
+     NO `has_' FLAG.  A base that defines nothing genuinely means `0' -- 48 of
+     the 51 back ends are in that case -- and `0' is the ladder's own answer
+     for them, not a floor standing in for a missing one.  */
+  bool (*push_args_reversed) (void);
+
+  /* `INCOMING_REG_PARM_STACK_SPACE' -- `REG_PARM_STACK_SPACE''s SECOND path
+     into shared code, and the reason `function.o' still bound
+     `U ix86_reg_parm_stack_space(tree_node const*)' after #133 converted the
+     first one.  PRINCIPLES' "one symbol can have several macro paths",
+     measured a third time.
+
+     `function.cc:1403' derives the name from `REG_PARM_STACK_SPACE' when a
+     base does not define it itself, and `function.cc:2322' then asks
+     `#ifdef INCOMING_REG_PARM_STACK_SPACE' to decide whether to set
+     `all->reg_parm_stack_space' at all.  Both the derivation and the
+     existence test were the primary's: i386 defines
+     `REG_PARM_STACK_SPACE' (i386.h:1672), aarch64 does not, so aarch64
+     functions were initialised with i386's answer -- computed by
+     `ix86_reg_parm_stack_space' on an aarch64 `fndecl'.
+
+     THE `#ifdef' ARM IS NOT LOST BY RETURNING 0.  `assign_parms_initialize_
+     all' does `memset (all, 0, sizeof (*all))' four lines earlier, so "the
+     macro is undefined" and "the macro yielded 0" already produce the same
+     state at this site -- the only site.  A base with no definition returns
+     0 here because 0 is what it means, not because 0 is a floor.
+
+     `int' AND NOT `poly_int64': the field it initialises is
+     `int reg_parm_stack_space' in `assign_parm_data_all', and every back
+     end's macro is an integer constant or an `int'-returning function.  */
+  int (*incoming_reg_parm_stack_space) (tree fndecl);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1095,5 +1168,18 @@ extern bool mt_accumulate_outgoing_args (void);
    `mt_init_expanders' gave `#ifdef INIT_EXPANDERS' rather than redirecting a
    name that would then still be spellable.  */
 extern poly_int64 mt_stack_dynamic_offset (tree fndecl);
+
+/* `PUSH_ARGS_REVERSED', for shared code.  Redirected in `defaults.h' rather
+   than called directly, because unlike `STACK_DYNAMIC_OFFSET' the name is
+   spelled at its use site (gimplify.cc) and defaults.h's own ladder is what
+   has to be displaced there.  */
+extern bool mt_push_args_reversed (void);
+
+/* `INCOMING_REG_PARM_STACK_SPACE', for shared code.  NOT redirected in
+   `defaults.h': like `STACK_DYNAMIC_OFFSET' it has exactly one shared use
+   (function.cc:2322) and that use is an `#ifdef', which a redirect cannot
+   help with.  The call replaces the guard and the body together, and the
+   name stays undefined in shared code so a future spelling fails by name.  */
+extern int mt_incoming_reg_parm_stack_space (tree fndecl);
 
 #endif /* GCC_TARGET_FRAME_H */

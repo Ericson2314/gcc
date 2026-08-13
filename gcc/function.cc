@@ -1400,9 +1400,15 @@ static poly_int64 cfa_offset;
 #define STACK_POINTER_OFFSET	0
 #endif
 
-#if defined (REG_PARM_STACK_SPACE) && !defined (INCOMING_REG_PARM_STACK_SPACE)
-#define INCOMING_REG_PARM_STACK_SPACE REG_PARM_STACK_SPACE
-#endif
+/* `INCOMING_REG_PARM_STACK_SPACE' USED TO BE DERIVED HERE from
+   `REG_PARM_STACK_SPACE', and the derivation was the primary's: i386 defines
+   `REG_PARM_STACK_SPACE' (i386.h:1672) and aarch64 does not, so the name
+   existed -- or not -- according to whichever base compiled this file.  Its
+   two consumers were the `STACK_DYNAMIC_OFFSET' ladder (moved to
+   `target-cumargs.cc' by #133) and `:2322' below (moved now).  The
+   derivation went with them; there it is a fact about the base being
+   compiled.  The name is left UNDEFINED in shared code deliberately, so that
+   a future shared use fails by name rather than picking up the primary's.  */
 
 /* `STACK_DYNAMIC_OFFSET' USED TO BE DEFINED HERE, and the `#ifndef' that
    guarded it was answered by whichever back end compiled this file.  That is
@@ -2319,10 +2325,16 @@ assign_parms_initialize_all (struct assign_parm_data_all *all)
   all->args_so_far = mt_pack_cumulative_args (&all->args_so_far_v);
   mt_init_cumulative_incoming_args (all->args_so_far, fntype, NULL_RTX);
 
-#ifdef INCOMING_REG_PARM_STACK_SPACE
+  /* The `#ifdef INCOMING_REG_PARM_STACK_SPACE' that used to guard this line
+     was `REG_PARM_STACK_SPACE''s SECOND path into shared code, and it is why
+     `function.o' still bound `ix86_reg_parm_stack_space' after #133 converted
+     the first one: `:1403' derives the name from `REG_PARM_STACK_SPACE', i386
+     defines that and aarch64 does not, so both the existence test and the
+     value were the primary's.  Both now live in `target-cumargs.cc'.  The
+     `#ifdef' arm is preserved by the `memset' above -- a base with no
+     definition returns 0, which is the state that memset already left.  */
   all->reg_parm_stack_space
-    = INCOMING_REG_PARM_STACK_SPACE (current_function_decl);
-#endif
+    = mt_incoming_reg_parm_stack_space (current_function_decl);
 }
 
 /* If ARGS contains entries with complex types, split the entry into two

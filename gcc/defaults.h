@@ -2393,6 +2393,30 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef ACCUMULATE_OUTGOING_ARGS
 #define ACCUMULATE_OUTGOING_ARGS (mt_accumulate_outgoing_args ())
 
+/* `PUSH_ARGS_REVERSED' -- the cheapest member of the `PUSH_ROUNDING' closure,
+   and the one whose consequence is largest per line: its only shared use is
+   `gimplify.cc:4791-4793', three run-time expressions in one `for' header
+   that decide the order EVERY call's arguments are gimplified in.  i386
+   defines it to `1', aarch64 does not, so that order was the primary's for
+   every target.
+
+   THE `#undef' IS LOAD-BEARING AND IS NOT TIDINESS.  This file has already
+   defined the name a thousand lines above (`:915-928') -- either from the
+   `PUSH_ROUNDING' ladder or from the `0' fallback -- using the PRIMARY's
+   `PUSH_ROUNDING', `STACK_GROWS_DOWNWARD' and `ARGS_GROW_DOWNWARD'.  Omitting
+   the `#undef' would leave that definition in force with `rc' still 0; the
+   only signal would be a warning count, which is exactly how the
+   `FUNCTION_MODE' near-miss went unnoticed.
+
+   NO PREPROCESSOR USE ANYWHERE.  Swept over all of `gcc/' outside `config/'
+   and `testsuite/': the only `#ifndef' occurrences are this file's own two
+   guards, which are definitions rather than uses, and the two mentions in
+   `cp/cp-tree.h' are in COMMENTS -- prose saying that certain lists are built
+   in source order "regardless of PUSH_ARGS_REVERSED".  That is what makes it
+   SHAPE 1 in the classification below where `PUSH_ROUNDING' itself is not.  */
+#undef PUSH_ARGS_REVERSED
+#define PUSH_ARGS_REVERSED (mt_push_args_reversed ())
+
 /* ------------------------------------------------------------------------
    THE NEIGHBOURS, CHECKED AND DELIBERATELY NOT REDIRECTED.  A family checked
    and judged fine is a result; silence about it is not.  All three verdicts
@@ -2507,8 +2531,17 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    expressions in one `for' header -- so **argument gimplification runs
    last-to-first for every target**, because the primary says so.  No
    preprocessor use anywhere, so it is SHAPE 1 with a one-file blast radius,
-   and it is the cheapest item in this family.  Not converted here; recorded
-   by name.
+   and it is the cheapest item in this family.  CONVERTED BY #134 -- the
+   redirect is above, next to `ACCUMULATE_OUTGOING_ARGS'.
+
+   IT IS ALSO THE FIRST MEMBER OF THIS FAMILY WHOSE EVIDENCE IS BEHAVIOURAL.
+   Everything else here was measured as a value or a bound symbol; argument
+   evaluation order is neither.  On `int t (void) { return h (f (), g ()); }'
+   at `-O0 -fno-inline', with the redirect injected off and back on in one
+   build dir, aarch64 goes from `bl g; bl f' to `bl f; bl g' while x86_64's
+   output is byte-identical -- and the aarch64 object assembles and
+   disassembles under real aarch64 binutils with a correct CFA.
+   `scratchpad/t134-order.sh'.
 
    `REG_PARM_STACK_SPACE' -- i386 defines it (i386.h:1672), aarch64 does not,
    13 back-end headers do.  Still leaking: `function.o' binds
@@ -2517,9 +2550,45 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    `STACK_DYNAMIC_OFFSET' ladder that #133 moved out.  That is PRINCIPLES'
    "one symbol can have several macro paths" measured again: closing the path
    you found does not close the symbol.  `INCOMING_REG_PARM_STACK_SPACE'
-   itself is defined by exactly one back-end header and by neither base; it is
-   derived from `REG_PARM_STACK_SPACE' at calls.cc and (still) function.cc
-   :1403, and both derivations are the primary's.  Named, not converted.  */
+   itself is defined by exactly one back-end header (rs6000) and by neither
+   base; it is derived from `REG_PARM_STACK_SPACE' at calls.cc and, until
+   #134, at function.cc:1403 as well.
+
+   #134 CLOSED THE function.cc PATH AND ONLY THAT ONE.  The derivation and the
+   `#ifdef' both moved into `target-cumargs.cc'; `function.o' now binds
+   `mt_incoming_reg_parm_stack_space' and binds `ix86_reg_parm_stack_space'
+   ZERO times, where before it bound it once.  The per-base thunks diverge as
+   they should -- i386's is a tail `jmp' to `ix86_reg_parm_stack_space'
+   (R_X86_64_PLT32), aarch64's is `xor %eax,%eax; ret'.
+
+   A VALUE ARM CANNOT DISTINGUISH THE TWO ON THIS PAIR, and saying so is the
+   result.  `ix86_reg_parm_stack_space' returns 32 only for `TARGET_64BIT &&
+   MS_ABI' and 0 otherwise, so the leaked answer for aarch64 was 0 -- the same
+   number aarch64's own absence produces.  The bug was never the number; it
+   was that the number came from `ix86_function_abi' being handed an aarch64
+   `FUNCTION_DECL' and reading i386's option state about it.  Correct BY LUCK,
+   which is the `Pmode' trap running the other way, and the reason the
+   evidence here is the tail-jmp and the symbol count rather than a value.
+
+   THE OTHER PATHS ARE OPEN AND ARE NOT CLAIMED CLOSED.  Enumerated from the
+   source by `scratchpad/t134-rpss.sh', with a verdict for each:
+     - `calls.cc' -- ELEVEN `#ifdef REG_PARM_STACK_SPACE' sites (:174, :1096,
+       :2793, :2885, :3568, :4014, :4257, :4272, :4597, :4945, closing at
+       :1194) and TWO value sites (:2886, :4273).  `calls.o' still binds
+       `U ix86_reg_parm_stack_space'.  OPEN, and the largest remaining piece;
+       several of the `#ifdef's span whole blocks, so this is `PUSH_ROUNDING'
+       SHAPE 2/5 work, not a redirect.
+     - `expr.cc:2192/:2198' -- one `#if defined' plus a value use, and
+       `expr.o' binds the symbol too.  OPEN.
+     - `function.cc' -- CLOSED by #134; the name is now undefined there, so a
+       future shared spelling fails by name.
+     - `target-cumargs.cc:683-686, :745-748' -- the two per-base derivations.
+       CORRECT BY CONSTRUCTION: that file is compiled once per back end with
+       that back end's `tm.h'.  Judged fine, and stated rather than omitted.
+     - `cse.cc:4263', `function.cc:2549/:4017/:4019', `function.h:574' --
+       COMMENTS only.  Judged fine.
+   So the symbol is closed in `function.o' and open in `calls.o' and
+   `expr.o'.  Two paths were not all of them; there are four.  */
 
 #undef DEBUGGER_REGNO
 #define DEBUGGER_REGNO(REGNO) (mt_debugger_regno ((unsigned int) (REGNO)))
