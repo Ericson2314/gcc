@@ -11083,3 +11083,248 @@ preserved at `/tmp/rs6k-y.c`; it reproduces from a fresh build in seconds.
   * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
   * Both build dirs' `config.log` name this worktree; every script asserts it
     and refuses otherwise.
+
+---
+
+# 47 BACK ENDS BUILT AT ONCE -- FIVE CAUSES CLOSED, AND ONE GC BUG THAT IS THE
+# WHOLE PROJECT IN ONE ARTEFACT
+
+Worktree `agent-a7c3dbfdb9e33dfb7`, build dir `/tmp/b-a7c3dbfdb9e33dfb7`
+(named for the worktree, never a task number), anchor **45**.  No task number
+is cited: the list is not in the worktree.  Two other agents were running and
+owned `poly_int`/`NUM_POLY_INT_COEFFS` + the mode machinery, and the
+`<cpu>-opts.h` / shared `options.h` leak; everything attributed to them below
+was recorded and left alone.
+
+## 0. THE HEADLINE, AND WHAT "PASSES" MEANS
+
+`--enable-targets` with the 48-back-end list from `scratchpad/all-backends.txt`
+**cannot be built at all**: the whole run dies at the GENERATOR stage with
+**1024 diagnostics, every one of them `config/loongarch/loongarch-opts.h:107`**,
+`TARGET_DOUBLE_FLOAT` colliding through `options-<cpu>.h` with every other back
+end that spells the name.  Not one back end reaches back-end compilation.  That
+is the `<cpu>-opts.h` leak and it is owned elsewhere; the census here therefore
+drops **loongarch** and runs **47**.
+
+| | back ends reaching back-end compilation | back ends with zero make errors |
+|---|---|---|
+| before | 47 / 47 | **4** -- `i386`, `aarch64`, `riscv`, `rs6000` |
+| after | 47 / 47 | **8** -- `+ mips`, `nds32`, `s390`, `sparc` |
+
+"Zero make errors" means exactly that: `make -k all-gcc` attempted every object
+for that base and none failed.  It is **objects, not a link and not a codegen
+claim** -- no `cc1` exists in that dir, because 39 back ends still fail.
+`mta7-bescore.sh` refuses to score a back end as passing merely because its
+name is absent from the log: under `make -k` a back end whose prerequisite died
+is never attempted, and "not attempted" and "passed" are the same silence, so
+absence is reported by name as `NOT-ATTEMPTED` (it was 0 in every run).
+
+The before figure of 4 is one this worktree measured, not one quoted: the brief
+said 2.  `riscv` and `rs6000` had been fixed by other agents in between.
+
+## 1. THE FIVE CAUSES CLOSED, WITH THE RATIO THAT IS THE POINT
+
+Commits `76afb178601` and `30dd6749ba0`.
+
+| cause | bases hit | one-line diagnosis |
+|---|---|---|
+| A `mt-<base>/options-tables.o` | **36** | missing `-DMULTI_TARGET_SUPPLY_TU=1` |
+| B `target-c-ops-<base>.o` | **33** | `TARGET_CPU_CPP_BUILTINS` lost its call site's scope |
+| C `target-cdata-<base>.o` | **17** | `JUMP_TABLES_IN_TEXT_SECTION` has no supply-side fallback |
+| D `target-addr-<base>.o` | 3 | `memmodel.h` missing before a per-base `tm_p.h` |
+| E `target-regs-<base>.o` | 3 | `REG_CLASS_NAMES` assertion demanded `==`, upstream allows a trailing name |
+
+**A** is the item STATE.md already recorded as latent and deliberately left
+"to avoid colliding with the all-back-ends grind" -- this IS that grind.  The
+sibling rule for `options-init.o`, five lines above it in
+`gen-target-manifest.sh`, already carried the marker.  Both objects are
+compiled with `-I<base>-inc`, so both see one base's `tm.h`; without the marker
+`defaults.h` treats this one as a CONSUMER, redirects its macros to
+`targetm_cdata`/`targetm_regs` -- which the driver that links it does not have
+-- and refuses **by name** at `defaults.h:2045` for any base that does not
+spell `MAX_BITS_PER_WORD`.  Silent on `i386 + aarch64` because both of them do.
+
+**B** is `rs6000` cause B generalised, and the generalisation is the finding:
+`i386` and `aarch64` both expand `TARGET_CPU_CPP_BUILTINS` to a call into
+`config/<cpu>/<cpu>-c.cc`, a file that includes `c-family/c-common.h` itself,
+so **neither configured base ever needed any of this vocabulary at this call
+site**.  Thirty-three back ends expand the macro to a body written inline in
+`config/<cpu>/<cpu>.h`, spelling the names `c_cpp_builtins` had in scope.
+Measured as the undeclared-name set: `builtin_define` (33 objects),
+`builtin_assert` (25), `builtin_define_std` (17),
+`builtin_define_with_int_value` (10), `builtin_define_with_value` (3),
+`preprocessing_asm_p` (2), `c_dialect_cxx` (2), `c_dialect_objc` (2),
+`c_register_addr_space` (3), `flag_iso` (1).  All but four are already `extern`
+in `c-family/c-common.h`; the four are function-like macros over `pfile` that
+`c_cpp_builtins` defines locally, repeated here and `#undef`-ed immediately
+after the expansion.  **Nothing is given a value.**
+
+**C IS AN `#ifndef` FALLBACK AND IS FLAGGED AS ONE**, because PRINCIPLES 2a
+lists that shape first.  It is admitted on a specific argument: the value is
+not a primary's, it is **upstream's own**, at `final.cc:101`, and `final.cc` is
+the only reader outside `config/`.  What changed is only WHERE the question can
+be asked -- `defaults.h` now defines the name unconditionally for consumer TUs,
+so `final.cc`'s `#ifndef` is dead there and can supply the 0 for nobody, while
+the supply side evaluates the macro against one base's `tm.h` and had no
+fallback at all.  The chain is the same one `final.cc` would see in a
+single-target build of that base, so the answer matches upstream for every back
+end both when the macro is present and when it is absent.  If that argument is
+judged wrong, the honest alternative is a `has_` pair like
+`STATIC_CHAIN_REGNUM`, and the fix is a two-line change.
+
+**D** is the `rs6000` cause B shape again in a third file.  Five sources
+include `BASE_HEADER (tm_p.h)`, i.e. that base's `<cpu>-protos.h`;
+`target-cumargs.cc` and `target-regs.cc` already included `memmodel.h` and
+three did not.  alpha, ia64 and sparc declare a function taking
+`enum memmodel` there, and a C++ enum cannot be introduced by an
+elaborated-type-specifier in a parameter list.  Neither `i386` nor `aarch64`
+names the type, which is why two of five could carry the include and three
+could lack it indefinitely.
+
+**E is a check being changed, and the reasoning is in the source.**  The
+invariant that matters is that every class in `0 .. N_REG_CLASSES-1` has a
+name.  `==` additionally forbids a TRAILING entry, and h8300, mn10300 and v850
+all end `REG_CLASS_NAMES` with `"LIM_REGS"` -- a name for the
+`LIM_REG_CLASSES` sentinel, which is not a class and is never indexed.  So the
+assertion was asserting something upstream does not guarantee.  The direction
+that can hurt -- FEWER names than classes -- still fails by name.
+`REG_CLASS_CONTENTS` and `REGISTER_NAMES` deliberately KEEP `==`.
+
+## 2. `machine_function` HAS ONE MARKER ROUTINE FOR 34 BACK ENDS, AND IT IS
+## xtensa'S.  THIS IS NOT A BUILD FAILURE; IT IS SILENT WRONG GC.
+
+This is the largest thing found and **nothing here fixes it**.  It was reached
+from a build failure -- five back ends failing on
+`fatal error: gt-<cpu>.h: No such file or directory` (moxie, cris, ft32,
+iq2000, bpf) -- and the missing files turn out to be the *symptom*.
+
+**34 back ends define `struct GTY(()) machine_function`**, each with different
+fields.  `gengtype` has no per-base namespace, so it keeps **one**:
+
+```
+gtype.state:41455    (!pair "machine_function" ... (!srcfileloc "config/arc/arc.cc" 344))
+                     -- ONE record, for 34 definitions
+
+gt-xtensa.h:23       gt_ggc_mx_machine_function (void *x_p)
+                     {  struct machine_function * const x = ...;
+                        gt_ggc_m_7rtx_def ((*x).vararg_a7_copy);
+                        gt_ggc_m_7rtx_def ((*x).set_frame_ptr_insn);
+                        gt_ggc_m_7rtx_def ((*x).last_logues_a9_content); }
+                     -- the ONLY definition anywhere in the build dir
+```
+
+and `gtype-desc.cc:1794` calls `gt_ggc_m_16machine_function ((*x).machine)`
+from the shared `rtl_data` walk.  So **every configured back end's
+`crtl->machine` is garbage-collected and PCH-walked as if it were xtensa's**,
+reading three `rtx` pointers out of whatever those offsets happen to hold.  It
+links cleanly, it produces no diagnostic, and it is PRINCIPLES 3 exactly: one
+name, several authorities.  (Note the two artefacts name *different* back ends
+-- `gtype.state` attributes the type to `arc`, the emitted routine landed in
+`gt-xtensa.h` -- which is itself the tell: the choice is arbitrary.)
+
+The missing `gt-<cpu>.h` follows from the same fact.  `gengtype` creates a
+`gt-<file>.h` only when it has something to put in it -- a GC root variable, or
+the marker routines for a structure it decided this file owns.  A back end
+whose only GTY declaration is `machine_function` therefore gets no file at all
+once some other back end has been declared the owner of that name, while it
+still `#include`s the file unconditionally.
+
+**This is a design fork and is not something to patch around.**  The shape the
+branch already uses elsewhere applies -- union the vocabulary, keep the data
+per configuration, qualify only what collides -- which here means `gengtype`
+emitting `machine_function_<base>` types and per-base marker routines, with the
+shared `rtl_data` walk dispatching through the selected base.  Making the
+missing headers appear by any cheaper route (an empty `gt-<cpu>.h`, or dropping
+the `#include`) would turn the loud half green and leave the silent half
+exactly as it is, which is the first item in PRINCIPLES 2a.
+
+**Not measured here:** whether this has ever caused an observed miscollection.
+It would take a GC-heavy compile on a base whose `machine_function` is larger
+than xtensa's, and no `cc1` exists in the 47-back-end dir to run it in.  Stated
+as an unmeasured consequence, not as an observed one.
+
+## 3. THE targhooks.cc SWEEP GENERALISED: 38 BACK ENDS, NOT ONE
+
+`scratchpad/mta7-targhook-matrix.sh` takes `rs6k-targhook-sweep.sh` from one
+back end to all 48.  It reads the 16 `#ifdef <tm.h macro>` defaults out of
+`targhooks.cc` -- a file compiled ONCE, so those are answered by the primary's
+`tm.h` for everybody -- and asks, per back end, which direction the answer is
+wrong in:
+
+```
+ICE RISK     this base defines the macro, NEITHER i386 nor aarch64 does
+             -> the #else arm runs: gcc_unreachable (), or a generic formula
+             151 (base, macro) pairs over 38 back ends
+
+SILENT RISK  i386/aarch64 define it, this base does not
+             -> this base silently gets the primary's answer
+             90 (base, macro) pairs
+```
+
+rs6000's nine were the first instance and are fixed; **the other 37 back ends
+are untouched**, and the sweep is predictive in the way it was before -- fixing
+one hook moves the ICE to the next macro on the list.  The SILENT column is the
+worse half and has no diagnostic at all.  These are ICEs and wrong answers, not
+build failures, so under the priority rule they sit behind the build wall --
+but the sweep costs nothing to re-run and the list is per back end.
+
+## 4. WHAT IS LEFT, ATTRIBUTED
+
+After the five causes, the 47-back-end residue is **overwhelmingly not mine**:
+
+  * **`poly_int` / `NUM_POLY_INT_COEFFS == 2`** -- ~1900 diagnostics, the
+    single largest group.  Owned.
+  * **`E_PSImode` -- 606 diagnostics, and only TWO back ends** (avr, msp430).
+    Worth stating precisely because the diagnostic count makes it look
+    systemic and it is not.  The mode union qualifies the colliding mode --
+    `insn-modes-avr.h` has `E_avr_PSImode` and `#define PSImode E_avr_PSImode`
+    -- but emits **no `#define E_PSImode E_avr_PSImode`**, and generated
+    `insn-recog`/`insn-emit`/`insn-output` code spells the `E_`-prefixed form
+    in `case` labels and comparisons.  The gap is in `gcc/genmodes.cc` in the
+    alias block whose comment begins at **:2060** ("The back end's own sources
+    say `PSImode`, not `avr_PSImode`") -- one `printf` short of complete.  Left
+    alone because the mode machinery has an owner; recorded here so it does not
+    have to be re-derived.
+  * **the shared `options.h` / `<cpu>-opts.h` leak**, which is the whole of the
+    rest: `CPU_SIMPLE` (frv's `attr_cpu` vs nds32's `nds32_cpu_type`, 9),
+    `selected_arch` declared `aarch64_arch` and used by `arm-common.cc` as
+    `const arch_option *` (17 + 3 + 3), `OPT_march_` in
+    `mt-nvptx/options-tables.cc` (5), `stringop_alg` vs `loop *`, `lock_loop`,
+    `vctp_insn`, `condcount`.  Owned.
+  * **`gt-<cpu>.h`** -- section 2.
+
+Non-owned residue after the five causes is under a dozen diagnostics.
+
+## 5. BARS
+
+  * 47-back-end dir `/tmp/b-a7c3dbfdb9e33dfb7`: `make -k all-gcc` rc=2 (39
+    back ends still fail), **8/47 with zero make errors**, 47/47 attempted,
+    0 `NOT-ATTEMPTED`.  Scored by `scratchpad/mta7-bescore.sh`.
+  * **The 8 was read from an INCREMENTAL run**, which is a caveat and is stated
+    rather than hidden: `make -k` re-attempts every failed and every missing
+    object on each run, so a base scoring zero errors on the third pass has
+    genuinely had everything attempted -- but its *mention* count is small, and
+    a reader who checked "was it attempted" by counting mentions would be
+    misled.  The 4-before figure came from a cold run in the same dir.
+  * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
+  * `config.log` in both build dirs names this worktree; `mta7-conf.sh` asserts
+    the srcdir anchor (exactly 45) and the build-dir name and refuses
+    otherwise.
+  * **PAIR CONTROL, SAME TREE, ALL FIVE CAUSES APPLIED** --
+    `/tmp/b-a7c3dbfdb9e33dfb7-pair`, i386 + aarch64 only:
+      - `make all-gcc` **rc=0**; `make multi-target-objs cc1 lto1` **rc=0**,
+        `grep -c 'error:'` **0**.
+      - x86_64 `-O2` on
+        `.../agent-a7c3dbfdb9e33dfb7/scratchpad/big.c` (md5
+        `e4558c736e241860bc610c56e66f9c43`, 150 lines):
+        **12369 bytes / `378fc33c1e70`** -- the recorded bar exactly.  Input
+        path quoted with the count.
+      - `specs-config` for x86_64 is **230 lines**, against the recorded ~230,
+        not merely non-empty; probed with the real aarch64 binutils for the
+        other target.
+      - `stock-compare.sh` vs `/tmp/b-stock` (which DOES exist, genuine
+        upstream at merge-base `c31b7a09eea`): **5/5 IDENTICAL**, 5 distinct
+        md5s on each side, negative control firing (1158 vs 804 lines,
+        differ), and it printed
+        `mt cfg : /tmp/b-a7c3dbfdb9e33dfb7-pair/...` so it is confirmed to
+        have run in THIS dir.
