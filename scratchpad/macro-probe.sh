@@ -107,6 +107,12 @@ for t in g++ nm awk sed sort comm grep; do
   command -v "$t" >/dev/null || die "missing tool: $t (are you inside the nix-shell?)"
 done
 [ -d "$BUILD/gcc" ] || die "no build dir $BUILD/gcc"
+# ABSOLUTE FROM HERE ON.  `ctx_dir' writes the control fixtures by path while
+# the script later `cd's into $BUILD/gcc; a relative $BUILD would put the
+# fixtures somewhere else after the cd, and the arms would then be measuring a
+# directory nobody is compiling against.  PRINCIPLES records the same class of
+# defect in stock-compare.sh, where a relative path produced a false green.
+BUILD=$(cd "$BUILD" && pwd) || die "cannot resolve $BUILD"
 [ -f "$BUILD/gcc/tm.h" ] || die "no $BUILD/gcc/tm.h"
 [ -s "$MACROS" ] || die "no macro list $MACROS"
 mkdir -p "$OUT" || die "cannot create $OUT"
@@ -120,9 +126,27 @@ BASES="i386 aarch64"
 CTXS="mt i386 aarch64"
 
 ctx_inc () {                      # include flags that define the context
+  # MTP_INJECT=same-context COLLAPSES the contexts -- every context resolves
+  # its headers exactly as `mt' does.  This is the fault arm 0 exists to
+  # catch, and it is in the script rather than in a report so that the next
+  # agent can re-run it.  See `INJECTION ARMS' below.
+  if [ "$MTP_INJECT" = same-context ]; then echo ""; return; fi
   case $1 in
     mt) echo "" ;;
     *)  echo "-I$1-inc" ;;
+  esac
+}
+
+# The directory each context's quoted `#include' resolves to FIRST.  `mt' has
+# no `-I<base>-inc', so its first hit is the build root via `-I.'; a base
+# context's first hit is its own `<base>-inc'.  This is not a second model of
+# the include path -- it is read off `ctx_inc' above, and the fixture arms
+# below FAIL if the two ever disagree, because each fixture states which
+# directory it came from and the arm checks that against this function.
+ctx_dir () {
+  case $1 in
+    mt) echo "$BUILD/gcc" ;;
+    *)  echo "$BUILD/gcc/$1-inc" ;;
   esac
 }
 
@@ -654,30 +678,199 @@ cd "$BUILD/gcc" || die "cd $BUILD/gcc"
 # other way here: leaving the control dead leaves the entire header probe
 # unrunnable, which reports nothing rather than reporting less.
 ########################################################################
-CTLMACRO=MIN_UNITS_PER_WORD
+# RE-ANCHORED 2026-08-13 A SECOND TIME ON THE SAME DAY, AND THIS TIME NOT ONTO
+# A MACRO AT ALL.  `MIN_UNITS_PER_WORD' lasted hours.  `UNITS_PER_WORD' became
+# `(mt_units_per_word ())', `defaults.h:1120' defines MIN_UNITS_PER_WORD AS
+# UNITS_PER_WORD, and `char cq[MIN_UNITS_PER_WORD]' therefore stopped compiling
+# in every context -- rc=9, no results.txt, no summary, for the THIRD time
+# (SELECT_CC_MODE -> STACK_POINTER_REGNUM -> MIN_UNITS_PER_WORD).
+#
+# THE PATTERN IS NOT "WE PICKED BADLY THREE TIMES".  Each re-anchor satisfied
+# its own written criteria and each died to this project's own conversion
+# programme, which is systematically converting exactly the population the
+# criteria drew from.  A control anchored on a real GCC target macro has an
+# expiry date BY CONSTRUCTION, and the expiry is catastrophic rather than
+# graceful: arm 0 runs before anything is probed, so the whole header probe
+# becomes unrunnable and the last successful run's figures get quoted as
+# current.  That already happened for about a day.
+#
+# So the fourth re-anchor is onto a FIXTURE THIS SCRIPT WRITES.  Three tiny
+# headers are generated into the three directories the three contexts resolve
+# quoted includes from:
+#
+#     $BUILD/gcc/mtp-ctl-{int,str,exp}.h            <- the `mt' context, via -I.
+#     $BUILD/gcc/i386-inc/mtp-ctl-{int,str,exp}.h   <- via -Ii386-inc
+#     $BUILD/gcc/aarch64-inc/mtp-ctl-{int,str,exp}.h<- via -Iaarch64-inc
+#
+# IT RIDES THE SAME MECHANISM AS THE REAL PROBES, which is the only thing that
+# makes it a control at all.  The real probes reach `tm.h' by a QUOTED include
+# from a source in $OUT resolved against `$inc $CPPFLAGS'; the fixture is
+# reached by a quoted include from the SAME source against the SAME flags.  A
+# fixture reached some other way -- a `-D' on the command line, a file next to
+# the probe source -- would prove the harness can pass a value to a compiler,
+# which nobody doubts, and would prove nothing about `-I<base>-inc'.
+#
+# THE THREE CRITERIA THE PREVIOUS RE-ANCHORS WROTE DOWN, SATISFIED BY
+# CONSTRUCTION RATHER THAN BY A SEARCH FOR A SURVIVING MACRO:
+#   * INDEPENDENT of the conversion programme.  `MTP_CTL_INT' is not a GCC
+#     macro; no back end defines it, `defaults.h' cannot redirect it, no hook
+#     conversion can delete it.  There is no family it can be dragged down
+#     with, because it has no family.
+#   * IN A DIFFERENT FAMILY FROM THE OTHER TWO CONTROLS.  The three controls
+#     key on three different macros in three different FILES -- and the file
+#     separation is deliberate: sharing one fixture header would make one
+#     truncated write take out all three phases at once, which is precisely
+#     the "two controls that move together are one control with two names"
+#     defect the 2026-08-12 re-anchor was written to remove.
+#   * A REAL NUMERIC SPREAD, NOT A 0/1 BIT.  4241 vs 8317 -- and unlike the
+#     rejected `SLOW_BYTE_ACCESS'-style candidates, a probe bug that defaults
+#     to 0, or that reads a stale/absent value, cannot land on either number
+#     by accident.  The old control's 4-vs-8 could plausibly be produced by
+#     some other macro; 4241 cannot.
+#
+# WHAT THIS FIXTURE DOES *NOT* PROVE, STATED RATHER THAN PAPERED OVER.  It
+# proves the `-I' SELECTION differs between contexts and carries a per-context
+# answer into a probe compiled exactly like the real ones.  It does not prove
+# the two bases' REAL header sets differ -- that is a fact about the tree, not
+# about the instrument, and the old real-macro control did carry it.  It is
+# not dropped: ARM 0c below asserts it directly on the `-dM' dumps, which is a
+# text-level fact no macro conversion can flatten (a conversion rewrites both
+# bases' headers alike, so it cannot make them equal).
+#
+# ORIGIN TAGS, AND THE SILENT FALLBACK THEY CATCH.  `-I.' is in CPPFLAGS for
+# every context, so a MISSING `aarch64-inc/mtp-ctl-int.h' does not fail to
+# compile -- it silently resolves to the build-root copy, which holds the
+# PRIMARY's answer.  That is this branch's own root bug aimed at its own
+# control, and it would read as "the two contexts agree".  So every fixture
+# also states WHICH DIRECTORY IT IS, the arm checks that against `ctx_dir',
+# and `fixture_verify' checks all nine files on disk BEFORE anything is
+# compiled.  "The control is broken" and "the contexts agree" are therefore
+# two different diagnostics with two different texts.
+#
+# INJECTION ARMS (both required by the brief, both re-runnable):
+#   MTP_INJECT=same-context   collapse the contexts.  Arm 0 must FAIL by name.
+#   MTP_INJECT=break-fixture  delete a fixture file.  `fixture_verify' must
+#                             refuse, with wording that cannot be mistaken for
+#                             a verdict about the contexts.
+########################################################################
+FIX_INT=mtp-ctl-int.h
+FIX_STR=mtp-ctl-str.h
+FIX_EXP=mtp-ctl-exp.h
+
+# `mt' takes the PRIMARY's answers, because `mt' IS the primary's header set --
+# the same relation the real probes have and the same one arm 0 has always
+# asserted.  ARM 0c is what keeps that from being a bare assumption.
+fix_int    () { case $1 in aarch64) echo 8317 ;; *) echo 4241 ;; esac; }
+fix_origin () { case $1 in aarch64) echo 202  ;; *) echo 101  ;; esac; }
+fix_str    () { case $1 in aarch64) echo mtpglobal ;; *) echo mtpglobl ;; esac; }
+fix_call   () { case $1 in
+                  aarch64) echo 'mtp_aarch64_select_cc_mode (OP, X, Y)' ;;
+                  *)       echo 'mtp_i386_cc_mode ((OP),(X),(Y))' ;;
+                esac; }
+
+fixture_write () {
+  local ctx d
+  for ctx in $CTXS; do
+    d=$(ctx_dir $ctx)
+    [ -d "$d" ] || die "control fixture: $d does not exist, so the $ctx \
+context has no directory to be distinguished by.  This is a broken BUILD DIR, \
+not a verdict about the contexts."
+    rm -f "$d/$FIX_INT" "$d/$FIX_STR" "$d/$FIX_EXP"
+    printf '#define MTP_CTL_INT %s\n#define MTP_CTL_INT_ORIGIN %s\n' \
+      "$(fix_int $ctx)" "$(fix_origin $ctx)" > "$d/$FIX_INT" \
+      || die "control fixture: cannot write $d/$FIX_INT"
+    printf '#define MTP_CTL_STR "%s"\n#define MTP_CTL_STR_ORIGIN %s\n' \
+      "$(fix_str $ctx)" "$(fix_origin $ctx)" > "$d/$FIX_STR" \
+      || die "control fixture: cannot write $d/$FIX_STR"
+    printf '#define MTP_CTL_EXP(OP,X,Y) %s\n#define MTP_CTL_EXP_ORIGIN %s\n' \
+      "$(fix_call $ctx)" "$(fix_origin $ctx)" > "$d/$FIX_EXP" \
+      || die "control fixture: cannot write $d/$FIX_EXP"
+  done
+  if [ "$MTP_INJECT" = break-fixture ]; then
+    rm -f "$(ctx_dir aarch64)/$FIX_INT"
+    echo "INJECT: deleted $(ctx_dir aarch64)/$FIX_INT"
+  fi
+  fixture_write_verify
+}
+
+# ASSERT ON THE CONTENT, BY NAME AND VALUE, AND RUN IT FIRST.  PRINCIPLES
+# records a generator that ran, exited 0 and changed nothing; existence,
+# timestamp, exit status and non-emptiness all passed on it.  Nine files are
+# checked for the exact `#define' line they were supposed to receive.  Note
+# these are FILE reads, not pipelines, so `grep -q' cannot turn a match into a
+# miss via SIGPIPE under `set -o pipefail'.
+FIXBAD=""
+fixchk () {                       # fixchk <file> <exact line> <label>
+  # `2>/dev/null' is forbidden on this project, so ABSENCE is tested first and
+  # separately -- which also keeps "the file is gone" and "the file says the
+  # wrong thing" as two distinguishable reports rather than one.
+  if [ ! -f "$1" ]; then FIXBAD="$FIXBAD $1[ABSENT:$3]"; return; fi
+  grep -qxF "$2" "$1" || FIXBAD="$FIXBAD $1[WRONG-CONTENT:$3]"
+}
+fixture_write_verify () {
+  local ctx d bad
+  FIXBAD=""
+  for ctx in $CTXS; do
+    d=$(ctx_dir $ctx)
+    fixchk "$d/$FIX_INT" "#define MTP_CTL_INT $(fix_int $ctx)" value
+    fixchk "$d/$FIX_INT" "#define MTP_CTL_INT_ORIGIN $(fix_origin $ctx)" origin
+    fixchk "$d/$FIX_STR" "#define MTP_CTL_STR \"$(fix_str $ctx)\"" string
+    fixchk "$d/$FIX_EXP" "#define MTP_CTL_EXP(OP,X,Y) $(fix_call $ctx)" call
+  done
+  bad=$FIXBAD
+  [ -z "$bad" ] || die "THE CONTROL FIXTURE IS BROKEN -- these generated files \
+are absent or do not hold the #define they were written with:$bad.  READ THIS \
+AS 'THE INSTRUMENT IS BROKEN', NOT AS A VERDICT ABOUT THE TWO CONTEXTS: no \
+context has been compared with any other at this point, and nothing has been \
+probed.  A missing per-base fixture would otherwise resolve through -I. to the \
+build-root copy and read exactly like 'the contexts agree'."
+}
+fixture_write
+echo "control: fixture written and content-verified in \
+$(for c in $CTXS; do printf '%s ' "$(ctx_dir $c)"; done)"
+
+CTLMACRO=MTP_CTL_INT
 control () {
-  local ctx inc v
+  local ctx inc v o
   for ctx in $CTXS; do
     inc=$(ctx_inc $ctx)
     { echo "$PRE"
+      echo "#include \"$FIX_INT\""
       echo "char cq[$CTLMACRO];"
+      echo "char cqo[${CTLMACRO}_ORIGIN];"
     } > "$OUT/ctl.cc"
     g++ -c -o "$OUT/ctl.o" "$OUT/ctl.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/err-ctl-$ctx.txt" 2>&1 \
       || { cat "$OUT/err-ctl-$ctx.txt"; die "control probe ($CTLMACRO) did not \
-compile in $ctx.  If this macro has just been CONVERTED it is no longer an \
-integral constant expression and the control is dead: re-anchor arm 0 on \
-another INDEPENDENT DIFFERING witness -- see the three criteria above -- and \
-do NOT anchor it on anything the EXP or STR control already uses."; }
+compile in $ctx.  $CTLMACRO is a FIXTURE this script writes, not a GCC macro, \
+so this is not a conversion killing the control: either $(ctx_dir $ctx) is not \
+on the $ctx include path (the mechanism the real probes ride is broken) or the \
+fixture is malformed.  Neither is a statement about whether the contexts \
+differ."; }
     v=$(nm -S --defined-only "$OUT/ctl.o" | awk '$4=="cq"{print strtonum("0x" $2)}')
-    [ -n "$v" ] || die "control: nm produced nothing for $ctx (tool present but silent)"
-    echo "control $ctx $CTLMACRO=$v"
+    o=$(nm -S --defined-only "$OUT/ctl.o" | awk '$4=="cqo"{print strtonum("0x" $2)}')
+    [ -n "$v" ] && [ -n "$o" ] \
+      || die "control: nm produced nothing for $ctx (tool present but silent)"
+    # ORIGIN FIRST.  If the context resolved somebody else's fixture, the VALUE
+    # comparison below would be comparing a directory with itself and would
+    # report agreement -- the exact reading this control exists to make
+    # impossible.
+    [ "$o" = "$(fix_origin $ctx)" ] || die "control: the $ctx context resolved \
+$FIX_INT from the WRONG DIRECTORY -- it reports origin $o, and $(ctx_dir $ctx) \
+was written with origin $(fix_origin $ctx).  THE TWO PROBE CONTEXTS ARE NOT \
+DISTINCT: $ctx is picking up another context's headers through the include \
+path, so every arm in this run would compare a header set with itself.  Check \
+the -I order in ctx_inc/CPPFLAGS before believing any figure from this harness."
+    echo "control $ctx $CTLMACRO=$v origin=$o"
     eval "CTL_$ctx=$v"
   done
-  [ "$CTL_i386" = 4 ] || die "control: i386 $CTLMACRO=$CTL_i386, expected 4"
-  [ "$CTL_aarch64" = 8 ] || die "control: aarch64 $CTLMACRO=$CTL_aarch64, expected 8"
-  [ "$CTL_mt" = 4 ] || die "control: mt $CTLMACRO=$CTL_mt, expected 4 (mt == primary)"
-  echo "control: OK -- the three contexts are distinguishable and mt == i386"
+  [ "$CTL_i386" = 4241 ] || die "control: i386 $CTLMACRO=$CTL_i386, expected 4241"
+  [ "$CTL_aarch64" = 8317 ] || die "control: aarch64 $CTLMACRO=$CTL_aarch64, expected 8317"
+  [ "$CTL_mt" = 4241 ] || die "control: mt $CTLMACRO=$CTL_mt, expected 4241 (mt == primary)"
+  [ "$CTL_i386" != "$CTL_aarch64" ] || die "control: the two bases measured the \
+same; the contexts are not distinguishable"
+  echo "control: OK -- the three contexts are distinguishable through the same \
+quoted-include/-I mechanism the real probes use, and mt == i386"
 }
 control
 
@@ -737,29 +930,46 @@ control
 CTLDEF='#define MTPCTL_AGREE(x) mtpctl_callee ((x), 42)'
 
 str_exp_control () {
-  local ctx inc agree rrc gao
+  local ctx inc agree rrc gao sby sor eor
   for ctx in $CTXS; do
     inc=$(ctx_inc $ctx)
 
-    # --- STR control: GLOBAL_ASM_OP, byte exact, via the same sizeof/index
-    #     shape the STR phase uses.  If this cannot be valued, STR is dead.
+    # --- STR control: the MTP_CTL_STR fixture, byte exact, via the same
+    #     sizeof/index shape the STR phase uses.  If this cannot be valued,
+    #     STR is dead.  Index 7 is where "mtpglobl" and "mtpglobal" first
+    #     differ in a BYTE as well as in length, so this control now exercises
+    #     both halves of the phase; the GLOBAL_ASM_OP version compared lengths
+    #     only.  (This index was written as 6 first and the control CAUGHT IT
+    #     -- both bases read 98, 'b' -- which is the arm doing its job against
+    #     its own author on its first run.)
     { echo "$PRE"
-      echo 'char ctl_len[sizeof (GLOBAL_ASM_OP)];'
-      echo 'char ctl_b0[(GLOBAL_ASM_OP)[1] + 129];'
+      echo "#include \"$FIX_STR\""
+      echo 'char ctl_len[sizeof (MTP_CTL_STR)];'
+      echo 'char ctl_b0[(MTP_CTL_STR)[7] + 129];'
+      echo 'char ctl_so[MTP_CTL_STR_ORIGIN];'
     } > "$OUT/ctlstr.cc"
     g++ -c -o "$OUT/ctlstr.o" "$OUT/ctlstr.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/err-ctlstr-$ctx.txt" 2>&1 \
-      || { cat "$OUT/err-ctlstr-$ctx.txt"; die "STR control: GLOBAL_ASM_OP did not compile in $ctx -- the STR phase cannot work"; }
+      || { cat "$OUT/err-ctlstr-$ctx.txt"; die "STR control: the MTP_CTL_STR \
+fixture did not compile in $ctx -- the STR phase cannot work.  This is the \
+instrument, not a converted macro: see fixture_write."; }
     gao=$(nm -S --defined-only "$OUT/ctlstr.o" | awk '$4=="ctl_len"{print strtonum("0x" $2)}')
-    [ -n "$gao" ] || die "STR control: nm produced nothing for $ctx"
-    echo "control-str $ctx sizeof(GLOBAL_ASM_OP)=$gao"
-    eval "CTLS_$ctx=$gao"
+    sby=$(nm -S --defined-only "$OUT/ctlstr.o" | awk '$4=="ctl_b0"{print strtonum("0x" $2)-129}')
+    sor=$(nm -S --defined-only "$OUT/ctlstr.o" | awk '$4=="ctl_so"{print strtonum("0x" $2)}')
+    [ -n "$gao" ] && [ -n "$sby" ] && [ -n "$sor" ] \
+      || die "STR control: nm produced nothing for $ctx"
+    [ "$sor" = "$(fix_origin $ctx)" ] || die "STR control: the $ctx context \
+resolved $FIX_STR from the WRONG DIRECTORY (origin $sor, expected \
+$(fix_origin $ctx) from $(ctx_dir $ctx)).  The contexts are not distinct."
+    echo "control-str $ctx sizeof(MTP_CTL_STR)=$gao byte7=$sby origin=$sor"
+    eval "CTLS_$ctx=$gao"; eval "CTLB_$ctx=$sby"
 
     # --- EXP control: the synthetic agreeing macro and a known-differing one,
     #     through the SAME marker/normalise path as the real EXP phase.
-    { echo "$PRE"; echo "$CTLDEF"
+    { echo "$PRE"; echo "#include \"$FIX_EXP\""; echo "$CTLDEF"
       echo 'MTPBEGIN 1 MTPMID MTPCTL_AGREE(zz) MTPEND'
-      echo 'MTPBEGIN 2 MTPMID SELECT_CC_MODE (mtpop, mtpx, mtpy) MTPEND'
+      echo 'MTPBEGIN 2 MTPMID MTP_CTL_EXP (mtpop, mtpx, mtpy) MTPEND'
+      echo 'MTPBEGIN 3 MTPMID MTP_CTL_EXP_ORIGIN MTPEND'
     } > "$OUT/ctlexp.cc"
     g++ -E "$OUT/ctlexp.cc" $inc $CPPFLAGS -std=c++14 -w \
         > "$OUT/ctlexp-$ctx.i" 2> "$OUT/err-ctlexp-$ctx.txt" \
@@ -770,19 +980,23 @@ str_exp_control () {
             gsub(/[ \t]+/," ",k); gsub(/^ +| +$/,"",k);
             gsub(/[ \t]+/," ",b); gsub(/^ +| +$/,"",b); print k "|" b }' \
       > "$OUT/ctlexp-$ctx.txt"
-    [ "$(wc -l < "$OUT/ctlexp-$ctx.txt")" = 2 ] \
-      || die "EXP control: captured $(wc -l < "$OUT/ctlexp-$ctx.txt") of 2 expansions in $ctx"
+    [ "$(wc -l < "$OUT/ctlexp-$ctx.txt")" = 3 ] \
+      || die "EXP control: captured $(wc -l < "$OUT/ctlexp-$ctx.txt") of 3 expansions in $ctx"
     agree=$(awk -F'|' '$1==1{print $2}' "$OUT/ctlexp-$ctx.txt")
     rrc=$(awk -F'|' '$1==2{print $2}' "$OUT/ctlexp-$ctx.txt")
+    eor=$(awk -F'|' '$1==3{print $2}' "$OUT/ctlexp-$ctx.txt")
+    [ "$eor" = "$(fix_origin $ctx)" ] || die "EXP control: the $ctx context \
+resolved $FIX_EXP from the WRONG DIRECTORY (origin [$eor], expected \
+$(fix_origin $ctx) from $(ctx_dir $ctx)).  The contexts are not distinct."
     # An expansion that is still the macro's own name is a non-expansion, and a
     # non-expansion compared with a non-expansion looks like agreement.
     case $agree in *MTPCTL_AGREE*) die "EXP control: MTPCTL_AGREE did not expand in $ctx";; esac
-    case $rrc in *SELECT_CC_MODE*) die "EXP control: SELECT_CC_MODE did not expand in $ctx";; esac
+    case $rrc in *MTP_CTL_EXP*) die "EXP control: MTP_CTL_EXP did not expand in $ctx";; esac
     # The witness must still be a CALL, not a bare token: if a future change
-    # made SELECT_CC_MODE expand to a constant, the two bases could still
+    # made MTP_CTL_EXP expand to a constant, the two bases could still
     # differ and the control would pass while no longer exercising the
     # differing-callee path it was chosen for.
-    case $rrc in *'('*')'*) ;; *) die "EXP control: SELECT_CC_MODE expanded to \
+    case $rrc in *'('*')'*) ;; *) die "EXP control: MTP_CTL_EXP expanded to \
 [$rrc] in $ctx, which is not a call.  The witness was chosen because it names a \
 different FUNCTION per base; if it has stopped doing that it is no longer \
 controlling the case it claims to.";; esac
@@ -791,10 +1005,19 @@ controlling the case it claims to.";; esac
     eval "CTLA_$ctx=\$agree"; eval "CTLR_$ctx=\$rrc"
   done
 
-  # STR must be able to SEE a difference: .globl (8 chars + NUL) vs .global (9).
-  [ "$CTLS_i386" = 9 ] || die "STR control: i386 sizeof(GLOBAL_ASM_OP)=$CTLS_i386, expected 9 (\\t.globl\\t)"
-  [ "$CTLS_aarch64" = 10 ] || die "STR control: aarch64 sizeof(GLOBAL_ASM_OP)=$CTLS_aarch64, expected 10 (\\t.global\\t)"
-  [ "$CTLS_i386" != "$CTLS_aarch64" ] || die "STR control: the two bases measured the same; STR cannot discriminate"
+  # STR must be able to SEE a difference, in BOTH of the things the phase
+  # measures: the length (mtpglobl 8+NUL vs mtpglobal 9+NUL) and an individual
+  # byte (index 6: 'l' 108 vs 'a' 97).
+  [ "$CTLS_i386" = 9 ] || die "STR control: i386 sizeof(MTP_CTL_STR)=$CTLS_i386, expected 9"
+  [ "$CTLS_aarch64" = 10 ] || die "STR control: aarch64 sizeof(MTP_CTL_STR)=$CTLS_aarch64, expected 10"
+  [ "$CTLS_mt" = 9 ] || die "STR control: mt sizeof(MTP_CTL_STR)=$CTLS_mt, expected 9 (mt == primary)"
+  [ "$CTLS_i386" != "$CTLS_aarch64" ] || die "STR control: the two bases measured the same length; STR cannot discriminate"
+  [ "$CTLB_i386" = 108 ] || die "STR control: i386 MTP_CTL_STR[7]=$CTLB_i386, expected 108 ('l')"
+  [ "$CTLB_aarch64" = 97 ] || die "STR control: aarch64 MTP_CTL_STR[7]=$CTLB_aarch64, expected 97 ('a')"
+  [ "$CTLB_i386" != "$CTLB_aarch64" ] || die "STR control: the two bases \
+measured the same BYTE.  A length-only difference would still be caught, but \
+the per-byte arm -- the one that exists because .globl and .global assemble \
+identically -- would be uncontrolled."
 
   # EXP must be able to report AGREEMENT (the direction never exercised by the
   # real macro set, which is 100% red under EXP) ...
@@ -804,14 +1027,15 @@ reported as differing (mt=[$CTLA_mt] i386=[$CTLA_i386] aarch64=[$CTLA_aarch64]).
 Every EXP FAIL in this run would be unattributable."
   # ... and to report DISAGREEMENT.
   [ "$CTLR_mt" != "$CTLR_aarch64" ] \
-    || die "EXP control: SELECT_CC_MODE is known to differ between the bases \
-(ix86_cc_mode vs aarch64_select_cc_mode) and EXP reported it identical; the \
-phase cannot discriminate"
+    || die "EXP control: MTP_CTL_EXP is written to name a DIFFERENT CALLEE per \
+base (mtp_i386_cc_mode vs mtp_aarch64_select_cc_mode) and EXP reported it \
+identical; the phase cannot discriminate"
   [ "$CTLR_mt" = "$CTLR_i386" ] \
-    || die "EXP control: mt and i386 disagree on SELECT_CC_MODE, but mt IS the \
+    || die "EXP control: mt and i386 disagree on MTP_CTL_EXP, but mt IS the \
 i386 header set; the contexts are not what they claim to be"
-  echo "control: OK -- STR discriminates (9 vs 10 bytes); EXP reports agreement \
-AND disagreement, so an EXP FAIL is a measurement and not a dead phase"
+  echo "control: OK -- STR discriminates by length (9 vs 10) and by byte \
+(108 vs 97); EXP reports agreement AND disagreement, so an EXP FAIL is a \
+measurement and not a dead phase"
 }
 str_exp_control
 
@@ -838,6 +1062,87 @@ names: a single change to that macro takes both out in the same run, and the \
 summary still prints."
 echo "control: OK -- the three phases rest on three DIFFERENT macros \
 (INT=$ctl_int_macro STR=$ctl_str_macro EXP=$ctl_exp_macro)"
+
+# ... AND ON THREE DIFFERENT FILES.  Now that the witnesses are fixtures this
+# script writes, "three different macros" is cheap to satisfy and would be
+# satisfied by three `#define's in ONE header -- which one truncated write, one
+# bad `printf', one full disk takes out together.  Three names in one file is
+# one control with three names, the same defect the macro-based version had.
+for f in "$FIX_INT" "$FIX_STR" "$FIX_EXP"; do
+  n=$(for g in "$FIX_INT" "$FIX_STR" "$FIX_EXP"; do [ "$g" = "$f" ] && echo x; done | wc -l)
+  [ "$n" = 1 ] || die "two controls read their witness from the same fixture \
+file ($f).  Give each phase its own file."
+done
+grep -qxF "#include \"$FIX_INT\"" "$OUT/ctl.cc" || die "the INT control's probe \
+source does not include $FIX_INT; the witness is not arriving by the quoted-\
+include path the real probes use"
+grep -qxF "#include \"$FIX_STR\"" "$OUT/ctlstr.cc" || die "the STR control's \
+probe source does not include $FIX_STR"
+grep -qxF "#include \"$FIX_EXP\"" "$OUT/ctlexp.cc" || die "the EXP control's \
+probe source does not include $FIX_EXP"
+echo "control: OK -- and on three DIFFERENT fixture files, each reached by a \
+quoted #include ($FIX_INT $FIX_STR $FIX_EXP)"
+
+########################################################################
+# ARM 0c -- THE REAL HEADER SETS, WHICH THE FIXTURE DELIBERATELY DOES NOT
+# SPEAK FOR.
+#
+# The fixtures prove the `-I' SELECTION differs and carries a per-context
+# answer.  They cannot prove the two bases' actual headers differ, because
+# this script wrote them.  The retired real-macro control did carry that fact
+# incidentally, and dropping it silently would be exactly the "weaken the
+# control while replacing it" move the brief forbids.
+#
+# So it is asserted directly, on the whole `-dM' dump rather than on any one
+# macro.  THIS ARM CANNOT BE KILLED BY THE CONVERSION PROGRAMME, which is the
+# whole reason it is shaped this way: converting a macro rewrites BOTH bases'
+# view of it identically, so a conversion moves lines from the "differing" pile
+# to the "agreeing" pile and can never make the two header sets equal unless
+# every target macro has been converted -- at which point this branch is
+# finished and the harness is supposed to say so loudly rather than quietly
+# keep scoring.
+#
+# The mt/i386 half is an ORDERING, not an identity: `mt' resolves the build
+# root's `tm.h' (i386's chain under a target-neutral name) while `i386'
+# resolves the `i386-inc' shim, and the two are not required to be
+# byte-identical -- the build root's file also carries the genuinely
+# target-neutral top half.  What must hold is that mt is CLOSER to i386 than to
+# aarch64, which is the proposition "mt is the primary's header set" in the
+# only form that survives that asymmetry.
+########################################################################
+header_set_arm () {
+  local ctx inc d_ia d_mi d_ma
+  for ctx in $CTXS; do
+    inc=$(ctx_inc $ctx)
+    echo "$PRE" > "$OUT/dmctl-$ctx.cc"
+    g++ -E -dM "$OUT/dmctl-$ctx.cc" $inc $CPPFLAGS -std=c++14 -w \
+        > "$OUT/dmctl-$ctx.txt" 2> "$OUT/err-dmctl-$ctx.txt" \
+      || { cat "$OUT/err-dmctl-$ctx.txt"; die "ARM 0c: -dM dump failed in $ctx"; }
+    [ "$(wc -l < "$OUT/dmctl-$ctx.txt")" -gt 5000 ] \
+      || die "ARM 0c: $ctx dump has only $(wc -l < "$OUT/dmctl-$ctx.txt") \
+lines; not a real dump, and every comparison below would be between two \
+near-empty files -- which reads as agreement"
+    sort -u "$OUT/dmctl-$ctx.txt" > "$OUT/dmctl-$ctx.s"
+  done
+  d_ia=$(comm -3 "$OUT/dmctl-i386.s" "$OUT/dmctl-aarch64.s" | wc -l)
+  d_mi=$(comm -3 "$OUT/dmctl-mt.s"   "$OUT/dmctl-i386.s"    | wc -l)
+  d_ma=$(comm -3 "$OUT/dmctl-mt.s"   "$OUT/dmctl-aarch64.s" | wc -l)
+  echo "control-headers: differing #define lines -- i386/aarch64 $d_ia, \
+mt/i386 $d_mi, mt/aarch64 $d_ma"
+  [ "$d_ia" -ge 200 ] || die "ARM 0c: the i386 and aarch64 contexts' -dM dumps \
+differ in only $d_ia lines.  Either the two -I directories are resolving to the \
+same real headers -- in which case every arm in this run compares a header set \
+with itself -- or the branch has genuinely finished converting, which is not a \
+thing this harness may assume quietly.  Establish which before touching this \
+bound."
+  [ "$d_mi" -lt "$d_ma" ] || die "ARM 0c: mt is not closer to i386 ($d_mi) than \
+to aarch64 ($d_ma).  'mt IS the primary's header set' is the premise every i386 \
+arm's tautological PASS rests on, and it does not hold in this build dir."
+  echo "control: OK -- the two bases' REAL headers differ ($d_ia #define lines) \
+and mt sits with i386, so the fixture arms above are not the only evidence the \
+contexts are distinct"
+}
+header_set_arm
 
 ########################################################################
 # PHASE INT -- batch compile with drop-and-retry.

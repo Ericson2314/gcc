@@ -1,3 +1,207 @@
+================================================================================
+SESSION: the header probe's controls are no longer GCC macros.  Arm 0 died for
+the THIRD time in three days; it is now a fixture the harness writes, and so
+are the STR and EXP controls.  Two harness deaths were stacked, not one.
+Build dir: /tmp/b-a7594bf (named for worktree agent-a7594bf263974f985).
+================================================================================
+
+## TWO DEATHS, AND THE BRIEF ONLY KNEW ABOUT THE SECOND
+
+`macro-probe-run.sh` exited rc=9 on this tree for TWO independent reasons, and
+the first one fires earlier than the one everybody was looking at:
+
+  1. **The completeness gate**, not arm 0: `BIGGEST_ALIGNMENT POINTER_SIZE
+     UNITS_PER_WORD` are redirected in `gcc/defaults.h` and `macro-status.txt`
+     still said `UNCONVERTED`.  The brief asserted these "were just moved to
+     `CONVERTED_NOARM` on the board".  **They were not, in this worktree** --
+     that edit lives in some other tree and is not merged into `multi-target`.
+     Measured: the pre-change harness dies at the gate before reaching arm 0.
+  2. **Arm 0**, once the board was corrected: `char cq[MIN_UNITS_PER_WORD]`,
+     `defaults.h:1120 #define MIN_UNITS_PER_WORD UNITS_PER_WORD`,
+     `defaults.h:2902 #define UNITS_PER_WORD (mt_units_per_word ())`.  Exactly
+     the death PRINCIPLES describes, third instance.
+
+Both reproduced by running `git show HEAD:scratchpad/macro-probe.sh` against
+this build dir, so the "the instrument is dead" claim is a measurement here and
+not an inheritance from the brief.  **Fixing arm 0 alone would have left the
+harness at rc=9** and would have looked like a failed repair.
+
+## THE FIX: THE CONTROLS ARE FIXTURES THE HARNESS WRITES
+
+Re-anchoring onto a fourth real macro restarts the same clock.  `SELECT_CC_MODE
+-> STACK_POINTER_REGNUM -> MIN_UNITS_PER_WORD` each satisfied its own written
+criteria and each was killed by this project's own conversion programme, which
+is systematically converting the population the criteria draw from.
+
+`macro-probe.sh` now generates three headers into the three directories the
+three contexts resolve quoted includes from:
+
+    $BUILD/gcc/mtp-ctl-{int,str,exp}.h             mt,      via -I.
+    $BUILD/gcc/i386-inc/mtp-ctl-{int,str,exp}.h    i386,    via -Ii386-inc
+    $BUILD/gcc/aarch64-inc/mtp-ctl-{int,str,exp}.h aarch64, via -Iaarch64-inc
+
+**It rides the mechanism the real probes ride, which is the only thing that
+makes it a control.**  Real probes reach `tm.h` by a quoted `#include` from a
+source in `$OUT` resolved against `$inc $CPPFLAGS`; the fixtures are reached by
+a quoted `#include` from the same source against the same flags.  A `-D` on the
+command line would have proved the harness can pass a number to a compiler.
+
+The three written criteria, satisfied by construction rather than by hunting
+for a macro that has not been converted yet:
+
+  * **Independent**: `MTP_CTL_INT` is not a GCC macro.  No back end defines it,
+    `defaults.h` cannot redirect it, no hook conversion deletes it.  It has no
+    family to be dragged down with.
+  * **Different family from the other two controls**: three macros in three
+    different FILES.  The file separation is deliberate -- three `#define`s in
+    one header is one control with three names, the defect the 2026-08-12
+    re-anchor was written to remove.
+  * **Real numeric spread, not a 0/1 bit**: 4241 vs 8317.  A defaulted 0, a
+    stale read or an absent value cannot land on either number.  4-vs-8 could
+    plausibly be produced by some other macro; 4241 cannot.
+
+STR and EXP had the same disease and got the same treatment.  `GLOBAL_ASM_OP`
+is `CONVERTED_SUPPLY` on the board **already** -- the STR control was resting
+on a macro that has been converted -- and `SELECT_CC_MODE` is `UNCONVERTED` and
+therefore next.  `MTP_CTL_STR` is `"mtpglobl"`/`"mtpglobal"`, keeping the 9-vs-10
+length spread AND adding a per-byte difference at index 7 (108 vs 97): the old
+control compared LENGTHS ONLY, so the byte arm -- the arm that exists because
+`.globl` and `.global` assemble identically -- was uncontrolled.  `MTP_CTL_EXP`
+is function-like with three parameters and a different callee per base, so the
+dummy-argument path 62 real arms use is still exercised.
+
+Nothing was lost by dropping the real macros: `GLOBAL_ASM_OP` and
+`SELECT_CC_MODE` still have their own arms in the probe set.  A control's job
+is instrument health, and instrument health should not depend on the tree.
+
+## ARM 0c -- WHAT THE FIXTURE DELIBERATELY DOES NOT SPEAK FOR
+
+The fixtures prove the `-I` SELECTION differs and carries a per-context answer
+into a probe compiled exactly like the real ones.  They cannot prove the two
+bases' REAL headers differ, because this script wrote them.  The old real-macro
+control carried that fact incidentally and dropping it silently would have been
+a weakening dressed as a replacement.
+
+So it is asserted directly on the whole `-dM` dump.  Measured:
+
+    differing #define lines -- i386/aarch64 24260, mt/i386 3, mt/aarch64 24259
+
+`d(mt,i386) < d(mt,aarch64)` is the premise every tautological i386 PASS rests
+on, stated as an ORDERING rather than an identity because `mt` resolves the
+build root's `tm.h` (i386's chain under a target-neutral name, plus a genuinely
+target-neutral top half) while `i386` resolves the `i386-inc` shim.  **This arm
+cannot be killed by the conversion programme**: a conversion rewrites both
+bases' view of a macro identically, so it moves lines from the differing pile
+to the agreeing pile and can never make the two header sets equal.
+
+## ORIGIN TAGS -- THE SILENT FALLBACK, AIMED AT THE CONTROL ITSELF
+
+`-I.` is in `CPPFLAGS` for every context, so a MISSING `aarch64-inc` fixture
+does not fail to compile: it resolves to the build-root copy, which holds the
+PRIMARY's answer.  One name, several authorities, no diagnostic -- this
+branch's root bug pointed at its own control, and it would read as "the two
+contexts agree".  So every fixture states which directory it came from, the
+arms check that against `ctx_dir`, and `fixture_write_verify` checks all nine
+files on disk by exact `#define` line BEFORE anything is compiled.
+
+## BOTH INJECTIONS FIRE, WITH TEXTS THAT CANNOT BE CONFUSED
+
+Both are in the script (`MTP_INJECT=`), forwarded by `macro-probe-run.sh`, so
+the next agent re-runs them rather than trusting this paragraph.
+
+  * `MTP_INJECT=same-context` collapses `ctx_inc` so every context resolves as
+    `mt` does.  rc=9, **no results.txt**, and:
+
+        FATAL: control: the aarch64 context resolved mtp-ctl-int.h from the
+        WRONG DIRECTORY -- it reports origin 101, and .../aarch64-inc was
+        written with origin 202.  THE TWO PROBE CONTEXTS ARE NOT DISTINCT
+
+    Note what that run also MEASURES: with the contexts collapsed the aarch64
+    value came back 4241, the primary's.  **The value comparison alone would
+    have reported agreement.**  The origin tag is what turns it into a
+    diagnostic.
+  * `MTP_INJECT=break-fixture` deletes one fixture file.  rc=9, no results.txt,
+    and a text that names the instrument:
+
+        FATAL: THE CONTROL FIXTURE IS BROKEN -- these generated files are
+        absent or do not hold the #define they were written with:
+        .../aarch64-inc/mtp-ctl-int.h[ABSENT:value] ...[ABSENT:origin].
+        READ THIS AS 'THE INSTRUMENT IS BROKEN', NOT AS A VERDICT ABOUT THE
+        TWO CONTEXTS
+
+    Restored afterwards; the clean run's output is byte-identical to the clean
+    run taken before the injections.
+
+A third arm fired unprompted and is worth recording because it fired against
+its own author: the byte index was first written as 6, and both bases read 98
+(`'b'` -- `"mtpglobl"` and `"mtpglobal"` do not diverge until index 7).  The
+STR control refused the run.
+
+## THE BOARD, WITH THE DECOMPOSITION THE HARNESS PRINTS
+
+`OUT=/tmp/mtp-a7594bf scratchpad/macro-probe-run.sh /tmp/b-a7594bf`, rc=0:
+
+    status: 149 macros on the board = 71 unconverted + 32 TAB + 37 EXIST
+            + 1 UNION + 8 with NO ARM AT ALL (the measurement debt)
+    status: completeness -- 67 derived from gcc/defaults.h + 3 declared
+            converted-without-redirect + 1 declared converted-by-union
+    probing 81 macros
+    macros probed: 81   bases: i386 aarch64
+    i386:    PASS 81  FAIL 0
+    aarch64: PASS 5   FAIL 76
+    by probe shape: 118 EXP, 31 INT, 11 KIND, 2 STR
+    aarch64 failures by shape: 52 EXP, 12 INT, 11 KIND, 1 STR
+    aarch64 PASS decomposition: 5 total = 4 redirect-vs-itself
+      (CONVERTED_NOARM, UNTRUSTED BY CONSTRUCTION) + 1 other
+
+**THIS IS THE FIRST HONEST READING SINCE THE HARNESS DIED.** Every figure of
+the form "216 arms, i386 108/0, aarch64 29/79" in circulation is the last
+successful run's and cannot be reproduced by running the script.  Do not diff
+the two as if they were two measurements: the arm count moved 216 -> 162
+because the retire set grew, which is legitimate retirement.
+
+**THE 1 "other" PASS IS NOT A TRUSTED PASS.** It is `MAX_BITS_PER_WORD INT
+mt=[64] ref=[64]` -- 64 in all three contexts, i.e. target-neutral agreement,
+wrong-reason shape 2.  So the **trusted count on the header board is 0**, not
+1 and not 2.  It has NOT been retired here: retiring an arm to move a number
+is the test-harness floor, and this one needs a deliberate decision (it is
+`#ifndef MAX_BITS_PER_WORD / #define MAX_BITS_PER_WORD BITS_PER_WORD` in
+`defaults.h:1123`, i.e. derived from an already-`CONVERTED_CDATA` macro).
+**Flagged, not banked.**
+
+## THE THREE CONVERTED_NOARM MACROS AND `t141-arm.sh` -- VERDICT
+
+`UNITS_PER_WORD`, `POINTER_SIZE`, `BIGGEST_ALIGNMENT` are now
+`CONVERTED_NOARM` here (they had to be: the gate refuses `UNCONVERTED` for a
+macro `defaults.h` redirects).  Three of the four untrusted aarch64 passes are
+exactly these -- the arm is comparing a redirect with itself, and the harness
+tags each one by name.
+
+`scratchpad/t141-arm.sh` is a real arm and is wired into nothing.  **The debt
+column is the honest place for them today**, because `CONVERTED_NOARM`'s
+contract is mechanically checked (a `CONVERTED_NOARM` macro must NOT appear in
+any probe list, or the debt overstates and coverage understates), and
+`t141-arm.sh` is a SEVENTH shape -- behavioural, build-and-diff, injection-
+based -- not a TAB, EXIST or UNION arm.  Wiring it in properly means a seventh
+status word plus its own coverage list, following the pattern the other five
+already follow, and a `BEHAV_MACROS=` line it can be read back out of.  Doing
+that as a side effect of a control repair would have been a status word
+invented in one file and treated as `UNCONVERTED` by every check in another --
+the exact defect the "unknown status word" gate exists to catch.  **Not done;
+recorded as the next move.**
+
+## WHAT I DID NOT MEASURE
+
+  * **No compiler source changed in this session** -- only `scratchpad/`.  The
+    codegen bars and the stderr floors therefore CANNOT have moved, and they
+    were not re-run.  Re-running them would have produced numbers that look
+    like measurements of this change and are not.
+  * `stock-compare.sh` not run.  `make cc1 lto1 multi-target-objs` rc=0 in
+    /tmp/b-a7594bf (it is how the build dir was made), 0 `Error` lines.
+  * The fixture proves the include-path SELECTION differs.  It says nothing
+    about run-time selection inside `cc1`, which remains this instrument's
+    stated blind spot.
+
 
 ================================================================================
 SESSION: Stage 2 continued -- 18 more (c-DATA) macros.  The class-(c)
