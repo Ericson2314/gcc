@@ -583,10 +583,44 @@ typedef unsigned char uchar;
    includes before tm.h.
 
    DELETE THIS, and every definition of it, together with the flip.  A
-   migration switch that outlives its migration is just a list to fall off.  */
+   migration switch that outlives its migration is just a list to fall off.
+
+   *** THE FLIP OUTRAN THE MIGRATION, AND THAT IS WHY `NUM_POLY_INT_COEFFS
+   == 1' IS NO LONGER PART OF THIS CONDITION. ***
+
+   The paragraphs above describe a plan in which every back end is converted
+   BEFORE the constant becomes 2.  On this branch the constant became 2 first
+   -- genmodes puts it in the shared numbering, and aarch64 being configured
+   makes it 2 for the whole build -- while 37 of the 47 back ends are still
+   unconverted.  Conjoining this switch on the global constant therefore made
+   the migration mechanism inert in exactly the build that needs it: at 2 the
+   shorthand is withheld from EVERY back end, so `TARGET_POLY_AWARE' selects
+   nothing and not opting in buys nothing.  Measured: 3060 `error:' lines and
+   41 failing per-base objects over 39 back ends.
+
+   The condition is now what the switch always meant -- "this back end has
+   not declared itself converted, so give it the shorthand" -- and it is a
+   per-BACK-END question, which is why it must not consult a build-wide
+   constant.  The opt-in is already delivered per object, from each back
+   end's own `config/<cpu>/t-<cpu>', by gen-multi-target-md.awk's
+   poly_aware(); measured in the 47-back-end build, exactly the ten converted
+   back ends' per-base objects carry the flag and no others.
+
+   NOTE WHAT THIS IS NOT.  It is not an `#ifndef' floor and it invents no
+   value: the conversion operator below returns coeffs[0] of the poly_int in
+   hand after asserting is_constant (), which is the same value the back end
+   computed at N == 1 and is nobody else's answer.  The one thing it gives up
+   is that a genuinely poly value reaching unconverted target code is caught
+   at run time by that assert rather than at compile time by a type error --
+   see machmode.h, where the same conjunct is dropped and the four fixed-size
+   accessors are moved onto to_constant () so that they assert too instead of
+   silently truncating.
+
+   For every single-target build this is a no-op: N is 1 everywhere except
+   aarch64 and riscv, and both of those declare TARGET_POLY_AWARE.  */
 #if (defined (IN_TARGET_CODE) \
      && (defined (USE_ENUM_MODES) \
-	 || (NUM_POLY_INT_COEFFS == 1 && !defined (TARGET_POLY_AWARE))))
+	 || !defined (TARGET_POLY_AWARE)))
 #define POLY_INT_CONVERSION 1
 #else
 #define POLY_INT_CONVERSION 0
