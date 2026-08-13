@@ -92,5 +92,71 @@ arm "ARM 4  -I names the other back end    " fail 'i386-inc/mt-inc-tag-aarch64.h
     MULTI_TARGET_INC=-Iaarch64-inc
 arm "ARM 5  restored                       " ok ""
 
+# ARM 6 -- THE DOUBLE INDIRECTION IN BASE_HEADER.
+#
+# BASE_HEADER now stringifies, because the user prefers the "..." include over
+# the <...> one.  `#' does NOT macro-expand its operand, so the one-level
+# spelling
+#
+#     #define BASE_HEADER(f) MT_HDR_STR (MT_BASE/f)     /* WRONG */
+#
+# yields the literal "MT_BASE/tm.h".  That is not a diagnostic; it is a
+# plausible-looking WRONG PATH, which is the exact failure shape this whole
+# change exists to remove.  MT_HDR_XSTR forces one expansion first.
+#
+# The other five arms CANNOT see this: with a wrong path the compile fails, so
+# a "did it fail?" arm is green for the wrong reason, and ARM 0 would go red
+# without saying why.  So this arm reads the EXPANSION, and carries its own
+# negative control -- the mistake is spelt out in the same TU, and the arm
+# requires the broken spelling to produce "MT_BASE/tm.h" while the shipped one
+# produces the base name.  An arm whose negative control does not fire is
+# indistinguishable from an absent arm.
+arm6 () {
+  t=$D/mt-arm6
+  rm -rf "$t"; mkdir -p "$t"
+  cat > "$t/probe.c" <<'PROBE_EOF'
+#include "multi-target-base.h"
+/* The definition under test, as shipped.  */
+MT6_LIVE BASE_HEADER (tm.h)
+/* The mistake, spelt out here so this arm has a control it can watch fire.  */
+#define MT6_ONE_STR(f) #f
+#define MT6_ONE(f) MT6_ONE_STR (MT_BASE/f)
+MT6_BROKEN MT6_ONE (tm.h)
+PROBE_EOF
+  out=$(sh "$S/eb-shell.sh" "cc -E -P -I$SRC/gcc -I$D/gcc/i386-inc -I$D/gcc \
+-DMT_BASE=i386-inc $t/probe.c" 2>&1)
+  got=$?
+  if [ "$got" != 0 ]; then
+    echo "ARM 6  BASE_HEADER expansion         : FAIL: cpp rc=$got"
+    echo "  If the message below names a path beginning MT_BASE/ then the"
+    echo "  double indirection has been lost: the witness caught it first,"
+    echo "  which is the arm firing, not the arm being broken."
+    echo "$out" | tail -20; rc=1; return
+  fi
+  live=$(echo "$out" | sed -n 's/^MT6_LIVE //p')
+  broken=$(echo "$out" | sed -n 's/^MT6_BROKEN //p')
+  # Non-vacuity first: an empty read looks exactly like a pass below.
+  if [ -z "$live" ] || [ -z "$broken" ]; then
+    echo "ARM 6  BASE_HEADER expansion         : FATAL: read nothing"
+    echo "  live='$live' broken='$broken'"; rc=9; return
+  fi
+  if [ "$broken" != '"MT_BASE/tm.h"' ]; then
+    echo "ARM 6  BASE_HEADER expansion         : FATAL: the negative control did"
+    echo "  not reproduce the mistake -- it gave $broken, so a green below would"
+    echo "  prove nothing.  Expected \"MT_BASE/tm.h\"."
+    rc=9; return
+  fi
+  if [ "$live" = '"i386-inc/tm.h"' ]; then
+    echo "ARM 6  BASE_HEADER expansion         : PASS ($live; the one-level"
+    echo "                                       spelling gives $broken)"
+  else
+    echo "ARM 6  BASE_HEADER expansion         : FAIL: BASE_HEADER (tm.h) gave"
+    echo "  $live, not \"i386-inc/tm.h\".  If it gave $broken the double"
+    echo "  indirection (MT_HDR_XSTR) has been lost."
+    rc=1
+  fi
+}
+arm6
+
 echo "OVERALL rc=$rc"
 exit $rc

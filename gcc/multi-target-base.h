@@ -51,9 +51,15 @@ along with GCC; see the file COPYING3.  If not see
    missing, and a single missing one is precisely the silent-primary failure
    being removed.
 
-   THE FORM IS PLAIN PARAMETER SUBSTITUTION INTO THE ANGLE-BRACKET INCLUDE.
-   It uses neither `#' nor `##'.  Four other spellings were tried and three
-   are traps:
+   THE FORM IS STRINGIFICATION, AND IT YIELDS THE QUOTED INCLUDE "..." RATHER
+   THAN THE ANGLE-BRACKET ONE.  That is a user preference, stated as *"I like
+   the version that results in "..." not <...> better"*.  It is also the
+   spelling of the original ruling -- `#include "<base>/tm.h"'.
+
+   The call sites are unchanged by it: BASE_HEADER (tm.h), argument unquoted.
+   Only the expansion moved, from <MT_BASE/tm.h> to "i386-inc/tm.h".
+
+   Five other spellings were tried and three are traps:
 
        #include MT_BASE "/tm.h"       WARNS ONLY and drops "/tm.h" -- a
 				      warning in a build that emits hundreds
@@ -61,8 +67,27 @@ along with GCC; see the file COPYING3.  If not see
        #include CAT (<, MT_BASE/tm.h) `##' cannot express this: a paste must
 				      yield ONE valid preprocessing token and a
 				      path is many
-       #include STR (MT_BASE/tm.h)    works, but spells `#'
+       #define BASE_HEADER(f) <MT_BASE/f>
+				      plain substitution into <>; works, and is
+				      what this file carried before
        #include BASE_HEADER ("tm.h")  i386-inc/"tm.h": No such file
+
+   TWO CONSEQUENCES OF "..." OVER <>, BOTH CHECKED RATHER THAN ASSUMED.
+   First, "..." is searched in the INCLUDING FILE'S OWN DIRECTORY before any
+   `-I'.  A shadow would take a directory literally named `<cpu>-inc' sitting
+   beside one of these sources, i.e. in gcc/ or in the build root; there is
+   none in the tree, and the fall-through to `-I' is graceful in any case.
+   Second, the quoted form is a different lookup for dependency generation:
+   the twenty `.deps' entries for these objects were compared before and after
+   by content and are byte-identical (and their mtimes confirm they were
+   regenerated, not merely left alone).  That matters here because a broken
+   depfile on this branch has already caused a class of silent staleness.
+
+   THE HELPERS ARE `MT_HDR_STR'/`MT_HDR_XSTR' AND NOT `STR'/`XSTR'.  `XSTR' is
+   the rtl.h accessor, and `MT_STR' is already defined -- differently -- in
+   target-cumargs.cc and target-regs.cc, both AFTER this header is included.
+   Either name would have been a redefinition.  `MT_HDR_STR' and `MT_HDR_XSTR'
+   were counted with `wc -l' and no `head': 0 hits each.
 
    THE `-D' IS `MT_BASE' AND NOT `BASE', AND THAT IS NOT FASTIDIOUSNESS.  `BASE'
    was tried first and the build failed: `-DBASE=aarch64-inc' goes on every one
@@ -91,8 +116,29 @@ along with GCC; see the file COPYING3.  If not see
 must be given -DMT_BASE=<cpu>-inc.  See gcc/multi-target-base.h."
 #endif
 
-/* This back end's copy of the header F.  F is UNQUOTED: BASE_HEADER (tm.h).  */
-#define BASE_HEADER(f) <MT_BASE/f>
+/* This back end's copy of the header F.  F is UNQUOTED: BASE_HEADER (tm.h).
+
+   THE DOUBLE INDIRECTION IS LOAD-BEARING, NOT DECORATION.  `#' suppresses
+   macro expansion of its operand, so MT_HDR_STR alone would stringify the
+   spelling `MT_BASE/tm.h' and yield the literal "MT_BASE/tm.h" -- a
+   plausible-looking WRONG PATH, which is exactly the silent-failure shape this
+   file exists to remove.  MT_HDR_XSTR exists solely to force one round of
+   expansion first, so MT_BASE becomes `i386-inc' BEFORE the `#' sees it.
+   ARM 6 of scratchpad/t140-inject.sh is the arm that catches its removal: it
+   asserts the expansion contains the actual base name, and its own negative
+   control is a hand-rolled single-indirection macro spelt in the same TU.
+
+   MEASURED, by stripping MT_HDR_XSTR from a copy of this file: the WITNESS
+   catches it too, and first --
+   `mt-inc-witness.h:1:40: fatal error: MT_BASE/mt-inc-tag-i386.h: No such
+   file or directory'.  So the mistake is fatal and names the flag rather than
+   silently opening another target's headers.  That is a second authority
+   agreeing, not a reason to drop ARM 6: the witness only fires because it is
+   reached through BASE_HEADER, and ARM 6 is what reads the expansion itself
+   and so can say WHICH way it went wrong.  */
+#define MT_HDR_STR(f) #f
+#define MT_HDR_XSTR(f) MT_HDR_STR (f)
+#define BASE_HEADER(f) MT_HDR_XSTR (MT_BASE/f)
 
 /* THE WITNESS, AND WHY IT IS NOT REDUNDANT.
 
