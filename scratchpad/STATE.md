@@ -9580,7 +9580,6 @@ each**.  `BASE_HEADER` is kept, so the include sites read as the user asked.
   * Rebuild stderr was not classified against the 32-line incremental floor:
     this was a near-cold arm (`Makefile.in` changed, so everything rebuilt),
     which is not comparable with it.
-<<<<<<< HEAD
 
 ---
 
@@ -9741,8 +9740,6 @@ and the fix was to change the thing it was objecting to, not to stop looking.
     run; nothing here touches that board.
   * The `config/` population still uses plain `#include "tm.h"` plus the `-I`,
     unchanged by this task, as does `target-asm-ops.cc` on `-DTM_H_FILE`.
-||||||| 964c12cb068
-=======
 
 ---
 
@@ -9938,4 +9935,3 @@ this worktree.  Nothing from `/tmp/b141` is quoted.  The earlier dir's
   * **No probe-scoreboard figure is quoted; `macro-probe-run.sh` was not run.**
   * The x86_64 identity is against this branch's own reference, not stock GCC;
     `stock-compare.sh` was not run in this dir.
->>>>>>> worktree-agent-a7a476335e5ac72b2
