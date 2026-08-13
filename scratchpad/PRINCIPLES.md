@@ -478,6 +478,23 @@ failure by name when a base is missing); do not invent a second one.
 missing value must fail *by name*. The natural fallback is always the primary's
 answer, which is the bug.
 
+**A CHECK THAT CANNOT SAY *WHICH* THING DISAGREES IS MOST OF A CHECK.** From
+the `target_rtl` layout witness, whose own comment states it: *"Named
+individually rather than summed: a check that cannot say WHICH structure
+disagrees is most of a check."* A summed comparison would have caught the same
+bug and told nobody where to look. Seven structs are compared **one at a
+time**, and the diagnostic names the back end, the struct and both sizes:
+
+```
+back end 'i386' computes 'sizeof (struct target_rtl)' as 5968, but
+target-independent code allocates 6184; a bound in its header is not
+spelled MULTI_TARGET_UNION_*
+```
+
+It then fired **unprompted** on a second struct nobody had asked about, which
+is what a check of this shape buys. Prefer N named comparisons to one
+aggregate, and make the message say what to do next.
+
 **Verification must be able to fail.** Inject a deliberate `#error`; require the
 build to FAIL naming it. **An injection that does not fire is a finding** — one
 revealed four sites inside a dead `#if TARGET_XCOFF`; another revealed a
