@@ -13204,11 +13204,24 @@ design than any of the three options offered.
 ## 4. WHAT THIS DOES NOT CLAIM
 
   * **No driver and no `cc1` was ever run.**  `make all-gcc` at 48 back ends is
-    **rc=2** (stamped `b48.rc`; 4 `make ... Error` lines, 4560 objects) -- the
-    pre-existing failing set, with my change NOT in the snapshot, so it is a
-    clean baseline and not a regression reading.  Every #143 and #154 statement
-    above comes from generated artefacts and preprocessed chains, never from
-    `xgcc` behaviour.
+    **rc=2** (stamped `b48.rc`; 4560 objects), with my change NOT in the
+    snapshot, so it is a clean baseline and not a regression reading.  Every
+    #143 and #154 statement above comes from generated artefacts and
+    preprocessed chains, never from `xgcc` behaviour.
+
+    **THE BRIEF'S "28 FAILING TARGETS" WAS NOT REPRODUCED and should not be
+    quoted further without saying which make goal it counted.**  Measured here
+    for `all-gcc`, the whole failing set is **three rules over two back ends**:
+
+        build/gen-target-specs-amdgcn_unknown_amdhsa.o
+        insn-modes-avr.o
+        mt-avr/avr.o                (plus `all-gcc' itself)
+
+    with `error:` lines from exactly two files, `config/avr/avr.cc` and
+    `mt-avr/insn-modes-avr.cc`.  **rs6000 is not in the failing set**, which is
+    what makes section 1's change testable at object level at all.  Whether 28
+    counted a different goal, per-target subdirectories, or an older tree, I
+    cannot say -- only that it is not this build's `all-gcc`.
   * **No bar is quoted.**  `12369 bytes / 378fc33c1e70`, `specs-config` 230
     lines and `stock-compare` 5/5 all need a linked `cc1`/`xgcc`, which neither
     build dir produced.  Per PRINCIPLES, `stock-compare` selects x86_64 and is
