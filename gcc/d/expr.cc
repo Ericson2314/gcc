@@ -34,7 +34,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "fold-const.h"
 #include "diagnostic.h"
 #include "langhooks.h"
-#include "tm.h"
 #include "function.h"
 #include "toplev.h"
 #include "varasm.h"

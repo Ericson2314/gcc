@@ -24,7 +24,6 @@
 #include "coretypes.h"
 #include "bitmap.h"
 #include "function.h"
-#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "value-range.h"

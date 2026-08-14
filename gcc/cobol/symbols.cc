@@ -39,7 +39,6 @@
 
 #include <search.h>
 #include <iconv.h>
-#include "tm.h"
 #include "../../libgcobol/ec.h"
 #include "../../libgcobol/common-defs.h"
 #include "util.h"

@@ -22,7 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "libiberty.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "opts.h"
 #include "diagnostic-core.h"
 

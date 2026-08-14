@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "opt-suggestions.h"
 #include "gcc.h"
-#include "tm.h"
+#include "options.h"
 #include "target-caps.h"
 #include "opts.h"
 

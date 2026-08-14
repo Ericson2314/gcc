@@ -436,7 +436,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   #
   # It is written into mt-<cpu>/ rather than the build root, and that is not a
   # tidying choice -- see the MT_SRC comment at emit_base_objects.  This is the
-  # file that exposed the reason: `#include "tm.h"' from a source sitting in
+  # file that exposed the reason: a `tm.h' include from a source sitting in
   # the build root finds the build root's OWN tm.h, which is the PRIMARY
   # target's, before any -I is consulted at all.
   printf "mt-%s/insn-modes-%s.cc: build/genmodes-%s$(build_exeext) modes-union.list\n", cpu, cpu, cpu;
@@ -1835,7 +1835,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
 
   # *** MT_SRC: WHY EVERY PER-BASE SOURCE LIVES IN mt-<cpu>/ ***
   #
-  # `#include "tm.h"' searches the directory OF THE FILE CONTAINING THE
+  # A `tm.h' include searches the directory OF THE FILE CONTAINING THE
   # DIRECTIVE first.  A generated source sitting in the build root therefore
   # finds the build root's own tm.h -- the PRIMARY target's.
   #
@@ -1846,8 +1846,8 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # is the branch's own bug class -- right on the build's triple, wrong
   # everywhere else -- reproduced inside the machinery meant to remove it.
   #
-  # The failing case is exactly a build-root source whose own
-  # `#include "tm.h"' is the first one reached.  Measured with -H, naming the
+  # The failing case is exactly a build-root source whose own `tm.h' include
+  # is the first one reached.  Measured with -H, naming the
   # file actually opened: a build-root insn-modes-aarch64.cc gave 57 errors,
   # the same source under mt-aarch64/ gave 0 and opened aarch64's tm.h.
   n = split("attrtab automata dfatab extract latencytab modes opinit output " \

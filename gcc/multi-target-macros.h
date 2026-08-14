@@ -29,7 +29,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    only route into a translation unit is the tail `gcc/mkconfig.sh' appends to
    `tm.h' and `tm-<base>.h'.  Everything below used to live at the end of it,
    which meant THIS BRANCH'S ENTIRE CONVERSION LAYER was reached only through
-   the header the branch exists to delete.  Deleting `#include "tm.h"' from
+   the header the branch exists to delete.  Deleting a `tm.h' include from
    `backend.h' / `target.h' / `cp/cp-tree.h' / `m2/gm2-gcc/gcc-consolidation.h'
    would have removed `POINTER_SIZE', `BITS_PER_WORD', `BYTES_BIG_ENDIAN' and
    the rest of the CONVERTED set along with the unconverted ones -- and the
@@ -67,7 +67,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
      - the tail of `defaults.h', i.e. immediately after every `tm.h' /
        `tm-<base>.h'.  Byte-for-byte today's ordering and today's semantics.
-     - immediately AFTER `#include "tm.h"' in each of the four channel
+     - immediately AFTER a `tm.h' include in each of the four channel
        headers.  Today the include guard makes that a no-op; when the `tm.h'
        line is deleted it becomes the surviving route, with no other edit and
        no ordering change.

@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "tree.h"
 #include "diagnostic.h"
-#include "tm.h"
 #include "cgraph.h"
 #include "toplev.h"
 #include "target.h"

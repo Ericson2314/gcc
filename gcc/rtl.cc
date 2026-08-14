@@ -27,7 +27,13 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "system.h"
 #include "coretypes.h"
+/* Only the generator half needs tm.h.  A generator is a single-target program
+   compiled against its base's tm-<base>.h, and hard-reg-set.h takes its
+   register widths from the raw tm.h names under GENERATOR_FILE; shared code
+   takes multi-target-reg-widths.h.  */
+#ifdef GENERATOR_FILE
 #include "tm.h"
+#endif
 #include "rtl.h"
 #ifdef GENERATOR_FILE
 # include "errors.h"

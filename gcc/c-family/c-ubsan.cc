@@ -21,7 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-macros.h"
 #include "c-family/c-common.h"
 #include "ubsan.h"
 #include "c-family/c-ubsan.h"

@@ -55,7 +55,6 @@
 #include "cdfval.h"
 #include "lexio.h"
 
-#include "tm.h"
 #include "../../libgcobol/ec.h"
 #include "../../libgcobol/common-defs.h"
 #include "symbols.h"
@@ -67,7 +66,6 @@
 #include "../../libgcobol/charmaps.h"
 #include "../../libgcobol/valconv.h"
 
-#include "tm.h"
 #include "target.h"
 
 #pragma GCC diagnostic ignored "-Wunused-result"

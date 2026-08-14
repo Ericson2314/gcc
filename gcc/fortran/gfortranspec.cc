@@ -51,7 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gcc.h"
 #include "opts.h"
 
-#include "tm.h"
+#include "options.h"
 #include "target-caps.h"
 #include "intl.h"
 
