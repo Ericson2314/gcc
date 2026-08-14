@@ -141,15 +141,30 @@ done < "$TMP/aliases"
 # Shared set from the generated makefile when one is available; the fallback is
 # stated as a fallback rather than silently used, because "outside config/" is
 # not "shared".
-if [ -n "$D" ] && [ -f "$D/gcc/Makefile" ]; then
-  # Objects with no mt-<base>/ prefix are the once-compiled ones.
-  awk '/^[a-zA-Z0-9_\/-]+\.o *:/ && $0 !~ /mt-[a-z0-9_]*\// { print $1 }' \
-    "$D/gcc/Makefile" | sed 's/\.o:*$//' | sort -u > "$TMP/shared-stems"
-  SHAREDSRC=$(awk '{print $1}' "$TMP/shared-stems")
-  SHAREDMODE="generated-makefile ($(wc -l < "$TMP/shared-stems") once-compiled stems)"
+# THE AUTHORITY IS THE COMPILE LINES THEMSELVES, not the makefile's rule text
+# and certainly not a path pattern.  A first version of this arm parsed
+# `$D/gcc/Makefile' for `<stem>.o :' and found 68 stems for a build with ~620
+# translation units -- and then never used the list, which is the
+# mechanism-present-but-never-invoked shape this project keeps meeting, here
+# committed by the instrument.  What settles it is what the compiler was
+# actually run on: `make' echoed every command, and a source under `mt-<base>/'
+# is per base while anything else was compiled once.
+if [ -n "$D" ] && [ -f "$D/mk.out" ]; then
+  tr ' ' '\n' < "$D/mk.out" \
+    | grep -E '\.(cc|c)$' | sort -u > "$TMP/all-srcs"
+  # Absolute paths only: those are the srcdir sources, the ones whose text can
+  # be read.  Build-dir-relative names are generated files and are skipped --
+  # stated, not silently dropped, because a generated shared TU spelling one of
+  # these macros would be invisible to this arm.
+  grep -v '^mt-' "$TMP/all-srcs" | grep "^$G/" | sort -u > "$TMP/shared-srcs"
+  grep    '^mt-' "$TMP/all-srcs" | sort -u > "$TMP/perbase-srcs"
+  nsh=$(wc -l < "$TMP/shared-srcs"); npb=$(wc -l < "$TMP/perbase-srcs")
+  [ "$nsh" -gt 100 ] || { echo "FATAL: only $nsh shared sources; the build log did not parse"; exit 9; }
+  SHAREDMODE="compile lines in $D/mk.out -- $nsh compiled once, $npb per base"
+  HAVESHARED=yes
 else
-  SHAREDSRC=
-  SHAREDMODE="NO BUILD DIR -- arm 4 NOT RUN (a path pattern is not an authority)"
+  SHAREDMODE="NO BUILD LOG -- arm 4 NOT RUN (a path pattern is not an authority)"
+  HAVESHARED=no
 fi
 
 echo "== #172 unconfigured-default sweep"
@@ -157,32 +172,51 @@ echo "   srcdir     $SRC"
 echo "   records    $nrec  (.opt lines with Var(), Init() or Mask())"
 echo "   shared set $SHAREDMODE"
 echo
-printf '%-10s %-40s %-10s %s\n' BACKEND VAR:BIT PROMOTED MACROS-IN-HEADERS
-sort "$TMP/rows" | while IFS='	' read -r be v ovr macs; do
+# ARM 4, scored per row: does any SHARED source spell one of this row's macros?
+# Over-broad on purpose -- it can only ACCUSE, never absolve, so it is allowed
+# to be too eager (PRINCIPLES section 4).  A hit means shared code reaches a
+# macro whose body is an option variable; whether that read happens before the
+# promotion still has to be established by hand.
+: > "$TMP/rows4"
+while IFS='	' read -r be v ovr macs; do
+  esc=SKIP
+  if [ "$HAVESHARED" = yes ] && [ "$macs" != "-" ]; then
+    esc=no
+    for m in $macs; do
+      if xargs -a "$TMP/shared-srcs" grep -lw "$m" 2>/dev/null | head -1 \
+           | grep -q .; then esc=SHARED; break; fi
+    done
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\n' "$be" "$v" "$ovr" "$esc" "$macs" >> "$TMP/rows4"
+done < "$TMP/rows"
+
+printf '%-10s %-38s %-10s %-7s %s\n' BACKEND VAR:BIT PROMOTED SHARED? MACROS-IN-HEADERS
+sort "$TMP/rows4" | while IFS='	' read -r be v ovr esc macs; do
   [ "$macs" = "-" ] && continue
-  printf '%-10s %-40s %-10s %s\n' "$be" "$v" "$ovr" "$macs"
+  printf '%-10s %-38s %-10s %-7s %s\n' "$be" "$v" "$ovr" "$esc" "$macs"
 done
 
 echo
 echo "== population BY CAUSE (pairs that reach a header macro)"
 awk -F'\t' '
-  { tot++ ; if ($4 == "-") next ; mac++ ; c[$3]++ ; be[$1] = 1 ; bec[$3 "\t" $1] = 1 }
+  { tot++ ; if ($5 == "-") next ; mac++ ; c[$3]++ ; be[$1] = 1 ; bec[$3 "\t" $1] = 1
+    if ($4 == "SHARED") { sh[$3]++ ; shtot++ } }
   END {
     printf "   %d (backend,var) pairs scanned\n", tot
     printf "   %d reach a header macro -- an escape route out of the back end\n\n", mac
-    printf "   %-10s %6s %8s   %s\n", "CAUSE", "PAIRS", "BACKENDS", "leak window"
-    printf "   %-10s %6d %8d   %s\n", "OVERRIDE",  c["OVERRIDE"],  n("OVERRIDE", bec),
+    printf "   %-10s %6s %8s %7s   %s\n", "CAUSE", "PAIRS", "BACKENDS", "SHARED", "leak window"
+    printf "   %-10s %6d %8d %7d   %s\n", "OVERRIDE", c["OVERRIDE"], n("OVERRIDE", bec), sh["OVERRIDE"],
            "before <be>_option_override runs"
-    printf "   %-10s %6d %8d   %s\n", "OPT-PARSE", c["OPT-PARSE"], n("OPT-PARSE", bec),
+    printf "   %-10s %6d %8d %7d   %s\n", "OPT-PARSE", c["OPT-PARSE"], n("OPT-PARSE", bec), sh["OPT-PARSE"],
            "ALWAYS, unless a -m option is passed"
-    printf "   %-10s %6d %8d   %s\n", "INIT-ONLY", c["INIT-ONLY"], n("INIT-ONLY", bec),
+    printf "   %-10s %6d %8d %7d   %s\n", "INIT-ONLY", c["INIT-ONLY"], n("INIT-ONLY", bec), sh["INIT-ONLY"],
            "the Init is the value; whose Init is linked?"
     k = 0; for (b in be) k++
     printf "\n   %d back ends affected in total\n", k
   }
   function n(cause, m,   k, key) { k = 0
     for (key in m) if (index(key, cause "\t") == 1) k++
-    return k }' "$TMP/rows"
+    return k }' "$TMP/rows4"
 
 echo
 echo "== BLIND SPOTS of this instrument, stated because a 0 from it is a claim"

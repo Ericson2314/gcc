@@ -2583,6 +2583,8 @@ for ts_od in ${spec_option_defaults}; do
       ts_tmpl="%{!mcompact-branches=*:-mcompact-branches=${ts_value}}" ;;
     *:tls)
                   ts_tmpl="%{!mtls-dialect=*:-mtls-dialect=${ts_value}}" ;;
+    riscv:isa_spec)
+      ts_tmpl="%{!misa-spec=*:-misa-spec=${ts_value}}" ;;
     *:schedule)
       ts_tmpl="%{!mschedule=*:-mschedule=${ts_value}}" ;;
   esac

@@ -861,6 +861,27 @@ for ts_od in ${spec_option_defaults}; do
       dnl i386 spells this -mtls-dialect=; loongarch and riscv spell it -mtls-dialect=
       dnl too, and arm -mtls-dialect=.  Uniform enough to state.
       ts_tmpl="%{!mtls-dialect=*:-mtls-dialect=${ts_value}}" ;;
+    riscv:isa_spec)
+      dnl Transcribed from riscv.h:81, which is where this target's own
+      dnl OPTION_DEFAULT_SPECS spells it.  Keyed on riscv rather than `*'
+      dnl because riscv is the only back end config.gcc sets with_isa_spec for.
+      dnl
+      dnl It was in the "deliberately absent" list below, on the grounds that
+      dnl the answer reaches the back end as a tm_define.  Measured, that is
+      dnl false for a multi-target compiler and the consequence is an ICE.
+      dnl `riscv_isa_spec' is Var()/Init(TARGET_DEFAULT_ISA_SPEC) in riscv.opt,
+      dnl and the tm_define supplies that Init only where the OPTION TABLE was
+      dnl generated -- while the driver reads the value out of the shared
+      dnl `global_options'.  With no -misa-spec= on the command line, no
+      dnl extension version matches the spec class in force and
+      dnl riscv-common.cc:162 `default_version' hits its gcc_unreachable:
+      dnl
+      dnl   internal compiler error: in default_version, at
+      dnl   common/config/riscv/riscv-common.cc:162
+      dnl
+      dnl Passing the value config.gcc inferred for THIS target is that
+      dnl target's own answer, not another's.
+      ts_tmpl="%{!misa-spec=*:-misa-spec=${ts_value}}" ;;
     *:schedule)
       ts_tmpl="%{!mschedule=*:-mschedule=${ts_value}}" ;;
   esac
@@ -871,8 +892,10 @@ for ts_od in ${spec_option_defaults}; do
   fi
 done
 
-dnl The _32/_64 variants, --with-cmodel, --with-fp-32, --with-odd-spreg-32,
-dnl --with-fpu and --with-isa-spec are deliberately absent from the table above.
+dnl The _32/_64 variants, --with-cmodel, --with-fp-32, --with-odd-spreg-32 and
+dnl --with-fpu are deliberately absent from the table above.  (--with-isa-spec
+dnl WAS on this list and has been moved into the table; see the riscv:isa_spec
+dnl arm for why "it reaches the back end as a tm_define" does not hold here.)
 dnl Their templates are guarded by OPT_ARCH32/OPT_ARCH64, whose expansion is a
 dnl compile-time property of the back end's tm.h (i386 keys it on
 dnl TARGET_64BIT_DEFAULT, mips on the default ABI), or they reach the back end as
