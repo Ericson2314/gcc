@@ -54,7 +54,8 @@ n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 [ -x "$B/gcc/cc1" ]  || { echo "FATAL: no $B/gcc/cc1"; exit 9; }
 
 S=$(cd "$(dirname "$0")" && pwd)
-VER=$(cat "$B/gcc/BASE-VER")
+VER=$(cat "$SRC/gcc/BASE-VER")
+[ -n "$VER" ] || { echo "FATAL: empty BASE-VER"; exit 9; }
 RTF=${MT_RUNTESTFLAGS:-}
 echo "== mtcheck: srcdir $SRC anchor=$n  gcc $VER  targets: $*"
 echo "== runtestflags: [$RTF]  compile-only: [${MT_COMPILE_ONLY:-}]"
@@ -113,6 +114,14 @@ for T in "$@"; do
   # See note 2 in the header: site.exp does not depend on TEST_TARGET.
   rm -f "$B/gcc/site.exp"
   rm -rf "$B/gcc/$TSD"
+  # AND CLEAR THE STAMP BEFORE THE RUN, NOT ONLY WRITE IT AFTER.  A `.rc' left
+  # by an EARLIER invocation is indistinguishable from this one's, so the
+  # scorer read a finished-looking stamp beside a still-running suite and
+  # printed the previous run's numbers.  That is the "a log being written looks
+  # exactly like a log that finished" trap arriving through the very stamp
+  # written to prevent it: the stamp has to be absent while the run is in
+  # flight, or it certifies the wrong run.  Measured live, not reasoned about.
+  rm -f "$B/check-$T.rc"
 
   # MT_TARGET_NAME / MT_TARGET_CONFIG / MT_COMPILE_ONLY are read by
   # gcc/testsuite/lib/multi-target.exp (commit dbd2c1e5843), which gcc-dg.exp
@@ -127,7 +136,7 @@ for T in "$@"; do
       MT_TARGET_CONFIG=$CFG \
       MT_COMPILE_ONLY='${MT_COMPILE_ONLY:-}' \
       export MT_TARGET_NAME MT_TARGET_CONFIG MT_COMPILE_ONLY; \
-      make check-gcc \
+      make ${MT_MAKEFLAGS:-} check-gcc \
         TEST_TARGET=$T \
         TESTSUITEDIR=$TSD \
         RUNTESTFLAGS=\"GCC_UNDER_TEST='$B/gcc/xgcc -B$B/gcc/ -ftarget-config=$CFG' $RTF\"" \
@@ -141,19 +150,26 @@ for T in "$@"; do
   # POST-CONDITION -- read the triple back out of the site.exp the run actually
   # used.  This is the arm that catches note 2 above, and it is deliberately a
   # READ of the generated artefact rather than a belief about make.
-  SE=$(find "$B/gcc/$TSD" -name site.exp | head -1)
-  if [ -z "$SE" ]; then
-    echo "FATAL[$T]: no site.exp under $B/gcc/$TSD -- the run did not happen"
-    exit 9
-  fi
-  saw=$(sed -n 's/^set target_triplet //p' "$SE" | head -1)
-  if [ "$saw" != "$T" ]; then
-    echo "FATAL[$T]: the run's site.exp says target_triplet=$saw, not $T."
-    echo "  This is the stale-site.exp trap: the suite ran, cleanly, and"
-    echo "  attributed its results to the wrong target."
-    exit 9
-  fi
-  echo "-- guard: run's site.exp attributes to $saw"
+  # EVERY site.exp the run used, not one of them.  Under -j there is one per
+  # parallel slot; checking a single arbitrary slot would leave the other 127
+  # unexamined, and it is precisely a per-slot disagreement that this trap
+  # would produce.
+  nse=0; bad=0
+  for SE in $(find "$B/gcc/$TSD" -name site.exp); do
+    nse=$((nse+1))
+    saw=$(sed -n 's/^set target_triplet //p' "$SE" | head -1)
+    if [ "$saw" != "$T" ]; then
+      echo "FATAL[$T]: $SE says target_triplet=$saw, not $T."
+      echo "  This is the stale-site.exp trap: the suite ran, cleanly, and"
+      echo "  attributed its results to the wrong target."
+      bad=$((bad+1))
+    fi
+  done
+  [ "$bad" = 0 ] || exit 9
+  # Non-vacuity: zero site.exp files would pass the loop above by never
+  # entering it, which reads as a green and means the run did not happen.
+  [ "$nse" -gt 0 ] || { echo "FATAL[$T]: no site.exp under $B/gcc/$TSD -- the run did not happen"; exit 9; }
+  echo "-- guard: all $nse site.exp files attribute to $T"
 
   # GUARD 4 -- multi-target.exp MUST HAVE BEEN REACHED.  That file is inert
   # unless MT_TARGET_NAME is in runtest's environment, and an inert run looks
@@ -161,7 +177,9 @@ for T in "$@"; do
   # which target produced them.  Its section-1 banner is the only evidence the
   # environment arrived, so read it back out of the log.  Without this arm the
   # `mechanism-present-but-never-invoked' shape survives the whole harness.
-  LOG=$(find "$B/gcc/$TSD" -name 'gcc.log' | head -1)
+  # The MERGED log, by exact path -- see mtscore.sh: under -j the slot dirs
+  # each hold their own gcc.log and `head -1' picks one of 128 at random.
+  LOG="$B/gcc/$TSD/gcc/gcc.log"
   if [ -z "$LOG" ] || ! grep -q "MULTI-TARGET RUN: target = $T" "$LOG"; then
     echo "FATAL[$T]: gcc.log carries no 'MULTI-TARGET RUN: target = $T' banner."
     echo "  multi-target.exp did not see MT_TARGET_NAME, so it was INERT:"

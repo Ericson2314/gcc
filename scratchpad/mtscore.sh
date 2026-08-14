@@ -22,7 +22,6 @@
 set -u
 B=${1:?build dir}; shift
 
-VER=$(cat "$B/gcc/BASE-VER")
 printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' \
   TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERROR
 printf '%s\n' "--------------------------------------------------------------------------------------------"
@@ -34,9 +33,14 @@ for T in "$@"; do
     printf '%-30s %s\n' "$T" "REFUSED: no check-$T.rc stamp -- the run did not finish"
     continue
   fi
-  SUM=$(find "$TSD" -name 'gcc.sum' 2>/dev/null | head -1)
-  if [ -z "$SUM" ]; then
-    printf '%-30s %s\n' "$T" "REFUSED: no gcc.sum under $TSD"
+  # THE MERGED SUM, BY EXACT PATH.  Under -j, make runs up to 128 runtest
+  # slots into $TSD/gcc<N>/ and merges them with dg-extract-results.sh into
+  # $TSD/gcc/gcc.sum.  A `find -name gcc.sum | head -1' therefore picks an
+  # ARBITRARY SLOT -- one 128th of the suite -- and prints it as the board.
+  # It did: a 13/6/3 slot was reported as a full aarch64 run.  Name the file.
+  SUM="$TSD/gcc/gcc.sum"
+  if [ ! -f "$SUM" ]; then
+    printf '%-30s %s\n' "$T" "REFUSED: no merged $SUM"
     continue
   fi
   if ! grep -q '=== gcc Summary' "$SUM"; then
@@ -68,8 +72,8 @@ fi
 echo
 echo "== top FAIL causes per target (first 12, by test file)"
 for T in "$@"; do
-  SUM=$(find "$B/gcc/testsuite.$T" -name 'gcc.sum' 2>/dev/null | head -1)
-  [ -n "$SUM" ] || continue
+  SUM="$B/gcc/testsuite.$T/gcc/gcc.sum"
+  [ -f "$SUM" ] || continue
   echo "-- $T"
   grep '^FAIL: ' "$SUM" | awk '{print $2}' | sort | uniq -c | sort -rn | head -12
 done
