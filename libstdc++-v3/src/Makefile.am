@@ -29,7 +29,7 @@ else
 filesystem_dir =
 endif
 
-if ENABLE_BACKTRACE
+if ENABLE_VENDORED_BACKTRACE
 backtrace_dir = libbacktrace
 else
 backtrace_dir =
@@ -81,7 +81,7 @@ vpath % $(top_srcdir)/src/c++26
 if ENABLE_FILESYSTEM_TS
 vpath % $(top_srcdir)/src/filesystem
 endif
-if ENABLE_BACKTRACE
+if ENABLE_VENDORED_BACKTRACE
 vpath % $(top_srcdir)/src/libbacktrace
 endif
 vpath % $(top_srcdir)/src/experimental
@@ -431,7 +431,7 @@ stamp-debug: $(foreach dir,. $(SUBDIRS),debug/$(dir)/Makefile)
 
 .SECONDARY: $(foreach dir,. $(SUBDIRS),debug/$(dir)/Makefile)
 
-if ENABLE_BACKTRACE
+if ENABLE_VENDORED_BACKTRACE
 backtrace_supported_h = $(backtrace_dir)/backtrace-supported.h
 debug_backtrace_supported_h = debug/$(backtrace_supported_h)
 $(debug_backtrace_supported_h): $(backtrace_supported_h) stamp-debug

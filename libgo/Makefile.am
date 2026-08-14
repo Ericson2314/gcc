@@ -46,10 +46,18 @@ AM_CPPFLAGS = -I $(srcdir)/runtime $(LIBFFIINCS) $(PTHREAD_CFLAGS)
 
 ACLOCAL_AMFLAGS = -I ./config -I ../config
 
+if SYSTEM_LIBBACKTRACE
+LIBBACKTRACE_LIB = -lbacktrace
+LIBBACKTRACE_INCLUDE =
+else
+LIBBACKTRACE_LIB = ../libbacktrace/libbacktrace.la
+LIBBACKTRACE_INCLUDE = -I $(srcdir)/../libbacktrace
+endif
+
 AM_CFLAGS = -fexceptions -fnon-call-exceptions \
 	$(SPLIT_STACK) $(WARN_CFLAGS) \
 	$(STRINGOPS_FLAG) $(HWCAP_CFLAGS) $(OSCFLAGS) \
-	-I $(srcdir)/../libgcc -I $(srcdir)/../libbacktrace \
+	-I $(srcdir)/../libgcc $(LIBBACKTRACE_INCLUDE) \
 	-I $(MULTIBUILDTOP)../../gcc/include
 
 AM_LDFLAGS =
@@ -841,7 +849,7 @@ libgo_ldflags = \
 	$(OSLDFLAGS)
 
 libgo_libadd = \
-	$(libgo_go_objs) ../libbacktrace/libbacktrace.la \
+	$(libgo_go_objs) $(LIBBACKTRACE_LIB) \
 	$(LIBATOMIC) $(LIBFFI) $(PTHREAD_LIBS) $(MATH_LIBS) $(NET_LIBS)
 
 libgo_la_SOURCES = $(runtime_files)

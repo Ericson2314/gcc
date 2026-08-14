@@ -25,29 +25,29 @@
 #include <cstdlib>
 
 #ifdef __cpp_lib_stacktrace // C++ >= 23 && hosted && HAVE_STACKTRACE
-struct __glibcxx_backtrace_state;
+struct backtrace_state;
 
 extern "C"
 {
-__glibcxx_backtrace_state*
-__glibcxx_backtrace_create_state(const char*, int,
+backtrace_state*
+backtrace_create_state(const char*, int,
 				 void(*)(void*, const char*, int),
 				 void*);
 
 int
-__glibcxx_backtrace_simple(__glibcxx_backtrace_state*, int,
+backtrace_simple(backtrace_state*, int,
 			   int (*) (void*, __UINTPTR_TYPE__),
 			   void(*)(void*, const char*, int),
 			   void*);
 int
-__glibcxx_backtrace_pcinfo(__glibcxx_backtrace_state*, __UINTPTR_TYPE__,
+backtrace_pcinfo(backtrace_state*, __UINTPTR_TYPE__,
 			   int (*)(void*, __UINTPTR_TYPE__,
 				   const char*, int, const char*),
 			   void(*)(void*, const char*, int),
 			   void*);
 
 int
-__glibcxx_backtrace_syminfo(__glibcxx_backtrace_state*, __UINTPTR_TYPE__ addr,
+backtrace_syminfo(backtrace_state*, __UINTPTR_TYPE__ addr,
 			    void (*) (void*, __UINTPTR_TYPE__, const char*,
 				      __UINTPTR_TYPE__, __UINTPTR_TYPE__),
 			    void(*)(void*, const char*, int),
@@ -83,14 +83,14 @@ namespace
   err_handler(void*, const char*, int)
   { }
 
-  __glibcxx_backtrace_state*
+  backtrace_state*
   init()
   {
 #if __GTHREADS && ! defined(__cpp_threadsafe_static_init)
 # warning "std::stacktrace initialization will not be thread-safe"
 #endif
-    static __glibcxx_backtrace_state* state
-      = __glibcxx_backtrace_create_state(nullptr, 1, err_handler, nullptr);
+    static backtrace_state* state
+      = backtrace_create_state(nullptr, 1, err_handler, nullptr);
     return state;
   }
 }
@@ -134,7 +134,7 @@ stacktrace_entry::_Info::_M_populate(native_handle_type pc)
     return function != nullptr;
   };
   const auto state = init();
-  if (::__glibcxx_backtrace_pcinfo(state, pc, +cb, err_handler, this))
+  if (::backtrace_pcinfo(state, pc, +cb, err_handler, this))
     return true;
 
   // If we get here then backtrace_pcinfo did not give us a function name.
@@ -146,7 +146,7 @@ stacktrace_entry::_Info::_M_populate(native_handle_type pc)
       {
 	static_cast<_Info*>(self)->_M_set_desc(symname);
       };
-      if (::__glibcxx_backtrace_syminfo(state, pc, +cb2, err_handler, this))
+      if (::backtrace_syminfo(state, pc, +cb2, err_handler, this))
 	return true;
     }
   return false;
@@ -162,7 +162,7 @@ __stacktrace_impl::_S_current(int (*cb) (void*, __UINTPTR_TYPE__), void* obj,
 {
   const auto state = init();
   // skip+2 because we don't want this function or its caller to be included.
-  int r = ::__glibcxx_backtrace_simple(state, skip + 2, cb, err_handler, obj);
+  int r = ::backtrace_simple(state, skip + 2, cb, err_handler, obj);
   // Could also use this to prevent tail-call optim: __asm ("" : "+g" (r));
   return r;
 }

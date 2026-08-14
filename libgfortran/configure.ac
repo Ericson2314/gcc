@@ -75,6 +75,12 @@ AC_USE_SYSTEM_EXTENSIONS
 
 GCC_WITH_TOOLEXECLIBDIR
 
+GCC_WITH_SYSTEM_LIBBACKTRACE
+GCC_CHECK_SYSTEM_LIBBACKTRACE
+dnl This is separate from the top to because the other consumers of
+dnl those do not use an automake conditional like this.
+AM_CONDITIONAL(SYSTEM_LIBBACKTRACE, [test "x$with_system_libbacktrace" = xyes])
+
 # Calculate toolexeclibdir
 # Also toolexecdir, though it's only used in toolexeclibdir
 case ${version_specific_libs} in

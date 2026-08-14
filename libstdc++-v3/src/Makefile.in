@@ -102,6 +102,7 @@ am__aclocal_m4_deps = $(top_srcdir)/../config/acx.m4 \
 	$(top_srcdir)/../config/lib-ld.m4 \
 	$(top_srcdir)/../config/lib-link.m4 \
 	$(top_srcdir)/../config/lib-prefix.m4 \
+	$(top_srcdir)/../config/libbacktrace.m4 \
 	$(top_srcdir)/../config/lthostflags.m4 \
 	$(top_srcdir)/../config/multi.m4 \
 	$(top_srcdir)/../config/no-executables.m4 \
@@ -489,8 +490,8 @@ AM_CPPFLAGS = $(GLIBCXX_INCLUDES) $(CPPFLAGS)
 @ENABLE_FILESYSTEM_TS_FALSE@@GLIBCXX_HOSTED_TRUE@filesystem_dir = 
 @ENABLE_FILESYSTEM_TS_TRUE@@GLIBCXX_HOSTED_TRUE@filesystem_dir = filesystem
 @GLIBCXX_HOSTED_FALSE@filesystem_dir = 
-@ENABLE_BACKTRACE_FALSE@@GLIBCXX_HOSTED_TRUE@backtrace_dir = 
-@ENABLE_BACKTRACE_TRUE@@GLIBCXX_HOSTED_TRUE@backtrace_dir = libbacktrace
+@ENABLE_VENDORED_BACKTRACE_FALSE@@GLIBCXX_HOSTED_TRUE@backtrace_dir = 
+@ENABLE_VENDORED_BACKTRACE_TRUE@@GLIBCXX_HOSTED_TRUE@backtrace_dir = libbacktrace
 @GLIBCXX_HOSTED_FALSE@backtrace_dir = 
 @GLIBCXX_HOSTED_FALSE@experimental_dir = 
 @GLIBCXX_HOSTED_TRUE@experimental_dir = experimental
@@ -692,9 +693,9 @@ CXXLINK = \
 @GLIBCXX_BUILD_DEBUG_TRUE@STAMP_INSTALL_DEBUG = install-debug
 @GLIBCXX_BUILD_DEBUG_FALSE@CLEAN_DEBUG = 
 @GLIBCXX_BUILD_DEBUG_TRUE@CLEAN_DEBUG = debug
-@ENABLE_BACKTRACE_TRUE@backtrace_supported_h = $(backtrace_dir)/backtrace-supported.h
-@ENABLE_BACKTRACE_FALSE@debug_backtrace_supported_h = 
-@ENABLE_BACKTRACE_TRUE@debug_backtrace_supported_h = debug/$(backtrace_supported_h)
+@ENABLE_VENDORED_BACKTRACE_TRUE@backtrace_supported_h = $(backtrace_dir)/backtrace-supported.h
+@ENABLE_VENDORED_BACKTRACE_FALSE@debug_backtrace_supported_h = 
+@ENABLE_VENDORED_BACKTRACE_TRUE@debug_backtrace_supported_h = debug/$(backtrace_supported_h)
 all: all-recursive
 
 .SUFFIXES:
@@ -1031,7 +1032,7 @@ vpath % $(top_srcdir)/src/c++20
 vpath % $(top_srcdir)/src/c++23
 vpath % $(top_srcdir)/src/c++26
 @ENABLE_FILESYSTEM_TS_TRUE@vpath % $(top_srcdir)/src/filesystem
-@ENABLE_BACKTRACE_TRUE@vpath % $(top_srcdir)/src/libbacktrace
+@ENABLE_VENDORED_BACKTRACE_TRUE@vpath % $(top_srcdir)/src/libbacktrace
 vpath % $(top_srcdir)/src/experimental
 @GLIBCXX_LDBL_COMPAT_TRUE@compatibility-ldbl.lo: compatibility-ldbl.cc
 @GLIBCXX_LDBL_COMPAT_TRUE@	$(LTCXXCOMPILE64) $(LONG_DOUBLE_COMPAT_FLAGS) -c $<
@@ -1154,8 +1155,8 @@ stamp-debug: $(foreach dir,. $(SUBDIRS),debug/$(dir)/Makefile)
 	date > stamp-debug;
 
 .SECONDARY: $(foreach dir,. $(SUBDIRS),debug/$(dir)/Makefile)
-@ENABLE_BACKTRACE_TRUE@$(debug_backtrace_supported_h): $(backtrace_supported_h) stamp-debug
-@ENABLE_BACKTRACE_TRUE@	cp $< $@
+@ENABLE_VENDORED_BACKTRACE_TRUE@$(debug_backtrace_supported_h): $(backtrace_supported_h) stamp-debug
+@ENABLE_VENDORED_BACKTRACE_TRUE@	cp $< $@
 
 build-debug: stamp-debug $(debug_backtrace_supported_h)
 	  $(MAKE) -C debug CXXFLAGS='$(DEBUG_FLAGS)' \

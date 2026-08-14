@@ -145,11 +145,19 @@ AC_DEFUN([DRUNTIME_LIBRARIES_BACKTRACE],
     AS_HELP_STRING([--without-libbacktrace],
                    [Do not use libbacktrace in core.runtime (default: auto)]))
 
+  GCC_WITH_SYSTEM_LIBBACKTRACE
+
   AS_IF([test "x$enable_libbacktrace" != "xno" && test "x$with_libbacktrace" != "xno"], [
-    LIBBACKTRACE=../../libbacktrace/libbacktrace.la
+    dnl Only here is it settled that the library is wanted at all.
+    GCC_CHECK_SYSTEM_LIBBACKTRACE
 
     gdc_save_CPPFLAGS=$CPPFLAGS
-    CPPFLAGS="$CPPFLAGS -I../libbacktrace "
+    AS_IF([test "x$with_system_libbacktrace" = xyes], [
+      LIBBACKTRACE=-lbacktrace
+    ], [
+      LIBBACKTRACE=../../libbacktrace/libbacktrace.la
+      CPPFLAGS="$CPPFLAGS -I../libbacktrace "
+    ])
 
     AC_CHECK_HEADER(backtrace-supported.h, have_libbacktrace_h=true,
       have_libbacktrace_h=false)

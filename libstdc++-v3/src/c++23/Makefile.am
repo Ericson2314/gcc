@@ -141,6 +141,14 @@ AM_CXXFLAGS = \
 	$(WARN_CXXFLAGS) $(OPTIMIZE_CXXFLAGS) $(CONFIG_CXXFLAGS) \
 	-fimplicit-templates
 
+if ENABLE_VENDORED_BACKTRACE
+# stacktrace.cc declares and calls libbacktrace's entry points by their
+# ordinary names.  But when we build the vendored copy as part of this
+# library, we want to rename to avoid collisions downstream. Include
+# this header on ourselves, too, for this reason.
+AM_CXXFLAGS += -include $(top_srcdir)/src/libbacktrace/backtrace-rename.h
+endif
+
 AM_MAKEFLAGS = \
 	"gxx_include_dir=$(gxx_include_dir)"
 

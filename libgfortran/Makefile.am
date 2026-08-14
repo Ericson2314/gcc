@@ -48,11 +48,21 @@ gfor_cdir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include
 LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS)) \
 	    $(lt_host_flags)
 
+if SYSTEM_LIBBACKTRACE
+LIBBACKTRACE_LIB = -lbacktrace
+LIBBACKTRACE_INCLUDE =
+else
+LIBBACKTRACE_LIB = ../libbacktrace/libbacktrace.la
+LIBBACKTRACE_INCLUDE = -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
+	      -I$(MULTIBUILDTOP)../libbacktrace \
+	      -I../libbacktrace
+endif
+
 toolexeclib_LTLIBRARIES = libgfortran.la
 toolexeclib_DATA = libgfortran.spec
 libgfortran_la_LINK = $(LINK) $(libgfortran_la_LDFLAGS)
 libgfortran_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` \
-	$(LTLDFLAGS) $(LIBQUADLIB) ../libbacktrace/libbacktrace.la \
+	$(LTLDFLAGS) $(LIBQUADLIB) $(LIBBACKTRACE_LIB) \
 	$(HWCAP_LDFLAGS) \
 	$(LIBM) $(extra_darwin_ldflags_libgfortran) \
 	$(version_arg) -Wc,-shared-libgcc
@@ -98,9 +108,7 @@ AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/$(MULTISRCTOP)../gcc \
 	      -I$(MULTIBUILDTOP)../../$(host_subdir)/gcc \
 	      -I$(srcdir)/$(MULTISRCTOP)../libgcc \
 	      -I$(MULTIBUILDTOP)../libgcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
-	      -I$(MULTIBUILDTOP)../libbacktrace \
-	      -I../libbacktrace
+	      $(LIBBACKTRACE_INCLUDE)
 
 # Fortran rules for complex multiplication and division
 AM_CFLAGS += -fcx-fortran-rules

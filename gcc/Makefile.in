@@ -455,9 +455,11 @@ DECNUMINC = -I$(DECNUM) -I$(DECNUMFMT) -I../libdecnumber
 LIBDECNUMBER = ../libdecnumber/libdecnumber.a
 
 # The backtrace library.
-BACKTRACE = $(srcdir)/../libbacktrace
-BACKTRACEINC = -I$(BACKTRACE)
-LIBBACKTRACE = ../libbacktrace/.libs/libbacktrace.a
+# With --with-system-libbacktrace these come from configure as -lbacktrace
+# and the ordinary header path, and LIBBACKTRACE_DEP is empty.
+BACKTRACEINC = @BACKTRACEINC@
+LIBBACKTRACE = @LIBBACKTRACE@
+LIBBACKTRACE_DEP = @LIBBACKTRACE_DEP@
 
 # Target to use when installing include directory.  Either
 # install-headers-tar, install-headers-cpio or install-headers-cp.
@@ -1149,7 +1151,7 @@ endif
 # constructed with a ./ prefix, which GNU Make removes while processing
 # prerequisites, so we need to strip it off.
 LIBDEPS= libcommon.a $(CPPLIB) $(LIBIBERTY) $(LIBICONV_DEP) $(LIBDECNUMBER) \
-	$(LIBBACKTRACE) $(LIBINTL_DEP:./%=%)
+	$(LIBBACKTRACE_DEP) $(LIBINTL_DEP:./%=%)
 
 # Likewise, for use in the tools that must run on this machine
 # even if we are cross-building GCC.

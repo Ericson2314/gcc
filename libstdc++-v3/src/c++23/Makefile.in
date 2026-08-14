@@ -90,6 +90,12 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
+
+# stacktrace.cc declares and calls libbacktrace's entry points by their
+# ordinary names.  But when we build the vendored copy as part of this
+# library, we want to rename to avoid collisions downstream. Include
+# this header on ourselves, too, for this reason.
+@ENABLE_VENDORED_BACKTRACE_TRUE@am__append_1 = -include $(top_srcdir)/src/libbacktrace/backtrace-rename.h
 subdir = src/c++23
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/../config/acx.m4 \
@@ -103,6 +109,7 @@ am__aclocal_m4_deps = $(top_srcdir)/../config/acx.m4 \
 	$(top_srcdir)/../config/lib-ld.m4 \
 	$(top_srcdir)/../config/lib-link.m4 \
 	$(top_srcdir)/../config/lib-prefix.m4 \
+	$(top_srcdir)/../config/libbacktrace.m4 \
 	$(top_srcdir)/../config/lthostflags.m4 \
 	$(top_srcdir)/../config/multi.m4 \
 	$(top_srcdir)/../config/no-executables.m4 \
@@ -491,13 +498,10 @@ MODULES_FLAGS = -isystem ${glibcxx_srcdir}/include/backward -fmodules \
 # set this option because CONFIG_CXXFLAGS has to be after
 # OPTIMIZE_CXXFLAGS on the compile line so that -O2 can be overridden
 # as the occasion calls for it.
-AM_CXXFLAGS = \
-	-std=gnu++23 \
-	$(glibcxx_lt_pic_flag) $(glibcxx_compiler_shared_flag) \
-	$(XTEMPLATE_FLAGS) $(VTV_CXXFLAGS) \
-	$(WARN_CXXFLAGS) $(OPTIMIZE_CXXFLAGS) $(CONFIG_CXXFLAGS) \
-	-fimplicit-templates
-
+AM_CXXFLAGS = -std=gnu++23 $(glibcxx_lt_pic_flag) \
+	$(glibcxx_compiler_shared_flag) $(XTEMPLATE_FLAGS) \
+	$(VTV_CXXFLAGS) $(WARN_CXXFLAGS) $(OPTIMIZE_CXXFLAGS) \
+	$(CONFIG_CXXFLAGS) -fimplicit-templates $(am__append_1)
 AM_MAKEFLAGS = \
 	"gxx_include_dir=$(gxx_include_dir)"
 

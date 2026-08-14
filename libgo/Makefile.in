@@ -112,6 +112,7 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/../config/depstand.m4 \
 	$(top_srcdir)/../config/hwcaps.m4 \
 	$(top_srcdir)/../config/lead-dot.m4 \
+	$(top_srcdir)/../config/libbacktrace.m4 \
 	$(top_srcdir)/../config/multi.m4 \
 	$(top_srcdir)/../config/override.m4 \
 	$(top_srcdir)/../config/toolexeclibdir.m4 \
@@ -230,12 +231,14 @@ am__DEPENDENCIES_3 = $(addsuffix .lo,$(PACKAGES)) \
 	$(golangorg_x_net_route_lo) log/syslog/syslog_c.lo \
 	runtime/internal/atomic_c.lo sync/atomic_c.lo \
 	internal/cpu/cpu_gccgo.lo $(am__DEPENDENCIES_2)
-am__DEPENDENCIES_4 =
-am__DEPENDENCIES_5 = $(am__DEPENDENCIES_3) \
-	../libbacktrace/libbacktrace.la $(am__DEPENDENCIES_4) \
-	$(am__DEPENDENCIES_4) $(am__DEPENDENCIES_4) \
-	$(am__DEPENDENCIES_4) $(am__DEPENDENCIES_4)
-libgo_llgo_la_DEPENDENCIES = $(am__DEPENDENCIES_5)
+@SYSTEM_LIBBACKTRACE_FALSE@am__DEPENDENCIES_4 =  \
+@SYSTEM_LIBBACKTRACE_FALSE@	../libbacktrace/libbacktrace.la
+am__DEPENDENCIES_5 =
+am__DEPENDENCIES_6 = $(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
+	$(am__DEPENDENCIES_5) $(am__DEPENDENCIES_5) \
+	$(am__DEPENDENCIES_5) $(am__DEPENDENCIES_5) \
+	$(am__DEPENDENCIES_5)
+libgo_llgo_la_DEPENDENCIES = $(am__DEPENDENCIES_6)
 @LIBGO_IS_LINUX_TRUE@@LIBGO_IS_X86_TRUE@am__objects_1 =  \
 @LIBGO_IS_LINUX_TRUE@@LIBGO_IS_X86_TRUE@	runtime/go-context.lo
 am__objects_2 = $(am__objects_1)
@@ -265,7 +268,7 @@ libgo_llgo_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libgo_llgo_la_LDFLAGS) $(LDFLAGS) -o $@
 @GOC_IS_LLGO_TRUE@am_libgo_llgo_la_rpath = -rpath $(toolexeclibdir)
-libgo_la_DEPENDENCIES = $(am__DEPENDENCIES_5)
+libgo_la_DEPENDENCIES = $(am__DEPENDENCIES_6)
 am_libgo_la_OBJECTS = $(am__objects_4)
 libgo_la_OBJECTS = $(am_libgo_la_OBJECTS)
 libgo_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -564,10 +567,14 @@ WARN_CFLAGS = $(WARN_FLAGS) $(WERROR)
 # -I/-D flags to pass when compiling.
 AM_CPPFLAGS = -I $(srcdir)/runtime $(LIBFFIINCS) $(PTHREAD_CFLAGS)
 ACLOCAL_AMFLAGS = -I ./config -I ../config
+@SYSTEM_LIBBACKTRACE_FALSE@LIBBACKTRACE_LIB = ../libbacktrace/libbacktrace.la
+@SYSTEM_LIBBACKTRACE_TRUE@LIBBACKTRACE_LIB = -lbacktrace
+@SYSTEM_LIBBACKTRACE_FALSE@LIBBACKTRACE_INCLUDE = -I $(srcdir)/../libbacktrace
+@SYSTEM_LIBBACKTRACE_TRUE@LIBBACKTRACE_INCLUDE = 
 AM_CFLAGS = -fexceptions -fnon-call-exceptions \
 	$(SPLIT_STACK) $(WARN_CFLAGS) \
 	$(STRINGOPS_FLAG) $(HWCAP_CFLAGS) $(OSCFLAGS) \
-	-I $(srcdir)/../libgcc -I $(srcdir)/../libbacktrace \
+	-I $(srcdir)/../libgcc $(LIBBACKTRACE_INCLUDE) \
 	-I $(MULTIBUILDTOP)../../gcc/include
 
 AM_LDFLAGS = $(am__append_1) $(am__append_2)
@@ -977,7 +984,7 @@ libgo_ldflags = \
 	$(OSLDFLAGS)
 
 libgo_libadd = \
-	$(libgo_go_objs) ../libbacktrace/libbacktrace.la \
+	$(libgo_go_objs) $(LIBBACKTRACE_LIB) \
 	$(LIBATOMIC) $(LIBFFI) $(PTHREAD_LIBS) $(MATH_LIBS) $(NET_LIBS)
 
 libgo_la_SOURCES = $(runtime_files)

@@ -5250,6 +5250,10 @@ AC_DEFUN([GLIBCXX_ENABLE_BACKTRACE], [
     [turns on libbacktrace support],
     [permit yes|no|auto])
 
+  GCC_WITH_SYSTEM_LIBBACKTRACE
+
+  if test "x$with_system_libbacktrace" = xno; then
+
   # Most of this is adapted from libsanitizer/configure.ac
 
   BACKTRACE_CPPFLAGS="-D_GNU_SOURCE"
@@ -5425,6 +5429,8 @@ elf64) elfsize=64 ;;
 esac
 BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
 
+  fi
+
   AC_MSG_CHECKING([whether to build libbacktrace support])
   if test "$enable_libstdcxx_backtrace" = "auto"; then
     case "$host" in
@@ -5435,6 +5441,14 @@ BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
   AC_MSG_RESULT($enable_libstdcxx_backtrace)
   if test "$enable_libstdcxx_backtrace" = "yes"; then
     BACKTRACE_SUPPORTED=1
+
+    if test "x$with_system_libbacktrace" = xyes; then
+
+    dnl Only here is it settled that the library is wanted at all; the option
+    dnl is parsed long before --enable-libstdcxx-backtrace=auto is resolved.
+    GCC_CHECK_SYSTEM_LIBBACKTRACE
+
+    else
 
     AC_CHECK_HEADERS(sys/mman.h)
     case "${host}" in
@@ -5464,6 +5478,8 @@ BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
       BACKTRACE_USES_MALLOC=1
     fi
 
+    fi
+
     if test "$ac_has_gthreads" = "yes"; then
       BACKTRACE_SUPPORTS_THREADS=1
     else
@@ -5479,7 +5495,18 @@ BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
     BACKTRACE_USES_MALLOC=0
     BACKTRACE_SUPPORTS_THREADS=0
   fi
+  # Note that GLIBCXX_CONDITIONAL will define a variable regardless of
+  # shell control flow, this is why it is worth defining all 3 of these,
+  # rather than e.g. trying to define ENABLE_SYSTEM_BACKTRACE only if
+  # ENABLE_BACKTRACE was true.
   GLIBCXX_CONDITIONAL(ENABLE_BACKTRACE, [test "$enable_libstdcxx_backtrace" = yes])
+  GLIBCXX_CONDITIONAL(ENABLE_SYSTEM_BACKTRACE,
+    [test "$enable_libstdcxx_backtrace" = yes \
+       && test "x$with_system_libbacktrace" = xyes])
+  dnl Use ../libbacktrace
+  GLIBCXX_CONDITIONAL(ENABLE_VENDORED_BACKTRACE,
+    [test "$enable_libstdcxx_backtrace" = yes \
+       && test "x$with_system_libbacktrace" = xno])
 ])
 
 dnl

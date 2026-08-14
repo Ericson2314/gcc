@@ -166,6 +166,7 @@ am__aclocal_m4_deps = $(top_srcdir)/../config/ax_pthread.m4 \
 	$(top_srcdir)/../config/gcc-plugin.m4 \
 	$(top_srcdir)/../config/hwcaps.m4 \
 	$(top_srcdir)/../config/lead-dot.m4 \
+	$(top_srcdir)/../config/libbacktrace.m4 \
 	$(top_srcdir)/../config/lthostflags.m4 \
 	$(top_srcdir)/../config/multi.m4 \
 	$(top_srcdir)/../config/override.m4 \
@@ -981,11 +982,18 @@ gfor_cdir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include
 LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS)) \
 	    $(lt_host_flags)
 
+@SYSTEM_LIBBACKTRACE_FALSE@LIBBACKTRACE_LIB = ../libbacktrace/libbacktrace.la
+@SYSTEM_LIBBACKTRACE_TRUE@LIBBACKTRACE_LIB = -lbacktrace
+@SYSTEM_LIBBACKTRACE_FALSE@LIBBACKTRACE_INCLUDE = -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
+@SYSTEM_LIBBACKTRACE_FALSE@	      -I$(MULTIBUILDTOP)../libbacktrace \
+@SYSTEM_LIBBACKTRACE_FALSE@	      -I../libbacktrace
+
+@SYSTEM_LIBBACKTRACE_TRUE@LIBBACKTRACE_INCLUDE = 
 toolexeclib_LTLIBRARIES = libgfortran.la
 toolexeclib_DATA = libgfortran.spec
 libgfortran_la_LINK = $(LINK) $(libgfortran_la_LDFLAGS)
 libgfortran_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` \
-	$(LTLDFLAGS) $(LIBQUADLIB) ../libbacktrace/libbacktrace.la \
+	$(LTLDFLAGS) $(LIBQUADLIB) $(LIBBACKTRACE_LIB) \
 	$(HWCAP_LDFLAGS) \
 	$(LIBM) $(extra_darwin_ldflags_libgfortran) \
 	$(version_arg) -Wc,-shared-libgcc
@@ -1021,9 +1029,7 @@ AM_CPPFLAGS = -iquote$(srcdir)/io -I$(srcdir)/$(MULTISRCTOP)../gcc \
 	      -I$(MULTIBUILDTOP)../../$(host_subdir)/gcc \
 	      -I$(srcdir)/$(MULTISRCTOP)../libgcc \
 	      -I$(MULTIBUILDTOP)../libgcc \
-	      -I$(srcdir)/$(MULTISRCTOP)../libbacktrace \
-	      -I$(MULTIBUILDTOP)../libbacktrace \
-	      -I../libbacktrace
+	      $(LIBBACKTRACE_INCLUDE)
 
 gfor_io_src = io/size_from_kind.c $(am__append_4)
 gfor_io_headers = \

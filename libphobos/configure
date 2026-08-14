@@ -848,6 +848,7 @@ with_gcc_major_version_only
 enable_werror
 with_libatomic
 with_libbacktrace
+with_system_libbacktrace
 with_target_system_zlib
 with_cross_host
 enable_version_specific_runtime_libs
@@ -1521,6 +1522,9 @@ Optional Packages:
   --without-libatomic     Do not use libatomic in core.atomic (default: auto)
   --without-libbacktrace  Do not use libbacktrace in core.runtime (default:
                           auto)
+  --with-system-libbacktrace
+                          link an installed libbacktrace instead of the copy
+                          in the GCC tree
   --with-target-system-zlib={yes,no,auto}
                           use installed libz (default: no)
   --with-cross-host=HOST  configuring with a cross compiler
@@ -12252,7 +12256,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12255 "configure"
+#line 12259 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12358,7 +12362,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12361 "configure"
+#line 12365 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -15582,12 +15586,49 @@ if test "${with_libbacktrace+set}" = set; then :
 fi
 
 
+
+
+# Check whether --with-system-libbacktrace was given.
+if test "${with_system_libbacktrace+set}" = set; then :
+  withval=$with_system_libbacktrace; with_system_libbacktrace=$withval
+else
+  with_system_libbacktrace=no
+fi
+
+
+    case "$with_system_libbacktrace" in
+    yes|no) ;;
+    *) as_fn_error $? "--with-system-libbacktrace does not take an argument" "$LINENO" 5 ;;
+  esac
+
+
   if test "x$enable_libbacktrace" != "xno" && test "x$with_libbacktrace" != "xno"; then :
 
-    LIBBACKTRACE=../../libbacktrace/libbacktrace.la
+
+
+  if test "x$with_system_libbacktrace" = xyes; then
+    ac_fn_c_check_header_mongrel "$LINENO" "backtrace.h" "ac_cv_header_backtrace_h" "$ac_includes_default"
+if test "x$ac_cv_header_backtrace_h" = xyes; then :
+
+else
+  as_fn_error $? "--with-system-libbacktrace given, but backtrace.h not found" "$LINENO" 5
+fi
+
+
+  fi
+
 
     gdc_save_CPPFLAGS=$CPPFLAGS
-    CPPFLAGS="$CPPFLAGS -I../libbacktrace "
+    if test "x$with_system_libbacktrace" = xyes; then :
+
+      LIBBACKTRACE=-lbacktrace
+
+else
+
+      LIBBACKTRACE=../../libbacktrace/libbacktrace.la
+      CPPFLAGS="$CPPFLAGS -I../libbacktrace "
+
+fi
 
     ac_fn_c_check_header_mongrel "$LINENO" "backtrace-supported.h" "ac_cv_header_backtrace_supported_h" "$ac_includes_default"
 if test "x$ac_cv_header_backtrace_supported_h" = xyes; then :

@@ -31,9 +31,16 @@ filesystem_lib =
 endif
 
 if ENABLE_BACKTRACE
+if ENABLE_SYSTEM_BACKTRACE
+backtrace_lib = -lbacktrace
+backtrace_dep =
+else
 backtrace_lib = $(top_builddir)/src/libbacktrace/libstdc++_libbacktrace.la
+backtrace_dep = $(backtrace_lib)
+endif
 else
 backtrace_lib =
+backtrace_dep =
 endif
 
 headers =
@@ -59,7 +66,7 @@ libstdc__exp_la_LIBADD = \
 libstdc__exp_la_DEPENDENCIES = \
 	$(top_builddir)/src/c++23/libc++23convenience.la \
 	$(top_builddir)/src/c++26/libc++26convenience.la \
-	$(filesystem_lib) $(backtrace_lib)
+	$(filesystem_lib) $(backtrace_dep)
 
 # AM_CXXFLAGS needs to be in each subdirectory so that it can be
 # modified in a per-library or per-sub-library way.  Need to manually

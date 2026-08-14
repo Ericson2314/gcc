@@ -525,6 +525,21 @@ AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
 AC_CHECK_TYPES([long long], [AC_CHECK_SIZEOF(long long)])
 GCC_STDINT_TYPES
+
+GCC_WITH_SYSTEM_LIBBACKTRACE
+GCC_CHECK_SYSTEM_LIBBACKTRACE
+if test "x$with_system_libbacktrace" = xyes; then
+  BACKTRACEINC=
+  LIBBACKTRACE=-lbacktrace
+  LIBBACKTRACE_DEP=
+else
+  BACKTRACEINC='-I$(srcdir)/../libbacktrace'
+  LIBBACKTRACE='../libbacktrace/.libs/libbacktrace.a'
+  LIBBACKTRACE_DEP='$(LIBBACKTRACE)'
+fi
+AC_SUBST(BACKTRACEINC)
+AC_SUBST(LIBBACKTRACE)
+AC_SUBST(LIBBACKTRACE_DEP)
 if test x"$ac_cv_c_uint64_t" = x"no" -o x"$ac_cv_c_int64_t" = x"no"; then
   AC_MSG_ERROR([uint64_t or int64_t not found])
 fi
