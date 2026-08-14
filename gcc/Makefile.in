@@ -1547,33 +1547,53 @@ MULTI_TARGET_INC =
 #			    object really is target-independent; renaming is
 #			    correct either way.)
 #   extract_base_offset_in_addr
-#			    defined bare, with the SAME SIGNATURE, by
-#			    aarch64.cc:30059, riscv.cc:14249 and arm.cc:34020,
-#			    and declared in each of their -protos.h.  Upstream
-#			    this is fine: one back end is linked.  Here it is a
-#			    hard `multiple definition' at the link of cc1.
+#			    aarch64.cc:30059 and riscv.cc:14249 both define it
+#			    with EXTERNAL linkage and the same signature, and
+#			    each declares it in its -protos.h.  Upstream this is
+#			    fine: one back end is linked.  Here it is a hard
+#			    `multiple definition' at the link of cc1.
 #
-#			    FOUND BY CONFIGURING A THIRD BACK END.  i386 does
-#			    not define this name, so the i386 + aarch64 pair
+#			    arm.cc:34020 and i386.cc:27898 also spell this name,
+#			    but BOTH ARE `static' (and i386's takes four
+#			    arguments), so neither collides.  Two agents found
+#			    this defect independently and both mis-stated that
+#			    population -- one named arm as a bare definer, the
+#			    other implied i386 was one too.  `bool' vs `static
+#			    bool' is the whole difference and it is one grep.
+#
+#			    FOUND BY CONFIGURING A THIRD BACK END.  i386 supplies
+#			    no external definition, so the i386 + aarch64 pair
 #			    that everything on this branch is built with cannot
 #			    see it; adding riscv made it a build failure on the
-#			    first link.  This is the case the comment above
-#			    predicted -- "a name added to some back end later
-#			    collides silently" -- and the sweep it names as the
-#			    check DID NOT EXIST until it was written to find
-#			    this.  It now does: scratchpad/sweep.sh, which
-#			    compares the per-base object sets pairwise and
-#			    reports every colliding strong symbol by name.
-#			    Its reading on the three-base build is: aarch64 vs
+#			    first link.  This is exactly the case the comment
+#			    above predicted -- "a name added to some back end
+#			    later collides silently" -- and the sweep it named
+#			    as the check DID NOT EXIST until this was written.
+#
+#			    NO shared translation unit names it: the only files
+#			    that do are under config/aarch64/, config/arm/,
+#			    config/i386/ and config/riscv/.  So each back end
+#			    keeps its OWN function and there is no name for the
+#			    middle end to choose between -- a bare rename
+#			    suffices, with no selector entry, unlike the
+#			    print_operand family (scratchpad/t150-rename-gap.sh)
+#			    which targhooks.cc and final.cc DO name.
+#
+#			    Checks: scratchpad/sweep.sh compares the per-base
+#			    object sets pairwise and reports every colliding
+#			    strong symbol by name (three-base reading: aarch64 vs
 #			    i386 none, i386 vs riscv none, aarch64 vs riscv
-#			    exactly this one.
+#			    exactly this one).  scratchpad/t150-rename-gap.sh is
+#			    the N-way replacement, because sweep.sh compares TWO
+#			    object sets -- the two-back-end habit written into
+#			    the very instrument meant to police it.
 MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
+  extract_base_offset_in_addr \
   linux_libc_has_function \
   linux_libm_function_max_error \
-  linux_fortify_source_default_level \
-  extract_base_offset_in_addr
+  linux_fortify_source_default_level
 
 MULTI_TARGET_RENAMES =
 
@@ -4764,6 +4784,17 @@ build/genpreds.o : BUILD_CPPFLAGS += \
 build/genattr.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 build/genattrtab.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# The SINGULAR genemit writes the insn-emit-*.cc that $(OBJS) links, and it
+# defined the bare `add_clobbers' / `added_clobbers_hard_reg_p' that combine.o,
+# recog.o, gcse.o and rtl-ssa/changes.o call.  Both switch on an insn code,
+# which is per base, so every back end's clobbers were looked up in the
+# primary's table and fell through to its `gcc_unreachable ()'.  The singular
+# run must now SKIP those two so multi-target-select.cc can define them as
+# forwarders; gen_target_ns () is null in it, so -- exactly as for
+# genconstants, genpreds, genattr and genattrtab above -- this flag is the
+# only way it can know it is on a multi-target build at all.
+build/genemit.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 # NO $(GTM_H) HERE, and none in gen-target-ns.o either: this is the program
 # that writes insn-constants.h, which $(GTM_H) contains.  Adding a target

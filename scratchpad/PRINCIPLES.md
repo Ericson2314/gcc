@@ -109,6 +109,35 @@ end** — and adding one is worth more than most individual conversions, because
 it converts a whole class of luck into evidence at once. Before writing that
 phrase, ask whether one more configured target would settle it.
 
+**AND AS OF TASK #150, A THIRD BACK END IS NOT A FREE ACTION — MEASURED, WITH
+THE BLOCKERS NAMED.** The paragraph above is right about *why* to want one and
+was silent about the cost. Four base sets were configured for #150 and **only
+`i386 + aarch64` yielded a usable `cc1`**:
+
+| base set | what stopped it |
+|---|---|
+| i386 aarch64 rs6000 s390 | `cc1` does not link: `print_operand`, `print_operand_address`, `legitimate_pic_operand_p`, `legitimize_pic_address`, `regclass_map` multiply defined |
+| i386 aarch64 riscv mips | `cc1` does not link: `extract_base_offset_in_addr`; and `insn_mips::unspecv_strings{,_len}` undefined |
+| i386 aarch64 riscv | links, but **x86_64 then ICEs in `multi_target_select`** — "back end 'i386' installs no garbage-collection markers"; and riscv's `cc1` **segfaults before parsing** |
+| i386 aarch64 | works |
+
+`extract_base_offset_in_addr` is fixed (a `MULTI_TARGET_RENAME_NAMES` entry —
+no shared TU names it, so each back end simply keeps its own). The rest are
+open and are **four independent causes**, not one.
+
+Three things this changes about how the lever should be described:
+
+- **"Configure more back ends" currently costs a debugging session per extra
+  base, not zero.** It is still the right lever; it is not the cheap one the
+  paragraph above implies. Budget for it.
+- **The `MULTI_TARGET_RENAME_NAMES` comment names `scratchpad/sweep.sh` as its
+  authority and that file DOES NOT EXIST**, and the check it describes is over
+  "the two object SETS" — the two-back-end habit written into the instrument
+  itself. `scratchpad/t150-rename-gap.sh` is the N-way replacement.
+- **The gengtype-marker and riscv-segfault failures appear only at three
+  bases**, so they were invisible to every measurement this branch has taken.
+  Expect more of these, and expect each new base to find its own.
+
 **THERE IS NO NON-ARCH-SPECIFIC `tm.h`, AND THERE NEVER WAS ONE.** This is the
 whole bug in one artefact, and it is worth reading the file before reasoning
 about it. The bare `gcc/tm.h` in a two-backend build is 1578 bytes whose
@@ -575,7 +604,14 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**The anchor value is 47 as of `1518ec4f96f`, not 45.** The `target_*` struct
+**The anchor value is 48 as of the `add_clobbers` selector (task #150)**, which
+added the `build/genemit.o : BUILD_CPPFLAGS += -DGEN_MULTI_TARGET` rule and its
+comment. It was 47 before that, and the paragraph below — written when 47 was
+new — is kept verbatim because its argument is the durable part and its number
+is not. **This is the third value this line has had. Do not treat the next
+change as a defect in the scripts.**
+
+**The anchor value was 47 as of `1518ec4f96f`, not 45.** The `target_*` struct
 sweep added a `DEPFILES` rule naming `MULTI_TARGET_REG_PROBES` twice. Every
 `*-conf.sh` written before that merge asserts `WANT_ANCHOR:-45` *exactly*, so
 they now refuse a **correct** tree with rc=9. That is the intended direction —

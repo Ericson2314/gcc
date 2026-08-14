@@ -206,6 +206,8 @@ tree ms_va_list_type_node;
   extern rtx_insn *peephole2_insns (rtx, rtx_insn *, int *);		\
   extern void insn_extract (rtx_insn *);				\
   extern const char *get_insn_name (int);				\
+  extern void add_clobbers (rtx, int);					\
+  extern bool added_clobbers_hard_reg_p (int);				\
   extern rtx_insn *peephole (rtx_insn *);				\
   extern void init_adjust_machine_modes (void);				\
   extern enum insn_code raw_optab_handler (unsigned);			\
@@ -303,6 +305,9 @@ struct mt_backend
   rtx_insn *(*peephole2_insns) (rtx, rtx_insn *, int *);
   void (*insn_extract) (rtx_insn *);
   const char *(*get_insn_name) (int);
+  /* Both switch on an insn code, which is per base; see genemit.cc.  */
+  void (*add_clobbers) (rtx, int);
+  bool (*added_clobbers_hard_reg_p) (int);
   rtx_insn *(*peephole) (rtx_insn *);
   void (*init_adjust_machine_modes) (void);
   enum insn_code (*raw_optab_handler) (unsigned);
@@ -360,14 +365,16 @@ MT_BACKENDS
 #define MT_BACKEND(BASE, NS)						\
   { #BASE, NS::recog, NS::split_insns, NS::peephole2_insns,		\
     NS::insn_extract,							\
-    NS::get_insn_name, NS::peephole, NS::init_adjust_machine_modes,	\
+    NS::get_insn_name,							\
+    NS::add_clobbers, NS::added_clobbers_hard_reg_p,			\
+    NS::peephole, NS::init_adjust_machine_modes,			\
     NS::raw_optab_handler, NS::init_all_optabs,				\
     NS::swap_optab_enable, NS::partial_vectors_supported_p,		\
     MT_ENTRY_VERIFY (NS)						\
     mt_install_ ## BASE },
 static const struct mt_backend mt_backends[] = {
   MT_BACKENDS
-  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL,
     MT_ENTRY_VERIFY_NULL NULL }
 };
@@ -719,6 +726,27 @@ get_insn_name (int code)
   return mt_in_force ("get_insn_name")->get_insn_name (code);
 }
 
+/* THE TWO EMIT-FAMILY NAMES.  `recog' reports how many CLOBBERs a pattern is
+   short of, and these two say what to add and whether any of them is a hard
+   register.  Both switch on an INSN CODE, and insn codes are per base -- so
+   asking the primary is not a conservative answer, it is a lookup in the
+   wrong table.  It used to land on the primary's `default: gcc_unreachable
+   ()'.  genemit no longer defines the bare names in the un-namespaced run;
+   see the note there for why that suppression is what makes these legal.  */
+
+void
+add_clobbers (rtx pattern, int insn_code_number)
+{
+  mt_in_force ("add_clobbers")->add_clobbers (pattern, insn_code_number);
+}
+
+bool
+added_clobbers_hard_reg_p (int insn_code_number)
+{
+  return mt_in_force ("added_clobbers_hard_reg_p")
+	   ->added_clobbers_hard_reg_p (insn_code_number);
+}
+
 rtx_insn *
 peephole (rtx_insn *ins1)
 {
@@ -811,12 +839,14 @@ selected_partial_vectors_supported_p (void)
    a record of something that exists; it is the open problem, restated with
    what task #51 measured.
 
-   SIX bare names are supplied to every configured target by the PRIMARY's
+   SIX bare names WERE supplied to every configured target by the PRIMARY's
    un-namespaced insn-emit-*.o, measured on /tmp/b78 (x86_64 + aarch64) with
-   `nm' over every object in the link:
+   `nm' over every object in the link.  TWO OF THE SIX ARE NOW SELECTED --
+   `add_clobbers' and `added_clobbers_hard_reg_p', the forwarders below --
+   and FOUR REMAIN:
 
-     add_clobbers               <- combine.o recog.o rtl-ssa/changes.o
-     added_clobbers_hard_reg_p  <- gcse.o recog.o
+     add_clobbers               <- combine.o recog.o rtl-ssa/changes.o   DONE
+     added_clobbers_hard_reg_p  <- gcse.o recog.o                        DONE
      gen_blockage               <- builtins.o explow.o function.o
                                    insn-output-{i386,aarch64}.o
                                    mt-i386/i386.o mt-aarch64/aarch64.o
@@ -828,12 +858,21 @@ selected_partial_vectors_supported_p (void)
    UNSPECV_BLOCKAGE is 1 for i386 and 5 for aarch64, so aarch64 emits an
    unspec_volatile numbered 1 that its own recog matches at 5.
 
-   Writing the forwarders is NOT what is blocking this.  gcc/Makefile.in's OBJS
-   names BOTH $(MULTI_TARGET_OBJS) and the primary's un-namespaced
+   Writing the forwarders is NOT what was blocking this.  gcc/Makefile.in's
+   OBJS names BOTH $(MULTI_TARGET_OBJS) and the primary's un-namespaced
    $(INSNEMIT_SEQ_O), so a forwarder here collides with insn-emit-*.o
    immediately.  (The comment further down that file claiming OBJS names the
-   former "rather than" the latter is false; both are on the list.)  That hunk
-   belongs to whoever owns Makefile.in.
+   former "rather than" the latter is false; both are on the list.)
+
+   RESOLVED FOR THE FIRST TWO, and not by touching OBJS: genemit now declines
+   to WRITE `add_clobbers' / `added_clobbers_hard_reg_p' in the un-namespaced
+   run, so there is nothing left in insn-emit-*.o to collide with.  The rest
+   of that object -- gen_blockage and the other gen_* -- is untouched, so this
+   did not have to decide anything about the four below.  The same move is
+   NOT available to those four, for the reason two paragraphs down: whether
+   they are called at all is decided by HAVE_* out of the singular
+   insn-flags.h, so deleting the definition would change which code runs and
+   not merely who answers.
 
    And five of the six can take a uniform forwarder while ONE cannot: every
    configured base defines add_clobbers, added_clobbers_hard_reg_p,
