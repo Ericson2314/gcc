@@ -12838,10 +12838,49 @@ demonstrably fires -- it reported this collision before the fix.
       config/, which differs from this back end's cpu_type
 
 This is not a selftest failure -- it happens BEFORE any selftest runs, and it
-means **no x86_64 measurement of any kind is possible in this build**.  The
-cause is named by the diagnostic itself: `gengtype` keys the markers on the
-directory (`config/i386`) while the selection keys on `cpu_type`.  The brief
-put `gengtype` out of scope, so it is reported and not touched.
+means **no x86_64 measurement of any kind is possible in this build**, which is
+also why `stock-compare` cannot be taken here (see section 7).
+
+**The diagnostic's own explanation is not the cause, and the real one is a
+THIRD-BACK-END defect of the same shape as section 5.**  The message blames a
+`cpu_type` vs `config/` directory mismatch; for i386 those agree.  Read the
+generated installer instead (`<objdir>/gcc/gtype-desc.cc:13037`):
+
+    bool gt_multi_target_install_markers (const char *base)
+    {
+      if (strcmp (base, "i386")    == 0) { ...machine_function_i386...    }
+      if (strcmp (base, "riscv")   == 0) { ...machine_function_riscv...   }
+      if (strcmp (base, "aarch64") == 0) { ...machine_function_aarch64... }
+      if (strcmp (base, "riscv")   == 0) { ...registered_function_riscv...   }
+      if (strcmp (base, "aarch64") == 0) { ...registered_function_aarch64... }
+      return gt_ggc_mx_machine_function_sel != NULL
+             && gt_ggc_mx_registered_function_sel != NULL;
+    }
+
+**Two** tags are dispatched.  All three bases supply `machine_function`.  Only
+aarch64 and riscv supply `registered_function` -- **i386 has no such type at
+all** (it is the SVE/RVV builtin-registration struct).  The return is an AND
+over EVERY dispatched tag, so i386 supplies one of two and is rejected.
+
+`gengtype.cc:4416` states the AND as deliberate: "A back end must supply a
+routine for EVERY dispatched tag or it is not installed at all: a partial
+install would leave some dispatcher holding the previously selected back end's
+routine."  The reasoning is right about a back end that FAILS to supply a
+routine and wrong about one that **does not define the type**.  Nothing will
+ever walk a `registered_function` for i386, because i386 has none; requiring a
+marker for it requires the impossible.
+
+**And it cannot happen with two back ends.**  Dispatch needs `TYPE_LANG_STRUCT`,
+i.e. two or more variants of the tag.  With i386 + aarch64, `registered_function`
+has ONE definer, so it is a plain struct, is not dispatched, and the AND has
+only `machine_function` in it -- which i386 supplies.  Adding riscv gives the
+tag a second definer, dispatch turns on, and i386 starts failing a test about a
+type it does not have.  Same lesson as section 5, different mechanism: the pair
+cannot tell.
+
+The brief put `gengtype` out of scope and another agent is live on it, so this
+is reported, not fixed.  The shape of the fix is "supply a routine for every
+dispatched tag THIS BACK END DEFINES", not "for every dispatched tag".
 
 ### 6.2 THE riscv DRIVER SEGFAULTS -- ONE SHARED `multilib_select`
 
@@ -12879,3 +12918,52 @@ Neither is a mode hole; both are the back ends' own selftests failing:
 
 These are what the suite is FOR, and they are the reason it is worth having
 switched on.  Neither is investigated here.
+
+## 7. BARS -- ONE OF THEM CANNOT BE TAKEN, AND THE HARNESS SAID SO ITSELF
+
+    make cc1 (3 bases)      rc=0
+    scratchpad/sweep.sh     PASSES, all three pairs, AND it fired before the
+                            fix -- so it can fail
+    aarch64 compiles        rc=0, correct aarch64 code
+    riscv compiles          rc=0, correct riscv code
+    aarch64 selftests       rc=0, 7677790 pass(es)   (back-end tests bypassed)
+    riscv selftests         rc=0, 8439208 pass(es)   (back-end tests bypassed)
+    MULTI_TARGET anchor     47
+    stock-compare           **UNSCORABLE -- 0/5 levels, rc=1**
+
+**The stock-compare failure is NOT this change and must not be read as one.**
+`stock-compare.sh` compiles with the **x86_64** target selected, and x86_64
+cannot select itself in this build for the `gengtype` reason in section 6.1 --
+which was observed on the FIRST selftest run of this task, **before** the
+`genmodes` change was applied.  So the bar is blocked upstream of anything
+here.
+
+What the harness did is exactly right and worth recording as a success of the
+instrument rather than a failure of the run: it scored every level
+`UNSCORABLE -- not compared, counts as failure`, printed
+`FATAL: only 0 of 5 levels were comparable -- this run proves nothing`, and its
+NEGATIVE CONTROL refused to assert anything
+(`FATAL: negative control had no real operands -- it asserts NOTHING`) rather
+than reporting the "ok, differs" that a missing-file comparison used to give.
+This is the false-green protection firing on a live event.
+
+**Consequence for the branch: the pair-control bars quoted in briefs
+(`12369 bytes / 378fc33c1e70`, `stock-compare 5/5`) cannot currently be
+reproduced in a THREE-base build at all.**  Anyone asked to reproduce them
+needs either the gengtype fix or a two-base tree, and should say which.
+
+## 8. WHAT THIS DOES NOT CLAIM
+
+  * The vector half of the exposure -- 382 / 307 / 119 modes -- is closed by
+    the same fix, but **no selftest exercises it**, because the runs abort in
+    the back ends' own selftests before `test_vector_ops` (simplify-rtx.cc:9899)
+    is reached.  The scalar-int half is measured end to end; the vector half is
+    measured only in the generated tables.
+  * The 28 Shape-A sites are asserted to be REPAIRED by reclassification on the
+    argument that their class predicate now rejects holes.  Only the three in
+    `simplify-rtx.cc` were actually exercised.
+  * `x86_64` is entirely unmeasured -- selftests, codegen and stock-compare --
+    for the section 6.1 reason.
+  * Only strong symbols are swept; COMDAT collisions are not visible.
+  * `arm` also defines `extract_base_offset_in_addr` and is covered by the
+    rename, but arm was not configured and so was not built.
