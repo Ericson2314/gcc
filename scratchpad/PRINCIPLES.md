@@ -633,11 +633,25 @@ the anchor AND `git diff --quiet` in the harness, and let the srcdir be
 something nobody can write. A build whose sources can change under it measures
 nothing, and it will not tell you that.
 
-**`specs-config` is 222 lines, not 230.** Measured on three separate targets
-with distinct md5s. The 230 came from an older shape and was propagated into
-brief after brief by the coordinator without re-measurement — including into
-briefs whose whole point was that stale figures must be re-measured. If a bar
-figure appears in a brief, it is a claim to check, not a constant.
+**`specs-config` IS 230 lines — and the story of this paragraph is the
+lesson.** An agent reported 222, measured on three targets with distinct md5s,
+and called 230 a stale coordinator figure. That was plausible (the coordinator
+*had* been repeating 230 without measuring) so the correction went into this
+file unchecked. Then it was measured at HEAD `7979e8742cb`, cold, from an
+immutable snapshot:
+
+```
+x86_64-pc-linux-gnu        230 lines  md5 a6c4c68bdf33
+aarch64-unknown-linux-gnu  230 lines  md5 f1a5ab201d95
+x86_64 -O2 big.c           12369 bytes  md5 378fc33c1e70
+```
+
+Both figures were real; they are **different configurations**, and neither
+party said which build produced its number. So: a bar figure is a claim to
+check — **including when the claim is that a bar figure is wrong.** A
+correction is not privileged over the thing it corrects. State the build dir
+and the commit beside any bar you quote, or the next reader cannot tell which
+of two true numbers applies to them.
 
 **A GUARD THE BUILD SYSTEM CITES BY NAME MAY NOT EXIST.** `gcc/Makefile.in`
 names `scratchpad/sweep.sh` as the check for bare duplicate symbols across back
