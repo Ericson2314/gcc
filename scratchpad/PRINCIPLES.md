@@ -604,10 +604,21 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**THE ANCHOR VALUE IS 50 as of `89883e54f02`** (the eleven-back-end merge).
-Fourth value this line has had — 45 → 47 → 48 → 50. Set `WANT_ANCHOR=50`.
-Everything the paragraphs below say about *why* the assert stays exact still
-holds; only the number moved, which is the point they make.
+**THE ANCHOR VALUE IS 52 as of the sixteen-back-end link (#167).** Fifth value
+this line has had — 45 → 47 → 48 → 50 → 52. Set `WANT_ANCHOR=52`. Everything
+the paragraphs below say about *why* the assert stays exact still holds; only
+the number moved, which is the point they make.
+
+**AND THE LAST TWO MOVES CAME FROM COMMENT PROSE, NOT FROM MECHANISM.** 50 → 52
+is two `MULTI_TARGET_*` names appearing inside an explanatory comment block in
+`gcc/Makefile.in`. That is worth saying out loud because it predicts the shape
+of the next false alarm: an agent diffing the anchor against the *rules* will
+find nothing changed and conclude a script is broken. The anchor is a content
+hash of one file, deliberately including its comments — which is what makes it
+catch a stale tree at all. Do not "fix" it by narrowing the grep to rule lines;
+that would make it blind to exactly the tree-staleness it exists to detect.
+
+**THE ANCHOR VALUE WAS 50 as of `89883e54f02`** (the eleven-back-end merge).
 
 **The anchor value was 48 as of the `add_clobbers` selector (task #150)**, which
 added the `build/genemit.o : BUILD_CPPFLAGS += -DGEN_MULTI_TARGET` rule and its
