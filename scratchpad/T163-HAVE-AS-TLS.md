@@ -1,5 +1,82 @@
 # T163 — converting `HAVE_AS_TLS` to a runtime capability
 
+## LANDED in `e35cbd1f730` (task #181). What is measured and what is NOT.
+
+The plan below is what was built, with one correction: **`MD-COND` needed no
+edits at all.** The generator wall is real but it is answered by a *constant*,
+not by a declaration — `#if defined (GENERATOR_FILE) || defined
+(USED_FOR_TARGET)` / `#define HAVE_AS_TLS 1` in the seven headers that carried
+the dead floors, which is the shape `rs6000.h` already used for its five
+assembler capabilities. gencondmd then sees exactly what `auto-host.h` used to
+give it, the conditions stay non-constant, and the final `insn-*.cc` read
+`targ_caps.as_tls` through `tm.h` → `defaults.h`.
+
+**MEASURED.** 47-back-end build from immutable snapshot `/tmp/snap2-…`
+(`e35cbd1f730`, anchor 49), and a completed 3-base build at `ba415463e56` for
+the before side.
+
+- **47 of 47 `build/gencondmd-<triple>.o` compile** with `HAVE_AS_TLS` gone
+  from `auto-host.h`. That is the whole of the "one generator" blocker, over
+  every back end, and it is the arm that would have failed loudly had any
+  header's block been missing or misplaced.
+- **`insn-conditions-<key>.md`, 22 keys carrying TLS conditions, 102 total, 92
+  non-constant (`-1` = decide at run time).** `tb1-mdtable.sh`. The ten
+  constants are *not* a loss and are unchanged by this work:
+
+  ```
+  2  (0 "TARGET_XCOFF && HAVE_AS_TLS")             rs6000, folded by TARGET_XCOFF
+  2  (0 "(TARGET_XCOFF && HAVE_AS_TLS) && (TARGET_32BIT)")
+  2  (0 "(TARGET_XCOFF && HAVE_AS_TLS) && (TARGET_64BIT)")
+  4  (1 "HAVE_AS_TLS")                             alpha, frv
+  ```
+
+  The `0`s fold on `TARGET_XCOFF`, which is a compile-time 0 in a
+  powerpc64-linux `tm.h`, and did so before. The `1`s are the **documented
+  residual**: a *bare* `"HAVE_AS_TLS"` condition is a constant expression to
+  gencondmd, so it folds to 1 and the pattern is kept but not decided per
+  target. Identical to what happened when `auto-host.h` supplied the 1, and it
+  is the safe direction — the pattern exists and `target_have_tls_p ()` at the
+  hook level is what stops it being used. Same gap `defaults.h:1706` already
+  records for `as_pltseq`, `as_rel16` and `as_loongarch_tls_le_relaxation`.
+  **Two back ends, one condition each.**
+- **BEFORE, both-sided, from a stamped rc=0 build**: `HAVE_AS_TLS` reads `1` in
+  `expr.o` and in `mt-xstormy16/xstormy16.o` (`tb1-macro.sh`), and
+  `tb1-tls.sh` reports **IDENTICAL** — two `cc1` runs differing only in an
+  `as_tls` line produce the same 392 bytes, md5 `b94fddbf8606`, zero `__emutls`
+  hits either way. That is the negative control firing: on a pre-#163 compiler
+  `as_tls` is an unknown key and `read_target_caps` drops it silently, so
+  "TLS still works" and "the capability is not wired" are the same output.
+
+**NOT MEASURED, and this is the work queue, not a claim.** The 47-base build
+and a 3-base `i386 + aarch64 + rs6000` build were both still in the
+libbackend/frontend compile phase when this was written — the host was at load
+48 from five concurrent agents and both had slowed to tens of log lines an
+hour. Neither produced a `cc1`, so:
+
+- **the AFTER side of `tb1-tls.sh` is unrun.** Run it on any build of
+  `e35cbd1f730` or later; it must report `as_tls 1` → real TLS, `as_tls 0` →
+  `__emutls`. Anything else is a failure and the script says which.
+- **the AFTER side of `tb1-macro.sh` is unrun.** `HAVE_AS_TLS` must read
+  `(targ_caps.as_tls)` in a compiler-proper object, against the `1` recorded
+  above.
+- **the hand-written back-end edits are compiled only as headers so far.** The
+  18 unwrapped hook-table guards and the 7 `TARGET_HAVE_TLS HAVE_AS_TLS` →
+  `true` conversions live in `mt-<cpu>/<cpu>.o`, a phase neither build
+  reached. `arc`, `m68k`, `microblaze`, `or1k`, `pa`, `sh`, `ia64`, `alpha`,
+  `frv`, `loongarch`, `mips`, `xtensa`, `s390`, `riscv`, `arm`, `sparc`,
+  `rs6000`, `aarch64`, `i386` are the files to watch.
+- the one `error:` in the 47-base log is
+  `build/gen-target-specs-amdgcn_unknown_amdhsa.o: gtype-desc.h: No such file`,
+  the `-k` ordering artefact already recorded in `T157-STUBS.md:534`,
+  `T173-BASE-HEADER.md:39`, `T176-TMH.md:287` and `STATE.md:70`. Not this work.
+
+Instruments: `tb1-tls.sh` (end-to-end, non-vacuity arm first),
+`tb1-mdtable.sh` (artefact-only, safe on an unfinished build and says so),
+`tb1-mdcond.sh` (log-based, refuses an unstamped log), `tb1-macro.sh`,
+`tb1-floors.sh`, `tb1-hooks.sh`, `tb1-hookval.sh`, `tb1-consumers.sh`.
+
+---
+
 Measured census: `scratchpad/t163-census.sh` (run it; do not quote from here).
 At `846a695c863` it reads **118 non-ChangeLog sites over 19 back ends**.
 
