@@ -2128,7 +2128,7 @@ spilled_pseudo_p (rtx op)
 static inline bool
 general_constant_p (rtx x)
 {
-  return CONSTANT_P (x) && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (x));
+  return CONSTANT_P (x) && (! flag_pic || mt_legitimate_pic_operand_p (x));
 }
 
 static bool

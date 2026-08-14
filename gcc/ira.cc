@@ -385,6 +385,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "output.h"
 #include "reload.h"
+/* For mt_legitimate_pic_operand_p.  The other five shared users of that
+   funnel already include this header for base_reg_class and friends; this
+   file did not, because it names only the one macro.  */
+#include "addresses.h"
 #include "cfgloop.h"
 #include "lra.h"
 #include "dce.h"
@@ -4342,8 +4346,8 @@ setup_reg_equiv (void)
 		|| ! flag_pic
 		/* A function invariant is often CONSTANT_P but may
 		   include a register.  We promise to only pass
-		   CONSTANT_P objects to LEGITIMATE_PIC_OPERAND_P.  */
-		|| LEGITIMATE_PIC_OPERAND_P (x))
+		   CONSTANT_P objects to mt_legitimate_pic_operand_p (addresses.h).  */
+		|| mt_legitimate_pic_operand_p (x))
 	      {
 		/* It can happen that a REG_EQUIV note contains a MEM
 		   that is not a legitimate memory operand.  As later

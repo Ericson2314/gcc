@@ -833,6 +833,44 @@ void add_subclass (type_p base, type_p subclass)
    divergence, and it is the reason this one was found rather than silently
    walking another back end's `machine_function'.  */
 
+/* Every back-end source directory gengtype has read a definition from, in
+   first-seen order.  A hand-rolled list rather than `vec': gengtype is a
+   BUILD tool, compiled against bconfig.h, and vec.h is not available to it --
+   the first draft used one and failed with "`vec' does not name a type; did
+   you mean `iovec'?", which names the header and not the reason.  */
+struct mt_base_seen
+{
+  const char *name;
+  struct mt_base_seen *next;
+};
+static struct mt_base_seen *mt_bases_seen;
+
+/* Record BASE as a back end this run knows about, and return it.
+
+   THIS SET IS DELIBERATELY WIDER THAN "back ends with a dispatched tag", and
+   the difference is the whole repair of gt_multi_target_install_markers below.
+   Only 33 of the 47 in-tree back ends define `struct GTY(()) machine_function'
+   and only three define `registered_function'; a back end that defines neither
+   still has files under config/<dir>/ that gengtype parses, so it is still a
+   back end gengtype has seen.  Deriving the known set from the dispatched tags
+   instead would make "this back end defines no per-base GC type" and "this
+   back end does not exist" the same answer -- absence of an artefact read as
+   absence of a mechanism.  */
+
+static const char *
+mt_note_base (const char *base)
+{
+  struct mt_base_seen *b, **tail = &mt_bases_seen;
+
+  for (b = mt_bases_seen; b; tail = &b->next, b = b->next)
+    if (strcmp (b->name, base) == 0)
+      return base;
+  b = XCNEW (struct mt_base_seen);
+  b->name = xstrdup (base);
+  *tail = b;
+  return base;
+}
+
 const char *
 mt_config_dir_of_file (const input_file *inpf)
 {
@@ -855,7 +893,7 @@ mt_config_dir_of_file (const input_file *inpf)
   q = strchr (p, '/');
   if (q == NULL || q == p)
     return NULL;
-  return xstrndup (p, q - p);
+  return mt_note_base (xstrndup (p, q - p));
 }
 
 /* The back end structure S was defined by, or NULL if it is not a back end's
@@ -4416,19 +4454,72 @@ mt_write_dispatchers (type_p structures)
 
   /* The installer is emitted even when there is nothing to install, so that
      multi-target-select.cc links either way and a build with one back end is
-     not a different program from a build with several.  */
+     not a different program from a build with several.
+
+     WHAT THIS FUNCTION RETURNS, AND WHAT IT USED TO RETURN.
+
+     It reports whether BASE is a back end THIS gengtype run has seen -- the
+     name check mt_config_dir_of_file's comment describes, which exists to
+     catch a back end whose cpu_type and whose config/ directory disagree
+     (`config/stormy16/' vs cpu_type `xstormy16', since renamed).
+
+     It used to return the conjunction
+
+	 gt_ggc_mx_machine_function_sel != NULL
+	 && gt_ggc_mx_registered_function_sel != NULL
+	 && ...
+
+     over EVERY dispatched tag, on the reasoning quoted below it that "a back
+     end must supply a routine for every dispatched tag or it is not installed
+     at all".  THAT PREMISE IS FALSE, and measurably so: `machine_function' is
+     defined by 33 of the 47 in-tree back ends and `registered_function' by
+     THREE (aarch64, arm, riscv), so the conjunction is false for 44 back ends
+     including i386.  A three-base build therefore stopped in
+     multi_target_select with "back end 'i386' installs no garbage-collection
+     markers", and the diagnostic's own explanation -- that the cpu_type and
+     the directory differ -- was wrong about its own cause.  This was invisible
+     to every i386 + aarch64 measurement on this branch only because such a
+     build never reaches a third base; it is false for i386 there too, and the
+     pair build is exempt for no reason a reader could have predicted.
+
+     The property the conjunction was reaching for is real: a dispatcher left
+     holding the PREVIOUSLY selected back end's routine is a silent
+     wrong-layout walk.  But refusing to install is not what prevents that --
+     RESETTING IS, and the reset below is unconditional and complete.  After
+     it, a tag this base does not define has a null dispatcher, and the
+     dispatcher emitted above answers a null by calling
+     gt_multi_target_no_marker, which fails BY NAME at the point of use.  That
+     is a stronger check than the conjunction and it cannot produce a false
+     positive: it fires when something actually tries to walk the type, not
+     when a back end merely declines to define it.  */
   oprintf (of, "\nbool\ngt_multi_target_install_markers "
 	   "(const char *base ATTRIBUTE_UNUSED)\n{\n");
-  if (ndispatch == 0)
-    oprintf (of, "  /* No tag is defined by more than one back end.  */\n"
-	     "  return true;\n}\n");
-  else
+
+  if (ndispatch != 0)
     {
-      /* Collect the set of back ends over all dispatched tags.  A back end
-	 must supply a routine for EVERY dispatched tag or it is not installed
-	 at all: a partial install would leave some dispatcher holding the
-	 previously selected back end's routine, which is the same silent
-	 wrong-layout walk in a subtler form.  */
+      /* THE RESET, AND IT COMES FIRST.  Every dispatcher goes null before any
+	 is set, so selecting a second back end cannot leave the first one's
+	 routine live for a tag the second does not define.  Written as a
+	 separate pass rather than folded into the per-base blocks because
+	 only a pass that runs for EVERY base can have that property.  */
+      oprintf (of, "  /* Reset first: see mt_write_dispatchers.  */\n");
+      for (s = structures; s; s = s->next)
+	{
+	  bool have_variant = false;
+	  if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
+	    continue;
+	  if (s->gc_used != GC_POINTED_TO && s->gc_used != GC_MAYBE_POINTED_TO)
+	    continue;
+	  for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
+	    if (mt_variant_base (s, ss) != NULL)
+	      have_variant = true;
+	  if (!have_variant)
+	    continue;
+	  const char *tag = filter_type_name (s->u.s.tag);
+	  oprintf (of, "  gt_ggc_mx_%s_sel = NULL;\n", tag);
+	  oprintf (of, "  gt_pch_nx_%s_sel = NULL;\n", tag);
+	}
+
       for (s = structures; s; s = s->next)
 	{
 	  if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
@@ -4449,33 +4540,22 @@ mt_write_dispatchers (type_p structures)
 	      oprintf (of, "    }\n");
 	    }
 	}
-      /* Report whether every dispatcher now has a routine.  The caller turns
-	 a false into a diagnostic naming the back end; see
-	 multi_target_select.  */
-      oprintf (of, "  return");
-      {
-	bool first = true;
-	for (s = structures; s; s = s->next)
-	  {
-	    bool have_variant = false;
-	    if (s->kind != TYPE_LANG_STRUCT || s->u.s.base_class)
-	      continue;
-	    if (s->gc_used != GC_POINTED_TO
-		&& s->gc_used != GC_MAYBE_POINTED_TO)
-	      continue;
-	    for (type_p ss = s->u.s.lang_struct; ss; ss = ss->next)
-	      if (mt_variant_base (s, ss) != NULL)
-		have_variant = true;
-	    if (!have_variant)
-	      continue;
-	    const char *tag = filter_type_name (s->u.s.tag);
-	    oprintf (of, "%s gt_ggc_mx_%s_sel != NULL",
-		     first ? "" : "\n	 &&", tag);
-	    first = false;
-	  }
-      }
-      oprintf (of, ";\n}\n");
     }
+
+  /* The name check.  mt_bases_seen is every config/<dir>/ gengtype read a
+     definition from, which is wider than the set with a dispatched tag -- see
+     mt_note_base for why that width is the point.  */
+  {
+    struct mt_base_seen *b;
+    oprintf (of, "  return");
+    if (mt_bases_seen == NULL)
+      oprintf (of, " true /* gengtype read no back end's sources */");
+    else
+      for (b = mt_bases_seen; b; b = b->next)
+	oprintf (of, "%s strcmp (base, \"%s\") == 0",
+		 b == mt_bases_seen ? "" : "\n	 ||", b->name);
+    oprintf (of, ";\n}\n");
+  }
 }
 
 /* Nonzero if S is a type for which typed GC allocators should be output.  */

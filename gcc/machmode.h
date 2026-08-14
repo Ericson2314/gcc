@@ -1364,4 +1364,45 @@ gt_pch_nx (pod_mode<T> *, gt_pointer_operator, void *)
 {
 }
 
+/* THE WIDEST INTEGER MODE THE SELECTED BACK END ACTUALLY HAS.
+
+   `MAX_MODE_INT' is not that.  It is an enumerator in the SINGULAR
+   insn-modes.h, whose mode vocabulary is unioned over every configured back
+   end, so it names the widest integer mode SOME back end has.  Shared code
+   reads it as "the widest this one has" -- the `HAVE_V8HFmode' disguise in
+   PRINCIPLES 3, where the UNION's answer leaks rather than the primary's.
+
+   Measured on a four-back-end cc1 (i386, aarch64, rs6000, s390) compiling
+   `int f (int a, int b) { return a + b * 3; }' for s390x:
+
+     expr.cc:936     `oldmode = MAX_MODE_INT' for a CONST_INT of unknown mode
+     MAX_MODE_INT    E_XImode -- i386's 64-byte AVX-512 integer mode
+     s390            has no XImode, so it is a HOLE: class MODE_RANDOM,
+		     precision 0
+     rtl.h:2326      `as_a <scalar_mode> (E_XImode)' -> hard abort
+
+   `internal compiler error: in as_a, at machmode.h:416', during RTL expand,
+   for powerpc64le and s390x and for NEITHER of the two bases every
+   measurement on this branch has been taken with.
+
+   The walk down from MAX_MODE_INT is the idiom expmed.cc:226 already uses and
+   documents for the same constant -- skip the holes, because the class now
+   correctly says "absent" for them.  Asking `mode_class' is asking THE
+   SELECTED BASE, since it is one of the per-base tables multi_target_select
+   installs, so the answer is this back end's own and not another's.
+
+   On a single-target build there are no holes, the loop exits on its first
+   iteration, and this is MAX_MODE_INT by another name.  */
+
+inline scalar_int_mode
+widest_int_mode_for_target (void)
+{
+  for (int m = (int) MAX_MODE_INT; m >= (int) MIN_MODE_INT; m--)
+    if (is_a <scalar_int_mode> ((machine_mode) m))
+      return as_a <scalar_int_mode> ((machine_mode) m);
+  /* Not floored: a back end with NO integer mode at all is not a thing that
+     can be compiled for, and answering QImode here would be inventing one.  */
+  gcc_unreachable ();
+}
+
 #endif /* not HAVE_MACHINE_MODES */

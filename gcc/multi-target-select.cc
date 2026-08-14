@@ -642,20 +642,30 @@ multi_target_select (const char *target)
 	   shape as the six above: the per-base routines were the missing half,
 	   and this line is the half that chooses between them.
 
-	   It fails BY NAME when the back end supplies no routines.  The name
-	   this looks up is the back end's `cpu_type', while gengtype names its
-	   routines after the SOURCE DIRECTORY the definition came from.  Those
-	   agree for every in-tree back end -- but only since `config/stormy16/'
-	   was renamed to `config/xstormy16/' to match its cpu_type; before
-	   that, selecting xstormy16 stopped the compiler HERE, which is this
-	   check having done its job.  It stays for the next one: a mismatch
-	   stops the compiler with the back end named, rather than leaving a
-	   dispatcher pointing at whichever back end was selected before.  */
+	   IT IS A NAME CHECK AND NOTHING ELSE, and saying so is a correction.
+	   The name this looks up is the back end's `cpu_type', while gengtype
+	   names its routines after the SOURCE DIRECTORY the definition came
+	   from.  Those agree for every in-tree back end -- but only since
+	   `config/stormy16/' was renamed to `config/xstormy16/' to match its
+	   cpu_type; before that, selecting xstormy16 stopped the compiler HERE,
+	   which is this check having done its job.
+
+	   The installer USED TO return a conjunction over every dispatched tag
+	   instead, and this diagnostic's text was written to explain that.  The
+	   conjunction was false for 44 of the 47 back ends -- `machine_function'
+	   has 33 definers and `registered_function' three -- so a three-base
+	   build stopped here with i386 named and an explanation that was not
+	   its cause.  Whether a back end DEFINES a per-base GC type is not a
+	   defect and must not be reported as one; whether anything ever WALKS a
+	   type this back end did not define is, and gengtype's dispatcher
+	   answers that one at the point of use, by name.  See
+	   mt_write_dispatchers.  */
 	if (!gt_multi_target_install_markers (base))
-	  internal_error ("back end %qs installs no garbage-collection markers "
-			  "for the types it defines; gengtype names them after "
-			  "the back end's source directory under config/, which "
-			  "differs from this back end's cpu_type", base);
+	  internal_error ("back end %qs is not a back end gengtype read any "
+			  "definition from; gengtype names its per-back-end "
+			  "marker routines after the source directory under "
+			  "%<config/%>, which for this back end differs from "
+			  "its %<cpu_type%>", base);
 
 	/* The C-family entry points -- TARGET_CPU_CPP_BUILTINS and
 	   REGISTER_TARGET_PRAGMAS -- are NOT installed here, and the reason is

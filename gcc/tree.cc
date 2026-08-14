@@ -9868,7 +9868,35 @@ build_common_tree_nodes (bool signed_char)
     }
   float128t_type_node = float128_type_node;
 #ifdef HAVE_BFmode
-  if (REAL_MODE_FORMAT (BFmode) == &arm_bfloat_half_format
+  /* `HAVE_BFmode' SAYS "SOME CONFIGURED BACK END HAS BFmode", NOT "THIS ONE
+     DOES", and the difference is a crash.
+
+     It comes out of the SINGULAR insn-modes.h, whose vocabulary is unioned
+     over every configured back end -- the `HAVE_V8HFmode' disguise in
+     PRINCIPLES 3, where the UNION's answer leaks rather than the primary's.
+     i386 and aarch64 have BFmode; rs6000 and s390 do not, so for those two
+     `BFmode' is a HOLE: a name in the shared numbering with no data behind
+     it.  `REAL_MODE_FORMAT' then takes its `gcc_unreachable ()' arm, because
+     a hole's class is not MODE_FLOAT, and a four-back-end cc1 died with
+
+	 <built-in>: internal compiler error: in build_common_tree_nodes,
+	 at tree.cc:9871
+
+     before parsing a line, for powerpc64le and s390x and for neither of the
+     two bases every measurement on this branch has been taken with.
+
+     THE FIX IS DOWNSTREAM OF THE UNION, NOT A RETREAT FROM IT (PRINCIPLES
+     2a).  `mode_class' is one of the per-base tables `multi_target_select'
+     installs, so asking it is asking THE SELECTED BASE whether it has this
+     mode.  A base without BFmode gets no `bfloat16_type_node' -- which is
+     that base's own answer, and exactly what upstream produces for it, where
+     `HAVE_BFmode' is simply undefined and this whole block is not compiled.
+     No back end reads another's value through this.
+
+     The class test comes FIRST because `REAL_MODE_FORMAT' is what aborts;
+     reordering these two conjuncts reinstates the crash.  */
+  if (GET_MODE_CLASS (BFmode) == MODE_FLOAT
+      && REAL_MODE_FORMAT (BFmode) == &arm_bfloat_half_format
       && targetm.scalar_mode_supported_p (BFmode)
       && targetm.libgcc_floating_mode_supported_p (BFmode))
     {
