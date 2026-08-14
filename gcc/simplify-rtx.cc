@@ -2044,8 +2044,12 @@ simplify_const_unary_operation (enum rtx_code code, machine_mode mode,
 	     the bits of the constant are significant, though, this is
 	     a dangerous assumption as many times CONST_INTs are
 	     created and used with garbage in the bits outside of the
-	     precision of the implied mode of the const_int.  */
-	  op_mode = MAX_MODE_INT;
+	     precision of the implied mode of the const_int.
+
+	     widest_int_mode_for_target, not MAX_MODE_INT: the union's widest
+	     integer mode may be a hole here, whose precision is 0, and
+	     rtx_mode_t would then build a zero-precision wide_int.  */
+	  op_mode = widest_int_mode_for_target ();
 	}
 
       real_from_integer (&d, mode, rtx_mode_t (op, op_mode), SIGNED);
@@ -2081,8 +2085,12 @@ simplify_const_unary_operation (enum rtx_code code, machine_mode mode,
 	     the bits of the constant are significant, though, this is
 	     a dangerous assumption as many times CONST_INTs are
 	     created and used with garbage in the bits outside of the
-	     precision of the implied mode of the const_int.  */
-	  op_mode = MAX_MODE_INT;
+	     precision of the implied mode of the const_int.
+
+	     widest_int_mode_for_target, not MAX_MODE_INT: the union's widest
+	     integer mode may be a hole here, whose precision is 0, and
+	     rtx_mode_t would then build a zero-precision wide_int.  */
+	  op_mode = widest_int_mode_for_target ();
 	}
 
       real_from_integer (&d, mode, rtx_mode_t (op, op_mode), UNSIGNED);
@@ -7235,8 +7243,13 @@ simplify_const_relational_operation (enum rtx_code code,
     {
       /* It would be nice if we really had a mode here.  However, the
 	 largest int representable on the target is as good as
-	 infinite.  */
-      machine_mode cmode = (mode == VOIDmode) ? MAX_MODE_INT : mode;
+	 infinite.
+
+	 widest_int_mode_for_target, not MAX_MODE_INT: see machmode.h -- the
+	 union's widest integer mode may be a hole for this back end.  */
+      machine_mode cmode
+	= (mode == VOIDmode) ? (machine_mode) widest_int_mode_for_target ()
+			     : mode;
       rtx_mode_t ptrueop0 = rtx_mode_t (trueop0, cmode);
       rtx_mode_t ptrueop1 = rtx_mode_t (trueop1, cmode);
 

@@ -7471,8 +7471,11 @@ expand_field_assignment (const_rtx x)
 	  if (!GET_MODE_PRECISION (GET_MODE (x0)).is_constant (&len))
 	    break;
 	  inner = SUBREG_REG (XEXP (SET_DEST (x), 0));
+	  /* widest_int_mode_for_target, not MAX_MODE_INT: the latter is the
+	     union's widest integer mode, which for this back end may be a
+	     hole, and gen_int_mode aborts in as_a <scalar_int_mode>.  */
 	  pos = gen_int_mode (subreg_lsb (XEXP (SET_DEST (x), 0)),
-			      MAX_MODE_INT);
+			      widest_int_mode_for_target ());
 	}
       else if (GET_CODE (SET_DEST (x)) == ZERO_EXTRACT
 	       && CONST_INT_P (XEXP (SET_DEST (x), 1)))

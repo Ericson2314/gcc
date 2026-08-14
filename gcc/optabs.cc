@@ -8349,8 +8349,14 @@ valid_multiword_target_p (rtx target)
 void
 create_integer_operand (class expand_operand *op, poly_int64 intval)
 {
+  /* Not MAX_MODE_INT.  That is the UNION's widest integer mode, i.e. the
+     widest SOME configured back end has; for this one it may be a hole with
+     precision 0, and `gen_int_mode' -> `trunc_int_for_mode' -> `as_a
+     <scalar_int_mode>' then aborts.  Measured: `__builtin_memcpy' at -O2 for
+     s390x, `in as_a, at machmode.h:416', through
+     emit_block_move_via_pattern.  */
   create_expand_operand (op, EXPAND_INTEGER,
-			 gen_int_mode (intval, MAX_MODE_INT),
+			 gen_int_mode (intval, widest_int_mode_for_target ()),
 			 VOIDmode, false, intval);
 }
 
