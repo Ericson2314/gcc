@@ -1,0 +1,258 @@
+# THE STOCK CONTROL — the multi-target board against unmodified GCC
+
+`#61` recorded it plainly: **no arm had ever compared against an unmodified
+GCC** except for x86_64. This is that control for `aarch64` and `s390x`, and
+it changes what every number on `TAA-BOARD.md` means.
+
+**Headline: aarch64's 98,027 FAIL and s390x's 46,009 FAIL are NOT the debt.**
+Most of each column is what upstream GCC does to that target in a compile-only
+run with no target libgcc. The debt is the part stock does not have.
+
+## 0. WHAT THE CONTROL COST TO GET RIGHT — read this before §2
+
+**The control had two defects of its own, and the first one produced a result
+that looked like success.** Both are recorded in full because both are this
+project's own recurring shape — a silent floor that reads as a measurement.
+
+| defect | how it presented | scale |
+|---|---|---|
+| `--with-native-system-header-dir` alone is **inert for a cross** (`cppdefault.cc` flags it `cross_include` and the driver drops it) | GCC's own `stdint.h` is an `#include_next` wrapper with nothing behind it: `fatal error: stdint.h: No such file` | **66,883** occurrences, the top cause of the whole stock run |
+| the cross was configured with `ORIGINAL_AS_FOR_TARGET = <nix gcc-wrapper>/bin/as` — **the HOST x86 assembler** — for *both* targets, wrapped as `gcc/as` | everything that assembles died; `gcc.c-torture/compile` drives `-c`, so `dg-do`'s compile-only downgrade never reaches it | **10,100** FAILs in that one directory on **both** targets; on s390x `invalid -march= option: 'z900'` **21,534** times |
+
+The first defect is the instructive one. With it in place the stock aarch64
+board read **84,572 PASS / 98,093 FAIL** against the multi-target board's
+**88,001 / 98,027** — *a FAIL column agreeing to 0.07%*. Two unrelated
+missing-header floors, one per side, summing to an apparent parity. Had that
+been reported, the project's acceptance bar would have been "aarch64 is
+already at parity with stock", which is false by roughly an order of
+magnitude.
+
+**The control has to be audited for its own floors before its agreement with
+the thing under test means anything.** Four guards now enforce it, all
+reading the *running* compiler rather than the build system:
+
+- **S2** `xgcc -dumpmachine` names the target back.
+- **S3** the target's own glibc headers are in `-E -v`'s search list **and** a
+  TU including `<stdint.h>` compiles.
+- **S4** `-print-prog-name=as` (not a Makefile grep — the defect was a wrapper
+  answering to the name `as`), then assemble a real function and require
+  `<target>-readelf -h` to name the machine. The host gas accepts an empty
+  file, so "no complaint" would have been another way to see nothing.
+- **G5a/G5b** the grafted `multi-target.exp` banner **and**, separately, the
+  compile-only banner. Without the graft `MT_COMPILE_ONLY` is silently inert
+  on the stock side and the control acquires a uniform link-FAIL floor.
+
+## 1. PROVENANCE — quote this with the board
+
+```
+multi-target side  /tmp/b-agent-aa9936ad7ccd9023c   (TAA-BOARD.md, unchanged,
+                   snapshot 555482db346, anchor 49, four bases)
+                   -- the .sum files were re-read, not re-run; the numbers
+                      reproduce TAA-BOARD.md exactly (aarch64 88001/98027)
+stock side         srcdir /tmp/snap-stock-agent-a3464debf6893de84
+                   = upstream c31b7a09eea (the branch's merge-base with
+                     upstream/master), git archive, read-only, no .git
+                   MULTI_TARGET anchor in gcc/Makefile.in = 0  (INVERTED
+                     assert: the control must not be the branch)
+                   + EXACTLY TWO testsuite files grafted from ba415463e56:
+                     lib/multi-target.exp verbatim, and one `load_lib' line
+                     at the same position gcc-dg.exp uses on the branch.
+                     NO compiler source is touched.
+                   builds /tmp/b-stock-agent-a3464debf6893de84-{aarch64,s390x}
+                     --target=<T> --enable-languages=c,lto --disable-bootstrap
+                     --disable-nls --disable-multilib --disable-werror
+                     --with-as/--with-ld = the same cross binutils the
+                       multi-target run uses (nixpkgs pkgsCross, binutils 2.46)
+                     --with-sysroot + --with-native-system-header-dir=/include
+                       = the same glibc headers, same store paths
+                     make all-gcc rc=0, `error:' 0, no target libgcc anywhere
+mode               MT_COMPILE_ONLY=1 on BOTH sides, same dg-do downgrade, same
+                   full suite, no exclusions, no RUNTESTFLAGS beyond
+                   GCC_UNDER_TEST.
+scripts            scratchpad/sc-{snap,conf,build,check,diff}.sh
+```
+
+**`--target` is used here and it is the stated exception**: this is a
+top-level configure of a cross compiler, the dispatcher case, and it is the
+only way a control exists at all — stock GCC has no `--enable-backends`.
+
+## 2. THE BOARDS
+
+```
+                        PASS      FAIL   XPASS   XFAIL   UNSUP    UNRES  ERROR
+aarch64-unknown-linux-gnu
+  multi-target         88001     98027       3     832   11012   133394     26
+  stock               344463     20443       2    1995    6731    17003      8
+  delta              -256462    +77584      +1   -1163   +4281  +116391    +18
+
+s390x-ibm-linux-gnu
+  multi-target         90464     46009       5     651    7811    13948     29
+  stock               130895     15627       2    1229    7440    12839      8
+  delta               -40431    +30382      +3    -578    +371    +1109    +21
+```
+
+**Stock aarch64 passes 344,463 tests where multi-target passes 88,001.** The
+multi-target FAIL column is not the interesting one — the **UNRESOLVED** column
+is, and it is `+116,391`: the compilation failed, so the test could not be run.
+
+**KILLED: 0 on every stock run** (`internal compiler error: Killed`,
+`terminated by signal 9`, `out of memory`) — counted, never subtracted.
+
+## 3. THE DEBT — `stock PASS -> multi-target NOT PASS`
+
+### 3a. aarch64 — **205,433 regressions**, and one cause is 95% of them
+
+```
+by multi-target verdict    121250 -> UNRESOLVED    84180 -> FAIL    3 -> XPASS
+top directories            194711  gcc.target/aarch64
+                            10093  gcc.c-torture/compile
+                              171  gcc.dg/compat
+                               28  gcc.dg/tree-ssa
+                               16  c-c++-common/torture
+                               14  gcc.c-torture/unsorted
+                               13  gcc.dg/torture
+
+DIRECTORY                  FAIL_MT   FAIL_ST     PASS_MT   PASS_ST
+gcc.target/aarch64           75306      2260        6441    211477
+gcc.c-torture/compile        10120         0         432     15044
+```
+
+**Only 12,922 aarch64 FAILs are shared with stock.** Against a board that read
+98,027 FAIL, the debt is 205,433 results — *larger* than the FAIL column,
+because most of it is UNRESOLVED, which no previous reading counted.
+
+`gcc.target/aarch64` alone is **194,711**, and `TAA-BOARD.md` §4 already names
+the cause: `extra_headers` is collected once for the legacy single `${target}`,
+so the build dir holds **only i386's intrinsic headers** and every test
+including `arm_neon.h`, `arm_sve.h` or `arm_neon_sve_bridge.h` dies. Stock
+ships those headers and passes 211,477 results in that directory against
+multi-target's 6,441. **That one build-system defect is worth 194,711 test
+results** — a number nobody could state before this control existed. (Another
+agent is live on `extra_headers`/`config.gcc`; this is that work's valuation, not a
+claim on it.)
+
+### 3b. s390x — **20,326 regressions**, against a 46,009 FAIL column. So **14,988 of
+the multi-target FAILs are stock's too** and are not this project's bug.
+
+```
+by multi-target verdict     19683 -> FAIL      643 -> UNRESOLVED
+top directories             9859  gcc.c-torture/compile
+                            2540  gcc.dg/torture
+                             987  gcc.target/s390
+                             887  gcc.dg/tree-ssa
+                             593  gcc.dg/vect
+                             326  c-c++-common/torture
+                             276  gcc.dg/debug
+                             253  gcc.dg/sso
+                             243  gcc.dg/params
+```
+
+**The cleanest single row in the whole exercise:**
+
+```
+DIRECTORY                  FAIL_MT   FAIL_ST     PASS_MT   PASS_ST
+gcc.c-torture/compile        11623         0        4872     15043
+gcc.dg/torture                5060        89       13284     16280
+gcc.dg/tree-ssa               1238         3        7962      8905
+gcc.dg/vect                   1186         2         949      1544
+gcc.target/s390                599         9        2225      3212
+c-c++-common/torture           652         0        2186      2512
+gcc.dg/sso                     506         0          17       270
+gcc.dg/params                  486         0           0       243
+```
+
+`gcc.c-torture/compile`: **stock fails zero, multi-target fails 11,623.** That
+directory alone is half the s390x debt and it is pure compile-and-assemble —
+no libgcc, no execution, nothing to excuse it.
+
+**And the ICEs are 100% debt.** Stock s390x's entire ICE population is the
+testsuite's own deliberate `I'm sorry Dave` plus 2 segfaults. The
+multi-target side, same target, same tests:
+
+```
+5782  internal compiler error: in as_a, at machmode.h:416
+4257  Segmentation fault
+1295  in s390_match_ccmode_set, at config/s390/s390.cc
+```
+
+`as_a, at machmode.h:416` is the site `TAA-BOARD.md` §4c already reports on
+**four** non-primary back ends. The control now says what that board could
+not: upstream does not do this at all.
+
+## 4. THE COMMON PART — real, and not this project's
+
+`12,922` aarch64 and `14,988` s390x FAILs are identical on both sides. The largest component is the
+link floor the compile-only downgrade cannot reach, because it wraps `dg-do`
+and some suites drive the compiler themselves:
+
+```
+stock s390x top diagnostic:  14126  error: ld returned 1 exit status
+gcc.c-torture/execute        FAIL_MT 15789   FAIL_ST 12750
+gcc.misc-tests/gcov-19.c     940 FAILs on BOTH sides, and on every target
+```
+
+**Do not subtract it.** It is stated so a reader can see how much of the FAIL
+column is not a multi-target observation at all.
+
+## 5. SCOPE DIFFERENCE — the two runs did not attempt identical work
+
+```
+aarch64   joined 324180   only stock 66465   only multi-target  7115
+          only-in-stock:  gcc.target/aarch64 12138, gcc.c-torture/execute 7872,
+                          gcc.dg/torture 7066, gcc.dg/vect 6036,
+                          c-c++-common/gomp 5046, gcc.c-torture/compile 4564
+s390x     joined 146313   only stock 21727   only multi-target 12604
+          only-in-stock:  c-c++-common/gomp 5044, gcc.dg/analyzer 4353,
+                          c-c++-common/analyzer 3191, c-c++-common/goacc 2843,
+                          gcc.dg/gomp 1722, gcc.dg/dfp 748
+```
+
+**The multi-target build declines whole test directories the stock build
+attempts** — the analyzer, OpenMP and OpenACC suites, ~21.7k results. That is
+itself an unexamined finding, not a defect in the comparison: those tests are
+not in the multi-target FAIL column *or* its PASS column. Anyone quoting §2's
+totals must read them beside this.
+
+## 6. PROVISIONAL, AND WHY
+
+The machine carried other agents throughout; load was 26–53 during these runs
+and 32 at scoring, **above the ~25 threshold**. KILLED is 0 on every stock
+run, and the conclusions in §3–§4 rest on counts in the thousands, so they
+stand. **Test-by-test diffing of individual rows from this board is not
+warranted at this load.**
+
+The multi-target side is `TAA-BOARD.md`'s own run, which was itself taken at
+load 8–25 and marked provisional there. Two provisional boards were compared;
+that is stated rather than hidden.
+
+## 7. WHAT THIS CHANGES ABOUT THE PROJECT'S BAR
+
+The acceptance bar is **parity with stock for that back end**, and it is now
+measurable, per target, per directory, per test name.
+
+```
+target    board FAIL   shared with stock   THE DEBT
+aarch64        98027              12922     205433   (121250 of it UNRESOLVED)
+s390x          46009              14988      20326
+```
+
+**Both directions of surprise appeared, as expected.** On aarch64 the debt is
+*larger* than the FAIL column, because 121,250 regressions are UNRESOLVED and
+no reading of the FAIL column could see them. On s390x a third of the FAIL
+column turns out to be upstream's own behaviour.
+
+The work queue, in order, with its price:
+
+1. **`extra_headers` per back end** — 194,711 aarch64 results. Already owned.
+2. **`gcc.c-torture/compile`** — 10,093 on aarch64 and 9,859 on s390x, and
+   **stock fails ZERO** in that directory on both. One directory, two targets,
+   ~20k results, pure compile-and-assemble.
+3. **`as_a, at machmode.h:416`** — 5,782 on s390x, and stock's entire ICE
+   population on that target is the testsuite's own deliberate ICE plus two
+   segfaults. `TAA-BOARD.md` §4c reports the same site on four non-primary
+   back ends.
+
+**What a stock run does NOT excuse.** The 940 `gcov-19.c` FAILs, the
+`ld returned 1 exit status` floor and the whole execution-shaped residue are
+present on both sides on both targets. They were never this project's bug and
+they are now measured rather than assumed.
