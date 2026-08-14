@@ -300,7 +300,8 @@ target_def_pointers_extend_kind (void)
 
 #include "hooks.h"
 #include "targhooks.h"
-#include "insn-target-def.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-target-def.h)
 
 #ifdef TARGETM_IS_INDIRECT
 

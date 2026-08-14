@@ -561,7 +561,8 @@ extern GCC_TARGET_TABLE (const struct insn_data_d, insn_data, );
 extern int peep2_current_count;
 
 #ifndef GENERATOR_FILE
-#include "insn-codes.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-codes.h)
 
 /* An enum of boolean attributes that may only depend on the current
    subtarget, not on things like operands or compiler phase.  */

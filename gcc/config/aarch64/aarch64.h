@@ -1284,7 +1284,8 @@ enum aarch64_abi_type
 #ifdef GENERATOR_FILE
 #define MACHMODE int
 #else
-#include "insn-modes.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-modes.h)
 #define MACHMODE machine_mode
 #endif
 

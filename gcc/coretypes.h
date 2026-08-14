@@ -543,11 +543,12 @@ typedef unsigned char uchar;
    back end's modes.  Which pair of generated headers to use is chosen on the
    command line; the configured target's is the default, which is what the
    compiler proper and the single-target build use.  */
+#include "multi-target-header.h"
 #ifndef INSN_MODES_H
-#define INSN_MODES_H "insn-modes.h"
+#define INSN_MODES_H MT_HEADER (insn-modes.h)
 #endif
 #ifndef INSN_MODES_INLINE_H
-#define INSN_MODES_INLINE_H "insn-modes-inline.h"
+#define INSN_MODES_INLINE_H MT_HEADER (insn-modes-inline.h)
 #endif
 
 #include INSN_MODES_H

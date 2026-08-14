@@ -20,7 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_OPTABS_LIBFUNCS_H
 #define GCC_OPTABS_LIBFUNCS_H
 
-#include "insn-opinit.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-opinit.h)
 
 rtx convert_optab_libfunc (convert_optab, machine_mode, machine_mode);
 rtx optab_libfunc (optab, machine_mode);

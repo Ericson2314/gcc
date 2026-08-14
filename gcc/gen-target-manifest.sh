@@ -580,7 +580,6 @@ ${AWK} '
       printf "\t  echo \047  every Init() value belonging to %s would stay zero.\047 >&2; \\\n", b
       printf "\t  exit 1; }\n"
       printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-init-%s.cc $@\n\n", b
-      printf "mt-%s/options-init.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
       printf "mt-%s/options-init.o: mt-%s/options-init.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
       # This TU sees that base'\''s tm.h, so it is on the
@@ -632,7 +631,6 @@ ${AWK} '
       printf "\t    exit 1; }; \\\n"
       printf "\tdone\n"
       printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-tables-%s.cc $@\n\n", b
-      printf "mt-%s/options-tables.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
       printf "mt-%s/options-tables.o: mt-%s/options-tables.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
       # -DMULTI_TARGET_SUPPLY_TU=1, EXACTLY AS options-init.o ABOVE, and it was

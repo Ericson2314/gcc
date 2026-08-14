@@ -20,7 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef EXPMED_H
 #define EXPMED_H 1
 
-#include "insn-codes.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-codes.h)
 
 /* For MULTI_TARGET_UNION_MAX_BITS_PER_WORD.  `struct target_expmed' below is
    allocated by target-globals.cc and read from back ends' own translation

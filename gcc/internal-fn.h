@@ -20,8 +20,9 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_INTERNAL_FN_H
 #define GCC_INTERNAL_FN_H
 
-#include "insn-codes.h"
-#include "insn-opinit.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-codes.h)
+#include MT_HEADER (insn-opinit.h)
 
 
 /* INTEGER_CST values for IFN_UNIQUE function arg-0.
