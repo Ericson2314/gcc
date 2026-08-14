@@ -1546,12 +1546,34 @@ MULTI_TARGET_INC =
 #			    linux.o would be better and wants a proof that the
 #			    object really is target-independent; renaming is
 #			    correct either way.)
+#   extract_base_offset_in_addr
+#			    defined bare, with the SAME SIGNATURE, by
+#			    aarch64.cc:30059, riscv.cc:14249 and arm.cc:34020,
+#			    and declared in each of their -protos.h.  Upstream
+#			    this is fine: one back end is linked.  Here it is a
+#			    hard `multiple definition' at the link of cc1.
+#
+#			    FOUND BY CONFIGURING A THIRD BACK END.  i386 does
+#			    not define this name, so the i386 + aarch64 pair
+#			    that everything on this branch is built with cannot
+#			    see it; adding riscv made it a build failure on the
+#			    first link.  This is the case the comment above
+#			    predicted -- "a name added to some back end later
+#			    collides silently" -- and the sweep it names as the
+#			    check DID NOT EXIST until it was written to find
+#			    this.  It now does: scratchpad/sweep.sh, which
+#			    compares the per-base object sets pairwise and
+#			    reports every colliding strong symbol by name.
+#			    Its reading on the three-base build is: aarch64 vs
+#			    i386 none, i386 vs riscv none, aarch64 vs riscv
+#			    exactly this one.
 MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
   linux_libc_has_function \
   linux_libm_function_max_error \
-  linux_fortify_source_default_level
+  linux_fortify_source_default_level \
+  extract_base_offset_in_addr
 
 MULTI_TARGET_RENAMES =
 
