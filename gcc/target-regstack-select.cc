@@ -26,7 +26,6 @@ along with GCC; see the file COPYING3.  If not see
    one indirection -- but rtl.h is needed for the declaration of
    `stack_regs_mentioned' to be in scope where it is defined, so that a
    signature drift is a compile error rather than a second overload.  */
-#include "tm.h"
 #include "rtl.h"
 #include "target-regstack.h"
 

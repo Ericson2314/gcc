@@ -25,7 +25,6 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "hooks.h"
 
 /* Generic hook that does absolutely zappo.  */

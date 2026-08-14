@@ -26,7 +26,6 @@
 #include "tree.h"
 #include "fold-const.h"
 #include "langhooks.h"
-#include "tm.h"
 #include "function.h"
 #include "cgraph.h"
 #include "toplev.h"

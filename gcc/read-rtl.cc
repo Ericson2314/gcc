@@ -30,7 +30,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "rtl.h"
 #include "obstack.h"
 #include "read-md.h"

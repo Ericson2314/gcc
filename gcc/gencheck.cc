@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 
 #define DEFTREECODE(SYM, NAME, TYPE, LEN) #SYM,
 #define END_OF_BASE_TREE_CODES
