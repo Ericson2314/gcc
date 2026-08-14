@@ -2920,4 +2920,4 @@ xstormy16_push_rounding (poly_int64 bytes)
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
-#include "gt-stormy16.h"
+#include "gt-xstormy16.h"

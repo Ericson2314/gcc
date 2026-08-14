@@ -269,7 +269,7 @@ TARGET_SPECIFIC_PAGES = {
     'gcc/V850-Options.html' : 'gcc/config/v850/',
     'gcc/VAX-Options.html' : 'gcc/config/vax/',
     'gcc/Visium-Options.html' : 'gcc/config/visium/',
-    'gcc/Xstormy16-Options.html' : 'gcc/config/stormy16/',
+    'gcc/Xstormy16-Options.html' : 'gcc/config/xstormy16/',
     'gcc/Xtensa-Options.html' : 'gcc/config/xtensa/',
     'gcc/eBPF-Options.html' : 'gcc/config/bpf/',
     'gcc/x86-Options.html' : 'gcc/config/i386/',

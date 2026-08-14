@@ -2517,6 +2517,49 @@ emit_mode_mask (void)
   print_closer ();
 }
 
+/* ASSESSED AND DELIBERATELY NOT "FIXED": `mode_inner[hole] = hole'.
+
+   A hole has no `component', so the expression below falls to `m->name' and a
+   hole is emitted as its own inner mode.  For a scalar mode that is upstream's
+   normal encoding -- `mode_inner[E_SImode]' really is `E_SImode' -- but a hole
+   exists in EVERY class of the shared numbering, including the vector classes,
+   so `GET_MODE_INNER' of a vector-class hole answers a vector-class mode.
+   That is a type-invariant violation, and a silent one:
+
+     machmode.h:626  mode_to_inner  returns  scalar_mode::from_int (mode_inner[mode])
+
+   and `from_int' is the unchecked constructor -- `scalar_mode::includes_p' is
+   never consulted on this path -- so nothing asserts, in a checking build
+   either.
+
+   THE OBVIOUS FIX IS UNAVAILABLE, AND THAT IS THE RESULT.  `emit_mode_2xwider'
+   twenty lines up meets the identical problem (a hole has size 0, so `0 == 2*0'
+   makes it its own 2x-wider) and answers `VOIDmode', "which every caller
+   already treats as none".  That substitution CANNOT be copied here, because
+   the two tables have different return types: `mode_2xwider' is read as a
+   `machine_mode', where VOIDmode is a legal value, and `mode_inner' is read as
+   a `scalar_mode', where it is not -- VOIDmode is `MODE_RANDOM' and fails
+   `scalar_mode::includes_p'.  So `scalar_mode' HAS NO REPRESENTABLE "NONE",
+   and every candidate value here is a lie of some kind; picking one would
+   move the wrongness rather than remove it, and would look like the 2xwider
+   guard while not being it.
+
+   WHAT WOULD ACTUALLY CLOSE IT, for whoever takes this next.  The property
+   that makes a hole safe everywhere else is that `FOR_EACH_MODE*' never walks
+   into one, so the question is never asked; the residue is code that reaches a
+   mode by ORDINAL rather than by walking.  Closing it therefore needs either
+   (a) a checked accessor -- make `mode_to_inner' assert `!mode_is_hole (mode)',
+   which needs a hole predicate exported into `insn-modes.h', currently absent,
+   and turns a silent wrong type into a diagnostic naming the mode; or
+   (b) `scalar_mode' gaining a none-value, which is a middle-end change far
+   outside genmodes.  (a) is the tractable one and is a task of its own: it is
+   an ARM, not a table edit, and it wants the both-sided evidence that no
+   configured back end reaches it in a normal compilation before it is turned
+   on.  Note that `mode_unit_size' and `mode_unit_precision' below take the
+   same `m->component ? ... : m->name' shape and so give a hole its own 0 --
+   there the answer happens to be harmless, which is why only this one is
+   worth a note.  */
+
 static void
 emit_mode_inner (void)
 {

@@ -637,11 +637,13 @@ multi_target_select (const char *target)
 
 	   It fails BY NAME when the back end supplies no routines.  The name
 	   this looks up is the back end's `cpu_type', while gengtype names its
-	   routines after the SOURCE DIRECTORY the definition came from; those
-	   agree for every in-tree back end except `stormy16', whose cpu_type
-	   is `xstormy16'.  A mismatch therefore stops the compiler here with
-	   the back end named, rather than leaving a dispatcher pointing at
-	   whichever back end was selected before.  */
+	   routines after the SOURCE DIRECTORY the definition came from.  Those
+	   agree for every in-tree back end -- but only since `config/stormy16/'
+	   was renamed to `config/xstormy16/' to match its cpu_type; before
+	   that, selecting xstormy16 stopped the compiler HERE, which is this
+	   check having done its job.  It stays for the next one: a mismatch
+	   stops the compiler with the back end named, rather than leaving a
+	   dispatcher pointing at whichever back end was selected before.  */
 	if (!gt_multi_target_install_markers (base))
 	  internal_error ("back end %qs installs no garbage-collection markers "
 			  "for the types it defines; gengtype names them after "

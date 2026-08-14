@@ -820,9 +820,18 @@ void add_subclass (type_p base, type_p subclass)
    Note this deliberately keys on the SOURCE DIRECTORY and not on the back
    end's `cpu_type'.  gengtype has no access to config.gcc and cannot know a
    cpu_type; the directory is what it can see, and it is what names the
-   `gt-<dir>.h' file the per-base routines are emitted into.  The two agree
-   for every back end but `stormy16' (whose cpu_type is `xstormy16'), and the
-   installer below fails BY NAME rather than silently when they do not.  */
+   `gt-<dir>.h' file the per-base routines are emitted into.
+
+   THE TWO NOW AGREE FOR EVERY IN-TREE BACK END, and that is a property of the
+   tree rather than of this function.  `config/stormy16/' was the one
+   exception -- cpu_type `xstormy16' -- so the installer below stopped the
+   compiler by name whenever that back end was selected.  It was renamed to
+   `config/xstormy16/' (config.gcc, `xstormy16-*-elf'), because the base
+   identity everywhere else on this branch is cpu_type and a directory->
+   cpu_type alias table here would be a second authority for one fact.  The
+   by-name failure below is KEPT: it is what would report the next such
+   divergence, and it is the reason this one was found rather than silently
+   walking another back end's `machine_function'.  */
 
 const char *
 mt_config_dir_of_file (const input_file *inpf)

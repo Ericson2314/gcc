@@ -755,7 +755,47 @@ for (i = 0; i < n_opts; i++) {
 	# a later switch S is a longer prefix of a switch T, T
 	# will be back-chained to S in a later iteration of this
 	# for() loop, which is what we want.
-	if (flag_set_p("Joined.*", flags[i])) {
+	# MULTI-TARGET: AND ONLY IF THIS BASE ACTUALLY SPELLS THAT ENUMERATOR.
+	#
+	# `opth-gen.awk' comments the enumerator out for an option that is an
+	# Alias (or Ignore) -- "Aliases do not get enumeration names" -- but
+	# still spends its ordinal.  Whether a NAME is an alias is a property
+	# of ONE back end, while `enum opt_code' is unioned, so the two
+	# disagree per base:
+	#
+	#     options.h:19257         OPT_march_ = 2434,
+	#     options-nvptx.h:18324   /* OPT_march_ = 2434, */
+	#
+	# because nvptx's `march=' is `Alias(misa=)' while eight other back
+	# ends declare it as a real Joined option.  The prefix relation below
+	# is the UNION's, so the foreign rows `-march=1.0' .. `-march=help'
+	# (mips', csky's) back-chain to `OPT_march_' in EVERY base's
+	# `mt-<base>/options-tables.cc' -- and the one base that suppressed the
+	# enumerator is the one that fails to compile.  5 diagnostics, 1 back
+	# end.  Swept: `scratchpad/res-optref.sh' checks every OPT_ ordinal
+	# every one of the 47 tables files names against that base's own
+	# header; nvptx/OPT_march_ is the only instance, out of 3714 ordinals.
+	#
+	# NON-EXPIRING, in the sense f3a75a98014 and b85d7120d03 argue for:
+	# this is not "rename today's colliding option", it is the generator
+	# refusing to emit a reference to an enumerator it did not emit.  Any
+	# future back end that aliases a name another declares Joined is
+	# covered without being named.
+	#
+	# `N_OPTS' is that base's OWN answer, not another base's: it is what
+	# back_chain is initialised to and it means "no back chain".  The rows
+	# it is used for are foreign options this back end does not have, and
+	# this back end's own `-march=' is reached through its Alias record at
+	# ordinal 2434, which is unaffected.  Nothing here supplies a value
+	# borrowed from the primary.
+	#
+	# The condition is opth-gen.awk's, transcribed rather than shared
+	# because the two generators do not include each other; if it ever
+	# drifts the build says so by name, which is how this was found.
+	if (flag_set_p("Joined.*", flags[i]) \
+	    && !((flag_set_p("Alias.*", flags[i]) \
+		  && !flag_set_p("SeparateAlias", flags[i])) \
+		 || flag_set_p("Ignore", flags[i]))) {
 		for (j = i + 1; j < n_opts; j++) {
 			if (substr (opts[j], 1, len) != opts[i])
 				break;

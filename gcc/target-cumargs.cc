@@ -580,6 +580,32 @@ mt_base_dwarf_frame_registers (void)
   return (unsigned int) DWARF_FRAME_REGISTERS;
 }
 
+/* DWARF_FRAME_RETURN_COLUMN.  A CALL, not a `target_cdata' field, and this
+   thunk is where the difference is paid: it is evaluated at each read, with
+   whatever `current_function_decl' is in force, because epiphany's expands to
+
+       DWARF_FRAME_REGNUM (current_function_decl != NULL
+			   && epiphany_is_interrupt_p (current_function_decl)
+			   ? IRET_REGNUM : GPR_LR)
+
+   `tree.h' and `function.h' are ALREADY included by this file for `cfun' and
+   for i386's `INCOMING_FRAME_SP_OFFSET', so this compiles here with no new
+   include -- which is exactly why it must NOT live in `target-cdata.cc'.
+   Adding the same include there would also have compiled, and would have
+   evaluated `current_function_decl' once, at selection time, when it is null:
+   every epiphany interrupt handler silently given `GPR_LR'.  Same include,
+   opposite meaning, decided entirely by WHEN the translation unit is
+   evaluated.  See target-cdata.h where the field used to be.
+
+   No range check, unlike `mt_base_dwarf_frame_regnum' above: this takes no
+   register number from shared code -- the back end names its own -- so there
+   is no union-width argument to reject.  */
+static unsigned int
+mt_base_dwarf_frame_return_column (void)
+{
+  return (unsigned int) DWARF_FRAME_RETURN_COLUMN;
+}
+
 /* THE FOUR POINTER REGNUMS, read in THIS base's translation unit.  The values
    this pair produces are 7/19/6/16 for i386 and 31/64/29/65 for aarch64, and
    the divergence is the whole content of the `aarch64_can_eliminate' ICE --
@@ -1137,6 +1163,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_debugger_regno,
   mt_base_dwarf_frame_regnum,
   mt_base_dwarf_frame_registers,
+  mt_base_dwarf_frame_return_column,
   mt_base_stack_pointer_regnum,
   mt_base_frame_pointer_regnum,
   mt_base_hard_frame_pointer_regnum,

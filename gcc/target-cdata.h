@@ -191,9 +191,44 @@ along with GCC; see the file COPYING3.  If not see
 					STACK_CHECK_FIXED_FRAME_SIZE)	\
   NUM (int,	     stack_check_max_frame_size,			\
 					STACK_CHECK_MAX_FRAME_SIZE)	\
-  NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)	\
-  NUM (unsigned short, dwarf_frame_return_column,				\
-					DWARF_FRAME_RETURN_COLUMN)
+  NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)
+
+/* `DWARF_FRAME_RETURN_COLUMN' WAS HERE AND IS NOT A CDATA FIELD.
+
+   It is the ONE cdata macro that is not compile-time data, and the rule that
+   says so is this file's own, thirty lines up: a macro placed here that is not
+   invariant is frozen at the value the command line gave it.  epiphany's is
+
+       #define EPIPHANY_RETURN_REGNO \
+	 ((current_function_decl != NULL \
+	   && epiphany_is_interrupt_p (current_function_decl)) \
+	  ? IRET_REGNUM : GPR_LR)
+       #define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO)
+
+   -- per-FUNCTION state, and `target-cdata.cc' runs ONCE with
+   `current_function_decl' null.  All eight shared readers are in
+   `dwarf2cfi.cc' per-function CFI, where upstream has that decl set, so a
+   field here answers every interrupt handler with `GPR_LR'.
+
+   THE TRAP, RECORDED BECAUSE IT IS THE CHEAP-LOOKING FIX.  The build failure
+   is `current_function_decl was not declared in this scope' -- a SCOPE error,
+   one `#include "tree.h"' away from compiling.  Adding that include makes the
+   diagnostic go away and gives epiphany the wrong DWARF return column in every
+   interrupt handler, with nothing left to report it.  The loud failure and the
+   silent wrong answer are one include apart, in the wrong direction.
+
+   So it moved to the paying side, `target_frame_desc::dwarf_frame_return_column',
+   which is a real call per read -- the same disposition target-cdata.h's header
+   comment already prescribes for `STACK_BOUNDARY', and it sits beside
+   `dwarf_frame_regnum' / `dwarf_frame_registers', which it is defined in terms
+   of and which are already there.
+
+   SWEPT, NOT ASSUMED: `scratchpad/cdata-perfn-sweep.sh' expands every cdata
+   macro's body transitively through the defining back end's own macros and
+   nominates any that reaches per-function state.  Re-run on this tree over all
+   28 cdata macros: ONE nomination, this one.  The sweep is over-broad by
+   construction -- it can nominate a macro, never clear one -- so that is an
+   upper bound on the population and a lower bound of one on this instance.  */
 
 /* THE OPTIONAL SCALARS -- MACROS A BACK END MAY LEGITIMATELY NOT DEFINE.
 
