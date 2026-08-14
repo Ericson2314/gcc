@@ -1,4 +1,4 @@
-# T176 — the last acceptance criterion: `#include "tm.h"` 163 → 54
+# T176 — the last acceptance criterion: `#include "tm.h"` 163 → 59
 
 Snapshots `374fe605b2c` (before) and `9c301ec45db` (after), anchor
 `grep -c MULTI_TARGET gcc/Makefile.in` = **49** in both, 47 back ends
@@ -7,7 +7,7 @@ snapshots.
 
 ```
 $ git grep '#include *"tm.h"' gcc ':(exclude)gcc/ChangeLog*' ':(exclude)gcc/*/ChangeLog*' | wc -l
-54          (was 163)
+59          (was 163)
 ```
 
 ---
@@ -116,10 +116,71 @@ again: *when you enumerate a population by stem, enumerate every stem.*
 | 58 shared TUs, line deleted | 90 | object REBUILT without it |
 | 14 redundant lines deleted | 75 | object rebuilt; **channel unchanged** |
 | 21 → a neutral header | 54 | object rebuilt with that exact text |
+| **5 restored — regression fix** | **59** | the 47-back-end build, see §1a |
 
 **No population left the board silently.** Full census of the 120 measured
 candidates: 58 deleted, 21 replaced, 18 REAL-TARGET residue, 14 STILL-REACHES
 (deleted, but see below), 9 not measurable in a `c,lto` build.
+
+### 1a. THE SWEEP WAS WRONG ABOUT FOUR FILES, AND THE BUILD IS WHY WE KNOW
+
+This is the part of the task worth reading second, after §0. **The deps-diff
+build was run to check for a silent change and it caught a loud one instead**
+— which is the argument for running it, not against it.
+
+First verification build: **1401 objects and 4465 errors**, against 4490 and 1.
+Three deletions produced 4272 diagnostics (1536 `FIRST_PSEUDO_REGISTER`, 1296
+`enum reg_class`, 1296 `N_REG_CLASSES`, 144 `LOAD_EXTEND_OP`, 144
+`BITS_PER_WORD`). Second build, after the fix: **4489 objects, 5 errors**, one
+new file. Third: pending.
+
+Both mistakes are ONE mistake in two disguises, and it is a lesson about the
+instrument, not about `tm.h`:
+
+- `rtl.cc`, `read-rtl.cc`, `print-rtl.cc` are compiled **twice** — as shared
+  cc1 objects and once per back end as generators (`build/rtl-<cpu>.o`).
+  `-DGENERATOR_FILE` makes `hard-reg-set.h:57` take register widths from the
+  **raw** `tm.h` names instead of `multi-target-reg-widths.h`, exactly as that
+  header documents in place. Fixed with `#ifdef GENERATOR_FILE`, evidence on
+  both sides: the generator half needs it (this build), the shared half does
+  not (the amputation arm).
+- `c/gccspec.cc` is compiled **once, under a different rule** — the driver's,
+  where `options.h` does not arrive by another road.
+
+**The unit of "a configuration" is the object's own recipe**, not the source
+file and not the directory. `t176-amp2.sh` borrows `cfgexpand.o`'s recipe for
+all 120 candidates, so it answers for one recipe and was read as answering for
+every recipe each file is built in. That is PRINCIPLES' "a test in a reduced
+environment can pass for a reason the real environment removes", where the
+reduced environment was a **recipe** rather than a directory.
+
+Two guards added so it cannot recur: `t176-twice.sh` asks the build system
+which sources have a second compilation (it names exactly five and excludes
+`main.cc` / `real.cc`, and asserts it found any `build/` objects at all so a
+blind instrument fails rather than reporting a clean zero); and
+`t176-realrecipe.sh` rebuilds one object with `make -n <object>`'s own line.
+
+`gencheck.cc` and `genmddump.cc` were **reverted, not guarded**: generator-only
+(`bconfig.h`), never shared TUs, and unverified in their own recipe because the
+build stopped before reaching them. An unverified deletion is not kept. T141
+already asked for these two to go to the generator owner separately.
+
+### 1b. AND ONE OF MY OWN EDITS EVADED THE CRITERION
+
+The guarded includes were first written `# include "tm.h"`, which does **not**
+match the acceptance grep `#include *"tm.h"`. The count read 54 with three
+real includes present — I would have reported a number three lower than the
+tree. Caught by `t176-census.sh` disagreeing with itself: it reports the
+acceptance grep **and** an independent real-directive regex, and they came back
+56 vs 59. The pair was built to separate prose from directives; that it can
+also disagree the *other* way was not the reason for it and is the more useful
+half. Now spelled `#include`, and the two counts are equal at 59.
+
+The plain form is also the correct one: `build/` generator objects receive no
+`-DMT_BASE` (the four `MULTI_TARGET_BASE_DEF` sites are all `mt-*/`), so
+`BASE_HEADER (tm.h)` — which `#error`s without `MT_BASE` — is unavailable to
+them. **The generator population reaches its base through the include path,
+which is the one `-I` selection the branch has not removed.**
 
 ### The instrument, and its two corrections
 
@@ -214,14 +275,34 @@ primary's chain, the same lie. Needs a plugin-recipe arm before any deletion.
 per-back-end headers each compilation actually opened (`t173-depsdiff.sh`).
 Rule: zero per-back-end headers lost.
 
-> RESULT PENDING — see the task report; this file records the method.
+```
+before: rc=2, 4490 objects        (snap-before 374fe605b2c, anchor 49)
+after : rc=2, 4490 objects        (snap-after  ff19f9242d8, anchor 49)
+objects in common: 2000
+PASS: identical per-back-end header sets across 2000 objects
+```
+
+**Per-back-end headers LOST 0, ADDED 0.** Both builds `rc=2` on the SAME one
+pre-existing failure, `build/gen-target-specs-amdgcn_unknown_amdhsa.o`
+(`gtype-desc.h: No such file or directory`), present without any change from
+this task; `error:` lines 1 and 1.
+
+Non-vacuity, because a green from an instrument that read nothing is worth
+nothing: the compared sets are **20662 records** over 2000 objects spanning
+**48** `*-inc/` directories — 2000 objects open a per-base `insn-modes.h`,
+1952 open a per-base `tm.h`, 1725 a per-base `insn-codes.h`. The two sides are
+byte-identical. (This arm has fired before: it is what caught 94 objects
+silently swapping `insn-modes.h` in #174, with both builds compiling clean.)
 
 Both builds are `make -k -j8 all-gcc` from read-only `git archive` snapshots
 with the anchor asserted at 49 and an `.rc` stamp written only after `make`
-returns. The before build produced **4490** objects and `rc=2` on one
-**pre-existing** failure, `build/gen-target-specs-amdgcn_unknown_amdhsa.o`
-(`gtype-desc.h: No such file or directory`), which is present without any
-change from this task.
+returns; the scorer refuses a log without the stamp.
+
+**The build-count arm is the one that actually fired in this task**, and it is
+worth saying which arm did the work: the deps-diff was clean on the FINAL
+tree, but 4490-vs-1401 objects and 1-vs-4465 errors on the first attempt is
+what caught the generator regression (§1a). A silent-change instrument and a
+loud-failure instrument are not redundant.
 
 ### What was verified for the 10 `config/` conversions, and what was not
 
