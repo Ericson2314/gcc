@@ -585,6 +585,46 @@ Note the last one runs **opposite** to the others: normally the primary's answer
 leaks to everyone; there the union's does. Same root — one authority answering
 for many.
 
+**AND A FOURTH PIECE, PAID FOR BY READING THE THREE ABOVE AS A TEMPLATE AND
+STILL GETTING IT HALF RIGHT (#189).** `EXTRA_HEADERS` has **two** authorities,
+not one, and they are *different kinds of thing*:
+
+```
+config.gcc      extra_headers=...      -> @extra_headers_list@ -> EXTRA_HEADERS
+tmake fragments EXTRA_HEADERS += ...   -> -include $(tmake_file)
+```
+
+The second is the **identical channel** `PASSES_EXTRA` travels on. An agent
+holding `b349257c0a2` as its template fixed the `config.gcc` side, measured a
+census of 180 headers over 14 back ends from `config.gcc` alone, called it
+complete — and the build stopped on `mm_malloc.h`, which no `config.gcc` line
+mentions and `config/i386/t-pmm_malloc` appends. The census was an undercount
+by construction and said nothing about it.
+
+So, for any per-back-end make variable: **enumerate BOTH channels before
+claiming a population.** Ask `git grep -n '<VAR>' gcc/config/` as well as
+`grep '<var>=' config.gcc`. Nine fragments over eight back ends feed
+`EXTRA_HEADERS`, and two of them (`avr/t-avr`, `frv/t-frv`) use `=` rather than
+`+=`, i.e. they *clobber* — a form a `+=`-shaped scan skips silently.
+
+**Fixing one channel is a partial fix BY CONSTRUCTION, and it presents as a
+complete one**, because the half you did fix is real, measurable and
+demonstrably works. The only reason this was caught before shipping is that the
+fix kept the legacy channel alive as a cross-check instead of deleting it —
+which is the *first* transferable piece above, doing exactly the job it was
+written for, against its own author.
+
+Corollary worth stating because it recurs: **a prior agent's "I deliberately
+left this alone" comment may be answerable now.** `config/rs6000/t-rs6000-headers`
+declines to move `EXTRA_HEADERS += rs6000-vecdefines.h`, reasoning that it
+"would make a build that merely configures rs6000 install a powerpc header".
+That was correct **against one flat `include/`** and is **dissolved** by the
+per-back-end directory: `include-rs6000/` is reached only when rs6000 is the
+base in force, so installing it is no longer a claim about anyone else's
+target. When you meet a recorded refusal, check whether the thing it was
+refusing has changed underneath it — and say which, since the comment stays in
+the tree.
+
 **The design rule that fixes it:** union the vocabulary, keep the data per
 configuration, select at run time, qualify only what actually collides. Landed
 eight times. Reuse the union-list mechanism (`#`-prefixed setting lines, hard
@@ -1261,6 +1301,27 @@ Six rules that each cost a session:
 
 1. **Absence of an artefact is not absence of a mechanism.** No file in a build
    dir ≠ no rule; make is lazy. Grep the generated `.mk`, never `ls`.
+
+   **AND GREPPING THE GENERATED TEXT IS NOT ENOUGH — RUN IT (#189).** A
+   generator emitted a make recipe iterating `source>dest` pairs:
+
+   ```
+   for pair in .../config/i386/pmm_malloc.h>mm_malloc.h ; do
+   bash: -c: line 1: syntax error near unexpected token `>'
+   ```
+
+   The generated text was **exactly correct** — every generator arm passed,
+   including one asserting that pair verbatim. `>` is a shell **redirection**,
+   so the fault existed only in what a shell does with correct text. **A
+   generator-level arm cannot see this class at all**, by construction: it
+   compares strings, and the string was right.
+
+   So for anything that generates a **recipe** rather than data, the arm has to
+   be "make ran this rule and the file appeared", not "the rule looks right".
+   The cheap version is one `make <the-one-target>` in an already-built dir,
+   which costs seconds and is the only thing that would have caught it. Same
+   family as the `$(eval)` case in rule 7: a **plausible, complete, non-empty**
+   artefact that is wrong when executed.
 2. **Presence of a mechanism is not evidence anything invokes it.** A complete,
    well-commented mode union sat inert for weeks. Grep the generated fragment
    for your flag; diff the artefact it should have changed.
