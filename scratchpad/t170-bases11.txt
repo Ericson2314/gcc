@@ -1,0 +1,14 @@
+# THE ELEVEN BACK ENDS THAT LINK INTO ONE cc1 as of 89883e54f02.
+# Triples taken verbatim from scratchpad/all-backends.txt so that this set is
+# a subset of the 48-base census rather than a fresh set of spellings.
+x86_64-pc-linux-gnu
+aarch64-unknown-linux-gnu
+powerpc64-linux-gnu
+s390x-linux-gnu
+riscv64-unknown-linux-gnu
+mips64-elf
+sparc64-linux
+arm-eabi
+ia64-elf
+visium-elf
+xtensa-elf
