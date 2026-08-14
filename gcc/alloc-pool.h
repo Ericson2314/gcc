@@ -24,7 +24,8 @@ along with GCC; see the file COPYING3.  If not see
 /* For flag_checking.  Guarded: see the note in tree.h -- a TU that already has
    its target's `options-<base>.h' must not also include `options.h'.  */
 #ifndef OPTIONS_H_INCLUDED
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 #endif
 
 extern void dump_alloc_pool_statistics (void);

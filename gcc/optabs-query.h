@@ -20,7 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_OPTABS_QUERY_H
 #define GCC_OPTABS_QUERY_H
 
-#include "insn-opinit.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-opinit.h)
 #include "target.h"
 
 /* Return true if OP is a conversion optab.  */

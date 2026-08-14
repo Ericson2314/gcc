@@ -40,7 +40,8 @@
 #include "pretty-print.h"
 
 // Needed directly by recog.h.
-#include "insn-config.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-config.h)
 
 // Needed directly by rtl-ssa.
 #include "splay-tree-utils.h"
@@ -55,7 +56,7 @@
 
 // Provides the global crtl->ssa.
 #include "memmodel.h"
-#include "tm_p.h"
+#include MT_HEADER (tm_p.h)
 #include "emit-rtl.h"
 
 // The rtl-ssa files themselves.

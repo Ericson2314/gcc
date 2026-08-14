@@ -28,7 +28,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "rust-feature-store.h"
 
 #include "expected.h"
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 
 namespace Rust {
 

@@ -282,7 +282,8 @@ extern void emit_cmp_and_jump_insns (rtx, rtx, enum rtx_code, rtx,
 /* Generate code to indirectly jump to a location given in the rtx LOC.  */
 extern void emit_indirect_jump (rtx);
 
-#include "insn-config.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-config.h)
 
 #ifndef GCC_INSN_CONFIG_H
 #error "insn-config.h must be included before optabs.h"

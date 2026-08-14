@@ -39,44 +39,45 @@ along with GCC; see the file COPYING3.  If not see
 must be given -DMT_BASE=<cpu>-inc.  See gcc/multi-target-base.h."
 #endif
 
+/* MT_HDR_STR and MT_HDR_XSTR, and the double indirection they exist for.  */
+#include "multi-target-header.h"
+
 /* This back end's copy of the header F.  F is UNQUOTED: BASE_HEADER (tm.h).
 
-   The double indirection is load-bearing.  `#' suppresses expansion of its
-   operand, so MT_HDR_STR alone stringifies the spelling and yields the
-   literal "MT_BASE/tm.h".  MT_HDR_XSTR forces one round of expansion first,
-   so MT_BASE becomes `i386-inc' before the `#' sees it.  ARM 6 of
-   scratchpad/t140-inject.sh reads the expansion and fails if it does not
-   contain the base name.
-
-   The helpers are MT_HDR_STR/MT_HDR_XSTR because XSTR is rtl.h's accessor and
-   MT_STR is defined differently in target-cumargs.cc and target-regs.cc.
+   ARM 6 of scratchpad/t140-inject.sh reads the expansion and fails if it does
+   not contain the base name.
 
    The `-D' is MT_BASE: `BASE' is a template parameter in
    config/aarch64/aarch64-sve-builtins-shapes.cc and a macro parameter in two
    more files, and `-DBASE=aarch64-inc' fails with `expected
    nested-name-specifier before aarch64', naming neither the flag nor a
    file.  */
-#define MT_HDR_STR(f) #f
-#define MT_HDR_XSTR(f) MT_HDR_STR (f)
 #define BASE_HEADER(f) MT_HDR_XSTR (MT_BASE/f)
 
-/* THE WITNESS.  A header a per-back-end object reaches only through the
-   include path, naming its own base's tag through BASE_HEADER, so the two
-   flags that say which back end this object is compiled for must agree:
+/* THE WITNESS.  Two `-D's on this object's command line say which back end it
+   is compiled for, and this makes them check each other:
 
-       mt-inc-witness.h	     #include BASE_HEADER (mt-inc-tag-<that base>.h)
-       mt-inc-tag-<base>.h   the tag it names, and the ONLY base whose
-			     directory holds it
+       -DMT_BASE=<cpu>-inc                which headers it reads
+       -DMULTI_TARGET_TARGETM_BASE=<cpu>  whose hook table it binds to,
+					  paired with the -Dtargetm= renames
 
-   giving, always by name:
+   The tag header is generated into ONE base's directory, so building the path
+   from MT_BASE and the file name from MULTI_TARGET_TARGETM_BASE fails by name
+   whenever they disagree:
 
-       include path missing   fatal: mt-inc-witness.h: No such file
-       include path wrong	    fatal: i386-inc/mt-inc-tag-aarch64.h: No such file
-       MT_BASE wrong	    fatal: aarch64-inc/mt-inc-tag-i386.h: No such file
-       MT_BASE undefined	    fatal: MT_BASE/tm.h: No such file
+       MT_BASE wrong	  fatal: aarch64-inc/mt-inc-tag-i386.h: No such file
+       MT_BASE undefined  fatal: MT_BASE/tm.h: No such file
 
-   Spelled by its plain name: BASE_HEADER (mt-inc-witness.h) would resolve
-   through `-I.' and the first arm would test nothing.  */
-#include "mt-inc-witness.h"
+   Both operands are expanded because MT_HDR_XSTR's parameter is not adjacent
+   to the `#'.
+
+   Objects carrying MT_BASE alone -- mt-<cpu>/reg-probe.o, the mtd-<cpu>
+   driver objects and mt-<cpu>/options-{init,tables}.o, which cannot carry
+   MULTI_TARGET_TARGETM_BASE because target.h requires it to be paired with
+   -Dtargetm= -- have no second statement of their base to check against, and
+   this arm is silent for them.  */
+#ifdef MULTI_TARGET_TARGETM_BASE
+#include MT_HDR_XSTR (MT_BASE/mt-inc-tag-MULTI_TARGET_TARGETM_BASE.h)
+#endif
 
 #endif /* GCC_MULTI_TARGET_BASE_H */

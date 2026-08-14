@@ -24,7 +24,8 @@
 #include "rust-ast.h"
 #include "rust-item.h"
 #include "rust-operators.h"
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 #include "rust-system.h"
 
 namespace Rust {

@@ -27,7 +27,8 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "tree.h"
 #include "predict.h"
-#include "tm.h"
+#include "multi-target-header.h"
+#include MT_HEADER (tm.h)
 /* The multi-target conversion layer.  It already arrives through the tm.h
    above (defaults.h ends with it), so the include guard makes this line a
    no-op today.  It is here so that deleting the tm.h line does not also
@@ -40,7 +41,7 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #include "input.h"
 #include "alias.h"
 #include "symtab.h"
-#include "options.h"
+#include MT_HEADER (options.h)
 #include "wide-int.h"
 #include "inchash.h"
 #include "stor-layout.h"

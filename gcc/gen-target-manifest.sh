@@ -568,7 +568,11 @@ ${AWK} '
       printf "\t@$(mkinstalldirs) mt-%s\n", b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       printf "\t  -f $(srcdir)/optc-gen.awk -v init_base=%s \\\n", b
-      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      # This file is compiled for ONE back end, so it names that back end
+      # headers.  Left plain they resolve to the build root copies, which are
+      # whichever back end the build root happened to hold.
+      printf "\t  -v base_inc=%s-inc/ \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h %s-inc/options.h %s-inc/tm.h\" \\\n", b, b
       printf "\t  < $< > tmp-options-init-%s.cc\n", b
       # A generator that fails and exits 0 has happened on this branch; an
       # empty or headers-only file would compile, link, and leave the bug in
@@ -580,7 +584,11 @@ ${AWK} '
       printf "\t  echo \047  every Init() value belonging to %s would stay zero.\047 >&2; \\\n", b
       printf "\t  exit 1; }\n"
       printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-init-%s.cc $@\n\n", b
-      printf "mt-%s/options-init.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
+      # This object is compiled for ONE back end, so it says which by name.
+      # coretypes.h reads MT_BASE to pick insn-modes.h and
+      # insn-modes-inline.h; without it this object takes the build root
+      # copies, which are another back end mode numbering.
+      printf "mt-%s/options-init.o: MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", b, b
       printf "mt-%s/options-init.o: mt-%s/options-init.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
       # This TU sees that base'\''s tm.h, so it is on the
@@ -618,7 +626,9 @@ ${AWK} '
       printf "\t@$(mkinstalldirs) mt-%s\n", b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       printf "\t  -f $(srcdir)/optc-gen.awk -v tables_base=%s \\\n", b
-      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      # Named for this back end, exactly as options-init.cc above.
+      printf "\t  -v base_inc=%s-inc/ \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h %s-inc/options.h %s-inc/tm.h\" \\\n", b, b
       printf "\t  < $< > tmp-options-tables-%s.cc\n", b
       # Both tables, by name.  optc-gen.awk emits an #error when the record
       # set is empty, but an awk that dies partway writes a TRUNCATED file
@@ -632,7 +642,8 @@ ${AWK} '
       printf "\t    exit 1; }; \\\n"
       printf "\tdone\n"
       printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-options-tables-%s.cc $@\n\n", b
-      printf "mt-%s/options-tables.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
+      # Named for this back end, exactly as options-init.o above.
+      printf "mt-%s/options-tables.o: MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", b, b
       printf "mt-%s/options-tables.o: mt-%s/options-tables.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
       # -DMULTI_TARGET_SUPPLY_TU=1, EXACTLY AS options-init.o ABOVE, and it was

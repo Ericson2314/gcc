@@ -2862,7 +2862,10 @@ write_init_file (void)
   fprintf (init_file, "#include \"rtl.h\"\n");
   fprintf (init_file, "#include \"tree.h\"\n");
   fprintf (init_file, "#include \"langhooks.h\"\n");
-  fprintf (init_file, "#include \"insn-codes.h\"\n");
+  /* This file is compiled for rs6000 only, so it names rs6000's insn codes
+     rather than leaving the choice to the include path.  */
+  fprintf (init_file, "#include \"multi-target-header.h\"\n");
+  fprintf (init_file, "#include MT_HEADER (insn-codes.h)\n");
   fprintf (init_file, "#include \"rs6000-builtins.h\"\n");
   fprintf (init_file, "\n");
 

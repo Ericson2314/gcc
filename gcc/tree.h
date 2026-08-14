@@ -27,8 +27,9 @@ along with GCC; see the file COPYING3.  If not see
    OPTIONS_H_INCLUDED is the family-wide marker opth-gen.awk emits for exactly
    this, and asking for it rather than naming a file is the point -- a header
    that needs AN options header cannot know WHICH one it is getting.  */
+#include "multi-target-header.h"
 #ifndef OPTIONS_H_INCLUDED
-#include "options.h"
+#include MT_HEADER (options.h)
 #endif
 #include "vec.h"
 

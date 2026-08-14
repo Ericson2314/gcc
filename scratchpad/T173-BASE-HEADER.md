@@ -1,5 +1,12 @@
 # `BASE_HEADER` — state, and the two things it does not cover
 
+> **#174 CLOSED "Not done 1".** The `-I<base>-inc` is deleted and the witness
+> is rebuilt on a second flag rather than on the include path. The "17 sites"
+> counted below was **30**, in five populations, two of which no grep over
+> `gcc/` could see. See the `#174` section at the end; the sections below are
+> kept as written so the reasoning that led there is still readable.
+
+
 Task #173. `-DMT_BASE=<cpu>-inc` is the authority; a per-back-end header is
 spelled `#include BASE_HEADER (<stem>.h)`.
 
@@ -169,3 +176,130 @@ about the deployed machine.
 
 `@d_target_objs@` is the `PASSES_EXTRA` shape: fed by the legacy single
 `${target}`, so five of the six D glue files are absent rather than off.
+
+---
+
+# #174 — the `-I` is gone
+
+`MULTI_TARGET_INC` is deleted, from `Makefile.in`, from `INCLUDES`, and from
+all six emissions. `-DMT_BASE` is the only thing that says which back end an
+object's headers come from.
+
+```
+$ git grep -- '-I.*-inc\>' ':(exclude)scratchpad'                     0
+$ grep -rE '^# *include "(<per-base stem>)\.h"' --include='*.h' gcc    0
+```
+
+## `MT_HEADER`, and why it is not `BASE_HEADER`
+
+`gcc/multi-target-header.h` adds `MT_HEADER (f)`: `<cpu>-inc/f` under
+`-DMT_BASE`, plain `"f"` without it. That is the form a header serving BOTH
+populations needs, and every shared header under `gcc/` is one — read once
+inside a shared object and again, textually, inside each back end's own.
+`BASE_HEADER` keeps its `#error` and stays the form for a source compiled
+only per back end.
+
+The `#else` arm is not a banned fallback: a TU with no `MT_BASE` is compiled
+once and the build root's copy is its own answer.
+
+## What the sites actually were — 30, not 17, and the count was the least of it
+
+| where | n | stems |
+|---|---|---|
+| shared headers, insn-* | 11 | `insn-codes` 4, `insn-opinit` 3, `insn-config` 2, `insn-target-def` 1, `tm_p` 1 |
+| `coretypes.h` | 2 | the `INSN_MODES_H` / `INSN_MODES_INLINE_H` hooks |
+| back-end headers | 3 | `aarch64.h`, `arm.h` (`insn-modes`), `i386.h` (`insn-attr-common`) |
+| shared headers, `tm.h` | 4 | `backend.h`, `target.h`, `cp/cp-tree.h`, `gcc-consolidation.h` |
+| shared headers, `options.h` | 10 | `tree.h`, `alloc-pool.h`, `analyzer/common.h`, `gcc-consolidation.h`, `loongarch-evolution.h`, 5 rust |
+| **generated** per-base sources | 4 families | `options-init.cc`, `options-tables.cc`, `insn-modes-<cpu>.cc`, `rs6000-builtins.cc` |
+
+The three back-end headers were converted and reverted in #173 because the
+shared `tm.h` includes `config/i386/i386.h`, so ~520 TUs with no `MT_BASE`
+read them. `MT_HEADER` is exactly what makes them convertible.
+
+**The `tm.h` and `options.h` rows were invisible to #173's census because they
+are counted under the OTHER acceptance grep.** They are the same population.
+
+**The generated row was invisible to any source grep**, because a generated
+`.cc` is not in the source tree. Enumerated from the build dir instead:
+`grep -l '^#include "<stem>.h"' mt-*/*.cc`.
+
+## Three defects, each found by a different instrument
+
+1. **The build.** `mt-arm/arm-c.o`, 243 diagnostics from one substitution:
+   `target.h:57`'s plain `"tm.h"` reaching i386's chain.
+   `error: use of enum 'attr_cpu' without previous declaration`.
+2. **The build again.** `mt-<cpu>/options-init.o`, 17 diagnostics on the
+   first few back ends — `ARM_DEFAULT_ABI`, `ARC_TUNE_NONE` — the generated
+   files' plain includes.
+3. **The deps-diff, and ONLY the deps-diff.** `mt-<cpu>/options-{init,tables}.o`
+   carried `MULTI_TARGET_INC` and **never `MULTI_TARGET_BASE_DEF`**: they
+   reached their base entirely through the include path. Both arms compiled
+   clean; 94 objects silently swapped `<cpu>-inc/insn-modes.h` for the build
+   root's. No build could have seen it.
+
+## The verification arm
+
+`t173-depsdiff.sh`, 47 back ends, cold immutable snapshots
+(`7f6febe5628` -> `350ea4875cb`), over the 2000 objects both builds produced:
+
+```
+per-back-end headers LOST:  0
+added:                      0
+removed, deliberately:      487 mt-inc-witness.h
+                             51 mt-inc-tag-<base>.h
+```
+
+The 51 are the 47 `reg-probe.o` plus four `mtd-*` driver objects — exactly
+the set carrying `MT_BASE` without a second flag. 436 objects keep the
+cross-check.
+
+**A target-specific variable assignment does not make a target out of date.**
+The `MULTI_TARGET_BASE_DEF` fix left 46 of 47 objects unrebuilt and the
+deps-diff still reported the loss. They had to be deleted by hand. Expect
+this for any fix that only changes a compile flag.
+
+## The witness, rebuilt on the other flag
+
+`mt-inc-witness.h` was findable only through the `-I` and had to go.
+`multi-target-base.h` now builds the directory from `MT_BASE` and the file
+name from `MULTI_TARGET_TARGETM_BASE`:
+
+```c
+#include MT_HDR_XSTR (MT_BASE/mt-inc-tag-MULTI_TARGET_TARGETM_BASE.h)
+```
+
+Measured **in the real 47-base build dir**, not a toy one — the reduced
+environment is what defeated the previous version of this check:
+
+```
+MT_BASE=aarch64-inc, TARGETM_BASE=i386
+  multi-target-base.h:80: fatal error: aarch64-inc/mt-inc-tag-i386.h
+negative control, unmodified command   rc=0, 41384-byte object
+```
+
+Silent for `reg-probe.o`, `mtd-<cpu>/*.o` and `options-{init,tables}.o`,
+which cannot carry `MULTI_TARGET_TARGETM_BASE` (`target.h` requires it paired
+with `-Dtargetm=`). Stated in the header. Deriving a second flag from the
+same rule would be a mitigation that cannot fire.
+
+## Bars
+
+```
+baseline  7f6febe5628  anchor 55  rc=2  1 error  3825 stderr  2894 objects
+after     350ea4875cb  anchor 49  rc=2  1 error  3825 stderr  2894 objects
+```
+
+Identical. The one error is pre-existing and the same in both:
+`gtype-desc.h: No such file` on `build/gen-target-specs-amdgcn_unknown_amdhsa.o`.
+`Killed` / `signal 9` / `out of memory`: 0 in both.
+
+## Still open
+
+`git grep '#include *"tm.h"' gcc` is **163**, not 0. It cannot be 0 yet, and
+PRINCIPLES says why: `defaults.h` has no route into any TU except the tail
+`mkconfig.sh` appends to `tm.h`, so deleting these un-defines the CONVERTED
+macros too, and the ones on `#if` lines then silently evaluate false. That is
+`T141-TMH-REMOVAL-PLAN.md`, not this task. #174 moved it 167 -> 163 by
+converting the four shared headers' spelling; the count only falls to 0 when
+the macro conversion lands.

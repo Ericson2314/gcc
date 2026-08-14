@@ -969,30 +969,19 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
     printf "\tdone\n";
-    # THE WITNESS PAIR, which makes the two flags that say which back end an
-    # object is compiled for check each other.  See multi-target-base.h.
-    #
-    #   mt-inc-witness.h	found through the include path, and naming
-    #			mt-inc-tag-<cpu>.h through BASE_HEADER
-    #   mt-inc-tag-<cpu>.h	the tag it names, and the ONLY base whose
-    #			directory holds it
-    #
-    # A missing -I loses the first file; a wrong -I or a wrong BASE makes the
-    # first file ask the wrong directory for the second.  All three are a
-    # fatal error naming a path.
+    # THE WITNESS TAG, which makes the two `-D's that say which back end an
+    # object is compiled for check each other.  See multi-target-base.h: it
+    # builds the directory from MT_BASE and the file name from
+    # MULTI_TARGET_TARGETM_BASE, and this file exists in exactly one base's
+    # directory, so a disagreement is a fatal error naming both halves.
     #
     # Written through move-if-change like the forwarders, and for the same
-    # reason: their content never changes once written, only their timestamps
+    # reason: its content never changes once written, only its timestamp
     # would, and the stamp below is what every object rule depends on.
     printf "\techo \"/* Generated; see gcc/multi-target-base.h.  */\" \\\n";
     printf "\t  > tmp-inc-%s.h\n", cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t  %s-inc/mt-inc-tag-%s.h\n", cpu, cpu;
-#include "multi-target-base.h"
-    printf "\techo \"#include BASE_HEADER (mt-inc-tag-%s.h)\" \\\n", cpu;
-    printf "\t  > tmp-inc-%s.h\n", cpu;
-    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
-    printf "\t  %s-inc/mt-inc-witness.h\n", cpu;
     printf "\t$(STAMP) %s-inc/s-inc\n\n", cpu;
 
     emit_base_objects();
@@ -2230,12 +2219,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
   printf "\t$(COMPILE) -DMULTI_TARGET_REG_PROBE $<\n";
   printf "\t$(POSTCOMPILE)\n";
-  printf "mt-%s/reg-probe.o: MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
-  # ...and the base by NAME; see multi-target-base.h.  A SEPARATE variable
-  # from MULTI_TARGET_INC on purpose: the two must be independently
-  # removable, because the whole value of -DMT_BASE is what it says when the -I
-  # is gone.  Folding them together would make the injection that tests this
-  # delete its own instrument.
+  # The base by NAME; see multi-target-base.h.
   printf "mt-%s/reg-probe.o: MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n\n",
 	 cpu, cpu;
   printf "MULTI_TARGET_REG_PROBES += mt-%s/reg-probe.o\n\n", cpu;
@@ -2289,9 +2273,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   }
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
-  printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
-  # The base by NAME, in its own variable; see mt-<cpu>/reg-probe.o above and
-  # multi-target-base.h for why it is not folded into MULTI_TARGET_INC.
+  # The base by NAME; see multi-target-base.h.
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n",
 	 cpu, cpu;
   # The bare names this back end's HAND-WRITTEN sources define; see
@@ -2324,7 +2306,6 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # because the two back ends happen to spell their feature macros
   # differently.
   printf "MT_C_OBJS_%s =%s\n", cpu, cobjs_this;
-  printf "$(MT_C_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
   printf "$(MT_C_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", cpu, cpu;
   printf "$(MT_C_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", cpu;
   printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
@@ -2456,7 +2437,6 @@ function emit_gcc_driver_objs(	n, bases, i, b, m, parts, j, obj, src, list) {
     if (list == "")
       continue;
     printf "MT_GCC_OBJS_%s =%s\n", b, list;
-    printf "$(MT_GCC_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", b, b;
     printf "$(MT_GCC_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", b, b;
     printf "MT_GCC_OBJS += $(MT_GCC_OBJS_%s)\n\n", b;
   }

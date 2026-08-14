@@ -52,8 +52,9 @@
 #ifndef GCC_TARGET_H
 #define GCC_TARGET_H
 
-#include "insn-codes.h"
-#include "tm.h"
+#include "multi-target-header.h"
+#include MT_HEADER (insn-codes.h)
+#include MT_HEADER (tm.h)
 /* The multi-target conversion layer.  It already arrives through the tm.h
    above (defaults.h ends with it), so the include guard makes this line a
    no-op today.  It is here so that deleting the tm.h line does not also

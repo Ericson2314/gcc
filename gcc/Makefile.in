@@ -1217,7 +1217,8 @@ LANGHOOKS_DEF_H = langhooks-def.h $(HOOKS_H)
 TARGET_DEF_H = target-def.h target-hooks-def.h $(HOOKS_H) targhooks.h
 C_TARGET_DEF_H = c-family/c-target-def.h c-family/c-target-hooks-def.h \
   $(TREE_H) $(C_COMMON_H) $(HOOKS_H) common/common-targhooks.h
-CORETYPES_H = coretypes.h insn-modes.h signop.h wide-int.h wide-int-print.h \
+CORETYPES_H = coretypes.h multi-target-header.h \
+  insn-modes.h signop.h wide-int.h wide-int-print.h \
   insn-modes-inline.h $(MACHMODE_H) double-int.h align.h poly-int.h \
   poly-int-types.h
 RTL_BASE_H = $(CORETYPES_H) rtl.h rtl.def reg-notes.def \
@@ -1515,23 +1516,6 @@ MT_PASSES_TAGS =
 # -I$(@D) and -I$(srcdir)/$(@D) cause the subdirectory of the file
 # currently being compiled, in both source trees, to be examined as well.
 # libintl.h will be found in ../intl if we are using the included libintl.
-
-# The per-back-end forwarding-header directory, empty for every object that is
-# not compiled for a particular back end.  Set with a target-specific
-# assignment by the rules that build a back end's objects; see
-# MULTI_TARGET_INC_STEMS in gen-multi-target-md.awk for what it holds.
-#
-# It comes first in INCLUDES below, and it has to be a variable rather than an
-# addition to CPPFLAGS: a quoted include searches the includer's own directory
-# and then this list IN ORDER, so a later entry finds the build root's copy,
-# which is the primary target's.
-#
-#include "multi-target-base.h"
-# What a source names for itself is spelled BASE_HEADER (<stem>.h) and reads
-# MULTI_TARGET_BASE_DEF instead; this remains for the headers reached
-# transitively, through shared headers that cannot name a base.  See
-# scratchpad/T173-BASE-HEADER.md.
-MULTI_TARGET_INC =
 
 # Names that a back end's HAND-WRITTEN sources define bare and that therefore
 # collide when two back ends are linked into one compiler.  Everything the
@@ -2125,20 +2109,16 @@ MULTI_TARGET_RENAME_NAMES = \
 
 MULTI_TARGET_RENAMES =
 
-# The back end a source is being compiled FOR, named so that its own headers
-# can be spelled `#include BASE_HEADER (tm.h)' rather than left to the -I
-# above.  Empty for every object that is not compiled for a particular back
-# end; set by the same rules that set MULTI_TARGET_INC, as
-# `-DMT_BASE=<cpu>-inc'.  See gcc/multi-target-base.h for the whole argument.
-#
-# DELIBERATELY A SECOND VARIABLE rather than an addition to MULTI_TARGET_INC.
-# The point of -DMT_BASE is what it says when the -I is missing or points at
-# another base; if the two travelled together, deleting the -I would delete
-# the thing that reports it, and the check would pass on the broken build --
-# a mitigation that cannot fire is indistinguishable from an absent one.
+# The back end a source is being compiled FOR, as `-DMT_BASE=<cpu>-inc'.  It
+# is the only thing that says which back end an object's headers come from:
+# every such header is named at the point of inclusion, as
+# `BASE_HEADER (tm.h)' from a source compiled once per back end, or as
+# `MT_HEADER (insn-codes.h)' from a shared header that serves both.  Empty for
+# every object that is not compiled for a particular back end.  See
+# gcc/multi-target-base.h and gcc/multi-target-header.h.
 MULTI_TARGET_BASE_DEF =
 
-INCLUDES = $(MULTI_TARGET_INC) -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
+INCLUDES = -I. -I$(@D) -I$(srcdir) -I$(srcdir)/$(@D) \
 	   -I$(srcdir)/../include $(INCINTL) \
 	   $(CPPINC) $(CODYINC) $(GMPINC) $(DECNUMINC) $(BACKTRACEINC) \
 	   $(ISLINC)

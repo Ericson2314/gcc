@@ -19,7 +19,8 @@
 #ifndef RUST_HIR_SCAN_DEADCODE
 #define RUST_HIR_SCAN_DEADCODE
 
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 #include "rust-hir-full-decls.h"
 #include "rust-hir-map.h"
 #include "rust-lint-marklive.h"
