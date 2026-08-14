@@ -83,8 +83,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    This block is included LAST on purpose -- from the tail of defaults.h,
    which is itself the tail of every tm header, and from the four channel
    headers immediately after their `tm.h'.  So by here every back end's
-   definition and every `defaults.h' fallback has been made.  What is redirected is therefore the final
-   answer for the primary base -- which is exactly the answer that must stop
+   definition and every `defaults.h' fallback has been made.  What is
+   redirected is therefore the final answer for the primary base -- which is exactly the answer that must stop
    being used by target-independent code.
 
    WHY A `#undef' RATHER THAN A HOOK.  These macros denote a VALUE that is
