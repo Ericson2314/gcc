@@ -19,6 +19,16 @@ along with GCC; see the file COPYING3.  If not see
 
 /* *** WHY THIS FILE EXISTS ***
 
+   THE FULL RATIONALE IS IN scratchpad/T173-BASE-HEADER.md AND IN NO OTHER
+   PLACE.  It used to be repeated as a four-line comment above every converted
+   include under gcc/config/ -- thirty copies of one paragraph, which is the
+   one-fact-several-authorities shape this branch exists to remove, and which
+   made `git grep -- '-I.*-inc'' return prose rather than uses.  That document
+   also records what is DONE (all 280 per-back-end include sites under
+   gcc/config/ name their base) and what is not (the `-I' still serves ~2000
+   objects TRANSITIVELY, through shared headers that cannot name a base), with
+   the measurements.
+
    Each configured back end gets a `<base>-inc/' directory holding its own
    tm.h, tm_p.h, tm-preds.h, tm-constrs.h and generated insn-*.h.  Objects
    compiled for that back end are given `-I<base>-inc' ahead of `-I.', so a
