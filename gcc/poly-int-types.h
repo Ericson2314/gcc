@@ -85,8 +85,17 @@ typedef poly_int<NUM_POLY_INT_COEFFS, widest_int> poly_widest_int;
    doesn't need polynomial-sized modes, its header file can continue to
    treat the argument as a normal constant.  This should go away once
    macros are moved to target hooks.  It shouldn't be used in other
-   contexts.  */
-#if NUM_POLY_INT_COEFFS == 1
+   contexts.
+
+   THE CONDITION IS SPELLED OUT RATHER THAN USING `ONLY_FIXED_SIZE_MODES',
+   and that is forced by include order, not a style choice: coretypes.h
+   includes poly-int-types.h (line 630) BEFORE machmode.h (line 632), where
+   ONLY_FIXED_SIZE_MODES is defined, so the name is not in scope here.  The
+   two must stay in step -- see machmode.h for why this is keyed per back end
+   on TARGET_POLY_AWARE and not on `NUM_POLY_INT_COEFFS == 1', which is 2 for
+   every back end on this branch and so made this wrapper the identity for the
+   37 unconverted ones.  */
+#if defined (IN_TARGET_CODE) && !defined (TARGET_POLY_AWARE)
 #define MACRO_INT(X) ((X).to_constant ())
 #else
 #define MACRO_INT(X) (X)
