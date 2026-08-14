@@ -1273,6 +1273,20 @@ answer is still wrong is worse than the failure.**
   **It reads as a broken tree and it is a broken heuristic.** Build the top
   level (`scratchpad/t171-topbuild.sh`), or make the test "has `libcpp.a` been
   built", never "does the directory exist".
+- **A TASK NUMBER IN YOUR BRIEF IS NOT SOMETHING YOU CAN READ. Subagents have
+  no `TaskList`/`TaskGet`/`TaskUpdate`.** The coordinator briefed an agent to
+  "update the tasks themselves (`TaskUpdate`)" — tools that do not exist in a
+  subagent's roster. The agent verified their absence twice via `ToolSearch`,
+  reported the contradiction instead of improvising, and updated nothing.
+  **That is the correct response** and it is what §"if a brief contradicts this
+  document" asks for.
+
+  This is the coordinator's error, not the agent's — and it had already been
+  written down before it was repeated. If you are handed a task number, treat
+  it as a *label for a body of findings that must be restated in the brief
+  itself*. If the brief does not contain the finding, it is not available to
+  you; say so rather than reconstructing it from `STATE.md`, which for several
+  numbers has no section at all.
 - **Build your own build dir.** Sharing `/tmp/b-objs` produces meaningless
   verdicts and spurious `mv: cannot stat tmp-*` failures; it has killed runs.
   **In a shared build dir, a file you did not write is not a fixture.**
