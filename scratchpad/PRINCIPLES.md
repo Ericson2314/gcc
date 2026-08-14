@@ -1649,6 +1649,70 @@ of a pipeline whose status is the last command's (`sort`'s). An empty
 
 
 
+**A SINGLE RUN CANNOT TELL "THIS BACK END EMITS" FROM "THIS BACK END CORRUPTS
+THE HEAP", AND IT FAILS TOWARDS THE GREEN.** Measured (`ta76-flaky.sh`):
+mips64 at `-O2`, same `cc1`, same input, same config, twelve runs —
+
+```
+5  rc=0  md5 ec1e83b08653      emits 4262 bytes
+7  rc=4  md5 725f91e9fac0      SIGSEGV in GIMPLE `fixup_cfg'
+```
+
+and ia64 gives **five distinct outcomes in eight runs**. The first mips run
+taken returned rc=0 and would have gone into the table as *emits*. So for any
+back end newly reaching codegen, **run it N times and require one outcome**;
+`STABLE` is an arm, not an assumption. The pay-off is not only avoiding a
+false green: instability is itself a *diagnosis*. It says memory corruption
+rather than a missing per-base answer, which is a different search entirely —
+and it reclassified two walls the brief carried as unrelated (a hang, and
+`free(): invalid size`) into one class.
+
+Corollary that cost a session in the other direction: **gdb disables ASLR, so
+a corruption bug can vanish under the debugger.** mips faulted 7 times in 12
+outside gdb and *never* inside it. "It does not reproduce under gdb" is
+evidence about the bug's class, not evidence that it is gone.
+
+**RUN THE INFERIOR FROM gdb, NOT `gdb -p` — AND THEN A HANG REPORTS LIKE A
+CRASH.** This host's `ptrace_scope` refuses attaching to a non-descendant, so
+`gdb -p` answers `ptrace: Operation not permitted` and a spinning `cc1`
+becomes "the spin site is unlocated" — which is where mips's non-termination
+sat for a whole task. Launching with `gdb --args` makes the inferior a
+descendant, and `timeout -s INT <n>s gdb -batch -x cmds` then interrupts it
+and runs `bt` exactly as it would after a signal. One script covers SIGSEGV,
+SIGFPE, SIGABRT and non-termination. `scratchpad/ta76-gdb.sh`.
+
+**A THIRD INSTANCE OF "THE BOUND IS THE UNION'S, THE NUMBERING IS PER BASE",
+AND IT IS THE COMMONEST REMAINING SHAPE.** `MULTI_TARGET_UNION_*` is the
+LAYOUT; a **loop** or a **`memcpy` length** must be the selected base's own
+count. Two live ones found in one task:
+
+- `reginfo.cc:simplifiable_subregs` walked `0 .. FIRST_PSEUDO_REGISTER` (the
+  union's **334**, ia64's) asking `targetm.hard_regno_nregs`, which rs6000
+  answers from a table **119** wide. Measured arrival: `xregno = 238`. The
+  fault was an FPE in `subreg_get_info` because the out-of-bounds read said
+  *zero registers*. Its own sibling twelve hundred lines up already had the
+  right bound **and a comment saying the short-circuit in front of it must not
+  be relied on** — this loop had no short-circuit at all.
+- `memcpy (reg_alloc_order, <own>_alloc_order, sizeof (reg_alloc_order))` in
+  arm, arc and nds32, and the same on `fixed_regs`/`call_used_regs` in rx.
+  Upstream the two widths are one number, so `sizeof` of either was correct;
+  here it reads off the end of the back end's own array.
+
+So: **grep for `sizeof` of a shared union-sized array inside `config/`, and
+for `< FIRST_PSEUDO_REGISTER` / `< N_REG_CLASSES` in shared code that then
+calls a `targetm` hook with the index.** Those two greps are cheap and each
+found a live crash. `MT_FIRST_PSEUDO_REGISTER` and `MT_N_REG_CLASSES` exist
+precisely so a site can say which of the two it means.
+
+**NAME BUILD DIRS AND SNAPSHOTS AFTER THE FULL WORKTREE ID.** A coordinator
+sweep of `/tmp/b-*` and `/tmp/snap-*` deleted 207 directories with a guard
+that matched worktree-id **substrings** and protected nothing; four builds and
+their snapshots went with it. `/tmp/snap-a76e99-f` is not a name a guard can
+recognise. Use `/tmp/b-<full worktree id>` **and** `/tmp/snap-<full worktree
+id>`, and re-measure anything that was in flight — a build dir deleted under a
+running `make` gives results untrustworthy in both directions, and a vanished
+object looks exactly like the ICE class you are hunting.
+
 Say what you measured, what you did not, and what your instrument cannot see.
 **A measured "still cannot be checked, because X" is a useful result; an
 unexamined pass is not.** Distinguish upper bounds from lower bounds explicitly
