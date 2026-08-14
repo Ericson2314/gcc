@@ -651,6 +651,22 @@ multi_target_select (const char *target)
 			  "objects predate target-sched.h and are from a "
 			  "different build", base);
 
+	/* This back end's `asm_fprintf' FORMAT EXTENSIONS; see
+	   target-asmfprintf.h.  Rides on the same table and is checked for
+	   the same reason.
+
+	   Until this line existed, `final.cc:asm_fprintf' read
+	   `#ifdef ASM_FPRINTF_EXTENSIONS' and the macro body out of the
+	   PRIMARY's headers.  Two of forty-eight back ends define it, i386
+	   and arm, and both define `%r' -- to different things.  arm hit
+	   `gcc_unreachable ()' on `%@' the first time it reached `final'.  */
+	targetm_asmfprintf = targetm_cumargs->asmfprintf;
+	if (targetm_asmfprintf == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no %<asm_fprintf%>-extension table attached; "
+			  "its objects predate target-asmfprintf.h and are "
+			  "from a different build", base);
+
 	/* Whether this back end has a REGISTER STACK; see target-regstack.h.
 
 	   A separate registry rather than a field riding on the cumargs table,

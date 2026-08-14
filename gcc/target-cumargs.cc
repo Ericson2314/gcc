@@ -1188,6 +1188,48 @@ static const struct target_sched_desc mt_base_sched = {
 #endif
 };
 
+/* THIS BASE'S `asm_fprintf' FORMAT EXTENSIONS; see target-asmfprintf.h for
+   the measurement and for why a null pointer is this base's own answer.
+
+   The `#ifdef' is read HERE, where `ASM_FPRINTF_EXTENSIONS' is still this
+   base's own macro out of its own `tm.h'.  That is the only place it can be
+   read correctly: `final.o' is shared, so the same `#ifdef' there was the
+   primary's answer served to forty-seven other back ends -- and the macro
+   body with it, so arm's `%@' reached `gcc_unreachable ()' while arm's `%r'
+   would have printed an i386 register name.
+
+   The macro expands to bare `case' labels and is designed to be spliced into
+   a switch; that is exactly what happens below.  ARGS is dereferenced rather
+   than copied because a `%r' extension consumes an argument the CALLER must
+   see consumed.  */
+#ifdef ASM_FPRINTF_EXTENSIONS
+static bool
+mt_base_asm_fprintf_extension (FILE *file, va_list *args, int c)
+{
+  /* The macro's second parameter is used as `va_arg ((ARGS), int)', so it
+     must be the va_list itself and not the pointer.  Its third is the
+     format pointer, which neither definer reads; NULL would be a lie if one
+     ever did, so it is passed as the address of the character instead.  */
+  switch (c)
+    {
+      ASM_FPRINTF_EXTENSIONS (file, *args, &c)
+
+    default:
+      return false;
+    }
+  return true;
+}
+#endif
+
+static const struct target_asmfprintf_desc mt_base_asmfprintf = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+#ifdef ASM_FPRINTF_EXTENSIONS
+  mt_base_asm_fprintf_extension
+#else
+  NULL
+#endif
+};
+
 /* `static' and reached through the `preds' pointer below, for the same reason
    `mt_base_frame' is.  */
 static const struct target_preds_desc mt_base_preds = {
@@ -1297,5 +1339,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   &mt_base_preds,
   &mt_base_attr,
   &mt_base_modeswitch,
-  &mt_base_sched
+  &mt_base_sched,
+  &mt_base_asmfprintf
 };

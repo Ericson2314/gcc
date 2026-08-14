@@ -1153,3 +1153,29 @@ mt_init_base_sched_attrs (void)
   if (targetm_sched->init_attrs != NULL)
     targetm_sched->init_attrs ();
 }
+
+/* ------------------------------------------------------------------------
+   THE `asm_fprintf' FORMAT EXTENSIONS; see target-asmfprintf.h for the
+   measurement.  `final.o' is shared, so its `#ifdef ASM_FPRINTF_EXTENSIONS'
+   and the macro body inside it were the PRIMARY's for every base -- and the
+   two definers, i386 and arm, give the same letter `%r' two different
+   meanings.  arm reached `gcc_unreachable ()' in `asm_fprintf' on its `%@'
+   the first time it got as far as `final'.  */
+const struct target_asmfprintf_desc *targetm_asmfprintf;
+
+bool
+mt_asm_fprintf_extension (FILE *file, va_list *args, int c)
+{
+  if (targetm_asmfprintf == NULL)
+    internal_error ("no back end has been selected, so it is not known which "
+		    "%<asm_fprintf%> format extensions exist; a target must "
+		    "be chosen with %<-ftarget-config=%> before assembly is "
+		    "written");
+  /* A null `extension' is this base's own answer -- forty-six back ends
+     define no `ASM_FPRINTF_EXTENSIONS' at all -- and false sends the caller
+     to `gcc_unreachable ()', which is exactly what upstream does for such a
+     target.  */
+  if (targetm_asmfprintf->extension == NULL)
+    return false;
+  return targetm_asmfprintf->extension (file, args, c);
+}

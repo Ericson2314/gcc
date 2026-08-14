@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-attr.h"
 #include "target-modeswitch.h"
 #include "target-sched.h"
+#include "target-asmfprintf.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -177,6 +178,13 @@ struct target_cumargs_desc
      here for the same reason the four above do, and is never null for the
      same reason.  */
   const struct target_sched_desc *sched;
+
+  /* THIS BASE'S `asm_fprintf' FORMAT EXTENSIONS; see target-asmfprintf.h.
+     Rides here for the same reason the five above do, and is never null for
+     the same reason: the per-base translation unit that defines this table
+     defines that one too.  A back end with no extensions supplies a table
+     saying so, which is not the same thing as supplying no table.  */
+  const struct target_asmfprintf_desc *asmfprintf;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */
