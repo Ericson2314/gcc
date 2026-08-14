@@ -13,7 +13,12 @@ gcc/config/darwin-driver.cc gcc/config/vxworks-driver.cc
 gcc/config/sol2-c.cc gcc/config/vms/vms-c.cc gcc/config/arm/arm-d.cc
 gcc/config/mips/mips-d.cc gcc/config/rs6000/rs6000-d.cc
 gcc/config/s390/s390-d.cc gcc/config/sparc/sparc-d.cc
-gcc/config/freebsd-d.cc gcc/config/avr/gen-avr-mmcu-specs.cc'
+gcc/config/freebsd-d.cc gcc/config/avr/gen-avr-mmcu-specs.cc
+gcc/config/i386/i386.h gcc/config/aarch64/aarch64.h gcc/config/arm/arm.h
+gcc/config/loongarch/loongarch-evolution.h'
+# The last four are HEADERS.  A back end .h is read both per base and from the
+# shared tm.h chain (which includes config/i386/i386.h), so it cannot name a
+# base; converting them gave 96 `MT_BASE is not defined'.
 echo "$B" | tr ' ' '\n' | grep . | sort > /tmp/t173-kindb.txt
 
 tot=0
