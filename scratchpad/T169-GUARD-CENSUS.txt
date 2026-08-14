@@ -1,0 +1,96 @@
+excluding 12977 identifiers the shared sources define themselves
+(defaults.h and multi-target-macros.h deliberately NOT excluded: they are
+ the tail of tm.h, not an independent channel)
+target macros in shared-source conditionals: 613 raw, 430 after exclusion
+
+CLASS            macros  sites  worst-case back ends served a foreign answer
+LOUD-DEF            14     29  47 of 48
+LOUD-DECL            6      7  47 of 48
+SILENT-VALUE       171    203  47 of 48
+SILENT-FLOW        161    388  47 of 48
+SILENT-OTHER        31     33  47 of 48
+
+LOUD   20 macros
+SILENT 363 macros   -- the silent half is 18.1x the loud one
+
+excluded as already CONVERTED or unanimous:
+  LOUD-DEF       2 sites
+  LOUD-DECL      35 sites
+  SILENT-VALUE   73 sites
+  SILENT-FLOW    45 sites
+  SILENT-OTHER   7 sites
+
+=== HOW MANY BACK ENDS, not how many lines.  For each macro, how many of
+=== the 48 bases get an answer that is not their own, bucketed.
+  40-47   141 macros
+  20-39    27 macros
+  10-19    24 macros
+  2-9      85 macros
+  1        58 macros
+  total  335 macros, of which 164 have the PRIMARY in the MINORITY
+
+=== LOUD half, worst first.  The guard deletes a definition or a
+=== declaration a per-base object may reference: a link or compile
+=== failure, enumerable BEFORE the link, which is the point.
+ 47 STACK_REGS                         LOUD-DECL  ndef=1   gcc/target-regstack.h:27
+ 47 OPTIMIZE_MODE_SWITCHING            LOUD-DEF   ndef=5   gcc/mode-switching.cc:43
+ 47 INSN_SCHEDULING                    LOUD-DEF   ndef=1   gcc/ddg.cc:33 gcc/haifa-sched.cc:150 gcc/haifa-sched.cc:902 gcc/modulo-sched.cc:48 gcc/sched-deps.cc:44 gcc/sched-deps.cc:5600 gcc/sched-ebb.cc:37 gcc/sched-rgn.cc:76 gcc/sel-sched.cc:41 gcc/sel-sched-dump.cc:29 gcc/sel-sched-ir.cc:40
+ 47 EXTRA_SPECS                        LOUD-DEF   ndef=18  gcc/gcc.cc:1877
+ 47 EH_RETURN_DATA_REGNO               LOUD-DEF   ndef=48  gcc/ira-lives.cc:1338
+ 47 ASSEMBLER_DIALECT                  LOUD-DEF   ndef=7   gcc/final.cc:3340
+ 47 ASSEMBLER_DIALECT                  LOUD-DECL  ndef=7   gcc/final.cc:187
+ 46 TARGET_FORMAT_TYPES                LOUD-DECL  ndef=2   gcc/c-family/c-format.cc:5257
+ 46 COLLECT_RUN_DSYMUTIL               LOUD-DEF   ndef=2   gcc/collect2.cc:3091
+ 46 AS_NEEDS_DASH_FOR_PIPED_INPUT      LOUD-DEF   ndef=2   gcc/gcc.cc:1407
+ 46 ASM_OUTPUT_ALIGNED_BSS             LOUD-DEF   ndef=17  gcc/varasm.cc:501 gcc/varasm.cc:2384
+ 46 ASM_OUTPUT_ALIGNED_BSS             LOUD-DECL  ndef=17  gcc/varasm.cc:120
+ 41 ELF_ASCII_ESCAPES                  LOUD-DEF   ndef=41  gcc/varasm.cc:8728
+ 37 TARGET_SUPPORTS_WIDE_INT           LOUD-DEF   ndef=48  gcc/emit-rtl.cc:232 gcc/emit-rtl.cc:622 gcc/emit-rtl.cc:644 gcc/recog.cc:1736
+ 37 TARGET_SUPPORTS_WIDE_INT           LOUD-DECL  ndef=48  gcc/emit-rtl.cc:203 gcc/rtl.h:3395
+ 19 HAVE_blockage                      LOUD-DEF   ndef=29  gcc/emit-rtl.cc:448
+  1 USE_SELECT_SECTION_FOR_FUNCTIONS   LOUD-DEF   ndef=1   gcc/varasm.cc:529
+  1 LEAF_REGISTERS                     LOUD-DEF   ndef=1   gcc/final.cc:4153 gcc/final.cc:4222
+  1 LEAF_REGISTERS                     LOUD-DECL  ndef=1   gcc/final.cc:211
+  1 HAVE_window_save                   LOUD-DEF   ndef=1   gcc/var-tracking.cc:626
+
+=== SILENT half, worst first.  No diagnostic exists for any of these.
+ 47 VECTOR_STORE_FLAG_VALUE            SILENT-FLOW  x3    gcc/simplify-rtx.cc:945 gcc/simplify-rtx.cc:959 /tmp/sn
+ 47 TARGET_WIN32_TLS                   SILENT-FLOW  x2    gcc/attribs.cc:2034 gcc/attribs.cc:2064
+ 47 TARGET_PTRMEMFUNC_VBIT_LOCATION    SILENT-VALUE x1    gcc/defaults.h:1007
+ 47 TARGET_MS_BITFIELD_LAYOUT          SILENT-FLOW  x1    gcc/ada/gcc-interface/utils.cc:2274
+ 47 TARGET_MACHO                       SILENT-FLOW  x1    gcc/algol68/a68-imports.cc:369
+ 47 TARGET_FPMATH_DEFAULT              SILENT-FLOW  x1    gcc/ada/gcc-interface/misc.cc:1250
+ 47 STACK_SAVEAREA_MODE                SILENT-VALUE x1    gcc/defaults.h:1478
+ 47 STACK_REGS                         SILENT-VALUE x2    gcc/target-def.h:232 gcc/target-def.h:245
+ 47 SETUP_FRAME_ADDRESSES              SILENT-VALUE x1    gcc/defaults.h:1393
+ 47 REVERSE_CONDITION                  SILENT-VALUE x1    gcc/defaults.h:1405
+ 47 RETURN_ADDR_RTX                    SILENT-FLOW  x1    gcc/builtins.cc:869
+ 47 RED_ZONE_SIZE                      SILENT-FLOW  x2    gcc/builtins.cc:5572 gcc/rtlanal.cc:549
+ 47 REAL_PIC_OFFSET_TABLE_REGNUM       SILENT-FLOW  x2    gcc/ira-lives.cc:1684 gcc/lra-lives.cc:1111
+ 47 PUSH_ROUNDING                      SILENT-OTHER x1    gcc/defaults.h:916
+ 47 PUSH_ROUNDING                      SILENT-FLOW  x1    gcc/target-frame.h:1086
+ 47 PROMOTE_MODE                       SILENT-FLOW  x5    gcc/explow.cc:898 gcc/explow.cc:913 /tmp/snap-ab60dd/gc
+ 47 PIC_OFFSET_TABLE_REGNUM            SILENT-VALUE x1    gcc/defaults.h:871
+ 47 OPTIMIZE_MODE_SWITCHING            SILENT-FLOW  x2    gcc/mode-switching.cc:1322 gcc/mode-switching.cc:1331
+ 47 NUM_UNSPECV_VALUES                 SILENT-FLOW  x5    gcc/print-rtl.cc:506 gcc/print-rtl.cc:516 /tmp/snap-ab6
+ 47 NUM_UNSPEC_VALUES                  SILENT-FLOW  x4    gcc/dwarf2out.cc:15374 gcc/print-rtl.cc:513 /tmp/snap-a
+ 47 MAX_MOVE_MAX                       SILENT-VALUE x1    gcc/defaults.h:1115
+ 47 MAIN_STACK_BOUNDARY                SILENT-VALUE x1    gcc/ada/gcc-interface/decl.cc:83
+ 47 LOCAL_DECL_ALIGNMENT               SILENT-VALUE x1    gcc/defaults.h:1267
+ 47 LOCAL_ALIGNMENT                    SILENT-VALUE x1    gcc/defaults.h:1258
+ 47 INSN_SCHEDULING                    SILENT-VALUE x1    gcc/sched-int.h:24
+ 47 INSN_SCHEDULING                    SILENT-FLOW  x21   gcc/cfgexpand.cc:7108 gcc/combine.cc:3812 /tmp/snap-ab6
+ 47 HAVE_setmemdi                      SILENT-VALUE x1    gcc/defaults.h:1460
+ 47 HAVE_fmasf4                        SILENT-FLOW  x1    gcc/c-family/c-cppbuiltin.cc:77
+ 47 HAVE_fmadf4                        SILENT-FLOW  x1    gcc/c-family/c-cppbuiltin.cc:82
+ 47 HAVE_cpymemdi                      SILENT-VALUE x1    gcc/defaults.h:1448
+ 47 HAVE_cpymemdi                      SILENT-FLOW  x1    gcc/targhooks.cc:2266
+ 47 HAVE_adddf3                        SILENT-FLOW  x2    gcc/c-family/c-cppbuiltin.cc:1572 gcc/targhooks.cc:729
+ 47 HARD_REGNO_RENAME_OK               SILENT-VALUE x1    gcc/defaults.h:1316
+ 47 HARD_REGNO_NREGS_HAS_PADDING       SILENT-VALUE x1    gcc/defaults.h:1234
+ 47 FIND_BASE_TERM                     SILENT-FLOW  x2    gcc/alias.cc:1413 gcc/alias.cc:1926
+ 47 EXTRA_SPECS                        SILENT-FLOW  x2    gcc/gcc.cc:2000 gcc/gcc.cc:12263
+ 47 EPILOGUE_USES                      SILENT-VALUE x1    gcc/defaults.h:1320
+ 47 EH_RETURN_STACKADJ_RTX             SILENT-FLOW  x5    gcc/c-family/c-cppbuiltin.cc:1634 gcc/df-scan.cc:3706 /
+ 47 EH_RETURN_DATA_REGNO               SILENT-VALUE x1    gcc/defaults.h:442
+ 47 EH_RETURN_DATA_REGNO               SILENT-FLOW  x1    gcc/ira-lives.cc:1456

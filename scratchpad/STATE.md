@@ -13760,3 +13760,167 @@ it is a generator gap rather than a per-back-end quirk.
     a linking configuration** -- m68k, microblaze, pdp11, vax, xtensa. So the
     count of eight is not new; *which* eight is, and the `unspec_strings` gap
     in three of the five is new information.
+## #169 -- the guard census: the cause class no symbol sweep can find
+
+**THE INSTRUMENT WAS BUILT AND RUN.** It had been named in brief after brief
+and never written. `scratchpad/t169-dump.sh` + `t169-guardsweep.sh` +
+`t169-report.sh`, over **all 48 back ends' real header chains**, against an
+immutable snapshot at anchor 50.
+
+**METHOD, and the one thing that makes it different from every earlier grep.**
+`cpp -x c++ -dM` over the generated `tm-<base>.h` for each of the 48 bases --
+which IS the chain `cc1` reads for that base -- rather than
+`grep '#define X' gcc/config/<be>/`. PRINCIPLES section 4 already records why:
+`elfos.h`, `tm-dwarf2.h`, `darwin.h` and `vx-common.h` sit ABOVE the back-end
+directory and are in nearly every target's chain, and a directory grep scored
+66 of 87 pairs wrong for exactly that reason. The controls confirm it here:
+`DWARF2_DEBUGGING_INFO` reads **46 of 48** definers (all via `elfos.h`, which
+no back-end directory contains) and `LEAF_REGISTERS` reads **1** (sparc).
+
+`-x c++` is not decoration: `multi-target-macros.h:189`'s guard has a
+`|| !defined (__cplusplus)` arm that switches every redirect off under C.
+
+### The two axes, and why a presence-only instrument is wrong about most of it
+
+| axis | meaning | example measured here |
+|---|---|---|
+| **PRESENCE** | some bases define it, others do not | `HAVE_PRE_INCREMENT` 8 of 48, i386 not among them |
+| **VALUE** | all 48 define it -- usually from `defaults.h`, which is in every chain -- but the values differ | `TARGET_SUPPORTS_WIDE_INT` 48/48, i386 says 1, **37 bases say otherwise** |
+| **CONVERTED** | 48/48 with one value because it expands to `mt_*()` | `LOAD_EXTEND_OP`, `MAX_STACK_ALIGNMENT` -- the fix, reported in its own column so it cannot be re-filed as open |
+
+**The brief's figure for `TARGET_SUPPORTS_WIDE_INT` -- "only 11 of 48 define
+the macro" -- is a directory grep and is wrong.** Measured through the real
+chains, **all 48 define it**; the divergence is in the VALUE, and 37 back ends
+disagree with the primary. An instrument that only asked "is it defined" would
+have scored that macro, and 171 others, as clean.
+
+### The population, by cause
+
+```
+target macros in shared-source conditionals: 613 raw, 430 after exclusions
+
+CLASS            macros  sites   worst case
+LOUD-DEF             14     29   47 of 48 back ends served a foreign answer
+LOUD-DECL             6      7   47 of 48
+SILENT-VALUE        171    203   47 of 48
+SILENT-FLOW         161    388   47 of 48
+SILENT-OTHER         31     33   47 of 48
+
+LOUD    20 macros
+SILENT 363 macros  -- 18.1x the loud half
+
+by back ends served a foreign answer, per macro:
+  40-47  141 macros     20-39  27     10-19  24     2-9  85     1  58
+  total  335, of which 164 have the PRIMARY IN THE MINORITY
+```
+
+**The brief's hypothesis that the silent half is the larger one is confirmed,
+by 18x.** And 164 macros have i386 in the *minority* -- the primary is not
+merely one answer among 48, it is the uncommon one, for 164 of them.
+
+`scratchpad/T169-GUARD-CENSUS.txt` is the report, `t169-macros.tsv` the
+per-macro table (columns in `t169-macros.README`), `t169-sites.tsv` the sites.
+
+### The LOUD queue is 20 macros and it is fully enumerated
+
+This is the deliverable the brief asked for -- *enumerable ahead of the link*.
+Worst first, with the number of back ends served a foreign answer:
+
+```
+47 STACK_REGS (decl)         47 OPTIMIZE_MODE_SWITCHING   47 INSN_SCHEDULING
+47 EXTRA_SPECS               47 EH_RETURN_DATA_REGNO      47 ASSEMBLER_DIALECT
+46 TARGET_FORMAT_TYPES       46 COLLECT_RUN_DSYMUTIL      46 ASM_OUTPUT_ALIGNED_BSS
+46 AS_NEEDS_DASH_FOR_PIPED_INPUT                          41 ELF_ASCII_ESCAPES
+37 TARGET_SUPPORTS_WIDE_INT  19 HAVE_blockage              1 LEAF_REGISTERS
+ 1 USE_SELECT_SECTION_FOR_FUNCTIONS                        1 HAVE_window_save
+```
+
+`LEAF_REGISTERS` appears at exactly the weight the wall that found it implies
+(1 back end, sparc), which is the instrument reproducing a known result.
+`INSN_SCHEDULING` at 47 over **eleven files** is the largest single entry and
+has never been named on this branch.
+
+### Two instrument errors, both caught, both worth carrying
+
+- **"Outside `config/`" is not "shared".** `gcc/target-regs.cc`,
+  `gcc/target-cumargs.cc`, `gcc/target-regstack.cc` and 218 siblings sit at
+  `gcc/` and are compiled **once per base** with `-I<base>-inc`. The first run
+  scored them, and put `DATA_ALIGNMENT ... target-cumargs.cc:344` at the top of
+  the LOUD table -- **that line is the FIX for `DATA_ALIGNMENT`, reported as
+  the defect.** The authority is the generated makefile, never a filename
+  pattern.
+- **A macro the shared sources define themselves is not decided by `tm.h`.**
+  `GCC_VERSION` scored "47 of 48" because exactly one base's chain (gcn)
+  reaches `include/ansidecl.h` and the other 47 do not. It lives *outside
+  `gcc/` entirely*, so a `gcc/`-only exclusion scan missed it.
+  `defaults.h` and `multi-target-macros.h` are deliberately NOT excluded: per
+  PRINCIPLES they have no source-level includers and are the tail of `tm.h`.
+
+### #162 (`AUTO_INC_DEC`) -- fixed, both-sided, injection-verified
+
+`f9eb2045919`. Measured over the 48 chains: **`AUTO_INC_DEC` would be 1 for 25
+back ends and 0 for 23**, and rtl.h computed 0 for all 48 because i386 defines
+none of the eight `HAVE_*` names. Auto-increment addressing was off
+compiler-wide for 25 back ends -- aarch64, arm, rs6000, riscv, m68k, sh, pa,
+avr and seventeen more.
+
+Now a `bool auto_inc_dec` on `target_insn_desc`, read through
+`mt_auto_inc_dec ()`, following the `mt_have_lo_sum` precedent beside it.
+
+Four arms, `scratchpad/t169-bothsided.sh` and `t169-inject.sh`, on a two-base
+`cc1` at `f9eb2045919`:
+
+| arm | result |
+|---|---|
+| the recorded x86_64 bar | `big.c -O2` **12369 bytes / md5 `378fc33c1e70`** -- unchanged |
+| the DATA, per base | `mt_base_insn+11`: i386 `00`, aarch64 `01` |
+| the SELECTION, both-sided | one `cc1`, one source, only `-ftarget-config` differs: the `auto_inc_dec` pass **runs for aarch64 and not for x86_64** |
+| the INJECTION | forcing aarch64's byte to `0` and relinking turns the pass off; restoring turns it back on |
+
+`specs-config` for both targets: **222 non-blank / 230 `wc -l`**, md5
+`a6c4c68bdf33` (x86_64) and `f1a5ab201d95` (aarch64) -- the recorded bars,
+byte for byte.
+
+**THE FIRST VERSION OF THE CODEGEN ARM REPORTED "INJECTION DID NOT FIRE", AND
+IT WAS THE ARM THAT WAS WRONG.** At `-O2` aarch64 emits byte-identical
+assembly whether the flag is 1 or 0 -- the pass runs and finds nothing
+profitable. An arm watching the `.s` would have scored a working conversion as
+absent. The observable that works is the pass's own RTL dump, because
+`auto-inc-dec.cc:1696` gates the whole pass on `if (!AUTO_INC_DEC) return
+false` -- **the flag's own consumer, not a downstream effect other heuristics
+can suppress.** Generalise: when an injection does not fire, ask whether the
+observable is the thing the change feeds, or something several decisions
+downstream of it.
+
+### What this instrument cannot see
+
+- **Whether the guarded entity is actually referenced by a per-base object.**
+  The brief asked for that arm and it is not built. The LOUD list is therefore
+  an **upper bound** on link failures: a definition deleted for 47 back ends
+  costs nothing if nothing in those back ends' objects names it. It is *not* an
+  upper bound on the class, because the SILENT half needs no reference at all.
+- **`#if` on macros the guard reaches only through another macro.** The scanner
+  reads identifiers spelled on the `#if` line. PRINCIPLES' `mode_ibit` lesson
+  applies: search for the accessor, not only the name.
+- **The LOUD/SILENT split is by brace depth**, so a guard at file scope that
+  the literal-stripping pass mis-braced reads as SILENT. The stripping can only
+  LOSE braces, so the instrument **under**-reports LOUD rather than inventing
+  it -- stated so the 20 is read as a floor.
+- **Nothing here is a build.** Every number is a preprocessor reading. The
+  instrument that settles any single entry is a build with the guard's answer
+  flipped, which is what `t169-inject.sh` does for one of them.
+
+### Build-dir note
+
+`t169-conf.sh` configures **`gcc/` alone** with `--enable-backends=all`, which
+is the only way to get 48 `tm-<base>.h` without asking the top level for 48
+per-target trees. It needs two things the top level would have supplied: an
+explicit `--build`/`--host`, and a build-machine `libiberty` at
+`../build-<build>/libiberty` (the script builds it). It also passes `--target`,
+which the top level's own `configure-gcc` rule passes -- flagged rather than
+assumed, since `--target` is otherwise off limits.
+
+Two pre-existing configure diagnostics were seen and NOT chased or silenced:
+`gcc/configure` line 24589 and 24612 `test: =: unary operator expected`.
+PRINCIPLES records that shape as having twice meant a silent truncation.
+

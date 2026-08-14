@@ -1,0 +1,15 @@
+# t169-macros.tsv COLUMNS (t169-guardsweep.sh)
+# macro  ndef  nval  same  axis  minority  sites  i386-value  aarch64-value
+#
+#   ndef      how many of the 48 back ends define it, through their REAL tm.h
+#             chain (cpp -dM over the generated tm-<base>.h), not a grep of
+#             gcc/config/<be>/ -- elfos.h and friends sit ABOVE the back-end
+#             directory and a directory grep misattributes them.
+#   nval      distinct VALUES among the definers.
+#   same      how many bases give byte-identically what i386 gives.  48-same is
+#             the number of back ends served a foreign answer, because the
+#             shared tm.h IS i386s chain.
+#   axis      PRESENCE (some define, some do not) | VALUE (all define, values
+#             differ) | CONVERTED (expands to mt_*() or targetm_cdata: the fix,
+#             not the bug) | agree (48/48, one value).
+#   minority  MINORITY if i386s answer is not the commonest one.

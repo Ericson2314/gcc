@@ -1,0 +1,430 @@
+ASM_DECLARE_OBJECT_NAME	45	6	2	PRESENCE	MINORITY	2	(FILE,NAME,DECL) darwin_asm_declare_object_name ((FILE), (NAME), (DECL))	(FILE,NAME,DECL) do { HOST_WIDE_INT size; if (USE_GNU_UNIQUE_OBJECT && DECL_ONE_ONLY (DECL) && (!DECL_ARTIFICIAL (DECL) || !TREE_READONLY (DECL))) ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "gnu_unique_object"); else ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object"); size_directive_output = 0; if (!flag_inhibit_size_directive && (DECL) && DECL_SIZE (DECL)) { size_directive_output = 1; size = tree_to_uhwi (DECL_SIZE_UNIT (DECL)); ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size); } ASM_OUTPUT_LABEL (FILE, NAME); } while (0)
+REGISTER_MOVE_COST	6	4	42	PRESENCE	majority	1	<undefined>	<undefined>
+CL_CXX	48	1	48	agree	majority	1	(1U << 5)	(1U << 5)
+DARWIN_PPC	2	2	1	PRESENCE	MINORITY	1	0	<undefined>
+DARWIN_X86	2	2	1	PRESENCE	MINORITY	1	1	<undefined>
+IFCVT_MODIFY_TESTS	1	1	47	PRESENCE	majority	2	<undefined>	<undefined>
+MAX_BITS_PER_WORD	48	3	10	VALUE	MINORITY	1	64	64
+STACK_ADDRESS_OFFSET	1	1	47	PRESENCE	majority	3	<undefined>	<undefined>
+IFCVT_MODIFY_CANCEL	1	1	47	PRESENCE	majority	2	<undefined>	<undefined>
+ASM_OUTPUT_ADDR_VEC	4	4	44	PRESENCE	majority	4	<undefined>	<undefined>
+SUPPORTS_ONE_ONLY	48	2	46	VALUE	majority	1	1	1
+TARGET_VXWORKS_RTP	7	2	5	PRESENCE	MINORITY	1	((vxworks_flags & OPTION_MASK_VXWORKS_RTP) != 0)	false
+TARGET_COFF	48	1	48	agree	majority	1	0	0
+PTRDIFF_TYPE	48	1	48	CONVERTED	majority	1	(targetm_cdata.ptrdiff_type)	(targetm_cdata.ptrdiff_type)
+LONG_LONG_FRACT_TYPE_SIZE	48	2	45	VALUE	majority	1	(BITS_PER_UNIT * 8)	(BITS_PER_UNIT * 8)
+IFCVT_MODIFY_INSN	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+GCC_INSN_FLAGS_H	48	1	48	agree	majority	1		
+INT_LEAST32_TYPE	48	3	9	VALUE	MINORITY	1	"int"	(INT32_TYPE ? INT32_TYPE : INT64_TYPE ? INT64_TYPE : 0)
+UINT8_TYPE	48	2	11	VALUE	MINORITY	1	"unsigned char"	(CHAR_TYPE_SIZE == 8 ? "unsigned char" : 0)
+TARGET_SUPPORTS_ALIASES	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+STRUCTURE_SIZE_BOUNDARY	23	3	25	PRESENCE	majority	1	<undefined>	8
+CL_D	48	1	48	agree	majority	1	(1U << 7)	(1U << 7)
+LINK_EH_SPEC	6	2	42	PRESENCE	majority	2	<undefined>	<undefined>
+REVERSE_CONDITION	48	7	1	VALUE	MINORITY	1	(CODE,MODE) ix86_reverse_condition ((CODE), (MODE))	(code,mode) reverse_condition (code)
+LIBCALL_VALUE	12	11	36	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_EXTERNAL	43	8	5	PRESENCE	MINORITY	1	<undefined>	(STR,DECL,NAME) aarch64_asm_output_external (STR, DECL, NAME)
+CTZ_DEFINED_VALUE_AT_ZERO	48	12	1	VALUE	MINORITY	1	(MODE,VALUE) ((VALUE) = GET_MODE_BITSIZE (MODE), TARGET_BMI ? 2 : 0)	(MODE,VALUE) ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
+ASM_OUTPUT_TYPE_DIRECTIVE	42	2	6	PRESENCE	MINORITY	3	<undefined>	(STREAM,NAME,TYPE) do { fputs (TYPE_ASM_OP, STREAM); assemble_name (STREAM, NAME); fputs (", ", STREAM); fprintf (STREAM, TYPE_OPERAND_FMT, TYPE); putc ('\n', STREAM); } while (0)
+SBSS_SECTION_ASM_OP	9	7	39	PRESENCE	majority	1	<undefined>	<undefined>
+CALL_REALLY_USED_REGISTERS	12	12	36	PRESENCE	majority	1	<undefined>	{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, CALL_USED_X18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 }
+UINT_FAST64_TYPE	48	4	3	VALUE	MINORITY	1	"long long unsigned int"	(INT_TYPE_SIZE >= 64 ? "unsigned int" : UINT_LEAST64_TYPE)
+ASM_OUTPUT_LABELREF	48	22	2	VALUE	MINORITY	1	(FILE,NAME) do { const char *xname = (NAME); if (! strcmp (xname, MACHOPIC_FUNCTION_BASE_NAME)) machopic_output_function_base_name(FILE); else if (xname[0] == '&' || xname[0] == '*') { int len = strlen (xname); if (len > 6 && !strcmp ("$stub", xname + len - 5)) machopic_validate_stub_or_non_lazy_ptr (xname); else if (len > 7 && !strcmp ("$stub\"", xname + len - 6)) machopic_validate_stub_or_non_lazy_ptr (xname); else if (len > 14 && !strcmp ("$non_lazy_ptr", xname + len - 13)) machopic_validate_stub_or_non_lazy_ptr (xname); else if (len > 15 && !strcmp ("$non_lazy_ptr\"", xname + len - 14)) machopic_validate_stub_or_non_lazy_ptr (xname); if (xname[1] != '"' && name_needs_quotes (&xname[1])) fprintf (FILE, "\"%s\"", &xname[1]); else fputs (&xname[1], FILE); } else if (xname[0] == '+' || xname[0] == '-') fprintf (FILE, "\"%s\"", xname); else if (darwin_label_is_anonymous_local_objc_name (xname)) fprintf (FILE, "%c%s", flag_next_runtime ? 'L' : 'l', xname); else if (strncmp (xname, "__anon_cfstring", 15) == 0) fprintf (FILE, "L%s", xname); else if (xname[0] != '"' && name_needs_quotes (xname)) asm_fprintf (FILE, "\"%U%s\"", xname); else asm_fprintf (FILE, "%U%s", xname); } while (0)	(FILE,NAME) aarch64_asm_output_labelref (FILE, NAME)
+ASM_OUTPUT_LABEL	48	6	40	VALUE	majority	1	(FILE,NAME) do { assemble_name ((FILE), (NAME)); fputs (":\n", (FILE)); } while (0)	(FILE,NAME) do { assemble_name ((FILE), (NAME)); fputs (":\n", (FILE)); } while (0)
+INIT_ARRAY_SECTION_ASM_OP	41	1	7	PRESENCE	MINORITY	1	<undefined>	
+PROFILE_HOOK	10	9	38	PRESENCE	majority	1	<undefined>	(LABEL) { rtx fun, lr; lr = aarch64_return_addr_rtx (); fun = gen_rtx_SYMBOL_REF (Pmode, MCOUNT_NAME); emit_library_call (fun, LCT_NORMAL, VOIDmode, lr, Pmode); }
+DBR_OUTPUT_SEQEND	3	3	45	PRESENCE	majority	1	<undefined>	<undefined>
+NO_FUNCTION_CSE	48	3	36	VALUE	majority	1	1	1
+DECIMAL64_TYPE_SIZE	48	1	48	agree	majority	1	64	64
+NEXT_OBJC_RUNTIME	48	2	2	VALUE	MINORITY	2	100508	0
+ASM_OUTPUT_DEF_FROM_DECLS	5	5	43	PRESENCE	majority	1	<undefined>	(STR,DECL,TARGET) aarch64_asm_output_alias (STR, DECL, TARGET)
+MAX_STACK_ALIGNMENT	48	1	48	CONVERTED	majority	1	(mt_max_stack_alignment ())	(mt_max_stack_alignment ())
+ASM_PREFERRED_EH_DATA_FORMAT	48	19	2	VALUE	MINORITY	1	(CODE,GLOBAL) (((CODE) == 2 && (GLOBAL) == 1) || ((CODE) == 0 && (GLOBAL) == 1) ? (DW_EH_PE_pcrel | DW_EH_PE_indirect | DW_EH_PE_sdata4) : ((CODE) == 1 || (GLOBAL) == 0) ? DW_EH_PE_pcrel : DW_EH_PE_absptr)	(CODE,GLOBAL) aarch64_asm_preferred_eh_data_format ((CODE), (GLOBAL))
+IFCVT_MODIFY_MULTIPLE_TESTS	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ENABLE_VTABLE_VERIFY	48	1	48	agree	majority	1	0	0
+GO_IF_LEGITIMATE_ADDRESS	1	1	47	PRESENCE	majority	4	<undefined>	<undefined>
+PROMOTE_MODE	31	25	1	PRESENCE	MINORITY	5	(MODE,UNSIGNEDP,TYPE) do { if (((MODE) == HImode && TARGET_PROMOTE_HI_REGS) || ((MODE) == QImode && TARGET_PROMOTE_QI_REGS)) (MODE) = SImode; } while (0)	(MODE,UNSIGNEDP,TYPE) if (GET_MODE_CLASS (MODE) == MODE_INT && GET_MODE_SIZE (MODE) < 4) { if (MODE == QImode || MODE == HImode) { MODE = SImode; } }
+UINTMAX_TYPE	48	1	48	agree	majority	1	((INT_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "unsigned int" : ((LONG_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "long unsigned int" : "long long unsigned int"))	((INT_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "unsigned int" : ((LONG_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "long unsigned int" : "long long unsigned int"))
+BIGGEST_FIELD_ALIGNMENT	2	2	46	PRESENCE	majority	6	<undefined>	<undefined>
+TARGET_DEFERRED_OUTPUT_DEFS	48	1	48	agree	majority	1	(DECL,TARGET) false	(DECL,TARGET) false
+SUBALIGN_LOG	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_FPRINTF_EXTENSIONS	2	2	1	PRESENCE	MINORITY	1	(FILE,ARGS,P) case 'z': fputc (TARGET_64BIT ? 'q' : 'l', (FILE)); break; case 'r': { unsigned int regno = va_arg ((ARGS), int); if (LEGACY_INT_REGNO_P (regno)) fputc (TARGET_64BIT ? 'r' : 'e', (FILE)); fputs (reg_names[regno], (FILE)); break; }	<undefined>
+ASM_OUTPUT_OPCODE	7	7	1	PRESENCE	MINORITY	3	(STREAM,PTR) ASM_OUTPUT_AVX_PREFIX ((STREAM), (PTR))	<undefined>
+HAVE_COMDAT_GROUP	48	2	7	VALUE	MINORITY	1	0	1
+WORD_REGISTER_OPERATIONS	48	1	48	CONVERTED	majority	1	(targetm_cdata.word_register_operations)	(targetm_cdata.word_register_operations)
+TARGET_HAS_FMV_TARGET_ATTRIBUTE	48	2	45	VALUE	majority	1	1	0
+TARGET_ALIGN_NATURAL	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+TARGET_USES_WEAK_UNWIND_INFO	48	2	2	VALUE	MINORITY	1	1	0
+LOCAL_LABEL_PREFIX	29	4	19	PRESENCE	MINORITY	1	<undefined>	"."
+LOCAL_REGNO	48	5	44	VALUE	majority	1	(REGNO) 0	(REGNO) 0
+TARGET_DECLSPEC	48	2	47	VALUE	majority	1	0	0
+HAVE_fmatf4	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+STACK_CHECK_FIXED_FRAME_SIZE	48	1	48	CONVERTED	majority	1	(targetm_cdata.stack_check_fixed_frame_size)	(targetm_cdata.stack_check_fixed_frame_size)
+TARGET_SUPPORTS_WIDE_INT	48	2	11	VALUE	MINORITY	21	1	1
+CFA_FRAME_BASE_OFFSET	48	2	47	VALUE	majority	1	(FNDECL) 0	(FNDECL) 0
+CHAR8_TYPE	48	1	48	agree	majority	1	"unsigned char"	"unsigned char"
+LONG_LONG_TYPE_SIZE	48	3	38	VALUE	majority	1	64	64
+DWARF2_FRAME_REG_OUT	48	4	1	VALUE	MINORITY	1	(n,for_eh) (! (for_eh) || !dwarf_debuginfo_p () || TARGET_64BIT ? (n) : (n) == 5 ? 4 : (n) == 4 ? 5 : (n) >= 11 && (n) <= 18 ? (n) + 1 : (n))	(REGNO,FOR_EH) (REGNO)
+DWARF_CIE_DATA_ALIGNMENT	48	1	48	CONVERTED	majority	1	(targetm_cdata.dwarf_cie_data_alignment)	(targetm_cdata.dwarf_cie_data_alignment)
+HAVE_fmakf4	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+HAVE_adddf3	26	17	1	PRESENCE	MINORITY	2	((TARGET_80387 && X87_ENABLE_ARITH (DFmode)) || (SSE_FLOAT_MODE_P (DFmode) && TARGET_SSE_MATH))	(TARGET_FLOAT)
+ASM_FINISH_DECLARE_OBJECT	42	4	6	PRESENCE	MINORITY	1	<undefined>	(FILE,DECL,TOP_LEVEL,AT_END) do { const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0); HOST_WIDE_INT size; if (!flag_inhibit_size_directive && DECL_SIZE (DECL) && ! AT_END && TOP_LEVEL && DECL_INITIAL (DECL) == error_mark_node && !size_directive_output) { size_directive_output = 1; size = tree_to_uhwi (DECL_SIZE_UNIT (DECL)); ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size); } } while (0)
+INT32_TYPE	48	3	10	VALUE	MINORITY	1	"int"	(STDINT_LONG32 ? "long int" : INT_TYPE_SIZE == 32 ? "int" : SHORT_TYPE_SIZE == 32 ? "short int" : CHAR_TYPE_SIZE == 32 ? "signed char" : 0)
+SWITCHABLE_TARGET	48	1	48	agree	majority	33	1	1
+ASM_DECLARE_REGISTER_GLOBAL	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+LONG_ACCUM_TYPE_SIZE	48	2	45	VALUE	majority	1	(LONG_FRACT_TYPE_SIZE * 2)	(LONG_FRACT_TYPE_SIZE * 2)
+RETURN_ADDRESS_POINTER_REGNUM	5	3	43	PRESENCE	majority	4	<undefined>	<undefined>
+UINT_FAST32_TYPE	48	4	3	VALUE	MINORITY	1	"unsigned int"	(INT_TYPE_SIZE >= 32 ? "unsigned int" : UINT_LEAST32_TYPE)
+DWARF_REG_TO_UNWIND_COLUMN	48	2	47	VALUE	majority	1	(REGNO) (REGNO)	(REGNO) (REGNO)
+ASM_OUTPUT_SOURCE_FILENAME	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+HAVE_speculation_barrier	7	3	5	PRESENCE	MINORITY	2	1	1
+TEXT_SECTION_ASM_OP	47	9	28	PRESENCE	majority	1	"\t.text"	"\t.text"
+HAVE_IFmode	48	1	48	agree	majority	1		
+STACK_CHECK_STATIC_BUILTIN	48	2	3	VALUE	MINORITY	1	1	0
+DWARF_ALT_FRAME_RETURN_COLUMN	11	11	37	PRESENCE	majority	1	<undefined>	(AARCH64_DWARF_V0 + AARCH64_DWARF_NUMBER_V)
+BSS_SECTION_ASM_OP	31	8	17	PRESENCE	MINORITY	3	<undefined>	"\t.bss"
+INT64_TYPE	48	5	3	VALUE	MINORITY	1	"long long int"	(LONG_TYPE_SIZE == 64 ? "long int" : LONG_LONG_TYPE_SIZE == 64 ? "long long int" : INT_TYPE_SIZE == 64 ? "int" : 0)
+DWARF_GNAT_ENCODINGS_DEFAULT	48	1	48	agree	majority	1	DWARF_GNAT_ENCODINGS_GDB	DWARF_GNAT_ENCODINGS_GDB
+STACK_CHECK_PROTECT	48	2	47	VALUE	majority	2	(!global_options.x_flag_exceptions ? 4 * 1024 : targetm_common->except_unwind_info (&global_options) == UI_SJLJ ? 8 * 1024 : 12 * 1024)	(!global_options.x_flag_exceptions ? 4 * 1024 : targetm_common->except_unwind_info (&global_options) == UI_SJLJ ? 8 * 1024 : 12 * 1024)
+STACK_PARMS_IN_REG_PARM_AREA	1	1	47	PRESENCE	majority	4	<undefined>	<undefined>
+BASE64_ASM_OP	41	1	7	PRESENCE	MINORITY	2	<undefined>	"\t.base64\t"
+ASM_OUTPUT_ALIGNED_LOCAL_P	48	1	48	agree	majority	1	true	true
+MOVE_RATIO	48	1	48	CONVERTED	majority	2	(SPEED) (mt_move_ratio ((bool) (SPEED)))	(SPEED) (mt_move_ratio ((bool) (SPEED)))
+SHORT_IMMEDIATES_SIGN_EXTEND	48	2	39	VALUE	majority	1	0	0
+INT_FAST64_TYPE	48	4	3	VALUE	MINORITY	1	"long long int"	(INT_TYPE_SIZE >= 64 ? "int" : INT_LEAST64_TYPE)
+CL_Fortran	48	1	48	agree	majority	2	(1U << 8)	(1U << 8)
+TARGET_EDOM	2	1	46	PRESENCE	majority	2	<undefined>	<undefined>
+TARGET_DEFAULT_PACK_STRUCT	48	1	48	agree	majority	1	0	0
+CLASS_MAX_NREGS	24	20	24	PRESENCE	MINORITY	1	<undefined>	<undefined>
+BITS_PER_UNIT	48	1	48	agree	majority	3	(8)	(8)
+AVOID_CCMODE_COPIES	9	2	6	PRESENCE	MINORITY	2		<undefined>
+INT_LEAST16_TYPE	48	3	8	VALUE	MINORITY	1	"short int"	(INT16_TYPE ? INT16_TYPE : INT32_TYPE ? INT32_TYPE : INT64_TYPE ? INT64_TYPE : 0)
+C_COMMON_OVERRIDE_OPTIONS	3	3	1	PRESENCE	MINORITY	1	do { SUBTARGET_C_COMMON_OVERRIDE_OPTIONS; } while (0)	<undefined>
+SHIFT_COUNT_TRUNCATED	48	1	48	CONVERTED	majority	1	(targetm_cdata.shift_count_truncated)	(targetm_cdata.shift_count_truncated)
+FRACT_TYPE_SIZE	48	2	45	VALUE	majority	1	(BITS_PER_UNIT * 2)	(BITS_PER_UNIT * 2)
+ASM_PN_FORMAT	48	4	42	VALUE	majority	1	"%s.%lu"	"%s.%lu"
+LOAD_EXTEND_OP	48	1	48	CONVERTED	majority	1	(MODE) ((enum rtx_code) mt_load_extend_op ((int) (MODE)))	(MODE) ((enum rtx_code) mt_load_extend_op ((int) (MODE)))
+UINT_LEAST8_TYPE	48	3	8	VALUE	MINORITY	1	"unsigned char"	(UINT8_TYPE ? UINT8_TYPE : UINT16_TYPE ? UINT16_TYPE : UINT32_TYPE ? UINT32_TYPE : UINT64_TYPE ? UINT64_TYPE : 0)
+ASM_OUTPUT_ALIGNED_DECL_LOCAL	14	13	2	PRESENCE	MINORITY	2	(FILE,DECL,NAME,SIZE,ALIGN) darwin_asm_output_aligned_decl_local ((FILE), (DECL), (NAME), (SIZE), (ALIGN))	<undefined>
+STATIC_CHAIN_REGNUM	45	37	3	PRESENCE	MINORITY	1	<undefined>	R18_REGNUM
+UINTPTR_TYPE	48	5	4	VALUE	MINORITY	1	"long unsigned int"	SIZE_TYPE
+UINT_FAST8_TYPE	48	4	8	VALUE	MINORITY	1	"unsigned char"	(INT_TYPE_SIZE >= 8 ? "unsigned int" : UINT_LEAST8_TYPE)
+ASM_WEAKEN_LABEL	44	4	4	PRESENCE	MINORITY	3	<undefined>	(FILE,NAME) do { fputs ("\t.weak\t", (FILE)); assemble_name ((FILE), (NAME)); fputc ('\n', (FILE)); } while (0)
+SUPPORTS_WEAK	48	2	47	VALUE	majority	2	1	1
+RETURN_ADDR_OFFSET	48	3	46	VALUE	majority	1	0	0
+DWARF2_UNWIND_INFO	45	2	40	PRESENCE	majority	6	1	1
+CTF_DEBUGGING_INFO	41	1	7	PRESENCE	MINORITY	1	<undefined>	1
+STACK_REGS	1	1	1	PRESENCE	MINORITY	3		<undefined>
+FIND_BASE_TERM	3	3	1	PRESENCE	MINORITY	2	(X) ix86_find_base_term (X)	<undefined>
+ASM_OUTPUT_MAX_SKIP_ALIGN	6	6	1	PRESENCE	MINORITY	3	(FILE,LOG,MAX_SKIP) do { if ((LOG) != 0) { if ((MAX_SKIP) == 0 || (MAX_SKIP) >= (1 << (LOG)) - 1) fprintf ((FILE), "\t.p2align %d\n", (LOG)); else fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP)); } } while (0)	(FILE,LOG,MAX_SKIP) do { if ((LOG) != 0) { if ((MAX_SKIP) == 0) fprintf ((FILE), "\t.p2align %d\n", (int) (LOG)); else fprintf ((FILE), "\t.p2align %d,,%d\n", (int) (LOG), (int) (MAX_SKIP)); } } while (0)
+HAVE_cpymemqi	2	1	46	PRESENCE	majority	2	<undefined>	<undefined>
+BLOCK_REG_PADDING	6	6	42	PRESENCE	majority	13	<undefined>	(MODE,TYPE,FIRST) (aarch64_pad_reg_upward (MODE, TYPE, FIRST) ? PAD_UPWARD : PAD_DOWNWARD)
+ASM_OUTPUT_WEAK_ALIAS	44	1	4	PRESENCE	MINORITY	2	<undefined>	(STREAM,NAME,VALUE) do { ASM_WEAKEN_LABEL (STREAM, NAME); if (VALUE) ASM_OUTPUT_DEF (STREAM, NAME, VALUE); } while (0)
+ASM_OUTPUT_SYMVER_DIRECTIVE	41	1	7	PRESENCE	MINORITY	1	<undefined>	(FILE,NAME,NAME2) do { fputs ("\t.symver\t", (FILE)); assemble_name ((FILE), (NAME)); fputs (", ", (FILE)); assemble_name ((FILE), (NAME2)); fputc ('\n', (FILE)); } while (0)
+PCC_BITFIELD_TYPE_MATTERS	48	3	42	VALUE	majority	1	1	1
+SIG_ATOMIC_TYPE	48	2	46	VALUE	majority	1	"int"	"int"
+PROFILE_BEFORE_PROLOGUE	11	3	37	PRESENCE	majority	1	<undefined>	<undefined>
+MEMORY_MOVE_COST	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+REG_WORDS_BIG_ENDIAN	48	1	48	CONVERTED	majority	1	(targetm_cdata.reg_words_big_endian)	(targetm_cdata.reg_words_big_endian)
+SHORT_FRACT_TYPE_SIZE	48	2	45	VALUE	majority	1	BITS_PER_UNIT	BITS_PER_UNIT
+LEGITIMIZE_RELOAD_ADDRESS	8	8	40	PRESENCE	majority	1	<undefined>	<undefined>
+ATTRIBUTE_ALIGNED_VALUE	48	1	48	CONVERTED	majority	1	(targetm_cdata.attribute_aligned_value)	(targetm_cdata.attribute_aligned_value)
+PUSH_ROUNDING	7	7	1	PRESENCE	MINORITY	2	(BYTES) ix86_push_rounding (BYTES)	<undefined>
+INT_FAST32_TYPE	48	4	3	VALUE	MINORITY	1	"int"	(INT_TYPE_SIZE >= 32 ? "int" : INT_LEAST32_TYPE)
+USE_SELECT_SECTION_FOR_FUNCTIONS	1	1	47	PRESENCE	majority	2	<undefined>	<undefined>
+STACK_PUSH_CODE	48	4	44	VALUE	majority	1	PRE_DEC	PRE_DEC
+MOVE_MAX_PIECES	48	1	48	CONVERTED	majority	1	(mt_move_max_pieces ())	(mt_move_max_pieces ())
+ASM_OUTPUT_INTERNAL_LABEL	48	2	47	VALUE	majority	1	(FILE,NAME) do { assemble_name_raw ((FILE), (NAME)); fputs (":\n", (FILE)); } while (0)	(FILE,NAME) do { assemble_name_raw ((FILE), (NAME)); fputs (":\n", (FILE)); } while (0)
+TARGET_MACHO	2	2	1	PRESENCE	MINORITY	1	1	<undefined>
+INSN_SETS_ARE_DELAYED	48	3	46	VALUE	majority	1	(INSN) false	(INSN) false
+DWARF_TYPE_SIGNATURE_SIZE	48	1	48	agree	majority	1	8	8
+USE_GNU_UNIQUE_OBJECT	48	2	44	VALUE	majority	1	0	0
+HAVE_DFmode	48	1	48	agree	majority	3		
+GLOBAL_ASM_OP	45	8	6	PRESENCE	MINORITY	1	"\t.globl "	"\t.global\t"
+HAVE_cpymemsi	21	6	16	PRESENCE	MINORITY	2	1	<undefined>
+ASM_OUTPUT_POOL_PROLOGUE	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ADDITIONAL_REGISTER_NAMES	31	31	1	PRESENCE	MINORITY	1	{ { "eax", AX_REG }, { "edx", DX_REG }, { "ecx", CX_REG }, { "ebx", BX_REG }, { "esi", SI_REG }, { "edi", DI_REG }, { "ebp", BP_REG }, { "esp", SP_REG }, { "rax", AX_REG }, { "rdx", DX_REG }, { "rcx", CX_REG }, { "rbx", BX_REG }, { "rsi", SI_REG }, { "rdi", DI_REG }, { "rbp", BP_REG }, { "rsp", SP_REG }, { "al", AX_REG }, { "dl", DX_REG }, { "cl", CX_REG }, { "bl", BX_REG }, { "sil", SI_REG }, { "dil", DI_REG }, { "bpl", BP_REG }, { "spl", SP_REG }, { "ah", AX_REG }, { "dh", DX_REG }, { "ch", CX_REG }, { "bh", BX_REG }, { "ymm0", XMM0_REG }, { "ymm1", XMM1_REG }, { "ymm2", XMM2_REG }, { "ymm3", XMM3_REG }, { "ymm4", XMM4_REG }, { "ymm5", XMM5_REG }, { "ymm6", XMM6_REG }, { "ymm7", XMM7_REG }, { "ymm8", XMM8_REG }, { "ymm9", XMM9_REG }, { "ymm10", XMM10_REG }, { "ymm11", XMM11_REG }, { "ymm12", XMM12_REG }, { "ymm13", XMM13_REG }, { "ymm14", XMM14_REG }, { "ymm15", XMM15_REG }, { "ymm16", XMM16_REG }, { "ymm17", XMM17_REG }, { "ymm18", XMM18_REG }, { "ymm19", XMM19_REG }, { "ymm20", XMM20_REG }, { "ymm21", XMM21_REG }, { "ymm22", XMM22_REG }, { "ymm23", XMM23_REG }, { "ymm24", XMM24_REG }, { "ymm25", XMM25_REG }, { "ymm26", XMM26_REG }, { "ymm27", XMM27_REG }, { "ymm28", XMM28_REG }, { "ymm29", XMM29_REG }, { "ymm30", XMM30_REG }, { "ymm31", XMM31_REG }, { "zmm0", XMM0_REG }, { "zmm1", XMM1_REG }, { "zmm2", XMM2_REG }, { "zmm3", XMM3_REG }, { "zmm4", XMM4_REG }, { "zmm5", XMM5_REG }, { "zmm6", XMM6_REG }, { "zmm7", XMM7_REG }, { "zmm8", XMM8_REG }, { "zmm9", XMM9_REG }, { "zmm10", XMM10_REG }, { "zmm11", XMM11_REG }, { "zmm12", XMM12_REG }, { "zmm13", XMM13_REG }, { "zmm14", XMM14_REG }, { "zmm15", XMM15_REG }, { "zmm16", XMM16_REG }, { "zmm17", XMM17_REG }, { "zmm18", XMM18_REG }, { "zmm19", XMM19_REG }, { "zmm20", XMM20_REG }, { "zmm21", XMM21_REG }, { "zmm22", XMM22_REG }, { "zmm23", XMM23_REG }, { "zmm24", XMM24_REG }, { "zmm25", XMM25_REG }, { "zmm26", XMM26_REG }, { "zmm27", XMM27_REG }, { "zmm28", XMM28_REG }, { "zmm29", XMM29_REG }, { "zmm30", XMM30_REG }, { "zmm31", XMM31_REG } }	{ R_ALIASES(0), R_ALIASES(1), R_ALIASES(2), R_ALIASES(3), R_ALIASES(4), R_ALIASES(5), R_ALIASES(6), R_ALIASES(7), R_ALIASES(8), R_ALIASES(9), R_ALIASES(10), R_ALIASES(11), R_ALIASES(12), R_ALIASES(13), R_ALIASES(14), R_ALIASES(15), R_ALIASES(16), R_ALIASES(17), R_ALIASES(18), R_ALIASES(19), R_ALIASES(20), R_ALIASES(21), R_ALIASES(22), R_ALIASES(23), R_ALIASES(24), R_ALIASES(25), R_ALIASES(26), R_ALIASES(27), R_ALIASES(28), R_ALIASES(29), R_ALIASES(30), {"wsp", R0_REGNUM + 31}, V_ALIASES(0), V_ALIASES(1), V_ALIASES(2), V_ALIASES(3), V_ALIASES(4), V_ALIASES(5), V_ALIASES(6), V_ALIASES(7), V_ALIASES(8), V_ALIASES(9), V_ALIASES(10), V_ALIASES(11), V_ALIASES(12), V_ALIASES(13), V_ALIASES(14), V_ALIASES(15), V_ALIASES(16), V_ALIASES(17), V_ALIASES(18), V_ALIASES(19), V_ALIASES(20), V_ALIASES(21), V_ALIASES(22), V_ALIASES(23), V_ALIASES(24), V_ALIASES(25), V_ALIASES(26), V_ALIASES(27), V_ALIASES(28), V_ALIASES(29), V_ALIASES(30), V_ALIASES(31), P_ALIASES(0), P_ALIASES(1), P_ALIASES(2), P_ALIASES(3), P_ALIASES(4), P_ALIASES(5), P_ALIASES(6), P_ALIASES(7), P_ALIASES(8), P_ALIASES(9), P_ALIASES(10), P_ALIASES(11), P_ALIASES(12), P_ALIASES(13), P_ALIASES(14), P_ALIASES(15) }
+PRINT_OPERAND_ADDRESS	16	10	32	PRESENCE	majority	1	<undefined>	<undefined>
+EH_FRAME_THROUGH_COLLECT2	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+UINT_FAST16_TYPE	48	6	3	VALUE	MINORITY	1	"short unsigned int"	(INT_TYPE_SIZE >= 16 ? "unsigned int" : UINT_LEAST16_TYPE)
+OBJECT_FORMAT_ELF	44	1	4	PRESENCE	MINORITY	5	<undefined>	
+ENABLE_X86_64_MFENTRY	48	1	48	agree	majority	1	0	0
+ASM_OUTPUT_EXTERNAL_LIBCALL	41	2	7	PRESENCE	MINORITY	1	<undefined>	(FILE,FUN) (*targetm.asm_out.globalize_label) (FILE, XSTR (FUN, 0))
+CASE_VECTOR_SHORTEN_MODE	7	7	41	PRESENCE	majority	3	<undefined>	(min,max,body) ((min < -0x1fff0 || max > 0x1fff0) ? SImode : (min < -0x1f0 || max > 0x1f0) ? HImode : QImode)
+ADJUST_INSN_LENGTH	13	13	35	PRESENCE	majority	4	<undefined>	(insn,length) do { if (aarch64_madd_needs_nop (insn)) length += 4; } while (0)
+DWARF2_ADDR_SIZE	48	5	41	VALUE	majority	1	((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)	((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
+ASM_OUTPUT_ALIGNED_LOCAL	41	8	7	PRESENCE	MINORITY	1	<undefined>	(FILE,NAME,SIZE,ALIGN) do { fprintf ((FILE), "%s", LOCAL_ASM_OP); assemble_name ((FILE), (NAME)); fprintf ((FILE), "\n"); ASM_OUTPUT_ALIGNED_COMMON (FILE, NAME, SIZE, ALIGN); } while (0)
+CTORS_SECTION_ASM_OP	11	8	37	PRESENCE	majority	2	<undefined>	"\t.section\t.init_array,\"aw\",%init_array"
+INCOMING_REGNO	48	5	44	VALUE	majority	1	(N) (N)	(N) (N)
+PREFERRED_STACK_BOUNDARY	48	1	48	CONVERTED	majority	1	(mt_preferred_stack_boundary ())	(mt_preferred_stack_boundary ())
+EH_FRAME_SECTION_NAME	39	2	2	PRESENCE	MINORITY	4	"__TEXT"	".eh_frame"
+TARGET_WIN32_TLS	1	1	1	PRESENCE	MINORITY	2	0	<undefined>
+INT_LEAST8_TYPE	48	3	8	VALUE	MINORITY	1	"signed char"	(INT8_TYPE ? INT8_TYPE : INT16_TYPE ? INT16_TYPE : INT32_TYPE ? INT32_TYPE : INT64_TYPE ? INT64_TYPE : 0)
+MASK_RETURN_ADDR	48	5	44	VALUE	majority	1	NULL_RTX	NULL_RTX
+HAVE_HFmode	48	1	48	agree	majority	1		
+WCHAR_TYPE	48	1	48	CONVERTED	majority	1	(targetm_cdata.wchar_type)	(targetm_cdata.wchar_type)
+TARGET_WEAK_NOT_IN_ARCHIVE_TOC	48	1	48	agree	majority	1	0	0
+ASM_NO_SKIP_IN_TEXT	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+TARGET_ASM_NAMED_SECTION	46	4	2	PRESENCE	MINORITY	3	darwin_asm_named_section	default_elf_asm_named_section
+HAVE_LD_EH_GC_SECTIONS	48	1	48	agree	majority	1	(targ_caps.ld_eh_gc_sections)	(targ_caps.ld_eh_gc_sections)
+HAS_LONG_COND_BRANCH	48	2	2	VALUE	MINORITY	1	1	0
+MALLOC_ABI_ALIGNMENT	48	1	48	CONVERTED	majority	1	(targetm_cdata.malloc_abi_alignment)	(targetm_cdata.malloc_abi_alignment)
+OFFS_MSGSEND_FAST	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+BRANCH_COST	48	28	1	VALUE	MINORITY	1	(speed_p,predictable_p) (!(speed_p) ? 2 : (predictable_p) ? 0 : ix86_branch_cost)	(SPEED_P,PREDICTABLE_P) (aarch64_branch_cost (SPEED_P, PREDICTABLE_P))
+SUPPORTS_INIT_PRIORITY	48	2	3	VALUE	MINORITY	1	0	1
+NUM_UNSPECV_VALUES	23	16	1	PRESENCE	MINORITY	5	114	40
+HAVE_cpymemdi	7	5	1	PRESENCE	MINORITY	2	(TARGET_64BIT)	1
+ASM_OUTPUT_TLS_COMMON	7	1	41	PRESENCE	majority	2	<undefined>	<undefined>
+SUPPORTS_SHF_GNU_RETAIN	48	2	7	VALUE	MINORITY	1	0	(targ_caps.gas_shf_gnu_retain)
+EH_RETURN_DATA_REGNO	48	29	1	VALUE	MINORITY	3	(N) ((N) <= DX_REG ? (N) : INVALID_REGNUM)	(N) ((N) < 4 ? ((unsigned int) R0_REGNUM + (N)) : INVALID_REGNUM)
+__USE_MISC	48	1	48	agree	majority	1	1	1
+INIT_SECTION_ASM_OP	5	4	2	PRESENCE	MINORITY	1	""	<undefined>
+HARD_REGNO_NREGS_HAS_PADDING	48	2	1	VALUE	MINORITY	1	(REGNO,MODE) (TARGET_128BIT_LONG_DOUBLE && !TARGET_64BIT && GENERAL_REGNO_P (REGNO) && ((MODE) == XFmode || (MODE) == XCmode))	(REGNO,MODE) 0
+OUTGOING_REGNO	48	5	44	VALUE	majority	1	(N) (N)	(N) (N)
+TARGET_LIB_INT_CMP_BIASED	48	2	47	VALUE	majority	1	(true)	(true)
+WINT_TYPE	48	2	4	VALUE	MINORITY	1	"int"	"unsigned int"
+EH_TABLES_CAN_BE_READ_ONLY	48	1	48	agree	majority	1	(targ_caps.ld_ro_rw_section_mixing)	(targ_caps.ld_ro_rw_section_mixing)
+GCC_DEFAULTS_H	48	1	48	agree	majority	1		
+CPLUSPLUS_CPP_SPEC	22	3	15	PRESENCE	MINORITY	1	CPP_SPEC	<undefined>
+TRAMPOLINE_SECTION	1	1	47	PRESENCE	majority	1	<undefined>	text_section
+ASM_WEAKEN_DECL	3	2	2	PRESENCE	MINORITY	2	(FILE,DECL,NAME,ALIAS) do { if (ALIAS) { warning (0, "alias definitions not supported in Mach-O; ignored"); break; } if (! DECL_EXTERNAL (DECL) && TREE_PUBLIC (DECL)) targetm.asm_out.globalize_label (FILE, NAME); if (DECL_EXTERNAL (DECL)) fputs ("\t.weak_reference ", FILE); else if (lookup_attribute ("weak_import", DECL_ATTRIBUTES (DECL))) break; else if (TREE_PUBLIC (DECL)) fputs ("\t.weak_definition ", FILE); else break; assemble_name (FILE, NAME); fputc ('\n', FILE); } while (0)	<undefined>
+SECONDARY_RELOAD_CLASS	6	6	42	PRESENCE	majority	1	<undefined>	<undefined>
+INT16_TYPE	48	3	10	VALUE	MINORITY	1	"short int"	(SHORT_TYPE_SIZE == 16 ? "short int" : INT_TYPE_SIZE == 16 ? "int" : CHAR_TYPE_SIZE == 16 ? "signed char" : 0)
+MAX_BITSIZE_MODE_ANY_INT	48	1	48	agree	majority	2	512	512
+AS_NEEDS_DASH_FOR_PIPED_INPUT	2	1	2	PRESENCE	MINORITY	2		<undefined>
+TARGET_PTRMEMFUNC_VBIT_LOCATION	48	4	1	VALUE	MINORITY	1	ptrmemfunc_vbit_in_pfn	ptrmemfunc_vbit_in_delta
+INTMAX_TYPE	48	1	48	agree	majority	1	((INT_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "int" : ((LONG_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "long int" : "long long int"))	((INT_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "int" : ((LONG_TYPE_SIZE == LONG_LONG_TYPE_SIZE) ? "long int" : "long long int"))
+EH_RETURN_HANDLER_RTX	48	14	33	VALUE	majority	1	NULL	gen_rtx_REG (Pmode, R6_REGNUM)
+TRAMPOLINE_ALIGNMENT	48	12	12	VALUE	MINORITY	1	FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)	64
+ASM_OUTPUT_FUNCTION_LABEL	48	3	1	VALUE	MINORITY	1	(FILE,NAME,DECL) ix86_asm_output_function_label ((FILE), (NAME), (DECL))	(FILE,NAME,DECL) assemble_function_label_raw ((FILE), (NAME))
+NO_DOLLAR_IN_LABEL	41	1	7	PRESENCE	MINORITY	8	<undefined>	
+OPTIONS_H_INCLUDED	48	1	48	agree	majority	2		
+IFUNC_ASM_TYPE	48	1	48	agree	majority	1	"gnu_indirect_function"	"gnu_indirect_function"
+DEFAULT_USE_CXA_ATEXIT	48	1	48	agree	majority	1	0	0
+POINTER_SIZE_UNITS	48	1	48	agree	majority	1	((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)	((POINTER_SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT)
+INT_FAST16_TYPE	48	6	3	VALUE	MINORITY	1	"short int"	(INT_TYPE_SIZE >= 16 ? "int" : INT_LEAST16_TYPE)
+OFFS_ASSIGNIVAR_FAST	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_DWARF_DELTA	3	2	2	PRESENCE	MINORITY	1	(FILE,SIZE,LABEL1,LABEL2) darwin_asm_output_dwarf_delta (FILE, SIZE, LABEL1, LABEL2, 0)	<undefined>
+INCOMING_STACK_BOUNDARY	48	1	48	CONVERTED	majority	1	(mt_incoming_stack_boundary ())	(mt_incoming_stack_boundary ())
+TYPE_OPERAND_FMT	42	3	6	PRESENCE	MINORITY	1	<undefined>	"%%%s"
+MAIN_STACK_BOUNDARY	1	1	1	PRESENCE	MINORITY	1	128	<undefined>
+DEFAULT_PCC_STRUCT_RETURN	48	3	30	VALUE	majority	1	0	0
+DWARF2_DEBUGGING_INFO	46	2	44	PRESENCE	majority	9	1	1
+EXTRA_SPECS	18	18	1	PRESENCE	MINORITY	3	{ "cc1_cpu", CC1_CPU_SPEC }, SUBTARGET_EXTRA_SPECS	{ "asm_cpu_spec", ASM_CPU_SPEC }
+PIC_OFFSET_TABLE_REG_CALL_CLOBBERED	48	3	44	VALUE	majority	1	0	0
+PC_REGNUM	5	5	43	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_FORMAT_PRIVATE_NAME	48	3	46	VALUE	majority	1	(OUTPUT,NAME,LABELNO) do { const char *const name_ = (NAME); char *const output_ = (OUTPUT) = (char *) alloca (strlen (name_) + 32); sprintf (output_, ASM_PN_FORMAT, name_, (unsigned long)(LABELNO)); } while (0)	(OUTPUT,NAME,LABELNO) do { const char *const name_ = (NAME); char *const output_ = (OUTPUT) = (char *) alloca (strlen (name_) + 32); sprintf (output_, ASM_PN_FORMAT, name_, (unsigned long)(LABELNO)); } while (0)
+LONG_LONG_ACCUM_TYPE_SIZE	48	3	44	VALUE	majority	1	(LONG_LONG_FRACT_TYPE_SIZE * 2)	(LONG_LONG_FRACT_TYPE_SIZE * 2)
+USER_LABEL_PREFIX	48	2	12	VALUE	MINORITY	1	"_"	""
+HAVE_NEWLIB_NANO_FORMATTED_IO	48	1	48	agree	majority	1	0	0
+MAX_BITS_PER_WORD_FROM_BITS_PER_WORD	35	1	13	PRESENCE	MINORITY	1	<undefined>	<undefined>
+LOCAL_ALIGNMENT	48	17	1	VALUE	MINORITY	1	(TYPE,ALIGN) ix86_local_alignment ((TYPE), VOIDmode, (ALIGN))	(EXP,ALIGN) aarch64_stack_alignment (EXP, ALIGN)
+ASM_OUTPUT_POOL_EPILOGUE	1	1	47	PRESENCE	majority	1	<undefined>	aarch64_asm_output_pool_epilogue
+HAVE_cpymemhi	3	1	45	PRESENCE	majority	2	<undefined>	<undefined>
+TARGET_PECOFF	48	1	48	agree	majority	1	0	0
+RETURN_ADDR_IN_PREVIOUS_FRAME	48	3	46	VALUE	majority	1	0	0
+TARGET_MEM_CONSTRAINT	48	3	46	VALUE	majority	1	'm'	'm'
+STORE_MAX_PIECES	48	1	48	CONVERTED	majority	1	(mt_store_max_pieces ())	(mt_store_max_pieces ())
+DWARF_FRAME_REGNUM	48	1	48	CONVERTED	majority	3	(REG) (mt_dwarf_frame_regnum ((unsigned int) (REG)))	(REG) (mt_dwarf_frame_regnum ((unsigned int) (REG)))
+TARGET_MS_BITFIELD_LAYOUT	1	1	1	PRESENCE	MINORITY	1	((target_flags & MASK_MS_BITFIELD_LAYOUT) != 0)	<undefined>
+ASM_OUTPUT_DWARF_OFFSET	3	2	2	PRESENCE	MINORITY	2	(FILE,SIZE,LABEL,OFFSET,BASE) darwin_asm_output_dwarf_offset (FILE, SIZE, LABEL, OFFSET, BASE)	<undefined>
+FLOAT_LIB_COMPARE_RETURNS_BOOL	48	4	45	VALUE	majority	1	(MODE,COMPARISON) false	(MODE,COMPARISON) false
+ASM_OUTPUT_ALIGNED_DECL_COMMON	12	11	2	PRESENCE	MINORITY	2	(FILE,DECL,NAME,SIZE,ALIGN) darwin_asm_output_aligned_decl_common ((FILE), (DECL), (NAME), (SIZE), (ALIGN))	<undefined>
+FRAME_ADDR_RTX	48	4	45	VALUE	majority	1	(x) (x)	(x) (x)
+HAVE_AS_TLS	7	1	41	PRESENCE	majority	1	<undefined>	<undefined>
+VECTOR_STORE_FLAG_VALUE	4	3	1	PRESENCE	MINORITY	3	(MODE) (GET_MODE_CLASS (MODE) == MODE_VECTOR_INT ? constm1_rtx : NULL_RTX)	(MODE) CONST1_RTX (GET_MODE_INNER (MODE))
+GCC_DRIVER_HOST_INITIALIZATION	3	2	2	PRESENCE	MINORITY	1	darwin_driver_init (&decoded_options_count, &decoded_options)	<undefined>
+FINAL_PRESCAN_INSN	13	13	35	PRESENCE	majority	2	<undefined>	(INSN,OPVEC,NOPERANDS) aarch64_final_prescan_insn (INSN);
+CLZ_DEFINED_VALUE_AT_ZERO	48	12	1	VALUE	MINORITY	1	(MODE,VALUE) ((VALUE) = GET_MODE_BITSIZE (MODE), TARGET_LZCNT ? 2 : 0)	(MODE,VALUE) ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
+OBJECT_FORMAT_MACHO	2	1	2	PRESENCE	MINORITY	3	1	<undefined>
+EMPTY_FIELD_BOUNDARY	32	7	16	PRESENCE	MINORITY	1	<undefined>	32
+STACK_BOUNDARY	48	1	48	CONVERTED	majority	2	(mt_stack_boundary ())	(mt_stack_boundary ())
+ASM_OUTPUT_DEBUG_LABEL	48	3	45	VALUE	majority	1	(FILE,PREFIX,NUM) (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM)	(FILE,PREFIX,NUM) (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM)
+TYPE_ASM_OP	42	1	6	PRESENCE	MINORITY	1	<undefined>	"\t.type\t"
+OPTIMIZE_MODE_SWITCHING	5	5	1	PRESENCE	MINORITY	3	(ENTITY) ix86_optimize_mode_switching[(ENTITY)]	(ENTITY) aarch64_optimize_mode_switching (aarch64_mode_entity (ENTITY))
+TARGET_IEEEQUAD_DEFAULT	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_CASE_LABEL	39	6	9	PRESENCE	MINORITY	1	<undefined>	(FILE,PREFIX,NUM,JUMPTABLE) do { ASM_OUTPUT_BEFORE_CASE_LABEL (FILE, PREFIX, NUM, JUMPTABLE); (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM); } while (0)
+HAVE_setmemqi	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+LONG_FRACT_TYPE_SIZE	48	2	45	VALUE	majority	1	(BITS_PER_UNIT * 4)	(BITS_PER_UNIT * 4)
+IRA_HARD_REGNO_ADD_COST_MULTIPLIER	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+UINT_LEAST64_TYPE	48	3	3	VALUE	MINORITY	1	"long long unsigned int"	UINT64_TYPE
+ASSEMBLER_DIALECT	7	7	1	PRESENCE	MINORITY	8	ASM_ATT	<undefined>
+TARGET_ATTRIBUTE_WEAK	48	2	47	VALUE	majority	1	__attribute__ ((weak))	__attribute__ ((weak))
+TARGET_VTABLE_DATA_ENTRY_DISTANCE	48	2	47	VALUE	majority	1	1	1
+INTPTR_TYPE	48	5	3	VALUE	MINORITY	1	"long int"	PTRDIFF_TYPE
+HAVE_fmadf4	16	14	1	PRESENCE	MINORITY	1	(TARGET_SSE_MATH && (TARGET_FMA || TARGET_FMA4 || TARGET_AVX512F))	(TARGET_FLOAT)
+ASM_OUTPUT_SIZE_DIRECTIVE	42	2	6	PRESENCE	MINORITY	1	<undefined>	(STREAM,NAME,SIZE) do { HOST_WIDE_INT size_ = (SIZE); fputs (SIZE_ASM_OP, STREAM); assemble_name (STREAM, NAME); fprintf (STREAM, ", " HOST_WIDE_INT_PRINT_DEC "\n", size_); } while (0)
+TARGET_HAS_IFUNC	48	2	47	VALUE	majority	1	0	0
+IFCVT_MODIFY_FINAL	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+MAX_BITSIZE_MODE_ANY_MODE	48	1	48	agree	majority	1	32768	32768
+HARDREG_PRE_REGNOS	1	1	47	PRESENCE	majority	2	<undefined>	{ FPM_REGNUM, 0 }
+HAVE_SOLARIS_LD	48	1	48	agree	majority	3	0	0
+PRINT_OPERAND_PUNCT_VALID_P	11	11	37	PRESENCE	majority	1	<undefined>	<undefined>
+GCC_MULTI_TARGET_MACROS_H	48	1	48	agree	majority	1		
+PIC_CASE_VECTOR_ADDRESS	1	1	47	PRESENCE	majority	2	<undefined>	<undefined>
+STACK_CHECK_MOVING_SP	48	2	46	VALUE	majority	1	0	0
+ARG_POINTER_CFA_OFFSET	48	6	40	VALUE	majority	1	(FNDECL) (FIRST_PARM_OFFSET (FNDECL) + crtl->args.pretend_args_size)	(FNDECL) (FIRST_PARM_OFFSET (FNDECL) + crtl->args.pretend_args_size)
+INSN_SCHEDULING	1	1	1	PRESENCE	MINORITY	33		<undefined>
+HAVE_setmemsi	12	6	7	PRESENCE	MINORITY	1	1	<undefined>
+CASE_VECTOR_PC_RELATIVE	48	11	31	VALUE	majority	1	0	1
+TARGET_HAS_BIONIC	48	2	44	VALUE	majority	1	0	0
+TARGET_FPMATH_DEFAULT	1	1	1	PRESENCE	MINORITY	1	(TARGET_SSE ? FPMATH_SSE : FPMATH_387)	<undefined>
+STACK_SAVEAREA_MODE	48	8	1	VALUE	MINORITY	1	(LEVEL) ((LEVEL) == SAVE_NONLOCAL ? (TARGET_64BIT ? TImode : DImode) : Pmode)	(LEVEL) ((LEVEL) == SAVE_NONLOCAL ? E_CDImode : Pmode)
+PRINT_OPERAND	15	11	33	PRESENCE	majority	1	<undefined>	<undefined>
+INITIAL_FRAME_ADDRESS_RTX	48	3	46	VALUE	majority	1	NULL	NULL
+NO_DOT_IN_LABEL	3	1	45	PRESENCE	majority	17	<undefined>	<undefined>
+HAVE_INITFINI_ARRAY_SUPPORT	48	2	7	VALUE	MINORITY	2	0	1
+OUTPUT_QUOTED_STRING	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+EXIT_IGNORE_STACK	48	4	28	VALUE	majority	1	1	(cfun->calls_alloca)
+DWARF2_LINENO_DEBUGGING_INFO	1	1	47	PRESENCE	majority	6	<undefined>	<undefined>
+DWARF_FRAME_REGISTERS	48	1	48	CONVERTED	majority	1	(mt_dwarf_frame_registers ())	(mt_dwarf_frame_registers ())
+FUNCTION_VALUE	5	5	43	PRESENCE	majority	1	<undefined>	<undefined>
+DATA_SECTION_ASM_OP	47	11	27	PRESENCE	majority	1	"\t.data"	"\t.data"
+REAL_PIC_OFFSET_TABLE_REGNUM	2	2	1	PRESENCE	MINORITY	2	(TARGET_64BIT ? R15_REG : BX_REG)	<undefined>
+IMMEDIATE_PREFIX	8	2	40	PRESENCE	majority	1	<undefined>	<undefined>
+COMPARE_MAX_PIECES	48	1	48	CONVERTED	majority	1	(mt_compare_max_pieces ())	(mt_compare_max_pieces ())
+OVERLAPPING_REGISTER_NAMES	3	3	45	PRESENCE	majority	1	<undefined>	<undefined>
+__GNU_LIBRARY__	48	1	48	agree	majority	1	6	6
+UINT_LEAST32_TYPE	48	3	9	VALUE	MINORITY	2	"unsigned int"	(UINT32_TYPE ? UINT32_TYPE : UINT64_TYPE ? UINT64_TYPE : 0)
+DECIMAL128_TYPE_SIZE	48	1	48	agree	majority	1	128	128
+yy_flex_debug	48	1	48	agree	majority	1	global_options.x_yy_flex_debug	global_options.x_yy_flex_debug
+ASM_OUTPUT_DEF	46	10	2	PRESENCE	MINORITY	4	<undefined>	(FILE,LABEL1,LABEL2) do { fprintf ((FILE), "%s", SET_ASM_OP); assemble_name (FILE, LABEL1); fprintf (FILE, ","); assemble_name (FILE, LABEL2); fprintf (FILE, "\n"); } while (0)
+TARGET_USE_WEAKREF	48	1	48	agree	majority	2	1	1
+ASM_OUTPUT_LABEL_REF	4	4	44	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_ALIGN_WITH_NOP	5	5	43	PRESENCE	majority	1	<undefined>	<undefined>
+EPILOGUE_USES	48	26	1	VALUE	MINORITY	1	(REGNO) ix86_epilogue_uses (REGNO)	(REGNO) (aarch64_epilogue_uses (REGNO))
+UINT32_TYPE	48	3	10	VALUE	MINORITY	1	"unsigned int"	(STDINT_LONG32 ? "long unsigned int" : INT_TYPE_SIZE == 32 ? "unsigned int" : SHORT_TYPE_SIZE == 32 ? "short unsigned int" : CHAR_TYPE_SIZE == 32 ? "unsigned char" : 0)
+INT8_TYPE	48	2	11	VALUE	MINORITY	1	"signed char"	(CHAR_TYPE_SIZE == 8 ? "signed char" : 0)
+TARGET_FORMAT_TYPES	2	1	2	PRESENCE	MINORITY	2	darwin_additional_format_types	<undefined>
+ELF_ASCII_ESCAPES	41	1	7	PRESENCE	MINORITY	1	<undefined>	"\1\1\1\1\1\1\1\1btn\1fr\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\0\0\"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\\\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1"
+ASM_OUTPUT_DWARF_PCREL	4	4	44	PRESENCE	majority	2	<undefined>	<undefined>
+ACCUM_TYPE_SIZE	48	2	45	VALUE	majority	1	(FRACT_TYPE_SIZE * 2)	(FRACT_TYPE_SIZE * 2)
+ADJUST_FIELD_ALIGN	5	5	1	PRESENCE	MINORITY	9	(FIELD,TYPE,COMPUTED) x86_field_alignment ((TYPE), (COMPUTED))	<undefined>
+FUNCTION_VALUE_REGNO_P	16	15	32	PRESENCE	majority	1	<undefined>	<undefined>
+HAVE_blockage	29	1	29	PRESENCE	majority	1	1	1
+WCHAR_TYPE_SIZE	48	4	16	VALUE	MINORITY	1	32	32
+STATIC_CHAIN_INCOMING_REGNUM	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+DWARF_VERSION_DEFAULT	48	1	48	agree	majority	1	5	5
+TARGET_LIBC_PROVIDES_SSP	48	2	7	VALUE	MINORITY	1	1	0
+SETUP_FRAME_ADDRESSES	48	5	1	VALUE	MINORITY	1	() ix86_setup_frame_addresses ()	() do { } while (0)
+HAS_LONG_UNCOND_BRANCH	48	3	2	VALUE	MINORITY	1	1	0
+PIC_OFFSET_TABLE_REGNUM	48	23	1	VALUE	MINORITY	1	(ix86_use_pseudo_pic_reg () ? (pic_offset_table_rtx ? INVALID_REGNUM : REAL_PIC_OFFSET_TABLE_REGNUM) : INVALID_REGNUM)	INVALID_REGNUM
+INVOKE__main	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_WEAKREF	48	2	47	VALUE	majority	5	(FILE,DECL,NAME,VALUE) do { fprintf ((FILE), "\t.weakref\t"); assemble_name ((FILE), (NAME)); fprintf ((FILE), ","); assemble_name ((FILE), (VALUE)); fprintf ((FILE), "\n"); } while (0)	(FILE,DECL,NAME,VALUE) do { fprintf ((FILE), "\t.weakref\t"); assemble_name ((FILE), (NAME)); fprintf ((FILE), ","); assemble_name ((FILE), (VALUE)); fprintf ((FILE), "\n"); } while (0)
+TARGET_DLLIMPORT_DECL_ATTRIBUTES	48	2	47	VALUE	majority	3	0	0
+DWARF2_FRAME_INFO	2	2	46	PRESENCE	majority	1	<undefined>	<undefined>
+STACK_SIZE_MODE	48	5	3	VALUE	MINORITY	1	Pmode	word_mode
+HAVE_setmemdi	7	5	1	PRESENCE	MINORITY	1	(TARGET_64BIT)	1
+DELAY_SLOTS	1	1	1	PRESENCE	MINORITY	1	0	<undefined>
+EH_RETURN_TAKEN_RTX	1	1	47	PRESENCE	majority	5	<undefined>	gen_rtx_REG (Pmode, R4_REGNUM)
+UINT64_TYPE	48	5	3	VALUE	MINORITY	1	"long long unsigned int"	(LONG_TYPE_SIZE == 64 ? "long unsigned int" : LONG_LONG_TYPE_SIZE == 64 ? "long long unsigned int" : INT_TYPE_SIZE == 64 ? "unsigned int" : 0)
+SIZE_ASM_OP	42	1	6	PRESENCE	MINORITY	1	<undefined>	"\t.size\t"
+ASM_DECLARE_COLD_FUNCTION_SIZE	41	1	7	PRESENCE	MINORITY	1	<undefined>	(FILE,FNAME,DECL) do { if (!flag_inhibit_size_directive) ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME); } while (0)
+INSN_REFERENCES_ARE_DELAYED	48	4	45	VALUE	majority	1	(INSN) false	(INSN) false
+LOCAL_DECL_ALIGNMENT	48	2	1	VALUE	MINORITY	1	(DECL) ix86_local_alignment ((DECL), VOIDmode, DECL_ALIGN (DECL))	(DECL) LOCAL_ALIGNMENT (TREE_TYPE (DECL), DECL_ALIGN (DECL))
+RED_ZONE_SIZE	1	1	1	PRESENCE	MINORITY	2	128	<undefined>
+PREFERRED_RELOAD_CLASS	10	9	38	PRESENCE	majority	1	<undefined>	<undefined>
+HAVE_BFmode	48	1	48	agree	majority	3		
+DEFAULT_FLAG_PIE	48	1	48	agree	majority	1	0	0
+TARGET_CLONES_ATTR_SEPARATOR	48	2	47	VALUE	majority	1	','	','
+ASM_DECLARE_COLD_FUNCTION_NAME	41	1	7	PRESENCE	MINORITY	1	<undefined>	(FILE,NAME,DECL) do { ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function"); ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL)); ASM_OUTPUT_FUNCTION_LABEL (FILE, NAME, DECL); } while (0)
+ASM_OUTPUT_REG_PUSH	18	18	1	PRESENCE	MINORITY	3	(FILE,REGNO) asm_fprintf ((FILE), "\tpush%z\t%%%r\n", (REGNO))	<undefined>
+SHORT_ACCUM_TYPE_SIZE	48	2	45	VALUE	majority	1	(SHORT_FRACT_TYPE_SIZE * 2)	(SHORT_FRACT_TYPE_SIZE * 2)
+INCOMING_FRAME_SP_OFFSET	48	1	48	CONVERTED	majority	1	(mt_incoming_frame_sp_offset ())	(mt_incoming_frame_sp_offset ())
+PREFERRED_DEBUGGING_TYPE	48	3	46	VALUE	majority	1	DWARF2_DEBUG	DWARF2_DEBUG
+MINIMUM_ATOMIC_ALIGNMENT	2	2	46	PRESENCE	majority	2	<undefined>	<undefined>
+NUM_UNSPEC_VALUES	29	24	1	PRESENCE	MINORITY	4	312	730
+DEFAULT_FLAG_SSP	48	1	48	agree	majority	1	0	0
+REVERSIBLE_CC_MODE	48	10	5	VALUE	MINORITY	1	(MODE) 1	(MODE) ((MODE) != CCFPmode && (MODE) != CCFPEmode)
+HONOR_REG_ALLOC_ORDER	48	4	44	VALUE	majority	1	0	0
+HAVE_KFmode	48	1	48	agree	majority	1		
+STACK_CHECK_MAX_VAR_SIZE	48	1	48	agree	majority	1	(STACK_CHECK_MAX_FRAME_SIZE / 100)	(STACK_CHECK_MAX_FRAME_SIZE / 100)
+BTF_DEBUGGING_INFO	41	1	7	PRESENCE	MINORITY	1	<undefined>	1
+TARGET_ALIGN_DOUBLE	2	1	2	PRESENCE	MINORITY	1	((target_flags & MASK_ALIGN_DOUBLE) != 0)	<undefined>
+TARGET_FHARDENED_SUPPORTED	48	2	44	VALUE	majority	1	0	0
+STACK_CHECK_PROBE_INTERVAL_EXP	48	1	48	agree	majority	1	12	12
+DYNAMIC_CHAIN_ADDRESS	48	11	38	VALUE	majority	1	(x) (x)	(x) (x)
+STACK_SLOT_ALIGNMENT	48	1	48	CONVERTED	majority	1	(TYPE,MODE,ALIGN) (mt_stack_slot_alignment ((TYPE), (MODE), (ALIGN)))	(TYPE,MODE,ALIGN) (mt_stack_slot_alignment ((TYPE), (MODE), (ALIGN)))
+BOOL_TYPE_SIZE	48	2	47	VALUE	majority	1	CHAR_TYPE_SIZE	CHAR_TYPE_SIZE
+POINTERS_EXTEND_UNSIGNED	12	4	7	PRESENCE	MINORITY	1	1	1
+ASM_OUTPUT_CASE_END	5	5	43	PRESENCE	majority	1	<undefined>	<undefined>
+ASM_OUTPUT_ALIGNED_BSS	17	10	2	PRESENCE	MINORITY	4	(FILE,DECL,NAME,SIZE,ALIGN) darwin_output_aligned_bss ((FILE), (DECL), (NAME), (SIZE), (ALIGN))	<undefined>
+HAVE_TFmode	48	1	48	agree	majority	5		
+TARGET_VTABLE_USES_DESCRIPTORS	48	2	47	VALUE	majority	1	0	0
+FLOAT_STORE_FLAG_VALUE	2	2	46	PRESENCE	majority	11	<undefined>	<undefined>
+ASM_OUTPUT_ASCII	48	8	4	VALUE	MINORITY	1	(MYFILE,MYSTRING,MYLENGTH) do { FILE *_my_file = (MYFILE); const unsigned char *_hide_p = (const unsigned char *) (MYSTRING); int _hide_thissize = (MYLENGTH); { const unsigned char *p = _hide_p; int thissize = _hide_thissize; int i; fprintf (_my_file, "\t.ascii \""); for (i = 0; i < thissize; i++) { int c = p[i]; if (c == '\"' || c == '\\') putc ('\\', _my_file); if (ISPRINT (c)) putc (c, _my_file); else { fprintf (_my_file, "\\%o", c); if (i < thissize - 1 && ISDIGIT (p[i + 1])) fprintf (_my_file, "\"\n\t.ascii \""); } } fprintf (_my_file, "\"\n"); } } while (0)	(FILE,STR,LENGTH) default_elf_asm_output_ascii ((FILE), (STR), (LENGTH))
+TARGET_USE_LOCAL_THUNK_ALIAS_P	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+MINIMUM_ALIGNMENT	48	1	48	CONVERTED	majority	1	(EXP,MODE,ALIGN) (mt_minimum_alignment ((EXP), (MODE), (ALIGN)))	(EXP,MODE,ALIGN) (mt_minimum_alignment ((EXP), (MODE), (ALIGN)))
+TARGET_VTABLE_ENTRY_ALIGN	48	4	45	VALUE	majority	1	POINTER_SIZE	POINTER_SIZE
+__GLIBC__	48	1	48	agree	majority	5	2	2
+DTORS_SECTION_ASM_OP	11	8	37	PRESENCE	majority	2	<undefined>	"\t.section\t.fini_array,\"aw\",%fini_array"
+HAVE_setmemhi	2	1	46	PRESENCE	majority	1	<undefined>	<undefined>
+OUTGOING_REG_PARM_STACK_SPACE	48	1	48	CONVERTED	majority	1	(FNTYPE) (mt_outgoing_reg_parm_stack_space ((FNTYPE)))	(FNTYPE) (mt_outgoing_reg_parm_stack_space ((FNTYPE)))
+STACK_CHECK_BUILTIN	48	2	47	VALUE	majority	1	0	0
+UINT_LEAST16_TYPE	48	3	8	VALUE	MINORITY	2	"short unsigned int"	(UINT16_TYPE ? UINT16_TYPE : UINT32_TYPE ? UINT32_TYPE : UINT64_TYPE ? UINT64_TYPE : 0)
+ASM_DECLARE_FUNCTION_NAME	46	19	2	PRESENCE	MINORITY	1	(FILE,NAME,DECL) do { const char *xname = NAME; if (GET_CODE (XEXP (DECL_RTL (DECL), 0)) != SYMBOL_REF) xname = IDENTIFIER_POINTER (DECL_NAME (DECL)); if (! DECL_WEAK (DECL) && ((TREE_STATIC (DECL) && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL))) || DECL_INITIAL (DECL))) machopic_define_symbol (DECL_RTL (DECL)); if ((TREE_STATIC (DECL) && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL))) || DECL_INITIAL (DECL)) (* targetm.encode_section_info) (DECL, DECL_RTL (DECL), false); ASM_OUTPUT_FUNCTION_LABEL (FILE, xname, DECL); } while (0)	(STR,NAME,DECL) aarch64_declare_function_name (STR, NAME, DECL)
+SPARC_STACK_BOUNDARY_HACK	1	1	47	PRESENCE	majority	2	<undefined>	<undefined>
+STORE_FLAG_VALUE	48	1	48	CONVERTED	majority	1	(targetm_cdata.store_flag_value)	(targetm_cdata.store_flag_value)
+POINTER_SIZE	48	1	48	CONVERTED	majority	1	(mt_pointer_size ())	(mt_pointer_size ())
+INT_FAST8_TYPE	48	4	8	VALUE	MINORITY	1	"signed char"	(INT_TYPE_SIZE >= 8 ? "int" : INT_LEAST8_TYPE)
+HARD_REGNO_RENAME_OK	48	21	1	VALUE	MINORITY	1	(SRC,TARGET) (!STACK_REGNO_P (SRC) && EXT_REX_SSE_REGNO_P (SRC) == EXT_REX_SSE_REGNO_P (TARGET))	(FROM,TO) true
+HAVE_window_save	1	1	47	PRESENCE	majority	5	<undefined>	<undefined>
+TARGET_DEC_EVAL_METHOD	48	1	48	agree	majority	1	2	2
+ACCUMULATE_OUTGOING_ARGS	48	1	48	CONVERTED	majority	1	(mt_accumulate_outgoing_args ())	(mt_accumulate_outgoing_args ())
+BITS_PER_WORD	48	1	48	CONVERTED	majority	1	(targetm_cdata.bits_per_word)	(targetm_cdata.bits_per_word)
+SUPPORTS_DISCRIMINATOR	48	2	47	VALUE	majority	1	(targ_caps.gas_discriminator)	(targ_caps.gas_discriminator)
+LIMIT_RELOAD_CLASS	1	1	47	PRESENCE	majority	5	<undefined>	<undefined>
+ASM_OUTPUT_ADDR_DIFF_VEC	2	2	46	PRESENCE	majority	4	<undefined>	<undefined>
+STACK_CHECK_MAX_FRAME_SIZE	48	1	48	CONVERTED	majority	1	(targetm_cdata.stack_check_max_frame_size)	(targetm_cdata.stack_check_max_frame_size)
+PID_TYPE	48	1	48	agree	majority	1	"int"	"int"
+ROUND_TYPE_ALIGN	3	3	45	PRESENCE	majority	4	<undefined>	<undefined>
+IFCVT_MACHDEP_INIT	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+DEFAULT_GDB_EXTENSIONS	48	1	48	agree	majority	1	1	1
+DECIMAL32_TYPE_SIZE	48	1	48	agree	majority	1	32	32
+STACK_GROWS_DOWNWARD	48	2	45	VALUE	majority	14	1	1
+ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX	5	5	1	PRESENCE	MINORITY	2	(FILE,ENCODING,SIZE,ADDR,DONE) if (TARGET_64BIT) { if ((SIZE) == 4 && ((ENCODING) & 0x70) == DW_EH_PE_pcrel) { fputs (ASM_LONG, FILE); assemble_name (FILE, XSTR (ADDR, 0)); fputs ("+4@GOTPCREL", FILE); goto DONE; } } else { if (ENCODING == ASM_PREFERRED_EH_DATA_FORMAT (2, 1)) { darwin_non_lazy_pcrel (FILE, ADDR); goto DONE; } }	<undefined>
+COLLECT_RUN_DSYMUTIL	2	1	2	PRESENCE	MINORITY	1	1	<undefined>
+LEAF_REG_REMAP	1	1	47	PRESENCE	majority	5	<undefined>	<undefined>
+APPLY_RESULT_SIZE	3	3	1	PRESENCE	MINORITY	1	(8+108)	<undefined>
+ASM_COMMENT_START	48	1	48	CONVERTED	majority	3	(targetm_cdata.asm_comment_start)	(targetm_cdata.asm_comment_start)
+SDATA_SECTION_ASM_OP	11	7	37	PRESENCE	majority	1	<undefined>	<undefined>
+HAVE_LTO_PLUGIN	48	1	48	agree	majority	3	(targ_caps.lto_plugin ? 2 : 0)	(targ_caps.lto_plugin ? 2 : 0)
+ASM_OUTPUT_SYMBOL_REF	10	10	1	PRESENCE	MINORITY	1	(FILE,SYM) do { const char *name = assemble_name_resolve (XSTR (SYM, 0)); if (ASSEMBLER_DIALECT == ASM_ATT && name[0] == '$' && user_label_prefix[0] == '\0') { fputc ('(', (FILE)); assemble_name_raw ((FILE), name); fputc (')', (FILE)); } else assemble_name_raw ((FILE), name); } while (0)	<undefined>
+MAX_FIXED_MODE_SIZE	48	1	48	CONVERTED	majority	1	(targetm_cdata.max_fixed_mode_size)	(targetm_cdata.max_fixed_mode_size)
+HAVE_fmasf4	22	17	1	PRESENCE	MINORITY	1	(TARGET_SSE_MATH && (TARGET_FMA || TARGET_FMA4 || TARGET_AVX512F))	(TARGET_FLOAT)
+CLEAR_INSN_CACHE	3	3	1	PRESENCE	MINORITY	1	(beg,end) extern void sys_icache_invalidate(void *start, size_t len); sys_icache_invalidate ((beg), (size_t)((end)-(beg)))	(beg,end) extern void __aarch64_sync_cache_range (void *, void *); __aarch64_sync_cache_range (beg, end)
+FRAME_POINTER_CFA_OFFSET	3	2	45	PRESENCE	majority	8	<undefined>	<undefined>
+EH_USES	4	4	44	PRESENCE	majority	6	<undefined>	<undefined>
+ASM_OUTPUT_ADDR_VEC_ELT	40	35	1	PRESENCE	MINORITY	1	(FILE,VALUE) ix86_output_addr_vec_elt ((FILE), (VALUE))	<undefined>
+DWARF_OFFSET_SIZE	48	1	48	agree	majority	1	4	4
+HAVE_SOLARIS_AS	48	1	48	agree	majority	1	0	0
+ASM_OUTPUT_FDESC	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+MIN_UNITS_PER_WORD	48	3	11	VALUE	MINORITY	1	4	UNITS_PER_WORD
+SIZETYPE	48	2	47	VALUE	majority	1	SIZE_TYPE	SIZE_TYPE
+MAKE_DECL_ONE_ONLY	46	2	45	PRESENCE	majority	2	(DECL) (DECL_WEAK (DECL) = 1)	(DECL) (DECL_WEAK (DECL) = 1)
+SET_RATIO	48	1	48	CONVERTED	majority	1	(SPEED) (mt_set_ratio ((bool) (SPEED)))	(SPEED) (mt_set_ratio ((bool) (SPEED)))
+RETURN_ADDR_RTX	43	42	1	PRESENCE	MINORITY	1	(COUNT,FRAME) ((COUNT) == 0 ? gen_rtx_MEM (Pmode, plus_constant (Pmode, arg_pointer_rtx, -UNITS_PER_WORD)) : gen_rtx_MEM (Pmode, plus_constant (Pmode, (FRAME), UNITS_PER_WORD)))	aarch64_return_addr
+ASM_OUTPUT_ADDR_DIFF_ELT	38	33	1	PRESENCE	MINORITY	2	(FILE,BODY,VALUE,REL) ix86_output_addr_diff_elt ((FILE), (VALUE), (REL))	(STREAM,BODY,VALUE,REL) do { switch (GET_MODE (BODY)) { case E_QImode: asm_fprintf (STREAM, "\t.byte\t(%LL%d - %LLrtx%d) / 4\n", VALUE, REL); break; case E_HImode: asm_fprintf (STREAM, "\t.2byte\t(%LL%d - %LLrtx%d) / 4\n", VALUE, REL); break; case E_SImode: case E_DImode: asm_fprintf (STREAM, "\t.word\t(%LL%d - %LLrtx%d) / 4\n", VALUE, REL); break; default: gcc_unreachable (); } } while (0)
+MULTIPLE_SYMBOL_SPACES	48	2	47	VALUE	majority	1	0	0
+ASM_DECLARE_FUNCTION_SIZE	44	9	4	PRESENCE	MINORITY	1	<undefined>	(FILE,FNAME,DECL) do { if (!flag_inhibit_size_directive) ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME); } while (0)
+MAX_MOVE_MAX	48	5	1	VALUE	MINORITY	1	64	MOVE_MAX
+ARGS_GROW_DOWNWARD	48	2	45	VALUE	majority	8	0	0
+SET_ASM_OP	39	1	9	PRESENCE	MINORITY	1	<undefined>	"\t.set\t"
+READONLY_DATA_SECTION_ASM_OP	45	8	3	PRESENCE	MINORITY	1	<undefined>	"\t.section\t.rodata"
+_POSIX_SOURCE	48	1	48	agree	majority	2	1	1
+INT_LEAST64_TYPE	48	3	3	VALUE	MINORITY	1	"long long int"	INT64_TYPE
+TARGET_SUPPORTS_WEAK	48	1	48	agree	majority	1	(SUPPORTS_WEAK && targ_caps.gas_weak)	(SUPPORTS_WEAK && targ_caps.gas_weak)
+DONT_USE_BUILTIN_SETJMP	1	1	47	PRESENCE	majority	7	<undefined>	<undefined>
+optimize	48	1	48	agree	majority	1	global_options.x_optimize	global_options.x_optimize
+HAVE_XFmode	48	1	48	agree	majority	3		
+CLEAR_RATIO	48	1	48	CONVERTED	majority	1	(SPEED) (mt_clear_ratio ((bool) (SPEED)))	(SPEED) (mt_clear_ratio ((bool) (SPEED)))
+UINT16_TYPE	48	3	10	VALUE	MINORITY	1	"short unsigned int"	(SHORT_TYPE_SIZE == 16 ? "short unsigned int" : INT_TYPE_SIZE == 16 ? "unsigned int" : CHAR_TYPE_SIZE == 16 ? "unsigned char" : 0)
+ASM_OUTPUT_SPECIAL_POOL_ENTRY	2	2	46	PRESENCE	majority	2	<undefined>	<undefined>
+FRAME_GROWS_DOWNWARD	48	5	31	VALUE	majority	1	1	1
+SHORT_TYPE_SIZE	48	3	33	VALUE	majority	1	16	16
+LEAF_REGISTERS	1	1	47	PRESENCE	majority	7	<undefined>	<undefined>
+HAVE_SFmode	48	1	48	agree	majority	5		
+HAVE_fmaxf4	1	1	47	PRESENCE	majority	1	<undefined>	<undefined>
+EH_RETURN_STACKADJ_RTX	28	24	1	PRESENCE	MINORITY	5	gen_rtx_REG (Pmode, CX_REG)	gen_rtx_REG (Pmode, R5_REGNUM)
+TLS_COMMON_ASM_OP	48	1	48	agree	majority	1	".tls_common"	".tls_common"
+REAL_LIBGCC_SPEC	2	1	2	PRESENCE	MINORITY	1	"%{static-libgcc|static:						      %:version-compare(!> 10.6 mmacosx-version-min= -lgcc_eh);		     shared-libgcc|fexceptions|fobjc-exceptions|fgnu-runtime:		     " DARWIN_SHARED_LIBGCC "						      %:version-compare(!> 10.3.9 mmacosx-version-min= -lgcc_eh)		      %:version-compare(>< 10.3.9 10.5 mmacosx-version-min= -lgcc_s.10.4)       %:version-compare(>< 10.5 10.6 mmacosx-version-min= -lgcc_s.10.5)	    } -lgcc "	<undefined>

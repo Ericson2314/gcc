@@ -1,0 +1,690 @@
+ASM_DECLARE_OBJECT_NAME	SILENT-FLOW	2	 gcc/varasm.cc:515 gcc/varasm.cc:2477
+REGISTER_MOVE_COST	SILENT-FLOW	1	 gcc/targhooks.cc:2193
+CL_CXX	SILENT-FLOW	1	 gcc/opts.cc:3861
+DARWIN_PPC	SILENT-FLOW	1	 gcc/jit/jit-playback.cc:3471
+DARWIN_X86	SILENT-FLOW	1	 gcc/jit/jit-playback.cc:3471
+IFCVT_MODIFY_TESTS	SILENT-FLOW	2	 gcc/ifcvt.cc:618 gcc/ifcvt.cc:6228
+ASM_DEBUG_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:954
+GCC_FLAG_TYPES_H	SILENT-VALUE	1	 gcc/flag-types.h:20
+DEBUG_STR_OFFSETS_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4174
+MAX_BITS_PER_WORD	SILENT-VALUE	1	 gcc/defaults.h:1123
+STACK_ADDRESS_OFFSET	SILENT-FLOW	3	 gcc/builtins.cc:5502 gcc/cselib.cc:2800 gcc/cselib.cc:3473
+IFCVT_MODIFY_CANCEL	SILENT-FLOW	2	 gcc/ifcvt.cc:730 gcc/ifcvt.cc:767
+GCC_GGC_H	SILENT-VALUE	1	 gcc/ggc.h:21
+DEBUG_LOC_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4152
+ASM_OUTPUT_ADDR_VEC	SILENT-FLOW	4	 gcc/final.cc:2461 gcc/final.cc:2528 gcc/final.cc:2544 gcc/final.cc:2541
+SUPPORTS_ONE_ONLY	SILENT-OTHER	1	 gcc/defaults.h:346
+TARGET_VXWORKS_RTP	SILENT-FLOW	1	 gcc/ada/gcc-interface/lang-specs.h:44
+JUMP_ALIGN	SILENT-VALUE	1	 gcc/final.cc:477
+CC_STATUS_INIT	SILENT-VALUE	1	 gcc/final.cc:95
+TARGET_COFF	SILENT-VALUE	1	 gcc/defaults.h:1413
+PTRDIFF_TYPE	SILENT-VALUE	1	 gcc/defaults.h:727
+LONG_LONG_FRACT_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:659
+IFCVT_MODIFY_INSN	SILENT-FLOW	1	 gcc/ifcvt.cc:412
+GCC_INSN_FLAGS_H	LOUD-DECL	1	 gcc/defaults.h:1421
+INT_LEAST32_TYPE	SILENT-VALUE	1	 gcc/defaults.h:798
+UINT8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:774
+TARGET_SUPPORTS_ALIASES	SILENT-VALUE	1	 gcc/target-def.h:203
+STRUCTURE_SIZE_BOUNDARY	SILENT-VALUE	1	 gcc/target-cdata-opt.h:101
+CL_D	SILENT-FLOW	1	 gcc/opts.cc:4069
+LINK_EH_SPEC	SILENT-FLOW	2	 gcc/gcc.cc:2117 gcc/gcc.cc:2112
+REVERSE_CONDITION	SILENT-VALUE	1	 gcc/defaults.h:1405
+LIBCALL_VALUE	SILENT-FLOW	1	 gcc/targhooks.cc:1138
+ASM_OUTPUT_EXTERNAL	SILENT-VALUE	1	 gcc/target-def.h:128
+DEBUG_LTO_INFO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4092
+CTZ_DEFINED_VALUE_AT_ZERO	SILENT-VALUE	1	 gcc/defaults.h:1081
+CTF_INFO_SECTION_NAME	SILENT-VALUE	1	 gcc/ctfout.cc:42
+ASM_OUTPUT_TYPE_DIRECTIVE	SILENT-OTHER	1	 gcc/defaults.h:245
+ASM_OUTPUT_TYPE_DIRECTIVE	SILENT-FLOW	2	 gcc/final.cc:2071 gcc/varasm.cc:6579
+TARGET_OBJFMT_CPP_BUILTINS	SILENT-VALUE	2	 gcc/c-family/c-cppbuiltin.cc:43 gcc/fortran/cpp.cc:51
+SBSS_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:110
+CALL_REALLY_USED_REGISTERS	SILENT-FLOW	1	 gcc/reginfo.cc:893
+UINT_FAST64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:850
+ASM_OUTPUT_LABELREF	SILENT-VALUE	1	 gcc/defaults.h:182
+ASM_OUTPUT_LABEL	SILENT-VALUE	1	 gcc/defaults.h:155
+INIT_ARRAY_SECTION_ASM_OP	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:1602
+DOLLARS_IN_IDENTIFIERS	SILENT-VALUE	1	 gcc/c-family/c-opts.cc:49
+CONSTANT_POOL_BEFORE_FUNCTION	SILENT-VALUE	1	 gcc/varasm.cc:1971
+MAX_CONDITIONAL_EXECUTE	SILENT-VALUE	1	 gcc/ifcvt.cc:49
+PROFILE_HOOK	SILENT-FLOW	1	 gcc/function.cc:5317
+DBR_OUTPUT_SEQEND	SILENT-FLOW	1	 gcc/final.cc:2717
+NO_FUNCTION_CSE	SILENT-VALUE	1	 gcc/defaults.h:1312
+DECIMAL64_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:639
+NEXT_OBJC_RUNTIME	SILENT-VALUE	1	 gcc/defaults.h:906
+NEXT_OBJC_RUNTIME	SILENT-FLOW	1	 gcc/c/gccspec.cc:35
+ASM_OUTPUT_DEF_FROM_DECLS	SILENT-VALUE	1	 gcc/target-def.h:157
+MAX_STACK_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1249
+ASM_PREFERRED_EH_DATA_FORMAT	SILENT-VALUE	1	 gcc/defaults.h:998
+IFCVT_MODIFY_MULTIPLE_TESTS	SILENT-FLOW	1	 gcc/ifcvt.cc:693
+TYPED_HASHTAB_H	SILENT-VALUE	1	 gcc/hash-table.h:243
+DEBUG_LTO_ABBREV_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4101
+ENABLE_VTABLE_VERIFY	SILENT-VALUE	1	 gcc/defaults.h:1500
+COLLECT_SHARED_INIT_FUNC	SILENT-VALUE	1	 gcc/collect2.cc:159
+GO_IF_LEGITIMATE_ADDRESS	SILENT-FLOW	4	 gcc/lra-constraints.cc:356 gcc/recog.cc:1894 gcc/reload.cc:2167 gcc/targhooks.cc:107
+PROMOTE_MODE	SILENT-FLOW	5	 gcc/explow.cc:898 gcc/explow.cc:913 gcc/function.cc:980 gcc/function.cc:990 gcc/function.cc:1030
+UINTMAX_TYPE	SILENT-VALUE	1	 gcc/defaults.h:743
+BIGGEST_FIELD_ALIGNMENT	SILENT-FLOW	6	 gcc/ada/gcc-interface/misc.cc:1147 gcc/d/d-target.cc:225 gcc/go/go-backend.cc:72 gcc/rust/rust-object-export.cc:69 gcc/stor-layout.cc:797 gcc/stor-layout.cc:2836
+TARGET_DEFERRED_OUTPUT_DEFS	SILENT-VALUE	1	 gcc/defaults.h:141
+SUBALIGN_LOG	SILENT-FLOW	1	 gcc/toplev.cc:1258
+MULTILIB_DEFAULTS	SILENT-FLOW	1	 gcc/jit/jit-playback.cc:3564
+MULTILIB_DEFAULTS	SILENT-VALUE	1	 gcc/gcc.cc:1431
+ASM_FPRINTF_EXTENSIONS	SILENT-FLOW	1	 gcc/final.cc:4071
+ASM_OUTPUT_OPCODE	SILENT-FLOW	3	 gcc/final.cc:3467 gcc/final.cc:3484 gcc/final.cc:4044
+HAVE_COMDAT_GROUP	SILENT-VALUE	1	 gcc/defaults.h:1752
+WORD_REGISTER_OPERATIONS	SILENT-VALUE	1	 gcc/defaults.h:1381
+TARGET_HAS_FMV_TARGET_ATTRIBUTE	SILENT-VALUE	1	 gcc/defaults.h:986
+_XOPEN_SOURCE_EXTENDED	SILENT-VALUE	1	 gcc/ada/gsocket.h:41
+TARGET_ALIGN_NATURAL	SILENT-FLOW	1	 gcc/ada/gcc-interface/targtyps.cc:211
+TARGET_USES_WEAK_UNWIND_INFO	SILENT-VALUE	1	 gcc/defaults.h:364
+LOCAL_LABEL_PREFIX	SILENT-FLOW	1	 gcc/final.cc:4062
+LOCAL_REGNO	SILENT-VALUE	1	 gcc/defaults.h:1145
+TARGET_DECLSPEC	SILENT-OTHER	1	 gcc/defaults.h:883
+HAVE_fmatf4	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:97
+STACK_CHECK_FIXED_FRAME_SIZE	SILENT-VALUE	1	 gcc/defaults.h:1834
+TARGET_SUPPORTS_WIDE_INT	SILENT-VALUE	3	 gcc/defaults.h:1373 gcc/rtl.h:782 gcc/rtl.h:852
+TARGET_SUPPORTS_WIDE_INT	LOUD-DEF	4	 gcc/emit-rtl.cc:232 gcc/emit-rtl.cc:622 gcc/emit-rtl.cc:644 gcc/recog.cc:1736
+TARGET_SUPPORTS_WIDE_INT	SILENT-OTHER	1	 gcc/rtl.h:2051
+TARGET_SUPPORTS_WIDE_INT	LOUD-DECL	2	 gcc/emit-rtl.cc:203 gcc/rtl.h:3395
+TARGET_SUPPORTS_WIDE_INT	SILENT-FLOW	11	 gcc/dwarf2out.cc:17014 gcc/dwarf2out.cc:17595 gcc/emit-rtl.cc:679 gcc/emit-rtl.cc:6423 gcc/expmed.cc:3610 gcc/genpreds.cc:1320 gcc/gensupport.cc:3570 gcc/rtl.h:2376 gcc/simplify-rtx.cc:80 gcc/simplify-rtx.cc:2125 gcc/simplify-rtx.cc:5965
+INT_TYPE_SIZE	SILENT-VALUE	2	 gcc/defaults.h:619 gcc/fortran/f95-lang.cc:526
+MAX_OFILE_ALIGNMENT	SILENT-VALUE	2	 gcc/ada/gcc-interface/targtyps.cc:155 gcc/defaults.h:1205
+CFA_FRAME_BASE_OFFSET	SILENT-VALUE	1	 gcc/defaults.h:1224
+CHAR8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:703
+LONG_LONG_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:627
+DWARF2_FRAME_REG_OUT	SILENT-VALUE	1	 gcc/defaults.h:572
+DWARF_CIE_DATA_ALIGNMENT	SILENT-OTHER	1	 gcc/defaults.h:532
+GCC_VERSION	SILENT-FLOW	34	 gcc/bitmap.cc:1103 gcc/bitmap.cc:1188 gcc/bitmap.cc:1230 gcc/bitmap.cc:1321 gcc/bitmap.h:714 gcc/cse.cc:5057 gcc/dwarf2out.cc:3367 gcc/dwarf2out.cc:3380 gcc/genconditions.cc:82 gcc/ggc.h:184 gcc/ggc-page.cc:1423 gcc/ggc-tests.cc:183 gcc/hwint.h:361 gcc/hwint.h:381 gcc/machmode.h:599 gcc/machmode.h:628 gcc/machmode.h:642 gcc/machmode.h:655 gcc/machmode.h:668 gcc/postreload-gcse.cc:1150 gcc/profile-count.h:86 gcc/realmpfr.h:40 gcc/sbitmap.cc:439 gcc/system.h:732 gcc/vec.h:1098 gcc/vec.h:1119 gcc/vec.h:1169 gcc/vec.h:1185 gcc/vec.h:1222 gcc/vec.h:1237 gcc/vec.h:1252 gcc/vec.h:1427
+GCC_VERSION	SILENT-VALUE	31	 gcc/algol68/a68.h:35 gcc/cobol/cobol-system.h:63 gcc/cp/cp-tree.h:679 gcc/cp/cp-tree.h:3396 gcc/diagnostic-core.h:70 gcc/dumpfile.h:31 gcc/fortran/gfortran.h:1197 gcc/ggc-page.cc:588 gcc/hwint.h:38 gcc/ira-int.h:154 gcc/ira-int.h:176 gcc/ira-int.h:698 gcc/jit/jit-common.h:32 gcc/output.h:118 gcc/pretty-print.h:579 gcc/rtl.h:1118 gcc/rtl.h:1299 gcc/rtl.h:1876 gcc/stringpool.h:36 gcc/system.h:772 gcc/system.h:838 gcc/system.h:844 gcc/system.h:852 gcc/system.h:868 gcc/system.h:1183 gcc/system.h:1196 gcc/tree.h:338 gcc/tree.h:3198
+GCC_VERSION	SILENT-OTHER	24	 gcc/defaults.h:1067 gcc/dwarf2cfi.cc:48 gcc/dwarf2out.cc:152 gcc/gcc.cc:197 gcc/genmatch.cc:141 gcc/genmatch.cc:730 gcc/genmatch.cc:776 gcc/genmatch.cc:789 gcc/genmatch.cc:802 gcc/genmatch.cc:815 gcc/genmatch.cc:830 gcc/genmatch.cc:850 gcc/jit/jit-common.h:31 gcc/system.h:763 gcc/system.h:858 gcc/system.h:931 gcc/system.h:1166 gcc/tree.h:4080 gcc/tree.h:4096 gcc/tree.h:4338 gcc/tree.h:4355 gcc/vec.h:326 gcc/vec.h:351 gcc/vec.h:2494
+GCC_VERSION	LOUD-DEF	12	 gcc/bitmap.cc:1068 gcc/cp/tree.cc:7240 gcc/genautomata.cc:886 gcc/hwint.cc:24 gcc/rtl.cc:726 gcc/sbitmap.cc:403 gcc/tree.cc:9177 gcc/tree.h:3833 gcc/tree.h:4394 gcc/tree.h:5175 gcc/var-tracking.cc:407 gcc/vec.h:1194
+GCC_VERSION	LOUD-DECL	2	 gcc/hwint.h:184 gcc/wide-int.cc:40
+HAVE_fmakf4	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:87
+HAVE_adddf3	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:1572 gcc/targhooks.cc:729
+ASM_FINISH_DECLARE_OBJECT	SILENT-FLOW	1	 gcc/passes.cc:236
+SIZE_MAX	SILENT-VALUE	2	 gcc/hwint.h:123 gcc/system.h:558
+INT32_TYPE	SILENT-VALUE	1	 gcc/defaults.h:766
+SWITCHABLE_TARGET	LOUD-DEF	2	 gcc/target-globals.cc:46 gcc/target-globals.h:68
+SWITCHABLE_TARGET	LOUD-DECL	31	 gcc/bb-reorder.cc:127 gcc/bb-reorder.h:30 gcc/builtins.cc:87 gcc/builtins.h:59 gcc/cfgloopanal.cc:38 gcc/emit-rtl.cc:72 gcc/expmed.cc:49 gcc/expmed.h:205 gcc/function-abi.cc:33 gcc/function-abi.h:313 gcc/gcse.cc:244 gcc/gcse.h:36 gcc/hard-reg-set.h:577 gcc/ira.cc:402 gcc/ira.h:128 gcc/ira-int.h:971 gcc/libfuncs.h:65 gcc/lower-subreg.cc:97 gcc/lower-subreg.h:66 gcc/multi-target-select.cc:116 gcc/optabs-libfuncs.cc:37 gcc/optabs-query.cc:38 gcc/recog.cc:60 gcc/recog.h:583 gcc/reginfo.cc:87 gcc/regs.h:236 gcc/reload1.cc:82 gcc/reload.h:202 gcc/rtl.h:4072 gcc/target-globals.h:23 gcc/toplev.cc:162
+ASM_DECLARE_REGISTER_GLOBAL	SILENT-FLOW	1	 gcc/varasm.cc:1607
+GTM_SELF_SPECS	SILENT-VALUE	1	 gcc/gcc.cc:1450
+LONG_ACCUM_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:671
+TARGET_HAVE_CTORS_DTORS	SILENT-OTHER	1	 gcc/target-def.h:83
+TARGET_ASM_CONSTRUCTOR	SILENT-OTHER	1	 gcc/target-def.h:59
+TARGET_ASM_CONSTRUCTOR	SILENT-VALUE	1	 gcc/target-def.h:84
+RETURN_ADDRESS_POINTER_REGNUM	SILENT-FLOW	4	 gcc/emit-rtl.cc:853 gcc/emit-rtl.cc:6349 gcc/stmt.cc:238 gcc/varasm.cc:1572
+UINT_FAST32_TYPE	SILENT-VALUE	1	 gcc/defaults.h:846
+DWARF_REG_TO_UNWIND_COLUMN	SILENT-VALUE	1	 gcc/defaults.h:565
+ASM_OUTPUT_SOURCE_FILENAME	SILENT-FLOW	1	 gcc/varasm.cc:8665
+LIBHWASAN_EARLY_SPEC	SILENT-VALUE	2	 gcc/gcc.cc:851 gcc/gcc.cc:860
+DEBUG_FRAME_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:318
+TARGET_OPTF	SILENT-VALUE	1	 gcc/c-family/c-opts.cc:57
+HAVE_speculation_barrier	SILENT-FLOW	2	 gcc/targhooks.cc:2896 gcc/targhooks.cc:2920
+GCC_TARGET_INSN_H	SILENT-VALUE	1	 gcc/target-insn.h:69
+TEXT_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:85
+GOMP_SELF_SPECS	SILENT-VALUE	1	 gcc/gcc.cc:1443
+HAVE_IFmode	SILENT-FLOW	1	 gcc/fortran/trans-types.cc:197
+STACK_CHECK_STATIC_BUILTIN	SILENT-VALUE	1	 gcc/defaults.h:1784
+DWARF_ALT_FRAME_RETURN_COLUMN	SILENT-VALUE	1	 gcc/target-cdata-opt.h:115
+BSS_SECTION_ASM_OP	SILENT-OTHER	3	 gcc/target-asm-ops.h:105 gcc/varasm.cc:119 gcc/varasm.cc:499
+GCC_STATISTICS	SILENT-VALUE	1	 gcc/statistics.h:21
+HAVE_POST_INCREMENT	SILENT-VALUE	1	 gcc/rtl.h:2930
+DEBUG_RNGLISTS_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4198
+DEBUG_STR_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4183
+INT64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:770
+STANDARD_STARTFILE_PREFIX_1	SILENT-VALUE	1	 gcc/gcc.cc:1712
+ENDFILE_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:934
+DEBUG_LTO_LINE_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4143
+DEBUG_LTO_MACINFO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4119
+HAVE_POST_DECREMENT	SILENT-VALUE	1	 gcc/rtl.h:2934
+STANDARD_STARTFILE_PREFIX_2	SILENT-VALUE	1	 gcc/gcc.cc:1715
+DWARF_GNAT_ENCODINGS_DEFAULT	SILENT-VALUE	1	 gcc/defaults.h:1857
+STACK_CHECK_PROTECT	SILENT-VALUE	2	 gcc/defaults.h:1803 gcc/defaults.h:1817
+STACK_PARMS_IN_REG_PARM_AREA	SILENT-FLOW	4	 gcc/calls.cc:1605 gcc/calls.cc:4379 gcc/calls.cc:4470 gcc/function.cc:2559
+BASE64_ASM_OP	SILENT-FLOW	2	 gcc/varasm.cc:2318 gcc/varasm.cc:8797
+ASM_OUTPUT_ALIGNED_LOCAL_P	SILENT-VALUE	1	 gcc/defaults.h:1591
+MOVE_RATIO	SILENT-FLOW	1	 gcc/targhooks.cc:2263
+MOVE_RATIO	SILENT-OTHER	1	 gcc/defaults.h:1447
+SHORT_IMMEDIATES_SIGN_EXTEND	SILENT-VALUE	1	 gcc/defaults.h:1377
+INT_FAST64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:834
+GCC_VEC_H	SILENT-VALUE	1	 gcc/vec.h:22
+CL_Fortran	SILENT-FLOW	2	 gcc/opts.cc:3856 gcc/opts.cc:4083
+TARGET_EDOM	SILENT-FLOW	2	 gcc/internal-fn.cc:3681 gcc/internal-fn.cc:4755
+TARGET_DEFAULT_PACK_STRUCT	SILENT-VALUE	1	 gcc/defaults.h:948
+ATTRIBUTE_UNUSED	SILENT-VALUE	1	 gcc/ada/runtime.h:40
+CLASS_MAX_NREGS	SILENT-FLOW	1	 gcc/targhooks.cc:2435
+HAVE_PRE_MODIFY_REG	SILENT-VALUE	1	 gcc/rtl.h:2950
+BITS_PER_UNIT	SILENT-FLOW	1	 gcc/genmodes.cc:1057
+BITS_PER_UNIT	SILENT-VALUE	2	 gcc/multi-target-macros.h:92 gcc/tree.h:5359
+AVOID_CCMODE_COPIES	SILENT-FLOW	2	 gcc/gcse.cc:553 gcc/gcse.cc:563
+INT_LEAST16_TYPE	SILENT-VALUE	1	 gcc/defaults.h:794
+C_COMMON_OVERRIDE_OPTIONS	SILENT-FLOW	1	 gcc/c-family/c-opts.cc:881
+SHIFT_COUNT_TRUNCATED	SILENT-VALUE	1	 gcc/defaults.h:1188
+FRACT_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:651
+ASM_PN_FORMAT	SILENT-OTHER	1	 gcc/defaults.h:46
+LOAD_EXTEND_OP	SILENT-VALUE	1	 gcc/defaults.h:1385
+UINT_LEAST8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:806
+ASM_OUTPUT_ALIGNED_DECL_LOCAL	SILENT-FLOW	2	 gcc/varasm.cc:2356 gcc/varasm.cc:3004
+STATIC_CHAIN_REGNUM	SILENT-VALUE	1	 gcc/target-cdata-opt.h:70
+TARGET_EXTRA_PRE_INCLUDES	LOUD-DEF	1	 gcc/incpath.cc:532
+TARGET_EXTRA_PRE_INCLUDES	SILENT-VALUE	1	 gcc/incpath.cc:543
+hash_map_h	SILENT-VALUE	1	 gcc/hash-map.h:21
+UINTPTR_TYPE	SILENT-VALUE	1	 gcc/defaults.h:858
+UINT_FAST8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:838
+ASM_WEAKEN_LABEL	SILENT-VALUE	3	 gcc/defaults.h:201 gcc/defaults.h:290 gcc/target-def.h:180
+SUPPORTS_WEAK	SILENT-OTHER	1	 gcc/defaults.h:289
+SUPPORTS_WEAK	SILENT-VALUE	1	 gcc/defaults.h:382
+RETURN_ADDR_OFFSET	SILENT-VALUE	1	 gcc/defaults.h:447
+DWARF2_UNWIND_INFO	SILENT-VALUE	1	 gcc/defaults.h:403
+DWARF2_UNWIND_INFO	SILENT-OTHER	1	 gcc/defaults.h:409
+DWARF2_UNWIND_INFO	SILENT-FLOW	4	 gcc/builtins.cc:8485 gcc/c-family/c-cppbuiltin.cc:1680 gcc/common/common-targhooks.cc:42 gcc/toplev.cc:536
+CTF_DEBUGGING_INFO	SILENT-FLOW	1	 gcc/toplev.cc:1515
+STACK_REGS	LOUD-DECL	1	 gcc/target-regstack.h:27
+STACK_REGS	SILENT-VALUE	2	 gcc/target-def.h:232 gcc/target-def.h:245
+FIND_BASE_TERM	SILENT-FLOW	2	 gcc/alias.cc:1413 gcc/alias.cc:1926
+HAVE_atomic_compare_and_swapqi	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:674
+ASM_OUTPUT_MAX_SKIP_ALIGN	SILENT-FLOW	3	 gcc/final.cc:2428 gcc/varasm.cc:2164 gcc/varasm.cc:2172
+HAVE_cpymemqi	SILENT-VALUE	1	 gcc/defaults.h:1448
+HAVE_cpymemqi	SILENT-FLOW	1	 gcc/targhooks.cc:2266
+BLOCK_REG_PADDING	SILENT-FLOW	13	 gcc/calls.cc:1238 gcc/calls.cc:1613 gcc/calls.cc:2219 gcc/calls.cc:2323 gcc/calls.cc:4480 gcc/calls.cc:4756 gcc/expr.cc:3026 gcc/expr.cc:3485 gcc/function.cc:2893 gcc/function.cc:3031 gcc/function.cc:3065 gcc/function.cc:3102 gcc/function.cc:3125
+ASM_OUTPUT_WEAK_ALIAS	SILENT-OTHER	1	 gcc/defaults.h:200
+ASM_OUTPUT_WEAK_ALIAS	SILENT-VALUE	1	 gcc/target-def.h:190
+FLOAT_WORDS_BIG_ENDIAN	SILENT-VALUE	2	 gcc/ada/gcc-interface/targtyps.cc:174 gcc/defaults.h:1040
+ASM_OUTPUT_SYMVER_DIRECTIVE	SILENT-FLOW	1	 gcc/varasm.cc:6647
+DEBUG_MACINFO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4116
+PCC_BITFIELD_TYPE_MATTERS	SILENT-VALUE	1	 gcc/defaults.h:1300
+SIG_ATOMIC_TYPE	SILENT-VALUE	1	 gcc/defaults.h:754
+PROFILE_BEFORE_PROLOGUE	SILENT-FLOW	1	 gcc/targhooks.cc:2385
+MEMORY_MOVE_COST	SILENT-FLOW	1	 gcc/targhooks.cc:2178
+HARD_FRAME_POINTER_IS_ARG_POINTER	SILENT-VALUE	1	 gcc/rtl.h:3950
+REG_WORDS_BIG_ENDIAN	SILENT-VALUE	1	 gcc/defaults.h:1044
+SHORT_FRACT_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:647
+LEGITIMIZE_RELOAD_ADDRESS	SILENT-FLOW	1	 gcc/reload.cc:5009
+LIBGCC_SPEC	SILENT-OTHER	1	 gcc/gcc.cc:916
+ATTRIBUTE_ALIGNED_VALUE	SILENT-VALUE	1	 gcc/defaults.h:1277
+PUSH_ROUNDING	SILENT-FLOW	1	 gcc/target-frame.h:1086
+PUSH_ROUNDING	SILENT-OTHER	1	 gcc/defaults.h:916
+INT_FAST32_TYPE	SILENT-VALUE	1	 gcc/defaults.h:830
+USE_SELECT_SECTION_FOR_FUNCTIONS	LOUD-DEF	1	 gcc/varasm.cc:529
+USE_SELECT_SECTION_FOR_FUNCTIONS	SILENT-FLOW	1	 gcc/varasm.cc:674
+STACK_PUSH_CODE	SILENT-OTHER	1	 gcc/defaults.h:1332
+MOVE_MAX_PIECES	SILENT-VALUE	1	 gcc/defaults.h:1097
+ASM_OUTPUT_INTERNAL_LABEL	SILENT-VALUE	1	 gcc/defaults.h:172
+TARGET_MACHO	SILENT-FLOW	1	 gcc/algol68/a68-imports.cc:369
+INSN_SETS_ARE_DELAYED	SILENT-VALUE	1	 gcc/defaults.h:1304
+LEGITIMATE_PIC_OPERAND_P	SILENT-VALUE	1	 gcc/defaults.h:1192
+DWARF_TYPE_SIGNATURE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:594
+_STDBOOL_H	SILENT-VALUE	1	 gcc/ginclude/stdbool.h:28
+CC1_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:773
+USE_GNU_UNIQUE_OBJECT	SILENT-VALUE	1	 gcc/defaults.h:1493
+HAVE_atomic_compare_and_swapsi	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:699 gcc/tree-profile.cc:1850
+HAVE_DFmode	SILENT-FLOW	3	 gcc/targhooks.cc:571 gcc/targhooks.cc:600 gcc/targhooks.cc:663
+GLOBAL_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:80
+GCC_INSN_MODES_H	SILENT-FLOW	1	 gcc/genmodes.cc:2032
+HAVE_cpymemsi	SILENT-VALUE	1	 gcc/defaults.h:1448
+HAVE_cpymemsi	SILENT-FLOW	1	 gcc/targhooks.cc:2266
+ASM_OUTPUT_POOL_PROLOGUE	SILENT-FLOW	1	 gcc/varasm.cc:4804
+ADDITIONAL_REGISTER_NAMES	SILENT-FLOW	1	 gcc/varasm.cc:1066
+PRINT_OPERAND_ADDRESS	SILENT-FLOW	1	 gcc/targhooks.cc:468
+EH_FRAME_THROUGH_COLLECT2	SILENT-FLOW	1	 gcc/dwarf2out.cc:500
+UINT_FAST16_TYPE	SILENT-VALUE	1	 gcc/defaults.h:842
+OBJECT_FORMAT_ELF	SILENT-VALUE	1	 gcc/target-def.h:38
+OBJECT_FORMAT_ELF	SILENT-FLOW	4	 gcc/d/d-target.cc:502 gcc/dwarf2out.cc:11492 gcc/dwarf2out.cc:11510 gcc/varasm.cc:9056
+ENABLE_X86_64_MFENTRY	SILENT-VALUE	1	 gcc/defaults.h:464
+FENCE_FOLLOWING_MOVNT	SILENT-VALUE	1	 gcc/tree-ssa-loop-prefetch.cc:206
+ASM_OUTPUT_EXTERNAL_LIBCALL	SILENT-FLOW	1	 gcc/targhooks.cc:121
+CASE_VECTOR_SHORTEN_MODE	SILENT-FLOW	3	 gcc/final.cc:955 gcc/final.cc:1140 gcc/final.cc:1182
+ADJUST_INSN_LENGTH	SILENT-FLOW	4	 gcc/final.cc:402 gcc/final.cc:1109 gcc/final.cc:1129 gcc/final.cc:1366
+MULTI_TARGET_UNION_MAX_BITS_PER_WORD	SILENT-VALUE	3	 gcc/expmed.h:32 gcc/hard-reg-set.h:63 gcc/lower-subreg.h:28
+SIZE_TYPE	SILENT-VALUE	1	 gcc/defaults.h:685
+DWARF2_ADDR_SIZE	SILENT-VALUE	1	 gcc/defaults.h:581
+ASM_OUTPUT_ALIGNED_LOCAL	SILENT-FLOW	1	 gcc/varasm.cc:3008
+CTORS_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:115
+CTORS_SECTION_ASM_OP	SILENT-VALUE	1	 gcc/target-def.h:60
+INCOMING_REGNO	SILENT-VALUE	1	 gcc/defaults.h:1180
+PREFERRED_STACK_BOUNDARY	SILENT-VALUE	1	 gcc/defaults.h:938
+EH_FRAME_SECTION_NAME	SILENT-VALUE	2	 gcc/defaults.h:411 gcc/target-def.h:90
+EH_FRAME_SECTION_NAME	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:1581 gcc/dwarf2out.cc:490
+HAVE_PRE_MODIFY_DISP	SILENT-VALUE	1	 gcc/rtl.h:2946
+DRIVER_SELF_SPECS	SILENT-VALUE	1	 gcc/gcc.cc:1437
+TARGET_WIN32_TLS	SILENT-FLOW	2	 gcc/attribs.cc:2034 gcc/attribs.cc:2064
+TARGET_64BIT	SILENT-FLOW	1	 gcc/ada/gcc-interface/targtyps.cc:226
+TARGET_64BIT	SILENT-VALUE	1	 gcc/ada/gcc-interface/decl.cc:62
+STACK_ALIGNMENT_NEEDED	SILENT-VALUE	2	 gcc/cfgexpand.cc:149 gcc/function.cc:97
+SECONDARY_INPUT_RELOAD_CLASS	SILENT-FLOW	1	 gcc/targhooks.cc:1459
+INT_LEAST8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:790
+LONG_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:623
+MASK_RETURN_ADDR	SILENT-VALUE	1	 gcc/defaults.h:451
+HAVE_HFmode	SILENT-FLOW	1	 gcc/targhooks.cc:651
+HAVE_POST_MODIFY_DISP	SILENT-VALUE	1	 gcc/rtl.h:2938
+WCHAR_TYPE	SILENT-VALUE	1	 gcc/defaults.h:719
+TARGET_WEAK_NOT_IN_ARCHIVE_TOC	SILENT-VALUE	1	 gcc/defaults.h:359
+ASM_NO_SKIP_IN_TEXT	SILENT-FLOW	1	 gcc/varasm.cc:2281
+TARGET_ASM_NAMED_SECTION	SILENT-VALUE	2	 gcc/target-def.h:63 gcc/target-def.h:75
+TARGET_ASM_NAMED_SECTION	SILENT-OTHER	1	 gcc/defaults.h:409
+HAVE_LD_EH_GC_SECTIONS	SILENT-FLOW	1	 gcc/varasm.cc:600
+GCC_TARGET_CAPS_H	SILENT-VALUE	1	 gcc/target-caps.h:35
+HAS_LONG_COND_BRANCH	SILENT-VALUE	1	 gcc/defaults.h:1053
+MALLOC_ABI_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:932
+OFFS_MSGSEND_FAST	SILENT-FLOW	1	 gcc/objc/objc-next-runtime-abi-01.cc:326
+BRANCH_COST	SILENT-VALUE	1	 gcc/defaults.h:1440
+HAVE_atomic_compare_and_swapdi	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:711 gcc/tree-profile.cc:1857
+SUPPORTS_INIT_PRIORITY	SILENT-VALUE	1	 gcc/defaults.h:397
+HAVE_PRE_INCREMENT	SILENT-VALUE	2	 gcc/rtl.h:2901 gcc/rtl.h:2922
+NUM_UNSPECV_VALUES	SILENT-FLOW	5	 gcc/print-rtl.cc:506 gcc/print-rtl.cc:516 gcc/print-rtl.cc:1631 gcc/print-rtl.cc:1638 gcc/read-rtl-function.cc:1025
+GCC_MEM_STATS_H	SILENT-VALUE	1	 gcc/mem-stats.h:21
+HAVE_cpymemdi	SILENT-VALUE	1	 gcc/defaults.h:1448
+HAVE_cpymemdi	SILENT-FLOW	1	 gcc/targhooks.cc:2266
+ASM_OUTPUT_TLS_COMMON	SILENT-FLOW	1	 gcc/varasm.cc:2427
+ASM_OUTPUT_TLS_COMMON	SILENT-VALUE	1	 gcc/defaults.h:127
+INCOMING_RETURN_ADDR_RTX	SILENT-FLOW	1	 gcc/df-scan.cc:3558
+INCOMING_RETURN_ADDR_RTX	SILENT-VALUE	2	 gcc/defaults.h:403 gcc/dwarf2cfi.cc:52
+SUPPORTS_SHF_GNU_RETAIN	SILENT-OTHER	1	 gcc/defaults.h:337
+EH_RETURN_DATA_REGNO	SILENT-FLOW	1	 gcc/ira-lives.cc:1456
+EH_RETURN_DATA_REGNO	LOUD-DEF	1	 gcc/ira-lives.cc:1338
+EH_RETURN_DATA_REGNO	SILENT-VALUE	1	 gcc/defaults.h:442
+__USE_MISC	SILENT-FLOW	1	 gcc/cp/module.cc:16902
+INIT_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:125
+GCC_MEM_STATS_TRAITS_H	SILENT-VALUE	1	 gcc/mem-stats-traits.h:21
+HARD_REGNO_NREGS_HAS_PADDING	SILENT-VALUE	1	 gcc/defaults.h:1234
+OUTGOING_REGNO	SILENT-VALUE	1	 gcc/defaults.h:1184
+TARGET_LIB_INT_CMP_BIASED	SILENT-VALUE	1	 gcc/defaults.h:1034
+WINT_TYPE	SILENT-VALUE	1	 gcc/defaults.h:731
+EH_TABLES_CAN_BE_READ_ONLY	SILENT-VALUE	1	 gcc/defaults.h:436
+ATTRIBUTE_PRINTF_1	SILENT-VALUE	1	 gcc/cobol/cbldiag.h:47
+HAVE_PRE_DECREMENT	SILENT-VALUE	2	 gcc/rtl.h:2901 gcc/rtl.h:2926
+ASM_FINAL_SPEC	LOUD-DEF	1	 gcc/gcc.cc:740
+GCC_DEFAULTS_H	SILENT-VALUE	1	 gcc/defaults.h:26
+CPLUSPLUS_CPP_SPEC	SILENT-OTHER	1	 gcc/defaults.h:895
+ATTRIBUTE_PRINTF_2	SILENT-FLOW	1	 gcc/ada/raise-gcc.c:279
+TRAMPOLINE_SECTION	SILENT-FLOW	1	 gcc/varasm.cc:3048
+TARGET_EXTRA_INCLUDES	SILENT-VALUE	1	 gcc/incpath.cc:540
+TARGET_EXTRA_INCLUDES	LOUD-DEF	1	 gcc/incpath.cc:532
+ASM_WEAKEN_DECL	SILENT-VALUE	2	 gcc/defaults.h:290 gcc/target-def.h:168
+ATTRIBUTE_PRINTF_3	SILENT-VALUE	1	 gcc/cobol/cbldiag.h:50
+SECONDARY_RELOAD_CLASS	SILENT-VALUE	1	 gcc/reload.h:26
+INT16_TYPE	SILENT-VALUE	1	 gcc/defaults.h:762
+TARGET_EXECUTABLE_SUFFIX	SILENT-VALUE	3	 gcc/ada/targext.c:59 gcc/gcc.cc:204 gcc/lto-wrapper.cc:67
+TARGET_EXECUTABLE_SUFFIX	SILENT-FLOW	1	 gcc/d/d-spec.cc:416
+MAX_BITSIZE_MODE_ANY_INT	SILENT-FLOW	1	 gcc/genmodes.cc:1071
+MAX_BITSIZE_MODE_ANY_INT	LOUD-DECL	1	 gcc/genmodes.cc:1015
+AS_NEEDS_DASH_FOR_PIPED_INPUT	LOUD-DEF	1	 gcc/gcc.cc:1407
+AS_NEEDS_DASH_FOR_PIPED_INPUT	SILENT-FLOW	1	 gcc/gcc.cc:1588
+TARGET_PTRMEMFUNC_VBIT_LOCATION	SILENT-VALUE	1	 gcc/defaults.h:1007
+INTMAX_TYPE	SILENT-VALUE	1	 gcc/defaults.h:735
+HARD_REGNO_CALLER_SAVE_MODE	SILENT-VALUE	1	 gcc/regs.h:194
+EH_RETURN_HANDLER_RTX	SILENT-VALUE	1	 gcc/defaults.h:1417
+TRAMPOLINE_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1175
+A68_EXPORT_SECTION_NAME	SILENT-VALUE	1	 gcc/algol68/a68.h:75
+ASM_OUTPUT_FUNCTION_LABEL	SILENT-VALUE	1	 gcc/defaults.h:166
+NO_DOLLAR_IN_LABEL	SILENT-FLOW	5	 gcc/cgraphclones.cc:623 gcc/collect2.cc:502 gcc/cp/coroutines.cc:2935 gcc/lto/lto-partition.cc:1739 gcc/tree.cc:9062
+NO_DOLLAR_IN_LABEL	SILENT-VALUE	3	 gcc/cp/cp-tree.h:6469 gcc/cp/cp-tree.h:6508 gcc/defaults.h:50
+OPTIONS_H_INCLUDED	SILENT-OTHER	2	 gcc/alloc-pool.h:26 gcc/tree.h:30
+IFUNC_ASM_TYPE	SILENT-VALUE	1	 gcc/defaults.h:119
+TARGET_TERMINATE_DW2_EH_FRAME_INFO	SILENT-OTHER	1	 gcc/target-def.h:89
+LABEL_ALIGN_AFTER_BARRIER	SILENT-VALUE	1	 gcc/final.cc:473
+STACK_POINTER_OFFSET	SILENT-VALUE	2	 gcc/defaults.h:1141 gcc/function.cc:1399
+DEFAULT_USE_CXA_ATEXIT	SILENT-VALUE	1	 gcc/defaults.h:1063
+POINTER_SIZE_UNITS	SILENT-VALUE	1	 gcc/defaults.h:866
+INT_FAST16_TYPE	SILENT-VALUE	1	 gcc/defaults.h:826
+OFFS_ASSIGNIVAR_FAST	SILENT-FLOW	1	 gcc/objc/objc-next-runtime-abi-01.cc:2575
+ASM_OUTPUT_DWARF_DELTA	SILENT-FLOW	1	 gcc/dwarf2asm.cc:184
+INCOMING_STACK_BOUNDARY	SILENT-VALUE	1	 gcc/defaults.h:944
+TYPE_OPERAND_FMT	SILENT-VALUE	1	 gcc/defaults.h:246
+MAIN_STACK_BOUNDARY	SILENT-VALUE	1	 gcc/ada/gcc-interface/decl.cc:83
+DEFAULT_PCC_STRUCT_RETURN	SILENT-VALUE	1	 gcc/defaults.h:1296
+DWARF2_DEBUGGING_INFO	SILENT-FLOW	8	 gcc/dwarf2out.cc:1142 gcc/dwarf2out.cc:2138 gcc/dwarf2out.cc:2366 gcc/opts.cc:1479 gcc/opts.cc:3606 gcc/targhooks.cc:2485 gcc/toplev.cc:536 gcc/toplev.cc:1511
+DWARF2_DEBUGGING_INFO	SILENT-VALUE	1	 gcc/defaults.h:1020
+CHAR_TYPE_SIZE	SILENT-VALUE	2	 gcc/defaults.h:606 gcc/fortran/f95-lang.cc:522
+EXTRA_SPECS	SILENT-FLOW	2	 gcc/gcc.cc:2000 gcc/gcc.cc:12263
+EXTRA_SPECS	LOUD-DEF	1	 gcc/gcc.cc:1877
+PIC_OFFSET_TABLE_REG_CALL_CLOBBERED	SILENT-VALUE	1	 gcc/defaults.h:875
+PC_REGNUM	SILENT-VALUE	1	 gcc/defaults.h:544
+ASM_FORMAT_PRIVATE_NAME	SILENT-VALUE	1	 gcc/defaults.h:58
+LONG_LONG_ACCUM_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:675
+MATH_LIBRARY	SILENT-VALUE	5	 gcc/cp/g++spec.cc:38 gcc/fortran/gfortranspec.cc:58 gcc/gcc.cc:75 gcc/go/gospec.cc:38 gcc/m2/gm2spec.cc:65
+USER_LABEL_PREFIX	SILENT-VALUE	1	 gcc/defaults.h:369
+HARD_FRAME_POINTER_REGNUM	SILENT-VALUE	1	 gcc/rtl.h:3941
+HARD_FRAME_POINTER_REGNUM	SILENT-FLOW	1	 gcc/reginfo.cc:847
+HAVE_NEWLIB_NANO_FORMATTED_IO	SILENT-VALUE	1	 gcc/defaults.h:1507
+MAX_BITS_PER_WORD_FROM_BITS_PER_WORD	SILENT-OTHER	1	 gcc/multi-target-macros.h:312
+SYSROOT_SUFFIX_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:1132
+DEBUG_INFO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4086
+DEFAULT_INCOMING_FRAME_SP_OFFSET	SILENT-VALUE	1	 gcc/dwarf2cfi.cc:67
+LOCAL_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1258
+HAVE_atomic_compare_and_swaphi	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:687
+ASM_OUTPUT_POOL_EPILOGUE	SILENT-FLOW	1	 gcc/varasm.cc:4810
+HAVE_cpymemhi	SILENT-VALUE	1	 gcc/defaults.h:1448
+HAVE_cpymemhi	SILENT-FLOW	1	 gcc/targhooks.cc:2266
+TARGET_PECOFF	SILENT-VALUE	1	 gcc/defaults.h:1409
+RETURN_ADDR_IN_PREVIOUS_FRAME	SILENT-VALUE	1	 gcc/defaults.h:1213
+TARGET_MEM_CONSTRAINT	SILENT-VALUE	1	 gcc/defaults.h:1196
+STORE_MAX_PIECES	SILENT-VALUE	1	 gcc/defaults.h:1106
+DWARF_FRAME_REGNUM	LOUD-DECL	1	 gcc/target-frame.h:1342
+DWARF_FRAME_REGNUM	SILENT-FLOW	1	 gcc/except.cc:2193
+DWARF_FRAME_REGNUM	SILENT-VALUE	1	 gcc/defaults.h:560
+TARGET_MS_BITFIELD_LAYOUT	SILENT-FLOW	1	 gcc/ada/gcc-interface/utils.cc:2274
+READ_CAN_USE_WRITE_PREFETCH	SILENT-VALUE	1	 gcc/tree-ssa-loop-prefetch.cc:160
+LOGICAL_OP_NON_SHORT_CIRCUIT	SILENT-VALUE	2	 gcc/fold-const.cc:6169 gcc/tree-ssa-ifcombine.cc:49
+ASM_OUTPUT_DWARF_OFFSET	SILENT-FLOW	2	 gcc/dwarf2asm.cc:243 gcc/dwarf2asm.cc:268
+FLOAT_LIB_COMPARE_RETURNS_BOOL	SILENT-VALUE	1	 gcc/defaults.h:1027
+LIBSTDCXX	SILENT-VALUE	3	 gcc/cp/g++spec.cc:45 gcc/d/d-spec.cc:34 gcc/m2/gm2spec.cc:72
+ASM_OUTPUT_ALIGNED_DECL_COMMON	SILENT-FLOW	2	 gcc/toplev.cc:557 gcc/varasm.cc:2405
+USE_STORE_PRE_DECREMENT	SILENT-VALUE	1	 gcc/rtl.h:2987
+__USE_GNU	SILENT-VALUE	1	 gcc/glimits.h:114
+FRAME_ADDR_RTX	SILENT-VALUE	1	 gcc/defaults.h:1401
+HAVE_AS_TLS	SILENT-VALUE	1	 gcc/defaults.h:127
+PAD_VARARGS_DOWN	SILENT-VALUE	1	 gcc/targhooks.cc:2671
+SECONDARY_OUTPUT_RELOAD_CLASS	SILENT-FLOW	1	 gcc/targhooks.cc:1464
+VECTOR_STORE_FLAG_VALUE	SILENT-FLOW	3	 gcc/simplify-rtx.cc:945 gcc/simplify-rtx.cc:959 gcc/simplify-rtx.cc:2647
+GCC_DRIVER_HOST_INITIALIZATION	SILENT-FLOW	1	 gcc/gcc.cc:9010
+FINAL_PRESCAN_INSN	SILENT-FLOW	2	 gcc/final.cc:2662 gcc/final.cc:2797
+LABEL_ALIGN	SILENT-VALUE	1	 gcc/final.cc:465
+CLZ_DEFINED_VALUE_AT_ZERO	SILENT-VALUE	1	 gcc/defaults.h:1078
+OBJECT_FORMAT_MACHO	SILENT-VALUE	2	 gcc/lto-section-names.h:28 gcc/lto-section-names.h:42
+OBJECT_FORMAT_MACHO	SILENT-FLOW	1	 gcc/algol68/a68-exports.cc:203
+TARGET_ASM_DESTRUCTOR	SILENT-OTHER	1	 gcc/target-def.h:71
+TARGET_ASM_DESTRUCTOR	SILENT-VALUE	1	 gcc/target-def.h:84
+EMPTY_FIELD_BOUNDARY	SILENT-VALUE	1	 gcc/target-cdata-opt.h:92
+MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER	SILENT-VALUE	1	 gcc/hard-reg-set.h:209
+MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER	LOUD-DECL	1	 gcc/hard-reg-set.h:90
+STACK_BOUNDARY	SILENT-FLOW	2	 gcc/emit-rtl.cc:6056 gcc/reload1.cc:1300
+DEBUG_PUBNAMES_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4164
+ASM_OUTPUT_DEBUG_LABEL	SILENT-VALUE	1	 gcc/defaults.h:194
+__HASHTAB_H__	LOUD-DECL	1	 gcc/gensupport.h:178
+LINK_GCC_C_SEQUENCE_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:977
+TYPE_ASM_OP	SILENT-VALUE	1	 gcc/defaults.h:246
+OPTIMIZE_MODE_SWITCHING	SILENT-FLOW	2	 gcc/mode-switching.cc:1322 gcc/mode-switching.cc:1331
+OPTIMIZE_MODE_SWITCHING	LOUD-DEF	1	 gcc/mode-switching.cc:43
+TARGET_IEEEQUAD_DEFAULT	SILENT-FLOW	1	 gcc/m2/gm2-gcc/m2configure.cc:107
+ASM_OUTPUT_CASE_LABEL	SILENT-FLOW	1	 gcc/final.cc:2484
+HAVE_setmemqi	SILENT-VALUE	1	 gcc/defaults.h:1460
+LONG_FRACT_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:655
+IRA_HARD_REGNO_ADD_COST_MULTIPLIER	SILENT-FLOW	1	 gcc/ira-costs.cc:2740
+STARTFILE_PREFIX_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:1124
+LIB_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:796
+UINT_LEAST64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:818
+ATTRIBUTE_NORETURN	SILENT-VALUE	1	 gcc/ada/runtime.h:44
+GCC_WIDE_INT_BITMASK_H	SILENT-VALUE	1	 gcc/wide-int-bitmask.h:20
+ASSEMBLER_DIALECT	LOUD-DECL	1	 gcc/final.cc:187
+ASSEMBLER_DIALECT	SILENT-FLOW	6	 gcc/final.cc:225 gcc/final.cc:3451 gcc/final.cc:3494 gcc/final.cc:3507 gcc/final.cc:3958 gcc/final.cc:3970
+ASSEMBLER_DIALECT	LOUD-DEF	1	 gcc/final.cc:3340
+TARGET_ATTRIBUTE_WEAK	SILENT-OTHER	1	 gcc/defaults.h:381
+USE_STORE_POST_INCREMENT	SILENT-VALUE	1	 gcc/rtl.h:2975
+NO_PROFILE_COUNTERS	SILENT-FLOW	1	 gcc/final.cc:1820
+TARGET_VTABLE_DATA_ENTRY_DISTANCE	SILENT-VALUE	1	 gcc/defaults.h:964
+INTPTR_TYPE	SILENT-VALUE	1	 gcc/defaults.h:854
+HAVE_fmadf4	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:82
+ASM_OUTPUT_SIZE_DIRECTIVE	SILENT-OTHER	1	 gcc/defaults.h:261
+TARGET_HAS_IFUNC	SILENT-VALUE	1	 gcc/defaults.h:470
+IFCVT_MODIFY_FINAL	SILENT-FLOW	1	 gcc/ifcvt.cc:737
+MAX_BITSIZE_MODE_ANY_MODE	SILENT-FLOW	1	 gcc/genmodes.cc:1077
+HARDREG_PRE_REGNOS	SILENT-FLOW	2	 gcc/gcse.cc:4230 gcc/gcse.cc:4360
+HAVE_SOLARIS_LD	SILENT-FLOW	1	 gcc/go/gospec.cc:454
+HAVE_SOLARIS_LD	SILENT-VALUE	2	 gcc/defaults.h:512 gcc/defaults.h:527
+PRINT_OPERAND_PUNCT_VALID_P	SILENT-FLOW	1	 gcc/targhooks.cc:481
+USE_STORE_POST_DECREMENT	SILENT-VALUE	1	 gcc/rtl.h:2979
+GCC_MULTI_TARGET_MACROS_H	SILENT-VALUE	1	 gcc/multi-target-macros.h:78
+PIC_CASE_VECTOR_ADDRESS	SILENT-FLOW	2	 gcc/expr.cc:14327 gcc/expr.cc:14342
+FRAME_BEGIN_LABEL	SILENT-VALUE	1	 gcc/dwarf2out.cc:342
+STACK_CHECK_MOVING_SP	SILENT-VALUE	1	 gcc/defaults.h:1794
+ARG_POINTER_CFA_OFFSET	SILENT-VALUE	1	 gcc/defaults.h:1218
+INSN_SCHEDULING	SILENT-FLOW	21	 gcc/cfgexpand.cc:7108 gcc/combine.cc:3812 gcc/combine.cc:4907 gcc/expr.cc:8920 gcc/modulo-sched.cc:3360 gcc/opts.cc:667 gcc/opts.cc:695 gcc/opts.cc:3279 gcc/recog.cc:1550 gcc/recog.cc:4627 gcc/recog.cc:4728 gcc/run-rtl-passes.cc:55 gcc/sched-rgn.cc:3740 gcc/sched-rgn.cc:3757 gcc/sched-rgn.cc:3771 gcc/sched-rgn.cc:3791 gcc/sched-rgn.cc:3824 gcc/sched-rgn.cc:3880 gcc/sched-rgn.cc:3929 gcc/sched-rgn.cc:3979 gcc/toplev.cc:1428
+INSN_SCHEDULING	SILENT-VALUE	1	 gcc/sched-int.h:24
+INSN_SCHEDULING	LOUD-DEF	11	 gcc/ddg.cc:33 gcc/haifa-sched.cc:150 gcc/haifa-sched.cc:902 gcc/modulo-sched.cc:48 gcc/sched-deps.cc:44 gcc/sched-deps.cc:5600 gcc/sched-ebb.cc:37 gcc/sched-rgn.cc:76 gcc/sel-sched.cc:41 gcc/sel-sched-dump.cc:29 gcc/sel-sched-ir.cc:40
+CC1PLUS_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:779
+HAVE_setmemsi	SILENT-VALUE	1	 gcc/defaults.h:1460
+CASE_VECTOR_PC_RELATIVE	SILENT-VALUE	1	 gcc/defaults.h:1161
+TARGET_HAS_BIONIC	SILENT-VALUE	1	 gcc/defaults.h:1073
+TARGET_FPMATH_DEFAULT	SILENT-FLOW	1	 gcc/ada/gcc-interface/misc.cc:1250
+REGMODE_NATURAL_SIZE	SILENT-VALUE	1	 gcc/regs.h:30
+DEBUG_LOCLISTS_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4158
+STACK_SAVEAREA_MODE	SILENT-VALUE	1	 gcc/defaults.h:1478
+PRINT_OPERAND	SILENT-FLOW	1	 gcc/targhooks.cc:453
+DEBUG_LINE_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4140
+INITIAL_FRAME_ADDRESS_RTX	SILENT-VALUE	1	 gcc/defaults.h:1389
+_XOPEN_SOURCE	SILENT-VALUE	1	 gcc/ada/s-oscons-tmplt.c:92
+NO_DOT_IN_LABEL	SILENT-FLOW	10	 gcc/asan.cc:3434 gcc/c/c-parser.cc:28702 gcc/cgraphclones.cc:623 gcc/collect2.cc:506 gcc/cp/coroutines.cc:2932 gcc/lto/lto-partition.cc:1740 gcc/lto/lto-partition.cc:1739 gcc/symtab.cc:2578 gcc/tree.cc:9065 gcc/tree.cc:9081
+NO_DOT_IN_LABEL	SILENT-VALUE	7	 gcc/cp/cp-tree.h:6457 gcc/cp/cp-tree.h:6508 gcc/d/d-tree.h:491 gcc/defaults.h:47 gcc/fortran/gfortran.h:86 gcc/fortran/trans-common.cc:344 gcc/tree-emutls.cc:78
+HAVE_INITFINI_ARRAY_SUPPORT	SILENT-VALUE	2	 gcc/defaults.h:323 gcc/defaults.h:338
+USE_STORE_PRE_INCREMENT	SILENT-VALUE	1	 gcc/rtl.h:2983
+OUTPUT_QUOTED_STRING	SILENT-FLOW	1	 gcc/final.cc:3846
+EXIT_IGNORE_STACK	SILENT-VALUE	1	 gcc/defaults.h:1156
+DWARF2_LINENO_DEBUGGING_INFO	SILENT-FLOW	5	 gcc/dwarf2out.cc:30203 gcc/dwarf2out.cc:30248 gcc/dwarf2out.cc:30263 gcc/opts.cc:3606 gcc/toplev.cc:1534
+DWARF2_LINENO_DEBUGGING_INFO	SILENT-VALUE	1	 gcc/defaults.h:1020
+DWARF_FRAME_REGISTERS	SILENT-VALUE	1	 gcc/defaults.h:458
+FUNCTION_VALUE	SILENT-FLOW	1	 gcc/targhooks.cc:1127
+DATA_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:90
+REAL_PIC_OFFSET_TABLE_REGNUM	SILENT-FLOW	2	 gcc/ira-lives.cc:1684 gcc/lra-lives.cc:1111
+IMMEDIATE_PREFIX	SILENT-FLOW	1	 gcc/final.cc:4056
+COMPARE_MAX_PIECES	SILENT-VALUE	1	 gcc/defaults.h:1111
+OVERLAPPING_REGISTER_NAMES	SILENT-FLOW	1	 gcc/varasm.cc:1047
+__GNU_LIBRARY__	SILENT-VALUE	1	 gcc/glimits.h:114
+UINT_LEAST32_TYPE	SILENT-VALUE	2	 gcc/defaults.h:713 gcc/defaults.h:814
+DECIMAL128_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:643
+HAVE_sync_compare_and_swapqi	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:671
+yy_flex_debug	SILENT-OTHER	1	 gcc/cobol/util.cc:3565
+LINK_COMMAND_SPEC	LOUD-DEF	1	 gcc/gcc.cc:1098
+ASM_OUTPUT_DEF	SILENT-VALUE	4	 gcc/defaults.h:108 gcc/defaults.h:201 gcc/target-def.h:95 gcc/target-def.h:146
+TARGET_USE_WEAKREF	SILENT-VALUE	2	 gcc/defaults.h:225 gcc/defaults.h:230
+ASM_OUTPUT_LABEL_REF	SILENT-FLOW	1	 gcc/final.cc:3732
+ASM_OUTPUT_ALIGN_WITH_NOP	SILENT-FLOW	1	 gcc/final.cc:2440
+EPILOGUE_USES	SILENT-VALUE	1	 gcc/defaults.h:1320
+CONSTANT_ADDRESS_P	SILENT-VALUE	1	 gcc/defaults.h:1283
+UINT32_TYPE	SILENT-VALUE	1	 gcc/defaults.h:782
+INT8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:758
+TARGET_FORMAT_TYPES	LOUD-DECL	1	 gcc/c-family/c-format.cc:5257
+TARGET_FORMAT_TYPES	SILENT-FLOW	1	 gcc/c-family/c-format.cc:5339
+ELF_ASCII_ESCAPES	LOUD-DEF	1	 gcc/varasm.cc:8728
+TARGET_ASM_OUTPUT_ANCHOR	SILENT-VALUE	1	 gcc/target-def.h:95
+ASM_OUTPUT_DWARF_PCREL	SILENT-FLOW	2	 gcc/dwarf2asm.cc:300 gcc/dwarf2asm.cc:1148
+ACCUM_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:667
+ADJUST_FIELD_ALIGN	SILENT-FLOW	9	 gcc/ada/gcc-interface/misc.cc:1151 gcc/d/d-target.cc:229 gcc/go/go-backend.cc:77 gcc/rust/rust-object-export.cc:74 gcc/stor-layout.cc:801 gcc/stor-layout.cc:1138 gcc/stor-layout.cc:1437 gcc/stor-layout.cc:1483 gcc/stor-layout.cc:2840
+FUNCTION_VALUE_REGNO_P	SILENT-FLOW	1	 gcc/targhooks.cc:1150
+HAVE_POST_MODIFY_REG	SILENT-VALUE	1	 gcc/rtl.h:2942
+HAVE_blockage	LOUD-DEF	1	 gcc/emit-rtl.cc:448
+WCHAR_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:631
+BTF_INFO_SECTION_NAME	SILENT-VALUE	1	 gcc/btfout.cc:48
+STATIC_CHAIN_INCOMING_REGNUM	SILENT-VALUE	1	 gcc/target-cdata-opt.h:82
+ASM_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:723
+DWARF_VERSION_DEFAULT	SILENT-VALUE	1	 gcc/defaults.h:1863
+TARGET_LIBC_PROVIDES_SSP	SILENT-VALUE	1	 gcc/defaults.h:1760
+SETUP_FRAME_ADDRESSES	SILENT-VALUE	1	 gcc/defaults.h:1393
+HAS_LONG_UNCOND_BRANCH	SILENT-VALUE	1	 gcc/defaults.h:1057
+CPP_SPEC	SILENT-VALUE	2	 gcc/defaults.h:896 gcc/gcc.cc:753
+PIC_OFFSET_TABLE_REGNUM	SILENT-VALUE	1	 gcc/defaults.h:871
+INVOKE__main	SILENT-FLOW	1	 gcc/cfgexpand.cc:6962
+ASM_OUTPUT_WEAKREF	SILENT-OTHER	1	 gcc/defaults.h:229
+ASM_OUTPUT_WEAKREF	SILENT-FLOW	4	 gcc/cgraphunit.cc:2412 gcc/symtab.cc:344 gcc/varasm.cc:6396 gcc/varasm.cc:6547
+TARGET_DLLIMPORT_DECL_ATTRIBUTES	SILENT-VALUE	2	 gcc/defaults.h:879 gcc/defaults.h:884
+TARGET_DLLIMPORT_DECL_ATTRIBUTES	SILENT-OTHER	1	 gcc/ada/gcc-interface/decl.cc:61
+DWARF2_FRAME_INFO	SILENT-FLOW	1	 gcc/targhooks.cc:2479
+STACK_SIZE_MODE	SILENT-VALUE	1	 gcc/defaults.h:1485
+HAVE_setmemdi	SILENT-VALUE	1	 gcc/defaults.h:1460
+DELAY_SLOTS	SILENT-FLOW	1	 gcc/opts.cc:623
+DEBUG_LTO_MACRO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4131
+EH_RETURN_TAKEN_RTX	SILENT-FLOW	5	 gcc/df-scan.cc:3716 gcc/except.cc:2302 gcc/except.cc:2316 gcc/except.cc:2330 gcc/except.cc:2337
+UINT64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:786
+HAVE_sync_compare_and_swapsi	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:696 gcc/tree-profile.cc:1847
+SIZE_ASM_OP	SILENT-VALUE	1	 gcc/defaults.h:262
+ASM_DECLARE_COLD_FUNCTION_SIZE	SILENT-FLOW	1	 gcc/varasm.cc:2256
+DEBUG_LTO_STR_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4186
+INSN_REFERENCES_ARE_DELAYED	SILENT-VALUE	1	 gcc/defaults.h:1308
+LOCAL_DECL_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1267
+PUSH_ARGS_REVERSED	SILENT-VALUE	1	 gcc/defaults.h:926
+PUSH_ARGS_REVERSED	SILENT-OTHER	1	 gcc/defaults.h:918
+PUSH_ARGS_REVERSED	SILENT-FLOW	1	 gcc/target-frame.h:1091
+RED_ZONE_SIZE	SILENT-FLOW	2	 gcc/builtins.cc:5572 gcc/rtlanal.cc:549
+COLLECT_SHARED_FINI_FUNC	SILENT-VALUE	1	 gcc/collect2.cc:163
+PREFERRED_RELOAD_CLASS	SILENT-FLOW	1	 gcc/targhooks.cc:2398
+HAVE_BFmode	SILENT-FLOW	3	 gcc/jit/jit-playback.cc:289 gcc/jit/jit-recording.cc:2653 gcc/tree.cc:9870
+DEFAULT_FLAG_PIE	SILENT-VALUE	1	 gcc/defaults.h:1345
+TARGET_CLONES_ATTR_SEPARATOR	SILENT-VALUE	1	 gcc/defaults.h:991
+ASM_DECLARE_COLD_FUNCTION_NAME	SILENT-FLOW	1	 gcc/final.cc:2227
+ASM_OUTPUT_REG_PUSH	SILENT-FLOW	3	 gcc/final.cc:1823 gcc/final.cc:1844 gcc/final.cc:1853
+SHORT_ACCUM_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:663
+GCC_TARGET_REGS_H	SILENT-VALUE	1	 gcc/target-regs.h:91
+DEBUG_ABBREV_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4098
+INCOMING_FRAME_SP_OFFSET	SILENT-VALUE	1	 gcc/defaults.h:1230
+PREFERRED_DEBUGGING_TYPE	SILENT-OTHER	1	 gcc/defaults.h:1019
+MINIMUM_ATOMIC_ALIGNMENT	SILENT-FLOW	2	 gcc/ada/gcc-interface/decl.cc:994 gcc/ada/gcc-interface/decl.cc:10215
+GCC_TARGET_CDATA_H	SILENT-VALUE	1	 gcc/target-cdata.h:65
+ADDR_VEC_ALIGN	LOUD-DEF	1	 gcc/final.cc:481
+ADDR_VEC_ALIGN	SILENT-FLOW	1	 gcc/final.cc:2474
+NUM_UNSPEC_VALUES	SILENT-FLOW	4	 gcc/dwarf2out.cc:15374 gcc/print-rtl.cc:513 gcc/print-rtl.cc:1636 gcc/read-rtl-function.cc:1034
+DEFAULT_FLAG_SSP	SILENT-VALUE	1	 gcc/defaults.h:1769
+REVERSIBLE_CC_MODE	SILENT-VALUE	1	 gcc/defaults.h:1200
+HONOR_REG_ALLOC_ORDER	SILENT-VALUE	1	 gcc/defaults.h:1149
+DWARF_FRAME_RETURN_COLUMN	SILENT-OTHER	1	 gcc/defaults.h:543
+HAVE_KFmode	SILENT-FLOW	1	 gcc/fortran/trans-types.cc:197
+STACK_CHECK_MAX_VAR_SIZE	SILENT-VALUE	1	 gcc/defaults.h:1841
+BTF_DEBUGGING_INFO	SILENT-FLOW	1	 gcc/toplev.cc:1519
+LIBTSAN_EARLY_SPEC	SILENT-VALUE	2	 gcc/gcc.cc:867 gcc/gcc.cc:876
+REGISTER_PREFIX	SILENT-VALUE	1	 gcc/c-family/c-cppbuiltin.cc:47
+REGISTER_PREFIX	SILENT-FLOW	3	 gcc/final.cc:4050 gcc/varasm.cc:979 gcc/varasm.cc:1632
+TARGET_ALIGN_DOUBLE	SILENT-FLOW	1	 gcc/ada/gcc-interface/targtyps.cc:223
+TARGET_FHARDENED_SUPPORTED	SILENT-VALUE	1	 gcc/defaults.h:476
+STACK_CHECK_PROBE_INTERVAL_EXP	SILENT-VALUE	1	 gcc/defaults.h:1789
+DYNAMIC_CHAIN_ADDRESS	SILENT-VALUE	1	 gcc/defaults.h:1397
+STACK_SLOT_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1262
+BOOL_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:610
+POINTERS_EXTEND_UNSIGNED	SILENT-VALUE	1	 gcc/target-def.h:268
+ASM_OUTPUT_CASE_END	SILENT-FLOW	1	 gcc/final.cc:2584
+ASM_OUTPUT_ALIGNED_BSS	LOUD-DECL	1	 gcc/varasm.cc:120
+ASM_OUTPUT_ALIGNED_BSS	LOUD-DEF	2	 gcc/varasm.cc:501 gcc/varasm.cc:2384
+ASM_OUTPUT_ALIGNED_BSS	SILENT-FLOW	1	 gcc/varasm.cc:7034
+HAVE_TFmode	SILENT-FLOW	5	 gcc/fortran/trans-types.cc:197 gcc/fortran/trans-types.cc:531 gcc/targhooks.cc:577 gcc/targhooks.cc:609 gcc/targhooks.cc:669
+TARGET_VTABLE_USES_DESCRIPTORS	SILENT-VALUE	1	 gcc/defaults.h:1851
+FLOAT_STORE_FLAG_VALUE	SILENT-FLOW	11	 gcc/cse.cc:2994 gcc/cse.cc:3001 gcc/cse.cc:3011 gcc/cse.cc:3049 gcc/cse.cc:3073 gcc/cse.cc:3089 gcc/cse.cc:3387 gcc/rtlanal.cc:5965 gcc/rtlanal.cc:5992 gcc/rtlanal.cc:6005 gcc/simplify-rtx.cc:2636
+ASM_OUTPUT_ASCII	SILENT-VALUE	1	 gcc/defaults.h:69
+HAVE_sync_compare_and_swapdi	SILENT-FLOW	2	 gcc/c-family/c-cppbuiltin.cc:708 gcc/tree-profile.cc:1854
+GCC_TARGET_FRAME_H	SILENT-VALUE	1	 gcc/target-frame.h:64
+TARGET_USE_LOCAL_THUNK_ALIAS_P	SILENT-VALUE	1	 gcc/target-def.h:213
+DEBUG_ARANGES_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4110
+MINIMUM_ALIGNMENT	SILENT-VALUE	1	 gcc/defaults.h:1272
+TARGET_VTABLE_ENTRY_ALIGN	SILENT-VALUE	1	 gcc/defaults.h:956
+__GLIBC__	SILENT-FLOW	5	 gcc/ada/adaint.h:54 gcc/ada/socket.c:209 gcc/ada/socket.c:226 gcc/ada/socket.c:242 gcc/ada/socket.c:258
+DTORS_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:120
+DTORS_SECTION_ASM_OP	SILENT-VALUE	1	 gcc/target-def.h:72
+HAVE_setmemhi	SILENT-VALUE	1	 gcc/defaults.h:1460
+LOOP_ALIGN	SILENT-VALUE	1	 gcc/final.cc:469
+HAVE_XCOFF_DWARF_EXTRAS	SILENT-VALUE	1	 gcc/dwarf2out.cc:114
+OUTGOING_REG_PARM_STACK_SPACE	SILENT-VALUE	1	 gcc/defaults.h:1239
+PTR_SIZE	SILENT-VALUE	4	 gcc/algol68/a68-exports.cc:45 gcc/algol68/a68-imports.cc:542 gcc/dwarf2out.cc:157 gcc/vmsdbgout.cc:103
+COLLECT2_OPTIONS_MAX_LENGTH	SILENT-VALUE	2	 gcc/defaults.h:1881 gcc/gcc.cc:5749
+STACK_CHECK_BUILTIN	SILENT-VALUE	1	 gcc/defaults.h:1779
+UINT_LEAST16_TYPE	SILENT-VALUE	2	 gcc/defaults.h:707 gcc/defaults.h:810
+ASM_DECLARE_FUNCTION_NAME	SILENT-FLOW	1	 gcc/varasm.cc:2213
+PTRDIFF_MAX	SILENT-VALUE	1	 gcc/pretty-print.cc:995
+ASM_DEBUG_OPTION_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:958
+SPARC_STACK_BOUNDARY_HACK	SILENT-FLOW	2	 gcc/function.cc:4203 gcc/rtlanal.cc:483
+DEBUG_PUBTYPES_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4169
+STORE_FLAG_VALUE	SILENT-VALUE	1	 gcc/defaults.h:1086
+POINTER_SIZE	SILENT-VALUE	1	 gcc/defaults.h:863
+INT_FAST8_TYPE	SILENT-VALUE	1	 gcc/defaults.h:822
+HAVE_atomic_compare_and_swapti	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:723
+DEBUG_RANGES_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4195
+HARD_REGNO_RENAME_OK	SILENT-VALUE	1	 gcc/defaults.h:1316
+HAVE_window_save	SILENT-FLOW	4	 gcc/cfgexpand.cc:4809 gcc/var-tracking.cc:1217 gcc/var-tracking.cc:9734 gcc/var-tracking.cc:10494
+HAVE_window_save	LOUD-DEF	1	 gcc/var-tracking.cc:626
+INSN_LENGTH_ALIGNMENT	SILENT-VALUE	1	 gcc/final.cc:496
+TARGET_DEC_EVAL_METHOD	SILENT-VALUE	1	 gcc/defaults.h:1049
+ACCUMULATE_OUTGOING_ARGS	SILENT-VALUE	1	 gcc/defaults.h:901
+BITS_PER_WORD	SILENT-VALUE	1	 gcc/defaults.h:602
+SUPPORTS_DISCRIMINATOR	SILENT-OTHER	1	 gcc/defaults.h:312
+LIMIT_RELOAD_CLASS	SILENT-FLOW	5	 gcc/reload.cc:727 gcc/reload.cc:960 gcc/reload.cc:1113 gcc/reload.cc:1206 gcc/reload.cc:1289
+ASM_OUTPUT_ADDR_DIFF_VEC	SILENT-FLOW	4	 gcc/final.cc:2461 gcc/final.cc:2528 gcc/final.cc:2552 gcc/final.cc:2541
+DWARF2_ASM_LINE_DEBUG_INFO	SILENT-VALUE	1	 gcc/dwarf2out.cc:3352
+STACK_CHECK_MAX_FRAME_SIZE	SILENT-VALUE	1	 gcc/defaults.h:1828
+PID_TYPE	SILENT-VALUE	1	 gcc/defaults.h:693
+ROUND_TYPE_ALIGN	SILENT-FLOW	4	 gcc/stor-layout.cc:1802 gcc/stor-layout.cc:1840 gcc/stor-layout.cc:1996 gcc/stor-layout.cc:2751
+IFCVT_MACHDEP_INIT	SILENT-FLOW	1	 gcc/ifcvt.cc:5376
+TARGET_CPU_CPP_BUILTINS	SILENT-VALUE	1	 gcc/fortran/cpp.cc:43
+DEFAULT_GDB_EXTENSIONS	SILENT-VALUE	1	 gcc/defaults.h:1013
+DECIMAL32_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:635
+NM_FLAGS	SILENT-VALUE	1	 gcc/collect2.cc:143
+STACK_GROWS_DOWNWARD	SILENT-VALUE	7	 gcc/builtins.cc:5477 gcc/defaults.h:533 gcc/defaults.h:919 gcc/defaults.h:1328 gcc/defaults.h:1333 gcc/explow.cc:1794 gcc/recog.cc:48
+STACK_GROWS_DOWNWARD	SILENT-FLOW	7	 gcc/builtins.cc:5610 gcc/builtins.cc:5700 gcc/builtins.cc:5735 gcc/rtlanal.cc:372 gcc/rtlanal.cc:582 gcc/rtlanal.cc:606 gcc/target-frame.h:1087
+OBJC_GEN_METHOD_LABEL	LOUD-DEF	1	 gcc/objc/objc-act.cc:79
+ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX	SILENT-FLOW	2	 gcc/dwarf2asm.cc:1114 gcc/dwarf2asm.cc:1161
+COLLECT_RUN_DSYMUTIL	LOUD-DEF	1	 gcc/collect2.cc:3091
+NUM_POLY_INT_COEFFS	SILENT-VALUE	4	 gcc/genmodes.cc:1131 gcc/genmodes.cc:1258 gcc/machmode.h:957 gcc/poly-int-types.h:89
+NUM_POLY_INT_COEFFS	LOUD-DEF	1	 gcc/tree.h:5189
+LEAF_REG_REMAP	SILENT-FLOW	5	 gcc/dwarf2out.cc:14590 gcc/dwarf2out.cc:14707 gcc/dwarf2out.cc:15250 gcc/final.cc:1728 gcc/function.cc:5983
+APPLY_RESULT_SIZE	SILENT-FLOW	1	 gcc/builtins.cc:1531
+ASM_COMMENT_START	SILENT-VALUE	1	 gcc/defaults.h:38
+ASM_COMMENT_START	SILENT-FLOW	2	 gcc/ada/gcc-interface/trans.cc:1431 gcc/ada/gcc-interface/trans.cc:1440
+_LARGEFILE_SOURCE	SILENT-VALUE	1	 gcc/ada/cstreams.c:34
+SDATA_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:95
+USE_LOAD_POST_INCREMENT	SILENT-VALUE	1	 gcc/rtl.h:2959
+STARTFILE_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:928
+LIBLSAN_EARLY_SPEC	SILENT-VALUE	2	 gcc/gcc.cc:883 gcc/gcc.cc:892
+HAVE_LTO_PLUGIN	SILENT-FLOW	3	 gcc/gcc-ar.cc:130 gcc/gcc-ar.cc:190 gcc/gcc-ar.cc:233
+ASM_OUTPUT_SYMBOL_REF	SILENT-FLOW	1	 gcc/final.cc:3720
+MAX_FIXED_MODE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:1287
+HAVE_fmasf4	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:77
+CLEAR_INSN_CACHE	SILENT-FLOW	1	 gcc/builtins.cc:6076
+USE_LOAD_PRE_INCREMENT	SILENT-VALUE	1	 gcc/rtl.h:2967
+JUMP_TABLES_IN_TEXT_SECTION	SILENT-VALUE	1	 gcc/final.cc:104
+FRAME_POINTER_CFA_OFFSET	SILENT-FLOW	8	 gcc/dwarf2out.cc:21620 gcc/function.cc:1464 gcc/function.cc:1968 gcc/var-tracking.cc:9990 gcc/var-tracking.cc:10093 gcc/var-tracking.cc:10146 gcc/var-tracking.cc:10166 gcc/var-tracking.cc:10202
+EH_USES	SILENT-FLOW	6	 gcc/df-problems.cc:910 gcc/df-problems.cc:2569 gcc/df-problems.cc:3979 gcc/df-problems.cc:3988 gcc/df-scan.cc:3377 gcc/df-scan.cc:3418
+HARD_FRAME_POINTER_IS_FRAME_POINTER	SILENT-VALUE	1	 gcc/rtl.h:3945
+USE_LOAD_POST_DECREMENT	SILENT-VALUE	1	 gcc/rtl.h:2963
+ASM_OUTPUT_ADDR_VEC_ELT	SILENT-FLOW	1	 gcc/final.cc:2564
+DWARF_OFFSET_SIZE	SILENT-VALUE	1	 gcc/defaults.h:589
+HAVE_SOLARIS_AS	SILENT-VALUE	1	 gcc/defaults.h:509
+HAVE_sync_compare_and_swaphi	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:684
+ASM_OUTPUT_FDESC	SILENT-FLOW	1	 gcc/varasm.cc:5531
+USE_LOAD_PRE_DECREMENT	SILENT-VALUE	1	 gcc/rtl.h:2971
+IS_ASM_LOGICAL_LINE_SEPARATOR	SILENT-VALUE	1	 gcc/final.cc:100
+LIBASAN_EARLY_SPEC	SILENT-VALUE	2	 gcc/gcc.cc:835 gcc/gcc.cc:844
+DEBUG_MACRO_SECTION	SILENT-VALUE	1	 gcc/dwarf2out.cc:4128
+MIN_UNITS_PER_WORD	SILENT-VALUE	1	 gcc/defaults.h:1119
+SIZETYPE	SILENT-VALUE	1	 gcc/defaults.h:689
+TARGET_OBJECT_SUFFIX	SILENT-VALUE	2	 gcc/ada/targext.c:55 gcc/gcc.cc:218
+MAKE_DECL_ONE_ONLY	SILENT-FLOW	1	 gcc/varasm.cc:6961
+MAKE_DECL_ONE_ONLY	SILENT-VALUE	1	 gcc/defaults.h:347
+SET_RATIO	SILENT-VALUE	1	 gcc/defaults.h:1471
+RETURN_ADDR_RTX	SILENT-FLOW	1	 gcc/builtins.cc:869
+ASM_OUTPUT_ADDR_DIFF_ELT	SILENT-FLOW	2	 gcc/final.cc:2573 gcc/tree-switch-conversion.h:537
+TARGET_AIX_OS	SILENT-VALUE	4	 gcc/algol68/a68-exports.cc:40 gcc/go/go-backend.cc:48 gcc/go/go-lang.cc:42 gcc/rust/rust-object-export.cc:48
+MULTIPLE_SYMBOL_SPACES	SILENT-VALUE	1	 gcc/defaults.h:391
+ASM_DECLARE_FUNCTION_SIZE	SILENT-FLOW	1	 gcc/varasm.cc:2237
+_GCC_WRAP_STDINT_H	SILENT-VALUE	1	 gcc/ginclude/stdint-wrap.h:1
+SYSROOT_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:1128
+LINK_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:785
+TARGET_F951_OPTIONS	SILENT-FLOW	1	 gcc/fortran/lang-specs.h:37
+MAX_MOVE_MAX	SILENT-VALUE	1	 gcc/defaults.h:1115
+ARGS_GROW_DOWNWARD	SILENT-FLOW	6	 gcc/rtlanal.cc:586 gcc/rtlanal.cc:594 gcc/rtlanal.cc:610 gcc/rtlanal.cc:618 gcc/rtlanal.cc:629 gcc/target-frame.h:1087
+ARGS_GROW_DOWNWARD	SILENT-VALUE	2	 gcc/defaults.h:919 gcc/defaults.h:1324
+SET_ASM_OP	SILENT-OTHER	1	 gcc/defaults.h:107
+READONLY_DATA_SECTION_ASM_OP	SILENT-OTHER	1	 gcc/target-asm-ops.h:100
+HASH_MAP_TRAITS_H	SILENT-VALUE	1	 gcc/hash-map-traits.h:20
+_POSIX_SOURCE	SILENT-OTHER	1	 gcc/ginclude/stddef.h:330
+_POSIX_SOURCE	SILENT-VALUE	1	 gcc/ginclude/stddef.h:312
+INT_LEAST64_TYPE	SILENT-VALUE	1	 gcc/defaults.h:802
+TARGET_SUPPORTS_WEAK	SILENT-VALUE	1	 gcc/defaults.h:306
+DONT_USE_BUILTIN_SETJMP	SILENT-FLOW	7	 gcc/c-family/c-cppbuiltin.cc:1618 gcc/except.cc:272 gcc/except.cc:303 gcc/except.cc:338 gcc/except.cc:1208 gcc/except.cc:1248 gcc/except.cc:1327
+hash_traits_h	SILENT-VALUE	1	 gcc/hash-traits.h:20
+DEBUGGER_REGNO	SILENT-VALUE	1	 gcc/defaults.h:554
+optimize	SILENT-VALUE	1	 gcc/ada/sigtramp-vxworks.c:121
+HAVE_XFmode	SILENT-FLOW	2	 gcc/targhooks.cc:574 gcc/targhooks.cc:606
+HAVE_XFmode	LOUD-DECL	1	 gcc/machmode.h:774
+INCHASH_H	SILENT-VALUE	1	 gcc/inchash.h:20
+CLEAR_RATIO	SILENT-OTHER	1	 gcc/defaults.h:1459
+UINT16_TYPE	SILENT-VALUE	1	 gcc/defaults.h:778
+GCC_BBITMAP_H	SILENT-VALUE	1	 gcc/bbitmap.h:20
+SELECT_CC_MODE	SILENT-FLOW	4	 gcc/ccmp.cc:308 gcc/combine.cc:3216 gcc/combine.cc:6931 gcc/compare-elim.cc:514
+ASM_OUTPUT_SPECIAL_POOL_ENTRY	SILENT-FLOW	2	 gcc/varasm.cc:4449 gcc/varasm.cc:4479
+FRAME_GROWS_DOWNWARD	SILENT-VALUE	1	 gcc/defaults.h:1209
+DL_LIBRARY	SILENT-VALUE	1	 gcc/cobol/gcobolspec.cc:61
+SHORT_TYPE_SIZE	SILENT-VALUE	1	 gcc/defaults.h:615
+LEAF_REGISTERS	SILENT-FLOW	4	 gcc/combine.cc:2252 gcc/function.cc:6491 gcc/regrename.cc:355 gcc/sel-sched.cc:1087
+LEAF_REGISTERS	LOUD-DEF	2	 gcc/final.cc:4153 gcc/final.cc:4222
+LEAF_REGISTERS	LOUD-DECL	1	 gcc/final.cc:211
+HAVE_SFmode	SILENT-FLOW	5	 gcc/expr.cc:411 gcc/gimple-lower-bitint.cc:4279 gcc/optabs.cc:6270 gcc/targhooks.cc:568 gcc/targhooks.cc:657
+TARGET_OS_CPP_BUILTINS	SILENT-VALUE	2	 gcc/c-family/c-cppbuiltin.cc:39 gcc/fortran/cpp.cc:47
+HAVE_fmaxf4	SILENT-FLOW	1	 gcc/c-family/c-cppbuiltin.cc:92
+EH_RETURN_STACKADJ_RTX	SILENT-FLOW	5	 gcc/c-family/c-cppbuiltin.cc:1634 gcc/df-scan.cc:3706 gcc/except.cc:2261 gcc/except.cc:2298 gcc/except.cc:2312
+TLS_COMMON_ASM_OP	SILENT-VALUE	1	 gcc/defaults.h:123
+OBJC_JBLEN	SILENT-VALUE	1	 gcc/objc/objc-next-runtime-abi-01.cc:2503
+REAL_LIBGCC_SPEC	SILENT-VALUE	1	 gcc/gcc.cc:917
