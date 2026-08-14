@@ -1375,7 +1375,7 @@ extern const char *fp_sysreg_names[NB_FP_SYSREGS];
 #define MODE_BASE_REG_CLASS(MODE)				\
    (TARGET_HAVE_MVE ? arm_mode_base_reg_class (MODE)		\
    :(TARGET_32BIT ? CORE_REGS					\
-   : GET_MODE_SIZE (MODE) >= 4 ? BASE_REGS			\
+   : known_ge (GET_MODE_SIZE (MODE), 4) ? BASE_REGS		\
    : LO_REGS))
 
 /* For Thumb we cannot support SP+reg addressing, so we return LO_REGS

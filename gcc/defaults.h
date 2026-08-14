@@ -2583,7 +2583,12 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 
    AND ONE TYPE TRAP THAT MAKES THIS NON-MECHANICAL.  recog.cc:1836 spells
    `PUSH_ROUNDING (MACRO_INT (rounded_size))', where `MACRO_INT' is
-   `.to_constant ()` when `NUM_POLY_INT_COEFFS > 1'.  That wrapper exists
+   `.to_constant ()` when `NUM_POLY_INT_COEFFS == 1' and the IDENTITY
+   otherwise -- this line said `> 1' and had the polarity backwards, which
+   matters because the constant is 2 build-wide on this branch, so the
+   wrapper is currently the identity everywhere and protects nobody
+   (measured with `-E -dM' in all four contexts; scratchpad/t145-*).
+   `poly-int-types.h:89' is the authority.  That wrapper exists
    because some back ends' macros are not poly-safe.  A single
    `poly_int64 mt_push_rounding (poly_int64)' makes the wrapper unnecessary at
    the SHARED sites, but the PER-BASE thunk must keep it for those back ends
