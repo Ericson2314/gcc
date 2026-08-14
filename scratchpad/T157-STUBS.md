@@ -120,6 +120,82 @@ eleven failed that test in this task. Renaming twenty blind on the strength of
 a sweep, with no link failure to check the result against, is how the
 `legitimate_pic_operand_p` mistake gets made twenty times instead of once.
 
+### RESOLVED by #165 — all twenty renamed, after the macro test
+
+`scratchpad/t165-macrotest.sh` runs the test on each of the twenty, in two arms
+that answer different questions: arm S (does a shared TU spell the bare
+symbol?) and arm M (does *any* `#define` under `config/` carry the name in its
+body?). Arm M is deliberately over-broad — it can only revoke a rename, never
+authorise one — and it carries a positive control (`constant_address_p`, known
+macro-reached) so that an all-clear cannot come from a broken instrument.
+
+**Nineteen are clean on both arms. The twentieth is a false positive**:
+`arm_md_asm_adjust` is found by arm.cc:838's
+`#define TARGET_MD_ASM_ADJUST arm_md_asm_adjust`, which is the `target.def`
+*hook* macro — expanded only by `target-def.h` inside arm.cc's own TU, so
+definition and use are in the same base's objects and the `-D` reaches both.
+
+Two blind spots of the source-level test were closed **against the generated
+artefact**, which is where both answers actually live:
+
+- the fourteen `arm_*` scheduling predicates are named by
+  `mt-arm/insn-attrtab-arm.cc`, which is generated and therefore invisible to
+  arm S. Safe, because `multi-target-md.mk` puts the `insn-*-<cpu>` objects
+  inside `MULTI_TARGET_OBJS_<cpu>`, which carries `MULTI_TARGET_RENAMES` — the
+  generated caller and the hand-written definition are renamed together.
+- `make_pass_insert_bti` is named by `arm-passes.def` and
+  `aarch64-passes.def`, which feed `pass-instances.def`, which **shared**
+  `passes.cc` includes twice. That would have revoked the rename. It does not,
+  for a reason that is itself a defect — see below.
+
+## `PASSES_EXTRA` IS i386's, SO EVERY OTHER BACK END'S TARGET PASSES ARE GONE
+
+Found by asking whether `make_pass_insert_bti` was safe to rename; it is, and
+the reason it is safe is that **nothing calls it, or any other back end's pass
+constructor**.
+
+`PASSES_EXTRA` is how a back end contributes its target passes to
+`pass-instances.def`, and it is set by the per-target `config/<cpu>/t-<cpu>`
+fragments reached through `-include $(tmake_file)`. In an **eight-base** build
+dir, `tmake_file` is substituted as **i386's list alone**:
+
+```
+tmake_file= .../config/t-slibgcc .../config/t-linux .../config/t-glibc
+            .../config/i386/t-linux64 .../config/i386/t-pmm_malloc
+            .../config/i386/t-i386 .../config/i386/t-linux
+            .../config/i386/t-gnu-property
+```
+
+because it comes from the single legacy `${target}` pass through `config.gcc`,
+not from the back-end list. Measured in `pass-instances.def` in that build dir:
+`pass_stv`, `pass_remove_partial_avx_dependency` and
+`pass_insert_endbr_and_patchable_area` are present — i386's, from
+`config/i386/t-i386`'s `PASSES_EXTRA` — and **not one pass from aarch64, arm,
+rs6000, s390, riscv, mips or sparc**, though `t-aarch64:195` and `t-arm:163`
+both still carry their `PASSES_EXTRA +=` lines.
+
+Both halves of this project's defining bug in one channel:
+
+- **leaked PRESENCE** — shared `passes.cc` walks `pass-instances.def`
+  unconditionally, so i386's target passes are in the pipeline whichever base
+  is selected;
+- **leaked ABSENCE** — every other back end's target passes are silently
+  missing. aarch64 and arm BTI insertion has never run on this branch. This is
+  the `AUTO_INC_DEC` (#162) and `LEAF_REGISTERS` shape: no diagnostic, and the
+  absence reads as "this back end has no target passes".
+
+**Not fixed here, and it is not a stub — it is a design change.**
+`pass-instances.def` is one shared authority and `passes.cc`'s `NEXT_PASS` walk
+is compiled once, so a per-base pass list means either a per-base `passes.cc`
+or a selector inside the walk. #165 is a link-level unblock and this is a
+correctness change; it is recorded here so the correctness pass inherits it as
+work rather than as archaeology.
+
+Note the ordering trap for whoever takes it: fixing `PASSES_EXTRA` **revokes
+the `make_pass_insert_bti` rename's justification**, since shared `passes.cc`
+would then name the bare symbol from two bases. The rename must stay and the
+pass list must select, not the other way round.
+
 ## Not fixed, and NOT stubbed — the real work queue
 
 These are open walls, left failing loudly rather than papered over. None of
