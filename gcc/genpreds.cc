@@ -2070,6 +2070,53 @@ write_insn_preds_c (void)
 #include \"reload.h\"\n\
 #include \"regs.h\"\n\
 #include \"emit-rtl.h\"");
+  /* THE SINGULAR RUN IS SHARED CODE AND MUST NOT ASK THE PRIMARY'S HEADERS.
+
+     genpreds runs once per back end into `namespace insn_<base>' AND once
+     un-namespaced into the shared `insn-preds.o' that $(OBJS) still names.
+     The per-back-end runs are fine: each is compiled with -I<base>-inc, so
+     every `tm.h' macro a constraint body spells is that base's own.  The
+     SINGULAR run is compiled once, against the primary's `tm.h', so any such
+     macro is i386's answer served to every configured target.
+
+     Measured: i386's `n', `s' and `i' constraints expand
+     `LEGITIMATE_PIC_OPERAND_P', which is `legitimate_pic_operand_p (X)' in
+     i386.h.  Once that function was renamed per back end (see
+     MULTI_TARGET_RENAME_NAMES) the singular object had nothing to bind to and
+     the link of cc1 reported `insn-preds.o: undefined reference to
+     legitimate_pic_operand_p' from `satisfies_constraint_n', `_s' and `_i'.
+     The link failure is the useful part: it named a shared object reading a
+     back-end macro, which is the leak this branch exists to remove and which
+     produced no diagnostic at all while the bare definition existed.
+
+     `#undef' first, and not as tidiness: the primary's `tm.h' has ALREADY
+     been read by this point, so a bare `#define' would be a redefinition
+     whose only signal is a warning -- PRINCIPLES 7 records a redirect that
+     stayed rc=0 with 495 warnings and the wrong macro still winning.
+
+     Emitted for the singular run of a MULTI-TARGET build only.  In a
+     single-target build there is one `tm.h' and it is the right one, so
+     rerouting would add an indirection and no correctness.
+
+     AND IT MUST COME BEFORE `tm-constrs.h', WHICH IS THE OPPOSITE OF THE
+     `multi-target-preds.h' INCLUDE AT THE END OF write_tm_preds_h.  That one
+     goes LAST because it renames USES that the wrappers above it have already
+     been parsed with; this one has to be in force WHEN THOSE WRAPPERS ARE
+     PARSED, because they are `inline' and the macro is expanded inside their
+     bodies.  Measured by getting it wrong: with the block emitted after the
+     include, the generated `insn-preds.cc' contained the `#define' on line 36
+     and the link STILL reported the undefined reference -- from
+     `satisfies_constraint_n', an inline out of `tm-constrs.h' whose body had
+     already expanded the primary's spelling.  The regenerated artefact
+     contained exactly the text intended and did not do what it was for; the
+     `#define' was present and the reference unchanged.  */
+  if (gen_multi_target_p () && gen_target_ns () == NULL)
+    puts ("\n\
+/* Shared object: route this back-end macro to the selected base.  */\n\
+#include \"addresses.h\"\n\
+#undef LEGITIMATE_PIC_OPERAND_P\n\
+#define LEGITIMATE_PIC_OPERAND_P(X) mt_legitimate_pic_operand_p (X)\n");
+
   print_gen_include (stdout, "tm-constrs");
   puts ("#include \"target.h\"\n");
 
