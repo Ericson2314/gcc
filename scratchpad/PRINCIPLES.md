@@ -742,6 +742,19 @@ passed — 40 hits on x86_64's own output, 0 on aarch64's and s390's — but it
 cannot see a target compiled at the wrong width, because every instruction it
 emits is genuinely a valid instruction of that architecture.
 
+**REMOVING `-I<base>-inc` IS SILENT, NOT LOUD.** 15 of 16 stems also exist
+under their plain name in the build root, so an unconverted include falls back
+instead of erroring; for seven, that copy is byte-identical to i386's. The
+`.deps` show the `-I` serving **~2000 objects transitively** (via
+`coretypes.h:553`) against ~280 direct. Delete it before the ~13 shared headers
+can name a base and 2000 objects silently take the primary's mode numbering.
+Remaining: 17 sites, `#ifdef MT_BASE`, listed in `T173-BASE-HEADER.md`.
+
+Two cautions from that conversion, both caught only by a 47-back-end build:
+a back end's `.h` may not name a base (the shared `tm.h` includes
+`config/i386/i386.h`, so converting one breaks ~520 shared TUs); and 8 bad
+include orders amplified into 251 diagnostics from one cause.
+
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
 
