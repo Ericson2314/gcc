@@ -1529,7 +1529,17 @@ MULTI_TARGET_INC =
 # some back end later collides silently: libbackend.a is an archive, so a
 # duplicate is diagnosed only when both members happen to be pulled in for
 # other reasons -- `ld' once reported 7 of 40.  The check is an `nm' sweep over
-# the two object SETS (scratchpad/sweep.sh), never the linker.
+# the per-base object sets, never the linker.
+#
+# THAT SENTENCE USED TO NAME `scratchpad/sweep.sh', WHICH HAD NEVER BEEN
+# WRITTEN -- and a comment naming a guard reads as evidence the guard ran.  It
+# also said "the TWO object SETS", which is the two-back-end habit written into
+# the very instrument meant to police it: a list sized on today's pair expires
+# the moment a third base is configured.  The check is now
+# scratchpad/t155-rename-gap.sh, which sweeps every configured base and refuses
+# to score when `nm' read nothing or when a base contributed no symbols at all
+# -- under `make -k' a back end that never built and one that collides with
+# nothing are the same silence.
 #
 #   targetm                 the hook table.  Renaming it is not enough on its
 #			    own: the middle end reads the bare name, so
@@ -1699,14 +1709,63 @@ MULTI_TARGET_INC =
 #			    only consumer, is already a targetm_regs read -- so
 #			    it is the purest rename of the six.
 #
-#			    Checks: scratchpad/sweep.sh compares the per-base
-#			    object sets pairwise and reports every colliding
-#			    strong symbol by name (three-base reading: aarch64 vs
-#			    i386 none, i386 vs riscv none, aarch64 vs riscv
-#			    exactly this one).  scratchpad/t150-rename-gap.sh is
-#			    the N-way replacement, because sweep.sh compares TWO
+#			    Checks: scratchpad/t155-rename-gap.sh sweeps EVERY
+#			    configured base and reports each colliding strong
+#			    symbol with how many bases define it (three-base
+#			    reading: aarch64 vs i386 none, i386 vs riscv none,
+#			    aarch64 vs riscv exactly this one).  It supersedes
+#			    scratchpad/t150-rename-gap.sh, which refuses any
+#			    build dir not named for the worktree that wrote it;
+#			    and both supersede a `sweep.sh' that compared TWO
 #			    object sets -- the two-back-end habit written into
-#			    the very instrument meant to police it.
+#			    the very instrument meant to police it -- AND THAT
+#			    HAD NEVER BEEN WRITTEN AT ALL.
+#
+#   THE N-WAY SWEEP (task #155).  Everything above this line was sized on
+#			    i386 + aarch64 plus what a third and a fourth base
+#			    found.  The names at the END of the list below are
+#			    what a 48-BACK-END sweep adds: for each of them BOTH
+#			    definers are back ends that pair never configures,
+#			    so not one could have been found by the pair
+#			    everything on this branch is built with.
+#
+#			    Measured population, over all 48 configured bases:
+#			    64 colliding hand-written names, of which 7 are the
+#			    deliberate mt_probe_* register probes -- compiled,
+#			    never linked, so benign.
+#
+#			    THE GENERATED HALF IS NOW CHECKED RATHER THAN
+#			    ASSERTED.  "Everything the generators emit is dealt
+#			    with by namespace insn_<base>" was a written
+#			    invariant; scratchpad/t155-gen-arm.sh tests it, and
+#			    across 48 bases reads 163,162 generated definitions
+#			    with ZERO collisions.
+#
+#			    THREE POPULATIONS THAT LOOK LIKE THIS ONE AND ARE
+#			    NOT, each measured rather than assumed:
+#			    gt_ggc_mx/gt_pch_nx (aarch64, arm, riscv) are C++
+#			    OVERLOADS on distinct parameter types -- already
+#			    distinct symbols -- and gengtype's shared output
+#			    calls them by the bare name, so renaming would BREAK
+#			    a working thing.  main, tool_cleanup and
+#			    maybe_unlink collide only across SEPARATE PROGRAMS
+#			    (gcn-run, nvptx-run, collect2, lto-wrapper), which
+#			    are never linked together.  host_detect_local_cpu is
+#			    bare in 8 back ends and IS latent, but it is
+#			    driver-side, already has a selector, and belongs to
+#			    the target-specs -march=native work.
+#
+#			    STILL OPEN, and the largest item is ONE CAUSE and
+#			    not twenty names: config/arm/aarch-common.cc is in
+#			    aarch64's extra_objs (config.gcc:377) AND arm's
+#			    (config.gcc:424), so every external it defines
+#			    collides -- exactly the config/linux.cc shape three
+#			    lines of this list already exist for.  Seven of its
+#			    24 are here; see scratchpad/t155-QUEUE.md for the
+#			    rest and for the one of them that carries a real
+#			    question (make_pass_insert_bti is a pass
+#			    constructor, registered from BOTH arm-passes.def and
+#			    aarch64-passes.def).
 MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
@@ -1727,7 +1786,40 @@ MULTI_TARGET_RENAME_NAMES = \
   aarch_pac_insn_p \
   linux_libc_has_function \
   linux_libm_function_max_error \
-  linux_fortify_source_default_level
+  linux_fortify_source_default_level \
+  legitimize_tls_address \
+  init_cumulative_args \
+  symbolic_reference_mentioned_p \
+  symbol_mentioned_p \
+  label_mentioned_p \
+  tls_mentioned_p \
+  nonpic_symbol_mentioned_p \
+  pic_address_needs_scratch \
+  tls_symbolic_operand \
+  small_data_operand \
+  simple_memory_operand \
+  direct_return \
+  split_di \
+  prepare_move_operands \
+  expand_move \
+  expand_block_move \
+  gen_compare_reg \
+  final_prescan_insn \
+  compute_frame_size \
+  reg_unused_after \
+  empty_delay_slot \
+  machopic_output_stub \
+  output_move_double \
+  output_move_single \
+  output_cbranch \
+  output_ubranch \
+  output_sibcall \
+  output_shift_loop \
+  output_call \
+  output_ascii \
+  require_derived_vector_type \
+  require_derived_scalar_type \
+  finish_opt_n_resolution
 
 MULTI_TARGET_RENAMES =
 
