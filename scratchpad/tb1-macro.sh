@@ -15,7 +15,21 @@ case "$D" in
   */b-agent-aab545de8b02de843*) ;;
   *) echo "FATAL: build dir $D is not named for this worktree"; exit 9 ;;
 esac
-[ -f "$D/make-top.rc" ] || { echo "FATAL: $D/make-top.rc absent -- unstamped log"; exit 9; }
+# THE PRECONDITION IS THE OBJECT, NOT THE `.rc' STAMP, AND THE DIFFERENCE IS
+# WHAT EACH ONE PROTECTS.  The stamp exists because a COUNT taken over a
+# truncated log is silently short (PRINCIPLES section 4: "a log being written
+# looks exactly like a log that finished").  This harness takes no count: it
+# re-runs ONE recipe as a preprocessor pass.  What that depends on is the
+# recipe being whole, and the object's existence is a stronger witness of that
+# than the stamp -- make wrote it, so the line was complete and the compiler
+# accepted it.  A half-written recipe cannot produce an object, and the
+# macro-count floor below catches the case where the reconstruction is wrong
+# anyway.
+#
+# Stated rather than quietly relaxed, because "this arm does not need the
+# stamp" is exactly the kind of exemption that gets claimed for an arm that
+# does.  If you add a count to this script, put the stamp check back.
+[ -f "$D/gcc/$O" ] || { echo "FATAL: $D/gcc/$O has not been built; nothing to read"; exit 9; }
 S=$(cd "$(dirname "$0")" && pwd)
 LOG="$D/tb1-joined.log"
 awk '{ if (buf != "") $0 = buf " " $0; if (sub(/\\$/, "")) { buf = $0; next } buf = ""; print }' \

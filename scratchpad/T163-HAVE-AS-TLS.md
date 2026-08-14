@@ -47,6 +47,25 @@ the before side.
   `as_tls` is an unknown key and `read_target_caps` drops it silently, so
   "TLS still works" and "the capability is not wired" are the same output.
 
+- **The macro is a run-time read in the compiler proper, both-sided, on the
+  SAME object name.** `tb1-macro.sh`, reading each object's own recipe with
+  `-E -dM` so `<ABSENT>` and `0` stay distinguishable:
+
+  ```
+                            HAVE_AS_TLS          HAVE_AS_DTPREL_RELOC
+  before  mt-i386/i386-c.o        1                      1
+  after   mt-i386/i386-c.o   (targ_caps.as_tls)   (targ_caps.as_dtprel_reloc)
+  after   mt-aarch64/aarch64-c.o  ditto                  ditto
+  after   mt-rs6000/rs6000-c.o    ditto                  ditto
+  ```
+
+  Its precondition is **the object, not the `.rc` stamp**, and that is
+  deliberate: the stamp exists because a *count* over a truncated log is
+  silently short, and this arm takes no count -- it re-runs one recipe. The
+  object's existence is the stronger witness that the recipe was whole. Said
+  out loud in the script, because "this arm does not need the stamp" is the
+  sort of exemption that gets claimed next for an arm that does.
+
 **NOT MEASURED, and this is the work queue, not a claim.** The 47-base build
 and a 3-base `i386 + aarch64 + rs6000` build were both still in the
 libbackend/frontend compile phase when this was written — the host was at load
@@ -56,15 +75,16 @@ hour. Neither produced a `cc1`, so:
 - **the AFTER side of `tb1-tls.sh` is unrun.** Run it on any build of
   `e35cbd1f730` or later; it must report `as_tls 1` → real TLS, `as_tls 0` →
   `__emutls`. Anything else is a failure and the script says which.
-- **the AFTER side of `tb1-macro.sh` is unrun.** `HAVE_AS_TLS` must read
-  `(targ_caps.as_tls)` in a compiler-proper object, against the `1` recorded
-  above.
-- **the hand-written back-end edits are compiled only as headers so far.** The
-  18 unwrapped hook-table guards and the 7 `TARGET_HAVE_TLS HAVE_AS_TLS` →
-  `true` conversions live in `mt-<cpu>/<cpu>.o`, a phase neither build
-  reached. `arc`, `m68k`, `microblaze`, `or1k`, `pa`, `sh`, `ia64`, `alpha`,
-  `frv`, `loongarch`, `mips`, `xtensa`, `s390`, `riscv`, `arm`, `sparc`,
-  `rs6000`, `aarch64`, `i386` are the files to watch.
+- **the hand-written back-end edits are compiled only in part.** `<cpu>-c.o`
+  built for i386, aarch64 and rs6000; the 18 unwrapped hook-table guards and
+  the 7 `TARGET_HAVE_TLS HAVE_AS_TLS` → `true` conversions live in
+  `mt-<cpu>/<cpu>.o`, which neither build reached. `arc`, `m68k`,
+  `microblaze`, `or1k`, `pa`, `sh`, `ia64`, `alpha`, `frv`, `loongarch`,
+  `mips`, `xtensa`, `s390`, `riscv`, `arm`, `sparc`, `rs6000`, `aarch64`,
+  `i386` are the files to watch. The likeliest failure is a `TARGET_HAVE_TLS`
+  left as `HAVE_AS_TLS` somewhere this census did not see: that is now a
+  non-constant in a static initializer, so it fails at the
+  `TARGET_INITIALIZER` line naming a macro nowhere near the edit.
 - the one `error:` in the 47-base log is
   `build/gen-target-specs-amdgcn_unknown_amdhsa.o: gtype-desc.h: No such file`,
   the `-k` ordering artefact already recorded in `T157-STUBS.md:534`,
