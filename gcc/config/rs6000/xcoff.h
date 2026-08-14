@@ -101,9 +101,10 @@
 #define TARGET_ASM_FUNCTION_RODATA_SECTION default_no_function_rodata_section
 #define TARGET_STRIP_NAME_ENCODING  rs6000_xcoff_strip_name_encoding
 #define TARGET_SECTION_TYPE_FLAGS  rs6000_xcoff_section_type_flags
-#ifdef HAVE_AS_TLS
+/* Unconditional; see the note on the definition in rs6000.cc.  The guard was
+   `#ifdef HAVE_AS_TLS', always true, and keeping it would have left this
+   naming a function the source no longer defines.  */
 #define TARGET_ENCODE_SECTION_INFO rs6000_xcoff_encode_section_info
-#endif
 #define ASM_OUTPUT_ALIGNED_DECL_COMMON  rs6000_xcoff_asm_output_aligned_decl_common
 #define ASM_OUTPUT_ALIGNED_DECL_LOCAL  rs6000_xcoff_asm_output_aligned_decl_common
 #define ASM_OUTPUT_ALIGNED_BSS  rs6000_xcoff_asm_output_aligned_decl_common
@@ -223,12 +224,14 @@
 #define COMMON_ASM_OP "\t.comm "
 #define LOCAL_COMMON_ASM_OP "\t.lcomm "
 
-#ifdef HAVE_AS_TLS
+/* Unconditional, for the same reason defaults.h's copy of this macro is: the
+   guard was always true, and the only caller -- varasm.cc's emit_tls_common,
+   a noswitch callback for tls_comm_section -- is unreachable unless the
+   target is emitting thread-local common data.  */
 #define ASM_OUTPUT_TLS_COMMON(FILE, DECL, NAME, SIZE)   \
   do { \
        rs6000_xcoff_asm_output_aligned_decl_common ((FILE), (DECL), (NAME), (SIZE), 0); \
   } while (0)
-#endif
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define SET_ASM_OP "\t.set "

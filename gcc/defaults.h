@@ -124,7 +124,22 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TLS_COMMON_ASM_OP ".tls_common"
 #endif
 
-#if defined (HAVE_AS_TLS) && !defined (ASM_OUTPUT_TLS_COMMON)
+/* THE `defined (HAVE_AS_TLS) &&' THAT USED TO GUARD THIS IS GONE, AND DROPPING
+   IT IS A NO-OP TODAY.  HAVE_AS_TLS came from an unconditional AC_DEFINE, so
+   the arm was always taken; keeping the guard while the macro becomes
+   `targ_caps.as_tls' would have been worse than useless, because by the time
+   this line is read the redirect has not happened yet -- mkconfig.sh appends
+   defaults.h LAST, and the capability block is a thousand lines below.  The
+   test would have silently gone FALSE and taken the definition with it, which
+   is the "#if on an undefined name evaluates false" trap in PRINCIPLES
+   section 4 rather than a decision.
+
+   Unconditional is also the right answer on its own terms: the only caller is
+   varasm.cc's emit_tls_common, a noswitch callback for tls_comm_section, which
+   nothing reaches unless the target is emitting thread-local common data --
+   and that already requires target_have_tls_p ().  Defining the spelling costs
+   nothing when TLS is off.  */
+#if !defined (ASM_OUTPUT_TLS_COMMON)
 #define ASM_OUTPUT_TLS_COMMON(FILE, DECL, NAME, SIZE)			\
   do									\
     {									\
@@ -1655,6 +1670,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define HAVE_AS_LTOFFX_LDXMOV_RELOCS (targ_caps.as_ltoffx_ldxmov_relocs)
 #undef HAVE_AS_MFCRF
 #define HAVE_AS_MFCRF (targ_caps.as_mfcrf)
+/* Thread-local storage.  Unlike its neighbours this one was an UNCONDITIONAL
+   `AC_DEFINE(HAVE_AS_TLS, 1)', so it reached every back end in every build and
+   the value here has to stay 1-shaped for that not to be a regression -- see
+   the note on .as_tls in target-caps.h.  The seven back-end headers that
+   carried `#ifndef HAVE_AS_TLS / #define HAVE_AS_TLS 0' floors were DEAD for
+   exactly that reason (auto-host.h got there first); they are scoped to
+   GENERATOR_FILE now and give 1, which is what gencondmd was already seeing.  */
+#undef HAVE_AS_TLS
+#define HAVE_AS_TLS (targ_caps.as_tls)
+#undef HAVE_AS_DTPREL_RELOC
+#define HAVE_AS_DTPREL_RELOC (targ_caps.as_dtprel_reloc)
 #undef HAVE_AS_POWER10_HTM
 #define HAVE_AS_POWER10_HTM (targ_caps.as_power10_htm)
 #undef HAVE_AS_REL16
@@ -1713,6 +1739,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    needs gencondmd to see a NON-constant, which the target-caps carrier does
    not offer a generator today.  */
 #define HAVE_AS_ENTRY_MARKERS 0
+/* 1, not 0, and deliberately unlike every other name in this block: those
+   were AC_DEFINEs that only existed when their back end was the configured
+   target, so 0 is what a target-library build always got.  HAVE_AS_TLS was
+   unconditional, so 0 here would be a change of value rather than a
+   restatement of one.  */
+#define HAVE_AS_TLS 1
+#define HAVE_AS_DTPREL_RELOC 1
 #define HAVE_AS_LTOFFX_LDXMOV_RELOCS 0
 #define HAVE_AS_MFCRF 0
 #define HAVE_AS_POWER10_HTM 0

@@ -561,10 +561,8 @@ static const scoped_attribute_specs *const ia64_attribute_table[] =
 #undef  TARGET_SECTION_TYPE_FLAGS
 #define TARGET_SECTION_TYPE_FLAGS  ia64_section_type_flags
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL ia64_output_dwarf_dtprel
-#endif
 
 /* ??? Investigate.  */
 #if 0

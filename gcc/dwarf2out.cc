@@ -16617,7 +16617,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	  dw_loc_descr_ref temp;
 
 	  /* If this is not defined, we have no way to emit the data.  */
-	  if (!targetm.have_tls || !targetm.asm_out.output_dwarf_dtprel)
+	  if (!target_have_tls_p () || !targetm.asm_out.output_dwarf_dtprel)
 	    break;
 
           temp = new_addr_loc_descr (rtl, dtprel_true);
@@ -19209,7 +19209,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
          enum dwarf_location_atom tls_op;
          enum dtprel_bool dtprel = dtprel_false;
 
-	  if (targetm.have_tls)
+	  if (target_have_tls_p ())
 	    {
 	      /* If this is not defined, we have no way to emit the
 		 data.  */

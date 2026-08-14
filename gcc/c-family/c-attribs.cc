@@ -2657,7 +2657,7 @@ handle_section_attribute (tree *node, tree name, tree args,
       }
 
   if (VAR_P (decl)
-      && !targetm.have_tls && targetm.emutls.tmpl_section
+      && !target_have_tls_p () && targetm.emutls.tmpl_section
       && DECL_THREAD_LOCAL_P (decl))
     {
       error ("section of %q+D cannot be overridden", *node);
@@ -3102,7 +3102,7 @@ handle_special_var_sec_attribute (tree *node, tree name, tree args,
     }
 
   if (VAR_P (decl)
-      && !targetm.have_tls && targetm.emutls.tmpl_section
+      && !target_have_tls_p () && targetm.emutls.tmpl_section
       && DECL_THREAD_LOCAL_P (decl))
     {
       error ("section of %q+D cannot be overridden", decl);

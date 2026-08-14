@@ -10690,7 +10690,7 @@ alpha_c_mode_for_floating_type (enum tree_index ti)
   alpha_multipass_dfa_lookahead
 
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
+#define TARGET_HAVE_TLS true
 
 #undef  TARGET_BUILTIN_DECL
 #define TARGET_BUILTIN_DECL  alpha_builtin_decl

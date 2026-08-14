@@ -2590,9 +2590,10 @@ dnl cfi advance, ...
 dnl --enable-newlib-nano-formatted-io mirrored a newlib configure flag so
 dnl GCC could gate features on it.
 
-dnl Thread-local storage.
-AC_DEFINE(HAVE_AS_TLS, 1,
-	  [Define if your assembler and linker support thread-local storage.])
+dnl Thread-local storage: `targ_caps.as_tls' and `.as_dtprel_reloc' now, probed
+dnl per target by target-specs/configure.  The unconditional AC_DEFINEs that
+dnl used to be here, and the note further down explaining why they had to stay,
+dnl are both gone; see the note below item 11 for what was wrong with it.
 
 
 dnl ---------------------------------------------------------------------------
@@ -2627,14 +2628,34 @@ dnl      architecture-extension probe.
 dnl  10. the DWARF 4 .debug_line cluster keyed on `case $cpu_type'.
 dnl  11. .lcomm with alignment.
 dnl
-dnl HAVE_AS_TLS and HAVE_AS_DTPREL_RELOC are NOT in that list.  Both are read
-dnl from `#if defined(...)' in generated .md TUs and in aarch64.cc, where
-dnl targ_caps is not in scope, so they stay build-time constants -- see the
-dnl reasoning kept above HAVE_AS_TLS.
+dnl  12. HAVE_AS_TLS and HAVE_AS_DTPREL_RELOC, which this note used to EXCLUDE
+dnl      from the list on a reason that was half right, and the wrong half was
+dnl      load-bearing.  It said both are read from `#if defined(...)' in
+dnl      generated .md TUs where targ_caps is not in scope, so they must stay
+dnl      build-time constants.  Two things wrong with that:
+dnl
+dnl      The .md TUs are not the problem.  genconditions.cc:179 emits
+dnl      `__builtin_constant_p (e) ? (int) e : -1' for every insn condition, so
+dnl      a NON-constant condition is legal and becomes a run-time test; and the
+dnl      final insn-*.cc are not generators, so targ_caps reaches them through
+dnl      tm.h -> defaults.h like anything else.  The only translation unit that
+dnl      genuinely cannot see targ_caps is build/gencondmd*.o, compiled
+dnl      -DGENERATOR_FILE, where defaults.h:33 guards target-caps.h out -- and
+dnl      the branch already had a shape for that, the `#if defined
+dnl      (GENERATOR_FILE)' blocks in rs6000.h and friends.  Seven back-end
+dnl      headers now carry HAVE_AS_TLS in exactly that form.
+dnl
+dnl      And `#if defined(...)' was never a reason to keep a probe, it was the
+dnl      description of a consumer that had to be restructured -- the same work
+dnl      every other name in this list needed.  The 33 preprocessor sites are
+dnl      C++ now; twenty of them were one pattern, `#ifdef HAVE_AS_TLS /
+dnl      #define TARGET_HAVE_TLS true' inside a hook table, which is two
+dnl      questions conjoined at the wrong end.  TARGET_HAVE_TLS is the back
+dnl      end's static "do I have a TLS sequence", targ_caps.as_tls is the
+dnl      deployed assembler's "will I accept it", and target_have_tls_p ()
+dnl      ANDs them -- the shape defaults.h already uses for
+dnl      TARGET_SUPPORTS_WEAK.
 dnl ---------------------------------------------------------------------------
-
-AC_DEFINE(HAVE_AS_DTPREL_RELOC, 1,
-	[Define if your assembler supports DTPREL relocation.])
 
 
 

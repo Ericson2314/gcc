@@ -1294,10 +1294,8 @@ do {									     \
 #define CANONICALIZE_FUNCPTR_FOR_COMPARE_LIBCALL \
   "__canonicalize_funcptr_for_compare"
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 /* The maximum offset in bytes for a PA 1.X pc-relative call to the
    head of the preceding stub table.  A long branch stub is two or three

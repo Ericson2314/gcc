@@ -789,10 +789,8 @@ TARGET_GNU_ATTRIBUTES (arc_attribute_table,
 #undef TARGET_ASM_ALIGNED_SI_OP
 #define TARGET_ASM_ALIGNED_SI_OP "\t.word\t"
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
-#endif
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_DWARF_REGISTER_SPAN
 #define TARGET_DWARF_REGISTER_SPAN arc_dwarf_register_span

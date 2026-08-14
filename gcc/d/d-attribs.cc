@@ -1073,7 +1073,7 @@ d_handle_section_attribute (tree *node, tree name, tree args, int flags,
     }
 
   if (VAR_P (*node)
-      && !targetm.have_tls && targetm.emutls.tmpl_section
+      && !target_have_tls_p () && targetm.emutls.tmpl_section
       && DECL_THREAD_LOCAL_P (*node))
     {
       error ("section of %q+D cannot be overridden", *node);

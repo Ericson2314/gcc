@@ -24856,13 +24856,11 @@ $as_echo "#define HAVE_ATTRIBUTE_ALIAS 1" >>confdefs.h
 
 
 
-$as_echo "#define HAVE_AS_TLS 1" >>confdefs.h
 
 
 
 
 
-$as_echo "#define HAVE_AS_DTPREL_RELOC 1" >>confdefs.h
 
 
 

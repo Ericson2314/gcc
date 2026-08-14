@@ -2818,6 +2818,33 @@ case ${target} in
   alpha*-dec-*vms* | ia64-hp-*vms*) ts_vms_debug=yes ;;
 esac
 
+dnl Thread-local storage, and the DTPREL relocation that travels with it.
+dnl
+dnl NOT PROBED, AND `yes' IS THE ANSWER UPSTREAM ALREADY GAVE.  gcc/configure.ac
+dnl carried an UNCONDITIONAL `AC_DEFINE(HAVE_AS_TLS, 1)' -- the per-target
+dnl assembler probe had been deleted long before -- so every back end in every
+dnl build got 1.  Defaulting to `no' here would not be conservative; it would
+dnl silently move 19 back ends off real TLS and onto emutls.
+dnl
+dnl THE ONE CONFIGURATION THAT SAID OTHERWISE SAID IT PER TRIPLE, WHICH IS THE
+dnl WHOLE REASON THIS IS A CAPABILITY AND NOT A HOOK.  config/i386/lynx.h and
+dnl config/rs6000/lynx.h each `#undef HAVE_AS_TLS' back to 0 -- and one i386
+dnl back end serves both lynx and everything else, so a per-back-end answer
+dnl cannot express it.  Same shape as vms_debug above.  Those two headers no
+dnl longer touch the macro; this case is where their answer lives now.
+dnl
+dnl A REAL PROBE IS STILL OWED and is deliberately not written here: upstream's
+dnl was a `case $target' over about twenty per-architecture asm snippets
+dnl (`.tbss'/@tlsgd/@tprel spellings differ per machine), and guessing at those
+dnl would produce a probe that fails for the wrong reason -- reported as "this
+dnl assembler has no TLS" -- which is worse than the honest default.  The key
+dnl exists and is read, so adding the snippets later changes nothing else.
+ts_as_tls=yes
+ts_as_dtprel_reloc=yes
+case ${target} in
+  *-*-lynxos*) ts_as_tls=no; ts_as_dtprel_reloc=no ;;
+esac
+
 dnl --- Toolchain-vendor requirements that used to abort gcc/configure.
 dnl
 dnl All three of these were `exit 1' or AC_MSG_ERROR in gcc/configure.ac, which
@@ -2938,6 +2965,8 @@ gas_balign_and_p2align `ts_bool "$gcc_cv_as_balign_and_p2align"`
 gas_max_skip_p2align `ts_bool "$gcc_cv_as_max_skip_p2align"`
 gas_literal16 `ts_bool "$gcc_cv_as_literal16"`
 gas_subsection_ordering `ts_bool "$gcc_cv_as_subsection_m1"`
+as_tls `ts_bool "$ts_as_tls"`
+as_dtprel_reloc `ts_bool "$ts_as_dtprel_reloc"`
 gas_weak `ts_bool "$gcc_cv_as_weak"`
 gas_weakref `ts_bool "$gcc_cv_as_weakref"`
 gas_nsubspa_comdat `ts_bool "$gcc_cv_as_nsubspa_comdat"`
@@ -3190,7 +3219,7 @@ ts_expected="target leb128 decimal_float decimal_bid_format
   ld_avr_avrxmega4_flmap
   ld_now ld_relro lto_plugin ld_demangle
   ld_static_option ld_dynamic_option gas_balign_and_p2align gas_max_skip_p2align
-  gas_literal16 gas_subsection_ordering gas_weak gas_weakref
+  gas_literal16 gas_subsection_ordering gas_weak gas_weakref as_tls as_dtprel_reloc
   gas_nsubspa_comdat gas_base64 gas_cv_ucomp gas_lcomm_with_alignment
   gas_section_exclude gas_shf_gnu_retain gas_section_link_order gas_shf_merge
   use_as_traditional_format as_mmacosx_version_min as_macos_build_version as_mfcrf

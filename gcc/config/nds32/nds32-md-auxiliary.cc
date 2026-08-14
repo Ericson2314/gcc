@@ -3654,7 +3654,7 @@ nds32_long_call_p (rtx symbol)
 bool
 nds32_tls_referenced_p (rtx x)
 {
-  if (!targetm.have_tls)
+  if (!target_have_tls_p ())
    return false;
 
   if (GET_CODE (x) == CONST && GET_CODE (XEXP (x, 0)) == PLUS)

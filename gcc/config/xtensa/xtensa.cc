@@ -293,7 +293,7 @@ static tree xtensa_handle_force_l32_attribute (tree *, tree, tree, int, bool *);
 #define TARGET_SECONDARY_RELOAD xtensa_secondary_reload
 
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM xtensa_cannot_force_const_mem
@@ -688,7 +688,7 @@ constantpool_mem_p (rtx op)
 static bool
 xtensa_tls_symbol_p (rtx x)
 {
-  if (! targetm.have_tls)
+  if (! target_have_tls_p ())
     return false;
 
   return SYMBOL_REF_P (x) && SYMBOL_REF_TLS_MODEL (x) != 0;
@@ -2466,7 +2466,7 @@ xtensa_mode_dependent_address_p (const_rtx addr,
 bool
 xtensa_tls_referenced_p (rtx x)
 {
-  if (! targetm.have_tls)
+  if (! target_have_tls_p ())
     return false;
 
   subrtx_iterator::array_type array;

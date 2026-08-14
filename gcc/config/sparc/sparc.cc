@@ -788,10 +788,13 @@ char sparc_hard_reg_printed[8];
 #undef TARGET_FOLD_BUILTIN
 #define TARGET_FOLD_BUILTIN sparc_fold_builtin
 
-#if TARGET_TLS
+/* Unconditional: this states that sparc HAS a TLS code sequence, which is a
+   property of the back end.  Whether the assembler accepts it is
+   targ_caps.as_tls, ANDed in by target_have_tls_p ().  The `#if TARGET_TLS'
+   that used to be here expanded to `#if HAVE_AS_TLS', which is now
+   `(targ_caps.as_tls)' -- an identifier on a `#if' line, i.e. silently 0.  */
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM sparc_cannot_force_const_mem
@@ -2307,7 +2310,7 @@ sparc_expand_move (machine_mode mode, rtx *operands)
     }
 
   /* Fix up TLS cases.  */
-  if (TARGET_HAVE_TLS
+  if (target_have_tls_p ()
       && CONSTANT_P (operands[1])
       && sparc_tls_referenced_p (operands [1]))
     {
@@ -4702,7 +4705,7 @@ sparc_tls_got (void)
 static bool
 sparc_tls_referenced_p (rtx x)
 {
-  if (!TARGET_HAVE_TLS)
+  if (!target_have_tls_p ())
     return false;
 
   if (GET_CODE (x) == CONST && GET_CODE (XEXP (x, 0)) == PLUS)

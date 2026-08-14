@@ -6992,7 +6992,7 @@ contains_constant_pool_address_p (const_rtx x)
 bool
 tls_referenced_p (const_rtx x)
 {
-  if (!targetm.have_tls)
+  if (!target_have_tls_p ())
     return false;
 
   subrtx_iterator::array_type array;

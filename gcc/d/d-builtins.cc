@@ -457,7 +457,7 @@ d_init_versions (void)
   else if (targetm_common->except_unwind_info (&global_options) == UI_DWARF2)
     VersionCondition::addPredefinedGlobalIdent ("GNU_DWARF2_Exceptions");
 
-  if (!targetm.have_tls)
+  if (!target_have_tls_p ())
     VersionCondition::addPredefinedGlobalIdent ("GNU_EMUTLS");
 
   if (STACK_GROWS_DOWNWARD)

@@ -458,7 +458,7 @@ static bool frv_modes_tieable_p			(machine_mode, machine_mode);
 #define TARGET_CANNOT_FORCE_CONST_MEM frv_cannot_force_const_mem
 
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_STRUCT_VALUE_RTX
 #define TARGET_STRUCT_VALUE_RTX frv_struct_value_rtx
@@ -487,10 +487,8 @@ static bool frv_modes_tieable_p			(machine_mode, machine_mode);
 #undef TARGET_EXPAND_BUILTIN_VA_START
 #define TARGET_EXPAND_BUILTIN_VA_START frv_expand_builtin_va_start
 
-#if HAVE_AS_TLS
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL frv_output_dwarf_dtprel
-#endif
 
 #undef TARGET_CLASS_LIKELY_SPILLED_P
 #define TARGET_CLASS_LIKELY_SPILLED_P frv_class_likely_spilled_p

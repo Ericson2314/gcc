@@ -12346,10 +12346,8 @@ loongarch_output_asm_load_canary (rtx reg, rtx canary, rtx tmp)
 #define TARGET_EXPAND_BUILTIN loongarch_expand_builtin
 
 /* The generic ELF target does not always have TLS support.  */
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
-#endif
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM loongarch_cannot_force_const_mem

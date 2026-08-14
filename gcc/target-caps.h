@@ -327,6 +327,52 @@ struct target_caps
      unconditionally.  */
   bool gas_weak;
 
+  /* Assembler and linker support thread-local storage.  Was HAVE_AS_TLS.
+
+     THE SPLIT IS THE SAME ONE gas_weak FORCED OPEN, AND IT IS WHY THIS IS A
+     CAPABILITY RATHER THAN A HOOK.  `TARGET_HAVE_TLS' -- the targetm hook --
+     asks whether THIS BACK END HAS A TLS CODE SEQUENCE AT ALL, which is a
+     static property of the back end and cannot change without rebuilding.
+     This field asks whether THE ASSEMBLER IN FRONT OF US ACCEPTS the
+     relocations that sequence needs, which is a property of the deployed
+     toolchain.  Upstream conflated them because both were one constant read
+     out of auto-host.h; every back end that wrote
+
+         #ifdef HAVE_AS_TLS
+         #define TARGET_HAVE_TLS true
+         #endif
+
+     was stating the first and gating it on the second.  The hook is now
+     defined unconditionally and the two are ANDed at the consumer, in
+     target_have_tls_p () -- exactly the shape of
+
+         #define TARGET_SUPPORTS_WEAK (SUPPORTS_WEAK && targ_caps.gas_weak)
+
+     in defaults.h.
+
+     KEPT true, and that is the answer upstream gives too: gcc/configure.ac
+     carried an UNCONDITIONAL `AC_DEFINE(HAVE_AS_TLS, 1)' -- the per-target
+     assembler probe had already been deleted -- so every back end in every
+     build got 1 from it.  `true' is therefore each back end's own former
+     answer rather than any other back end's, which is the test PRINCIPLES
+     section 2a sets for a default.
+
+     The one configuration that said otherwise said it per TRIPLE and not per
+     back end: config/i386/lynx.h and config/rs6000/lynx.h each `#undef'd the
+     macro back to 0, and one i386 back end has to hold both answers.  That is
+     the vms_debug shape, and it is why this cannot live in targetm; it is a
+     `case $target' in target-specs/configure.ac now.  */
+  bool as_tls;
+
+  /* Assembler supports DTPREL relocations, i.e. it can spell a link-time
+     dtprel(symbol) in a data directive so DWARF can describe the address of a
+     thread-local variable.  Was HAVE_AS_DTPREL_RELOC, and it travels with
+     as_tls: config/aarch64/aarch64.cc is the only consumer and tests the two
+     jointly, because a DW_OP_GNU_push_tls_address location needs both the
+     code sequence and the relocation.  Same unconditional `AC_DEFINE(..., 1)'
+     upstream, so `true' is again each back end's own former answer.  */
+  bool as_dtprel_reloc;
+
   /* Assembler accepts `.weakref'.  Was HAVE_GAS_WEAKREF.  Kept distinct from
      the new TARGET_USE_WEAKREF policy macro: pa/som.h does not want .weakref
      even though gas there accepts it, and it used to say so by pretending the

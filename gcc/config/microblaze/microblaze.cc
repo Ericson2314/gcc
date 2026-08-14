@@ -235,10 +235,8 @@ static void microblaze_elf_asm_destructor (rtx, int) ATTRIBUTE_UNUSED;
 
 section *sdata2_section;
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 /* MicroBlaze does not do speculative execution.  */
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE

@@ -774,6 +774,15 @@ if (union_file != "") {
 	# TLS quietly off in six back ends.  A rename fixes the names that
 	# collide today and leaves that shape intact for the next one.
 	#
+	# THE HAVE_AS_TLS HALF OF THAT EXAMPLE IS HISTORY NOW AND THE ARGUMENT
+	# IS NOT.  Those seven floors are gone: HAVE_AS_TLS is
+	# `targ_caps.as_tls' (defaults.h), and what the back-end headers still
+	# carry is a `#if defined (GENERATOR_FILE)' block for gencondmd, which
+	# no options header can reach.  So the example no longer reproduces --
+	# and it was never load-bearing for this block, which is scoped by
+	# construction rather than by a list of names.  The pa/pa.h
+	# TARGET_64BIT row still reproduces exactly as written.
+	#
 	# So the header does what it was always supposed to do and no more:
 	# every back end sees its OWN headers' macros and nobody else's.  This
 	# is not a rename, needs no back-end edit, and does not expire -- a
