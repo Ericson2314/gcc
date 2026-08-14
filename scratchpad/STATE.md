@@ -13924,3 +13924,123 @@ Two pre-existing configure diagnostics were seen and NOT chased or silenced:
 `gcc/configure` line 24589 and 24612 `test: =: unary operator expected`.
 PRINCIPLES records that shape as having twice meant a silent truncation.
 
+
+# TASK #136 -- THE BARE `gen_*` NAMES: THREE SELECTED, ONE ALREADY DISSOLVED
+
+Built twice from immutable snapshots (`t136-snap.sh`, `git archive`, no `.git`
+in the snapshot at all), two bases, anchor **55** measured on the snapshot:
+
+| build | snapshot sha | `make cc1` |
+|---|---|---|
+| before | `b62e0fdd883` | rc 0 |
+| after  | `a626931d29b` | rc 0 |
+
+## 1. THE DEFECT, READ FROM A COMPILED FUNCTION
+
+`nm` cannot see this one. The wrong answer **links**, so a symbol-table arm
+scores definitions and reports nothing. The instrument is five lines at `-O2
+-fstack-clash-protection` (`t136-blockage.c`, `t136-blockage.sh`), read out of
+the `expand` dump:
+
+```
+before   x86_64   (unspec_volatile [(const_int 0)] UNSPECV_BLOCKAGE)   cc1 rc 0
+         aarch64  (unspec_volatile [(const_int 0)] UNSPECV_GET_FPCR)   cc1 rc 4
+after    x86_64   (unspec_volatile [(const_int 0)] UNSPECV_BLOCKAGE)   cc1 rc 0
+         aarch64  (unspec_volatile [(const_int 0)] UNSPECV_BLOCKAGE)   cc1 rc 0
+```
+
+`UNSPECV_BLOCKAGE` is 1 for i386 and 5 for aarch64. **`UNSPECV_GET_FPCR` is
+what aarch64's own printer calls the number 1** -- the rtx carried i386's
+number into aarch64's vocabulary. The wanted numbers are read out of the
+build's own `insn-constants-<base>.h`, so an md change moves the bar rather
+than invalidating it silently.
+
+**`-fstack-clash-protection` is what made it loud.** Without it the same defect
+is silent; with it aarch64 ICEs at the vregs pass with `unrecognizable insn`.
+The flag is the difference between "a bug you find under gdb" and "a bug that
+names itself", and it cost nothing to find -- explow.cc's blockage sites are
+all on the stack-probe path.
+
+## 2. WHAT WAS ACTUALLY TWO PROBLEMS
+
+* **Who answers.** `genemit` now declines to write `gen_blockage`, `gen_nop`
+  and `gen_speculation_barrier` in the un-namespaced run -- the `add_clobbers`
+  move of `a1b3d77c222` -- so `multi-target-select.cc` can define the bare
+  names as forwarders without colliding with `$(INSNEMIT_SEQ_O)`.
+* **Who decides they are called at all.** This was `HAVE_*` out of the
+  **singular** `insn-flags.h`, i.e. one back end deciding for all of them. Each
+  back end now answers through an `mt_md_entry_points` that `genemit` writes
+  into its own `insn-emit-<base>.cc`, where **a null pointer is a real answer**:
+  `blockage` absent gives `gen_asm_input_blockage ()` (the expansion
+  `emit-rtl.cc` gave such a back end under the `#if` that is now gone),
+  `speculation_barrier` absent gives silence and a false hook, `nop` absent
+  gives `internal_error` naming the back end.
+
+`HAVE_speculation_barrier` is a **runtime** condition in general -- genflags
+emits the pattern's md condition, not just `1` -- and the hook reads it as one,
+so the condition travels as a generated predicate rather than as the pointer's
+non-nullness.
+
+Mechanism arm (`t136-nm.sh`), all three names:
+
+```
+before   insn-emit-1.o / -2.o / -8.o   (the singular, un-namespaced file)
+after    multi-target-select.o
+```
+
+## 3. THE FOURTH NAME WAS STALE, AND ONLY A RE-MEASUREMENT SAYS SO
+
+The brief and three source comments carried `gen_movxf <- reg-stack.o`.
+`reg-stack.cc` no longer contains that call: the body moved to
+`target-regstack.cc`, compiled once per back end. Re-measured with `nm -CA
+--undefined-only` over every object in the link:
+
+```
+insn-output-i386.o        U insn_i386::gen_movxf (rtx, rtx)
+target-regstack-i386.o    U insn_i386::gen_movxf (rtx, rtx)
+```
+
+Both namespaced, both per-base. **No shared object names the bare symbol.** The
+`::gen_movxf` the singular insn-emit still defines is dead weight, not a leak,
+and the design question the handover reserved for a ruling had already been
+dissolved by the `target-regstack` split.
+
+## 4. BARS
+
+```
+x86_64  -O2 big.c   12369 bytes  md5 378fc33c1e70   before AND after, identical
+specs-config        wc -l 230    md5 a6c4c68bdf33   before AND after
+aarch64 -O2 big.c   12196 bytes  md5 9edf6aa6616c   before AND after, identical
+```
+
+**The brief expected aarch64's output to change and it does not.** `big.c` never
+reaches a blockage, so it is not a witness for this defect -- which is exactly
+why the defect survived every bar this branch has quoted. The change is visible
+only in the function that emits one. (The 12196 differs from PRINCIPLES'
+12210, which was taken at `70c9d9b3194`; it is identical on both sides of this
+change, so it is inherited, not caused here.)
+
+## 5. TWO THINGS THAT FAILED FIRST, BOTH BY NAME
+
+* **A namespace-scope `const` object has INTERNAL linkage in C++.** The first
+  table generated without `extern` on the definition, and the link failed with
+  `undefined reference to insn_aarch64::mt_md_entry_table` -- loud, named, one
+  rebuild.
+* **`nm` without `-C` matched nothing.** These are C++ symbols
+  (`_Z12gen_blockagev`); a grep written against the C spelling reads exactly
+  like "the name is already gone". The script now demangles and anchors on
+  `NAME(`.
+
+## 6. WHAT THIS DOES NOT CLAIM
+
+* **Two bases only.** Every `mt_md_entry_points` measured here is a back end
+  that HAS all three patterns, so the null-pointer arms -- the generic
+  ASM_INPUT, the absent barrier, the `nop` error -- are **written and not
+  exercised**. A base lacking one of the three is the arm that would exercise
+  them, and none was configured.
+* The **declarations** of `gen_nop` / `gen_speculation_barrier` reaching shared
+  code still come from the singular `insn-flags.h` for anything that does not
+  include `multi-target-md-entry.h`; the header now declares them for the
+  callers that do, so a primary without the pattern no longer leaves a shared
+  caller undeclared. This was not tested with such a primary.
+* No testsuite was run.

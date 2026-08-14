@@ -861,7 +861,7 @@ selected_partial_vectors_supported_p (void)
      gen_nop                    <- cfgrtl.o except.o targhooks.o         DONE
                                    varasm.o
      gen_speculation_barrier    <- targhooks.o                           DONE
-     gen_movxf                  <- reg-stack.o                           OPEN
+     gen_movxf                  <- reg-stack.o                           STALE
 
    gen_blockage is the one with a measured wrong answer behind it.
    UNSPECV_BLOCKAGE is 1 for i386 and 5 for aarch64, so aarch64 emitted an
@@ -902,12 +902,22 @@ selected_partial_vectors_supported_p (void)
 			  varasm.cc) calls it unconditionally, so there is no
 			  guard to carry and nothing to fall back to.
 
-   gen_movxf IS STILL THE PRIMARY'S.  Its only caller is reg-stack.cc, x87
-   code; i386 defines the pattern and aarch64 does not, so a uniform forwarder
-   would have to invent an answer for aarch64.  The user has ruled on the
-   shape -- reg-stack.cc is not shared code: "if it is not for all targets,
-   moving to a different file sounds good" -- which dissolves the name rather
-   than forwarding it, and is a separate change.  */
+   THE gen_movxf ROW IS STALE, AND MEASURING IT RATHER THAN REASONING FROM IT
+   IS THE POINT.  That row records reg-stack.o naming the bare `::gen_movxf',
+   and reg-stack.cc no longer contains the call: the body moved to
+   target-regstack.cc, which is compiled once per back end, so the name is
+   spelled only inside a translation unit whose own insn-flags-<base>.h has it
+   (see target-regstack.h).  Re-measured on this build with `nm -CA
+   --undefined-only' over every object in the link, the only references are:
+
+     insn-output-i386.o        U insn_i386::gen_movxf (rtx, rtx)
+     target-regstack-i386.o    U insn_i386::gen_movxf (rtx, rtx)
+
+   Both NAMESPACED, both in per-base objects.  No shared object names the bare
+   symbol, so the `::gen_movxf' the singular insn-emit still defines is dead
+   weight rather than an answer anyone reads.  The user's ruling -- reg-stack.cc
+   is not shared code, "if it is not for all targets, moving to a different
+   file sounds good" -- had already dissolved this one.  */
 
 rtx
 gen_blockage (void)

@@ -120,10 +120,12 @@ gen_target_ns (void)
    It is not one name either.  The same measurement found SIX bare names that
    the primary's insn-emit answers for every configured target: `add_clobbers',
    `added_clobbers_hard_reg_p', `gen_blockage', `gen_nop',
-   `gen_speculation_barrier' and `gen_movxf'.  Five of the six are defined by
-   every configured base in its own namespace and can take a uniform forwarder;
-   `gen_movxf' is defined by i386 and not by aarch64 and cannot.  See the
-   handover for #51.
+   `gen_speculation_barrier' and `gen_movxf'.
+
+   FIVE ARE SELECTED NOW and the sixth turned out not to be a shared name at
+   all: `gen_movxf' is reached only through `insn_i386::' from per-base
+   objects.  The three below `add_clobbers' go through mt_md_entry_points; see
+   multi-target-select.cc, which carries the measurement.
 
    What ALSO survives is a declaration problem: a namespaced declaration in
    insn-flags-<base>.h, pulled into scope by that header's using-directive,
@@ -131,15 +133,12 @@ gen_target_ns (void)
    config/aarch64/aarch64.cc an ambiguous overload against emit-rtl.h's.  So
    genflags SKIPS the names on this list; see the note at its call site.
 
-   THE EDGE, STATED RATHER THAN FLOORED: whatever eventually defines
-   `::gen_blockage' here must be guarded by the exact complement of
-   emit-rtl.cc's `#if !HAVE_blockage', and HAVE_blockage comes from the
-   SINGULAR insn-flags.h -- still the primary target's.  Configure a primary
-   with no `blockage' pattern alongside a base that has one and the middle end
-   calls emit-rtl.cc's generic expansion for both.  That is a wrong answer, not
-   a link failure, and the fix is to union the singular insn-flags.h -- the same
-   job insn-config.h has already had done to it.  Until then it is written
-   down, here and in multi-target-select.cc, rather than papered over.
+   THE EDGE IS CLOSED, AND NOT BY UNIONING insn-flags.h.  `::gen_blockage' is
+   defined in multi-target-select.cc, and what decides whether it expands to a
+   pattern or to the generic ASM_INPUT is the back end in force, through the
+   null-or-not pointer in its own mt_md_entry_points.  emit-rtl.cc's
+   `#if !HAVE_blockage' is gone, so a primary without a `blockage' pattern no
+   longer decides for a base that has one.
 
    The failure mode if this list is ever short is a compile error at the call
    site naming the function, not silent misbehaviour.  */
