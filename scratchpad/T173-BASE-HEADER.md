@@ -1,128 +1,70 @@
-# Naming the base at the point of inclusion — the one place this is written down
+# `BASE_HEADER` — state, and the two things it does not cover
 
-Task #173. This is the rationale that used to be repeated as a four-line
-comment in every converted file under `gcc/config/`. It lives here once;
-`gcc/multi-target-base.h` points at it, and nothing else should restate it.
+Task #173. `-DMT_BASE=<cpu>-inc` is the authority; a per-back-end header is
+spelled `#include BASE_HEADER (<stem>.h)`.
 
-## The rule
+## Done
 
-A source that is compiled **once per back end** spells every per-back-end
-header as
+All **280** direct per-back-end include sites under `gcc/config/` name their
+base, over 11 stems (`tm` 32, `tm_p` 117, `insn-attr` 64, `tm-constrs` 41,
+`insn-config` 22, `insn-codes` 18, `insn-opinit` 6, `options` 3, `insn-modes`
+3, `insn-attr-common` 3, `tm-preds` 2, `insn-flags` 1).
 
-```c
-#include "multi-target-base.h"
-#include BASE_HEADER (tm.h)          /* -> "i386-inc/tm.h" */
-```
+**A back end's `.h` may not name a base.** Four were converted and reverted:
+the shared `tm.h` includes `config/i386/i386.h` at line 50, so a header in
+that chain is read by ~520 translation units that have no `MT_BASE`. Which
+back end sits there is a property of the configuration. Sources compiled per
+back end may name a base; headers may not.
 
-Macro form, argument unquoted, never a hardcoded base name, and the expansion
-yields the **quoted** include (user's preference). `BASE_HEADER` reads
-`-DMT_BASE=<cpu>-inc`, which the makefile sets **per object**, so the header
-always follows what is actually being built.
+## Not done 1 — the `-I` cannot be deleted yet, and it fails silently
 
-Hardcoding `"riscv-inc/tm.h"` is rejected even where it would work today: if
-that file is ever compiled for a second base it opens riscv's headers and
-compiles **cleanly**, because the file exists. `BASE_HEADER` cannot fail that
-way.
-
-## Why not `-I<base>-inc`
-
-The user's ruling: *"we really need to get rid of the -I tricks."* The
-argument, in the order it actually bites:
-
-- **It is selection by path order, and it is silent.** With several back ends
-  configured, every `<base>-inc/` holds the same sixteen names. A missing or
-  mis-ordered `-I` does not fail — it compiles the wrong target's headers
-  perfectly well. `d7a12b9d5c4`'s own subject is that mechanism failing to
-  reach its consumers.
-- **It is a second authority for one fact.** `-DMT_BASE=<cpu>-inc` and
-  `-I<cpu>-inc` say the same thing twice, which is the root shape this branch
-  exists to remove.
-- **Upstream is not doing it.** Upstream finds `tm.h` through `-I` too, but
-  upstream has exactly **one** candidate, so its `-I` is finding a file, not
-  choosing between bases. Using `-I` to *select* is this branch's invention.
-
-## What is done, and what the `-I` is still doing
-
-`gcc/config/` is finished: **all 280 direct include sites over 11 stems** name
-their base, and `git grep '#include "<stem>.h"' gcc/config` returns only the
-15 files that have no base (below). Nothing under `gcc/config/` is selected by
-include-path order any more.
-
-**The `-I` cannot yet be deleted, and the reason is measured, not assumed.**
-It is still the only mechanism supplying per-back-end headers **transitively**,
-through *shared* headers — and a shared header cannot name a base. Read from
-the baseline 47-back-end build's own `.deps` (`t173-deps.sh`), which lists
-every header each compilation actually opened:
+`-I<base>-inc` still serves the **transitive** reaches, from shared headers,
+which cannot name a base. From the 47-back-end build's own `.deps`
+(`t173-deps.sh`), objects opening `<base>-inc/…`:
 
 ```
-2000 objects open <base>-inc/insn-modes.h        (via coretypes.h:553)
-2000                        insn-modes-inline.h
-1952                        tm.h
-1725                        insn-codes.h
- 754                        insn-config.h
- 649                        insn-opinit.h
- 365                        tm_p.h
+2000  insn-modes.h, insn-modes-inline.h   (coretypes.h:553)
+1952  tm.h        1725 insn-codes.h       754 insn-config.h
+ 649  insn-opinit.h                       365 tm_p.h
 ```
 
-Only ~280 of those are direct includes in `gcc/config/`. The rest arrive
-through `coretypes.h`, `rtl.h` and friends.
-
-**And deleting the `-I` would fail SILENTLY, which is the part that decides
-the sequencing.** `t173-rootstems.sh`: 15 of the 16 stems *also* exist under
-their plain name in the build root, so an unconverted include does not become
-a `No such file` — it quietly starts reading the build root's copy. And
-`t173-rootvsbase.sh` says what that copy is, at 47 back ends, i386 vs riscv:
+Only ~280 of those are direct. And removal is **silent**, not loud: 15 of 16
+stems also exist under their plain name in the build root
+(`t173-rootstems.sh`), and `t173-rootvsbase.sh` at 47 bases, i386 vs riscv:
 
 ```
 stem                   root           i386-inc       riscv-inc
-insn-constants.h       801ba7df7801   801ba7df7801   ae4a94788b05   root is i386's
-insn-attr-common.h     817d9a8bd888   817d9a8bd888   f5c5e78f7ce5   root is i386's
-insn-codes.h           5aeec06641cc   5aeec06641cc   ec14eff8b336   root is i386's
-insn-config.h          2b8a758a795e   2b8a758a795e   1663fdf01b0a   root is i386's
-insn-modes.h           e3829ca9640b   e3829ca9640b   273a85fed2cc   root is i386's
-insn-modes-inline.h    c2942130a4a4   c2942130a4a4   9f5627481df1   root is i386's
-insn-target-def.h      8ed769972514   8ed769972514   b24f838d5a4a   root is i386's
+insn-constants.h       801ba7df7801   801ba7df7801   ae4a94788b05
+insn-attr-common.h     817d9a8bd888   817d9a8bd888   f5c5e78f7ce5
+insn-codes.h           5aeec06641cc   5aeec06641cc   ec14eff8b336
+insn-config.h          2b8a758a795e   2b8a758a795e   1663fdf01b0a
+insn-modes.h           e3829ca9640b   e3829ca9640b   273a85fed2cc
+insn-modes-inline.h    c2942130a4a4   c2942130a4a4   9f5627481df1
+insn-target-def.h      8ed769972514   8ed769972514   b24f838d5a4a
 ```
 
-**Every stem is genuinely per base — no stem is unioned** — and for seven of
-them the build root's copy is byte-identical to the primary's. So removing
-the `-I` today hands ~2000 per-back-end objects i386's mode numbering, insn
-codes and target-def table, with no diagnostic. That is §2a's
-*"reverting a per-base header to a shared one because the shared one builds"*,
-arriving disguised as the cleanup that removes it.
+No stem is unioned, and for seven the build root's copy **is i386's**. Deleting
+the `-I` today hands ~2000 per-back-end objects the primary's mode numbering,
+insn codes and target-def table with no diagnostic.
 
-The brief's method — *"delete it and let the build break, the breakage
-enumerates them for you"* — assumed the failure would be loud. Measured, it is
-not, and that is the finding rather than a reason to proceed carefully.
+`coretypes.h` already has the hook for one stem —
+`#ifndef INSN_MODES_H / #define INSN_MODES_H "insn-modes.h" / #include
+INSN_MODES_H` — so resolving that macro to `BASE_HEADER (insn-modes.h)` under
+`#ifdef MT_BASE` is the shape for the other six. That is a change to *shared*
+headers, i.e. the same population as "stop the 248 shared TUs including
+`tm.h`", and belongs with it.
 
-### The mechanism that would finish it
+**When the `-I` goes, the witness goes with it.** `mt-inc-witness.h` is
+findable only through the `-I`, and it is what makes a wrong base fail by
+name. `-DMT_BASE` alone needs its own check — the per-base header asserting
+its own identity against `MT_BASE` — or a wrong `-DMT_BASE` compiles another
+back end's headers cleanly.
 
-The shared side needs the base named too, and `coretypes.h` **already has the
-hook** for one stem:
+## Not done 2 — the 15 files with no base
 
-```c
-#ifndef INSN_MODES_H
-#define INSN_MODES_H "insn-modes.h"
-#endif
-#include INSN_MODES_H
-```
-
-so a per-base object only needs that macro to resolve to
-`BASE_HEADER (insn-modes.h)` when `MT_BASE` is defined. The same shape —
-`#ifdef MT_BASE` naming the base, plain name otherwise — covers the other six
-stems wherever a shared header reaches them. That names the base at the point
-of inclusion, keeps `-DMT_BASE` the sole authority, and needs no `-I`.
-
-It is a change to *shared* headers, i.e. the same population as
-"stop the 248 shared TUs including `tm.h`", and it should be sequenced with
-that rather than bolted onto a `gcc/config/` sweep.
-
-## The files that have no base
-
-15 files under `gcc/config/` are compiled **once**, so `BASE_HEADER` is the
-wrong answer and `-DMT_BASE` is not passed to them. Classified from the
-generated makefile (`t173-classify.sh`) over three configurations, never from
-the path:
+Compiled once, so `BASE_HEADER` does not apply and `-DMT_BASE` is not passed.
+They get the shared `tm.h`, which is the primary's header chain. Classified
+from the generated makefile (`t173-classify.sh`) over three configurations.
 
 | file(s) | channel |
 |---|---|
@@ -132,16 +74,11 @@ the path:
 | `arm-d.cc`, `mips-d.cc`, `rs6000-d.cc`, `s390-d.cc`, `sparc-d.cc`, `freebsd-d.cc` | `@d_target_objs@`, a single `${target}` substitution |
 | `avr/gen-avr-mmcu-specs.cc` | `avr/t-avr`, a build-machine tool |
 
-Each of these gets the **shared** `tm.h`, which is i386's header chain under a
-target-neutral name. Two consequences worth stating separately:
+`driver-i386.o` is the only host driver built, and it is right by luck: the
+host is x86_64, so the primary's chain is the right one. On an aarch64 host
+`driver-aarch64.o` gets i386's macros silently. #143 chose `target-specs` for
+`-march=native`, which is the same answer — `local_cpu_detect` wants a fact
+about the deployed machine.
 
-- `driver-i386.o` is the only host driver currently built and it is right **by
-  luck** — the host is x86_64, so the primary's chain happens to be the right
-  one. On an aarch64 host, `driver-aarch64.o` would be compiled once against
-  i386's macros and say nothing. **Latently wrong, not currently wrong.**
-  #143 chose `target-specs` as the route for `-march=native`, which is the
-  same answer here: what `local_cpu_detect` wants is a fact about the deployed
-  machine.
-- `@d_target_objs@` is the `PASSES_EXTRA` shape verbatim — fed by the legacy
-  single `${target}`, so only one back end's D glue is ever built, and the
-  other five are absent rather than off.
+`@d_target_objs@` is the `PASSES_EXTRA` shape: fed by the legacy single
+`${target}`, so five of the six D glue files are absent rather than off.
