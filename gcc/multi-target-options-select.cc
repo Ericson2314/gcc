@@ -61,6 +61,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+/* For `global_options_init' -- the SHARED one, whose layout is the union of
+   every configured back end's (opth-gen.awk) and which is exactly the object
+   the per-base Init() functions below are meant to write.  `opts.h' does not
+   reach it.  */
+#include "options.h"
 #include "opts.h"
 
 /* Declares every configured base's tables and defines MT_OPTION_TABLES and
