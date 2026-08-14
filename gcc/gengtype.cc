@@ -5762,6 +5762,34 @@ main (int argc, char **argv)
 	  const char *fname = get_input_file_name (gt_files[i]);
 	  parse_file (fname);
 	  DBGPRINTF ("parsed file #%d %s", (int) i, fname);
+	  /* Note the back end this file belongs to, if any.  mt_bases_seen is
+	     documented (see mt_note_base) as "every config/<dir>/ gengtype read
+	     a definition from ... wider than the set with a dispatched tag",
+	     and it was NOT: mt_note_base was reachable only from the
+	     struct/typedef registration paths, so a back end that defines no
+	     GTY struct or typedef OF ITS OWN never entered the set at all.
+	     xstormy16 is exactly that -- its only GTY annotation is
+	     `static GTY(()) section *bss100_section;', a root variable of a
+	     core type declared in output.h -- so `gt_multi_target_install_markers'
+	     returned false for it and multi_target_select killed the compiler
+	     with "back end 'xstormy16' is not a back end gengtype read any
+	     definition from".  Measured: the generated installer's name list was
+	     i386/riscv/aarch64, i.e. precisely the dispatched-tag set the
+	     comment says it is wider than.  A written invariant is not a checked
+	     one.
+
+	     Doing it here rather than at an output site also makes the set
+	     independent of EMISSION ORDER, which is what made this defect
+	     order-dependent and therefore invisible to the two-back-end builds:
+	     get_output_file_with_visibility also calls mt_config_dir_of_file,
+	     but it runs per output file and can run after the dispatchers have
+	     already been written.  "Which files did gengtype read" is a question
+	     about parsing, so it is answered in the parse loop.
+
+	     mt_config_dir_of_file returns NULL for anything that is not
+	     config/<dir>/<file> -- config/elfos.h and config/linux.cc have no
+	     <dir> component -- so this notes back ends and nothing else.  */
+	  mt_config_dir_of_file (gt_files[i]);
 	  /* Check if this is a header file generated during the build.  */
 	  int len = strlen (fname);
 	  if (len >= 5
