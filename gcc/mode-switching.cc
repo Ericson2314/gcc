@@ -40,7 +40,20 @@ along with GCC; see the file COPYING3.  If not see
    to instruction attribute values.  */
 #include "insn-attr.h"
 
-#ifdef OPTIMIZE_MODE_SWITCHING
+/* NO `#ifdef OPTIMIZE_MODE_SWITCHING' HERE ANY MORE, AND THAT WAS THE BUG.
+
+   This object is SHARED -- compiled once, against the primary's headers --
+   so the guard that used to wrap this whole file, and the pass gate at the
+   bottom of it, were i386's answer to a question forty-seven other back ends
+   also get asked.  Five of forty-eight define `OPTIMIZE_MODE_SWITCHING'
+   (aarch64, epiphany, i386, riscv, sh); the pass ran for all forty-eight, and
+   the three of the remainder that reach codegen -- ia64, visium, xtensa --
+   died on the first unguarded `targetm.mode_switching.*' call, frame `#0' at
+   `0x0'.  The three that DO define it got i386's entity numbering and did not
+   die, which is the worse half.
+
+   The body below is target-neutral C++ apart from the two macros, which are
+   now read per base; see target-modeswitch.h.  */
 
 /* The algorithm for setting the modes consists of scanning the insn list
    and finding all the insns which require a specific mode.  Each insn gets
@@ -797,10 +810,29 @@ optimize_mode_switching (void)
   int e;
   basic_block bb;
   bool need_commit = false;
-  static const int num_modes[] = NUM_MODES_FOR_MODE_SWITCHING;
-#define N_ENTITIES ARRAY_SIZE (num_modes)
-  int entity_map[N_ENTITIES] = {};
-  struct bb_info *bb_info[N_ENTITIES] = {};
+  /* THE SELECTED BASE'S ENTITY LIST.  This was `static const int num_modes[]
+     = NUM_MODES_FOR_MODE_SWITCHING' -- a file-scope array in a SHARED object,
+     hence the primary's list handed to every back end.  aarch64 has two
+     entities and i386 four; aarch64's SME mode switching was being run
+     against i386's numbering, silently, and ia64/visium/xtensa were being run
+     at all.  See target-modeswitch.h.
+
+     `N_ENTITIES' is therefore no longer a constant, so the two arrays it
+     sized are allocated rather than declared.  `XALLOCAVEC' and not a fixed
+     upper bound: a bound would be a number invented here, and the largest
+     entity count in tree (epiphany's five) is not a fact this file may
+     assume.  */
+  const int *num_modes = mt_mode_switch_num_modes ();
+  const int n_entities_max = mt_mode_switch_n_entities ();
+#define N_ENTITIES n_entities_max
+  int *entity_map = XALLOCAVEC (int, MAX (n_entities_max, 1));
+  struct bb_info **bb_info = XALLOCAVEC (struct bb_info *,
+					 MAX (n_entities_max, 1));
+  /* The declarations these replace ended in `= {}'.  Only the slots this
+     function assigns are ever read, so the zeroing is not load-bearing -- it
+     is kept so that the conversion changes the STORAGE and nothing else.  */
+  memset (entity_map, 0, sizeof (int) * MAX (n_entities_max, 1));
+  memset (bb_info, 0, sizeof (struct bb_info *) * MAX (n_entities_max, 1));
   int i, j;
   int n_entities = 0;
   int max_num_modes = 0;
@@ -814,7 +846,7 @@ optimize_mode_switching (void)
   sbitmap *avin, *avout;
 
   for (e = N_ENTITIES - 1; e >= 0; e--)
-    if (OPTIMIZE_MODE_SWITCHING (e))
+    if (mt_optimize_mode_switching (e))
       {
 	int entry_exit_extra = 0;
 
@@ -1288,8 +1320,6 @@ optimize_mode_switching (void)
 
   return 1;
 }
-
-#endif /* OPTIMIZE_MODE_SWITCHING */
 
 namespace {
 
@@ -1317,20 +1347,20 @@ public:
   /* The epiphany backend creates a second instance of this pass, so we need
      a clone method.  */
   opt_pass * clone () final override { return new pass_mode_switching (m_ctxt); }
+  /* THE GATE IS THE SELECTED BASE'S ANSWER, NOT THE PRIMARY'S.  It used to be
+     `#ifdef OPTIMIZE_MODE_SWITCHING' in a shared object, i.e. `true' for all
+     forty-eight back ends because i386 defines the macro.  `mt_mode_switching_p'
+     is false exactly for a base whose own `tm.h' does not define it -- which
+     is what that back end already meant, read where it can be read.  */
   bool gate (function *) final override
     {
-#ifdef OPTIMIZE_MODE_SWITCHING
-      return true;
-#else
-      return false;
-#endif
+      return mt_mode_switching_p ();
     }
 
   unsigned int execute (function *) final override
     {
-#ifdef OPTIMIZE_MODE_SWITCHING
-      optimize_mode_switching ();
-#endif /* OPTIMIZE_MODE_SWITCHING */
+      if (mt_mode_switching_p ())
+	optimize_mode_switching ();
       return 0;
     }
 

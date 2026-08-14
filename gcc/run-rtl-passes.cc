@@ -55,6 +55,9 @@ run_rtl_passes (char *initial_pass_name)
 #ifdef INSN_SCHEDULING
       init_sched_attrs ();
 #endif
+      /* AND THE SELECTED BASE'S OWN; see target-sched.h and the twin call in
+	 cfgexpand.cc.  The `#ifdef' above is the primary's.  */
+      mt_init_base_sched_attrs ();
       bitmap_obstack_initialize (NULL);
       bitmap_obstack_initialize (&reg_obstack);
       opt_pass *rest_of_compilation

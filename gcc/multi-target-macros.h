@@ -434,6 +434,18 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    order.  */
 #include "target-insn.h"
 
+/* THE MODE-SWITCHING ENTITY LIST AND THE SCHEDULER-ATTRIBUTE INITIALISER.
+   Declarations only, and no `#undef'/`#define' pair for either, for the
+   reason the `HAVE_<pattern>' paragraph above gives: the macros they replace
+   (`OPTIMIZE_MODE_SWITCHING', `NUM_MODES_FOR_MODE_SWITCHING',
+   `INSN_SCHEDULING') are read at points this header cannot order itself
+   against, and both have a SINGLE shared consumer each -- `mode-switching.cc'
+   and `cfgexpand.cc'/`run-rtl-passes.cc'.  Rewriting three call sites is
+   cheaper and has no include-order dependence.  See target-modeswitch.h and
+   target-sched.h for what each was answering wrongly and for whom.  */
+#include "target-modeswitch.h"
+#include "target-sched.h"
+
 /* `LOAD_EXTEND_OP' IS THE ONE MEMBER OF target-insn.h THAT DOES GET A
    `#undef'/`#define' PAIR, and the paragraph above says why the other three
    do not: theirs come from `insn-config.h', which shared code includes at

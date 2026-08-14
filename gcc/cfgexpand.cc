@@ -7108,6 +7108,13 @@ pass_expand::execute (function *fun)
 #ifdef INSN_SCHEDULING
   init_sched_attrs ();
 #endif
+  /* AND THE SELECTED BASE'S OWN.  The `#ifdef' above is the PRIMARY's, and so
+     is the `init_sched_attrs' it guards: exactly one of the twelve
+     initialisers in an eleven-base cc1 was ever run, leaving every other
+     base's `internal_dfa_insn_code' NULL for its own back end to call through.
+     Additive rather than a replacement, and unconditional rather than under
+     the primary's `#ifdef'; both reasons are in target-sched.h.  */
+  mt_init_base_sched_attrs ();
 
   /* Make sure first insn is a note even if we don't want linenums.
      This makes sure the first insn will never be deleted.

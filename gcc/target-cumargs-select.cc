@@ -1068,3 +1068,88 @@ mt_insn_current_length (rtx_insn *insn)
 {
   return mt_attr ()->current_length (insn);
 }
+
+/* ------------------------------------------------------------------------
+   THE MODE-SWITCHING ENTITY LIST; see target-modeswitch.h for the
+   measurement.
+
+   `mode-switching.cc' used to wrap its pass gate and its whole body in a raw
+   `#ifdef OPTIMIZE_MODE_SWITCHING' and to read `NUM_MODES_FOR_MODE_SWITCHING'
+   into a file-scope array.  That object is shared, so both were the
+   PRIMARY's: the gate said yes for forty-three back ends that define neither
+   macro, and the three of them with no mode-switching hooks at all died on a
+   null `targetm.mode_switching.*' slot -- frame `#0' at `0x0'.  */
+const struct target_modeswitch_desc *targetm_modeswitch;
+
+static const struct target_modeswitch_desc *
+mt_modeswitch (void)
+{
+  if (targetm_modeswitch == NULL)
+    internal_error ("no back end has been selected, so it is not known "
+		    "whether this target switches modes; a target must be "
+		    "chosen with %<-ftarget-config=%> before the "
+		    "mode-switching pass runs");
+  return targetm_modeswitch;
+}
+
+/* THE PASS GATE.  Zero entities is this back end's own answer -- it is what
+   the absence of `OPTIMIZE_MODE_SWITCHING' from its `tm.h' already meant --
+   and not a floor; see the long note in target-modeswitch.h.  */
+
+bool
+mt_mode_switching_p (void)
+{
+  return mt_modeswitch ()->n_entities > 0;
+}
+
+int
+mt_mode_switch_n_entities (void)
+{
+  return mt_modeswitch ()->n_entities;
+}
+
+const int *
+mt_mode_switch_num_modes (void)
+{
+  return mt_modeswitch ()->num_modes;
+}
+
+bool
+mt_optimize_mode_switching (int entity)
+{
+  const struct target_modeswitch_desc *d = mt_modeswitch ();
+
+  /* Not `if (d->optimize_p)': a base with entities and no predicate is a
+     build bug, and returning false for it would silently disable the pass
+     for a back end that asked for it -- the quiet direction.  The two
+     fields come off one `#ifdef' in target-cumargs.cc, so this cannot
+     happen without that file having been edited wrongly, which is exactly
+     when a by-name failure is worth having.  */
+  if (d->n_entities == 0)
+    return false;
+  if (d->optimize_p == NULL)
+    internal_error ("back end %qs lists %d mode-switching entities but "
+		    "supplies no %<OPTIMIZE_MODE_SWITCHING%> predicate",
+		    d->name, d->n_entities);
+  return d->optimize_p (entity);
+}
+
+/* ------------------------------------------------------------------------
+   THE SCHEDULER-ATTRIBUTE INITIALISER; see target-sched.h for the
+   measurement.  Exactly one of the twelve `init_sched_attrs' in an
+   eleven-base `cc1' ever ran -- the bare, primary one -- so every other
+   base's `internal_dfa_insn_code' stayed NULL and a back end asking its own
+   automaton called through address `0x0'.  */
+const struct target_sched_desc *targetm_sched;
+
+void
+mt_init_base_sched_attrs (void)
+{
+  if (targetm_sched == NULL)
+    internal_error ("no back end has been selected, so its scheduling "
+		    "attributes cannot be initialised; a target must be "
+		    "chosen with %<-ftarget-config=%> before RTL is "
+		    "generated");
+  if (targetm_sched->init_attrs != NULL)
+    targetm_sched->init_attrs ();
+}

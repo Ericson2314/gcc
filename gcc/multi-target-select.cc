@@ -610,6 +610,41 @@ multi_target_select (const char *target)
 			  "predate target-attr.h and are from a different "
 			  "build", base);
 
+	/* This back end's MODE-SWITCHING ENTITY LIST; see target-modeswitch.h.
+	   Rides on the same table and is checked for the same reason as the
+	   four above.
+
+	   Until this line existed, `mode-switching.cc' -- shared code -- read
+	   `#ifdef OPTIMIZE_MODE_SWITCHING' and `NUM_MODES_FOR_MODE_SWITCHING'
+	   out of the PRIMARY's headers.  Five of forty-eight back ends define
+	   those macros, so the pass gate said yes to the other forty-three and
+	   handed them i386's entity numbering; ia64, visium and xtensa, which
+	   register no mode-switching hooks at all, then died on a NULL
+	   `targetm.mode_switching.*' slot with frame `#0' at `0x0'.  aarch64,
+	   riscv and sh did not die -- they ran their own hooks against
+	   somebody else's entity list, silently.  */
+	targetm_modeswitch = targetm_cumargs->modeswitch;
+	if (targetm_modeswitch == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no mode-switching table attached; its objects "
+			  "predate target-modeswitch.h and are from a "
+			  "different build", base);
+
+	/* This back end's SCHEDULER-ATTRIBUTE INITIALISER; see target-sched.h.
+	   Rides on the same table and is checked for the same reason.
+
+	   Until this line existed, the only `init_sched_attrs' anybody called
+	   was the bare one, so `insn_riscv::internal_dfa_insn_code' and its
+	   ten siblings stayed NULL and a back end asking its own automaton --
+	   `riscv_sched_variable_issue', `mips_sim_wait_units' -- called
+	   through address `0x0'.  */
+	targetm_sched = targetm_cumargs->sched;
+	if (targetm_sched == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no scheduler-attribute table attached; its "
+			  "objects predate target-sched.h and are from a "
+			  "different build", base);
+
 	/* Whether this back end has a REGISTER STACK; see target-regstack.h.
 
 	   A separate registry rather than a field riding on the cumargs table,
