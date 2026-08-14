@@ -18763,6 +18763,61 @@ struct mips_sim {
   state_t dfa_state;
 };
 
+/* ADVANCE THE DFA ONE CYCLE, USING THIS BACK END'S OWN AUTOMATON.
+
+   A copy of `advance_state' (haifa-sched.cc:3161), and the copy is the fix.
+   That function is compiled ONCE, in a shared translation unit, so its three
+   `state_transition' calls bind the BARE `state_transition' -- the PRIMARY's
+   automaton.  This file is compiled against mips's own `insn-attr-mips.h',
+   so every `state_transition', `state_size' and `dfa_start' spelled here is
+   `insn_mips::'.  Measured on the linked objects:
+
+       nm -C mt-mips/mips.o   U insn_mips::state_transition(void*, rtx_def*)
+                              U insn_mips::state_size()
+                              U advance_state(void*)          <- the primary's
+
+   and the two meet INSIDE ONE LOOP.  `mips_sim_wait_units' spins until
+   `insn_mips::state_transition' reports the unit free, while every cycle is
+   advanced by i386's automaton over a buffer `mips_set_tuning_info' sized
+   with `insn_mips::state_size ()'.  The mips state therefore never changes in
+   a way mips's automaton can observe and the loop DOES NOT TERMINATE:
+   measured at 100% CPU with a flat 22-35 MB RSS for 21 minutes, and located
+   by running `cc1' under gdb and interrupting it --
+
+       #0 internal_state_transition(int, DFA_chip*)   <- the bare one
+       #1 advance_state(void*)
+       #2 mips_sim_wait_units(mips_sim*, rtx_insn*)
+       #3 mips_mult_zero_zero_cost(mips_sim*, bool)
+       #4 mips_set_tuning_info()
+       #5 pass_expand::execute(function*)
+
+   -- rather than by `gdb -p', which this host's ptrace_scope refuses.
+
+   This does NOT convert the shared scheduling family; `multi-target-attr.h`
+   records `internal_dfa_insn_code', `state_transition' and the rest as
+   deliberately unselected and they still are, with the leak ratchet still
+   asserting it.  What changes is only that MIPS'S OWN simulator, which
+   already asks mips's automaton every other question, stops borrowing one
+   answer from somebody else's.  */
+
+static void
+mips_sim_advance_state (state_t state)
+{
+  if (targetm.sched.dfa_pre_advance_cycle)
+    targetm.sched.dfa_pre_advance_cycle ();
+
+  if (targetm.sched.dfa_pre_cycle_insn)
+    state_transition (state, targetm.sched.dfa_pre_cycle_insn ());
+
+  state_transition (state, NULL);
+
+  if (targetm.sched.dfa_post_cycle_insn)
+    state_transition (state, targetm.sched.dfa_post_cycle_insn ());
+
+  if (targetm.sched.dfa_post_advance_cycle)
+    targetm.sched.dfa_post_advance_cycle ();
+}
+
 /* Reset STATE to the initial simulation state.  */
 
 static void
@@ -18776,7 +18831,7 @@ mips_sim_reset (struct mips_sim *state)
   state_reset (curr_state);
 
   targetm.sched.init (0, false, 0);
-  advance_state (curr_state);
+  mips_sim_advance_state (curr_state);
 }
 
 /* Initialize STATE before its first use.  DFA_STATE points to an
@@ -18805,7 +18860,7 @@ mips_sim_next_cycle (struct mips_sim *state)
 
   state->time++;
   state->insns_left = state->issue_rate;
-  advance_state (curr_state);
+  mips_sim_advance_state (curr_state);
 }
 
 /* Advance simulation state STATE until instruction INSN can read
