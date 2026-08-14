@@ -33,31 +33,33 @@
 #      calls find_gcc is guarded by `if ![info exists GCC_UNDER_TEST]', so a
 #      command-line assignment wins.
 set -u
+S=$(cd "$(dirname "$0")" && pwd)
+MT_LIB_DIR=$S
+. "$S/mt-lib.sh"
 
 B=${1:?build dir}; shift
 [ $# -ge 1 ] || { echo "FATAL: name at least one target triple"; exit 9; }
 
-case "$B" in
-  */b-a78a*) ;;
-  *) echo "FATAL: build dir $B is not named for this worktree (PRINCIPLES 5)"; exit 9 ;;
-esac
-[ -f "$B/MY-SRC" ] || { echo "FATAL: $B has no MY-SRC stamp"; exit 9; }
-SRC=$(cat "$B/MY-SRC")
-grep -q "$SRC/configure" "$B/config.log" \
-  || { echo "FATAL: $B/config.log does not name $SRC"; exit 9; }
-n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
-[ "$n" = "${WANT_ANCHOR:?set WANT_ANCHOR}" ] \
-  || { echo "FATAL: $SRC anchor=$n, expected exactly $WANT_ANCHOR"; exit 9; }
-( cd "$SRC" && git diff --quiet ) \
-  || { echo "FATAL: $SRC changed under the build"; exit 9; }
+# THE BUILD-DIR GUARD IS DERIVED, NOT HARDCODED.  It used to read `*/b-a78a*',
+# this worktree's hash, which is why `t175-mtcheck.sh' exists: the next agent
+# could not run this file and copied it under a task number.  Same guard, no
+# edit needed per worktree, no task number to collide on.  See mt-lib.sh.
+mt_assert_builddir "$B"
+SRC=$(mt_src_of "$B") || exit 9
+mt_assert_configured_from "$B" "$SRC"
+n=$(mt_assert_anchor "$SRC") || exit 9
+# BOTH freeze arms.  This file asserted `git diff --quiet' (live worktree) and
+# t175-mtcheck.sh asserted SNAP-SHA + read-only (immutable snapshot); each is
+# wrong for the other's srcdir -- `git diff' in a `git archive' extraction has
+# no repository and walks UP, turning the check into an error.
+kind=$(mt_assert_src_frozen "$SRC") || exit 9
 [ -x "$B/gcc/xgcc" ] || { echo "FATAL: no $B/gcc/xgcc"; exit 9; }
 [ -x "$B/gcc/cc1" ]  || { echo "FATAL: no $B/gcc/cc1"; exit 9; }
 
-S=$(cd "$(dirname "$0")" && pwd)
 VER=$(cat "$SRC/gcc/BASE-VER")
 [ -n "$VER" ] || { echo "FATAL: empty BASE-VER"; exit 9; }
 RTF=${MT_RUNTESTFLAGS:-}
-echo "== mtcheck: srcdir $SRC anchor=$n  gcc $VER  targets: $*"
+echo "== mtcheck: srcdir $SRC $kind anchor=$n  gcc $VER  targets: $*"
 echo "== runtestflags: [$RTF]  compile-only: [${MT_COMPILE_ONLY:-}]"
 
 for T in "$@"; do

@@ -163,10 +163,19 @@ Three things this changes about how the lever should be described:
 - **"Configure more back ends" currently costs a debugging session per extra
   base, not zero.** It is still the right lever; it is not the cheap one the
   paragraph above implies. Budget for it.
-- **The `MULTI_TARGET_RENAME_NAMES` comment names `scratchpad/sweep.sh` as its
-  authority and that file DOES NOT EXIST**, and the check it describes is over
-  "the two object SETS" — the two-back-end habit written into the instrument
-  itself. `scratchpad/t150-rename-gap.sh` is the N-way replacement.
+- **The `MULTI_TARGET_RENAME_NAMES` comment named a `sweep.sh` as its authority
+  and that file DID NOT EXIST**, and the check it described was over "the two
+  object SETS" — the two-back-end habit written into the instrument itself.
+  **The N-way replacement is `scratchpad/mt-rename-sweep.sh`, and it is the
+  survivor of six.** That sentence went on to name `t150-`, `t155-`, `t157-`,
+  `t165-` and `t167-rename-gap.sh` in turn — one job, six authorities, no
+  diagnostic, i.e. this branch's own root bug in its own tooling, with four
+  add/add merge conflicts on colliding `t<NNN>` names in a single day. The
+  survivor is the **union** of their arms, because later was not automatically
+  better: the *oldest* of the six was the only one that exits nonzero and the
+  only one that compares just the objects that are actually linked. See
+  `scratchpad/INSTRUMENTS.md` for the current set and
+  `scratchpad/ATTIC.md` for which arm came from where.
 - **The gengtype-marker and riscv-segfault failures appear only at three
   bases**, so they were invisible to every measurement this branch has taken.
   Expect more of these, and expect each new base to find its own.
@@ -1105,12 +1114,14 @@ and the commit beside any bar you quote, or the next reader cannot tell which
 of two true numbers applies to them.
 
 **A GUARD THE BUILD SYSTEM CITES BY NAME MAY NOT EXIST.** `gcc/Makefile.in`
-names `scratchpad/sweep.sh` as the check for bare duplicate symbols across back
+named a `sweep.sh` as the check for bare duplicate symbols across back
 ends. It had never been written. The defect it was supposed to catch was live:
 `extract_base_offset_in_addr` is defined bare by aarch64, riscv **and** arm — a
 hard link failure, and invisible to the i386+aarch64 pair. This is worse than
 `mechanism-present-but-never-invoked`: a comment naming a guard reads as
-evidence the guard ran. **Before trusting any named check, confirm the file
+evidence the guard ran. **`scratchpad/mt-cite-check.sh` is now that
+confirmation, run over `gcc/Makefile.in` and this file; it found a SECOND such
+citation on its first run.** Before trusting any named check, confirm the file
 exists and run it.**
 
 **A HOLE WITH A REAL CLASS IS A USABLE OBJECT.** `genmodes.cc` unions the mode

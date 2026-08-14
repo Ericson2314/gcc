@@ -1534,15 +1534,29 @@ MT_PASSES_TAGS =
 # other reasons -- `ld' once reported 7 of 40.  The check is an `nm' sweep over
 # the per-base object sets, never the linker.
 #
-# THAT SENTENCE USED TO NAME `scratchpad/sweep.sh', WHICH HAD NEVER BEEN
+# THAT SENTENCE USED TO NAME A `sweep.sh', WHICH HAD NEVER BEEN
 # WRITTEN -- and a comment naming a guard reads as evidence the guard ran.  It
 # also said "the TWO object SETS", which is the two-back-end habit written into
 # the very instrument meant to police it: a list sized on today's pair expires
-# the moment a third base is configured.  The check is now
-# scratchpad/t155-rename-gap.sh, which sweeps every configured base and refuses
-# to score when `nm' read nothing or when a base contributed no symbols at all
-# -- under `make -k' a back end that never built and one that collides with
-# nothing are the same silence.
+# the moment a third base is configured.
+#
+# THE CHECK IS `scratchpad/mt-rename-sweep.sh', AND IT IS THE SURVIVOR OF SIX.
+# This sentence has, in turn, named a sweep.sh (absent) and then t150-, t155-,
+# t157-, t165- and t167-rename-gap.sh -- one job, six authorities, no
+# diagnostic, which is this branch's own root bug in its own tooling.  The
+# survivor is the UNION of their arms, not the latest of them: later was not
+# automatically better and three of them dropped guards their predecessors
+# had.  It sweeps every configured base; compares only objects that are really
+# in libbackend.a; refuses to score when `nm' read nothing, when the build has
+# not returned, or when a base contributed no objects; reports hand-written
+# and generated populations separately; names the two defining objects for
+# every collision; carries a base-vs-SHARED arm with a vacuity call-out; and
+# EXITS NONZERO, which none of the six did.  The retired five are under
+# scratchpad/attic/ with scratchpad/ATTIC.md recording what went where.
+#
+# scratchpad/mt-cite-check.sh asserts that every scratchpad path named in this
+# file exists.  It was written because THIS comment named a file that did not,
+# and on its first run it found a second one (t155-gen-arm.sh, below).
 #
 #   targetm                 the hook table.  Renaming it is not enough on its
 #			    own: the middle end reads the bare name, so
@@ -1712,17 +1726,21 @@ MT_PASSES_TAGS =
 #			    only consumer, is already a targetm_regs read -- so
 #			    it is the purest rename of the six.
 #
-#			    Checks: scratchpad/t155-rename-gap.sh sweeps EVERY
+#			    Checks: scratchpad/mt-rename-sweep.sh sweeps EVERY
 #			    configured base and reports each colliding strong
 #			    symbol with how many bases define it (three-base
 #			    reading: aarch64 vs i386 none, i386 vs riscv none,
 #			    aarch64 vs riscv exactly this one).  It supersedes
-#			    scratchpad/t150-rename-gap.sh, which refuses any
-#			    build dir not named for the worktree that wrote it;
-#			    and both supersede a `sweep.sh' that compared TWO
-#			    object sets -- the two-back-end habit written into
-#			    the very instrument meant to police it -- AND THAT
-#			    HAD NEVER BEEN WRITTEN AT ALL.
+#			    t150/t155/t157/t165/t167-rename-gap.sh, now in
+#			    scratchpad/attic/, and the `sweep.sh' that compared
+#			    TWO object sets -- the two-back-end habit written
+#			    into the very instrument meant to police it -- and
+#			    that for a long time HAD NEVER BEEN WRITTEN AT ALL.
+#			    The per-worktree build-dir assertion that forced
+#			    each of those copies is now DERIVED from the
+#			    script's own path (scratchpad/mt-lib.sh), so the
+#			    survivor runs unedited in every worktree and its
+#			    name carries no task number to collide on.
 #
 #   THE N-WAY SWEEP (task #155).  Everything above this line was sized on
 #			    i386 + aarch64 plus what a third and a fourth base
@@ -1740,9 +1758,19 @@ MT_PASSES_TAGS =
 #			    THE GENERATED HALF IS NOW CHECKED RATHER THAN
 #			    ASSERTED.  "Everything the generators emit is dealt
 #			    with by namespace insn_<base>" was a written
-#			    invariant; scratchpad/t155-gen-arm.sh tests it, and
-#			    across 48 bases reads 163,162 generated definitions
-#			    with ZERO collisions.
+#			    invariant, and the file this line named -- a
+#			    `t155-gen-arm.sh' -- NEVER EXISTED, which
+#			    is the sweep.sh shape repeating three hundred lines
+#			    below its own post-mortem.  Found by
+#			    scratchpad/mt-cite-check.sh on its first run.  The
+#			    generated half is now the `gen' population of
+#			    scratchpad/mt-rename-sweep.sh, reported SEPARATELY
+#			    from the hand-written one so a collision there is
+#			    visible as the worse finding it is.  The reading it
+#			    replaces -- 163,162 generated definitions across 48
+#			    bases, ZERO collisions -- is retained as a figure
+#			    but is NOT attributable to a script in this tree;
+#			    re-measure before quoting it.
 #
 #			    THREE POPULATIONS THAT LOOK LIKE THIS ONE AND ARE
 #			    NOT, each measured rather than assumed:
@@ -1842,7 +1870,7 @@ MT_PASSES_TAGS =
 #			    csky, ia64, m68k, nds32, sh, visium, xtensa.  All
 #			    sixteen COMPILE; `cc1' does not link, and the eleven
 #			    names `ld' reported decompose exactly into the two
-#			    arms of scratchpad/t165-rename-gap.sh: ten base-vs-
+#			    arms of scratchpad/mt-rename-sweep.sh: ten base-vs-
 #			    base (arm 1) and one base-vs-SHARED (arm 2).
 #
 #			    Eight of the ten pass the macro test and are renamed
