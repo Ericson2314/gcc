@@ -61,6 +61,40 @@ This is the whole answer to "an aarch64-only change cannot cause an identical
 move on both targets": **nothing in this column is a target-specific
 measurement in the first place.**  It cannot help but move identically.
 
+## 2a. MEASURED DIRECTLY, ON THIS TASK'S OWN RUN — it is the slot count
+
+The section above was inferred from another agent's surviving run.  This task
+then produced its own, and the number lands on the unit:
+
+```
+$ S=.../testsuite.x86_64-pc-linux-gnu/gcc/gcc.sum      # MT_MAKEFLAGS=-j8
+ERROR lines:                        32
+ERROR blocks (tcl error sourcing):   8
+      8 ERROR: xgcc: fatal error: no target selected
+      8 ERROR: tcl error sourcing .../gcc.dg/asan/asan.exp.
+      8 ERROR: tcl error code CHILDSTATUS <N> 1
+      2+2+2+2  c-c++-common musttail glob failures
+```
+
+and `mtcheck.sh`'s own guard on the same run printed
+
+```
+-- guard: all 8 site.exp files attribute to x86_64-pc-linux-gnu
+```
+
+**Eight parallel slots, eight `asan.exp` failures, one per slot.**  24 lines
+from that, plus 8 musttail lines, is the 32.
+
+So the column is `slots x 3 + 8`, and **`ERROR` is a linear function of `-j`**.
+#176's 32 → 16 is therefore not sixteen defects and not four blocks → two: it
+is **eight slots → four**, i.e. a different `-j` between the two runs.  It
+moves identically on both targets because both targets are run with the same
+`-j` by the same script.
+
+That also makes the column's floor predictable, which is the useful part: at
+`-j8` a clean run *should* read 32, and a reading of 32 is evidence of nothing
+having gone wrong.
+
 ## 3. Why it varies between runs at all
 
 The count is a function of *how many times `asan.exp` gets sourced*, which is
