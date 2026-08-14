@@ -1261,6 +1261,106 @@ struct target_frame_desc
      would put a `.to_constant ()' where SVE is exactly the case that has
      none.  i386's and sparc's `unsigned int' widen silently and correctly.  */
   poly_uint64 (*regmode_natural_size) (machine_mode mode);
+
+  /* `CASE_VECTOR_MODE' -- the mode of a jump table's elements.  The sibling
+     of `case_vector_pc_relative' above, and left alone by the task that
+     converted that one because `target-cdata.h:166' records it as deferred to
+     the mode-numbering work.  MEASURED, THAT DEFERRAL DOES NOT APPLY TO THIS
+     MECHANISM, and the distinction is worth stating because the note reads as
+     though it blocks any conversion at all.
+
+     What `target-cdata.h:166' says is that a `machine_mode' cannot be a
+     `target-cdata' FIELD, because such a field is a number cached at
+     selection time and mode NUMBERING would have to be per base for that
+     number to mean anything.  That is a correct objection to a field.  It is
+     not an objection to a CALL, for two independent reasons:
+
+       - The mode vocabulary is UNIONED (`genmodes.cc' `read_union_list'), so
+         `E_DImode' is one number for every configured base.  A mode crossing
+         this boundary is not transported into a different vocabulary; there
+         is only one.  `mt_base_pmode' and `mt_base_function_mode' already
+         return modes through this very table and have since #124.
+       - The reason this name cannot be a cached field anyway is the same one
+         `case_vector_pc_relative' has: it is OPTION STATE.  i386's is
+         `(!TARGET_LP64 || (flag_pic && ix86_cmodel != CM_LARGE_PIC)
+           ? SImode : DImode)' (`i386.h:1920'), so a value frozen at selection
+         time would be frozen at whatever `-fpic' said.
+
+     WHAT IT COST, AND WHY IT WAS NOT AN ICE COLUMN.  Two shared sites read it
+     (`stmt.cc:1204', `expr.cc:14346/14356/14357/14358'), and both got i386's
+     expression evaluated against i386's option state.  aarch64's answer is a
+     plain `Pmode' (`aarch64.h:1367'), i.e. DImode on this target.
+     i386's yields DImode too -- but ONLY when `!flag_pic'.  Under `-fpic' the
+     `flag_pic && ix86_cmodel != CM_LARGE_PIC' arm makes it SImode, so aarch64
+     built PIC jump tables out of 4-byte elements while its own `casesi'
+     expander and `aarch64_output_casesi' assume `Pmode'.  This agreed by
+     luck in the non-PIC case and diverged the moment PIC was on, which is
+     precisely the shape PRINCIPLES calls out for `INCOMING_REG_PARM_STACK_SPACE'
+     and `ARG_POINTER_CFA_OFFSET': correct for a reason a third back end -- or
+     here, a single extra flag -- destroys.
+
+     SWEPT FOR CONSTANT-EXPRESSION CONTEXTS.  No `#if', `#ifdef', case label,
+     array bound or static initialiser in shared code names `CASE_VECTOR_MODE'.
+     The three tests against it -- `epiphany.h:737/746/801' and
+     `i386.cc:16154' -- are back ends' own translation units and keep the real
+     macro.  */
+  machine_mode (*case_vector_mode) (void);
+
+  /* `INCOMING_RETURN_ADDR_RTX' -- where the return address is on entry.
+     THE AUTHORITY BEHIND THE LAST STANDING aarch64 ICE COLUMN, 7 ICEs in
+     `maybe_record_trace_start', and the same disguise as everything else
+     here: both configured bases define the name, so shared code took the
+     primary's and there was no diagnostic.
+
+       i386      `gen_rtx_MEM (Pmode, stack_pointer_rtx)'   i386.h:2162
+       aarch64   `gen_rtx_REG (Pmode, LR_REGNUM)'           aarch64.h:1472
+
+     These are not two values of one kind; they are different KINDS of answer.
+     i386 says the return address is in MEMORY at the stack pointer, aarch64
+     says it is in a REGISTER.
+
+     AND THAT SPLIT IS NOT A PROPERTY OF THIS PAIR -- IT IS THE POPULATION.
+     45 back ends define the macro, and by shape they are 7 `gen_rtx_MEM'
+     against 37 `gen_rtx_REG' (the balance being back ends that call a
+     function, e.g. avr).  i386 is one of the SEVEN.  So the primary hands a
+     memory location to the 37 back ends whose return address is a register --
+     this is a majority-wrong leak, not an aarch64 quirk, and it is invisible
+     to any pair that happens to agree on the shape (i386 + rx, i386 + rl78
+     and i386 + h8300 would all have looked fine).  `dwarf2cfi.cc:3283' passes whichever it got to
+     `initial_return_save', which builds the CIE's initial row from it -- so
+     for aarch64 the CIE claimed the return address was already spilled to the
+     stack at function entry.  Every trace that then established the truth
+     (LR live in x30 until the prologue stores it) disagreed with that row,
+     and `maybe_record_trace_start' reached its `Inconsistent CFI state'
+     `gcc_unreachable ()' at `dwarf2cfi.cc:2606'.
+
+     Note where the failure surfaced: in the CFI row comparison, three files
+     from the macro that decided it, with the back end entirely correct --
+     the same geometry as `aarch64_output_casesi' in the sibling fix.
+
+     A SECOND SHARED CONSUMER, AND IT IS AN EXISTENCE TEST.  `df-scan.cc:3559'
+     is `if (REG_P (INCOMING_RETURN_ADDR_RTX))', which marks the return-address
+     register live on entry to the function.  With i386's MEM that test is
+     FALSE, so on aarch64 x30 was never added to the entry block's defs.  That
+     is a dataflow consequence rather than an ICE, and it is why this
+     conversion is not only about the assert.
+
+     A FUNCTION, AND NOT MERELY BECAUSE OF OPTION STATE.  This one cannot be
+     cached at all: it builds a fresh `rtx' and i386's body reads
+     `stack_pointer_rtx', which is per-function RTL state created by
+     `init_emit_regs'.  Caching an rtx at selection time would hand every
+     function the first function's stack pointer object -- the
+     `PIC_OFFSET_TABLE_REGNUM' trap `target-cdata.h:160' names.
+
+     `dwarf2cfi.cc:52's `#ifndef' FALLBACK IS NOT THE SUPPLY-SIDE KIND AND IS
+     LEFT ALONE.  It is `(gcc_unreachable (), NULL_RTX)', i.e. a fail-by-name
+     for a back end that defines nothing, which is what PRINCIPLES asks for;
+     it is simply never reached in a shared TU because the primary defines the
+     name.  The thunk below is compiled per base, so for a base that genuinely
+     defines nothing that fallback is reached HERE, in that base's own
+     translation unit, and aborts naming the base rather than handing out
+     i386's stack pointer.  */
+  rtx (*incoming_return_addr_rtx) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1512,5 +1612,21 @@ extern poly_int64 mt_push_rounding (poly_int64 bytes);
    comments above for the two ICE columns they were producing.  */
 extern bool mt_case_vector_pc_relative (void);
 extern poly_uint64 mt_regmode_natural_size (machine_mode mode);
+
+/* `CASE_VECTOR_MODE' and `INCOMING_RETURN_ADDR_RTX', for shared code.  Both
+   are redirected in `multi-target-macros.h'.  See the field comments above for
+   why the `target-cdata.h:166' mode deferral does not reach the first, and for
+   the CFI row the second was corrupting.
+
+   THE SECOND IS `#ifdef'-TESTED IN SHARED CODE AND THE FIRST IS NOT, which is
+   the one asymmetry between them.  `df-scan.cc:3558' guards its use with
+   `#ifdef INCOMING_RETURN_ADDR_RTX'.  A redirect keeps the name defined, so
+   that guard stays true -- which is CORRECT here and not a leak, because the
+   thing behind it is now a call to the selected back end rather than to
+   whichever base compiled `df-scan.cc'.  The existence question that guard is
+   really asking is answered inside the per-base thunk, where a base defining
+   nothing hits `dwarf2cfi.cc:52's `gcc_unreachable ()' by name.  */
+extern machine_mode mt_case_vector_mode (void);
+extern rtx mt_incoming_return_addr_rtx (void);
 
 #endif /* GCC_TARGET_FRAME_H */

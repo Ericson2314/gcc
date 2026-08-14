@@ -163,10 +163,35 @@ along with GCC; see the file COPYING3.  If not see
      the macro invariant.  It is not; freezing it would silently change PIC
      code generation.
 
-     `Pmode', `CASE_VECTOR_MODE' and `STACK_SIZE_MODE' are `machine_mode's, and
-     mode NUMBERING is per base.  A mode in this struct would be a number
-     transported into a vocabulary where it means something else -- the
-     shared-numbering problem, which is Stage 4's, not this mechanism's.  */
+     `Pmode', `CASE_VECTOR_MODE' and `STACK_SIZE_MODE' are `machine_mode's,
+     and they stay out of this struct -- but READ THE NEXT PARAGRAPH BEFORE
+     CITING THIS ONE AS A BLOCKER ON CONVERTING THEM AT ALL.
+
+     THE REASON GIVEN HERE USED TO BE "mode NUMBERING is per base", i.e. that
+     a mode in this struct would be a number transported into a vocabulary
+     where it means something else.  MEASURED, THAT PREMISE IS FALSE ON THIS
+     TREE, and it had already been false for as long as `mt_base_pmode' has
+     existed.  `genmodes.cc' unions the mode VOCABULARY and keeps only the
+     per-base DATA, so the enumerators of `enum machine_mode' are one shared
+     numbering: over `insn-modes-i386.h' and `insn-modes-aarch64.h', 244
+     enumerators each, identical in order and value -- `E_SImode' is 27 and
+     `E_DImode' 28 on both -- while the two files differ overall exactly as
+     the per-base data is meant to.  `scratchpad/a446b256f0b8bb99c-modenum.sh',
+     with a negative control, because "both lists came out empty" and "both
+     lists agree" are the same output.
+
+     So the objection to a mode HERE is the one every other entry in this
+     block has, and it is enough on its own: these three are OPTION STATE, not
+     invariants.  i386's `CASE_VECTOR_MODE' (i386.h:1920) reads `flag_pic' and
+     `ix86_cmodel'; `Pmode' reads `ix86_pmode'.  A value cached at selection
+     time would be frozen at whatever the command line said -- the same defect
+     as `PIC_OFFSET_TABLE_REGNUM' just above.
+
+     WHAT THAT DISTINCTION CHANGES: it rules these names out of THIS
+     mechanism, and it does NOT defer them to the mode-numbering work.  All
+     three belong in `target_frame_desc' as CALLS, which is where `Pmode' and
+     `FUNCTION_MODE' already are and where `CASE_VECTOR_MODE' now is.
+     `STACK_SIZE_MODE' is the one of the three still unconverted.  */
 #define TARGET_CDATA_FIELDS(STR, NUM)					\
   STR (asm_comment_start,	ASM_COMMENT_START)			\
   STR (wchar_type,		WCHAR_TYPE)				\

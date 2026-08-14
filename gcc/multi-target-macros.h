@@ -1213,6 +1213,30 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef REGMODE_NATURAL_SIZE
 #define REGMODE_NATURAL_SIZE(MODE) (mt_regmode_natural_size (MODE))
 
+/* `CASE_VECTOR_MODE' completes the jump-table pair above, and
+   `INCOMING_RETURN_ADDR_RTX' is the authority behind the last standing
+   aarch64 ICE column.  See target-frame.h for both field comments.
+
+   `CASE_VECTOR_MODE' WAS CORRECT BY LUCK AND ONLY WITHOUT PIC.  aarch64's is
+   `Pmode'; i386's (`i386.h:1920') is
+   `(!TARGET_LP64 || (flag_pic && ix86_cmodel != CM_LARGE_PIC)
+     ? SImode : DImode)'.  Both are DImode when `!flag_pic', which is why the
+   two-base build agreed; under `-fpic' i386's becomes SImode and aarch64 got
+   4-byte jump-table elements from a back end that requires `Pmode'.
+   `target-cdata.h:166' defers this name to the mode-numbering work, and that
+   deferral is about a CACHED FIELD -- the mode vocabulary is unioned, so a
+   mode returned by a CALL crosses no numbering boundary, exactly as `Pmode'
+   and `FUNCTION_MODE' already do.
+
+   `INCOMING_RETURN_ADDR_RTX' is a KIND divergence and not a value one: i386
+   says the return address is in memory at the stack pointer, aarch64 says it
+   is in x30.  `dwarf2cfi.cc:3283' built every target's CIE from i386's
+   answer, and `maybe_record_trace_start' then found the rows inconsistent.  */
+#undef CASE_VECTOR_MODE
+#define CASE_VECTOR_MODE (mt_case_vector_mode ())
+#undef INCOMING_RETURN_ADDR_RTX
+#define INCOMING_RETURN_ADDR_RTX (mt_incoming_return_addr_rtx ())
+
 /* ------------------------------------------------------------------------
    THE OPTION-STATE FAMILY -- `UNITS_PER_WORD', `POINTER_SIZE',
    `BIGGEST_ALIGNMENT'.  See target-frame.h for the bodies, for why all three
