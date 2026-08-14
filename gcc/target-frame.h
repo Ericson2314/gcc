@@ -1204,6 +1204,63 @@ struct target_frame_desc
          which is the constant-ness assumption this project is removing.  */
   bool (*has_push_rounding) (void);
   poly_int64 (*push_rounding) (poly_int64 bytes);
+
+  /* `CASE_VECTOR_PC_RELATIVE' -- the jump-table shape.  THREE shared sites
+     (`stmt.cc:1202', `expr.cc:14356', `final.cc:2147') and, before this, all
+     three were answered by the primary: i386 does not define the macro at
+     all, so `defaults.h:1162' supplied 0 for everyone, while aarch64's
+     `aarch64.h:1496' says 1.
+
+     WHAT THAT COST, MEASURED RATHER THAN ARGUED.  `stmt.cc' emitted an
+     `ADDR_VEC' for aarch64 where the back end's own `casesi' expander
+     requires an `ADDR_DIFF_VEC', and `aarch64_output_casesi' then died on its
+     first line -- `gcc_assert (GET_CODE (diff_vec) == ADDR_DIFF_VEC)'.  68
+     ICEs in the aarch64 testsuite column.
+
+     A FUNCTION AND NOT A `target-cdata' FIELD, for the reason that struct's
+     header states: the macro is option-dependent on seven of the sixteen back
+     ends that define it -- `riscv_cmodel' (riscv.h:913),
+     `rs6000_relative_jumptables' (rs6000.h:1735), `flag_pic || optimize_size'
+     (nds32.h:1698), `TARGET_PID' (rx.h:466), `flag_pic' (c6x, nvptx),
+     `TARGET_MIPS16_SHORT_JUMP_TABLES' (mips.h:2714).  A value cached at
+     selection time would be frozen at whatever the command line said.
+
+     SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE REDIRECTING.  The one
+     `#if CASE_VECTOR_PC_RELATIVE' in the tree is `m68k.md:5804', which is a
+     back end's own translation unit and therefore keeps the real macro; no
+     `#if', `#ifdef', case label, array bound or static initialiser in shared
+     code names it.  */
+  bool (*case_vector_pc_relative) (void);
+
+  /* `REGMODE_NATURAL_SIZE' -- how much of a register one mode occupies.
+     EIGHT shared sites (`emit-rtl.cc' x2, `combine.cc' x2, `rtlanal.cc',
+     `expmed.cc' x2, `expr.cc', `cfgexpand.cc', `ira-conflicts.cc',
+     `reginfo.cc') and, before this, all of them were i386's.
+
+     THIS IS THE `regs.h:31' FALLBACK NOT BEING REACHED, which is worth saying
+     because `multi-target-macros.h' lists this name among the eleven that
+     inherit the `UNITS_PER_WORD' redirect by ordinary macro expansion.  That
+     inheritance only happens when regs.h's `#ifndef' is TAKEN -- and it is
+     not, because the primary's `i386.h:1112' has already defined the name as
+     `ix86_regmode_natural_size (MODE)'.  So the derived conversion recorded
+     there was real for a base that defines nothing and dead for the one that
+     matters.  Four back ends define the macro: i386, aarch64, riscv, sparc.
+
+     WHAT IT COST.  aarch64's answer is `BYTES_PER_SVE_PRED' /
+     `BYTES_PER_SVE_VECTOR' for variable-width SVE modes and `UNITS_PER_WORD'
+     otherwise; i386's is `UNITS_PER_WORD' for everything that is not
+     P2HImode/P2QImode.  `gen_lowpart_common (emit-rtl.cc:1649)' therefore
+     computed `mregs > xregs' with the wrong divisor for every SVE mode and
+     returned 0, and `gen_lowpart_general (rtlhooks.cc:57)' asserted.  509
+     ICEs in the aarch64 testsuite column, of which 447 are
+     `gcc.target/aarch64/sve'.
+
+     `poly_uint64' AND NOT `unsigned int': aarch64's and riscv's already
+     return `poly_uint64' (an SVE vector's size is not constant), and every
+     shared site already stores the result in a `poly_uint64'.  Narrowing here
+     would put a `.to_constant ()' where SVE is exactly the case that has
+     none.  i386's and sparc's `unsigned int' widen silently and correctly.  */
+  poly_uint64 (*regmode_natural_size) (machine_mode mode);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1447,5 +1504,13 @@ extern int mt_reg_parm_stack_space (tree fndecl_or_type);
    including aarch64, so it is observable on the configured pair.  */
 extern bool mt_has_push_rounding (void);
 extern poly_int64 mt_push_rounding (poly_int64 bytes);
+
+/* `CASE_VECTOR_PC_RELATIVE' and `REGMODE_NATURAL_SIZE', for shared code.  Both
+   ARE redirected in `multi-target-macros.h': neither name is `#ifdef'-tested
+   anywhere in shared code, so unlike `PUSH_ROUNDING' there is no guard that
+   could end up answered by a different back end than the body.  See the field
+   comments above for the two ICE columns they were producing.  */
+extern bool mt_case_vector_pc_relative (void);
+extern poly_uint64 mt_regmode_natural_size (machine_mode mode);
 
 #endif /* GCC_TARGET_FRAME_H */

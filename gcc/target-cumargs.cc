@@ -62,6 +62,12 @@ along with GCC; see the file COPYING3.  If not see
    here.  */
 #include "emit-rtl.h"
 #include "predict.h"
+/* For `regs.h:31''s `#ifndef REGMODE_NATURAL_SIZE' fallback, evaluated HERE
+   so that a base which does not define the macro gets `UNITS_PER_WORD' from
+   its OWN headers.  Including the header rather than restating the fallback
+   is deliberate: a restatement would be a second authority for the value and
+   would silently stop tracking regs.h.  */
+#include "regs.h"
 #include "multi-target-reg-widths.h"
 /* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
    booleans at the bottom of this file.  */
@@ -872,6 +878,35 @@ mt_base_push_rounding (poly_int64 bytes ATTRIBUTE_UNUSED)
 #endif
 }
 
+/* `CASE_VECTOR_PC_RELATIVE' and `REGMODE_NATURAL_SIZE', read in THIS base's
+   translation unit.  See target-frame.h for both field comments.
+
+   NEITHER NEEDS AN `#ifdef' AND NEITHER GETS ONE, but the two reach their
+   fallback by different routes and both routes are supply-side -- each base
+   gets upstream's own documented default for a back end that defines nothing,
+   never another base's answer:
+
+     `CASE_VECTOR_PC_RELATIVE'  `defaults.h:1161' `#ifndef' -> 0, and
+                                `defaults.h' is the tail of THIS base's
+                                `tm.h', so the 0 is evaluated here.
+     `REGMODE_NATURAL_SIZE'     `regs.h:31' `#ifndef' -> `UNITS_PER_WORD',
+                                which is why this file includes `regs.h' at
+                                all.  In a SHARED translation unit that
+                                `#ifndef' is not taken -- the primary's
+                                `i386.h:1112' got there first -- which is the
+                                whole defect.  */
+static bool
+mt_base_case_vector_pc_relative (void)
+{
+  return CASE_VECTOR_PC_RELATIVE != 0;
+}
+
+static poly_uint64
+mt_base_regmode_natural_size (machine_mode mode ATTRIBUTE_UNUSED)
+{
+  return REGMODE_NATURAL_SIZE (mode);
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -1332,7 +1367,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_has_reg_parm_stack_space,
   mt_base_reg_parm_stack_space,
   mt_base_has_push_rounding,
-  mt_base_push_rounding
+  mt_base_push_rounding,
+  mt_base_case_vector_pc_relative,
+  mt_base_regmode_natural_size
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

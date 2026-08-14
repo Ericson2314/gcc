@@ -1192,6 +1192,28 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define SET_RATIO(SPEED) (mt_set_ratio ((bool) (SPEED)))
 
 /* ------------------------------------------------------------------------
+   THE JUMP-TABLE SHAPE AND THE REGISTER-GRANULARITY ANSWER.  Two names, two
+   ICE columns in the aarch64 testsuite, and the same disguise: one macro,
+   several authorities, no diagnostic.  See target-frame.h for both field
+   comments and for the position sweeps.
+
+   `REGMODE_NATURAL_SIZE' IS NOT A NEW CONVERSION SO MUCH AS A CORRECTION TO
+   ONE THIS FILE ALREADY CLAIMED.  The `MIN_UNITS_PER_WORD' closure note below
+   lists `regs.h:31 REGMODE_NATURAL_SIZE (UNITS_PER_WORD)' among the eleven
+   names that inherit the option-state redirect by ordinary macro expansion.
+   That inheritance requires regs.h's `#ifndef' to be TAKEN, and in a shared
+   translation unit it is not: the primary's `i386.h:1112' defines the name as
+   `ix86_regmode_natural_size (MODE)' long before regs.h is read.  So the
+   entry was true for a hypothetical base defining nothing and dead for the
+   four back ends that define it -- i386, aarch64, riscv, sparc.  The
+   `#undef' here is what makes it real, and it must come AFTER that block's
+   `UNITS_PER_WORD' redirect has no further say in this name.  */
+#undef CASE_VECTOR_PC_RELATIVE
+#define CASE_VECTOR_PC_RELATIVE (mt_case_vector_pc_relative ())
+#undef REGMODE_NATURAL_SIZE
+#define REGMODE_NATURAL_SIZE(MODE) (mt_regmode_natural_size (MODE))
+
+/* ------------------------------------------------------------------------
    THE OPTION-STATE FAMILY -- `UNITS_PER_WORD', `POINTER_SIZE',
    `BIGGEST_ALIGNMENT'.  See target-frame.h for the bodies, for why all three
    are calls rather than cached values, and for the closure note.
@@ -1214,6 +1236,9 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
        :1278      ATTRIBUTE_ALIGNED_VALUE       (BIGGEST_ALIGNMENT)
        :1835      STACK_CHECK_FIXED_FRAME_SIZE  (UNITS_PER_WORD)
        regs.h:31  REGMODE_NATURAL_SIZE          (UNITS_PER_WORD)
+                    -- LISTED HERE AND NEVER TRUE.  regs.h's `#ifndef' is
+                    not taken in a shared TU; i386.h:1112 defined the name
+                    first.  Redirected on its own above.
 
    A macro BODY is expanded at the use site, not where it is written, so each
    of those picks up the redirect automatically and correctly -- 354 further
