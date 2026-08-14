@@ -37,14 +37,16 @@ probe () {
     || { echo "FATAL: $base dump has no __cplusplus -- it was preprocessed as C, and every multi-target-macros.h redirect is off in that mode"; exit 9; }
   v=$(awk -v m="$macro" '$1 == "#define" && $2 == m { $1=""; $2=""; print; exit }' \
 	"$D/dm-$base.txt")
-  [ -n "$v" ] || v="(absent)"
+  # ABSENT IS NOT AN ANSWER.  An empty dump reads the same way as a macro that
+  # is genuinely undefined, so the probe macro must be one BOTH bases define.
+  [ -n "$v" ] || { echo "FATAL: $macro absent from $base's dump"; exit 9; }
   printf '%-10s %-28s %-22s %s\n' "$base" "$obj" "$macro" "$v"
   eval "R_$base=\$v"
 }
 
 printf '%-10s %-28s %-22s %s\n' base object macro value
-probe i386  mt-i386/i386-c.o          TARGET_64BIT_DEFAULT
-probe riscv mt-riscv/riscv-c.o        TARGET_64BIT_DEFAULT
+probe i386  mt-i386/i386-c.o          POINTER_SIZE
+probe riscv mt-riscv/riscv-c.o        POINTER_SIZE
 
 # Both-sided: one value proves nothing if the other is the same.
 if [ "$R_i386" = "$R_riscv" ]; then
