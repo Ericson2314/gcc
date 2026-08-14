@@ -59,11 +59,28 @@ predefined_function_abi::initialize (unsigned int id,
      to change the interface of TARGET_HARD_REGNO_CALL_PART_CLOBBERED so
      that it tells us which registers in a multi-register value are
      actually clobbered.  */
+  /* ALL THREE REGISTER WALKS IN THIS FUNCTION ARE BOUNDED BY
+     MT_FIRST_PSEUDO_REGISTER, NOT BY FIRST_PSEUDO_REGISTER.  They ask
+     `targetm.hard_regno_mode_ok' about a register number; the union width is
+     the widest configured back end's (334, ia64's) while each back end
+     answers from a table of its own width.  Measured by an ASAN `cc1'
+     compiling for mips64, whose table is 188 wide:
+
+       AddressSanitizer: global-buffer-overflow, READ of size 1
+         #0 mips_hard_regno_mode_ok  config/mips/mips.cc:13404
+         #1 predefined_function_abi::initialize  function-abi.cc:67
+         #2 init_reg_sets_1  reginfo.cc:635
+       0 bytes after global variable 'mips_hard_regno_mode_ok_p'
+
+     The HARD_REG_SETs written here keep the union layout; only the walk is
+     the selected base's own count.  A register this base does not have is
+     absent from every one of these sets, which is what its absence means.  */
   m_full_and_partial_reg_clobbers = full_reg_clobbers;
   for (unsigned int i = 0; i < NUM_MACHINE_MODES; ++i)
     {
       machine_mode mode = (machine_mode) i;
-      for (unsigned int regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+      for (unsigned int regno = 0;
+	   regno < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++regno)
 	if (targetm.hard_regno_mode_ok (regno, mode)
 	    && hard_regno_nregs (regno, mode) == 1
 	    && targetm.hard_regno_call_part_clobbered (m_id, regno, mode))
@@ -86,7 +103,8 @@ predefined_function_abi::initialize (unsigned int id,
     {
       machine_mode mode = (machine_mode) i;
       m_mode_clobbers[i] = m_full_and_partial_reg_clobbers;
-      for (unsigned int regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+      for (unsigned int regno = 0;
+	   regno < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++regno)
 	if (targetm.hard_regno_mode_ok (regno, mode)
 	    && !overlaps_hard_reg_set_p (m_full_reg_clobbers, mode, regno)
 	    && !targetm.hard_regno_call_part_clobbered (m_id, regno, mode))
@@ -101,7 +119,8 @@ predefined_function_abi::initialize (unsigned int id,
       {
 	machine_mode mode = (machine_mode) i;
 	const_hard_reg_set all_clobbers = m_full_and_partial_reg_clobbers;
-	for (unsigned int regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+	for (unsigned int regno = 0;
+	     regno < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++regno)
 	  if (targetm.hard_regno_mode_ok (regno, mode)
 	      && !overlaps_hard_reg_set_p (m_full_reg_clobbers, mode, regno)
 	      && targetm.hard_regno_call_part_clobbered (m_id, regno, mode))
