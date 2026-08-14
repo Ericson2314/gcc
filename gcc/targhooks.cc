@@ -97,6 +97,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "options.h"
 #include "case-cfn-macros.h"
 #include "avoid-store-forwarding.h"
+#include "multi-target-md-entry.h"
 
 bool
 default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
@@ -2893,11 +2894,14 @@ default_instruction_selection (function *, gimple_stmt_iterator *)
 bool
 default_have_speculation_safe_value (bool active ATTRIBUTE_UNUSED)
 {
-#ifdef HAVE_speculation_barrier
-  return active ? HAVE_speculation_barrier : true;
-#else
-  return false;
-#endif
+  /* The back end in force answers, through its own mt_md_entry_points.
+     `HAVE_speculation_barrier' is the singular insn-flags.h's, i.e. one back
+     end's machine description answering for every back end in the compiler:
+     both halves of it -- whether the pattern exists, and whether its condition
+     holds -- were i386's here.  */
+  if (!multi_target_has_speculation_barrier_p ())
+    return false;
+  return active ? multi_target_have_speculation_barrier () : true;
 }
 /* Alternative implementation of TARGET_HAVE_SPECULATION_SAFE_VALUE
    that can be used on targets that never have speculative execution.  */
@@ -2917,13 +2921,11 @@ default_speculation_safe_value (machine_mode mode ATTRIBUTE_UNUSED,
 {
   emit_move_insn (result, val);
 
-#ifdef HAVE_speculation_barrier
   /* Assume the target knows what it is doing: if it defines a
      speculation barrier, but it is not enabled, then assume that one
      isn't needed.  */
-  if (HAVE_speculation_barrier)
+  if (multi_target_have_speculation_barrier ())
     emit_insn (gen_speculation_barrier ());
-#endif
 
   return result;
 }

@@ -414,7 +414,12 @@ extern rtx replace_equiv_address (rtx, rtx, bool = false);
 /* Likewise, but the reference is not required to be valid.  */
 extern rtx replace_equiv_address_nv (rtx, rtx, bool = false);
 
+/* Defined in multi-target-select.cc, forwarding to the back end in force.  */
 extern rtx gen_blockage (void);
+
+/* The expansion `gen_blockage' uses for a back end with no `blockage'
+   pattern.  */
+extern rtx gen_asm_input_blockage (void);
 extern rtvec gen_rtvec (int, ...);
 extern rtx copy_insn_1 (rtx);
 extern rtx copy_insn (rtx);

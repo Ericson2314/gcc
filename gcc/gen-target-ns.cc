@@ -35,7 +35,7 @@ along with GCC; see the file COPYING3.  If not see
    An existing build directory hid this completely, because the header was
    already there from an earlier state; it reproduced only from an empty one.
 
-   The six functions below read no target macro and touch no rtx -- they are
+   The functions below read no target macro and touch no rtx -- they are
    string handling over GEN_HDR_SUFFIX.  Splitting them out is therefore not a
    weakening of the single-authority rule that put them next to gensupport in
    the first place: there is still exactly ONE definition of gen_target_ns ()
@@ -153,6 +153,52 @@ gen_name_is_global_p (const char *name)
     return false;
   for (unsigned i = 0; i < ARRAY_SIZE (globals); i++)
     if (strcmp (name, globals[i]) == 0)
+      return true;
+  return false;
+}
+
+/* THE MIDDLE END'S BARE gen_* NAMES.
+
+   builtins.cc, explow.cc and function.cc call `gen_blockage'; cfgrtl.cc,
+   except.cc, targhooks.cc and varasm.cc call `gen_nop'; targhooks.cc calls
+   `gen_speculation_barrier'.  Those calls are compiled once, in shared
+   objects, so the name they bind to has to answer for whichever back end is
+   in force at run time.
+
+   Each entry here becomes three things, all from this one list: a field of
+   `struct mt_md_entry_points', a per-back-end initialiser genemit writes into
+   insn-emit-<base>.cc, and a forwarder in multi-target-select.cc.  The order
+   of the fields follows the order of this array.
+
+   The names are md PATTERN names, without the `gen_' prefix, matching
+   gen_name_is_global_p above.
+
+   `movxf' is deliberately absent.  Its only caller is reg-stack.cc, which is
+   x87 code, and it is defined by i386 and not by aarch64 -- so it is a
+   question about which objects reg-stack.cc belongs in, not about who answers
+   a shared name.  See multi-target-select.cc.  */
+
+static const char *const mt_md_entries[] = {
+  "blockage", "nop", "speculation_barrier"
+};
+
+static_assert (ARRAY_SIZE (mt_md_entries) == MT_MD_ENTRY_COUNT,
+	       "mt_md_entries and MT_MD_ENTRY_COUNT must agree");
+
+const char *
+mt_md_entry_name (unsigned i)
+{
+  gcc_assert (i < ARRAY_SIZE (mt_md_entries));
+  return mt_md_entries[i];
+}
+
+bool
+gen_name_is_md_entry_p (const char *name)
+{
+  if (!gen_multi_target_p ())
+    return false;
+  for (unsigned i = 0; i < ARRAY_SIZE (mt_md_entries); i++)
+    if (strcmp (name, mt_md_entries[i]) == 0)
       return true;
   return false;
 }

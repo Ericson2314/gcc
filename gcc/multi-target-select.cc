@@ -85,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-cumargs.h"
 #include "target-regstack.h"
 #include "multi-target-reg-widths.h"
+#include "multi-target-md-entry.h"
 /* For `optab', `struct target_optabs' and the four optab entry points below.
    `insn-opinit.h' is safe to include HERE, from a shared translation unit,
    only because everything in it that this file names is target-independent
@@ -214,6 +215,7 @@ tree ms_va_list_type_node;
   extern void init_all_optabs (struct target_optabs *);			\
   extern bool swap_optab_enable (optab, machine_mode, bool);		\
   extern bool partial_vectors_supported_p (void);			\
+  extern const struct mt_md_entry_points mt_md_entry_table;		\
   MT_DECLARE_VERIFY
 
 /* The data tables.  One list, used three times: to declare them per back end,
@@ -314,6 +316,9 @@ struct mt_backend
   void (*init_all_optabs) (struct target_optabs *);
   bool (*swap_optab_enable) (optab, machine_mode, bool);
   bool (*partial_vectors_supported_p) (void);
+  /* The gen_* the middle end calls by a bare name, and whether this back end
+     has each pattern at all; see multi-target-md-entry.h.  */
+  const struct mt_md_entry_points *md;
 #if CHECKING_P
   void (*verify_reg_names_in_constraints) (void);
 #endif
@@ -370,12 +375,13 @@ MT_BACKENDS
     NS::peephole, NS::init_adjust_machine_modes,			\
     NS::raw_optab_handler, NS::init_all_optabs,				\
     NS::swap_optab_enable, NS::partial_vectors_supported_p,		\
+    &NS::mt_md_entry_table,						\
     MT_ENTRY_VERIFY (NS)						\
     mt_install_ ## BASE },
 static const struct mt_backend mt_backends[] = {
   MT_BACKENDS
   { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL,
     MT_ENTRY_VERIFY_NULL NULL }
 };
 #undef MT_BACKEND
@@ -843,63 +849,113 @@ selected_partial_vectors_supported_p (void)
    verify_reg_names_in_constraints: genoutput emits it only under
    `#if CHECKING_P'.
 
-   THIS COMMENT SAID "THE TWO CONDITIONAL ONES" AND DESCRIBED A gen_blockage
-   FORWARDER BELOW IT.  There is no such forwarder and there never was -- the
-   description was the whole of it.  Do not read the paragraph that follows as
-   a record of something that exists; it is the open problem, restated with
-   what task #51 measured.
-
-   SIX bare names WERE supplied to every configured target by the PRIMARY's
+   SIX bare names were supplied to every configured target by the PRIMARY's
    un-namespaced insn-emit-*.o, measured on /tmp/b78 (x86_64 + aarch64) with
-   `nm' over every object in the link.  TWO OF THE SIX ARE NOW SELECTED --
-   `add_clobbers' and `added_clobbers_hard_reg_p', the forwarders below --
-   and FOUR REMAIN:
+   `nm' over every object in the link:
 
      add_clobbers               <- combine.o recog.o rtl-ssa/changes.o   DONE
      added_clobbers_hard_reg_p  <- gcse.o recog.o                        DONE
-     gen_blockage               <- builtins.o explow.o function.o
+     gen_blockage               <- builtins.o explow.o function.o        DONE
                                    insn-output-{i386,aarch64}.o
                                    mt-i386/i386.o mt-aarch64/aarch64.o
-     gen_nop                    <- cfgrtl.o except.o targhooks.o varasm.o
-     gen_speculation_barrier    <- targhooks.o
-     gen_movxf                  <- reg-stack.o
+     gen_nop                    <- cfgrtl.o except.o targhooks.o         DONE
+                                   varasm.o
+     gen_speculation_barrier    <- targhooks.o                           DONE
+     gen_movxf                  <- reg-stack.o                           OPEN
 
-   gen_blockage is the one with a demonstrated wrong answer behind it:
-   UNSPECV_BLOCKAGE is 1 for i386 and 5 for aarch64, so aarch64 emits an
-   unspec_volatile numbered 1 that its own recog matches at 5.
+   gen_blockage is the one with a measured wrong answer behind it.
+   UNSPECV_BLOCKAGE is 1 for i386 and 5 for aarch64, so aarch64 emitted an
+   unspec_volatile numbered 1 which its own recog matches at 5.  Read from a
+   compiled function rather than from a symbol table -- the wrong answer LINKS
+   -- with scratchpad/t136-blockage.sh, whose witness is five lines at -O2
+   -fstack-clash-protection:
 
-   Writing the forwarders is NOT what was blocking this.  gcc/Makefile.in's
-   OBJS names BOTH $(MULTI_TARGET_OBJS) and the primary's un-namespaced
-   $(INSNEMIT_SEQ_O), so a forwarder here collides with insn-emit-*.o
-   immediately.  (The comment further down that file claiming OBJS names the
-   former "rather than" the latter is false; both are on the list.)
+     x86_64   (unspec_volatile [(const_int 0)] UNSPECV_BLOCKAGE)   rc 0
+     aarch64  (unspec_volatile [(const_int 0)] UNSPECV_GET_FPCR)   rc 4
 
-   RESOLVED FOR THE FIRST TWO, and not by touching OBJS: genemit now declines
-   to WRITE `add_clobbers' / `added_clobbers_hard_reg_p' in the un-namespaced
-   run, so there is nothing left in insn-emit-*.o to collide with.  The rest
-   of that object -- gen_blockage and the other gen_* -- is untouched, so this
-   did not have to decide anything about the four below.  The same move is
-   NOT available to those four, for the reason two paragraphs down: whether
-   they are called at all is decided by HAVE_* out of the singular
-   insn-flags.h, so deleting the definition would change which code runs and
-   not merely who answers.
+   UNSPECV_GET_FPCR is what aarch64's own printer calls the number 1.  It is
+   an ICE at the vregs pass under -fstack-clash-protection and silence
+   without it.
 
-   And five of the six can take a uniform forwarder while ONE cannot: every
-   configured base defines add_clobbers, added_clobbers_hard_reg_p,
-   gen_blockage, gen_nop and gen_speculation_barrier in its own namespace, but
-   gen_movxf is defined by i386 and not by aarch64 -- so `fail to link, naming
-   the base' is the right behaviour for the five and the wrong behaviour for
-   gen_movxf, whose only caller (reg-stack.cc) is x87 code aarch64 cannot
-   reach.  That is a design question and is left to a ruling, not resolved
-   here by whichever choice makes the build succeed.
+   The three below are what genemit no longer writes in the un-namespaced run
+   -- the same move that landed for add_clobbers, and legal for the same
+   reason: with nothing left in insn-emit-*.o under those names, a definition
+   here does not collide with the $(INSNEMIT_SEQ_O) that $(OBJS) names beside
+   $(MULTI_TARGET_OBJS).
 
-   Separately, and true of gen_blockage, gen_nop, gen_speculation_barrier and
-   gen_movxf but not of the other two: WHETHER the middle end calls them at all
-   is decided by HAVE_blockage / HAVE_speculation_barrier / STACK_REGS out of
-   the SINGULAR insn-flags.h and tm.h, still the primary's.  Forwarding fixes
-   which expansion runs; it does not fix who decides that one runs.  That is an
-   insn-flags.h union job, the same one insn-config.h has already had done to
-   it.  */
+   WHETHER THE MIDDLE END CALLS THEM WAS THE OTHER HALF, and it was decided by
+   HAVE_* out of the SINGULAR insn-flags.h, i.e. by one back end for all of
+   them.  Each name is answered per base now, by the mt_md_entry_points that
+   genemit writes into insn-emit-<base>.cc, and a null pointer there is a real
+   answer -- `this back end has no such pattern':
+
+     blockage             absent -> gen_asm_input_blockage (), which is the
+			  expansion emit-rtl.cc gave such a back end under
+			  `#if !HAVE_blockage'.  That `#if' is gone.
+     speculation_barrier  absent -> the barrier is not emitted and
+			  TARGET_HAVE_SPECULATION_SAFE_VALUE is false, which is
+			  what `#ifdef HAVE_speculation_barrier' gave.  The
+			  pattern's md CONDITION travels too, as a predicate,
+			  because the hook reads it at run time.
+     nop                  absent -> internal_error naming the back end.  Every
+			  caller (cfgrtl.cc, except.cc, targhooks.cc,
+			  varasm.cc) calls it unconditionally, so there is no
+			  guard to carry and nothing to fall back to.
+
+   gen_movxf IS STILL THE PRIMARY'S.  Its only caller is reg-stack.cc, x87
+   code; i386 defines the pattern and aarch64 does not, so a uniform forwarder
+   would have to invent an answer for aarch64.  The user has ruled on the
+   shape -- reg-stack.cc is not shared code: "if it is not for all targets,
+   moving to a different file sounds good" -- which dissolves the name rather
+   than forwarding it, and is a separate change.  */
+
+rtx
+gen_blockage (void)
+{
+  const struct mt_md_entry_points *md = mt_in_force ("gen_blockage")->md;
+
+  if (md->gen_blockage == NULL)
+    return gen_asm_input_blockage ();
+  return md->gen_blockage ();
+}
+
+rtx
+gen_nop (void)
+{
+  const struct mt_backend *b = mt_in_force ("gen_nop");
+
+  if (b->md->gen_nop == NULL)
+    internal_error ("back end %qs has no %<nop%> pattern, and %<gen_nop%> "
+		    "is called unconditionally", b->name);
+  return b->md->gen_nop ();
+}
+
+rtx
+gen_speculation_barrier (void)
+{
+  const struct mt_backend *b = mt_in_force ("gen_speculation_barrier");
+
+  if (b->md->gen_speculation_barrier == NULL)
+    internal_error ("back end %qs has no %<speculation_barrier%> pattern",
+		    b->name);
+  return b->md->gen_speculation_barrier ();
+}
+
+bool
+multi_target_has_speculation_barrier_p (void)
+{
+  return (mt_in_force ("multi_target_has_speculation_barrier_p")
+	    ->md->gen_speculation_barrier != NULL);
+}
+
+bool
+multi_target_have_speculation_barrier (void)
+{
+  const struct mt_md_entry_points *md
+    = mt_in_force ("multi_target_have_speculation_barrier")->md;
+
+  return md->have_speculation_barrier && md->have_speculation_barrier ();
+}
 
 #if CHECKING_P
 void
