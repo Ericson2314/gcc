@@ -174,7 +174,65 @@ The evidence of the fix is §1 and §2.
 
 ---
 
-## 5. What is NOT claimed
+## 5. The suite delta
+
+Both targets, `MT_COMPILE_ONLY=1`, `make -j8`, both `rc=0`, all four
+`mtcheck.sh` guards green on both. Baseline is `T173-board.txt`
+(`80bf400ae06`).
+
+```
+                           PASS     FAIL   XPASS   XFAIL   UNSUP    UNRES   ERROR
+x86_64  T173 baseline    162165    16290       3    1556    4451    13361      32
+x86_64  this run         162165    16290       3    1556    4451    13354      16
+        delta                 0        0       0       0       0       -7     -16
+
+aarch64 T173 baseline     83158   106277       6     816   11298   133718      32
+aarch64 this run          93055    96910       3     845   11012   128852      16
+        delta             +9897    -9367      -3     +29    -286    -4866     -16
+```
+
+**x86_64 is unchanged in the five result columns — but NOT in all seven, and
+saying so matters.** `ERROR` fell 32 → 16 on **both** targets by the same
+amount, and `UNRES` moved −7 on x86_64. An identical move on both targets is
+not attributable to a change that only alters what aarch64 computes; it is a
+harness or environment difference between the baseline run and this one, and
+it is recorded rather than netted out. The columns that carry the signal
+(`PASS`/`FAIL`/`XPASS`) are frozen on x86_64 to the unit, which is the control
+this delta rests on.
+
+### The ICE column, counted from the merged `gcc.log`
+
+A `.sum` records an ICE as an ordinary FAIL and says nothing about where the
+compiler died, so these come from the log.
+
+```
+aarch64 ICEs by site                       before   this run
+  in gen_lowpart_general, rtlhooks.cc:57      509          0
+  in aarch64_output_casesi, aarch64.cc         68          0
+  in paradoxical_subreg_p, rtl.h:3338           4          0
+  in ordered_min, poly-int.h:1383               3          0
+  in maybe_record_trace_start, dwarf2cfi.cc     7          7
+`unrecognizable insn'                           0          0
+```
+
+**The two named causes are gone entirely, and two unnamed ones went with
+them.** `paradoxical_subreg_p` and `ordered_min` were not in the brief and
+were not aimed at: both assert on mode-size relations that
+`REGMODE_NATURAL_SIZE` feeds, so they were downstream symptoms of the same
+defect rather than separate causes — the same shape as `get_attr_type` falling
+out with `extract_insn` in #175.
+
+`maybe_record_trace_start` (7) did **not** move, and that is the honest
+negative: it is a CFI/unwind defect and this change does not touch unwinding.
+It is the whole of the remaining aarch64 ICE column.
+
+**The `before` column for the last three rows is `ed7feb54b99`'s log
+(`/tmp/b-a7de5`), not `T173-board.txt`'s** — the T173 log had been deleted
+before this task started, and the board file records only per-target totals
+and top FAIL files, not ICE sites. The 509 and 68 are the brief's own figures
+and agree with that log exactly.
+
+## 6. What is NOT claimed
 
 - **`CASE_VECTOR_MODE` is the same family and is NOT fixed here.** aarch64's
   is `Pmode`, i386's is
@@ -186,4 +244,22 @@ The evidence of the fix is §1 and §2.
 - **The suite delta is HEAD-vs-baseline, not these two commits in isolation.**
   The reproducers in §1 and §2 are what attribute the two ICE columns.
 - 45 of 47 back ends remain unmeasured; only C and LTO are configured, and
-  with no target libgcc every `dg-do run` is downgraded to compile.
+  with no target libgcc every `dg-do run` is downgraded to compile. Much of
+  *both* FAIL columns is the absent runtime; the aarch64-minus-x86_64 delta is
+  the signal and the common part is the build's shape.
+- **`KILLED` is 2 on aarch64, 0 on x86_64, counted and never subtracted** —
+  the same two as the T173 baseline. Two OOM-killed compilations remain in the
+  aarch64 FAIL column as ordinary failures.
+- **The run is PROVISIONAL by the board's own rule.** The 15-minute load
+  average at scoring time was **27.36** (1-min 19.85, 5-min 22.25), above the
+  ~25 threshold. Four other agents were building on this machine. That
+  inflates `KILLED` risk and timeout-shaped failures; it does not plausibly
+  manufacture a 509 → 0 ICE collapse, which §1 and §2 attribute directly.
+- **The whole-suite totals fell on aarch64** (335313 → 331677). Tests that ICE
+  emit extra result lines; removing the ICE removes them. Recorded rather than
+  netted out.
+- **The build dir was destroyed mid-run once by an unrelated `/tmp` sweep and
+  everything was re-measured from scratch**, including a fresh configure and
+  `make all-gcc` from the same snapshot. The bars and both reproducers came
+  out byte-identical across the two builds, which is a reproducibility check
+  this task did not set out to run.
