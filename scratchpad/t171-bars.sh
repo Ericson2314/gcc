@@ -52,7 +52,13 @@ done
 [ "$fatal" = 0 ] || exit 9
 # ... and each compiler must still be able to say no.  A cc1 that accepts
 # anything, or that dies before parsing, would make every arm below quiet.
-sed 's/^target .*/target sparc64-unknown-linux-gnu/' "$(cfg_of "$AFT" "$T1")" \
+# THE BOGUS TRIPLE MUST BE ONE NO BUILD HERE CONFIGURES, and the first draft
+# used `sparc64-unknown-linux-gnu' -- which IS configured in the eight-base
+# build, so the compiler accepted it, compiled, and ICEd in `ehcleanup'.  The
+# control then reported FATAL on a correct compiler.  A negative control whose
+# validity depends on the configuration is the same defect this task is about,
+# committed by its own harness.  `m68k' is in no base set used here.
+sed 's/^target .*/target m68k-unknown-linux-gnu/' "$(cfg_of "$AFT" "$T1")" \
   > "$O/bogus-config"
 sh "$S/eb-shell.sh" "cd $O && $(cc1_of "$AFT") -quiet -nostdinc \
   -ftarget-config=$O/bogus-config $BIG -o $O/bogus.s" \
