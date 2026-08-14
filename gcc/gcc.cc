@@ -8714,7 +8714,34 @@ driver::main (int argc, char **argv)
      here for that reason, the same way collect2 does it.  */
   for (int i = 1; i < argc; i++)
     if (startswith (argv[i], "-ftarget-config="))
-      read_target_caps (argv[i] + strlen ("-ftarget-config="));
+      {
+	const char *p = argv[i] + strlen ("-ftarget-config=");
+	read_target_caps (p);
+	/* AND IT IS `found_target_config' TOO.  A file the user pointed at
+	   and a file the driver searched for are the same kind of thing --
+	   the selected target's configuration, in the selected target's
+	   directory -- and everything keyed off `found_target_config' wants
+	   both.  In particular set_up_specs reads
+	   `dirname (found_target_config) / specs', which is where a target's
+	   `*option_defaults', `*self_spec', `*asm' and `*link' live.
+
+	   Leaving it NULL here meant that route was live ONLY for a driver
+	   invoked as `<triple>-gcc', and dead for every `-ftarget-config='
+	   invocation -- which is how this branch's own testsuite harness
+	   drives `xgcc'.  Measured, four bases, before:
+
+	     xgcc -B... -ftarget-config=<riscv cfg> -O2 -S    ->  cc1 with no
+	       -march= and no -mabi= at all, 32-bit code, `.attribute arch, ""'
+	       and `Error: the architecture string of -march and elf
+	       architecture attributes cannot be empty' from a real riscv64 as
+
+	   while `riscv64-unknown-linux-gnu-gcc' on the same input DID read
+	   the file, got `-march=rv64gc -mabi=lp64d', and reached the ICE this
+	   commit's sibling fixes.  Two invocations of one compiler taking two
+	   different paths through the target's own configuration, with the
+	   quieter one being the one everything was measured with.  */
+	found_target_config = p;
+      }
 
   /* Failing that, ask our own name.  An installed driver is called
      <triple>-gcc, and now so is the one in the build directory, so this is
