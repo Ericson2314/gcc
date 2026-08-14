@@ -270,6 +270,11 @@ extern unsigned int cl_enums_count;
    Must run before any option is decoded -- both driver::main and toplev::main
    scan argv for -ftarget-config= before decoding for exactly this reason.  */
 extern bool multi_target_options_select (const char *);
+
+/* The back end serving the target the call above selected, or NULL if none has
+   been selected.  Read by the driver to name `include-<base>' beside `include'
+   when it walks its exec prefixes (gcc.cc, `%I'); see the definition.  */
+extern const char *multi_target_options_base (void);
 #else
 extern const struct cl_enum cl_enums[];
 extern const unsigned int cl_enums_count;
@@ -286,6 +291,13 @@ extern const unsigned int cl_enums_count;
    the very next line.  It cannot mask a wrong table, because there is no
    other table for it to be masking.  */
 inline bool multi_target_options_select (const char *) { return true; }
+
+/* A single-target build has one `include' directory and no per-back-end one,
+   so there is no directory to name.  NULL rather than "" deliberately: the
+   caller skips the whole pass on NULL, where "" would make it walk every exec
+   prefix appending nothing and add each prefix itself to the system include
+   path.  */
+inline const char *multi_target_options_base (void) { return NULL; }
 #endif
 
 /* Possible ways in which a command-line option may be erroneous.
