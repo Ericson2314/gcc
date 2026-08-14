@@ -932,8 +932,12 @@ convert_modes (machine_mode mode, machine_mode oldmode, rtx x, int unsignedp)
       /* If the caller did not tell us the old mode, then there is not
 	 much to do with respect to canonicalization.  We have to
 	 assume that all the bits are significant.  */
+      /* Not MAX_MODE_INT: that is the UNION's widest integer mode, which for
+	 this back end may be a hole with no data behind it.  See
+	 widest_int_mode_for_target (machmode.h) for the abort it caused and
+	 why this is the selected base's own answer.  */
       if (!is_a <scalar_int_mode> (oldmode))
-	oldmode = MAX_MODE_INT;
+	oldmode = widest_int_mode_for_target ();
       wide_int w = wide_int::from (rtx_mode_t (x, oldmode),
 				   GET_MODE_PRECISION (int_mode),
 				   unsignedp ? UNSIGNED : SIGNED);
