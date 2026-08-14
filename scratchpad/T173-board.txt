@@ -1,0 +1,40 @@
+TARGET                             PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+--------------------------------------------------------------------------------------------
+x86_64-pc-linux-gnu              162165    16290        3     1556     4451    13361       32
+aarch64-unknown-linux-gnu         83158   106277        6      816    11298   133718       32
+
+== KILLED (compiler killed, NOT a test result -- machine contamination)
+  x86_64-pc-linux-gnu          0
+  aarch64-unknown-linux-gnu    2
+      xgcc: fatal error: cc1 terminated by signal 9 (Killed)
+      xgcc: fatal error: cc1 terminated by signal 9 (Killed)
+  load at scoring time: load average: 10.84, 16.99, 25.65
+  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is quoted)
+
+== top FAIL causes per target (first 12, by test file)
+-- x86_64-pc-linux-gnu
+    940 gcc.misc-tests/gcov-19.c
+     66 gcc.misc-tests/gcov-4.c
+     40 gcc.dg/analyzer/torture/boxed-int-1.c
+     35 gcc.misc-tests/gcov-22.c
+     30 gcc.dg/lto/pr80922-2
+     25 gcc.misc-tests/gcov-4b.c
+     24 gcc.dg/lto/pr80922-1
+     24 gcc.dg/analyzer/torture/asm-x86-linux-array_index_mask_nospec.c
+     20 gcc.dg/analyzer/torture/conditionals-2.c
+     19 gcc.misc-tests/gcov-7.c
+     16 outputs-348
+     16 outputs-346
+-- aarch64-unknown-linux-gnu
+    942 gcc.misc-tests/gcov-19.c
+    342 gcc.target/aarch64/advsimd-intrinsics/vcopy_lane_indices.c
+    223 gcc.target/aarch64/sve/acle/general-c/svwrite_lane_zt_1.c
+    218 gcc.target/aarch64/sve/acle/general-c/lut_4.c
+    201 gcc.target/aarch64/sve/acle/general-c/gnu_vectors_1.c
+    197 gcc.target/aarch64/sve/acle/general-c/gnu_vectors_2.c
+    186 gcc.target/aarch64/sve/acle/general-c/svwrite_zt_1.c
+    126 gcc.target/aarch64/fp8_scalar_typecheck_1.c
+    110 gcc.dg/Wstringop-overflow-77.c
+    108 compiler
+    101 gcc.target/aarch64/simd/lut-incorrect-range.c
+     89 gcc.target/aarch64/sve/acle/general-c/sizeless-2.c
