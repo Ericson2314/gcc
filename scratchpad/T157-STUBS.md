@@ -79,6 +79,47 @@ So the rename turned `multiple definition` into `undefined reference`, twice.
 the symbol. A symbol grep answers a different question than the one being
 asked, and answers it in the reassuring direction.
 
+## TWENTY COLLIDING NAMES THAT THE LINKER DID NOT DIAGNOSE
+
+`cc1` links with **eight** back ends at `f2c2de8aea9` — and
+`scratchpad/t157-rename-gap.sh` over the same build dir reports **27** bare
+names defined by more than one base. Seven are the deliberate
+`MULTI_TARGET_REG_PROBES` (`mt_probe_*`, compiled and never linked). **Twenty
+are real:**
+
+```
+aarch_accumulator_forwarding      arm_early_load_addr_dep
+aarch_mm_needs_acquire            arm_early_load_addr_dep_ptr
+aarch_mm_needs_release            arm_early_store_addr_dep
+aarch_rev16_p                     arm_early_store_addr_dep_ptr
+aarch_rev16_shleft_mask_imm_p     arm_mac_accumulator_is_mul_result
+aarch_rev16_shright_mask_imm_p    arm_mac_accumulator_is_result
+aarch_validate_mbranch_protection arm_md_asm_adjust
+make_pass_insert_bti              arm_no_early_alu_shift_dep
+                                  arm_no_early_alu_shift_value_dep
+                                  arm_no_early_mul_dep
+                                  arm_no_early_store_addr_dep
+                                  arm_rtx_shift_left_p
+```
+
+All are `config/arm/aarch-common.cc` and `config/arm/aarch-bti-insert.cc`,
+compiled once for **arm** and once for **aarch64** — the same shape as
+`config/linux.cc`, already in the rename list for the same reason.
+
+**A GREEN LINK IS NOT EVIDENCE THE RENAME LIST IS COMPLETE.** `gcc/Makefile.in`
+says so above the list — "libbackend.a is an ARCHIVE, so a duplicate is
+diagnosed only when both members happen to be pulled in for other reasons;
+`ld` once reported 7 of 40" — and this is that sentence being demonstrated on a
+live build rather than quoted. The seven `aarch_*` names in the previous commit
+*were* diagnosed; these twenty are the same defect in the same two files and
+were not. **The sweep is the authority; the linker is an under-count of it.**
+
+Not renamed here, deliberately: each name needs the macro test above (does the
+primary's `tm.h` expand some macro to it?) before a rename is safe, and two of
+eleven failed that test in this task. Renaming twenty blind on the strength of
+a sweep, with no link failure to check the result against, is how the
+`legitimate_pic_operand_p` mistake gets made twenty times instead of once.
+
 ## Not fixed, and NOT stubbed — the real work queue
 
 These are open walls, left failing loudly rather than papered over. None of
