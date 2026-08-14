@@ -14065,3 +14065,211 @@ Agents working at >2 bases no longer have to write "bar not applicable".
   tables (`mode_next[V1QI] == VOIDmode`, `class_narrowest_mode` = `V2QI`) plus
   the before/after ICE. A trip-count breakpoint would have said the same thing
   less durably.
+
+# #174 -- MODE ORDINALS: THE INDEX-ORIGIN HALF OF #164
+
+#164 fixed the WALK STARTS. `MIN_MODE_<CLASS>` is the shared numbering's first
+ordinal of a class, so `FOR_EACH_MODE_FROM (mode, MIN_MODE_VECTOR_INT)` ran
+zero iterations for a base whose narrowest vector int differs; the fix was to
+start such walks at `GET_CLASS_NARROWEST_MODE`. The **same constant is also an
+INDEX ORIGIN, an ARRAY BOUND and a STRUCT SIZE**, and that half was untouched.
+This is the enumeration of that half, at **11 bases** (`t170-bases11.txt`),
+anchor **55**, snapshots `7f6febe5628` (before) and `4b78f6fc998` (after).
+
+## 1. THE POPULATION -- EVERY `MIN_MODE_` USE IN THE TREE, BY CAUSE
+
+`grep -rn 'MIN_MODE_'` over `gcc/**/*.{cc,h}` outside `genmodes.cc` is **43
+lines**. They sort into five causes and nothing else.
+
+| cause | sites | back ends affected | state |
+|---|---|---|---|
+| **A. origin diverges between shared and per-base TUs** | `expmed.h:243,248,254,604,631` | **all 11** (arm's TUs against everyone else's) | **FIXED** |
+| **B. union ordinal shifted into a 64-bit mask** | `aarch64-protos.h:495-499` | 1 defines it; the WIDTH is a function of the whole union | **OPEN -- design** |
+| **C. origin + bound both union-derived** | `tree.cc:10397,10419,10421`, `tree-complex.cc:1081,1084`, `rs6000.cc:28874,28885`, `tree-core.h:194,199` | 0 diverging | **CHECKED CLEAN** |
+| **D. ordinal RANGE over the union, visiting holes** | `emit-rtl.cc:6496,6509,6526`, `optabs-query.cc:746` | all, at >1 base | **FIXED** (the rest -- `expmed.cc:226,316,322,328`, `tree.cc:10397`, `machmode.h:1417` -- were already guarded) |
+| **E. same shape, different origin, non-firing** | `fixed-value.h:40,41` | 0 | **measured non-firing** |
+
+**Report causes, not lines**: five causes, two of them already closed by #164's
+sibling work, one closed here, one clean, one open.
+
+## 2. CAUSE A -- BOOLEANNESS WAS LOST ON HOLES
+
+`MIN_MODE_INT` is not the MODE_INT run's first ordinal: `emit_insn_modes_h`
+skips the leading `BOOL_MODE`s so the middle end cannot pick a boolean mode
+for a bitfield. Under the shared numbering that skip has to be a property of
+the SLOT -- but each per-back-end `genmodes` run could only see booleanness for
+the modes IT defines, and another back end's mode is a hole here with every
+flag cleared.
+
+Measured by `t174-modes.sh`, reading all twelve generated headers:
+
+```
+744 readings over 12 contexts (SHARED + 11 bases)
+  MIN_MODE_INT:   arm E_QImode   SHARED and the other ten E_B2Imode
+  MAX_MODE_BOOL:  arm E_B4Imode  SHARED and the other ten E_BImode
+```
+
+arm is the only back end with scalar `BOOL_MODE`s past `BI` (`B2I`, `B4I`,
+`arm-modes.def:88`); ordinals 76/77/78/79 are `BI`/`B2I`/`B4I`/`QI`, so the
+origin is **two apart**, not fourteen as the brief said.
+
+`expmed_mode_index` (`expmed.h:243`) is an **inline**, so a shared TU and an
+arm TU index one `target_expmed` two elements apart with no diagnostic; and
+`NUM_MODE_INT` sizes those arrays, which is what the layout witness reports.
+**A wrong ELEMENT is worse than a wrong size: only the size has a witness.**
+
+`t174-sizeof.sh` isolates it -- one TU, same build dir, same sources, differing
+only in which `insn-modes.h` it saw, with the size printed by the compiler out
+of an incomplete-template error:
+
+```
+insn-modes.h from   context   sizeof (struct target_expmed)   NUM_MODE_INT
+BEFORE              shared            514168                       11
+BEFORE              arm               509504                        9
+AFTER               shared            509504                        9
+AFTER               arm               509504                        9
+```
+
+509504 against 514168 is exactly the witness's pair, so the cause is
+`MIN_MODE_INT` and **not** the `MAX_BITS_PER_WORD` divergence that also bounds
+this struct. `reginfo.o` is shared and `target-regs-arm.o` is per-base, so
+those two objects are precisely the two contexts above.
+
+**Note which way it converged.** The ten non-arm bases went 11 -> 9: they had
+been counting arm's `B2I` and `B4I` as integer modes, so their `MIN_MODE_INT`
+was a **boolean mode** -- the thing `emit_insn_modes_h`'s own comment forbids.
+9 is what each of these back ends computes standing alone upstream. This is not
+the union's answer imposed on eleven back ends; it is each back end's own
+answer, which they happen to share.
+
+Fixed in `4b78f6fc998` by carrying booleanness in `modes-union.list` (a third,
+mandatory field), giving holes the numbering's answer, and failing by name when
+a back end's own answer disagrees -- the same treatment `cl` already gets, for
+the same reason.
+
+## 3. THE 2b QUESTION, ANSWERED: UNION THE BOUNDS, AND KEEP THE PER-BASE TABLE THAT ALREADY EXISTS
+
+The previous agent named "unioning class bounds" as a design decision and left
+it. It is decidable, and the answer is that **there are two facts here wearing
+one name**:
+
+- `MIN_MODE_<CLASS>` is a fact about the NUMBERING -- where a class's run
+  begins. It appears in headers included by both shared and per-base TUs, as an
+  index origin, an array bound and a struct size. If it is per base, then one
+  program contains inlines that index one struct at two different elements, and
+  structs whose size depends on who compiled them. The linker cannot see either.
+- "Which mode does THIS back end's class start at" is a different fact, and
+  `GET_CLASS_NARROWEST_MODE` (`genmodes.cc:2731`) is already the per-base table
+  that answers it. #164 moved every walk start onto it.
+
+So the split is settled and complete: **bounds are the numbering's, walk starts
+are the base's.** What breaks if each base gets its own bound is what was
+measured above. What breaks if the bound is the union's for everyone is that
+ordinal ranges become **supersets** and visit foreign holes -- which is the safe
+direction, because a hole answers `MODE_RANDOM` to `GET_MODE_CLASS` and a class
+test converts the superset back into this base's own set. Truncation has no
+such remedy; that was #164.
+
+## 4. CAUSE B -- `AARCH64_APPROX_MODE`, OPEN, AND IT IS A DESIGN DECISION
+
+```c
+#define AARCH64_APPROX_MODE(MODE)                                  \
+  ((MIN_MODE_FLOAT <= (MODE) && (MODE) <= MAX_MODE_FLOAT)          \
+   ? ((uint64_t) 1 << ((MODE) - MIN_MODE_FLOAT))                   \
+   : ... ((uint64_t) 1 << ((MODE) - MIN_MODE_VECTOR_FLOAT          \
+                           + MAX_MODE_FLOAT - MIN_MODE_FLOAT + 1)) \
+```
+
+Measured at 11 bases: the union's scalar float run is **10** and its vector
+float run is **210**, so the highest shift count is **219** on a `uint64_t`.
+UB, no diagnostic, and it gets worse with every back end added.
+
+**It is currently masked, and by luck.** Every `cpu_approx_modes` in the tree
+uses only `AARCH64_APPROX_NONE` (0) or `AARCH64_APPROX_ALL` (~0), so the `&`
+gives the right answer whatever the shift produces. The three call sites
+(`aarch64.cc:17124,17189,17300`) are runtime, and the JSON tunings path
+(`aarch64-json-schema.h:250`) accepts arbitrary integers, at which point the
+masking stops.
+
+Not fixed here, because every candidate fix invents something:
+
+- **Widen the mask.** 220 bits and unbounded; it is a `uint64_t` in a struct the
+  JSON schema serialises.
+- **Abort when the index does not fit.** That is every float mode, so aarch64
+  stops compiling.
+- **A dense per-base class index**, emitted by `genmodes` beside
+  `class_narrowest_mode` -- position of a mode among the modes THIS base has of
+  its class. This is the real missing primitive; it would also give
+  `expmed_mode_index` a dense origin instead of a shared one. It is a new
+  generated table and a new invariant, and it is not usable in a static
+  initializer (no in-tree tuning needs one, but the shape would be a trap).
+
+**This needs a ruling, not a patch.**
+
+## 5. CAUSE C -- CHECKED, AND CLEAN
+
+`MIN_MODE_COMPLEX_FLOAT` / `MAX_MODE_COMPLEX_FLOAT` are **identical in all
+twelve contexts** (in `t174-modes.sh`'s output both before and after), so
+`BUILT_IN_COMPLEX_MUL_MIN + (mode - MIN_MODE_COMPLEX_FLOAT)` and
+`tree-core.h:194`'s bound on `enum built_in_function` agree everywhere. The run
+is 10 at 11 bases, so each base's builtin enumeration carries ten slots and uses
+the three or four modes it has; that is a cost, not a wrong answer.
+`tree.cc:10397` already skips holes by class. **A cause checked and judged fine
+is a result; silence about it is not.**
+
+## 6. CAUSE E -- `FCONST0`/`FCONST1`, THE ONE THE BRIEF DID NOT NAME
+
+`fixed-value.h:40` is `fconst0[mode - QQmode]` into an **18-element** array and
+`:41` is `fconst1[mode - HAmode]` into an **8-element** one -- the same
+origin-arithmetic shape with a mode name as the origin instead of `MIN_MODE_`.
+Measured: the union's fixed-point run is exactly the 18 modes of
+`machmode.def`, contiguous, because **no back end defines a scalar fixed-point
+mode** (`grep -rnE '^ *(U?FRACT|U?ACCUM)_MODE' config/` is empty; riscv's
+`RVV_FRACT_MODE` is its own vector macro). So it does not fire -- and it does
+not fire for a reason that a single new back end would remove.
+
+## 7. BOTH-SIDED, AND THE BARS
+
+11 bases, snapshot `4b78f6fc998`, `/tmp/b-ac0602-b`, `make all-gcc` rc=0,
+`error:` **0**:
+
+```
+x86_64  specs-config  wc -l 230  grep -c . 222  md5 a6c4c68bdf33
+x86_64  -O2 big.c     12369 bytes  md5 378fc33c1e70      <- the recorded bar
+aarch64 specs-config  md5 2c087e1b0d8d
+aarch64 -O2 w.c       .arch armv8-a, 3 x-registers on a `long' shift, rc=0
+arm     specs-config  md5 079e18edd511
+arm     -O2 w.c       layout witness SILENT; .cpu arm7tdmi/.arch armv4t/.fpu softvfp
+```
+
+The x86_64 bar is byte-identical to the recorded two-base figure, so the
+change is a no-op for codegen. The aarch64 arm is semantic, not "it
+assembles": a 64-bit target emitting `x` registers for a `long` shift, which is
+the arm riscv64 failed while passing "right ELF machine".
+
+## 8. arm's NEXT WALL, WHICH IS NOT THIS ONE
+
+With the witness silent, arm now reaches `initialize_rtl` and dies:
+
+```
+0x2014c0b TEST_HARD_REG_BIT (HARD_REG_SET const&, unsigned int)  hard-reg-set.h:286
+0x2014c0b setup_class_hard_regs                                  ira.cc:494
+0x2014c0b setup_alloc_regs                                       ira.cc:573
+0x2014c0b ira_init ()                                            ira.cc:1784
+```
+
+A hard-reg-set bound, not a mode ordinal. It emits `.cpu arm7tdmi`,
+`.arch armv4t`, `.fpu softvfp` first, so target selection and the back end's
+own initialisation are working.
+
+## 9. WHAT WAS NOT MEASURED
+
+- **No 47-base build.** Everything here is 11 bases. Cause B's 219 is therefore
+  a **lower bound** on the shift count.
+- **`GET_MODE_CLASS` is the hole test everywhere in cause D.** That is sound
+  only because `genmodes.cc:2412` emits `MODE_RANDOM` for holes; if a later
+  change gives holes their run's class back, all four guards silently stop
+  guarding and nothing says so.
+- The instrument reads generated headers and one compiled TU. **It cannot see
+  ordinal arithmetic that spells neither `MIN_MODE_` nor a mode name** -- a
+  helper taking an origin as a parameter would be invisible to it.
