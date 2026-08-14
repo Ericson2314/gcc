@@ -13,11 +13,37 @@ this task only**, on two conditions, and this file is the second one:
 
 ## Stubs left by this task
 
-**NONE.**
+**ONE.**
 
-That is a real entry, not an empty section. Every change made for #157 supplies
-a genuine per-base answer, and it is worth saying which kind each one is,
-because "no stubs" is exactly the claim a later reader will want to re-check:
+### 1. `only_leaf_regs_used` — `final.cc`, aborts by name
+
+Reached by configuring **eight** back ends; `mt-sparc/sparc.o` calls it and an
+eight-base link fails with `undefined reference to only_leaf_regs_used()`.
+
+It is SHARED code — declared in `output.h`, defined in `final.cc` — whose
+definition is gated on `LEAF_REGISTERS`, a per-back-end `tm.h` macro. Shared
+objects are compiled once, against the primary's `tm.h`; i386 does not define
+`LEAF_REGISTERS`, so **the definition is not compiled at all**.
+
+The stub `internal_error`s naming the macro. It does **not** return a value,
+deliberately: `true` would tell every back end its function uses only
+renumberable registers, `false` would silently disable sparc's leaf-register
+optimisation, and both are plausible values belonging to no back end —
+findable only by reading the assembly of a sparc leaf function. The abort is
+findable by running it once.
+
+**The larger bug behind it, NOT fixed:** `function.cc:6491`'s
+`rest_of_handle_check_leaf_regs` is gated on the *same* macro, so
+`crtl->uses_only_leaf_regs` is never set for **any** back end. sparc's
+leaf-register pass has been silently inert on this branch, not merely
+unlinkable. The fix is to move `LEAF_REGISTERS` into the per-base family
+(`target-regs.h` is its natural home) — a correctness change, deferred.
+
+---
+
+Everything else made for #157 supplies a genuine per-base answer, and it is
+worth saying which kind each one is, because that is exactly the claim a later
+reader will want to re-check:
 
 | change | what it supplies | whose answer |
 |---|---|---|
@@ -29,9 +55,29 @@ because "no stubs" is exactly the claim a later reader will want to re-check:
 | genenums empty `unspec`/`unspecv` tables | length **0** for an md that defines no such enum | its own — counted from that md, and what upstream behaves as |
 | `HAVE_BFmode` guard (`tree.cc`) | no `bfloat16_type_node` for a base without BFmode | its own — exactly upstream's behaviour for it |
 | `widest_int_mode_for_target ()` | widest int mode the **selected** base has | its own; `gcc_unreachable ()` rather than a floor if a base had none |
+| 7 × `aarch_*`, `output_probe_stack_range` renamed per base | each back end keeps its own | its own — no shared TU, no macro |
+| `constant_address_p` → 6th `target_addr` funnel | `CONSTANT_ADDRESS_P` in each base's own context | its own, incl. `defaults.h`'s generic form under *its* `tm.h` |
 
 **No fallback anywhere in the above is another back end's value.** The
-suspension was available and was not needed.
+suspension was used exactly once, for `only_leaf_regs_used`, and there it
+bought an abort rather than a value.
+
+## The rename test, and why it is written down
+
+Two of the eleven names added by this task looked like pure renames and were
+not: `legitimate_pic_operand_p` and `constant_address_p`. In both cases a grep
+for the **symbol** over every shared `.cc` and `.h` found nothing, and in both
+cases shared code reaches the function through a **`tm.h` macro** whose name is
+not the symbol's — `LEGITIMATE_PIC_OPERAND_P` (7 shared sites) and
+`CONSTANT_ADDRESS_P` (7 shared sites), each with a `defaults.h` fallback and
+each defined by **i386.h** as a call to the bare function.
+
+So the rename turned `multiple definition` into `undefined reference`, twice.
+
+**The test:** before concluding a bare rename suffices, ask what the PRIMARY's
+`tm.h` expands the corresponding MACRO to — not only whether shared code spells
+the symbol. A symbol grep answers a different question than the one being
+asked, and answers it in the reassuring direction.
 
 ## Not fixed, and NOT stubbed — the real work queue
 

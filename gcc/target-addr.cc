@@ -60,6 +60,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include BASE_HEADER (tm_p.h)
 #include "regs.h"
+/* `recog.h' FOR mips, AND THE REASON IS A GOOD ADVERTISEMENT FOR THE WHOLE
+   FILE.  mips.h:2671 defines
+
+       #define CONSTANT_ADDRESS_P(X) (CONSTANT_P (X) && memory_address_p (SImode, X))
+
+   and `memory_address_p' is a macro in recog.h.  So one back end's answer to
+   `is this a constant address' is expressed in terms of a middle-end
+   predicate, which is precisely the kind of thing that cannot be discovered by
+   reading i386's headers -- it appeared the moment mips was configured, as
+   `error: memory_address_p was not declared in this scope', naming the file
+   and the line.  Every base compiles its own copy of these bodies, so each one
+   drags in whatever its own macros need; the include list here is the union of
+   what the configured back ends ask for, and it will grow as back ends are
+   added.  That is the mechanism working, not a defect in it.  */
+#include "recog.h"
 #include "target-addr.h"
 
 /* --- BASE_REG_CLASS and friends ------------------------------------- */
