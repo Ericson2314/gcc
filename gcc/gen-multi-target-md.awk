@@ -2370,6 +2370,162 @@ function accumulate_extra_headers(	i, n, parts, p) {
 	mthdr_bases = mthdr_bases cpu " ";
     }
   }
+  accumulate_frag_headers();
+}
+
+# THE SECOND AUTHORITY FOR EXTRA_HEADERS, WHICH THE config.gcc SCAN ABOVE DOES
+# NOT SEE, AND WHICH THE CROSS-CHECK IN gcc/Makefile.in FOUND.
+#
+# `extra_headers' is not the only thing feeding EXTRA_HEADERS.  The tmake
+# fragments append to the make variable directly, and reach gcc/Makefile.in
+# through `-include $(tmake_file)' at the bottom of it -- the identical channel,
+# and the identical bug, as PASSES_EXTRA in #171.  Nine fragments over eight
+# back ends do it, and `i386/t-pmm_malloc' is why a two-base build stopped with
+#
+#     stmp-int-hdrs: mm_malloc.h reaches this rule through ... but no
+#     configured back end's manifest record claims it.
+#
+# Two of the nine (`avr/t-avr', `frv/t-frv') use `=' rather than `+=', so under
+# the legacy single-${target} include they CLOBBER the list.  Both forms are
+# read here; the distinction does not survive into a per-back-end list, because
+# each back end's list is built from its own fragments alone and there is
+# nothing of another back end's for an `=' to clobber.
+#
+# TWO KINDS OF TOKEN, and the fragment itself says which:
+#
+#   a PATH (`$(srcdir)/ginclude/unwind-arm-common.h')  -- copied as-is.
+#   a BARE NAME (`mm_malloc.h', `stdfix-gcc.h', `rs6000-vecdefines.h') -- a file
+#     GENERATED into the build root, whose rule is in the same fragment.  The
+#     rule is read for its prerequisite: if that is a `$(srcdir)/...' file the
+#     recipe is a copy (`cat $^ > $@', `cp $< $@') and this copies it directly
+#     under the INSTALLED name, which is not the source's basename --
+#     `mm_malloc.h' comes from `pmm_malloc.h'.  Otherwise the prerequisite is
+#     itself generated (rs6000-vecdefines.h comes from rs6000-builtins.cc, via
+#     the generator program), and the build root already has a rule for it
+#     because a multi-target build includes t-rs6000-headers; that file is then
+#     depended on and copied.
+#
+# WHY INSTALLING IT IS NOW THE RIGHT ANSWER, when a previous agent deliberately
+# left it alone.  `config/rs6000/t-rs6000-headers' says, of exactly these two
+# lines: "Moving them would make a build that merely configures rs6000 install
+# a powerpc header, which is a different decision from giving the header a rule
+# -- and the wrong one to make silently."  That objection was correct while
+# there was ONE flat `include/'.  It is dissolved by the per-back-end directory
+# this task introduces: `include-rs6000/rs6000-vecdefines.h' is reached only
+# when rs6000 is the base in force, so a build that configures rs6000 installing
+# an rs6000 header is no longer a claim about anybody else's target.
+# TWO PASSES OVER THE FRAGMENT, AND THAT IS NOT A TIDINESS CHOICE.  The tokens
+# are ALL collected and the file CLOSED before any of them is resolved, because
+# resolving a bare name means reading the same fragment again for its rule --
+# and in awk a `close()' inside the loop resets the outer `getline'`s position,
+# so the outer loop restarts from line 1 and never terminates.  Measured: the
+# first version of this function hung the generator indefinitely.
+function accumulate_frag_headers(	i, n, parts, frag, line, cont, tok, j, m,
+				    toks, ntok, pend) {
+  n = split(tmkp, parts, " ");
+  for (i = 2; i <= n; i++) {
+    frag = srcdir "/config/" parts[i];
+    cont = 0;
+    ntok = 0;
+    while ((getline line < frag) > 0) {
+      sub(/#.*/, "", line);
+      if (cont) {
+	# a continued value line
+      } else if (line ~ /^[ \t]*EXTRA_HEADERS[ \t]*\+?=/) {
+	sub(/^[ \t]*EXTRA_HEADERS[ \t]*\+?=/, "", line);
+      } else {
+	continue;
+      }
+      cont = (line ~ /\\[ \t]*$/);
+      sub(/\\[ \t]*$/, "", line);
+      m = split(line, toks, " ");
+      for (j = 1; j <= m; j++) {
+	tok = toks[j];
+	if (tok == "")
+	  continue;
+	# `$(EXTRA_HEADERS)' appears on the right of t-openbsd's `USER_H =' and
+	# mips/t-sdemtk's list; a self-reference is not a header.
+	if (tok ~ /^\$\(/ && tok !~ /^\$\(srcdir\)/)
+	  continue;
+	pend[++ntok] = tok;
+      }
+    }
+    close(frag);
+    for (j = 1; j <= ntok; j++)
+      record_frag_header(pend[j], frag);
+  }
+}
+
+# One EXTRA_HEADERS token from one fragment, resolved to a (source, installed
+# name) pair and recorded against this back end.
+function record_frag_header(tok, frag,	src, dst, pair, prev) {
+  if (index(tok, "/") > 0) {
+    src = tok;
+    dst = tok;
+    sub(/.*\//, "", dst);
+  } else {
+    dst = tok;
+    src = frag_rule_source(tok, frag);
+    if (src == "")
+      src = tok;			# generated into the build root
+  }
+  pair = src ">" dst;
+
+  # A CONFLICT IS REFUSED BY NAME RATHER THAN RESOLVED BY LAST-WINS.  i386 has
+  # `t-pmm_malloc' AND `t-gmm_malloc', which install DIFFERENT CONTENT as
+  # `mm_malloc.h' and are chosen by the triple's libc -- both cpu_type i386.  A
+  # back end's directory has one slot for that name, so if two configured
+  # triples of one back end disagree there is no per-back-end answer and this
+  # must not pick one: that would be the primary's answer wearing a back end's
+  # name, one directory deeper.  Configuring only one of them is unambiguous
+  # and is what every build here does; configuring both is a real question and
+  # gets a real diagnostic.
+  prev = frag_dst_src[cpu, dst];
+  if (prev != "" && prev != src) {
+    printf "gen-multi-target-md.awk: back end `%s' has two different sources" \
+	   " for the installed header `%s':\n  %s\n  %s\nBoth are named by" \
+	   " tmake fragments of configured triples of this back end, and" \
+	   " include-%s/ has one slot for that name.  Configure one of those" \
+	   " triples, or give the two a channel that distinguishes them.\n",
+	   cpu, dst, prev, src, cpu > "/dev/stderr";
+    exit 1;
+  }
+  frag_dst_src[cpu, dst] = src;
+
+  if (index(" " frag_pairs[cpu] " ", " " pair " ") == 0) {
+    frag_pairs[cpu] = frag_pairs[cpu] pair " ";
+    # The token EXACTLY as the fragment wrote it, for the gcc/Makefile.in
+    # cross-check: $(EXTRA_HEADERS) holds these in the fragment's own spelling
+    # (bare `mm_malloc.h', not a path), so the derived list must too or the
+    # check fails on a file that is in fact handled.
+    frag_toks[cpu] = frag_toks[cpu] tok " ";
+    if (index(" " mthdr_bases " ", " " cpu " ") == 0)
+      mthdr_bases = mthdr_bases cpu " ";
+  }
+}
+
+# The prerequisite of the rule building BARE NAME in FRAG, when that
+# prerequisite is a source file -- i.e. when the fragment's recipe is a copy.
+# Returns "" when the rule is absent or its prerequisite is itself generated,
+# which the caller reads as "the build root makes this one".
+function frag_rule_source(name, frag,	line, rest, m, toks, j) {
+  while ((getline line < frag) > 0) {
+    sub(/#.*/, "", line);
+    if (line !~ ("^" name "[ \t]*:"))
+      continue;
+    rest = line;
+    sub("^" name "[ \t]*:[ \t]*", "", rest);
+    sub(/\\[ \t]*$/, "", rest);
+    m = split(rest, toks, " ");
+    for (j = 1; j <= m; j++)
+      if (toks[j] ~ /^\$\(srcdir\)/) {
+	close(frag);
+	return toks[j];
+      }
+    break;
+  }
+  close(frag);
+  return "";
 }
 
 # THE INTRINSICS HEADERS OF EVERY CONFIGURED BACK END, EACH IN ITS OWN
@@ -2412,6 +2568,21 @@ function accumulate_extra_headers(	i, n, parts, p) {
 # back end install the same intrinsics), while the per-target directory
 # $(libsubdir)/<target>/ holds facts that really are per triple -- specs-config
 # and include-fixed, both probed on the deployed machine.
+# The prerequisite half of one back end's fragment pairs: every source that is
+# a real file make can be asked for.  A `$(srcdir)/...' source always is; a
+# bare-name source is a build-root generated file and is also named, because
+# that is what makes make build it before the copy.  Both are simply the source
+# side of the pair.
+function emit_frag_header_deps(c,	n, parts, i, s) {
+  n = split(frag_pairs[c], parts, " ");
+  for (i = 1; i <= n; i++) {
+    s = parts[i];
+    sub(/>.*/, "", s);
+    if (s != "")
+      printf " %s", s;
+  }
+}
+
 function emit_extra_headers(	i, n, parts, c) {
   n = split(mthdr_bases, parts, " ");
 
@@ -2431,19 +2602,40 @@ function emit_extra_headers(	i, n, parts, c) {
   }
 
   printf "MT_HEADER_BASES =%s\n", " " mthdr_bases;
+  # Both channels, in the fragments' own spelling, because this is what
+  # gcc/Makefile.in cross-checks $(EXTRA_HEADERS) against and that variable
+  # holds a bare `mm_malloc.h' beside the config.gcc full paths.
   printf "MT_EXTRA_HEADERS =";
   for (i = 1; i <= n; i++)
-    printf " $(MT_EXTRA_HEADERS_%s)", parts[i];
+    printf " $(MT_EXTRA_HEADERS_%s) $(MT_FRAG_HEADER_TOKENS_%s)",
+	   parts[i], parts[i];
   printf "\n\n";
 
   for (i = 1; i <= n; i++) {
     c = parts[i];
+    printf "MT_FRAG_HEADER_TOKENS_%s = %s\n", c, frag_toks[c];
+    # `source>installed-name' pairs.  A pair rather than a bare path because
+    # the two differ: pmm_malloc.h is installed as mm_malloc.h, and
+    # ginclude/stdfix.h as stdfix-gcc.h.  Deriving the name from the source's
+    # basename -- which is what the config.gcc loop below does, correctly for
+    # its own tokens -- would install those two under the wrong name, and a
+    # wrong name is a missing header at `#include' time with a file sitting
+    # right there.
+    printf "MT_FRAG_HEADER_PAIRS_%s = %s\n", c, frag_pairs[c];
+    # Only the sources that are real prerequisites.  A pair whose source is a
+    # bare name is generated into the build root by a rule this build already
+    # has (t-rs6000-headers), and naming it here is what makes make run that
+    # rule before the copy.
+    printf "MT_FRAG_HEADER_DEPS_%s =", c;
+    emit_frag_header_deps(c);
+    printf "\n";
     printf "MT_EXTRA_HEADERS_%s = %s\n", c, mthdrs[c];
     # The stamp, one per back end, so a back end whose header set changed is
     # the only one re-copied.  `include-<cpu>' is created by the recipe rather
     # than being an order-only prerequisite because make would then treat the
     # directory's mtime as the stamp and never re-run.
-    printf "include-%s/s-hdrs: $(MT_EXTRA_HEADERS_%s)\n", c, c;
+    printf "include-%s/s-hdrs: $(MT_EXTRA_HEADERS_%s) $(MT_FRAG_HEADER_DEPS_%s)\n",
+	   c, c, c;
     printf "\t$(mkinstalldirs) include-%s\n", c;
     # The /././ marker is copied from stmp-int-hdrs and means the same thing:
     # install under the name AFTER the marker, subdirectories included.  Only
@@ -2462,6 +2654,15 @@ function emit_extra_headers(	i, n, parts, c) {
     printf "\t  rm -f include-%s/$$realfile; \\\n", c;
     printf "\t  cp $$file include-%s/$$realfile || exit 1; \\\n", c;
     printf "\t  chmod a+r include-%s/$$realfile; \\\n", c;
+    printf "\tdone\n";
+    # The fragment channel's pairs, split on `>' so the installed name is the
+    # fragment's, not the source's basename.
+    printf "\tfor pair in $(MT_FRAG_HEADER_PAIRS_%s); do \\\n", c;
+    printf "\t  src=`echo $$pair | sed -e 's|>.*||'`; \\\n";
+    printf "\t  dst=`echo $$pair | sed -e 's|.*>||'`; \\\n";
+    printf "\t  rm -f include-%s/$$dst; \\\n", c;
+    printf "\t  cp $$src include-%s/$$dst || exit 1; \\\n", c;
+    printf "\t  chmod a+r include-%s/$$dst; \\\n", c;
     printf "\tdone\n";
     printf "\t$(STAMP) $@\n\n";
   }

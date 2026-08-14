@@ -122,5 +122,64 @@ else
   say FAIL "5 negative control exited $nrc but says nothing about extra_headers"
 fi
 
+# 6 -- THE FRAGMENT CHANNEL.  EXTRA_HEADERS has a second authority: the tmake
+# fragments append to it directly.  This is what the gcc/Makefile.in
+# cross-check caught (`mm_malloc.h' for i386), so it gets arms of its own,
+# against the REAL fragments rather than synthetic ones -- the whole point is
+# whether the scan reads what the fragments actually say.
+{ mkrec i386 x86_64-pc-linux-gnu "cpuid.h" no
+  mkrec arm  arm-none-eabi       "arm_neon.h" no
+} | sed -e 's|^tmake_file_present$|tmake_file_present i386/t-pmm_malloc arm/t-bpabi|' \
+  > "$W/mf.txt"
+awk -v srcdir="$S/gcc" -f "$A" "$W/mf.txt" > "$W/outf.mk" 2> "$W/errf.txt"
+frc=$?
+if [ $frc -ne 0 ]; then
+  echo "FATAL: generator exited $frc on the fragment manifest"; cat "$W/errf.txt"; exit 9
+fi
+# The token, in the fragment's own spelling, so gcc/Makefile.in's cross-check
+# against $(EXTRA_HEADERS) can match it.
+grep -q '^MT_FRAG_HEADER_TOKENS_i386 = mm_malloc.h' "$W/outf.mk" \
+  && say PASS "6a i386 token mm_malloc.h, bare as the fragment writes it" \
+  || say FAIL "6a i386 tokens [$(grep '^MT_FRAG_HEADER_TOKENS_i386' "$W/outf.mk")]"
+# ... and resolved to pmm_malloc.h>mm_malloc.h: the INSTALLED NAME IS NOT THE
+# SOURCE'S BASENAME.  Deriving it from the basename would install pmm_malloc.h,
+# which is a wrong name, i.e. a missing header with the file sitting there.
+p=$(grep '^MT_FRAG_HEADER_PAIRS_i386 =' "$W/outf.mk")
+case $p in
+  *'i386/pmm_malloc.h>mm_malloc.h'*) say PASS "6b pair pmm_malloc.h>mm_malloc.h" ;;
+  *) say FAIL "6b i386 pairs [$p]" ;;
+esac
+# arm's is a plain path and keeps its own basename.
+q=$(grep '^MT_FRAG_HEADER_PAIRS_arm =' "$W/outf.mk")
+case $q in
+  *'unwind-arm-common.h>unwind-arm-common.h'*) say PASS "6c arm unwind-arm-common.h" ;;
+  *) say FAIL "6c arm pairs [$q]" ;;
+esac
+# The aggregate the cross-check reads must contain BOTH channels.
+a=$(grep '^MT_EXTRA_HEADERS =' "$W/outf.mk")
+case $a in
+  *MT_FRAG_HEADER_TOKENS_i386*) say PASS "6d MT_EXTRA_HEADERS spans both channels" ;;
+  *) say FAIL "6d MT_EXTRA_HEADERS [$a]" ;;
+esac
+
+# 7 -- THE CONFLICT REFUSAL.  i386 has t-pmm_malloc AND t-gmm_malloc, which
+# install DIFFERENT CONTENT as mm_malloc.h and are chosen by the triple's libc.
+# One back end, one directory, one slot, two answers: the generator must refuse
+# by name rather than let the last one win, because last-wins here is the
+# primary's-answer defect one directory deeper.
+{ mkrec i386 x86_64-pc-linux-gnu "cpuid.h" no
+  mkrec i386 i686-elf            "cpuid.h" no
+} | awk 'BEGIN{n=0} /^tmake_file_present$/{n++; print $0 (n==1?" i386/t-pmm_malloc":" i386/t-gmm_malloc"); next} {print}' \
+  > "$W/mc.txt"
+awk -v srcdir="$S/gcc" -f "$A" "$W/mc.txt" > "$W/outc.mk" 2> "$W/errc.txt"
+crc=$?
+if [ $crc -eq 0 ]; then
+  say FAIL "7 conflict control: generator accepted two sources for mm_malloc.h"
+elif grep -q 'mm_malloc.h' "$W/errc.txt" && grep -q 'two different sources' "$W/errc.txt"; then
+  say PASS "7 conflict refused by name (rc=$crc)"
+else
+  say FAIL "7 exited $crc but not about mm_malloc.h: $(head -1 "$W/errc.txt")"
+fi
+
 echo "== t189-dryrun rc=$rc  ($W)"
 exit $rc
