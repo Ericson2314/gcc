@@ -66,29 +66,72 @@ the before side.
   out loud in the script, because "this arm does not need the stamp" is the
   sort of exemption that gets claimed next for an arm that does.
 
-**NOT MEASURED, and this is the work queue, not a claim.** The 47-base build
-and a 3-base `i386 + aarch64 + rs6000` build were both still in the
-libbackend/frontend compile phase when this was written — the host was at load
-48 from five concurrent agents and both had slowed to tens of log lines an
-hour. Neither produced a `cc1`, so:
+- **THE CAPABILITY VARIES, END TO END, IN ONE `cc1`.** `tb1-tls.sh`, two runs
+  on `__thread int tv; int *tls_addr (void) { return &tv; }` differing only in
+  one line of the target-config file:
 
-- **the AFTER side of `tb1-tls.sh` is unrun.** Run it on any build of
-  `e35cbd1f730` or later; it must report `as_tls 1` → real TLS, `as_tls 0` →
-  `__emutls`. Anything else is a failure and the script says which.
-- **the hand-written back-end edits are compiled only in part.** `<cpu>-c.o`
-  built for i386, aarch64 and rs6000; the 18 unwrapped hook-table guards and
-  the 7 `TARGET_HAVE_TLS HAVE_AS_TLS` → `true` conversions live in
-  `mt-<cpu>/<cpu>.o`, which neither build reached. `arc`, `m68k`,
-  `microblaze`, `or1k`, `pa`, `sh`, `ia64`, `alpha`, `frv`, `loongarch`,
-  `mips`, `xtensa`, `s390`, `riscv`, `arm`, `sparc`, `rs6000`, `aarch64`,
-  `i386` are the files to watch. The likeliest failure is a `TARGET_HAVE_TLS`
-  left as `HAVE_AS_TLS` somewhere this census did not see: that is now a
-  non-constant in a static initializer, so it fails at the
-  `TARGET_INITIALIZER` line naming a macro nowhere near the edit.
-- the one `error:` in the 47-base log is
-  `build/gen-target-specs-amdgcn_unknown_amdhsa.o: gtype-desc.h: No such file`,
-  the `-k` ordering artefact already recorded in `T157-STUBS.md:534`,
-  `T173-BASE-HEADER.md:39`, `T176-TMH.md:287` and `STATE.md:70`. Not this work.
+  ```
+                          as_tls 1                     as_tls 0
+  before  ba415463e56   392 b94fddbf8606  emutls 0   392 b94fddbf8606  emutls 0
+  after   e35cbd1f730   392 b94fddbf8606  emutls 0   450 ce64c7a1f1d7  emutls 6
+  ```
+
+  Three things at once. The before row is **IDENTICAL** — the negative control
+  firing, because `as_tls` is an unknown key a pre-#163 `read_target_caps`
+  drops without a word, so "TLS works" and "not wired" are the same bytes and
+  no arm that looked only at the `as_tls 0` run could tell them apart. The
+  after row **differs**, and in the right direction. And `as_tls 1` is
+  **byte-identical to the pre-change compiler**, so the default did not move.
+  Reproduced byte for byte at **3 bases and at 47**.
+
+- **No other codegen moved.** `tb1-nochange.sh`, x86_64 `-O2` on
+  `scratchpad/big.c`: before and after are **byte-identical**, 12036 bytes /
+  `361c53860d4f`, at 3 bases and at 47. (That figure is *not* the recorded
+  `12369 / 378fc33c1e70` bar — this runs from a two-line hand-written config
+  rather than the real `specs-config`, so it is a different quantity and must
+  not be compared with it. What is comparable is the two sides of this run.)
+  Note this script's pass condition is the **opposite** of `tb1-tls.sh`'s:
+  identical is right here and wrong there, which is why both exist.
+
+- **All 19 edited back ends produce their object.** `tb1-beobj.sh` at 47
+  bases: `aarch64 alpha arc arm frv i386 ia64 m68k microblaze mips nds32 or1k
+  pa riscv rs6000 s390 sh sparc xtensa`, 0 missing. This is a separate arm from
+  "the build succeeded" because under `-k` a failed object is a log line and
+  the build carries on — PRINCIPLES §4's "never attempted and passed are the
+  same silence". **loongarch is the exception and is not covered**: it is not
+  in `backends-47.txt` (dropped from the branch), so its `loongarch.cc` and
+  `loongarch-opts.h` edits are compiled nowhere. Stated rather than counted.
+
+- **`cc1` links at 47 back ends** (227 MB), 0 `multiple definition`, 0
+  `undefined reference`. `rc=2` is the `gtype-desc.h` `-k` ordering artefact on
+  `build/gen-target-specs-amdgcn_unknown_amdhsa.o`, already recorded in
+  `T157-STUBS.md:534`, `T173-BASE-HEADER.md:39`, `T176-TMH.md:287` and
+  `STATE.md:70`. The `i386 + aarch64 + rs6000` build is **rc=0, `error:` 0**.
+
+## The arm that was wrong, kept rather than swapped out
+
+`tb1-mdcond.sh`'s first refusal was `non-constant == total`, and it **failed on
+a correct tree**: 10 of 102 conditions fold, and all ten are right. Six are
+`(0 "TARGET_XCOFF && HAVE_AS_TLS")`, folded by `TARGET_XCOFF` — a compile-time
+0 in a powerpc64-linux `tm.h`, exactly as before. Four are alpha's and frv's
+*bare* `(1 "HAVE_AS_TLS")`, which is a constant expression to gencondmd
+whatever supplies the 1: pattern **kept**, decided at build time. `0` and `1`
+mean opposite things — deleted versus kept — and a count puts them in one
+bucket. The obvious repair, lowering the threshold to 92, is a test-harness
+floor that expires the next time a back end gains a pattern.
+
+The replacement, **arm 1b, is a strengthening**: it asks the root property
+directly — is `HAVE_AS_TLS` **1 inside gencondmd's own translation unit**? If
+so, nothing can fold to 0 through it and every generator sees precisely what
+`auto-host.h` used to give. Measured 1 for alpha, frv, mips, rs6000, sparc and
+xtensa. A missing, misplaced or `0`-valued `#if defined (GENERATOR_FILE)` block
+fails here **by name**, which the count could not do. Positive control, same
+translation unit, same reader: `HAVE_AS_TLS 1`, `HAVE_AS_MFCRF 0`,
+`HAVE_AS_PLTSEQ 0`, `HAVE_AS_DTPREL_RELOC <ABSENT>` — three distinct states, so
+the instrument can tell a 0 and an absence from a 1.
+
+(`HAVE_AS_DTPREL_RELOC` being absent in gencondmd is correct: no `.md` mentions
+it, only `aarch64.cc`, which is not a generator.)
 
 Instruments: `tb1-tls.sh` (end-to-end, non-vacuity arm first),
 `tb1-mdtable.sh` (artefact-only, safe on an unfinished build and says so),

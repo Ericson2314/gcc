@@ -38,7 +38,7 @@ RAWLOG="$D/make-top.out"
 # as MISSING-CMD (i.e. "this object has no per-base rule") had the harness not
 # insisted on a macro count.
 LOG="$D/tb1-joined.log"
-awk '{ if (buf != "") $0 = buf " " $0; if (sub(/\\$/, "")) { buf = $0; next } buf = ""; print }' \
+awk "{ gsub(/\t/, \" \"); if (buf != \"\") \$0 = buf \" \" \$0; if (sub(/\\\\$/, \"\")) { buf = \$0; next } buf = \"\"; print }" \
   "$RAWLOG" > "$LOG"
 S=$(cd "$(dirname "$0")" && pwd)
 
