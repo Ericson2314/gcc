@@ -22,7 +22,8 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "tree.h"
 #include "memmodel.h"
 #include "tm_p.h"
