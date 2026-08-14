@@ -45,6 +45,23 @@
 #     directory the multi-target side names.  Verified by -v: the search list
 #     must contain that path.
 #
+#   * --with-as / --with-ld, ABSOLUTE, at the real cross binutils.  THE SECOND
+#     CONTROL-SIDE DEFECT, found the same way as the first.  Putting the shim
+#     directory on PATH is not enough: gcc/configure recorded
+#
+#         ORIGINAL_AS_FOR_TARGET = <nix gcc-wrapper-15.2.0>/bin/as
+#
+#     i.e. THE HOST x86_64 ASSEMBLER, for both targets, and wrote a gcc/as
+#     wrapper around it.  Every test that assembles -- all of
+#     gcc.c-torture/compile, which drives -c rather than dg-do, so the
+#     compile-only downgrade does not reach it -- then died with
+#     "Assembler messages: Fatal error: invalid -march= option: `z900'"
+#     (21,534 occurrences on s390x; 10,100 FAILs in that one directory on
+#     BOTH targets).  That is PRINCIPLES 4b's fallback-config accident
+#     arriving BY ACCIDENT rather than on purpose, on the side that is
+#     supposed to be the reference.  The multi-target side names its
+#     assembler absolutely in specs-config and never had it.
+#
 # Same on both sides: --enable-languages=c,lto, --disable-bootstrap,
 # --disable-nls, --disable-werror, the same CC/CFLAGS, the same nix shell,
 # `make all-gcc' only, and therefore the same absence of any target libgcc.
@@ -74,6 +91,10 @@ n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 grep -q '^load_lib multi-target.exp$' "$SRC/gcc/testsuite/lib/gcc-dg.exp" \
   || { echo "FATAL: $SRC/gcc/testsuite/lib/gcc-dg.exp does not load multi-target.exp"; exit 9; }
 [ -d "$HDR" ] || { echo "FATAL: no target header dir $HDR"; exit 9; }
+TOOLS=/tmp/tools-agent-a3464debf6893de84/bin
+AS="$TOOLS/$T-as"; LD="$TOOLS/$T-ld"
+[ -x "$AS" ] || { echo "FATAL: no cross assembler $AS"; exit 9; }
+[ -x "$LD" ] || { echo "FATAL: no cross linker $LD"; exit 9; }
 case "$D" in
   */b-stock-agent-a3464debf6893de84*) ;;
   *) echo "FATAL: build dir $D is not named for this worktree"; exit 9 ;;
@@ -85,6 +106,7 @@ sh "$S/eb-shell.sh" "cd $D && PATH=/tmp/tools-agent-a3464debf6893de84/bin:\$PATH
   --target=$T \
   --disable-werror \
   --disable-bootstrap --disable-nls --disable-multilib \
+  --with-as=$AS --with-ld=$LD \
   --with-sysroot=$SYSROOT \
   --with-native-system-header-dir=/include \
   CC=gcc CFLAGS='-O2 -g0 -Wno-error=format-security' \

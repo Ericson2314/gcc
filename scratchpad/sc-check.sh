@@ -93,6 +93,32 @@ grep -q "^ $HDRDIR\$" "$B/hdr-list-$T.txt" \
        sed -n '/search starts here/,/End of search/p' "$B/hdr-list-$T.txt"; exit 9; }
 echo "-- guard S3: target system headers reachable at $HDRDIR"
 
+# ---- S4: THE ASSEMBLER MUST BE THE TARGET'S, NOT THE HOST'S ----
+# Read out of the RUNNING driver (-print-prog-name=as), not out of the
+# Makefile: a `gcc/as' wrapper in the build dir answers to the name `as' while
+# executing something else entirely, which is exactly what happened.  Then
+# assemble a real object and make `readelf -h' name the machine, because "a
+# tool accepted it" is not "the tool was the right tool" -- PRINCIPLES, and
+# also because the host x86 gas ACCEPTS an empty file.
+ASPROG=$("$B/gcc/xgcc" -B"$B/gcc/" -print-prog-name=as)
+echo "-- assembler in use: $ASPROG"
+printf 'int sc_as_probe (int x) { return x + 1; }\n' > "$B/as-probe-$T.c"
+"$B/gcc/xgcc" -B"$B/gcc/" -c -o "$B/as-probe-$T.o" "$B/as-probe-$T.c" \
+  > "$B/as-probe-$T.err" 2>&1 \
+  || { echo "FATAL[$T]: the control cannot assemble a one-line function:";
+       sed -n '1,10p' "$B/as-probe-$T.err"; exit 9; }
+mach=$("/tmp/tools-agent-a3464debf6893de84/bin/$T-readelf" -h "$B/as-probe-$T.o" \
+        | sed -n 's/^ *Machine: *//p')
+case "$T:$mach" in
+  aarch64*:*AArch64*) ;;
+  s390x*:*S/390*|s390x*:*IBM*) ;;
+  *) echo "FATAL[$T]: the control assembled to machine '$mach' -- wrong target."
+     echo "  (ORIGINAL_AS_FOR_TARGET pointing at the host assembler produces"
+     echo "   exactly this, and it is silent until something looks.)"
+     exit 9 ;;
+esac
+echo "-- guard S4: assembled object reports Machine: $mach"
+
 TSD="testsuite.$T"
 rm -f "$B/gcc/site.exp"
 rm -rf "$B/gcc/$TSD"
