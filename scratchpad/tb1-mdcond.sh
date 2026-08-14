@@ -70,7 +70,61 @@ for f in "$G"/insn-conditions-*.md; do
 done
 echo "    total $tot conditions, $nonconst non-constant"
 [ "$tot" -gt 0 ] || { echo "FATAL: ZERO TLS conditions survived -- they were folded out at build time"; exit 9; }
-[ "$nonconst" = "$tot" ] || { echo "FATAL: $((tot - nonconst)) conditions were folded to a constant at build time"; exit 9; }
+
+# THE REFUSAL THAT USED TO BE HERE WAS `nonconst == tot', AND IT WAS THE WRONG
+# TEST.  IT IS RECORDED RATHER THAN SWAPPED OUT, so the next reader can see why
+# the obvious check does not work.
+#
+# It fired on this tree, reporting "10 conditions were folded to a constant" --
+# and every one of the ten is correct:
+#
+#   6  (0 "TARGET_XCOFF && HAVE_AS_TLS")  and its 32/64-bit variants
+#          folded by TARGET_XCOFF, a compile-time 0 in a powerpc64-linux tm.h.
+#          Nothing to do with TLS, and it folded the same way before.
+#   4  (1 "HAVE_AS_TLS")   alpha and frv, per back end and per triple
+#          a BARE condition is a constant expression to gencondmd whatever
+#          supplies the 1, so it folds to 1 -- pattern KEPT, merely decided at
+#          build time.  Same as when auto-host.h supplied it.
+#
+# `0' and `1' mean opposite things -- deleted versus kept -- and counting them
+# together scores a correct tree as a failure.  Worse, the obvious repair
+# (lower the threshold to 92) is a test-harness floor: it expires the moment a
+# back end gains or loses a pattern.
+#
+# ARM 1b IS THE EXACT TEST, and it is a strengthening rather than a relaxation:
+# it asks the ROOT property directly.  If `HAVE_AS_TLS' is 1 inside gencondmd's
+# own translation unit, then no condition anywhere can be folded to 0 BECAUSE
+# OF IT, and every generator sees precisely what auto-host.h used to give.  If
+# a back end's `#if defined (GENERATOR_FILE)' block were missing, misplaced or
+# written 0, this fails by name -- which the count could not do.
+echo
+echo "arm 1b  HAVE_AS_TLS inside each gencondmd translation unit (must be 1):"
+S=$(cd "$(dirname "$0")" && pwd)
+LOG="$D/tb1-joined.log"
+awk "{ gsub(/\t/, \" \"); if (buf != \"\") \$0 = buf \" \" \$0; if (sub(/\\\\$/, \"\")) { buf = \$0; next } buf = \"\"; print }" \
+  "$D/make-top.out" > "$LOG"
+bad=0; seen=0
+for key in alpha_unknown_linux_gnu frv_unknown_elf mips64_unknown_elf \
+           powerpc64_unknown_linux_gnu sparc64_unknown_linux_gnu \
+           xtensa_unknown_elf; do
+  o="build/gencondmd-$key.o"
+  [ -f "$D/gcc/$o" ] || { printf '    %-32s NOT BUILT\n' "$key"; bad=$((bad+1)); continue; }
+  cmd=$(grep -F -- " -o $o " "$LOG" | tail -1)
+  [ -n "$cmd" ] || { printf '    %-32s no compile command\n' "$key"; bad=$((bad+1)); continue; }
+  pp=$(printf '%s\n' "$cmd" | sed -e 's/ -c / /' -e 's/ -o [^ ]*//' \
+         -e 's/ -MT [^ ]*//' -e 's/ -MF [^ ]*//' -e 's/ -MMD//' -e 's/ -MP//')
+  { echo "cd $D/gcc"; printf '%s -E -dM\n' "$pp"; } > "$D/tb1-gc-pp.sh"
+  out=$(sh "$S/eb-shell.sh" "sh $D/tb1-gc-pp.sh" 2>/dev/null || true)
+  nmac=$(printf '%s\n' "$out" | grep -c '^#define ' || true)
+  [ "$nmac" -ge 200 ] || { printf '    %-32s only %s macros -- did not preprocess\n' "$key" "$nmac"; bad=$((bad+1)); continue; }
+  v=$(printf '%s\n' "$out" | awk '$1=="#define" && $2=="HAVE_AS_TLS" {print $3; f=1} END{if(!f) print "<ABSENT>"}')
+  printf '    %-32s %s\n' "$key" "$v"
+  seen=$((seen+1))
+  [ "$v" = 1 ] || bad=$((bad+1))
+done
+[ "$seen" -ge 5 ] || { echo "FATAL: arm 1b read only $seen back ends"; exit 9; }
+[ "$bad" = 0 ] || { echo "FATAL: $bad back ends do not give gencondmd HAVE_AS_TLS 1"; exit 9; }
+echo "    all $seen give 1 -- what auto-host.h used to give; no condition can fold to 0 through it"
 
 echo
 # ---- arm 2: the text reached the C++ translation units -----------------
@@ -99,7 +153,7 @@ echo
 # distinguishable (PRINCIPLES section 4).
 S=$(cd "$(dirname "$0")" && pwd)
 LOG="$D/tb1-joined.log"
-awk '{ if (buf != "") $0 = buf " " $0; if (sub(/\\$/, "")) { buf = $0; next } buf = ""; print }' \
+awk "{ gsub(/\t/, \" \"); if (buf != \"\") \$0 = buf \" \" \$0; if (sub(/\\\\$/, \"\")) { buf = \$0; next } buf = \"\"; print }" \
   "$D/make-top.out" > "$LOG"
 obj=$(ls "$G"/insn-recog-rs6000-*.o 2>/dev/null | head -1)
 [ -n "$obj" ] || obj=$(ls "$G"/insn-output-rs6000.o 2>/dev/null | head -1)

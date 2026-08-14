@@ -32,7 +32,7 @@ esac
 [ -f "$D/gcc/$O" ] || { echo "FATAL: $D/gcc/$O has not been built; nothing to read"; exit 9; }
 S=$(cd "$(dirname "$0")" && pwd)
 LOG="$D/tb1-joined.log"
-awk '{ if (buf != "") $0 = buf " " $0; if (sub(/\\$/, "")) { buf = $0; next } buf = ""; print }' \
+awk "{ gsub(/\t/, \" \"); if (buf != \"\") \$0 = buf \" \" \$0; if (sub(/\\\\$/, \"\")) { buf = \$0; next } buf = \"\"; print }" \
   "$D/make-top.out" > "$LOG"
 cmd=$(grep -F -- " -o $O " "$LOG" | tail -1)
 [ -n "$cmd" ] || { echo "FATAL: no compile command for $O"; exit 9; }
