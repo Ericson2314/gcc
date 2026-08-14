@@ -192,12 +192,29 @@ must re-derive.
 
 | population | count | action |
 |---|---|---|
-| **shared headers** | **5** — `target.h`, `backend.h`, `multi-target-base.h`, `cp/cp-tree.h`, `m2/gm2-gcc/gcc-consolidation.h` | **stop including `tm.h`** |
+| **shared headers** | **4** — `target.h`, `backend.h`, `cp/cp-tree.h`, `m2/gm2-gcc/gcc-consolidation.h` | **stop including `tm.h`** |
 | shared TUs | 248 | stop including it (macro conversion) |
 | `gcc/config/` glue | 101 | `BASE_HEADER (tm.h)` |
 | compiled N times | 7 | `BASE_HEADER` — **done** |
 
-**Those five headers are the whole transitive channel** — `i386.cc` and
+**The count was 5 and is 4.** `multi-target-base.h` was in that list by a
+**false positive**: all nineteen of its `tm.h` occurrences are inside its own
+explanatory comment block, which quotes `#include "tm.h"` as prose. It includes
+no `tm.h`. Measured by `scratchpad/t141-tmh-census.sh`; the "whole transitive
+channel" claim itself HOLDS, and the corrected first-hop split is
+`backend.h` 462 / `target.h` 400 / `cp-tree.h` 47 / `gcc-consolidation.h` 20.
+Other first-hop names in the census (`optabs.h`, `calls.h`, `rtl-ssa.h`, ...)
+are intermediates that reach `tm.h` THROUGH these four, not extra channels.
+
+**AND `defaults.h` HAS ZERO SOURCE-LEVEL INCLUDERS — its only route into any TU
+is the tail `mkconfig.sh` appends to `tm.h`.** Since `defaults.h:1900+` is this
+branch's entire conversion layer (cdata redirects, `MULTI_TARGET_UNION_*`, 32
+`mt_*()` calls), **deleting `tm.h` from the four headers today would un-define
+the CONVERTED macros too** -- and the ones on `#if` lines would then silently
+evaluate FALSE. Severing `defaults.h` from `tm.h` therefore BLOCKS the whole
+removal. See `scratchpad/T141-TMH-REMOVAL-PLAN.md`.
+
+**Those four headers are the whole transitive channel** — `i386.cc` and
 `aarch64.cc` spell no `tm.h` at all and reach it through them. They are why
 `tm.h` reaches ~520 of 622 TUs, and being shared they cannot name a base, so
 for them the only move is deletion.
