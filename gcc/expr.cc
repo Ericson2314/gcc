@@ -152,7 +152,16 @@ init_expr_target (void)
 	 directly loaded or stored from memory.  */
 
       if (mode != VOIDmode && mode != BLKmode)
-	for (regno = 0; regno < FIRST_PSEUDO_REGISTER
+	/* MT_FIRST_PSEUDO_REGISTER: this asks a BACK-END HOOK about a register
+	   number, and each back end answers from a table of its own width.
+	   Named by an ASAN `cc1' compiling for mips64:
+
+	     AddressSanitizer: global-buffer-overflow, READ of size 1
+	       #0 mips_hard_regno_mode_ok  config/mips/mips.cc:13404
+	       #1 init_expr_target         expr.cc:159
+	     0 bytes after global `mips_hard_regno_mode_ok_p' (188 wide;
+	     the union with eleven back ends configured is 334, ia64's).  */
+	for (regno = 0; regno < MT_FIRST_PSEUDO_REGISTER
 	     && (direct_load[(int) mode] == 0 || direct_store[(int) mode] == 0);
 	     regno++)
 	  {

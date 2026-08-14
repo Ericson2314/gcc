@@ -3287,7 +3287,11 @@ init_alias_target (void)
 
   memset (static_reg_base_value, 0, sizeof static_reg_base_value);
 
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  /* MT_FIRST_PSEUDO_REGISTER, not the union width: the body asks two
+     back-end questions about the register number.  `static_reg_base_value'
+     itself keeps the union LAYOUT (rtl.h:4086).  Same shape as the
+     ASAN-named overflow of `mips_hard_regno_mode_ok_p'.  */
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     /* Check whether this register can hold an incoming pointer
        argument.  FUNCTION_ARG_REGNO_P tests outgoing register
        numbers, so translate if necessary due to register windows.  */
