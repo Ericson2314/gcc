@@ -38,22 +38,48 @@ test -x "$CC1" || { echo "FATAL: no $CC1"; exit 9; }
 # is reported as such rather than being read as "one failure per base".
 run_one () {
   t=$1
-  cfg=$(ls "$B"/gcc/specs-"$t"-config "$B"/target-specs-"$t"/specs-config 2>/dev/null | head -1)
+  # cc1 is invoked DIRECTLY rather than through the driver, for two reasons.
+  # It is the shortest path to "this cc1, this target config"; and the riscv
+  # DRIVER currently segfaults (rc=139) reading its own generated `specs' file,
+  # so going through it would make riscv unmeasurable for a reason that has
+  # nothing to do with the selftests.  That segfault is a separate finding and
+  # is recorded as one -- it is not worked around silently here.
+  cfg=$(ls "$B"/lib/gcc/*/"$t"/specs-config 2>/dev/null | head -1)
   if test -z "$cfg"; then
     echo "=== $t: NO CONFIG FOUND -- skipping, and this is a SKIP not a pass"
     return
   fi
   echo "=== $t   (config $cfg)"
-  "$CC1" -ftarget-config="$cfg" -nostdinc /dev/null -S -o /dev/null \
+  # NO `-S' here.  `gcc/Makefile.in's SELFTEST_FLAGS passes -S because it goes
+  # through the DRIVER; cc1 rejects it ("valid for the driver but not for C")
+  # and exits 1 having run no selftest at all.  That failure looks like a
+  # selftest failure in the exit status and is not one -- worth stating,
+  # because rc=1 from this script has to mean "a selftest failed".
+  "$CC1" -ftarget-config="$cfg" -quiet -nostdinc /dev/null -o /dev/null \
     -fself-test="$SRC/gcc/testsuite/selftests" > "/tmp/t121-st-$t.out" 2>&1
   rc=$?
   echo "  rc=$rc"
   # Name the failing assertion and the mode, not just the count.
   grep -E "FAIL:|expected:|actual:|internal compiler error|:[0-9]+: [a-z_]+:" \
     "/tmp/t121-st-$t.out" | head -12 | sed 's/^/  /'
+  # NON-VACUITY, and it is not optional.  A cc1 that selected no target also
+  # exits 0 from -fself-test, having exercised nothing -- which is the false
+  # green this whole task exists to remove.  The runner's dtor prints
+  # "-fself-test: N pass(es)", so a green must show N, and N must be large.
+  # The counts also DIFFER between bases (measured: aarch64 7677790, riscv
+  # 8439208), which is itself evidence that each base is walking its own modes
+  # rather than some shared vacuous set.
+  passes=$(sed -n 's/.*-fself-test: \([0-9]*\) pass(es).*/\1/p' "/tmp/t121-st-$t.out")
   if [ "$rc" = 0 ]; then
-    echo "  PASSED -- but check it tested something: a run that selected no"
-    echo "  target also exits 0 having exercised nothing."
+    if [ -z "$passes" ]; then
+      echo "  rc=0 BUT NO PASS COUNT WAS PRINTED -- this is NOT a pass."
+      echo "  The selftests did not run.  Refusing to score it green."
+    elif [ "$passes" -lt 1000000 ]; then
+      echo "  rc=0 with only $passes passes -- suspiciously few; the suite"
+      echo "  normally reports millions.  Treat as a partial run, not a pass."
+    else
+      echo "  PASSED: $passes assertions"
+    fi
   fi
 }
 

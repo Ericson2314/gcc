@@ -2317,7 +2317,52 @@ emit_mode_class (void)
   print_decl ("unsigned char", "mode_class", "NUM_MACHINE_MODES");
 
   for_all_modes (c, m)
-    tagged_printf ("%s", mode_class_names[m->cl], m->name);
+    /* A HOLE IS NOT A MODE OF ANY CLASS HERE.
+
+       A hole is a mode this back end does not define, occupying an ordinal in
+       the shared numbering because some other configured back end does.  Its
+       precision, size and nunits are already 0 and its format is a null
+       pointer, so that shared code asking a foreign mode about itself gets an
+       answer that is wrong in a way that shows.  Its CLASS was the one thing
+       still answering for the other back end -- `read_union_list' sets
+       `m->cl' to the shared numbering's class so the hole lands in the right
+       run of the enum, and this table was printing that.
+
+       Which made the class and the precision two authorities on one fact, in
+       the same table, for the same base.  Every predicate in machmode.h is
+       written on the class ALONE:
+
+	 SCALAR_INT_MODE_P (M)  GET_MODE_CLASS (M) == MODE_INT
+				|| GET_MODE_CLASS (M) == MODE_PARTIAL_INT
+	 VECTOR_MODE_P (M)      GET_MODE_CLASS (M) == MODE_VECTOR_*
+
+       so a hole was a usable scalar integer, or a usable vector, OF WIDTH
+       ZERO.  `FOR_EACH_MODE*' never reaches one -- `mode_next' and
+       `class_narrowest_mode' stay dense over this back end's own modes -- but
+       target-independent code that walks `0 .. NUM_MACHINE_MODES' by raw
+       index does, and there is a population of it: simplify-rtx.cc:9378,
+       :9747 and :9899 are three such loops in the selftests alone.  Measured
+       on a three-base build (i386 + aarch64 + riscv, 517 modes in the shared
+       numbering), the modes each base was accepting as its own:
+
+	 base      holes  SCALAR_INT_MODE_P  VECTOR_MODE_P
+	 i386        393                  1            382
+	 aarch64     325                  3            307
+	 riscv       151                  5            119
+
+       and the single i386 scalar-int one is `CI', which is exactly the mode
+       cc1's own selftests abort on the moment a target is actually selected.
+
+       The class a back end should give a mode it does not have is the class
+       it gives anything it has no other word for, which is what MODE_RANDOM
+       is for -- it is VOIDmode's and BLKmode's class.  Note this is NOT a
+       fallback supplying some other base's answer: it is this base saying it
+       has no such mode, which is its own answer and the true one.  The enum
+       ORDER is untouched (`m->cl' still decides which run the ordinal lands
+       in, and that is vocabulary, shared by construction); only the value
+       this base's own table reports changes, and that is data.  */
+    tagged_printf ("%s", mode_class_names[m->is_hole ? MODE_RANDOM : m->cl],
+		   m->name);
 
   print_closer ();
 }

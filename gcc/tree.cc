@@ -10361,8 +10361,15 @@ build_common_builtin_nodes (void)
   {
     int mode;
 
+    /* MIN_/MAX_MODE_COMPLEX_FLOAT are the SHARED mode numbering's bounds, so
+       on a multi-target build this range also covers other back ends' complex
+       float modes.  Those are holes here -- class MODE_RANDOM, precision 0 --
+       and declaring `__mulXC3'/`__divXC3' for one would name a libcall for a
+       mode this target does not have.  A single-target build has no holes.  */
     for (mode = MIN_MODE_COMPLEX_FLOAT; mode <= MAX_MODE_COMPLEX_FLOAT; ++mode)
       {
+	if (GET_MODE_CLASS ((machine_mode) mode) != MODE_COMPLEX_FLOAT)
+	  continue;
 	char mode_name_buf[4], *q;
 	const char *p;
 	enum built_in_function mcode, dcode;
