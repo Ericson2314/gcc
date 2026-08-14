@@ -1,5 +1,66 @@
 # T159 — `TARGET_POLY_AWARE` is delivered; `IN_TARGET_CODE` is not
 
+## WITHDRAWN (task #181). THE CONCLUSION BELOW IS WRONG, AND THE COUNT THAT PRODUCED IT IS CORRECT.
+
+`scratchpad/tb1-itc.sh`, run against a cold three-base build
+(`i386 aarch64 xstormy16`, `make all-gcc` **rc=0**, `error:` 0, `cc1` links,
+snapshot `ba415463e56`, anchor 49). It reads the macro state each object's OWN
+recipe arrives at, with `-E -dM`, so `<ABSENT>` and `0` are distinguishable:
+
+```
+                            IN_TARGET_CODE  TARGET_POLY_AWARE  ONLY_FIXED_SIZE_MODES  POLY_INT_CONVERSION  MACRO_MODE(MODE)
+mt-xstormy16/xstormy16.o          1            <ABSENT>                 1                      1           (as_a <fixed_size_mode> (MODE))
+mt-aarch64/aarch64.o              1                1                    0                      0           (MODE)
+insn-output-xstormy16.o           1            <ABSENT>                 1                      1           (as_a <fixed_size_mode> (MODE))
+insn-output-aarch64.o             1                1                    0                      0           (MODE)
+target-regs-xstormy16.o       <ABSENT>         <ABSENT>                 0                      0           (MODE)
+expr.o                        <ABSENT>         <ABSENT>                 0                      0           (MODE)
+```
+
+**The shorthand is live in `cc1`'s own objects, and it is already both-sided.**
+xstormy16 — a back end that has NOT been converted, and therefore wants the
+shorthand — gets `ONLY_FIXED_SIZE_MODES 1`, `POLY_INT_CONVERSION 1` and the
+`as_a <fixed_size_mode>` / `.to_constant ()` re-key of `3715ed1ec91`, in both
+its hand-written and its generated target sources. aarch64 — converted, and
+declaring so — gets the identity. Shared `expr.o` gets the identity. Nothing
+is inert and nothing needs widening.
+
+**WHY THE COUNT WAS RIGHT AND THE INFERENCE WAS WRONG: `IN_TARGET_CODE` HAS
+NEVER BEEN A COMMAND-LINE FLAG, HERE OR UPSTREAM.** Every back-end source
+spells `#define IN_TARGET_CODE 1` as its own first line — 186 files under
+`gcc/config/` — and nine generators (`genattrtab`, `genautomata`, `genemit`,
+`genextract`, `genopinit`, `genoutput`, `genpeep`, `genpreds`, `genrecog`)
+write that same line into the sources they emit. `-DTARGET_POLY_AWARE` needs a
+`-D` because it is an *opt-in with no in-source spelling*; `IN_TARGET_CODE`
+needs none because the source says it. So `0` compile lines is the correct and
+expected reading for a flag that does not exist, in this tree and in upstream's
+— and the two names look symmetric only from the makefile.
+
+The trap is the one PRINCIPLES section 4 already names in the other direction:
+**a zero from a name-matching instrument is a claim about the instrument.** The
+census counted `-D` occurrences, which is a complete measurement of a channel
+`IN_TARGET_CODE` does not travel through.
+
+Two residual facts the same run establishes, neither of them the reported bug:
+
+- `target-{regs,addr,cdata,c-ops,cumargs}-<cpu>.o` and
+  `mt-<cpu>/target-passes-<cpu>.o` are per-base objects compiled from SHARED
+  sources, so they carry no `IN_TARGET_CODE` and take the poly-general arm.
+  That is the safe direction and matches what those sources are.
+- `insn-modes-<cpu>.cc` and `insn-enums-<cpu>.cc` are the two generated
+  per-base sources whose generators do NOT write the line. Upstream's do not
+  either, so they match upstream rather than diverging from it.
+
+**`gen-multi-target-md.awk`'s "widen this when they do" comment is about
+`-DTARGET_POLY_AWARE`, which HAS been widened** — 61 compile lines carry it,
+and the table above shows it landing on exactly the objects it should. Nothing
+in that comment schedules an `IN_TARGET_CODE` flag.
+
+Everything below is the original text, kept because its measurements are all
+reproducible and only its conclusion is not.
+
+---
+
 **Measured, four-base build (i386, aarch64, riscv, xstormy16) at
 `1937e74ec05`, full cold build log:**
 
