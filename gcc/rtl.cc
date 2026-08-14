@@ -27,13 +27,12 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "system.h"
 #include "coretypes.h"
-/* This file is compiled twice: once as a shared object, and once per back end
-   as a generator (build/rtl-<cpu>.o).  A generator is a single-target program
-   compiled against that base's tm-<base>.h, and hard-reg-set.h:57 takes its
-   register widths from the raw tm.h names in that configuration.  Shared code
-   takes multi-target-reg-widths.h instead and needs no tm.h here.  */
+/* Only the generator half needs tm.h.  A generator is a single-target program
+   compiled against its base's tm-<base>.h, and hard-reg-set.h takes its
+   register widths from the raw tm.h names under GENERATOR_FILE; shared code
+   takes multi-target-reg-widths.h.  */
 #ifdef GENERATOR_FILE
-# include "tm.h"
+#include "tm.h"
 #endif
 #include "rtl.h"
 #ifdef GENERATOR_FILE
