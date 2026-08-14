@@ -28,6 +28,7 @@
 #include "bconfig.h"
 #include "system.h"
 #include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "errors.h"
 #include "read-md.h"

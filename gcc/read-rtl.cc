@@ -30,6 +30,11 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "system.h"
 #include "coretypes.h"
+/* Compiled both shared and per back end as a generator; only the generator
+   configuration needs tm.h.  See the note in rtl.cc.  */
+#ifdef GENERATOR_FILE
+# include "tm.h"
+#endif
 #include "rtl.h"
 #include "obstack.h"
 #include "read-md.h"
