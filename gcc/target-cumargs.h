@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-modeswitch.h"
 #include "target-sched.h"
 #include "target-asmfprintf.h"
+#include "target-automata.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -185,6 +186,12 @@ struct target_cumargs_desc
      defines that one too.  A back end with no extensions supplies a table
      saying so, which is not the same thing as supplying no table.  */
   const struct target_asmfprintf_desc *asmfprintf;
+
+  /* THIS BASE'S DFA PIPELINE-HAZARD ENTRY POINTS; see target-automata.h.
+     Rides here for the same reason the six above do, and is never null for
+     the same reason.  A back end with no automaton supplies a table saying
+     `has_dfa == false', which is not the same thing as supplying no table.  */
+  const struct target_automata_desc *automata;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */
