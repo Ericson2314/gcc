@@ -1512,14 +1512,17 @@ multi-target-md.mk: multi-target.manifest multi-target.multilib \
 # 2500 lines further down, and the reason scan_hdr_frag in
 # gen-multi-target-md.awk reads those fragments itself instead.
 #
-# $(MT_OPTIONS_INIT_OBJS) is the one part of a back end's object set that
-# multi-target-common.mk contributes rather than multi-target-md.mk: it is
-# generated from that back end's OPTIONLIST, not from its machine description
-# (options-init-<base>.o -- see optc-gen.awk on Init()).  It is named here,
-# with `=' and not `+=', because multi-target-common.mk is included some 700
-# lines ABOVE this line and a `+=' there would be discarded by this assignment
-# -- the trap the paragraph above describes, from the other side.
-MULTI_TARGET_OBJS = $(MT_OPTIONS_INIT_OBJS)
+# $(MT_OPTIONS_INIT_OBJS) USED TO BE NAMED HERE AND IS NOT ANY MORE.  Those
+# objects (mt-<base>/options-init.o, generated from the back end's OPTIONLIST
+# rather than from its machine description) are now part of
+# $(MULTI_TARGET_OPTION_TABLE_OBJS), i.e. libcommon-target.a rather than
+# libbackend.a, because the DRIVER needs them: see the note there.  Naming
+# them in both places would put one definition in two archives.
+#
+# This assignment stays, empty, with `=' and not `+=': multi-target-md.mk
+# appends to it below and an undefined name would make a fragment that stopped
+# emitting anything indistinguishable from a back end that needs nothing.
+MULTI_TARGET_OBJS =
 
 # EVERY configured back end's `<cpu>-passes.def', and the same list with each
 # file tagged by the back end that owns it.  Accumulated with `+=' by
@@ -2972,8 +2975,18 @@ OBJS-libcommon-target = $(gcc_all_common_objects) common/common-target-select.o 
 # two halves are named together because they are useless apart: the tables with
 # no selector are objects nothing points at, and the selector with no tables
 # does not link.
+#
+# $(MT_OPTIONS_INIT_OBJS) IS PART OF THIS SET AND USED NOT TO BE.  Those
+# objects define global_options_init_<base>, this base's own Init() values,
+# and they lived in $(MULTI_TARGET_OBJS) -- libbackend.a -- because the only
+# caller was multi_target_select, which only cc1 runs.  The driver therefore
+# decoded riscv's -march= with x_riscv_isa_spec still 0 and died in
+# default_version.  They are option state selected by the same key as the
+# tables above, so they belong in the same archive and are named in the same
+# `if': tables without inits is a compiler whose non-primary options all read
+# zero, which is exactly the silent-default shape.
 MULTI_TARGET_OPTION_TABLE_OBJS = $(if $(MT_OPTIONS_TABLES_OBJS), \
-  $(MT_OPTIONS_TABLES_OBJS) multi-target-options-select.o)
+  $(MT_OPTIONS_TABLES_OBJS) $(MT_OPTIONS_INIT_OBJS) multi-target-options-select.o)
 
 # This lists all host objects for the front ends.
 ALL_HOST_FRONTEND_OBJS = $(foreach v,$(CONFIG_LANGUAGES),$($(v)_OBJS))

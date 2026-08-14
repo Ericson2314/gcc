@@ -61,6 +61,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+/* For `global_options_init' -- the SHARED one, whose layout is the union of
+   every configured back end's (opth-gen.awk) and which is exactly the object
+   the per-base Init() functions below are meant to write.  `opts.h' does not
+   reach it.  */
+#include "options.h"
 #include "opts.h"
 
 /* Declares every configured base's tables and defines MT_OPTION_TABLES and
@@ -72,19 +77,55 @@ along with GCC; see the file COPYING3.  If not see
    triple a target-config file names to the back end serving it.  Neither is
    derivable from the other.  */
 
+/* THE Init() VALUES TRAVEL WITH THE TABLES, AND THIS IS THE ONLY PLACE THAT
+   APPLIES THEM.
+
+   `global_options_init_<base>' is a hand-named function in
+   mt-<base>/options-init.cc, one per back end -- see optc-gen.awk.  It applies
+   that back end's own Init() arguments, which cannot be compiled into
+   options.cc because an Init() argument is a MACRO from that back end's tm.h.
+
+   IT USED TO BE CALLED FROM `mt_install_<base>' IN multi-target-select.cc,
+   i.e. from `multi_target_select', whose only caller is toplev.cc -- cc1.
+   The comment there justified the placement by saying the DRIVER "never
+   selects a target".  gcc.cc selects one three times over, and the omission
+   was a live crash rather than a theoretical gap: riscv's DRIVER_SELF_SPECS
+   expands `%:riscv_expand_arch(%*)' inside the driver, that spec function
+   calls riscv_parse_arch_string, and `riscv_ext_info_t::default_version ()'
+   reads `riscv_isa_spec' -- `global_options.x_riscv_isa_spec'.  With riscv's
+   `Init (TARGET_DEFAULT_ISA_SPEC)' never applied it read 0, i.e.
+   ISA_SPEC_CLASS_NONE, no version of the base extensions matched, and the
+   function fell off the end into its `gcc_unreachable ()'.  That single site
+   aborted `configure-target-specs-riscv64-unknown-linux-gnu' and is why riscv
+   emitted `.attribute arch, ""'.
+
+   So the values belong here, with the option tables: they are option state,
+   keyed by the same base, needed by every program that decodes an option.
+   `global_options_init' is written rather than some later caller's struct
+   because there are three callers of `init_options_struct' and this runs
+   before all of them -- gcc.cc:8873 is above `decode_argv', toplev.cc:2391 is
+   above `init_options_struct', lto-wrapper.cc:2425 likewise.  One authority,
+   not two: multi-target-select.cc no longer names these functions at all.  */
+
 struct mt_option_tables
 {
   const char *base;
   const struct cl_option *options;
   const struct cl_enum *enums;
   unsigned int enums_count;
+  void (*apply_init) (struct gcc_options *);
 };
 
+#define MT_OPTION_TABLE(BASE) extern void global_options_init_ ## BASE (struct gcc_options *);
+MT_OPTION_TABLES
+#undef MT_OPTION_TABLE
+
 #define MT_OPTION_TABLE(BASE) \
-  { #BASE, cl_options_ ## BASE, cl_enums_ ## BASE, cl_enums_ ## BASE ## _count },
+  { #BASE, cl_options_ ## BASE, cl_enums_ ## BASE, cl_enums_ ## BASE ## _count, \
+    global_options_init_ ## BASE },
 static const struct mt_option_tables mt_option_tables[] = {
   MT_OPTION_TABLES
-  { NULL, NULL, NULL, 0 }
+  { NULL, NULL, NULL, 0, NULL }
 };
 #undef MT_OPTION_TABLE
 
@@ -141,6 +182,14 @@ multi_target_options_select (const char *target)
 	cl_options = b->options;
 	cl_enums = b->enums;
 	cl_enums_count = b->enums_count;
+	/* And this base's own Init() values, into the object every
+	   init_options_struct copies from.  A NULL here would be a back end
+	   whose options-init object did not link, which is a build bug and
+	   must not read as "this back end has no Init() values": that is the
+	   silent zero this whole file exists to remove.  */
+	if (b->apply_init == NULL)
+	  return false;
+	b->apply_init (&global_options_init);
 	return true;
       }
 

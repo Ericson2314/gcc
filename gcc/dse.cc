@@ -1742,7 +1742,12 @@ find_shift_sequence (poly_int64 access_bytes,
      e.g. at -Os, even when no actual shift will be needed.  */
   auto access_bits = access_bytes * BITS_PER_UNIT;
   if (store_info->const_rhs
-      && known_le (access_bytes, GET_MODE_SIZE (MAX_MODE_INT))
+      /* widest_int_mode_for_target, not MAX_MODE_INT.  This one does not
+	 abort, which is why it is worth naming: a hole has SIZE 0, so the
+	 test would be false for every access and this optimisation would
+	 silently never run on any back end lacking the union's widest
+	 integer mode.  */
+      && known_le (access_bytes, GET_MODE_SIZE (widest_int_mode_for_target ()))
       && smallest_int_mode_for_size (access_bits).exists (&new_mode))
     {
       auto byte = subreg_lowpart_offset (new_mode, store_mode);

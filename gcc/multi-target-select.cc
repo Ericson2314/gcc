@@ -281,19 +281,25 @@ tree ms_va_list_type_node;
 #define MT_DEFINE_TABLE(NAME, NS) decltype (::NAME) NAME;
 MT_ALL_TABLES (MT_DEFINE_TABLE, )
 
-/* global_options_init_<base> is NOT in the back end's namespace: it is a
-   hand-named function in options-init-<base>.cc, one per back end, and the
-   name already carries the base.  What it does is apply that back end's own
-   Init() values -- see optc-gen.awk -- which cannot be compiled into
-   options.cc because an Init() argument is a macro from that back end's
-   tm.h.  */
+/* THE Init() VALUES ARE NOT APPLIED HERE ANY MORE -- see
+   multi-target-options-select.cc.  This file used to call
+   global_options_init_<base> from mt_install_<base>, and the comment
+   justifying that placement said the driver "never selects a target".  That
+   was false when it was written: gcc.cc selects one three times over
+   (multi_target_options_select, targetm_common_select,
+   spec_functions_select), immediately before decode_argv.  The consequence
+   was live -- riscv's DRIVER_SELF_SPECS runs %:riscv_expand_arch() inside the
+   driver, which reads global_options.x_riscv_isa_spec, which was 0
+   (ISA_SPEC_CLASS_NONE) rather than riscv's own TARGET_DEFAULT_ISA_SPEC, and
+   default_version () reached its gcc_unreachable.  The Init() values are
+   option state, so they now travel with the option TABLES, which the driver
+   already installs.  */
 #define MT_BACKEND(BASE, NS)						\
   namespace NS {							\
     MT_DECLARE_FUNCS (NS)						\
     MT_ALL_TABLES (MT_DECLARE_TABLE, NS)				\
   }									\
-  extern struct gcc_target targetm_ ## BASE;				\
-  extern void global_options_init_ ## BASE (struct gcc_options *);
+  extern struct gcc_target targetm_ ## BASE;
 MT_BACKENDS
 #undef MT_BACKEND
 
@@ -353,16 +359,6 @@ struct mt_backend
        reads.  A struct copy here would silently lose exactly those	\
        twelve stores.  */						\
     ::targetm_ptr = &targetm_ ## BASE;					\
-    /* And the Init() values that only this back end can spell.  Written	\
-       into global_options_init itself rather than handed to some later	\
-       caller, because there are three callers of init_options_struct and	\
-       one of them is the DRIVER, which never selects a target: a		\
-       forwarder would have had to answer "no target selected" by doing	\
-       nothing, which is the floor this file refuses everywhere else.	\
-       One object, written once, before the one read that matters --	\
-       toplev::main runs multi_target_select above				\
-       init_options_struct.  */						\
-    global_options_init_ ## BASE (&global_options_init);		\
   }
 MT_BACKENDS
 #undef MT_BACKEND
