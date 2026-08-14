@@ -1518,16 +1518,19 @@ MT_PASSES_TAGS =
 
 # The per-back-end forwarding-header directory, empty for every object that is
 # not compiled for a particular back end.  Set with a target-specific
-# assignment -- `foo-arm.o: MULTI_TARGET_INC = -Iarm-inc' -- by the rules that
-# build a back end's objects; see MULTI_TARGET_INC_STEMS in
-# gen-multi-target-md.awk for what the directory holds and why it exists.
+# assignment by the rules that build a back end's objects; see
+# MULTI_TARGET_INC_STEMS in gen-multi-target-md.awk for what it holds.
 #
-# It has to come BEFORE -I. and it has to be a variable rather than an addition
-# to CPPFLAGS, because both of those decide the answer.  `#include "insn-attr.h"'
-# searches the includer's own directory first and then the -I list IN ORDER, so
-# a -I appended after -I. would still find the primary target's copy in the
-# build root and would do so silently: the wrong header compiles perfectly
-# well, it just describes another target.
+# It comes first in INCLUDES below, and it has to be a variable rather than an
+# addition to CPPFLAGS: a quoted include searches the includer's own directory
+# and then this list IN ORDER, so a later entry finds the build root's copy,
+# which is the primary target's.
+#
+#include "multi-target-base.h"
+# What a source names for itself is spelled BASE_HEADER (<stem>.h) and reads
+# MULTI_TARGET_BASE_DEF instead; this remains for the headers reached
+# transitively, through shared headers that cannot name a base.  See
+# scratchpad/T173-BASE-HEADER.md.
 MULTI_TARGET_INC =
 
 # Names that a back end's HAND-WRITTEN sources define bare and that therefore

@@ -177,8 +177,7 @@ cpp_include_defaults_table (void)
        THE DEFAULT IS "" AND THAT IS THE POINT.  gcc's build no longer creates
        include-fixed, so a compile-time path here would be a system include
        directory that NOTHING CREATES -- the entry would sit in every search
-       path and be silently skipped, which is precisely the failure this
-       project has already paid for once with `-I<base>-inc'.  "" is compacted
+       path and be silently skipped.  "" is compacted
        out below, so a compiler nobody has told about fixed headers does not
        claim to have any.  Say `fixed_include_dir <path>' in the target config
        to get the entry back, and it names a directory mkheaders made.

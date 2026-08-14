@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "varasm.h"
 #include "regs.h"
+#include "multi-target-base.h"
 #include BASE_HEADER (insn-config.h)
 #include "conditions.h"
 #include "output.h"
@@ -51,7 +52,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "stmt.h"
 #include "expr.h"
 #include "reload.h"
-#include "multi-target-base.h"
 #include BASE_HEADER (tm_p.h)
 #include "target.h"
 #include "debug.h"

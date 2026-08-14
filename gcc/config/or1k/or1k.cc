@@ -48,9 +48,9 @@
 #include "case-cfn-macros.h"
 
 /* These 4 are needed to allow using satisfies_constraint_J.  */
+#include "multi-target-base.h"
 #include BASE_HEADER (insn-config.h)
 #include "recog.h"
-#include "multi-target-base.h"
 #include BASE_HEADER (tm_p.h)
 #include BASE_HEADER (tm-constrs.h)
 

@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Compiled once per back end, with `-I<base>-inc' so that every `tm.h',
+/* Compiled once per back end, so that every `tm.h',
    `tm_p.h', `insn-*.h' and `options.h' it reaches is THAT back end's, and
    with -DTARGETM_ADDR_SYMBOL naming the table so all of them can be linked
    into one compiler.  See target-addr.h for why this exists and
@@ -42,9 +42,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "rtl.h"

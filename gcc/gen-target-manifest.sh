@@ -560,17 +560,10 @@ ${AWK} '
       # non-primary back end has and the primary does not was reading zero.
       #
       # THE SOURCE GOES IN mt-<base>/, NOT THE BUILD ROOT, AND THAT IS NOT
-      # TIDINESS.  -I%s-inc is what puts the right tm.h in scope, but a
-      # quoted #include searches the directory of the INCLUDER first, ahead
-      # of every -I.  Generated into the build root, this file included the
-      # build root tm.h -- the PRIMARY one -- with -Iaarch64-inc sitting
-      # first in the -I list and doing nothing.  The compile did not fail on
-      # it either: config/i386/i386.h was read for the aarch64 object and the
-      # only complaint was about a macro it never reached.  mt-<base>/ holds
-      # no headers, so the -I list is consulted and wins.  This is the same
-      # trap MULTI_TARGET_INC in gcc/Makefile.in describes, reached from the
-      # one direction that comment does not cover: the hand-written back-end
-      # sources live in $(srcdir)/config/<cpu>/, so they never see it.
+      # TIDINESS.  A quoted #include searches the directory of the INCLUDER
+      # first; generated into the build root, this file reached the build
+      # root tm.h -- the PRIMARY one -- and compiled clean.  mt-<base>/ holds
+      # no headers.
       printf "mt-%s/options-init.cc: optionlist-%s $(srcdir)/opt-functions.awk $(srcdir)/opt-read.awk $(srcdir)/optc-gen.awk\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s\n", b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
@@ -590,7 +583,7 @@ ${AWK} '
       printf "mt-%s/options-init.o: MULTI_TARGET_INC = -I%s-inc\n", b, b
       printf "mt-%s/options-init.o: mt-%s/options-init.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
-      # -I<base>-inc means this TU sees that base'\''s tm.h, so it is on the
+      # This TU sees that base'\''s tm.h, so it is on the
       # supply side of defaults.h'\''s (c-DATA) redirection and must keep the
       # real macros.  It is not `targetm'\''-renamed, so it cannot carry
       # MULTI_TARGET_TARGETM_BASE (target.h:392 requires that name to be
@@ -617,7 +610,7 @@ ${AWK} '
       # so the INDICES agree; the CONTENT cannot be, because merging the
       # argument lists would make lp64 a valid x86 ABI.
       #
-      # -I<base>-inc for the same reason options-init.cc has it: an
+      # Compiled per back end for the same reason options-init.cc is: an
       # EnumValue(... Value(AARCH64_ABI_LP64)) is a back-end macro and has to
       # resolve in its own back end tm.h.  A name that resolves to some OTHER
       # configuration definition compiles clean and is wrong.
@@ -643,7 +636,7 @@ ${AWK} '
       printf "mt-%s/options-tables.o: mt-%s/options-tables.cc\n", b, b
       printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b
       # -DMULTI_TARGET_SUPPLY_TU=1, EXACTLY AS options-init.o ABOVE, and it was
-      # missing here.  Both objects are compiled with -I<base>-inc, so both see
+      # missing here.  Both objects are compiled per back end, so both see
       # that base tm.h and both are on the supply side of the (c-DATA)
       # redirection at the end of defaults.h.  Without the marker this object
       # is treated as a CONSUMER: its macros are redirected to targetm_cdata

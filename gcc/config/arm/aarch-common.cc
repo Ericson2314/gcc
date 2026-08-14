@@ -26,8 +26,8 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include BASE_HEADER (insn-modes.h)
 #include "multi-target-base.h"
+#include BASE_HEADER (insn-modes.h)
 #include BASE_HEADER (tm.h)
 #include "rtl.h"
 #include "rtl-iter.h"

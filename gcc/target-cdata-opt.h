@@ -30,7 +30,7 @@ along with GCC; see the file COPYING3.  If not see
    So the per-macro `#ifdef' has to be written out once, somewhere.  Here is
    the right somewhere, for the same reason `target-cumargs.cc' was the right
    place for `INIT_EXPANDERS': THIS HEADER IS ONLY EVER REACHED FROM
-   `target-cdata.cc', which is compiled ONCE PER BACK END with `-I<base>-inc'.
+   `target-cdata.cc', which is compiled ONCE PER BACK END.
    Every `#ifdef' below is therefore answered by THE BACK END THE ANSWER IS
    FOR, which is correct by construction -- it is the exact opposite of the
    `#ifdef' in shared code that this conversion removes, where one base

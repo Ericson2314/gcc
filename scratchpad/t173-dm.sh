@@ -22,11 +22,16 @@ D=${1:?build dir}
 S=$(cd "$(dirname "$0")" && pwd)
 LOG="$D/make-top.out"
 [ -f "$LOG" ] || { echo "FATAL: no $LOG to take recipes from"; exit 9; }
-[ -f "$D/make-top.rc" ] || { echo "FATAL: $LOG has no .rc stamp; a log being written looks exactly like one that finished"; exit 9; }
+# NOT the `.rc' stamp.  That guard is for SCORING a build -- where a truncated
+# log reads as a smaller error count -- and this script scores nothing about
+# the build.  It replays one recipe, so what it needs is that the recipe is in
+# the log and the object it produced exists.  Both are asserted per object in
+# probe(); an unfinished build simply has fewer objects to choose from.
 
 probe () {
   base=$1; obj=$2; macro=$3
   # The last recipe that produced this object, verbatim.
+  [ -f "$D/gcc/$obj" ] || { echo "FATAL: $obj was never built in $D"; exit 9; }
   cmd=$(grep -- " -o $obj " "$LOG" | tail -1)
   [ -n "$cmd" ] || { echo "FATAL: no recipe for $obj in $LOG"; exit 9; }
   # -c -> -E -dM, and drop the -o so the dump comes to stdout.

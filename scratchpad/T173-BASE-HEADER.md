@@ -47,12 +47,46 @@ No stem is unioned, and for seven the build root's copy **is i386's**. Deleting
 the `-I` today hands ~2000 per-back-end objects the primary's mode numbering,
 insn codes and target-def table with no diagnostic.
 
-`coretypes.h` already has the hook for one stem —
-`#ifndef INSN_MODES_H / #define INSN_MODES_H "insn-modes.h" / #include
-INSN_MODES_H` — so resolving that macro to `BASE_HEADER (insn-modes.h)` under
-`#ifdef MT_BASE` is the shape for the other six. That is a change to *shared*
-headers, i.e. the same population as "stop the 248 shared TUs including
-`tm.h`", and belongs with it.
+### The whole remaining job is 17 sites (`t173-sharedhdrs.sh`)
+
+Only shared **headers** matter: a shared `.cc` is compiled once with no
+`MT_BASE` and correctly wants the build root's copy. A shared header is
+textually included into per-back-end TUs as well, and there its plain include
+is what the `-I` resolves. There are eleven such includes in ten headers:
+
+```
+insn-codes.h    expmed.h:23  internal-fn.h:23  recog.h:564  target.h:55
+insn-config.h   optabs.h:285  rtl-ssa.h:43  target-insn.h
+insn-opinit.h   internal-fn.h:24  optabs-libfuncs.h:23  optabs-query.h:23
+insn-target-def.h  target-def.h:303
+insn-attr.h     target-attr.h
+tm_p.h          rtl-ssa.h:58
+```
+
+plus `coretypes.h:546-553,631`, which already routes `insn-modes.h` and
+`insn-modes-inline.h` through the `INSN_MODES_H` / `INSN_MODES_INLINE_H`
+macros, and the four back-end headers reverted above.
+
+The shape at every one of them, which works in both contexts because a header
+that serves both must:
+
+```c
+#ifdef MT_BASE
+# include "multi-target-base.h"
+# include BASE_HEADER (insn-codes.h)
+#else
+# include "insn-codes.h"
+#endif
+```
+
+The `#else` arm is not a fallback in the banned sense: a TU with no `MT_BASE`
+is compiled once and the build root's copy is its own answer. `BASE_HEADER`
+itself must keep `#error`ing on a missing `MT_BASE`, or a per-base object that
+loses the flag silently gets the primary's headers.
+
+This is a change to shared headers — the same population as "stop the 248
+shared TUs including `tm.h`" — and `target.h`, `recog.h` and `optabs.h` are
+files other tasks are editing, so it wants sequencing rather than a drive-by.
 
 **When the `-I` goes, the witness goes with it.** `mt-inc-witness.h` is
 findable only through the `-I`, and it is what makes a wrong base fail by

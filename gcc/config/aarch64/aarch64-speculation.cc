@@ -33,9 +33,9 @@
 #include "basic-block.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
+#include "multi-target-base.h"
 #include BASE_HEADER (insn-attr.h)
 #include "df.h"
-#include "multi-target-base.h"
 #include BASE_HEADER (tm_p.h)
 #include BASE_HEADER (insn-config.h)
 #include "recog.h"

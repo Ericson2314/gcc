@@ -2074,7 +2074,7 @@ write_insn_preds_c (void)
 
      genpreds runs once per back end into `namespace insn_<base>' AND once
      un-namespaced into the shared `insn-preds.o' that $(OBJS) still names.
-     The per-back-end runs are fine: each is compiled with -I<base>-inc, so
+     The per-back-end runs are fine: each is compiled for one back end, so
      every `tm.h' macro a constraint body spells is that base's own.  The
      SINGULAR run is compiled once, against the primary's `tm.h', so any such
      macro is i386's answer served to every configured target.

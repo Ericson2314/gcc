@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Compiled once per back end, with `-I<base>-inc' so every header it reaches
+/* Compiled once per back end, so every header it reaches
    is that back end's, and with -DTARGETM_CDATA_SYMBOL naming its refresh
    function.  See target-cdata.h for what this is and for the invariance
    precondition on every field.
@@ -33,9 +33,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 /* Some of these macros are not self-contained arithmetic on option variables:
