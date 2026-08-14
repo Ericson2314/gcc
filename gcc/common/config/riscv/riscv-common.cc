@@ -2112,15 +2112,43 @@ riscv_compute_multilib (
      request is genuinely incompatible and riscv_multi_lib_check will
      emit the proper diagnostic.  */
 
-  /* Find march.  */
-  riscv_current_arch_str =
-    find_last_appear_switch (switches, n_switches, "march=");
-  /* Find mabi.  */
-  riscv_current_abi_str =
-    find_last_appear_switch (switches, n_switches, "mabi=");
+  /* Find march and mabi.
+     find_last_appear_switch returns NULL when the switch is absent, and
+     assigning NULL to a std::string is undefined -- in practice a strlen of 0,
+     i.e. a SEGFAULT IN THE DRIVER BEFORE IT PRINTS ANYTHING.  The comment that
+     used to stand here said "it should not happened since we have set both in
+     OPTION_DEFAULT_SPECS", and the check below (.empty ()) was written for a
+     value that had already been dereferenced two lines above it.
 
-  /* Failed to find -march or -mabi, but it should not happened since we have
-     set both in OPTION_DEFAULT_SPECS.  */
+     That premise does not hold on a multi-target compiler.  OPTION_DEFAULT_SPECS
+     is not compiled in here: the defaults reach the driver as DATA, through the
+     `*option_defaults' spec of the per-target spec file, which
+     target-specs/configure writes from gcc/multi-target.manifest.  A target
+     whose spec file has not been generated -- or was generated before the top
+     level began passing --with-option-defaults -- reaches this line with no
+     -march at all.  Measured on this branch, that is exactly what happened:
+
+         Program received signal SIGSEGV
+         #0  __strlen_evex ()
+         #1  riscv_compute_multilib (...)
+         #2  driver::set_up_specs () const
+
+     for every riscv invocation, which is why every measurement on this branch
+     has driven cc1 directly and side-stepped the driver.
+
+     The NULL is now tested before it is used.  This is not a fallback that
+     invents a value: it takes the SAME branch the code already took for an
+     empty string, returning the multilib the generic matcher chose, and it
+     leaves the diagnostic to riscv_multi_lib_check as before.  */
+  const char *arch_sw = find_last_appear_switch (switches, n_switches, "march=");
+  const char *abi_sw = find_last_appear_switch (switches, n_switches, "mabi=");
+  if (arch_sw == NULL || abi_sw == NULL)
+    return multilib_dir;
+
+  riscv_current_arch_str = arch_sw;
+  riscv_current_abi_str = abi_sw;
+
+  /* An option present but valueless (`-march=') is still nothing to match on.  */
   if (riscv_current_arch_str.empty () || riscv_current_abi_str.empty ())
     return multilib_dir;
 

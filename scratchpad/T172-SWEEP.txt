@@ -1,0 +1,135 @@
+== #172 unconfigured-default sweep
+   srcdir     /tmp/snap-a82d
+   records    773  (.opt lines with Var(), Init() or Mask())
+   shared set compile lines in /tmp/b-a82dcce59b2d6b84e/mk.out -- 759 compiled once, 136 per base
+
+BACKEND    VAR:BIT                                PROMOTED   SHARED? MACROS-IN-HEADERS
+aarch64    aarch64_flag_outline_atomics           OPT-PARSE  SHARED  TARGET_OUTLINE_ATOMICS 
+aarch64    aarch64_tls_dialect                    INIT-ONLY  SHARED  TARGET_TLS_DESC 
+arc        arc_fpu_build                          INIT-ONLY  SHARED  TARGET_FP_DP_AX TARGET_FP_DP_BASE TARGET_FP_DP_CONV TARGET_FP_DP_FUSED TARGET_FP_DP_SQRT TARGET_FP_SP_BASE TARGET_FP_SP_CONV TARGET_FP_SP_FUSED TARGET_FP_SP_SQRT TARGET_HARD_FLOAT 
+arc        arc_mpy_option                         INIT-ONLY  no      TARGET_MPYW TARGET_MULTI TARGET_PLUS_DMPY TARGET_PLUS_MACD TARGET_PLUS_QMACW 
+arc        arc_size_opt_level                     INIT-ONLY  SHARED  JUMP_ALIGN 
+arc        arc_tune                               OVERRIDE   no      TARGET_DBNZ 
+arc        TARGET_BRANCH_INDEX                    INIT-ONLY  no      TARGET_BI_BIH 
+arc        TARGET_NPS_BITOPS                      INIT-ONLY  no      TARGET_RRQ_CLASS 
+arc        unaligned_access                       OVERRIDE   SHARED  STRICT_ALIGNMENT 
+arm        arm_float_abi                          INIT-ONLY  no      TARGET_HAVE_MVE TARGET_HAVE_MVE_FLOAT TARGET_MAYBE_HARD_FLOAT TARGET_VFP_BASE 
+arm        arm_structure_size_boundary            OVERRIDE   SHARED  STRUCTURE_SIZE_BOUNDARY 
+arm        inline_asm_unified                     OVERRIDE   SHARED  ASM_APP_ON 
+avr        avropt_sp8                             INIT-ONLY  no      AVR_HAVE_SPH 
+bpf        bpf_asm_dialect_var                    INIT-ONLY  SHARED  ASSEMBLER_DIALECT 
+csky       csky_float_abi                         INIT-ONLY  SHARED  TARGET_HARD_FLOAT TARGET_HARD_FLOAT_ABI TARGET_SOFT_FLOAT 
+csky       csky_fpu_index                         OVERRIDE   no      TARGET_SINGLE_FPU 
+csky       csky_target_double_float               INIT-ONLY  SHARED  TARGET_DOUBLE_FLOAT 
+epiphany   epiphany_stack_offset                  OVERRIDE   SHARED  INCOMING_FRAME_SP_OFFSET STACK_POINTER_OFFSET 
+frv        frv_branch_cost_int                    INIT-ONLY  SHARED  BRANCH_COST 
+frv        frv_condexec_insns                     INIT-ONLY  SHARED  MAX_CONDITIONAL_EXECUTE 
+frv        frv_sched_lookahead                    INIT-ONLY  no      FIRST_CYCLE_MULTIPASS_SCHEDULING_LOOKAHEAD 
+gcn        flag_xnack                             OVERRIDE   no      TARGET_XNACK 
+i386       ix86_apx_features                      OVERRIDE   SHARED  TARGET_APX_CCMP TARGET_APX_EGPR TARGET_APX_NDD TARGET_APX_NF TARGET_APX_PPX TARGET_APX_PUSH2POP2 TARGET_APX_ZU 
+i386       ix86_pmode                             OVERRIDE   SHARED  Pmode 
+i386       ix86_stack_protector_guard             OVERRIDE   SHARED  TARGET_SSP_GLOBAL_GUARD TARGET_SSP_TLS_GUARD 
+mingw      flag_setstackexecutable                INIT-ONLY  SHARED  CHECK_EXECUTE_STACK_ENABLED 
+mips       mips_abi                               INIT-ONLY  no      ABI_NEEDS_64BIT_REGS	 GENERATE_MIPS16E_SAVE_RESTORE TARGET_NEWABI		 TARGET_O32_FP64A_ABI TARGET_OLDABI		 
+mips       mips_cb                                INIT-ONLY  no      TARGET_CB_ALWAYS TARGET_CB_NEVER 
+mips       TARGET_MIPS16E2                        INIT-ONLY  no      ISA_HAS_MIPS16E2 
+mips       TARGET_STRICT_ALIGN                    INIT-ONLY  no      ISA_HAS_UNALIGNED_ACCESS 
+nds32      nds32_abi                              INIT-ONLY  SHARED  TARGET_HARD_FLOAT TARGET_SOFT_FLOAT 
+nds32      nds32_arch_option                      INIT-ONLY  no      TARGET_ISA_V2 TARGET_ISA_V3M 
+nds32      nds32_fp_regnum                        INIT-ONLY  no      NDS32_EXT_FPU_DOT_E 
+nvptx      nvptx_alias                            INIT-ONLY  no      TARGET_SUPPORTS_ALIASES 
+nvptx      ptx_isa_option                         INIT-ONLY  no      TARGET_SM30 TARGET_SM35 TARGET_SM37 TARGET_SM50 TARGET_SM52 TARGET_SM53 TARGET_SM61 TARGET_SM70 TARGET_SM75 TARGET_SM80 TARGET_SM89 
+nvptx      ptx_version_option                     OVERRIDE   no      TARGET_PTX_4_0 TARGET_PTX_4_1 TARGET_PTX_4_2 TARGET_PTX_5_0 TARGET_PTX_6_0 TARGET_PTX_6_3 TARGET_PTX_7_0 TARGET_PTX_7_3 TARGET_PTX_7_8 
+riscv      riscv_abi                              OVERRIDE   SHARED  POINTER_SIZE 
+riscv      riscv_base_subext:DOUBLE_FLOAT         INIT-ONLY  SHARED  UNITS_PER_FP_REG 
+riscv      riscv_base_subext:RVE                  INIT-ONLY  SHARED  GP_REG_LAST 
+riscv      riscv_cmodel                           OVERRIDE   SHARED  CASE_VECTOR_PC_RELATIVE JUMP_TABLES_IN_TEXT_SECTION 
+riscv      riscv_isa_flags:64BIT                  OPT-PARSE  SHARED  MAX_FIXED_MODE_SIZE TARGET_ZICOND_LIKE UNITS_PER_WORD Xmode 
+riscv      riscv_isa_flags:VECTOR                 OVERRIDE   SHARED  OPTIMIZE_MODE_SWITCHING 
+riscv      riscv_tls_dialect                      INIT-ONLY  SHARED  TARGET_TLSDESC 
+riscv      riscv_vector_elen_flags:VECTOR_ELEN_64 OVERRIDE   SHARED  RVV_REQUIRE_ELEN_64 
+riscv      riscv_xthead_subext:XTHEADMEMIDX       INIT-ONLY  SHARED  HAVE_POST_MODIFY_DISP HAVE_PRE_MODIFY_DISP 
+riscv      riscv_xventana_subext:XVENTANACONDOPS  INIT-ONLY  SHARED  TARGET_ZICOND_LIKE 
+riscv      riscv_zi_subext:ZICOND                 INIT-ONLY  SHARED  TARGET_ZICOND_LIKE 
+rs6000     rs6000_isa_flags:64BIT                 OVERRIDE   SHARED  AGGREGATE_PADDING_FIXED DRAFT_V4_STRUCT_RET FIXED_R13 JUMP_TABLES_IN_TEXT_SECTION OBJC_JBLEN OS_MISSING_POWERPC64 PTRDIFF_TYPE RESTORE_FP_PREFIX SAVE_FP_PREFIX SIZE_TYPE STACK_CHECK_PROTECT TARGET_32BIT		 TARGET_VXWORKS64 TCB_HWCAP_BASE_OFFSET TCB_PLATFORM_OFFSET TLS_REGNUM WCHAR_TYPE WCHAR_TYPE_SIZE 
+rs6000     rs6000_isa_flags:DFP                   INIT-ONLY  no      TARGET_NO_SDMODE_STACK	 
+rs6000     rs6000_isa_flags:EFFICIENT_UNALIGNED_VSX INIT-ONLY  SHARED  MOVE_MAX_PIECES 
+rs6000     rs6000_isa_flags:MINIMAL_TOC           INIT-ONLY  no      TOC_REGISTER 
+rs6000     rs6000_isa_flags:PCREL                 INIT-ONLY  no      TARGET_NO_TOC_OR_PCREL TARGET_TOC 
+rs6000     rs6000_isa_flags:POPCNTB               INIT-ONLY  no      TARGET_FRSQRTES	 
+rs6000     rs6000_isa_flags:POPCNTD               INIT-ONLY  no      TARGET_LDBRX 
+rs6000     rs6000_isa_flags:POWERPC64             OVERRIDE   SHARED  MAX_FIXED_MODE_SIZE MOVE_MAX STORE_MAX_PIECES TARGET_EXTSWSLI	 TARGET_VADDUQM		 UNITS_PER_WORD 
+rs6000     rs6000_isa_flags:PPC_GFXOPT            INIT-ONLY  no      TARGET_FRES	 TARGET_MINMAX	 
+rs6000     rs6000_isa_flags:PREFIXED              INIT-ONLY  no      PCREL_SUPPORTED_BY_OS	 
+rs6000     rs6000_link_stack                      INIT-ONLY  no      TARGET_LINK_STACK 
+rs6000     rs6000_pltseq                          OVERRIDE   no      TARGET_PLTSEQ		 
+rs6000     rs6000_relative_jumptables             INIT-ONLY  SHARED  CASE_VECTOR_MODE CASE_VECTOR_PC_RELATIVE 
+rx         rx_cpu_type                            INIT-ONLY  SHARED  FUNCTION_BOUNDARY 
+s390       s390_branch_cost                       INIT-ONLY  SHARED  BRANCH_COST 
+s390       s390_indirect_branch_table             INIT-ONLY  SHARED  TARGET_INDIRECT_BRANCH_TABLE 
+s390       s390_stack_protector_guard             INIT-ONLY  no      TARGET_SP_GLOBAL_GUARD TARGET_SP_TLS_GUARD 
+s390       s390_tune                              OVERRIDE   no      s390_tune_attr TARGET_AVOID_CMP_AND_BRANCH 
+sh         sh_branch_cost                         OVERRIDE   SHARED  BRANCH_COST 
+sh         TARGET_ACCUMULATE_OUTGOING_ARGS        INIT-ONLY  SHARED  ACCUMULATE_OUTGOING_ARGS 
+sh         TARGET_FDPIC                           INIT-ONLY  SHARED  PIC_OFFSET_TABLE_REG_CALL_CLOBBERED SH_OFFSETS_MUST_BE_WITHIN_SECTIONS_P TRAMPOLINE_SIZE 
+sparc      sparc_code_model                       OVERRIDE   no      TARGET_CM_EMBMEDANY TARGET_CM_MEDANY TARGET_CM_MEDLOW TARGET_CM_MEDMID 
+sparc      sparc_cpu                              OVERRIDE   no      sparc_cpu_attr 
+visium     visium_cpu                             OVERRIDE   SHARED  TRAMPOLINE_ALIGNMENT TRAMPOLINE_SIZE visium_cpu_attr 
+vms        flag_vms_pointer_size                  INIT-ONLY  SHARED  POINTER_SIZE PTRDIFF_TYPE SIZETYPE 
+xtensa     xtensa_strict_alignment                OVERRIDE   SHARED  STRICT_ALIGNMENT 
+
+== population BY CAUSE (pairs that reach a header macro)
+   772 (backend,var) pairs scanned
+   73 reach a header macro -- an escape route out of the back end
+
+   CAUSE       PAIRS BACKENDS  SHARED   leak window
+   OVERRIDE       24       14      16   before <be>_option_override runs
+   OPT-PARSE       2        2       2   ALWAYS, unless a -m option is passed
+   INIT-ONLY      47       17      24   the Init is the value; whose Init is linked?
+
+   23 back ends affected in total
+
+== BLIND SPOTS of this instrument, stated because a 0 from it is a claim
+   about the instrument (PRINCIPLES section 4):
+   * bare Mask(X) records with NO Var() -- they land in the SHARED
+     global_options.x_target_flags and their bit numbering is per base.
+     Not scanned here: 633 such records across the tree.
+   * arm 3 reads gcc/config/<be>/*.h ONLY.  A macro defined in a
+     generated header, or in gcc/config/*.h one level up (elfos.h et al,
+     which PRINCIPLES records as 66 of 87 missed pairs in an earlier
+     sweep), is invisible to it.  Upper bound, not lower.
+   * arm 2 is a grep for an assignment, not a reachability proof: a var
+     assigned in dead code scores OVERRIDE.
+
+== THE BLOCKER THIS SWEEP WALKED INTO, measured, and NOT worked around
+   `multi_target_select' is called from ONE place -- toplev.cc:2425, i.e. cc1.
+   It is what applies each back end's own Init() values, via
+   `global_options_init_<base> (&global_options_init)'
+   (multi-target-select.cc:360, mt-<base>/options-init.cc).
+
+   The DRIVER never calls it, and multi-target-select.cc's own comment says
+   why it was written this way: "there are three callers of
+   init_options_struct and one of them is the DRIVER, which never selects a
+   target".  The conclusion drawn there -- write into global_options_init once,
+   at cc1's selection -- is right for cc1 and leaves the driver with
+   `{}, /* riscv_isa_spec (another back end) */' (options.cc:1726).
+
+   That is not inert.  The driver reads target option state in at least two
+   places: riscv's TARGET_COMPUTE_MULTILIB, and DRIVER_SELF_SPECS' spec
+   function `riscv_expand_arch', which parses -march and needs riscv_isa_spec:
+
+     #1 riscv_ext_info_t::default_version () const     <- gcc_unreachable
+     #2 riscv_subset_list::add (char const*, bool)
+     #3 riscv_subset_list::parse_base_ext (char const*)
+     #5 riscv_parse_arch_string (char const*, gcc_options*, unsigned long)
+     #6 riscv_expand_arch (int, char const**)
+     #7 handle_spec_function (char const*, bool*, char const*)
+    #12 do_self_spec (char const*)
+    #13 driver::set_up_specs () const
+
+   An explicit `-misa-spec=20191213' on the driver's command line does NOT
+   help: the driver does not decode target `-m' options into its own
+   global_options, so the Init is the only source there is.
+
+   This is a DESIGN question (PRINCIPLES 2b), not a bug to patch: it decides
+   whether, and how, the driver selects a base.  Reported rather than resolved.

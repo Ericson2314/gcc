@@ -2336,6 +2336,35 @@ install-gdb: $(INSTALL_GDB_TK)
 # gcc/Makefile.in's multi-target-specs).  A pass-through avoids re-inventing
 # that: this makefile never enumerates target-specs' options.
 #
+# THE PASS-THROUGH IS THE WRONG CHANNEL FOR BUILD DATA, AND THAT COST riscv64
+# ITS WORD SIZE.  `--with-option-defaults' and `--with-cpu-type' are not things
+# the person running the probe knows or should have to type: config.gcc infers
+# them from the triple, gcc/configure.ac records them in
+# gcc/multi-target.manifest, and target-specs/configure has a twenty-arm
+# template table waiting for them.  Nothing passed them.  Measured on the
+# eleven-back-end build: `*option_defaults' is EMPTY in all eleven spec files,
+# including riscv64's, whose manifest stanza reads
+#
+#     option_defaults  abi=lp64d arch=rv64gc tls=trad isa_spec=20191213
+#
+# With no `-march=' reaching it, riscv's MASK_64BIT is never set -- it is set
+# ONLY by riscv_parse_arch_string off OPT_march_, never by an option override --
+# so TARGET_64BIT is its unpromoted 0, UNITS_PER_WORD is 4, and the compiler
+# emits 32-bit code into an ELF64 object.  The same NULL cmdline_subset_list is
+# why `.attribute arch' comes out as the empty string.  One missing input, both
+# symptoms.
+#
+# So these two are read from the manifest and passed automatically, BEFORE the
+# pass-through, which therefore still overrides them.  This does not re-enumerate
+# target-specs' options in the sense the paragraph above forbids: the objection
+# there was to a fixed list SILENTLY TRUNCATING what a user supplied, and these
+# are supplied by nobody.
+#
+# THE MANIFEST IS REQUIRED, NOT OPTIONAL.  Passing an empty --with-option-defaults
+# when the file cannot be read would be indistinguishable from a target that
+# genuinely has no defaults -- which is exactly the state that produced the bug,
+# so it fails by name instead.
+#
 # WRITING THE FILE IS NOT THE FIX; WRITING IT WHERE THE DRIVER LOOKS IS.  Both
 # are `rc=0' from the producer's side, and getting the directory wrong leaves a
 # correct file one directory from anything that reads it, which is the bug this
@@ -2392,6 +2421,29 @@ configure-target-specs-$(1):
 	  mt_tools=`dirname "$$$$mt_as"`; \
 	fi; \
 	mt_dest="$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)"; \
+	mt_manifest="$$$$r/gcc/multi-target.manifest"; \
+	test -f "$$$$mt_manifest" || { \
+	  echo "*** target-specs for $(1): no $$$$mt_manifest." >&2; \
+	  echo "*** It carries this target's config.gcc-derived CPU/ABI" >&2; \
+	  echo "*** defaults, and running the probe without them writes an" >&2; \
+	  echo "*** empty \`*option_defaults' spec -- which looks exactly like" >&2; \
+	  echo "*** a target that has none.  Build gcc first." >&2; \
+	  exit 1; }; \
+	mt_od=`$$(AWK) -v t="$(1)" \
+	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
+	   seen && $$$$1 == "option_defaults" { $$$$1 = ""; print; exit }' \
+	  "$$$$mt_manifest"`; \
+	mt_ct=`$$(AWK) -v t="$(1)" \
+	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
+	   seen && $$$$1 == "cpu_type" { print $$$$2; exit }' \
+	  "$$$$mt_manifest"`; \
+	test -n "$$$$mt_ct" || { \
+	  echo "*** target-specs for $(1): $$$$mt_manifest has no \`cpu_type'" >&2; \
+	  echo "*** line for this target.  Without the back-end name the" >&2; \
+	  echo "*** option-default templates cannot be chosen (i386 spells" >&2; \
+	  echo "*** \`cpu' as -mtune, most others as -mcpu), so this stops" >&2; \
+	  echo "*** rather than guessing." >&2; \
+	  exit 1; }; \
 	mt_src=; \
 	for f in gcc/specs-src-$(1) gcc/mlib-specs-$(1); do \
 	  test -f "$$$$r/$$$$f" && mt_src="$$$$mt_src $$$$r/$$$$f"; \
@@ -2413,6 +2465,8 @@ configure-target-specs-$(1):
 	  --build=$${build_alias} --host=$(1) --with-target=$(1) \
 	  --with-tools-dir="$$$$mt_tools" \
 	  --with-specs-file="$$$$mt_dest/specs" \
+	  --with-cpu-type="$$$$mt_ct" \
+	  --with-option-defaults="$$$$mt_od" \
 	  $$$${mt_src:+--with-source-specs="$$$$mt_src"} \
 	  $$(TARGET_SPECS_FLAGS_FOR_$(1)) \
 	  || exit 1; \
