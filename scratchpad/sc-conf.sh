@@ -18,12 +18,32 @@
 #     mandatory there).  Stock aarch64-linux has an empty multilib list anyway,
 #     and `make all-gcc' builds no target library either way, so this cannot
 #     move a compile-only test result.  Stated rather than hidden.
-#   * --with-native-system-header-dir=<the TARGET's own glibc headers>, the
-#     same store path taa-tools.sh hands the multi-target run for this target.
-#     Same headers on both sides is the point; a host header dir here would
-#     make every #include a different experiment.
-#   * --with-sysroot is NOT passed on either side, so the header dir above is
-#     used literally.
+#   * The TARGET's own glibc headers -- the same store path taa-tools.sh hands
+#     the multi-target run, which reads it at run time out of specs-config as
+#     `native_system_header_dir'.  Same headers on both sides is the point.
+#
+#     AND THE FIRST ATTEMPT AT THIS GOT IT WRONG IN A WAY THAT LOOKED LIKE A
+#     RESULT.  `--with-native-system-header-dir=<dir>' ALONE is inert for a
+#     cross: cppdefault.cc flags that entry `cross_include', so the driver
+#     drops it, and the only directories left are the build dir's own
+#     gcc/include and gcc/include-fixed.  GCC's own stdint.h is a
+#     `#include_next' wrapper, so with no system directory behind it every
+#     translation unit that includes <stdint.h> dies with
+#
+#         gcc/include/stdint.h:11:16: fatal error: stdint.h: No such file
+#
+#     -- 66,883 occurrences, the top cause of the whole stock run, and the
+#     board it produced (84,572 PASS / 98,093 FAIL) was WITHIN 0.1% OF THE
+#     MULTI-TARGET BOARD'S FAIL COLUMN.  Two unrelated missing-header floors
+#     of similar size read as parity.  That is the shape this project keeps
+#     finding: the control has to be checked for its OWN defects before its
+#     agreement with the thing under test means anything.
+#
+#     The fix is to give the same directory through the sysroot, which is not
+#     dropped for a cross: --with-sysroot=<store path> plus
+#     --with-native-system-header-dir=/include, which resolves to exactly the
+#     directory the multi-target side names.  Verified by -v: the search list
+#     must contain that path.
 #
 # Same on both sides: --enable-languages=c,lto, --disable-bootstrap,
 # --disable-nls, --disable-werror, the same CC/CFLAGS, the same nix shell,
@@ -35,6 +55,11 @@ SRC=$(cd "$SRC" && pwd)
 D=${1:?build dir}
 T=${2:?target triple}
 HDR=${3:?target header dir}
+# The sysroot is the parent of the header dir, and the header dir must be
+# literally <sysroot>/include or the substitution below is a lie.
+SYSROOT=${HDR%/include}
+[ "$SYSROOT/include" = "$HDR" ] \
+  || { echo "FATAL: header dir $HDR is not <something>/include; the sysroot form does not apply"; exit 9; }
 
 # ANTI-ANCHOR: the control must be measuring UPSTREAM.  Exact, and inverted.
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
@@ -60,7 +85,8 @@ sh "$S/eb-shell.sh" "cd $D && PATH=/tmp/tools-agent-a3464debf6893de84/bin:\$PATH
   --target=$T \
   --disable-werror \
   --disable-bootstrap --disable-nls --disable-multilib \
-  --with-native-system-header-dir=$HDR \
+  --with-sysroot=$SYSROOT \
+  --with-native-system-header-dir=/include \
   CC=gcc CFLAGS='-O2 -g0 -Wno-error=format-security' \
   CXX=g++ CXXFLAGS='-O2 -g0 -Wno-error=format-security' \
   --enable-languages=c,lto" > "$D/conf.out" 2> "$D/conf.err"
@@ -68,4 +94,5 @@ rc=$?
 echo "configure rc=$rc"
 [ -f "$D/Makefile" ] || { echo "FATAL: no Makefile"; tail -20 "$D/conf.err"; exit 9; }
 echo "$SRC" > "$D/MY-SRC"
+echo "$HDR" > "$D/TARGET-HDR"	# sc-check.sh guard S3 reads this back
 tail -3 "$D/conf.err" || true

@@ -70,6 +70,29 @@ if [ "$got" != "$T" ]; then
 fi
 echo "-- guard S2: xgcc -dumpmachine = $T"
 
+# ---- S3: THE TARGET'S SYSTEM HEADERS MUST ACTUALLY BE REACHABLE ----
+# The multi-target side reads `native_system_header_dir' out of specs-config at
+# run time and finds them.  The control has to reach the SAME directory or the
+# comparison is between two different header environments -- which it was, at
+# 66,883 `stdint.h: No such file' diagnostics, producing a FAIL column within
+# 0.1% of the multi-target board's for an entirely unrelated reason.  A control
+# with its own floor is not a control.  Both halves asserted: the directory is
+# in the search list, AND a translation unit including <stdint.h> compiles.
+HDRDIR=$(cat "$B/TARGET-HDR") || { echo "FATAL: no $B/TARGET-HDR"; exit 9; }
+echo '#include <stdint.h>
+int64_t sc_probe;' > "$B/hdr-probe-$T.c"
+if ! "$B/gcc/xgcc" -B"$B/gcc/" -S -o "$B/hdr-probe-$T.s" "$B/hdr-probe-$T.c" \
+       > "$B/hdr-probe-$T.err" 2>&1; then
+  echo "FATAL[$T]: the stock compiler cannot find its own target system headers."
+  sed -n '1,10p' "$B/hdr-probe-$T.err"
+  exit 9
+fi
+"$B/gcc/xgcc" -B"$B/gcc/" -E -v -o /dev/null "$B/hdr-probe-$T.c" 2> "$B/hdr-list-$T.txt"
+grep -q "^ $HDRDIR\$" "$B/hdr-list-$T.txt" \
+  || { echo "FATAL[$T]: $HDRDIR is not in the include search list:";
+       sed -n '/search starts here/,/End of search/p' "$B/hdr-list-$T.txt"; exit 9; }
+echo "-- guard S3: target system headers reachable at $HDRDIR"
+
 TSD="testsuite.$T"
 rm -f "$B/gcc/site.exp"
 rm -rf "$B/gcc/$TSD"

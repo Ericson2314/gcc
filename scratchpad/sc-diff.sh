@@ -20,6 +20,12 @@
 #
 # usage: sc-diff.sh <mt-sum> <stock-sum> <label>
 set -u
+# `join' REQUIRES ITS INPUTS IN THE COLLATING ORDER IT USES, and the default
+# locale is not C: `sort' put `outputs-10' where `join' did not expect it and
+# join printed "input is not in sorted order" ON STDERR while still emitting a
+# TRUNCATED table on stdout.  A silently short per-directory table is exactly
+# the kind of result that gets read as "those directories are clean".
+export LC_ALL=C
 MT=${1:?multi-target gcc.sum}
 ST=${2:?stock gcc.sum}
 LAB=${3:?label}
@@ -29,6 +35,17 @@ for f in "$MT" "$ST"; do
   grep -q '=== gcc Summary' "$f" \
     || { echo "FATAL: $f has no '=== gcc Summary' -- truncated run, not a board"; exit 9; }
 done
+
+# DIRECTORY OF A TEST NAME.  A .sum test name is `<path> <description>' and the
+# DESCRIPTION CONTAINS SLASHES AND SPACES (`scan-assembler foo\tv5', `expected
+# covered: {14(true) 15 18}').  Splitting the whole name on `/' therefore
+# invents directories out of description text -- it did, and printed rows named
+# `outputs-98 asm auxdump 2: outputs-2.su'.  Take the FIRST whitespace token,
+# then at most two path components.
+sc_dir () {
+  sed -e 's/#[0-9]*$//' -e 's/[ 	].*//' \
+  | awk -F/ '{ print (NF>1 ? $1"/"$2 : $1) }'
+}
 
 TD=$(mktemp -d) || exit 9
 trap 'rm -rf "$TD"' 0
@@ -74,12 +91,12 @@ echo
 echo "-- REGRESSIONS: stock PASS -> multi-target NOT PASS.  THIS IS THE DEBT."
 awk -F'\t' '$2=="PASS" && $3!="PASS" {print $3"\t"$1}' "$TD/j" > "$TD/reg"
 echo "   count: $(wc -l < "$TD/reg")"
+echo "   by multi-target verdict:"
+awk -F'\t' '{c[$1]++} END {for (k in c) printf "%8d  -> %s\n", c[k], k}' "$TD/reg" | sort -rn
 echo "   by test directory (top 25):"
-awk -F'\t' '{ n=$2; sub(/#[0-9]+$/,"",n); split(n,a,"/");
-              d=(a[1] ~ /^gcc\.target|^gcc\.c-torture|^gcc\.dg$/ && a[2]!="" ) ? a[1]"/"a[2] : a[1];
-              if (a[1]=="gcc.dg") d=(a[2]!="" && n ~ /\//) ? a[1]"/"a[2] : a[1];
-              c[d]++ } END { for (k in c) printf "%8d  %s\n", c[k], k }' "$TD/reg" \
-  | sort -rn | head -25
+awk -F'\t' '{ print $2 }' "$TD/reg" | sc_dir | sort | uniq -c | sort -rn | head -25
+echo "   20 named regressions (the work queue, verbatim):"
+awk -F'\t' '{sub(/#[0-9]+$/,"",$2); printf "     %-11s %s\n", $1, $2}' "$TD/reg" | sort | head -20
 
 echo
 echo "-- FIXED BY NOTHING: multi-target PASS where stock does NOT pass"
@@ -94,10 +111,8 @@ awk -F'\t' '$2=="FAIL" && $3=="FAIL"' "$TD/j" | wc -l
 echo
 echo "-- PER TEST DIRECTORY: FAIL counts, both sides"
 dirof () {
-  awk -F'\t' -v want="$1" '$2==want {n=$1; sub(/#[0-9]+$/,"",n); split(n,a,"/");
-      d=(a[2]!="") ? a[1]"/"a[2] : a[1];
-      if (a[1]!="gcc.target" && a[1]!="gcc.c-torture") d=a[1];
-      c[d]++ } END { for (k in c) printf "%s\t%d\n", k, c[k] }' "$2" | sort
+  awk -F'\t' -v want="$1" '$2==want {print $1}' "$2" | sc_dir | sort | uniq -c \
+  | awk '{printf "%s\t%d\n", $2, $1}' | sort
 }
 dirof FAIL "$TD/mt" > "$TD/dmt"
 dirof FAIL "$TD/st" > "$TD/dst"
@@ -107,8 +122,8 @@ printf '%-34s %9s %9s %9s   %9s %9s %9s\n' DIRECTORY FAIL_MT FAIL_ST FAIL_D PASS
 join -t"$(printf '\t')" -a1 -a2 -e0 -o 0,1.2,2.2 "$TD/dmt" "$TD/dst" > "$TD/dj"
 join -t"$(printf '\t')" -a1 -a2 -e0 -o 0,1.2,2.2 "$TD/pmt" "$TD/pst" > "$TD/pj"
 join -t"$(printf '\t')" -a1 -a2 -e0 -o 0,1.2,1.3,2.2,2.3 "$TD/dj" "$TD/pj" \
- | awk -F'\t' '{printf "%-34s %9d %9d %+9d   %9d %9d %+9d\n", $1,$2,$3,$2-$3,$4,$5,$4-$5}' \
- | sort -k4,4 -rn
+ | awk -F'\t' '{printf "%-34s %9d %9d %9d   %9d %9d %9d\n", $1,$2,$3,$2-$3,$4,$5,$4-$5}' \
+ | sort -k4,4nr | awk '$2+$3+$5+$6 >= 20'
 
 echo
 echo "-- ONLY-IN rows (a test name+occurrence one side produced and the other"
@@ -119,6 +134,6 @@ cut -f1 "$TD/st" | sort > "$TD/nst"
 echo "   only multi-target: $(comm -23 "$TD/nmt" "$TD/nst" | wc -l)"
 echo "   only stock:        $(comm -13 "$TD/nmt" "$TD/nst" | wc -l)"
 echo "   top 15 only-in-stock names:"
-comm -13 "$TD/nmt" "$TD/nst" | sed 's/#[0-9]*$//' | awk '{split($1,a,"/"); print a[1]"/"a[2]}' | sort | uniq -c | sort -rn | head -15
+comm -13 "$TD/nmt" "$TD/nst" | sc_dir | sort | uniq -c | sort -rn | head -15
 echo "   top 15 only-in-multi-target names:"
-comm -23 "$TD/nmt" "$TD/nst" | sed 's/#[0-9]*$//' | awk '{split($1,a,"/"); print a[1]"/"a[2]}' | sort | uniq -c | sort -rn | head -15
+comm -23 "$TD/nmt" "$TD/nst" | sc_dir | sort | uniq -c | sort -rn | head -15
