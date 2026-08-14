@@ -303,6 +303,25 @@ enum reg_class { NO_REGS = 0 };
 #define REGNO_REG_CLASS(REGNO) \
   ((enum reg_class) targetm_regs->regno_reg_class ((int) (REGNO)))
 
+/* `PIC_OFFSET_TABLE_REGNUM', asked of the SELECTED base.  See the field
+   comment in target-regs.h for what the primary answering cost: i386's
+   expands to `INVALID_REGNUM' for x86_64, so `emit-rtl.cc:6361' left
+   `pic_offset_table_rtx' NULL for every one of the forty-four back ends that
+   DO have a PIC register, and mips's prologue then handed that null to
+   `reg_overlap_mentioned_p'.
+
+   NOT `#ifdef'-BREAKING AND NOT CONSTANT-EXPRESSION-BREAKING.  Swept over all
+   of `gcc/' outside `config/' and the generators: the twelve shared spellings
+   (df-scan.cc x3, emit-rtl.cc x4, cfgexpand.cc x2, shrink-wrap.cc x2,
+   builtins.cc, df-problems.cc, reginfo.cc) are every one an ordinary run-time
+   expression -- no `#if', no case label, no array bound, no static
+   initialiser -- and the only preprocessor occurrence of the name anywhere is
+   `defaults.h:871's own `#ifndef', which is upstream's and is on the supply
+   side.  `REAL_PIC_OFFSET_TABLE_REGNUM' is a DIFFERENT name, is `#ifdef'd at
+   ira-lives.cc:1684 and lra-lives.cc:1111, and is NOT converted here.  */
+#undef PIC_OFFSET_TABLE_REGNUM
+#define PIC_OFFSET_TABLE_REGNUM (targetm_regs->pic_offset_table_regnum ())
+
 /* `MAX_BITS_PER_WORD' is an array bound in eleven places.  If this back end
    did not supply its own, the fallback above derived it from BITS_PER_WORD,
    and BITS_PER_WORD is about to stop being a constant expression.  Refuse,
