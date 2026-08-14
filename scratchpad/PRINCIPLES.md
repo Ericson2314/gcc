@@ -808,6 +808,18 @@ end's `.h` may not name a base **unconditionally** (the shared `tm.h` includes
 those three convertible); and 8 bad include orders once amplified into 251
 diagnostics from one cause.
 
+**A GUARD THAT REPORTS PROTECTING NOTHING IS A STOP, NOT A GREEN.** Cleaning
+207 stale `/tmp` build dirs, the coordinator wrote a keep-list for the four
+live agents' directories. It printed `removed=207 kept_live=0` — and the delete
+ran anyway. Zero protected while four agents were mid-build is not a pass; it
+is the guard reporting that it matched nothing. (The ids were truncated in the
+directory names, so the substring test found none of them.)
+
+Destructive operations need the inverse acceptance test: **assert the expected
+number of protected items BEFORE deleting, and abort if it is zero.** Same
+shape as every other false green here — "everything is fine" and "the
+instrument did not run" produce the same output.
+
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
 
