@@ -876,6 +876,29 @@ number of protected items BEFORE deleting, and abort if it is zero.** Same
 shape as every other false green here — "everything is fine" and "the
 instrument did not run" produce the same output.
 
+**CURRENT BARS — `7375c86aa4c`, anchor 49, two bases, cold from an immutable
+snapshot.** `specs-config` MOVED and it is not a regression:
+
+```
+make all-gcc                MAKERC=0, 0 error:, cc1 links
+cc1 -quiet -nostdinc -O2 -ftarget-config=<cfg> big.c -o x.s
+  x86_64                    12369 bytes  md5 378fc33c1e70   (unchanged)
+specs-config  wc -l         232          md5 cfbc7a65e54e   x86_64
+                            232          md5 575aff0c188b   aarch64
+  was 230 / a6c4c68bdf33 before #189
+```
+
+The two extra lines are the per-back-end include directory each target's spec
+now names. **Every brief written before `7375c86aa4c` quotes 230 /
+`a6c4c68bdf33`**, so an agent holding an older brief will score this as a
+failure. It is the fix landing. The artefact it produces:
+
+```
+include/           16 files   target-neutral ginclude only
+include-i386/     120 files   incl. mm_malloc.h (tmake-fragment channel)
+include-aarch64/   10 files   incl. arm_neon_sve_bridge.h
+```
+
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
 
