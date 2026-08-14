@@ -57,6 +57,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h" /* for dump_function_header */
 #include "context.h"
 #include "pass_manager.h"
+/* MULTI-TARGET: multi_target_current_base (), which pass_gate_p () below
+   compares each target pass's owner against; and multi-target-passes.h, the
+   generated declarations of the per-back-end pass forwarders that
+   pass-instances.def now names.  The latter has to come after tree-pass.h,
+   which declares `opt_pass', and after context.h for `gcc::context'.  */
+#include "multi-target-select.h"
+#include "multi-target-passes.h"
 #include "cfgrtl.h"
 #include "tree-ssa-live.h"  /* For remove_unused_locals.  */
 #include "tree-cfgcleanup.h"
@@ -114,8 +121,61 @@ opt_pass::opt_pass (const pass_data &data, context *ctxt)
     sub (NULL),
     next (NULL),
     static_pass_number (0),
+    mt_base (NULL),
     m_ctxt (ctxt)
 {
+}
+
+/* MULTI-TARGET: is PASS one this compilation may run?
+
+   pass-instances.def is built from EVERY configured back end's
+   `<cpu>-passes.def', so the tree contains i386's passes, aarch64's, arm's
+   and the rest at once.  A pass that carries no owner is target-independent
+   and always runs.  A pass that carries one runs only when that back end is
+   the one `multi_target_select' installed.
+
+   Both directions matter and they are the two halves of this project's
+   defining bug, met in one mechanism:
+
+     * LEAKED PRESENCE.  Before this, pass-instances.def held i386's
+       pass_stv, pass_remove_partial_avx_dependency and
+       pass_insert_endbr_and_patchable_area and nothing else, and shared
+       passes.cc ran them unconditionally -- for aarch64, for s390, for every
+       configured base.  They were kept out of trouble only by their own
+       gates, which read i386 option state that no other target sets.
+     * LEAKED ABSENCE.  Every other back end's target passes were not in the
+       file at all, so aarch64's and arm's BTI insertion had never run on this
+       branch, and neither had aarch64 early-ra, ldp fusion, track-speculation
+       or any of the rest.
+
+   Nothing here falls back on a back end.  When NOTHING has been selected,
+   `multi_target_current_base ()' is null and every owned pass is off -- a
+   compiler that was told no target runs no target's passes, rather than
+   whichever one the build machine was configured with.  */
+
+static bool
+pass_owner_selected_p (opt_pass *pass)
+{
+  if (pass->mt_base == NULL)
+    return true;
+
+  const char *base = multi_target_current_base ();
+  return base != NULL && strcmp (base, pass->mt_base) == 0;
+}
+
+/* PASS's gate, with the ownership test above in front of it.
+
+   It has to be in front rather than folded into each pass's own gate ():
+   a target pass's gate reads its own back end's option state and target
+   hooks, and for the wrong back end those answers are not merely false, they
+   are another target's.  aarch64's pass_insert_bti gates on
+   aarch_bti_enabled (); reaching that from an i386 compilation is the bug,
+   not the pass returning false afterwards.  */
+
+static inline bool
+pass_gate_p (opt_pass *pass, function *fun)
+{
+  return pass_owner_selected_p (pass) && pass->gate (fun);
 }
 
 
@@ -966,7 +1026,7 @@ dump_one_pass (opt_pass *pass, int pass_indent)
   const char *pn;
   bool is_on, is_really_on;
 
-  is_on = pass->gate (cfun);
+  is_on = pass_gate_p (pass, cfun);
   is_really_on = override_gate_status (pass, current_function_decl, is_on);
 
   if (pass->static_pass_number <= 0)
@@ -2274,7 +2334,7 @@ execute_ipa_summary_passes (ipa_opt_pass_d *ipa_pass)
 
       /* Execute all of the IPA_PASSes in the list.  */
       if (ipa_pass->type == IPA_PASS
-	  && pass->gate (cfun)
+	  && pass_gate_p (pass, cfun)
 	  && ipa_pass->generate_summary)
 	{
 	  pass_init_dump_file (pass);
@@ -2588,7 +2648,7 @@ execute_one_pass (opt_pass *pass)
 
   /* Check whether gate check should be avoided.
      User controls the value of the gate through the parameter "gate_status". */
-  gate_status = pass->gate (cfun);
+  gate_status = pass_gate_p (pass, cfun);
   gate_status = override_gate_status (pass, current_function_decl, gate_status);
 
   /* Override gate with plugin.  */
@@ -2800,7 +2860,7 @@ ipa_write_summaries_2 (opt_pass *pass, struct lto_out_decl_state *state)
       gcc_assert (pass->type == SIMPLE_IPA_PASS || pass->type == IPA_PASS);
       if (pass->type == IPA_PASS
 	  && ipa_pass->write_summary
-	  && pass->gate (cfun))
+	  && pass_gate_p (pass, cfun))
 	{
 	  /* If a timevar is present, start it.  */
 	  if (pass->tv_id)
@@ -2931,7 +2991,7 @@ ipa_write_optimization_summaries_1 (opt_pass *pass,
       gcc_assert (pass->type == SIMPLE_IPA_PASS || pass->type == IPA_PASS);
       if (pass->type == IPA_PASS
 	  && ipa_pass->write_optimization_summary
-	  && pass->gate (cfun))
+	  && pass_gate_p (pass, cfun))
 	{
 	  /* If a timevar is present, start it.  */
 	  if (pass->tv_id)
@@ -2998,7 +3058,7 @@ ipa_read_summaries_1 (opt_pass *pass)
       gcc_assert (!cfun);
       gcc_assert (pass->type == SIMPLE_IPA_PASS || pass->type == IPA_PASS);
 
-      if (pass->gate (cfun))
+      if (pass_gate_p (pass, cfun))
 	{
 	  if (pass->type == IPA_PASS && ipa_pass->read_summary)
 	    {
@@ -3053,7 +3113,7 @@ ipa_read_optimization_summaries_1 (opt_pass *pass)
       gcc_assert (!cfun);
       gcc_assert (pass->type == SIMPLE_IPA_PASS || pass->type == IPA_PASS);
 
-      if (pass->gate (cfun))
+      if (pass_gate_p (pass, cfun))
 	{
 	  if (pass->type == IPA_PASS && ipa_pass->read_optimization_summary)
 	    {
@@ -3136,7 +3196,7 @@ execute_ipa_stmt_fixups (opt_pass *pass,
     {
       /* Execute all of the IPA_PASSes in the list.  */
       if (pass->type == IPA_PASS
-	  && pass->gate (cfun))
+	  && pass_gate_p (pass, cfun))
 	{
 	  ipa_opt_pass_d *ipa_pass = (ipa_opt_pass_d *) pass;
 

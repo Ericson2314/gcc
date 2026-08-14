@@ -198,6 +198,66 @@ function poly_aware(c,   frag, line, found) {
   return found;
 }
 
+# The `<cpu>-passes.def' files a back end contributes, read out of its tmake
+# fragments' `PASSES_EXTRA +=' lines.
+#
+# ASKED OF THE FRAGMENT RATHER THAN GUESSED FROM THE NAME.  Every in-tree back
+# end that has one calls it `config/<cpu>/<cpu>-passes.def', so
+# `test -f config/$cpu/$cpu-passes.def' would give the same answer today, and
+# it would be a SECOND authority for a fact the fragment already states.  The
+# fragment is where a back end declares this, in the same place and the same
+# form upstream reads it from, and it is what upstream's `-include
+# $(tmake_file)' would have picked up had the tmake_file been the back end's.
+#
+# THE VARIABLE THIS REPLACES IS THE WHOLE BUG.  `PASSES_EXTRA' reaches
+# gcc/Makefile.in only through `-include $(tmake_file)', and `tmake_file' is
+# @tmake_file@ -- substituted from the single legacy `${target}' pass through
+# config.gcc, i.e. i386's fragments alone in every build here.  So
+# pass-instances.def held i386's target passes and nobody else's, however many
+# back ends were configured.  This function reads the BACK-END LIST instead,
+# which is the list that is actually in the compiler.
+#
+# The tmake fragments are scanned in their own right; the `-include' of a
+# target's tmake_file stays where it is, and the pass-instances.def rule no
+# longer looks at $(PASSES_EXTRA).  gcc/Makefile.in cross-checks the two.
+function passes_defs_for(c, frags,	i, n, parts, frag, line, cont, out, tok, j, m, toks) {
+  if (c in passes_def_cache)
+    return passes_def_cache[c];
+  out = "";
+  n = split(frags, parts, " ");
+  for (i = 2; i <= n; i++) {
+    frag = srcdir "/config/" parts[i];
+    cont = 0;
+    while ((getline line < frag) > 0) {
+      sub(/#.*/, "", line);
+      if (cont) {
+	# A continued value line; keep taking tokens.
+      } else if (line ~ /^[ \t]*PASSES_EXTRA[ \t]*\+?=/) {
+	sub(/^[ \t]*PASSES_EXTRA[ \t]*\+?=/, "", line);
+      } else {
+	continue;
+      }
+      cont = (line ~ /\\[ \t]*$/);
+      sub(/\\[ \t]*$/, "", line);
+      m = split(line, toks, " ");
+      for (j = 1; j <= m; j++) {
+	tok = toks[j];
+	# The fragments spell these `$(srcdir)/config/<cpu>/<cpu>-passes.def'.
+	# Resolve $(srcdir) here, because this script has to OPEN the file
+	# (gen-target-passes.awk reads it) as well as name it to make.
+	gsub(/\$\(srcdir\)/, srcdir, tok);
+	if (tok == "")
+	  continue;
+	if (index(" " out " ", " " tok " ") == 0)
+	  out = out tok " ";
+      }
+    }
+    close(frag);
+  }
+  passes_def_cache[c] = out;
+  return out;
+}
+
 # A few triples name a GENERATED header in their tm_file: sysroot-suffix.h or
 # linux-sysroot-suffix.h, built by a tmake_file fragment.  A multi-target build
 # includes no target's tmake_file, so the rule has to be reproduced here -- the
@@ -1768,7 +1828,8 @@ function emit_modes_union(   i, c, m, deps, seen_modes) {
 # selector that chooses between them is a separate piece of work.  Emitting the
 # rules first is deliberate -- it is the half that can be verified on its own,
 # by `make multi-target-objs'.
-function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
+function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
+				pdefs, ptags, pdeps) {
   objs = "";
 
   # The ONE flag a fragment's recipe carries that the uniform recipe cannot do
@@ -2193,6 +2254,54 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
   printf "mt-%s/reg-probe.o: MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n\n",
 	 cpu, cpu;
   printf "MULTI_TARGET_REG_PROBES += mt-%s/reg-probe.o\n\n", cpu;
+
+  # THIS BACK END'S TARGET PASSES.
+  #
+  # Two things come out of `<cpu>-passes.def' and they go in opposite
+  # directions.  The DIRECTIVES go to gen-pass-instances.awk, which puts them
+  # in the one shared pass-instances.def with each inserted pass renamed
+  # `<pass>_mt_<cpu>' -- that is the tag list below.  The FACTORIES go here,
+  # into a forwarder translation unit compiled with THIS back end's headers
+  # and THIS back end's renames, because `make_pass_insert_bti' is a
+  # MULTI_TARGET_RENAME_NAMES symbol (aarch64 and arm both define it) and no
+  # bare name for it exists in the linked compiler for shared code to call.
+  #
+  # Same shape and the same argument as target-addr-<cpu>.o and
+  # target-c-ops-<cpu>.o above: a shared source cannot read a back end's own
+  # protos header, so the object that does is built once per back end.  The
+  # difference is only that this one's body is generated, because its contents
+  # are a function of that back end's passes.def rather than of a fixed
+  # template.
+  pdefs = passes_defs_for(cpu, tmkp);
+  if (pdefs != "") {
+    ptags = ""; pdeps = "";
+    n = split(pdefs, parts, " ");
+    for (i = 1; i <= n; i++) {
+      printf "MT_PASSES_DEFS += %s\n", parts[i];
+      printf "MT_PASSES_TAGS += %s=%s\n", parts[i], cpu;
+      ptags = ptags parts[i] "=" cpu " ";
+      pdeps = pdeps " " parts[i];
+    }
+    printf "\n";
+
+    printf "mt-%s/target-passes-%s.cc: $(srcdir)/gen-target-passes.awk%s\n",
+	   cpu, cpu, pdeps;
+    printf "\t@$(mkinstalldirs) mt-%s\n", cpu;
+    printf "\t$(AWK) -f $(srcdir)/gen-target-passes.awk -v mode=source \\\n";
+    printf "\t  -v want_base=%s -v pass_bases='%s' \\\n", cpu, ptags;
+    printf "\t  > tmp-target-passes-%s.cc\n", cpu;
+    printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-target-passes-%s.cc $@\n\n",
+	   cpu;
+
+    printf "mt-%s/target-passes-%s.o: mt-%s/target-passes-%s.cc \\\n",
+	   cpu, cpu, cpu, cpu;
+    printf "  %s-inc/s-inc multi-target-passes.h s-gtype \\\n", cpu;
+    printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h \\\n";
+    printf "  $(TREE_H) $(GIMPLE_H) $(RTL_H) $(TREE_PASS_H) $(CONTEXT_H)\n";
+    printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
+    printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
+    objs = objs " mt-" cpu "/target-passes-" cpu ".o";
+  }
 
   printf "MULTI_TARGET_OBJS_%s =%s\n", cpu, objs;
   printf "$(MULTI_TARGET_OBJS_%s): MULTI_TARGET_INC = -I%s-inc\n", cpu, cpu;
