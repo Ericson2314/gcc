@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #define INCLUDE_LIST
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "timevar.h"
 #include "hash-set.h"
 #include "machmode.h"

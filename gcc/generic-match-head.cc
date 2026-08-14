@@ -39,7 +39,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "optabs.h"
 #include "optabs-tree.h"
 #include "dbgcnt.h"
-#include "tm.h"
 #include "tree-eh.h"
 #include "langhooks.h"
 #include "tree-pass.h"

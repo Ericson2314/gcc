@@ -46,7 +46,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "optabs-tree.h"
 #include "tree-eh.h"
 #include "dbgcnt.h"
-#include "tm.h"
 #include "gimple-range.h"
 #include "langhooks.h"
 #include "attribs.h"

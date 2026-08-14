@@ -26,7 +26,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "diagnostic.h"
 #include "fold-const.h"
-#include "tm.h"
 #include "function.h"
 #include "cgraph.h"
 #include "stor-layout.h"

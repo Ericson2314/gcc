@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-#include "tm.h"
 #include "cp-tree.h"
 #include "stringpool.h" // for get_identifier
 #include "intl.h"
