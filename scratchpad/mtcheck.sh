@@ -191,4 +191,11 @@ for T in "$@"; do
 done
 
 echo
-sh "$S/mtscore.sh" "$B" "$@"
+# MT_SCORER lets a caller that copied these scripts elsewhere (to keep an
+# in-flight run safe from edits to the originals) name the copy.  Refuse by
+# name rather than let the run end with a bare "No such file": the suite has
+# already cost an hour by that point and a missing scorer would otherwise
+# discard it.
+SCORER=${MT_SCORER:-$S/mtscore.sh}
+[ -f "$SCORER" ] || { echo "FATAL: no scorer at $SCORER (set MT_SCORER)"; exit 9; }
+sh "$SCORER" "$B" "$@"

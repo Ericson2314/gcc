@@ -22,6 +22,16 @@
 set -u
 B=${1:?build dir}; shift
 
+# KILLED IS ITS OWN VERDICT AND IS NOT A TEST RESULT AT ALL.
+#
+# DejaGnu cannot tell "the compiler said no" from "the compiler was killed":
+# an OOM-killed cc1 records as a plain FAIL.  A baseline is the thing every
+# later change is scored against and nobody re-derives one once it exists, so
+# machine load silently becomes permanent expected-failure noise -- real
+# regressions then look like noise and noise looks like regression.  Counted
+# from the LOG (the .sum cannot carry it) and printed BESIDE the board, never
+# subtracted from FAIL: subtracting it would be a failure floor, and the point
+# is to make the contamination visible, not to net it out.
 printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' \
   TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERROR
 printf '%s\n' "--------------------------------------------------------------------------------------------"
@@ -68,6 +78,24 @@ if [ "$any" = 0 ]; then
   echo "FATAL: no target produced a scoreable run.  Refusing to report a board."
   exit 9
 fi
+
+echo
+echo "== KILLED (compiler killed, NOT a test result -- machine contamination)"
+KILLPAT='internal compiler error: Killed|terminated by signal 9|out of memory|virtual memory exhausted'
+for T in "$@"; do
+  LOG="$B/gcc/testsuite.$T/gcc/gcc.log"
+  if [ ! -f "$LOG" ]; then
+    printf '  %-28s %s\n' "$T" "no log"
+    continue
+  fi
+  k=$(grep -c -iE "$KILLPAT" "$LOG" || true)
+  printf '  %-28s %s\n' "$T" "$k"
+  if [ "$k" -gt 0 ]; then
+    grep -iE "$KILLPAT" "$LOG" | sed 's/^/      /' | head -10
+  fi
+done
+echo "  load at scoring time: $(uptime | sed 's/.*load average/load average/')"
+echo "  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is quoted)"
 
 echo
 echo "== top FAIL causes per target (first 12, by test file)"
