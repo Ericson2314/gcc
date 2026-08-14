@@ -77,6 +77,30 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #ifndef GCC_MULTI_TARGET_MACROS_H
 #define GCC_MULTI_TARGET_MACROS_H
+
+/* `target_unit', MOVED HERE FROM `defaults.h'.
+
+   OUTSIDE the consumer/back-end guard below, because both sides need it:
+   `rtl.h' declares `vec<target_unit> &' parameters and every back end's own
+   translation unit includes `rtl.h' too.  It is target-neutral where it
+   stands -- `BITS_PER_UNIT' is `insn-modes.h''s, reached through
+   `coretypes.h:553' in every shared TU independently of `tm.h', and it is the
+   genmodes union quantity rather than the primary's answer.  Its old home was
+   the one thing `rtl.h' needed from `defaults.h' that was never a target
+   macro at all.  Done this way to keep gengtype happy.  */
+#ifndef USED_FOR_TARGET
+#if BITS_PER_UNIT == 8
+#define TARGET_UNIT uint8_t
+#elif BITS_PER_UNIT == 16
+#define TARGET_UNIT uint16_t
+#elif BITS_PER_UNIT == 32
+#define TARGET_UNIT uint32_t
+#else
+#error Unknown BITS_PER_UNIT
+#endif
+typedef TARGET_UNIT target_unit;
+#endif
+
 /* ------------------------------------------------------------------------
    (c-DATA): REDIRECT THE CONFIG-INVARIANT TARGET MACROS TO PER-CONFIG SLOTS.
 
@@ -186,6 +210,56 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    not have.  The dispatched version answers NO_REGS out of range.  */
 #include "target-regs.h"
 #include "multi-target-reg-widths.h"
+
+/* `enum reg_class' ITSELF, FOR A TRANSLATION UNIT THAT HAS NO `tm.h'.
+
+   The TYPE, not any value.  `hard-reg-set.h:551' declares three
+   `enum reg_class' arrays in `struct target_hard_regs', and `coretypes.h:432'
+   says of the enum that it "is target specific, so it should not appear in
+   target-independent code" -- which is why `reg_class_t' is an int.  The
+   declaration nevertheless comes from the back end's own header, so a shared
+   translation unit that stops including `tm.h' loses the TYPE and gets
+
+       hard-reg-set.h:551: use of enum 'reg_class' without previous declaration
+
+   which is the single largest cause on the measured list: 8 of the 22 Class A
+   files that fail with `tm.h' emptied fail on exactly this, and it is what
+   revoked `lists.cc', `rtlhash.cc' and `rtl-error.cc' after they had been
+   scored deletable.
+
+   THIS IS NOT AN `#ifndef' FLOOR, AND THE TEST PRINCIPLES 2a PRESCRIBES IS
+   "WHOSE ANSWER IS THE FALLBACK".  The answer here is NOBODY'S: no register
+   class VALUE is supplied.  `ALL_REGS', `GENERAL_REGS' and `REGNO_REG_CLASS'
+   below still come from `targetm_regs', i.e. from the selected base, and a
+   base that has not been selected still fails by name.  The one enumerator
+   is `NO_REGS = 0', which is 0 in all 52 back ends -- the same measurement
+   the block above already relies on when it says reginfo.cc and ira.cc seed
+   their tables by memset-to-zero.
+
+   THE GUARD IS `GCC_TM_H', WHICH IS A FACT AND NOT A DEFAULT.  It asks "has a
+   back end's header chain been read in this translation unit", and the answer
+   decides who declares the type -- never what it contains.  In the `tm.h'
+   route this header is reached from `defaults.h', i.e. from INSIDE `tm.h'
+   after its own guard is set, so this is skipped and the back end's real enum
+   stands, unchanged, byte for byte.
+
+   IF A TRANSLATION UNIT REACHES THIS FIRST AND `tm.h' LATER, the back end's
+   declaration collides with this one and the compiler says so.  That is the
+   wanted direction: a hard error naming both declarations, rather than two
+   authorities for one type agreeing by luck.  Measured over the whole tree at
+   anchor 48: no shared TU is in that order today (`tm.h' is conventionally
+   the fourth line, ahead of everything that reaches here).
+
+   THE WIDTH IS CROSS-CHECKED RATHER THAN ASSUMED.  A one-enumerator enum and
+   a 34-enumerator one must agree on size or `struct target_hard_regs' has two
+   layouts -- the `cl_optimization' shape exactly.  `target-regs.cc' measures
+   `sizeof (enum reg_class)' in each base's OWN preprocessor context and
+   `mt_check_reg_class_size' compares it with this one at selection time,
+   naming the base and both sizes.  A silent agreement is not what is being
+   relied on; a check that can fail is.  */
+#ifndef GCC_TM_H
+enum reg_class { NO_REGS = 0 };
+#endif
 
 /* THE COMPILE-TIME WIDTHS, FOR CONSUMER TRANSLATION UNITS.
 
@@ -336,6 +410,20 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    sites spelled out is cheaper than a macro whose value depends on include
    order.  */
 #include "target-insn.h"
+
+/* `LOAD_EXTEND_OP' IS THE ONE MEMBER OF target-insn.h THAT DOES GET A
+   `#undef'/`#define' PAIR, and the paragraph above says why the other three
+   do not: theirs come from `insn-config.h', which shared code includes at
+   unpredictable points relative to this header.  This one comes from the back
+   end's own `<cpu>.h' with a `defaults.h' fallback, exactly like the frame
+   macros below, so it is reached at a settled point and a redirect here is the
+   last word.  Its use site -- `rtl.h:4762', inside the inline `load_extend_op'
+   -- is a header every translation unit shares, which is also why leaving it
+   to a rewritten call site was not an option: there is one call site and it is
+   in the header that has to stop needing `tm.h'.  */
+#undef LOAD_EXTEND_OP
+#define LOAD_EXTEND_OP(MODE) \
+  ((enum rtx_code) mt_load_extend_op ((int) (MODE)))
 
 #undef STACK_BOUNDARY
 #define STACK_BOUNDARY (mt_stack_boundary ())

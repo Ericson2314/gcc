@@ -896,11 +896,27 @@ mt_base_push_rounding (poly_int64 bytes ATTRIBUTE_UNUSED)
    so there is nothing to assert.  What makes this non-vacuous is that the two
    bases produce DIFFERENT tables, which is checked at the object level rather
    than here (scratchpad/t111-insn-guards.sh).  */
+/* LOAD_EXTEND_OP, in THIS base's preprocessor context; see target-insn.h.
+
+   No `#ifdef' and no fallback of its own: for a back end that defines the
+   macro this is that back end's expression, and for the 15 that do not it is
+   `defaults.h:1386''s `UNKNOWN' -- read HERE, where it is upstream's own
+   documented answer for a back end that says nothing, rather than in shared
+   code where it would be the primary's absence answering for everyone.  That
+   is the supply-side floor PRINCIPLES 2a permits, and the distinction is the
+   whole point of evaluating it in this translation unit.  */
+static int
+mt_base_load_extend_op (int mode)
+{
+  return (int) LOAD_EXTEND_OP ((machine_mode) mode);
+}
+
 static const struct target_insn_desc mt_base_insn = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
   HAVE_lo_sum != 0,
   HAVE_rotate != 0,
-  HAVE_rotatert != 0
+  HAVE_rotatert != 0,
+  mt_base_load_extend_op
 };
 
 /* THIS BASE'S CONSTRAINT VOCABULARY; see target-preds.h for the measurement

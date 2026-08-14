@@ -245,6 +245,20 @@ init_reg_sets (void)
   MT_CHECK_LAYOUT (target_constraints, sizeof_target_constraints)
 #undef MT_CHECK_LAYOUT
 
+  /* And the type three of `target_hard_regs'' fields are made of.  Separate
+     from MT_CHECK_LAYOUT because it is not a struct and because the remedy is
+     different: a struct-size disagreement means a bound was left spelled with
+     the unqualified name, while this one means the `enum reg_class' a shared
+     translation unit sees -- the one-enumerator declaration in
+     multi-target-macros.h, taken whenever that TU has no `tm.h' -- is not the
+     width this back end's real enum has.  */
+  if (sizeof (enum reg_class) != r->sizeof_enum_reg_class)
+    internal_error ("back end %qs computes %<sizeof (enum reg_class)%> as %wu, "
+		    "but target-independent code sees %wu; the two "
+		    "declarations of that type do not agree on width",
+		    r->name, (unsigned HOST_WIDE_INT) r->sizeof_enum_reg_class,
+		    (unsigned HOST_WIDE_INT) sizeof (enum reg_class));
+
   /* The union is the LAYOUT and the selected base's counts are the CONTENTS,
      so this cannot be one loop.  Every row of the union-sized table is
      cleared; only the rows this base has are filled.  A phantom class is
