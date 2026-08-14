@@ -986,18 +986,41 @@ main (int argc, const char **argv)
 
   file = choose_output (output_files, file_idx);
 
-  /* Namespaced, like everything else genemit writes.  add_clobbers and
-     added_clobbers_hard_reg_p are declared bare in recog.h, so the bare names
-     the middle end calls come from whichever insn-emit.cc is linked -- today
-     still the singular one, i.e. the primary's.  Namespacing the per-back-end
-     copies is what stops two back ends defining `::add_clobbers'; SELECTING
-     between them is the emit family's share of the residual recorded at the
-     head of multi-target-select.cc, and it is blocked on the same thing
-     gen_blockage is: the singular insn-flags.h.  */
-  print_ns_open (file);
-  output_add_clobbers (file);
-  output_added_clobbers_hard_reg_p (file);
-  print_ns_close (file);
+  /* Namespaced, like everything else genemit writes -- and on a multi-target
+     build the UN-NAMESPACED run does not write them at all.
+
+     `add_clobbers' and `added_clobbers_hard_reg_p' are declared bare in
+     recog.h and called by combine.o, recog.o, gcse.o and rtl-ssa/changes.o.
+     Namespacing the per-back-end copies stopped two back ends defining
+     `::add_clobbers', but the bare name the middle end calls still came from
+     the singular insn-emit-*.o that $(OBJS) carries, i.e. the PRIMARY's --
+     and both functions switch on an INSN CODE, which is per base.  Measured:
+     aarch64's code for `*adddi3_aarch64' reached i386's switch, missed every
+     case, and hit its `default: gcc_unreachable ()', which is why the ICE
+     reported `config/i386/sync.md' -- the last #line the primary's file
+     emitted -- while compiling for aarch64.
+
+     Suppressing the definition here is what lets multi-target-select.cc
+     define the bare name as a forwarder: OBJS names the singular
+     $(INSNEMIT_SEQ_O) as well as $(MULTI_TARGET_OBJS), so a forwarder and
+     this definition would otherwise be a duplicate-definition link error.
+     (That collision is why this was previously left alone.  It is NOT the
+     insn-flags.h problem gen_blockage has: nothing decides WHETHER these two
+     are called from a HAVE_* macro -- recog.cc calls them whenever recog
+     reports clobbers to add -- so there is no `#if' authority left behind,
+     and no gen_movxf-style question about a base that lacks the name, since
+     genemit writes both functions for EVERY back end unconditionally.)
+
+     The rest of the singular file is untouched: gen_blockage, gen_nop,
+     gen_speculation_barrier and gen_movxf still come from it and are still
+     the primary's.  They are a separate ruling; see multi-target-select.cc.  */
+  if (!gen_multi_target_p () || gen_target_ns () != NULL)
+    {
+      print_ns_open (file);
+      output_add_clobbers (file);
+      output_added_clobbers_hard_reg_p (file);
+      print_ns_close (file);
+    }
 
   /* maybe_code_for_* / maybe_gen_* ARE namespaced, unlike the two above:
      their only declarations are in the generated insn-opinit.h, which

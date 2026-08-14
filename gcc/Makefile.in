@@ -4764,6 +4764,17 @@ build/genattr.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 build/genattrtab.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# The SINGULAR genemit writes the insn-emit-*.cc that $(OBJS) links, and it
+# defined the bare `add_clobbers' / `added_clobbers_hard_reg_p' that combine.o,
+# recog.o, gcse.o and rtl-ssa/changes.o call.  Both switch on an insn code,
+# which is per base, so every back end's clobbers were looked up in the
+# primary's table and fell through to its `gcc_unreachable ()'.  The singular
+# run must now SKIP those two so multi-target-select.cc can define them as
+# forwarders; gen_target_ns () is null in it, so -- exactly as for
+# genconstants, genpreds, genattr and genattrtab above -- this flag is the
+# only way it can know it is on a multi-target build at all.
+build/genemit.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 # NO $(GTM_H) HERE, and none in gen-target-ns.o either: this is the program
 # that writes insn-constants.h, which $(GTM_H) contains.  Adding a target
 # header back to either line reinstates the circular dependency that made a
