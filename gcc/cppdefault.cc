@@ -24,6 +24,8 @@
 #include "tm.h"
 #include "cppdefault.h"
 #include "target-caps.h"
+#include "multi-target-select.h"
+#include "diagnostic-core.h"
 
 #ifndef NATIVE_SYSTEM_HEADER_COMPONENT
 #define NATIVE_SYSTEM_HEADER_COMPONENT 0
@@ -115,6 +117,48 @@ native_system_header_component (void)
    $(NATIVE_SYSTEM_HEADER_DIR) -- so a compiler told nothing about its target
    searches exactly what it always did.  */
 
+/* $(libsubdir)/include-<base> for the back end in force, or "" -- which the
+   compaction at the end of the table drops -- when this compiler was built
+   with no per-back-end headers at all.
+
+   WHY THIS DIRECTORY EXISTS RATHER THAN ONE `include/'.  config.gcc's
+   `extra_headers' is per back end, and gcc/configure.ac expanded it once, for
+   the single legacy ${target}, into @extra_headers_list@ -- so `include/' held
+   i386's 118 intrinsics headers and nobody else's, and `#include <arm_neon.h>'
+   for aarch64 failed with `No such file or directory' 2,900 times in one
+   testsuite run.  The obvious repair, unioning all 47 back ends' lists into
+   `include/', does not work and fails SILENTLY: 18 basenames are claimed by
+   more than one back end and are different files in each -- arm_neon.h is both
+   aarch64's and arm's, mmintrin.h is arm's, i386's and rs6000's, htmintrin.h
+   is rs6000's and s390's.  One directory means the last copy wins and every
+   other back end's users compile against another architecture's intrinsics,
+   with no diagnostic anywhere.  One name, several authorities.
+
+   So the directory names the back end, and the search path selects it here.  */
+
+static const char *
+mt_base_include_dir (void)
+{
+#ifdef GCC_BASE_INCLUDE_DIR_PREFIX
+  const char *base = multi_target_current_base ();
+
+  /* Fail by name rather than quietly searching nothing.  Reaching this table
+     at all means a compilation is under way, and a compilation with no base
+     selected is a bug in the selector, not a user error -- the alternative,
+     returning "", would drop this entry and reproduce the exact defect being
+     fixed (the back end's headers silently not on the path) in a form no build
+     and no test could see.  */
+  if (base == NULL)
+    internal_error ("no back end is selected, so the per-back-end include "
+		    "directory cannot be named; %<-ftarget-config=%> chooses "
+		    "it and nothing else can");
+
+  return concat (GCC_BASE_INCLUDE_DIR_PREFIX, base, NULL);
+#else
+  return "";
+#endif
+}
+
 const struct default_include *
 cpp_include_defaults_table (void)
 {
@@ -145,6 +189,22 @@ cpp_include_defaults_table (void)
     { targ_caps.gxx_backward_include_dir, "G++", 1, 1, 0, 0 },
     /* Pick up libc++ include files, if we have -stdlib=libc++.  */
     { targ_caps.gxx_libcxx_include_dir, "G++", 2, 1, 0, 0 },
+    /* THE SELECTED BACK END'S OWN INTRINSICS HEADERS -- arm_neon.h, xmmintrin.h,
+       riscv_vector.h.  Built just below from the base in force, because this
+       directory is the one entry in this table whose answer is per BACK END
+       rather than per target or per installation.
+
+       It is deliberately NOT a targ_caps capability.  The hook-vs-capability
+       test is whether the answer could differ between two installations of the
+       same compiler serving the same target: these headers ship inside the
+       compiler and cannot change without rebuilding it, so routing them
+       through target-specs' probe channel would make a static fact into
+       something an operator can get wrong.  fixed_include_dir below is the
+       other side of that test and correctly IS a capability.
+
+       AHEAD of GCC_INCLUDE_DIR so that a back end could shadow a generic
+       header if it ever needed to; no in-tree back end does today.  */
+    { mt_base_include_dir (), "GCC", 0, 0, 0, 0 },
 #ifdef GCC_INCLUDE_DIR
     /* This is the dir for gcc's private headers.  */
     { GCC_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },

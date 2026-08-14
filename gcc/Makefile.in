@@ -495,8 +495,24 @@ USER_H = $(srcdir)/ginclude/float.h \
 	 $(srcdir)/ginclude/stdalign.h \
 	 $(srcdir)/ginclude/stdatomic.h \
 	 $(srcdir)/ginclude/stdckdint.h \
-	 $(srcdir)/ginclude/stdcountof.h \
-	 $(EXTRA_HEADERS)
+	 $(srcdir)/ginclude/stdcountof.h
+# NO $(EXTRA_HEADERS) HERE ANY MORE.  USER_H is copied into ONE flat
+# `include/' by stmp-int-hdrs, and EXTRA_HEADERS is `@extra_headers_list@',
+# which gcc/configure.ac expands from the single legacy ${target} pass through
+# config.gcc -- so this line put i386's 118 intrinsics headers, and nobody
+# else's, on every configured back end's search path.  `#include <arm_neon.h>'
+# compiled for aarch64 said `No such file or directory'.
+#
+# The per-back-end headers are now $(MT_EXTRA_HEADERS_<cpu>), derived from the
+# back-end list by gen-multi-target-md.awk, and each back end's set is copied
+# to its OWN `include-<cpu>/' -- they cannot share this directory, because 18
+# basenames belong to more than one back end (arm_neon.h to aarch64 and arm,
+# mmintrin.h to arm, i386 and rs6000, htmintrin.h to rs6000 and s390) and a
+# flat copy would silently give one back end's users another's intrinsics.
+# cppdefault.cc puts include-<base> on the path for the base in force.
+#
+# What is left in USER_H is exactly the target-neutral set: gcc's own
+# ginclude/ headers, which every back end gets and which no back end overrides.
 
 USER_H_INC_NEXT_PRE = @user_headers_inc_next_pre@
 USER_H_INC_NEXT_POST = @user_headers_inc_next_post@
@@ -1028,7 +1044,20 @@ EXTRA_GCC_OBJS =@extra_gcc_objs@ $(MT_GCC_OBJS)
 # List of extra libraries that should be linked with the gcc driver.
 EXTRA_GCC_LIBS = @EXTRA_GCC_LIBS@
 
-# List of additional header files to install.
+# THE LEGACY CHANNEL, KEPT ONLY SO IT CAN CHECK THE NEW ONE.
+#
+# @extra_headers_list@ is gcc/configure.ac:2252 expanding ${extra_headers} from
+# the ONE legacy ${target} pass through config.gcc, with
+# `$(srcdir)/config/${cpu_type}/' prepended -- ${cpu_type} likewise being that
+# one target's.  It is therefore the primary back end's header list and no
+# other's.  Nothing installs it any more; $(MT_EXTRA_HEADERS_<cpu>), derived
+# from the back-end list, does that per back end.
+#
+# It is not deleted, for the same reason PASSES_EXTRA was not: the two lists
+# check each other in the stmp-int-hdrs rule below.  Every file this channel
+# names must also be named by the back-end-derived one, so a back end the
+# manifest scan missed shows up as a hard failure here instead of as an
+# intrinsics header quietly absent from a search path.
 EXTRA_HEADERS =@extra_headers_list@
 
 # How to handle <stdint.h>.
@@ -5641,6 +5670,7 @@ CFLAGS-intl.o += -DLOCALEDIR=\"$(localedir)\"
 # rs6000/sysv4.h build INCLUDE_DEFAULTS out of them.
 PREPROCESSOR_DEFINES = \
   -DGCC_INCLUDE_DIR=\"$(libsubdir)/include\" \
+  -DGCC_BASE_INCLUDE_DIR_PREFIX=\"$(libsubdir)/include-\" \
   -DGPLUSPLUS_INCLUDE_DIR=\"$(gcc_gxx_include_dir)\" \
   -DGPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT=0 \
   -DGPLUSPLUS_TOOL_INCLUDE_DIR=\"$(gcc_gxx_include_dir)/$(target_noncanonical)\" \
@@ -5723,7 +5753,34 @@ gcov-tool$(exeext): $(GCOV_TOOL_OBJS) $(LIBDEPS)
 # No `$(STMP_FIXINC)' prerequisite any more: gcc/'s build does not run
 # fixincludes.  This builds gcc's OWN headers (`include/'), which are not a
 # per-target artefact; `include-fixed/' is not built here at all.
-stmp-int-hdrs: $(T_GLIMITS_H) $(T_STDINT_GCC_H) $(USER_H) fixinc_list
+#
+# $(MT_HEADER_STAMPS) is one stamp per back end that has intrinsics headers,
+# each having copied that back end's $(MT_EXTRA_HEADERS_<cpu>) into its own
+# `include-<cpu>/'.  They hang off this target because this is what everything
+# that wants a usable include tree already depends on (SELFTEST_DEPS, install).
+stmp-int-hdrs: $(T_GLIMITS_H) $(T_STDINT_GCC_H) $(USER_H) fixinc_list \
+	       $(MT_HEADER_STAMPS)
+# THE TWO CHANNELS CHECK EACH OTHER.  $(EXTRA_HEADERS) is the primary target's
+# list, expanded by configure from the single legacy ${target}; every file in
+# it must also be in the back-end-derived $(MT_EXTRA_HEADERS).  A file only the
+# legacy channel knows about means gen-target-manifest.sh did not record
+# `extra_headers' for a back end that is genuinely in this compiler -- which
+# would surface as `arm_neon.h: No such file or directory' in a testsuite run
+# and nowhere else.  The reverse direction is NOT an error: the derived list is
+# expected to be larger, by thirteen back ends.
+	@for f in $(EXTRA_HEADERS); do \
+	  case " $(MT_EXTRA_HEADERS) " in \
+	    *" $$f "*) ;; \
+	    *) echo "stmp-int-hdrs: $$f reaches this rule through" >&2; \
+	       echo "  @extra_headers_list@, the single legacy \$${target}'s" >&2; \
+	       echo "  config.gcc pass, but no configured back end's manifest" >&2; \
+	       echo "  record claims it.  MT_EXTRA_HEADERS is derived from the" >&2; \
+	       echo "  back-end list and is the authority; a file only the" >&2; \
+	       echo "  legacy channel knows about means the extra_headers scan" >&2; \
+	       echo "  in gen-target-manifest.sh missed a back end." >&2; \
+	       exit 1 ;; \
+	  esac; \
+	done
 # Copy in the headers provided with gcc.
 #
 # If the sequence /././ appears somewhere after srcdir in a USER_H
@@ -6603,7 +6660,27 @@ $(DESTDIR)$(man1dir)/$(LTO_DUMP_INSTALL_NAME)$(man1ext): doc/lto-dump.1 installd
 # installs.  It is not reinstated against the per-target directory: mkheaders
 # writes that directory in place, on the deployed machine, so there are no
 # build-directory absolute symlinks in it to rewrite.
-install-headers: $(INSTALL_HEADERS_DIR)
+install-headers: $(INSTALL_HEADERS_DIR) install-base-headers
+
+# EVERY CONFIGURED BACK END'S INTRINSICS HEADERS, ONE DIRECTORY EACH.
+#
+# $(libsubdir)/include-<cpu_type>, matching the -DGCC_BASE_INCLUDE_DIR_PREFIX
+# cppdefault.cc searches.  Keyed on the back end because that is what
+# `extra_headers' is a property of; contrast include-fixed and specs-config
+# above, which are per TARGET because they are probed on the deployed machine.
+#
+# Not folded into $(libsubdir)/include: 18 basenames are claimed by more than
+# one back end and are different files in each (arm_neon.h -- aarch64 and arm;
+# mmintrin.h -- arm, i386 and rs6000; htmintrin.h -- rs6000 and s390), so one
+# directory installs whichever back end `cp' reaches last and gives everyone
+# else's users the wrong architecture's intrinsics, silently.
+.PHONY: install-base-headers
+install-base-headers: stmp-int-hdrs installdirs
+	for b in $(MT_HEADER_BASES); do \
+	  $(mkinstalldirs) $(DESTDIR)$(libsubdir)/include-$$b || exit 1; \
+	  cp -p -r include-$$b/. $(DESTDIR)$(libsubdir)/include-$$b/ || exit 1; \
+	  rm -f $(DESTDIR)$(libsubdir)/include-$$b/s-hdrs; \
+	done
 
 # Create or recreate the gcc private include file directory.
 #

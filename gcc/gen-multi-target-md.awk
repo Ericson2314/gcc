@@ -39,6 +39,11 @@
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
   tmk = ""; tmkp = ""; outf = ""; xobjs = ""; xgobjs = "";
+  # Cleared per record like the rest: `cobjs' is deliberately NOT in this list
+  # (it is read only on the first record for a back end), but extra_headers is
+  # unioned over every record, so a stale value here would attribute one
+  # triple's headers to the next triple's back end.
+  xhdrs = ""; tgmath = "";
 }
 
 # Record the build-directory headers a t-<...>-headers fragment generates, so
@@ -334,6 +339,16 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # that says which source builds `driver-avr.o' lives in avr/t-avr, which is in
   # avr-elf's tmake_file and need not be in the first avr record seen.
   accumulate_gcc_driver_objs();
+
+  # The user-visible intrinsics headers, unioned per back end over EVERY
+  # record for exactly the reason the driver objects above are: `extra_headers'
+  # is set by TRIPLE, not by back end.  config.gcc gives `rs6000-*-*' a base
+  # list and then adds `ppc-asm.h' again for one further triple, and the
+  # vxworks block appends seven `../vxworks/*' headers to whatever back end is
+  # underneath it.  Taking the first record's value would make the installed
+  # header set depend on the order targets were named -- one name, several
+  # authorities, no diagnostic.
+  accumulate_extra_headers();
 
   # Every record gets its per-triple conditions rules; only the first record
   # for a back end gets the per-back-end ones.  The per-triple rules name
@@ -1536,6 +1551,8 @@ $1 == "extra_objs" { xobjs = ""; for (i = 2; i <= NF; i++) xobjs = xobjs $i " " 
 $1 == "c_target_objs" { cobjs = ""; for (i = 2; i <= NF; i++) cobjs = cobjs $i " " }
 $1 == "extra_gcc_objs" { xgobjs = ""; for (i = 2; i <= NF; i++) xgobjs = xgobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
+$1 == "extra_headers" { xhdrs = ""; for (i = 2; i <= NF; i++) xhdrs = xhdrs $i " " }
+$1 == "use_gcc_tgmath" { tgmath = $2 }
 $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
@@ -1554,6 +1571,7 @@ END		  { flush(); emit_condition_intersections();
 		    emit_codes_union();
 		    emit_opinit_union();
 		    emit_gcc_driver_objs();
+		    emit_extra_headers();
 		    emit_inc_dirs() }
 
 # THE SHARED insn-config ANSWER.  Same shape as the mode numbering below, and
@@ -2319,6 +2337,141 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # build, and that arm cannot be expressed without building one base alone.
   printf ".PHONY: multi-target-objs-%s\n", cpu;
   printf "multi-target-objs-%s: $(MULTI_TARGET_OBJS_%s)\n\n", cpu, cpu;
+}
+
+# Record one manifest record's `extra_headers' against its back end.
+#
+# The path is built here, from THIS record's cpu_type, and that is the half
+# gcc/configure.ac got wrong: it prepends `$(srcdir)/config/${cpu_type}/' using
+# the ONE legacy ${target}'s cpu_type, so every entry in @extra_headers_list@
+# names a file under config/i386/ whatever back end asked for it.  A relative
+# entry (`../vxworks/math.h') is resolved against the back end's own directory,
+# which is what config.gcc means by it.
+function accumulate_extra_headers(	i, n, parts, p) {
+  n = split(xhdrs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "")
+      continue;
+    p = "$(srcdir)/config/" cpu "/" parts[i];
+    if (index(" " mthdrs[cpu] " ", " " p " ") == 0) {
+      mthdrs[cpu] = mthdrs[cpu] p " ";
+      if (index(" " mthdr_bases " ", " " cpu " ") == 0)
+	mthdr_bases = mthdr_bases cpu " ";
+    }
+  }
+  # <tgmath.h> is gcc's own, not the back end's, but WHETHER a target gets it
+  # is per target, so it is unioned into that back end's set rather than into
+  # the shared USER_H list.
+  if (tgmath == "yes") {
+    p = "$(srcdir)/ginclude/tgmath.h";
+    if (index(" " mthdrs[cpu] " ", " " p " ") == 0) {
+      mthdrs[cpu] = mthdrs[cpu] p " ";
+      if (index(" " mthdr_bases " ", " " cpu " ") == 0)
+	mthdr_bases = mthdr_bases cpu " ";
+    }
+  }
+}
+
+# THE INTRINSICS HEADERS OF EVERY CONFIGURED BACK END, EACH IN ITS OWN
+# DIRECTORY.
+#
+# `EXTRA_HEADERS' in gcc/Makefile.in is `@extra_headers_list@', substituted by
+# gcc/configure.ac:2252 from the single legacy ${target} pass through
+# config.gcc.  So in a build holding 47 back ends it is i386's 118 headers and
+# nobody else's, `<builddir>/gcc/include/' contained cpuid.h and the mmintrin
+# family alone, and compiling anything for aarch64 that says
+#
+#     #include <arm_neon.h>
+#
+# failed with `No such file or directory' -- 62,464 aarch64 testsuite failures,
+# 2,900 of them arm_neon.h, 571 arm_sve.h, and arm_neon_sve_bridge.h the single
+# largest line on the board.  Leaked ABSENCE for 13 back ends; leaked PRESENCE
+# for i386, whose headers were on every target's search path.
+#
+# WHY THIS IS NOT THE PASSES_EXTRA SHAPE, THOUGH IT IS THE SAME ROOT.  For
+# PASSES_EXTRA (b349257c0a2) it was enough to derive the list from the back-end
+# list and tag each file with its owner, because the consumer -- one
+# pass-instances.def -- can hold every back end's entries side by side once
+# they are distinguishable.  A header search path cannot: the name IS the
+# lookup key.  Measured over all 47 back ends, 18 basenames are claimed by more
+# than one back end and are different files in each --
+#
+#   mmintrin.h                              arm, i386, rs6000
+#   arm_neon.h arm_acle.h arm_fp16.h arm_bf16.h        aarch64, arm
+#   htmintrin.h htmxlintrin.h                          rs6000, s390
+#   {x,e,p,t,s,n,i}mmintrin.h x86intrin.h x86gprintrin.h
+#   bmiintrin.h bmi2intrin.h                           i386, rs6000
+#
+# -- so a union into one `include/' is not a union at all, it is 18 silent
+# overwrites whose winner is decided by the order of a shell `for' loop.  aarch64
+# users would get arm's arm_neon.h.  Hence one directory per back end,
+# `include-<cpu_type>/', and the search path picks the selected base's.
+#
+# Keyed on cpu_type and not on the triple because that is the granularity of
+# the fact: extra_headers is a property of the back end (all 188 triples of a
+# back end install the same intrinsics), while the per-target directory
+# $(libsubdir)/<target>/ holds facts that really are per triple -- specs-config
+# and include-fixed, both probed on the deployed machine.
+function emit_extra_headers(	i, n, parts, c) {
+  n = split(mthdr_bases, parts, " ");
+
+  # A non-vacuity check in the generated fragment's own terms.  14 of the 47
+  # in-tree back ends set extra_headers; zero means the manifest carries no
+  # `extra_headers' key at all -- i.e. gen-target-manifest.sh was not updated
+  # alongside this -- and the symptom would otherwise be an empty include-<cpu>
+  # tree, which looks exactly like a back end that legitimately has no
+  # intrinsics.  Absent artefact and absent mechanism again.
+  if (n == 0) {
+    print "gen-multi-target-md.awk: not one configured back end contributed" \
+	  " extra_headers; i386, aarch64, arm, rs6000, s390, riscv, mips," \
+	  " sparc, nds32, ia64, m68k, arc, c6x and epiphany all set it," \
+	  " so zero means the manifest has no `extra_headers' record" \
+	  > "/dev/stderr";
+    exit 1;
+  }
+
+  printf "MT_HEADER_BASES =%s\n", " " mthdr_bases;
+  printf "MT_EXTRA_HEADERS =";
+  for (i = 1; i <= n; i++)
+    printf " $(MT_EXTRA_HEADERS_%s)", parts[i];
+  printf "\n\n";
+
+  for (i = 1; i <= n; i++) {
+    c = parts[i];
+    printf "MT_EXTRA_HEADERS_%s = %s\n", c, mthdrs[c];
+    # The stamp, one per back end, so a back end whose header set changed is
+    # the only one re-copied.  `include-<cpu>' is created by the recipe rather
+    # than being an order-only prerequisite because make would then treat the
+    # directory's mtime as the stamp and never re-run.
+    printf "include-%s/s-hdrs: $(MT_EXTRA_HEADERS_%s)\n", c, c;
+    printf "\t$(mkinstalldirs) include-%s\n", c;
+    # The /././ marker is copied from stmp-int-hdrs and means the same thing:
+    # install under the name AFTER the marker, subdirectories included.  Only
+    # the vxworks block uses it (../vxworks/././base/b_NULL.h), and dropping it
+    # here would install that header as b_NULL.h -- a wrong name, not a missing
+    # file, so nothing would report it.
+    printf "\tfor file in $(MT_EXTRA_HEADERS_%s); do \\\n", c;
+    printf "\t  case $$file in \\\n";
+    printf "\t    */././*) \\\n";
+    printf "\t      realfile=`echo $$file | sed -e 's|^.*/\\./\\./||'`; \\\n";
+    printf "\t      case $$realfile in \\\n";
+    printf "\t        */*) $(mkinstalldirs) include-%s/`echo $$realfile | sed -e 's|/[^/]*$$||'`;; \\\n", c;
+    printf "\t      esac;; \\\n";
+    printf "\t    *) realfile=`echo $$file | sed -e 's|.*/\\([^/]*\\)$$|\\1|'`;; \\\n";
+    printf "\t  esac; \\\n";
+    printf "\t  rm -f include-%s/$$realfile; \\\n", c;
+    printf "\t  cp $$file include-%s/$$realfile || exit 1; \\\n", c;
+    printf "\t  chmod a+r include-%s/$$realfile; \\\n", c;
+    printf "\tdone\n";
+    printf "\t$(STAMP) $@\n\n";
+  }
+
+  printf "MT_HEADER_STAMPS =";
+  for (i = 1; i <= n; i++)
+    printf " include-%s/s-hdrs", parts[i];
+  printf "\n\n";
+  printf ".PHONY: multi-target-headers\n";
+  printf "multi-target-headers: $(MT_HEADER_STAMPS)\n\n";
 }
 
 # Record one manifest record's `extra_gcc_objs' against its back end, unioning

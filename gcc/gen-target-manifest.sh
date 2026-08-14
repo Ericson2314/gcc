@@ -122,6 +122,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     extra_gcc_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
+    use_gcc_tgmath=
     TM_MULTILIB_CONFIG=
     . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
     # config.gcc leaves these unset for most targets; the primary target gets
@@ -177,6 +178,40 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # <cpu>-c.cc against that back end headers.
     echo "c_target_objs ${c_target_objs}"
     echo "extra_options ${extra_options}"
+    # The INTRINSICS HEADERS this back end installs for the user -- arm_neon.h,
+    # emmintrin.h, riscv_vector.h and 177 others.  NO BACKTICK AND NO
+    # APOSTROPHE ANYWHERE IN THIS BLOCK: it is inside a command substitution,
+    # so either one truncates the whole stanza and the manifest comes out with
+    # configure still exiting 0.  See the identical warning on c_target_objs
+    # above; adding this comment reproduced that failure once already.
+    #
+    # gcc/configure.ac expands ${extra_headers} into @extra_headers_list@ from
+    # the ONE legacy ${target} pass through config.gcc, so EXTRA_HEADERS in
+    # gcc/Makefile.in was the primary list alone and <builddir>/gcc/include/
+    # held only the i386 set.  That is 62,464 aarch64 test failures, with
+    # arm_neon_sve_bridge.h missing being the largest single line on the board.
+    #
+    # NOTE THE NAMES CANNOT SHARE ONE DIRECTORY, which is what makes this
+    # unlike extra_objs and unlike PASSES_EXTRA.  Measured over all 47 back
+    # ends (scratchpad/eh-census.sh): 180 headers, 14 back ends, and 18
+    # basenames claimed by more than one back end --
+    #
+    #   mmintrin.h        arm i386 rs6000
+    #   arm_neon.h  arm_acle.h  arm_fp16.h  arm_bf16.h        aarch64 arm
+    #   htmintrin.h  htmxlintrin.h                            rs6000 s390
+    #   {x,e,p,t,s,n,i}mmintrin.h  x86intrin.h  x86gprintrin.h
+    #   bmiintrin.h  bmi2intrin.h                             i386 rs6000
+    #
+    # -- different files, same name, no diagnostic if they are copied into one
+    # include/ directory: whichever back end the copy loop reaches last wins,
+    # and every other back end user gets another architecture intrinsics.  So
+    # each back end headers go to include-<cpu_type>/, keyed on the back end
+    # because that is what the fact is a property of.
+    echo "extra_headers ${extra_headers}"
+    # Whether this target wants the gcc <tgmath.h>.  Same channel, same bug:
+    # configure appends ginclude/tgmath.h to extra_headers_list on the PRIMARY
+    # target use_gcc_tgmath.  Recorded so it is asked per back end.
+    echo "use_gcc_tgmath ${use_gcc_tgmath}"
     echo "out_file ${out_file}"
     echo "md_file ${md_file}"
     # The back-end sources gengtype must scan for GTY markers.  gengtype makes
