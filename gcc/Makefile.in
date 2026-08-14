@@ -5768,6 +5768,38 @@ stmp-int-hdrs: $(T_GLIMITS_H) $(T_STDINT_GCC_H) $(USER_H) fixinc_list \
 # would surface as `arm_neon.h: No such file or directory' in a testsuite run
 # and nowhere else.  The reverse direction is NOT an error: the derived list is
 # expected to be larger, by thirteen back ends.
+#
+# THIS CHECK IS CURRENTLY RED, AND IT IS RIGHT.  It fails naming `mm_malloc.h',
+# and that is a SECOND AUTHORITY for EXTRA_HEADERS which the fix above does not
+# yet cover: besides config.gcc's `extra_headers', the tmake fragments append to
+# EXTRA_HEADERS directly, reaching this file through `-include $(tmake_file)' at
+# the bottom -- the identical channel, and the identical bug, as PASSES_EXTRA in
+# #171.  Nine fragments over eight back ends do it:
+#
+#   i386/t-pmm_malloc, i386/t-gmm_malloc   += mm_malloc.h          (GENERATED)
+#   rs6000/t-rs6000                        += rs6000-vecdefines.h  (GENERATED)
+#   c6x/t-c6x-elf, arm/t-bpabi,
+#   arm/t-symbian                          += ginclude/unwind-arm-common.h
+#   avr/t-avr, frv/t-frv                    = <path>   ASSIGNMENT, not `+=',
+#                                               so under the legacy channel they
+#                                               CLOBBER the whole list
+#
+# So the 180-header, 18-collision census in the commit above is an UNDERCOUNT:
+# it read config.gcc only.  The `$(srcdir)/...' entries are a mechanical
+# extension of the scan already written.  The two GENERATED ones are not, and
+# one of them is a design question rather than a gap:
+#
+# `mm_malloc.h' IS PER TRIPLE WITHIN ONE BACK END.  t-pmm_malloc and
+# t-gmm_malloc produce DIFFERENT CONTENT under the SAME NAME, chosen by which
+# libc the triple uses, and both are i386.  So it is a 19th colliding basename
+# and the collision is INSIDE a back end, which per-cpu_type keying cannot
+# express -- include-i386/mm_malloc.h has one slot and two answers.  Deciding
+# what a back end serving both glibc and non-glibc triples installs there is
+# invention, not debugging, so it is handed back rather than guessed at.
+#
+# The check is deliberately NOT relaxed to get past this.  Without it the build
+# goes green and i386 silently LOSES mm_malloc.h, which it had before this
+# change -- a regression with no diagnostic, which is the whole defect class.
 	@for f in $(EXTRA_HEADERS); do \
 	  case " $(MT_EXTRA_HEADERS) " in \
 	    *" $$f "*) ;; \
