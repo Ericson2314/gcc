@@ -164,19 +164,24 @@ for f in state_size state_transition state_reset dfa_start insn_default_latency 
   [ -z "$c" ] && c=0
   chk "bare $f binders" "$c" 0
 done
-# `internal_dfa_insn_code' is STILL not selected and STILL leaks, and it stays
-# on the ratchet in its original direction: no shared translation unit names
-# it, so a rename/selector would be a change with no consumer -- but it is a
-# bare function POINTER that each base's `init_sched_attrs' assigns, and if a
-# shared object ever binds it that has to be noticed.
-c=$(sh "$S/eb-shell.sh" \
-      "cd $G && nm -C -u --print-file-name *.o | grep -cE ' U internal_dfa_insn_code(\\(|\$)'" 2>/dev/null)
-[ -z "$c" ] && c=0
-if [ "$c" = 0 ]; then
-  ok "RATCHET: bare internal_dfa_insn_code has 0 binders, as measured -- no shared TU names it"
-else
-  bad "RATCHET: bare internal_dfa_insn_code is now bound by $c object(s); a shared TU started naming it -- it needs the target-automata.h treatment"
-fi
+# `internal_dfa_insn_code' is STILL not selected, and it stays on the ratchet
+# in its original direction.  No shared translation unit names it, so a
+# selector would be a change with no consumer -- but it is a bare function
+# POINTER that each base's `init_sched_attrs' assigns, and a shared object
+# starting to bind it has to be noticed.
+#
+# THE EXPECTED READING IS ONE BINDER, NOT ZERO, AND ASSERTING ZERO WAS WRONG.
+# Measured: the single bare binder is `insn-automata.o' -- the PRIMARY's own
+# generated automaton reaching the pointer its own `insn-dfatab.o' defines.
+# That pair is internally consistent and is not a leak; after this change
+# nothing shared calls into it at all.  So the arm names the binder rather
+# than counting it, which is the only form that can tell "still just the
+# generated pair" from "a shared object appeared".
+b=$(sh "$S/eb-shell.sh" \
+      "cd $G && nm -C -u --print-file-name *.o | grep -E ' U internal_dfa_insn_code\$' | sed 's,.*/,,;s/:.*//' | sort -u | tr '\\n' ' '" 2>/dev/null)
+b=$(echo $b)
+chk "bare internal_dfa_insn_code binders (expect the generated pair alone)" \
+    "$b" "insn-automata.o"
 
 echo
 echo "=== ARM 5: INJECTION -- every mitigation must fire, with control+restore"
