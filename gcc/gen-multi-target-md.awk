@@ -2469,7 +2469,12 @@ function record_frag_header(tok, frag,	src, dst, pair, prev) {
     if (src == "")
       src = tok;			# generated into the build root
   }
-  pair = src ">" dst;
+  # `:' and NOT `>' as the separator.  The pairs are iterated by a `for' loop
+  # in a shell recipe, where an unquoted `>' is a REDIRECTION -- measured:
+  # `syntax error near unexpected token `>'', and the rule died before copying
+  # anything.  A colon cannot occur in these names, and the split below takes
+  # the LAST one so that a srcdir path containing a colon still resolves.
+  pair = src ":" dst;
 
   # A CONFLICT IS REFUSED BY NAME RATHER THAN RESOLVED BY LAST-WINS.  i386 has
   # `t-pmm_malloc' AND `t-gmm_malloc', which install DIFFERENT CONTENT as
@@ -2577,7 +2582,7 @@ function emit_frag_header_deps(c,	n, parts, i, s) {
   n = split(frag_pairs[c], parts, " ");
   for (i = 1; i <= n; i++) {
     s = parts[i];
-    sub(/>.*/, "", s);
+    sub(/:[^:]*$/, "", s);
     if (s != "")
       printf " %s", s;
   }
@@ -2658,8 +2663,8 @@ function emit_extra_headers(	i, n, parts, c) {
     # The fragment channel's pairs, split on `>' so the installed name is the
     # fragment's, not the source's basename.
     printf "\tfor pair in $(MT_FRAG_HEADER_PAIRS_%s); do \\\n", c;
-    printf "\t  src=`echo $$pair | sed -e 's|>.*||'`; \\\n";
-    printf "\t  dst=`echo $$pair | sed -e 's|.*>||'`; \\\n";
+    printf "\t  src=`echo $$pair | sed -e 's|:[^:]*$$||'`; \\\n";
+    printf "\t  dst=`echo $$pair | sed -e 's|.*:||'`; \\\n";
     printf "\t  rm -f include-%s/$$dst; \\\n", c;
     printf "\t  cp $$src include-%s/$$dst || exit 1; \\\n", c;
     printf "\t  chmod a+r include-%s/$$dst; \\\n", c;

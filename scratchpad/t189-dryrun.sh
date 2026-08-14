@@ -141,18 +141,18 @@ fi
 grep -q '^MT_FRAG_HEADER_TOKENS_i386 = mm_malloc.h' "$W/outf.mk" \
   && say PASS "6a i386 token mm_malloc.h, bare as the fragment writes it" \
   || say FAIL "6a i386 tokens [$(grep '^MT_FRAG_HEADER_TOKENS_i386' "$W/outf.mk")]"
-# ... and resolved to pmm_malloc.h>mm_malloc.h: the INSTALLED NAME IS NOT THE
+# ... and resolved to pmm_malloc.h:mm_malloc.h: the INSTALLED NAME IS NOT THE
 # SOURCE'S BASENAME.  Deriving it from the basename would install pmm_malloc.h,
 # which is a wrong name, i.e. a missing header with the file sitting there.
 p=$(grep '^MT_FRAG_HEADER_PAIRS_i386 =' "$W/outf.mk")
 case $p in
-  *'i386/pmm_malloc.h>mm_malloc.h'*) say PASS "6b pair pmm_malloc.h>mm_malloc.h" ;;
+  *'i386/pmm_malloc.h:mm_malloc.h'*) say PASS "6b pair pmm_malloc.h:mm_malloc.h" ;;
   *) say FAIL "6b i386 pairs [$p]" ;;
 esac
 # arm's is a plain path and keeps its own basename.
 q=$(grep '^MT_FRAG_HEADER_PAIRS_arm =' "$W/outf.mk")
 case $q in
-  *'unwind-arm-common.h>unwind-arm-common.h'*) say PASS "6c arm unwind-arm-common.h" ;;
+  *'unwind-arm-common.h:unwind-arm-common.h'*) say PASS "6c arm unwind-arm-common.h" ;;
   *) say FAIL "6c arm pairs [$q]" ;;
 esac
 # The aggregate the cross-check reads must contain BOTH channels.
