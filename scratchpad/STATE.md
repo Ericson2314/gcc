@@ -13292,3 +13292,197 @@ design than any of the three options offered.
     captures the status of `true` and **stamped rc=0 on a make that had printed
     "Target 'multi-target-objs' not remade because of errors"**.  A stamped
     exit code is only as good as the capture.
+
+# TASK #32 -- COMPILED-ONCE TUs GATED ON TARGET MACROS: THE CENSUS
+
+**RE-MEASURED. THE BRIEFED FIGURES ARE NOT REPRODUCIBLE AND WERE LOW.** The
+brief carried *146 files, 498 macros, 925 sites*. Those numbers appear in no
+`STATE.md` section and in no script in this tree; they could not be
+reproduced or even re-derived. Measured at `8b126bdce7d` from an immutable
+snapshot against a **48-back-end** build (`/tmp/b-a568476`):
+
+| | briefed | measured |
+|---|---|---|
+| macros | 498 | **413** |
+| sites | 925 | **2845** |
+| files | 146 | **224** |
+
+Macros are in the same range; **sites are 3x the briefed figure**. As
+PRINCIPLES predicts, the stale number was wrong in the direction that made
+the task look smaller.
+
+## The instruments, and what each one caught
+
+Four arms, in `scratchpad/t32-*.sh`. Each caught a defect in another, which
+is the only reason the final number is trustworthy.
+
+- **`t32-dump.sh`** -- dumps all **48** back ends through the real
+  `tm-<base>.h` chain. Prior art (`tgh-hdrmatrix.sh`) reached 46 bases and
+  recorded *definedness* only; this keeps the **body**, which is what makes
+  the divergence question answerable at all.
+- **`t32-census.sh`** -- sorts sites by **POSITION OF USE**, the axis that
+  decides the shape of the fix.
+- **`t32-valueall.sh`** -- EXPANDS each macro per base and compares **values**.
+
+**THREE FILTERS, EACH ADDED BECAUSE THE PREVIOUS COUNT WAS WRONG:**
+
+1. *Divergence across the 48 bases.* Also drops, for free, every macro this
+   branch already converted: a redirect is the same text in all 48 dumps.
+2. *Defined somewhere under `config/`.* `gcn`'s `tm.h` chain drags in
+   `gcc/system.h`, so `ATTRIBUTE_UNUSED` (1512 sites), `FOR_EACH_VEC_ELT`
+   (1050) and `ggc_strdup` scored as target macros. **The pollution was
+   larger than the signal.**
+3. *Defined in the PRIMARY's dump, for value uses only.* `SIGNED`/`UNSIGNED`
+   scored 602 sites and are the generic `signop` enumerators; they entered
+   via `config/arc/arc.h:626`'s function-like `SIGNED(X,V)`, which no shared
+   TU can see. Deliberately NOT applied to `#ifdef`/`#if`, where "the primary
+   does not define it" **is** the leak.
+
+**A BLIND SPOT FOUND IN MY OWN INSTRUMENT, WORTH INHERITING.** The first
+shared-context dump was preprocessed as **C**, and
+`multi-target-macros.h:164`'s guard has an `|| !defined (__cplusplus)` arm --
+so every redirect was switched off and `Pmode` read as i386's raw
+`(ix86_pmode == PMODE_DI ? DImode : SImode)`. I concluded from that, and from
+`defaults.h` alone, that **`Pmode` was unconverted. It is converted**
+(`mt_pmode ()`). Anything probing this branch's conversion layer with `cpp`
+must pass `-x c++` or it will report the unconverted tree.
+
+## THE IDENTITY CLASS -- 3 macros, 57 sites, and NOT work
+
+The brief asks for these to be named rather than counted. Measured by value
+over all 48 bases:
+
+- **`CHAR_TYPE_SIZE` -- 43 sites.** `BITS_PER_UNIT` in 45 bases, literal `8`
+  in 4: **two bodies, one value (8) in all 48.** A text-only instrument calls
+  it divergent. Converting it changes nothing and proves nothing.
+- **`SHORT_FRACT_TYPE_SIZE` -- 2 sites.** 8 everywhere.
+- **`ELIMINABLE_REGS` -- 12 sites.** Already POISONED, not a redirect, so the
+  census's "converted" regex missed it. Already done.
+
+My own value arm had to be fixed twice before it could say this, and both
+defects produced a WRONG answer rather than a missing one: `(8)` vs `8`
+scored as divergence (the identity trap, committed by the instrument written
+to catch it), and a **function-like** macro named alone expands to itself, so
+all 48 "agreed" and it scored IDENTITY -- a green for a macro never read.
+
+## THE CLASSIFICATION -- 2845 live sites
+
+| class | route | sites |
+|---|---|---|
+| **(a)** object-like, divergent, EXPR | `targetm` / `target-cdata` | **1078** |
+| **(a')** function-like, divergent, EXPR | ditto, but each needs its own signature | **1048** |
+| **(a'')** existence-only `#ifdef` | a `has_` flag, the `INIT_EXPANDERS` precedent | **469** |
+| **(b)** macros defined by <=4 of 48 | per-base compilation (`reg-stack.cc`, #51) | **166** |
+| **(d) HARD RESIDUE** | `#if` arithmetic, array bounds, case labels | **68** |
+| identity / already done | none -- do not count | 57 |
+
+**CLASS (d), NAMED AND SIZED, because it is what the next agent needs.**
+68 sites: **37 `#if`**, **30 array bounds**, **1 case label**. It is not
+spread thin -- it concentrates in `emit-rtl.cc` (9), `rtlanal.cc` (8),
+`target-regstack.cc` (6), `attribs.cc` (5), `varasm.cc` (4),
+`target-regs.cc` (4), `builtins.cc` (4).
+
+The `#if` half is dominated by `TARGET_SUPPORTS_WIDE_INT` (14),
+`STACK_GROWS_DOWNWARD` (9) and `ARGS_GROW_DOWNWARD` (5). The bound half is
+dominated by the **register vocabulary** -- and most of that is *already*
+handled by `MULTI_TARGET_UNION_*`; what remains after subtracting the union
+macros is 30 sites, not the 152 a raw count gives.
+
+**CLASS (b) IS ONE FAMILY, NOT A SCATTER.** 166 sites, and 166 of them are
+the register stack: `FIRST_STACK_REG` (98), `STACK_REG_P` (45),
+`LAST_STACK_REG` (12), `STACK_REGS` (11). Defined by **2 of 48** back ends.
+`target-regstack.cc` already exists for exactly this; these sites are the
+residue not yet routed through it.
+
+## LANDED: `STORE_FLAG_VALUE`
+
+155 sites. All 48 bases expand it to an integer **literal**, only `-1` and
+`1`, so it is invariant and evaluable at `target-cdata.cc`'s refresh point --
+`target-cdata.h`'s own two-part test for a field rather than a call.
+
+**Its two `#if` sites had to move WITH the macro**, which is the whole reason
+the census sorts by position. An identifier in a `#if` is silently `0`:
+
+- `optabs.cc:2026` would have read `0 == 1 || 0 == -1`, taken the `#else`,
+  and given `normalizep = 1` to **every** back end -- wrong code for every
+  target whose compares produce an all-ones mask, no diagnostic.
+- `emit-rtl.cc:529` would have read `0 != 1 && 0 != -1` -- true for everyone,
+  the opposite of what the line says.
+
+**BOTH-SIDED, AT OBJECT LEVEL, AND IT NEEDED A THIRD BACK END.** Only `gcn`
+and `m68k` are `-1` of all 48, so **the i386+aarch64 pair cannot tell** --
+the "correct by luck" shape PRINCIPLES names. An i386+aarch64+m68k build,
+same struct offset:
+
+```
+i386     movl $0x1,0x58(%rdi)
+aarch64  movl $0x1,0x58(%rdi)
+m68k     movl $0xffffffff,0x58(%rdi)      <- -1
+```
+
+Two-base `cc1` links (`rc=0`, stamped); `optabs.o` 44, `expmed.o` 67,
+`combine.o` 43, `emit-rtl.o` 12 relocations against `targetm_cdata`.
+
+`defaults.h:1086`'s `#ifndef STORE_FLAG_VALUE` fallback STAYS: it is a
+supply-side floor giving a back end that defines nothing upstream's own
+documented `1`, not the primary's answer to a base that never spoke.
+
+## WHAT THIS DOES NOT CLAIM
+
+- The census scans **`.cc` files only**. Headers are not in the population,
+  so 2845 is a **lower bound**. (`STORE_FLAG_VALUE` was swept across headers
+  by hand; nothing else was.)
+- A source line spelling **two** leaky macros is counted **once** -- also a
+  lower bound.
+- The 1048 function-like sites are classified by **body text**, not value:
+  the expansion arm cannot read a function-like macro by naming it alone.
+  Some unknown fraction of them are identities.
+- No test suite was run. The evidence for `STORE_FLAG_VALUE` is the
+  per-base object divergence and a linking `cc1`, not execution.
+- The 48-back-end build produces **no `cc1`** (28 failing targets,
+  pre-existing), so every 48-base figure here is object- or header-level.
+
+## #32 VERIFICATION, AND A BAR THAT DOES NOT REPRODUCE
+
+Two-base build at `3807a3b5a06` (`/tmp/b-a568476-two3`, from the immutable
+snapshot `/tmp/snap3-a568476`): `all-gcc` **rc=0** (stamped), `cc1` links,
+`specs-config` **230 lines for both targets** -- that bar is met.
+
+**BOTH-SIDED, AND BOTH CONVERSIONS NEEDED A THIRD BACK END TO SAY ANYTHING.**
+
+| macro | i386 | aarch64 | third base |
+|---|---|---|---|
+| `STORE_FLAG_VALUE` | 1 | 1 | **m68k: -1** |
+| `WORD_REGISTER_OPERATIONS` | 0 | 0 | **arm: 1** |
+
+Read off the per-base `target-cdata-<base>.o` at the same struct offset
+`0x58`; the two `int` fields merge into one 8-byte store, so i386 and aarch64
+both emit `movq $0x1` (= `{1, 0}`) while arm loads `.rodata.cst8` containing
+`01000000 01000000` (= `{1, 1}`) and m68k emits `movl $0xffffffff`.
+
+**The habitual pair is blind to both of these.** Of 48 back ends only `gcn`
+and `m68k` answer -1 to the first, and i386/aarch64 agree on the second. This
+is the "correct by luck" shape PRINCIPLES lists, met twice in one task.
+
+**THE CODEGEN BAR `12369 bytes / 378fc33c1e70` DOES NOT REPRODUCE AT HEAD,
+AND IT IS NOT THIS TASK.** Measured, cold, from immutable snapshots, with
+`specs-config` present and the real cross binutils:
+
+```
+                                        x86_64 -O2 -c big.c
+pre-task  8b126bdce7d  /tmp/b-a568476-ctl    6376  b55aaccf5ca7
+post      3807a3b5a06  /tmp/b-a568476-two3   6376  b55aaccf5ca7
+```
+
+The control and the change agree **byte for byte**, and aarch64 `-S` is
+byte-identical too (12210 bytes both sides, `cmp` clean). So the 2x gap
+against the recorded bar is inherited, not introduced; some earlier change
+moved it and the recorded figure was never re-measured. Per PRINCIPLES the
+build dir and commit are stated beside the number so the next reader can tell
+which of the two applies.
+
+**AND THE IDENTICAL md5 IS THE POINT, NOT A DISAPPOINTMENT.** Neither
+configured base changes its answer, because i386's `1` and `0` are exactly
+what the primary was already supplying to everyone -- the conversion moves
+the AUTHORITY, not the value. The pair that shows it is not a no-op is the
+object-level divergence above, which is why that arm exists.
