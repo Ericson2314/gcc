@@ -622,6 +622,47 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**STANDING USER RULING — GET THE BACK ENDS BUILDING, EVEN IF EVERYTHING IS
+BUSTED.** Verbatim: *"just get those backends building — even if everything is
+busted it's OK, we'll figure it out. it should be mechanical, right? and the
+hooks pattern is well established upstream."* Earlier in the same exchange:
+*"that's rote."*
+
+This **suspends §2a's ban on stubs and `#ifndef` floors, for link-level fixes,
+for this phase only.** The goal metric is the **count of back ends that link**;
+per-base functionality is explicitly deferred. Two conditions attach:
+
+- Prefer a **fail-by-name abort** (`gcc_unreachable ()`, or an `internal_error`
+  naming the symbol and the base) over a plausible wrong value. A stub that
+  quietly returns the primary's answer is exactly the defect class this project
+  exists to remove and the hardest to find later; one that aborts is trivial.
+- **Record every stub in one committed list.** The correctness pass then
+  inherits a work queue instead of an archaeology problem.
+
+§2a is NOT repealed — it resumes the moment this phase ends, and it still
+governs anything that is not a link-level unblock.
+
+**CHECK WHETHER THE HOOK ALREADY EXISTS BEFORE BUILDING A MECHANISM.** The
+coordinator asserted that the `print_operand` family "needs a SELECTOR, not a
+rename, because `targhooks.cc` and `final.cc` name it". Measured, that is
+false in the way that mattered:
+
+- `TARGET_PRINT_OPERAND` / `TARGET_PRINT_OPERAND_ADDRESS` are **already target
+  hooks** — `target.def:1107`, `:1116`.
+- `final.cc:3679`/`:3695` call `targetm.asm_out.print_operand`, i.e. *through
+  the hook*.
+- `targhooks.cc` defines only `default_print_operand`, never the bare name.
+- The 8 back ends defining a bare global `print_operand` are each supplying
+  *their own* function, registered as their own hook.
+
+So no shared TU names the bare symbol, and the settled rule gives a **bare
+rename**. Generalise: upstream has spent twenty years moving target behaviour
+behind `targetm`, so **before designing dispatch, ask whether `target.def`
+already has the hook and whether shared code reaches the bare name or the
+hook.** Much of what looks like new mechanism here is a rename plus an existing
+hook — which is what makes the user's "it should be mechanical" the right
+prior.
+
 **A WRITTEN INVARIANT IS NOT A CHECKED ONE — AND A MACRO-MEDIATED ACCESS
 DEFEATS THE GREP THAT WOULD HAVE CHECKED IT.** `genmodes.cc`'s `CONST_MODE_*`
 block argues `const` is safe for all eight mode tables because "there is not
