@@ -742,18 +742,57 @@ passed — 40 hits on x86_64's own output, 0 on aarch64's and s390's — but it
 cannot see a target compiled at the wrong width, because every instruction it
 emits is genuinely a valid instruction of that architecture.
 
-**REMOVING `-I<base>-inc` IS SILENT, NOT LOUD.** 15 of 16 stems also exist
-under their plain name in the build root, so an unconverted include falls back
-instead of erroring; for seven, that copy is byte-identical to i386's. The
-`.deps` show the `-I` serving **~2000 objects transitively** (via
-`coretypes.h:553`) against ~280 direct. Delete it before the ~13 shared headers
-can name a base and 2000 objects silently take the primary's mode numbering.
-Remaining: 17 sites, `#ifdef MT_BASE`, listed in `T173-BASE-HEADER.md`.
+**`-I<base>-inc` IS GONE (#174), AND WHAT IT COST IS THE TRANSFERABLE PART.**
+`-DMT_BASE` is now the only thing that says which back end an object's headers
+come from; `git grep -- '-I.*-inc\>' ':(exclude)scratchpad'` is **0**. The
+shape is `MT_HEADER (f)` from `gcc/multi-target-header.h` for a header serving
+both populations, `BASE_HEADER (f)` for a source compiled only per back end.
 
-Two cautions from that conversion, both caught only by a 47-back-end build:
-a back end's `.h` may not name a base (the shared `tm.h` includes
-`config/i386/i386.h`, so converting one breaks ~520 shared TUs); and 8 bad
-include orders amplified into 251 diagnostics from one cause.
+Removal was silent, not loud: 15 of 16 stems also exist under their plain name
+in the build root, and for seven that copy is byte-identical to i386's.
+
+**THE SITE COUNT WAS 17 AND IT WAS 30, AND THE MISSING THIRTEEN WERE MISSING
+FOR TWO DIFFERENT REASONS — BOTH WORTH GENERALISING.**
+
+- Four `tm.h` and ten `options.h` sites in shared headers were **counted under
+  a different acceptance grep** and so were absent from a census that believed
+  itself complete. `target.h:57`'s plain `"tm.h"` cost 243 diagnostics in
+  `mt-arm/arm-c.o`. *When you enumerate a population by stem, enumerate every
+  stem, not the ones your task is named after.*
+- Four families of **generated** per-base sources (`options-init.cc`,
+  `options-tables.cc`, `insn-modes-<cpu>.cc`, `rs6000-builtins.cc`) are not in
+  the source tree, so `git grep` over `gcc/` cannot see them. Enumerated from
+  the build dir instead. *Rule 1 of §4 again: grep the generated artefact.*
+  `genmodes.cc`'s own comment had predicted this exact bug and nobody had
+  acted on it.
+
+**AND THE THIRD DEFECT WAS VISIBLE ONLY TO THE DEPS-DIFF.**
+`mt-<cpu>/options-{init,tables}.o` set `MULTI_TARGET_INC` and **never
+`MULTI_TARGET_BASE_DEF`** — they reached their base entirely through the
+include path. Both arms compiled clean; 94 objects silently swapped
+`<cpu>-inc/insn-modes.h` for the build root's. **No build could have seen it**,
+which is the whole reason "it builds" was refused as the bar. Final:
+per-back-end headers LOST **0**, added **0**, over the 2000 objects both
+47-back-end builds produced.
+
+**A TARGET-SPECIFIC VARIABLE ASSIGNMENT DOES NOT MAKE A TARGET OUT OF DATE.**
+Adding `MULTI_TARGET_BASE_DEF` left 46 of 47 objects unrebuilt, and the
+deps-diff still reported the loss on stale `.Po` files. Delete the objects by
+hand after any fix that only changes a compile flag.
+
+The witness moved with the `-I`: `mt-inc-witness.h` was findable only through
+it. `multi-target-base.h` now builds the directory from `MT_BASE` and the file
+name from `MULTI_TARGET_TARGETM_BASE`, so the two flags check each other, and
+it was verified **in the real 47-base build dir** — `aarch64-inc/mt-inc-tag-i386.h:
+No such file`, with a passing negative control. It is silent for the 51 objects
+carrying `MT_BASE` alone; deriving a second flag from the same make rule would
+be a mitigation that cannot fire.
+
+Two older cautions, both caught only by a 47-back-end build, still hold: a back
+end's `.h` may not name a base **unconditionally** (the shared `tm.h` includes
+`config/i386/i386.h`, so ~520 shared TUs read it — `MT_HEADER` is what made
+those three convertible); and 8 bad include orders once amplified into 251
+diagnostics from one cause.
 
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
