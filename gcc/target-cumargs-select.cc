@@ -547,6 +547,22 @@ mt_push_rounding (poly_int64 bytes)
   return mt_frame ()->push_rounding (bytes);
 }
 
+/* `CASE_VECTOR_PC_RELATIVE' and `REGMODE_NATURAL_SIZE'.  Uncached, through
+   `mt_frame ()', for the reason `Pmode' is: seven back ends spell the first
+   as option state (`flag_pic', `riscv_cmodel', `rs6000_relative_jumptables',
+   ...), and the second takes an argument, so there is no value to cache.  */
+bool
+mt_case_vector_pc_relative (void)
+{
+  return mt_frame ()->case_vector_pc_relative ();
+}
+
+poly_uint64
+mt_regmode_natural_size (machine_mode mode)
+{
+  return mt_frame ()->regmode_natural_size (mode);
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 
