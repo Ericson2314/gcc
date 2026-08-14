@@ -1066,6 +1066,24 @@ has its own line in `tm.h` beside `options.h`. The brief's open question about
 includer, while `insn-modes.h` reaches every shared TU through `coretypes.h:553`
 ahead of `tm.h`, so it needs no vocabulary at all.
 
+**"ARRIVES AHEAD OF `tm.h`" IS A FACT ABOUT ORDERING, NOT A CERTIFICATE OF
+NEUTRALITY.** The clause above — "so it needs no vocabulary at all" — is a
+non-sequitur, and #187 measured what it was hiding. `insn-modes.h` /
+`insn-modes-inline.h` are the **widest leak channel in the compiler: 812 of 833
+shared objects**, every shared object that opens anything, and the build root's
+copy is **byte-identical to i386's**. Wider than `tm.h` (451 shared openers) and
+`tm_p.h` (122). Whenever a line here explains *how* a header reaches everyone,
+check separately whether the thing that reaches them is per-base; the two
+questions are independent and this file conflated them for the widest file in
+the tree.
+
+Corollary, same measurement: `git grep '"tm.h"'` **undercounts the real
+population by 7.6×** — 59 source spellings against 451 shared objects that
+actually open it, plus 5 files spelling `MT_HEADER (tm.h)` that the grep cannot
+see at all. #68's criterion is not merely foolable in principle; the factor is
+measured. Score that population with `t187-perbase-read.sh`, which reads each
+object's `.deps/*.Po`, and keep the grep only as a tripwire beside it.
+
 Re-scored over all 625 shared TUs, the four vocabularies move the Class A
 population **not at all**: 31 CLEAR + 8 hit only by `options.h` names = the
 same 39. What actually revokes is the **transitive** channel, which no
