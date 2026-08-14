@@ -1,0 +1,37 @@
+== sc-check: STOCK srcdir /tmp/snap-stock-agent-a3464debf6893de84 sha=c31b7a09eea3c33bccca12bab4a7bb6b01da1ff6 anchor=0
+== target: aarch64-unknown-linux-gnu   runtestflags: []   compile-only: [1]
+-- guard S2: xgcc -dumpmachine = aarch64-unknown-linux-gnu
+-- guard S3: target system headers reachable at /nix/store/2xzifm4c0h9d0yv91az0v1c0bxd14h23-glibc-aarch64-unknown-linux-gnu-2.42-67-dev/include
+-- assembler in use: /tmp/tools-agent-a3464debf6893de84/bin/aarch64-unknown-linux-gnu-as
+-- guard S4: assembled object reports Machine: AArch64
+-- make check-gcc rc=0
+-- guard: all 10 site.exp files attribute to aarch64-unknown-linux-gnu
+-- guard G5a: multi-target.exp banner present
+-- guard G5b: dg-do run/link/assemble downgrade IS installed
+
+TARGET                             PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+--------------------------------------------------------------------------------------------
+aarch64-unknown-linux-gnu        344463    20443        2     1995     6731    17003        8
+
+== KILLED (compiler killed, NOT a test result -- machine contamination)
+  aarch64-unknown-linux-gnu    0
+  load at scoring time: load average: 38.84, 39.90, 32.99
+  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is quoted)
+
+== NOT DOWNGRADED (drove the compiler outside dg-do: linked and/or ran)
+  aarch64-unknown-linux-gnu    execution-shaped 4        gcov 1304
+
+== top FAIL causes per target (first 12, by test file)
+-- aarch64-unknown-linux-gnu
+    940 gcc.misc-tests/gcov-19.c
+     66 gcc.misc-tests/gcov-4.c
+     40 gcc.dg/analyzer/torture/boxed-int-1.c
+     35 gcc.misc-tests/gcov-22.c
+     30 gcc.dg/lto/pr80922-2
+     25 gcc.misc-tests/gcov-4b.c
+     24 gcc.dg/lto/pr80922-1
+     20 gcc.dg/analyzer/torture/conditionals-2.c
+     19 gcc.misc-tests/gcov-7.c
+     16 outputs-348
+     16 outputs-346
+     16 outputs-344
