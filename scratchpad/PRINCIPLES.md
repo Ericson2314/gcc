@@ -622,6 +622,28 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**A LOG BEING WRITTEN LOOKS EXACTLY LIKE A LOG THAT FINISHED — STAMP THE
+EXIT.** An agent reported "13 errors → 7, 4 back ends → 2" and later withdrew
+**both** figures: neither build had completed when it read them, so the delta
+compared two mid-build snapshots stopped at two different unknown points.
+Its own non-vacuity arm did not catch it, because that arm tested **existence
+and non-emptiness** — precisely the two properties a truncated log has. A
+partial log is non-empty, contains real compile lines, and greps clean.
+
+The fix is structural, not vigilance: **write `<tag>.rc` only after `make`
+returns, and have the scorer REFUSE any log lacking that stamp.** Then an
+unfinished build is a hard failure by name instead of a smaller number.
+
+This compounds with the `-k` rule above — under `-k`, "never attempted" and
+"passed" are the same silence, and under truncation "not yet reached" joins
+them. Two different ways for the same absence to read as success.
+
+Credit where due: the agent found this in its own landed work and withdrew the
+numbers unprompted, which is the behaviour this file exists to produce. The
+content assertions in that task survived untouched, because none of them came
+from a log count — they were both-sided assertions on generated files and
+linked objects.
+
 **AN INSTRUMENT THAT CANNOT SHOW ITS OWN FIXES LANDING CANNOT BE USED TO GRIND
 A POPULATION.** Before working a queue an instrument produced, apply the test:
 *take a defect this project already fixed, and check the instrument now reports
