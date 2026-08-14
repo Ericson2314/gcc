@@ -60,6 +60,25 @@ extern bool epiphany_regno_rename_ok (unsigned src, unsigned dst);
 /* Also declared in insn-attr.h, but files generated from epiphany.md
    can't / won't include that.  In particular:
    PR other/55523: gencondmd file includes / dependencies are messed up,
-   it uses peephole2 predicates without having all the necessary headers.  */
+   it uses peephole2 predicates without having all the necessary headers.
+
+   MULTI-TARGET: IN THE BACK END'S NAMESPACE, and that is the fix rather than
+   a decoration.  genattrtab now emits the DEFINITION inside
+   `namespace insn_epiphany' (every back end has its own `get_attr_*' set, and
+   they must not collide in one binary).  The bare declaration that used to
+   stand here is read by `insn-recog-epiphany-*.cc' through `tm_p-epiphany.h'
+   BEFORE that file opens its own namespace, so twelve calls in epiphany's
+   peephole2 conditions bound to a global `::get_attr_sched_use_fpu' that
+   nothing defines: `undefined reference to get_attr_sched_use_fpu(rtx_insn*)'.
+
+   Declaring it here in the same namespace as the definition makes the two
+   agree.  The generated sources emit `using namespace insn_epiphany;' at
+   global scope, so unqualified uses still resolve exactly as before -- but now
+   to the function that exists.  Hardcoding the namespace name is safe in THIS
+   file specifically: `epiphany-protos.h' is epiphany's own header and is read
+   only by objects built for epiphany.  */
+namespace insn_epiphany {
 extern int get_attr_sched_use_fpu (rtx_insn *);
+}
+using namespace insn_epiphany;
 

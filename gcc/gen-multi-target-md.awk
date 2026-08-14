@@ -1906,6 +1906,33 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
     obj = parts[i];
     sub(/\.o$/, "", obj);
     src = frag_source_for(obj, tmkp);
+    # A c_target_obj NO FRAGMENT CLAIMS IS A DEFECT, NOT A NON-BACK-END OBJECT,
+    # AND IT USED TO LEAVE THIS LOOP SILENTLY.
+    #
+    # The refusal in the second loop below cannot catch it: that loop iterates
+    # over cobjs_own, and an object with src == "" fails the `^config/<cpu>/'
+    # test here and is therefore never put in cobjs_own to be refused.  The
+    # exclusion runs BEFORE the check, so the check cannot fire -- the
+    # `mitigation that cannot fire' shape in PRINCIPLES section 4.
+    #
+    # Measured: `v850e1-elf' set `c_target_objs="v850-c.o"' while its
+    # tmake_file omitted `v850/t-v850', the only fragment carrying the rule.
+    # v850-c.o disappeared from MT_C_OBJS_v850 with no word anywhere, and the
+    # link failed 8 symbols later at `ghs_pragma_*' -- a name that does not
+    # mention v850-c.o, config.gcc, or this loop.
+    #
+    # $(warning) rather than $(error): the point is that the operator SEES it.
+    # An $(error) here would also be defensible, and is deliberately not used
+    # yet because this generator runs for all 48 back ends at once and one
+    # unfixed fragment would block every one of them.  If this warning is ever
+    # observed to be zero across a full 48-base run, promote it.
+    if (src == "") {
+      printf "$(warning multi-target: %s lists %s in c_target_objs but no" \
+	     " tmake fragment claims a rule for it -- it will NOT be built" \
+	     " and anything referencing its symbols will fail at link time)\n\n", \
+	     cpu, parts[i];
+      continue;
+    }
     if (src ~ ("^\\$\\(srcdir\\)/config/" cpu "/")) {
       cobjs_own = cobjs_own parts[i] " ";
       # ... and record it so gcc/Makefile.in can take it OUT of C_TARGET_OBJS.

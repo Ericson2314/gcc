@@ -692,7 +692,25 @@ immed_wide_int_const_1 (const wide_int_ref &v, machine_mode mode)
 #endif
 }
 
-#if TARGET_SUPPORTS_WIDE_INT == 0
+/* MULTI-TARGET: the `#if TARGET_SUPPORTS_WIDE_INT == 0' that used to wrap
+   this definition is gone, and its absence is the fix rather than an
+   oversight.
+
+   `emit-rtl.cc' is compiled ONCE and shares its object with all 48 back ends,
+   so that `#if' was read with the PRIMARY back end's tm.h.  The primary sets
+   TARGET_SUPPORTS_WIDE_INT to 1, so the function was compiled out -- while
+   m68k, which sets it to 0, still calls it from its own md (m68k.md:3270,
+   reached via mt-m68k/insn-emit-m68k-7.o).  The link failed with
+   `undefined reference to immed_double_const(long, long, machine_mode)'.
+
+   One name, one authority, and the authority was the wrong back end: exactly
+   the shape PRINCIPLES section 3 describes, in its "guard hiding a
+   declaration" disguise.  The body below reads no target macro at all -- only
+   host quantities and mode queries -- so compiling it unconditionally is not
+   a fallback or an invented answer.  It is the same function every back end
+   that asks for it would have got standing alone; the back ends that do not
+   call it simply do not call it.  */
+
 /* Return a CONST_DOUBLE or CONST_INT for a value specified as a pair
    of ints: I0 is the low-order word and I1 is the high-order word.
    For values that are larger than HOST_BITS_PER_DOUBLE_INT, the
@@ -737,7 +755,6 @@ immed_double_const (HOST_WIDE_INT i0, HOST_WIDE_INT i1, machine_mode mode)
 
   return lookup_const_double (value);
 }
-#endif
 
 /* Return an rtx representation of C in mode MODE.  */
 

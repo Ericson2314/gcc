@@ -34,6 +34,42 @@ along with GCC; see the file COPYING3.  If not see
 #include "read-md.h"
 #include "gen-target-ns.h"
 
+/* The enum types the MIDDLE END names bare and unconditionally.  Every back
+   end must export a table and a length for each of these, because
+   multi-target-select.cc's MT_OTHER_TABLES / MT_SCALAR_TABLES declare and
+   install them for ALL configured back ends -- not for the subset whose md
+   happens to declare the enum.
+
+   Only 20 of the 48 back ends write `define_c_enum "unspecv"'; the other 28
+   emitted no unspecv_strings and no unspecv_strings_len at all, so the
+   installer referenced symbols that were never defined and cc1 failed to
+   link with `undefined reference to insn_<base>::unspecv_strings'.  */
+static const char *const mt_required_enums[] = { "unspec", "unspecv" };
+
+/* Set as each enum type is emitted, so main () can tell which of the above
+   the md did NOT supply.  */
+static bool mt_required_seen[ARRAY_SIZE (mt_required_enums)];
+
+/* Emit the EMPTY form of one of those tables: a real per-back-end answer,
+   not a borrowed one.  This back end genuinely has no names for this enum,
+   and a length of 0 says exactly that -- every consumer bound is
+   `i < <enum>_strings_len', so no index is ever accepted and no other back
+   end's strings can be reached.  Note this is NOT an `#ifndef' floor
+   supplying the primary's value; the primary's table is not consulted.
+
+   A one-element dummy rather than a zero-length array: `T x[] = {}' is a GCC
+   extension rather than valid C++, and the LENGTH is what any consumer
+   reads, never ARRAY_SIZE of this object.  */
+static void
+print_empty_enum_type (const char *name)
+{
+  printf ("\n/* This back end's md declares no `%s' enum.  Empty table with"
+	  "\n   length 0: the bound refuses every index.  */\n", name);
+  printf ("static const char *const %s_strings_empty[1] = { \"\" };\n", name);
+  printf ("const char *const *%s_strings = %s_strings_empty;\n", name, name);
+  printf ("int %s_strings_len = 0;\n", name);
+}
+
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
 
@@ -44,6 +80,9 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
   struct enum_value *value;
 
   def = (struct enum_type *) *slot;
+  for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
+    if (strcmp (def->name, mt_required_enums[i]) == 0)
+      mt_required_seen[i] = true;
   /* Array plus pointer on a multi-target build, matching the declaration
      genconstants writes into insn-constants-<base>.h.  */
   printf ("\nconst char *const %s_strings%s[] = {", def->name,
@@ -110,6 +149,13 @@ main (int argc, const char **argv)
      silently.  Namespaced; multi-target-select.cc supplies the bare names.  */
   print_ns_open (stdout);
   reader.traverse_enum_types (print_enum_type, 0);
+  /* AFTER the traversal, so mt_required_seen is complete.  Supplying the
+     missing ones here rather than making the installer conditional keeps ONE
+     authority for "which tables exist": the installer's list.  */
+  if (gen_target_ns ())
+    for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
+      if (!mt_required_seen[i])
+	print_empty_enum_type (mt_required_enums[i]);
   print_ns_close (stdout);
 
   if (ferror (stdout) || fflush (stdout) || fclose (stdout))

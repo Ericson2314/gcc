@@ -3371,10 +3371,12 @@ extern rtx_insn *end_sequence (void);
 extern double_int rtx_to_double_int (const_rtx);
 #endif
 extern void cwi_output_hex (FILE *, const_rtx);
-#if TARGET_SUPPORTS_WIDE_INT == 0
+/* MULTI-TARGET: unconditional.  The definition in emit-rtl.cc is now
+   unconditional too -- see the comment there.  Guarding the DECLARATION with
+   a per-back-end macro in a header 500 shared TUs read means the primary
+   decides whether a back end can name its own function.  */
 extern rtx immed_double_const (HOST_WIDE_INT, HOST_WIDE_INT,
 			       machine_mode);
-#endif
 extern rtx immed_wide_int_const (const poly_wide_int_ref &, machine_mode);
 
 /* In varasm.cc  */

@@ -4172,6 +4172,45 @@ only_leaf_regs_used (void)
   return true;
 }
 
+#else /* !LEAF_REGISTERS */
+
+/* MULTI-TARGET STUB -- RECORDED IN scratchpad/UR-STUBS.md.  DELIBERATELY
+   ABORTS BY NAME; it does NOT answer.
+
+   `final.cc' is compiled once, so `#ifdef LEAF_REGISTERS' is decided by the
+   PRIMARY back end's tm.h.  Only sparc and ia64 define LEAF_REGISTERS, so on
+   any build whose primary is neither, this function was compiled out --
+   while `sparc.cc', compiled with sparc's own headers, calls it from three
+   places.  `undefined reference to only_leaf_regs_used()'.
+
+   The honest fix is a per-base answer for LEAF_REGISTERS (it is a per-back-end
+   string constant indexed by regno, so it wants the cdata treatment).  That is
+   a correctness change, not a link fix, and it is queued.
+
+   What is NOT acceptable here is returning `false' -- or `true' -- as a
+   "sensible default".  Both are somebody's real answer, both compile, both
+   silently change sparc's leaf-register allocation, and neither leaves any
+   trace to find later.  PRINCIPLES section 2a.  So this aborts, naming itself,
+   the macro and the fact that the base did not supply it.
+
+   Reachability: the shared caller in `function.cc'
+   (`rest_of_handle_check_leaf_regs') is ITSELF under `#ifdef LEAF_REGISTERS'
+   and so is compiled out alongside this.  The only callers that survive are
+   inside sparc's and ia64's own objects, so this abort fires when one of those
+   two back ends is SELECTED, and never for the other 46.  */
+
+bool
+only_leaf_regs_used (void)
+{
+  internal_error ("%<only_leaf_regs_used%>: this build has no per-back-end "
+		  "%<LEAF_REGISTERS%>, so the answer would be another back "
+		  "end%'s; refusing to invent one");
+}
+
+#endif /* LEAF_REGISTERS */
+
+#ifdef LEAF_REGISTERS
+
 /* Scan all instructions and renumber all registers into those
    available in leaf functions.  */
 

@@ -3092,3 +3092,19 @@ epiphany_mt_print_operand_punct_valid_p (unsigned char code)
 #define TARGET_PRINT_OPERAND_PUNCT_VALID_P epiphany_mt_print_operand_punct_valid_p
 
 struct gcc_target targetm = TARGET_INITIALIZER;
+
+/* MULTI-TARGET: gengtype writes this back end's `machine_function' GC
+   markers -- gt_ggc_mx_machine_function_epiphany and its pch siblings -- into
+   `gt-epiphany.h', and NOTHING INCLUDED IT.  Upstream never needed the include
+   because upstream has one `machine_function' and one unsuffixed marker
+   emitted into `gtype-desc.cc' itself.  Here the marker is per back end, the
+   installer in `gtype-desc.cc' names it, and the definition lived in a
+   generated header no translation unit read: `undefined reference to
+   gt_ggc_mx_machine_function_epiphany(void*)'.
+
+   The other 45 back ends were fine only because they include their
+   `gt-<cpu>.h' already, for GTY roots upstream gave them.  epiphany has no such
+   root, so the file existed and was never opened -- the
+   `absent artefact vs absent mechanism' shape: the header was generated, so
+   every check that looked for it passed.  */
+#include "gt-epiphany.h"
