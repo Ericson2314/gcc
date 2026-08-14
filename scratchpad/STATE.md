@@ -13060,6 +13060,44 @@ Both-sided (`t49-verify.sh`): rs6000 moves as above; the i386 control
 preprocesses to a macro set **identical apart from the two new names**, total
 macro count **8358 on all four readings**.
 
+### THE COMPILE ARM -- because preprocessing does not prove it BUILDS
+
+The reading above proves what the macros become.  It does not prove
+`rs6000.cc` still compiles once the guards are taken, and this change turns on
+code that has **never been compiled in this tree**: `TARGET_CMODEL` becomes
+`rs6000_current_cmodel` and `DOT_SYMBOLS` becomes `dot_symbols`, both
+previously unreachable.  (`dot_symbols` is `int dot_symbols;` at
+`rs6000.cc:118` and is assigned at `rs6000.cc:3553`; `rs6000_current_cmodel` is
+`Var(rs6000_current_cmodel)` in `linux64.opt`.  Both exist, so the link is
+safe -- but that was checked, not assumed.)
+
+`scratchpad/t49-compile.sh` does it surgically, in the BASELINE build dir,
+because a full patched 48-back-end build could not be finished (section 4):
+inject the two prologue blocks into that build's own `tm-rs6000.h`, recompile
+`mt-rs6000/rs6000.o` with the build's OWN command line lifted from its log,
+then restore both files.
+
+    recompile rc=0
+    object 769744 -> 777192 bytes          <- MUST-MOVE arm passes
+    warnings 3, all pre-existing           <- both poly_int/format warnings
+                                              are in b48.err too
+
+**The MUST-MOVE arm is the load-bearing one.**  A compile that succeeded and
+produced a byte-identical object would mean the change reaches no code and the
+whole finding is wrong; +7448 bytes says it reaches a great deal.
+
+Two harness bugs of my own, both caught by asserts rather than by luck, and
+both worth recording because each would have read as a verdict about the tree:
+
+  * the injection check asserted **1** `HAVE_LD_LARGE_TOC` line when a correct
+    injection produces **2** (the `#ifndef` and the `# define`), and refused a
+    CORRECT injection -- the right direction for an assert to fail in;
+  * the compile command was lifted with `grep -o '...-o mt-rs6000/rs6000\.o
+    [^ ]*'`, which stopped at `-MMD` and dropped the source file.  The result
+    was `g++: fatal error: no input files`, which reads exactly like **"the
+    change does not build"**.  The script now requires the lifted command to
+    end in `rs6000.cc` and says so by name if it does not.
+
 ### STILL OPEN, NOT FIXED HERE -- and why each was left
 
   * `sol2.h:373` `#ifdef HAVE_LD_CTF` is silently false, so `SCTF_CC1_SPEC`
@@ -13222,6 +13260,18 @@ design than any of the three options offered.
     what makes section 1's change testable at object level at all.  Whether 28
     counted a different goal, per-target subdirectories, or an older tree, I
     cannot say -- only that it is not this build's `all-gcc`.
+  * **THE FULL PATCHED 48-BACK-END A/B WAS NOT COMPLETED, and the reason is
+    host contention, not a result.**  A second 48-back-end build was configured
+    from a snapshot of the fix (`/tmp/b-ad1798a2b26398cc6-48fix`) to compare
+    the failing-rule set and object count.  Its `tm-rs6000.h` was confirmed to
+    carry both prologue blocks, and then it was abandoned: `uptime` showed
+    **load average 51 with FIVE concurrent `make -k -j8` builds** from other
+    agents on this host, and the build was running roughly 20x slower than the
+    baseline (538 objects in ~3 hours against the baseline's 4560 in ~50
+    minutes).  It was stopped rather than left to contend.  `scratchpad/t49-ab.sh`
+    is written and ready for whoever has a quiet machine.  **This is a missing
+    measurement, not a passed one** -- what stands in its place is the compile
+    arm in section 1, which is narrower (one object, not 4560).
   * **No bar is quoted.**  `12369 bytes / 378fc33c1e70`, `specs-config` 230
     lines and `stock-compare` 5/5 all need a linked `cc1`/`xgcc`, which neither
     build dir produced.  Per PRINCIPLES, `stock-compare` selects x86_64 and is
