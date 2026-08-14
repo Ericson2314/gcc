@@ -1490,6 +1490,22 @@ multi-target-md.mk: multi-target.manifest multi-target.multilib \
 # lines ABOVE this line and a `+=' there would be discarded by this assignment
 # -- the trap the paragraph above describes, from the other side.
 MULTI_TARGET_OBJS = $(MT_OPTIONS_INIT_OBJS)
+
+# EVERY configured back end's `<cpu>-passes.def', and the same list with each
+# file tagged by the back end that owns it.  Accumulated with `+=' by
+# multi-target-md.mk, so -- exactly as for MULTI_TARGET_OBJS above -- they must
+# be declared BEFORE the include and never re-assigned after it.
+#
+# This is the channel that replaces $(PASSES_EXTRA) for the pass list.
+# PASSES_EXTRA reaches this file only through `-include $(tmake_file)' at the
+# bottom, and @tmake_file@ is the single legacy `${target}'s fragments -- so in
+# a build holding eight back ends it is i386's alone, and pass-instances.def
+# held i386's three target passes and NOT ONE from aarch64, arm, rs6000, s390,
+# riscv, mips or sparc.  aarch64 and arm BTI insertion had never run.  These
+# two variables come from the BACK-END LIST, which is the list that is in the
+# compiler.
+MT_PASSES_DEFS =
+MT_PASSES_TAGS =
 -include multi-target-md.mk
 
 # Specify the directories to be searched for header files.
@@ -4211,10 +4227,77 @@ s-bversion: BASE-VER
 CFLAGS-optinfo-emit-json.o += $(ZLIBINC)
 CFLAGS-analyzer/engine.o += $(ZLIBINC)
 
-pass-instances.def: $(srcdir)/passes.def $(PASSES_EXTRA) \
+# THE PASS LIST OF EVERY CONFIGURED BACK END, NOT OF ONE TARGET.
+#
+# $(MT_PASSES_DEFS) replaces $(PASSES_EXTRA) here.  The two differ in where
+# they come from, which is the whole of the defect: PASSES_EXTRA is set by the
+# `config/<cpu>/t-<cpu>' fragments reached through `-include $(tmake_file)' at
+# the bottom of this file, and @tmake_file@ is substituted from the ONE legacy
+# `${target}' pass through config.gcc.  In an eight-back-end build dir that is
+#
+#   tmake_file= .../config/t-slibgcc .../config/t-linux .../config/t-glibc
+#               .../config/i386/t-linux64 .../config/i386/t-pmm_malloc
+#               .../config/i386/t-i386 ...
+#
+# so pass-instances.def held pass_stv, pass_remove_partial_avx_dependency and
+# pass_insert_endbr_and_patchable_area and nothing else -- i386's target passes
+# running for every configured base, and every other back end's silently
+# absent.  Both halves of this project's defining bug in one variable.
+# $(MT_PASSES_DEFS) is accumulated by multi-target-md.mk from the BACK-END
+# LIST, one entry per back end whose tmake fragments say `PASSES_EXTRA +='.
+#
+# THE TWO CHANNELS CHECK EACH OTHER RATHER THAN ONE BEING DELETED.  Every file
+# the legacy channel supplies must also be in the list derived from the back-end
+# list; a file in $(PASSES_EXTRA) and not in $(MT_PASSES_DEFS) means the
+# fragment scan missed a back end that is genuinely in this compiler, and that
+# would otherwise show up as a target pass quietly not running -- the exact
+# failure being fixed, arriving with no diagnostic.  The reverse direction is
+# NOT an error: $(MT_PASSES_DEFS) is expected to be the larger list, by seven
+# back ends.
+#
+# Written through move-if-change from a temporary, because gen-pass-instances.awk
+# can now FAIL -- an untagged extra file, a REPLACE_PASS from a back end, an
+# anchor passes.def does not have -- and a `> pass-instances.def' redirection
+# leaves a truncated file behind that the next `make -k' finds newer than its
+# prerequisites and does not rebuild.
+pass-instances.def: $(srcdir)/passes.def $(MT_PASSES_DEFS) \
 		    $(srcdir)/gen-pass-instances.awk
+	@for f in $(PASSES_EXTRA); do \
+	  case " $(MT_PASSES_DEFS) " in \
+	    *" $$f "*) ;; \
+	    *) echo "pass-instances.def: $$f reaches this rule through" >&2; \
+	       echo "  -include \$$(tmake_file) but no configured back end's" >&2; \
+	       echo "  tmake fragments claim it.  MT_PASSES_DEFS is derived" >&2; \
+	       echo "  from the back-end list and is the authority; a file only" >&2; \
+	       echo "  the legacy channel knows about means the scan in" >&2; \
+	       echo "  gen-multi-target-md.awk missed a back end." >&2; \
+	       exit 1 ;; \
+	  esac; \
+	done
+	test -n "$(strip $(MT_PASSES_DEFS))" || { \
+	  echo "pass-instances.def: MT_PASSES_DEFS is empty." >&2; \
+	  echo "  Not one configured back end contributed a passes.def, which" >&2; \
+	  echo "  cannot be right: i386, aarch64, arm, rs6000, s390, riscv," >&2; \
+	  echo "  sparc, xtensa, alpha, arc, avr, bpf, cris, pru and visium" >&2; \
+	  echo "  all have one.  multi-target-md.mk was not included, or the" >&2; \
+	  echo "  PASSES_EXTRA scan in gen-multi-target-md.awk found nothing." >&2; \
+	  exit 1; }
 	$(AWK) -f $(srcdir)/gen-pass-instances.awk \
-	  $(srcdir)/passes.def $(PASSES_EXTRA) > pass-instances.def
+	  -v pass_bases='$(MT_PASSES_TAGS)' \
+	  $(srcdir)/passes.def $(MT_PASSES_DEFS) > tmp-pass-instances.def
+	$(SHELL) $(srcdir)/../move-if-change tmp-pass-instances.def $@
+
+# The declarations of the per-back-end pass forwarders that pass-instances.def
+# now names; see gen-target-passes.awk.  Same generator as the forwarder
+# bodies, so the calls in passes.cc and the definitions in
+# mt-<base>/target-passes-<base>.cc cannot disagree about a name.
+multi-target-passes.h: $(srcdir)/gen-target-passes.awk $(MT_PASSES_DEFS)
+	test -n "$(strip $(MT_PASSES_TAGS))" || { \
+	  echo "multi-target-passes.h: MT_PASSES_TAGS is empty; see" >&2; \
+	  echo "  the pass-instances.def rule above." >&2; exit 1; }
+	$(AWK) -f $(srcdir)/gen-target-passes.awk -v mode=header \
+	  -v pass_bases='$(MT_PASSES_TAGS)' > tmp-multi-target-passes.h
+	$(SHELL) $(srcdir)/../move-if-change tmp-multi-target-passes.h $@
 
 $(out_object_file): $(out_file)
 	$(COMPILE) $<
@@ -5074,7 +5157,7 @@ generated_files = config.h tm.h $(TM_P_H) $(TM_D_H) $(TM_JIT_H) $(TM_H) \
        case-cfn-macros.h \
        jit/jit-target-hooks-def.h case-cfn-macros.h \
        cfn-operators.pd omp-device-properties.h \
-       multi-target-reg-widths.h
+       multi-target-reg-widths.h multi-target-passes.h
 
 #
 # How to compile object files to run on the build machine.

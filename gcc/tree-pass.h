@@ -108,6 +108,24 @@ public:
   /* Static pass number, used as a fragment of the dump file name.  */
   int static_pass_number;
 
+  /* MULTI-TARGET: the back end that owns this pass -- "aarch64", "i386" --
+     or NULL for a target-independent pass.
+
+     pass-instances.def now holds EVERY configured back end's target passes,
+     not the one target's that `-include $(tmake_file)' happened to supply, so
+     the pass tree a compiler builds contains passes belonging to back ends
+     this compilation is not for.  This field is how a pass says whose it is;
+     passes.cc's pass_gate_p () is where it is read.
+
+     Set by the forwarder in mt-<base>/target-passes-<base>.cc, which is the
+     one translation unit that cannot be wrong about the answer -- it exists
+     once per back end.  It survives clone () because clone () copies the
+     pass object, so instances 2..n of a target pass inherit their owner.
+
+     A null value is "shared", not "unknown": there is no default back end
+     whose passes run when nothing has been selected.  */
+  const char *mt_base;
+
 protected:
   gcc::context *m_ctxt;
 };
