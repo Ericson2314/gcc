@@ -75,7 +75,14 @@ if [ "$fails" = 0 ]; then echo "ALL FOUR BASES: PASS"; else echo "FAILURES: $fai
 echo
 echo "== negative control: an unconfigured target must be refused by name"
 c=$D/lib/gcc/$V/x86_64-pc-linux-gnu/specs-config
-sed 's/^target=.*/target=sparc64-unknown-linux-gnu/' "$c" > "$OUT/bogus-config"
+# `target <triple>', SPACE-separated -- not `target=<triple>'.  The first
+# draft of this control substituted on `^target=' and matched nothing, so it
+# wrote an UNMODIFIED copy and would have scored the compiler accepting its
+# own real target as "the control fired".  It printed CONTROL DID NOT INJECT
+# instead only because it re-reads the file and requires the injected string
+# to be there -- assert that your injection produced the state you intended,
+# not that it exited (PRINCIPLES 7).
+sed 's/^target .*/target sparc64-unknown-linux-gnu/' "$c" > "$OUT/bogus-config"
 if ! grep -q 'sparc64' "$OUT/bogus-config"; then
   echo "  CONTROL DID NOT INJECT: no 'target=' line in $c -- the control proves"
   echo "  nothing and this arm is UNSCORED.  Keys present:"
