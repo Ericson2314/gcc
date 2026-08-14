@@ -2296,10 +2296,8 @@ or1k_libm_function_max_error (unsigned cfn, machine_mode mode,
 #undef  TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P or1k_legitimate_address_p
 
-#ifdef HAVE_AS_TLS
 #undef  TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed

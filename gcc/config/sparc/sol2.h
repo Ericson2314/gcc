@@ -308,7 +308,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
     {								\
       HOST_WIDE_INT size;					\
 								\
-      if (targetm.have_tls && DECL_THREAD_LOCAL_P (DECL))	\
+      if (target_have_tls_p () && DECL_THREAD_LOCAL_P (DECL))	\
 	ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "tls_object");	\
       else							\
 	ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");	\

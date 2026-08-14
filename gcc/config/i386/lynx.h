@@ -60,8 +60,13 @@ along with GCC; see the file COPYING3.  If not see
 
 #undef ASM_OUTPUT_ALIGN
 
-/* The file i386.cc defines TARGET_HAVE_TLS unconditionally if
-   HAVE_AS_TLS is defined.  HAVE_AS_TLS is defined as gas support for
-   TLS is detected by configure.  We undefine it here.  */
+/* THE `#undef HAVE_AS_TLS' THAT USED TO BE HERE MOVED TO target-specs.
+   i386.cc defines TARGET_HAVE_TLS unconditionally -- that is the back end's
+   own "I have a TLS sequence" -- and this header used to contradict it by
+   taking the assembler's answer away.  That answer is targ_caps.as_tls now,
+   set to 0 for `*-*-lynxos*' in target-specs/configure.ac.
 
-#undef HAVE_AS_TLS
+   IT HAD TO MOVE, NOT MERELY CHANGE SPELLING.  This is a per-CONFIGURATION
+   answer, not a per-back-end one: one i386 back end serves lynx and every
+   other x86 target at once in a multi-target compiler, so nothing compiled
+   into the back end can hold both.  Same shape as vms_debug.  */

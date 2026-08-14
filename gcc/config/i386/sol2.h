@@ -124,7 +124,7 @@ along with GCC; see the file COPYING3.  If not see
     {								\
       HOST_WIDE_INT size;					\
 								\
-      if (targetm.have_tls && DECL_THREAD_LOCAL_P (DECL))	\
+      if (target_have_tls_p () && DECL_THREAD_LOCAL_P (DECL))	\
 	ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "tls_obj");	\
       else							\
 	ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");	\

@@ -433,6 +433,37 @@ extern struct gcc_target *targetm_ptr;
 
 #endif
 
+/* IS THREAD-LOCAL STORAGE USABLE FOR THE TARGET BEING COMPILED FOR?
+   TWO QUESTIONS, CONJOINED HERE RATHER THAN AT EITHER AUTHORITY.
+
+     targetm.have_tls   does this back end have a TLS code sequence at all?
+			A static property of the back end: it ships with the
+			compiler and cannot change without rebuilding one.
+     targ_caps.as_tls	does the assembler in front of us accept the
+			relocations that sequence needs?  A property of the
+			deployed toolchain, probed after the build.
+
+   Upstream had one constant, HAVE_AS_TLS, standing for both, so fourteen back
+   ends wrote `#ifdef HAVE_AS_TLS / #define TARGET_HAVE_TLS true' -- stating
+   the first and gating it on the second, inside a STATIC INITIALIZER, which
+   is the one place a runtime capability cannot be read.  Defining the hook
+   unconditionally and ANDing here is the same move defaults.h already makes
+   for weak symbols:
+
+     #define TARGET_SUPPORTS_WEAK (SUPPORTS_WEAK && targ_caps.gas_weak)
+
+   CALL THIS, NOT `targetm.have_tls'.  A bare read of the hook now answers
+   only the first question, and for the fourteen back ends whose hook used to
+   BE the probe it answers `true' unconditionally -- so a site that keeps the
+   bare read has silently stopped consulting the assembler.  There is no
+   diagnostic for that, which is why the accessor exists rather than a
+   documented convention.  */
+inline bool
+target_have_tls_p ()
+{
+  return targetm.have_tls && targ_caps.as_tls;
+}
+
 /* Return an estimate of the runtime value of X, for use in things
    like cost calculations or profiling frequencies.  Note that this
    function should never be used in situations where the actual

@@ -18421,10 +18421,8 @@ s390_bitint_type_info (int n, struct bitint_info *info)
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P s390_scalar_mode_supported_p
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM s390_cannot_force_const_mem
 
@@ -18535,10 +18533,8 @@ s390_bitint_type_info (int n, struct bitint_info *info)
 #undef TARGET_INVALID_WITHIN_DOLOOP
 #define TARGET_INVALID_WITHIN_DOLOOP hook_constcharptr_const_rtx_insn_null
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL s390_output_dwarf_dtprel
-#endif
 
 #undef TARGET_DWARF_FRAME_REG_MODE
 #define TARGET_DWARF_FRAME_REG_MODE s390_dwarf_frame_reg_mode

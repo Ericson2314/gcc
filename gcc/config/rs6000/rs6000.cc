@@ -1378,7 +1378,7 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 #define TARGET_INTERNAL_ARG_POINTER rs6000_internal_arg_pointer
 
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM rs6000_cannot_force_const_mem
@@ -1608,10 +1608,8 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 #define TARGET_STACK_PROTECT_FAIL rs6000_stack_protect_fail
 #endif
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL rs6000_output_dwarf_dtprel
-#endif
 
 /* Use a 32-bit anchor range.  This leads to sequences like:
 
@@ -9544,15 +9542,16 @@ rs6000_delegitimize_address (rtx orig_x)
     {
       y = XVECEXP (y, 0, 0);
 
-#ifdef HAVE_AS_TLS
       /* Do not associate thread-local symbols with the original
-	 constant pool symbol.  */
-      if (TARGET_XCOFF
+	 constant pool symbol.  A run-time `if' now: the `#ifdef HAVE_AS_TLS'
+	 that used to wrap this was always true, and the thing it stood for --
+	 whether the assembler takes TLS -- is target_have_tls_p ().  */
+      if (target_have_tls_p ()
+	  && TARGET_XCOFF
 	  && SYMBOL_REF_P (y)
 	  && CONSTANT_POOL_ADDRESS_P (y)
 	  && rs6000_real_tls_symbol_ref_p (get_pool_constant (y)))
 	return orig_x;
-#endif
 
       if (offset != NULL_RTX)
 	y = gen_rtx_PLUS (Pmode, y, offset);
@@ -17755,8 +17754,8 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
 	  ASM_OUTPUT_INTERNAL_LABEL_PREFIX (file, "LC");
 	  fprintf (file, "%d\n", ((*found)->labelno));
 
-#ifdef HAVE_AS_TLS
-	  if (TARGET_XCOFF && SYMBOL_REF_P (x)
+	  if (target_have_tls_p ()
+	      && TARGET_XCOFF && SYMBOL_REF_P (x)
 	      && (SYMBOL_REF_TLS_MODEL (x) == TLS_MODEL_GLOBAL_DYNAMIC
 		  || SYMBOL_REF_TLS_MODEL (x) == TLS_MODEL_LOCAL_DYNAMIC))
 	    {
@@ -17766,7 +17765,6 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
 	      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (file, "LCM");
 	      fprintf (file, "%d\n", ((*found)->labelno));
 	    }
-#endif
 	  return;
 	}
     }
@@ -18018,8 +18016,7 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
   else
     output_addr_const (file, x);
 
-#if HAVE_AS_TLS
-  if (TARGET_XCOFF && SYMBOL_REF_P (base))
+  if (target_have_tls_p () && TARGET_XCOFF && SYMBOL_REF_P (base))
     {
       switch (SYMBOL_REF_TLS_MODEL (base))
 	{
@@ -18046,7 +18043,6 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
 	  gcc_unreachable ();
 	}
     }
-#endif
 
   putc ('\n', file);
 }
@@ -21881,8 +21877,8 @@ rs6000_xcoff_select_section (tree decl, int reloc,
     }
   else
     {
-#if HAVE_AS_TLS
-      if (TREE_CODE (decl) == VAR_DECL && DECL_THREAD_LOCAL_P (decl))
+      if (target_have_tls_p ()
+	  && TREE_CODE (decl) == VAR_DECL && DECL_THREAD_LOCAL_P (decl))
 	{
 	  if (bss_initializer_p (decl))
 	    return tls_comm_section;
@@ -21891,9 +21887,7 @@ rs6000_xcoff_select_section (tree decl, int reloc,
 	  else
 	    return tls_private_data_section;
 	}
-      else
-#endif
-	if (TREE_PUBLIC (decl))
+      else if (TREE_PUBLIC (decl))
 	return data_section;
       else
 	return private_data_section;
@@ -22329,7 +22323,18 @@ rs6000_asm_output_dwarf_datarel (FILE *file, int size, const char *label)
   fputs("-__gcc_unwind_dbase", file);
 }
 
-#ifdef HAVE_AS_TLS
+/* UNCONDITIONAL, AND THAT IS A NO-OP RATHER THAN A WIDENING.  This and the
+   `TARGET_ENCODE_SECTION_INFO' line in xcoff.h that names it were both inside
+   `#ifdef HAVE_AS_TLS', a macro that came from an unconditional AC_DEFINE --
+   so on XCOFF this hook has always been registered.  Leaving the guard while
+   the macro became a run-time value would have taken the DEFINITION away and
+   left the registration naming a function that does not exist, which is the
+   "guard hiding a declaration" row of PRINCIPLES section 3.
+
+   No target_have_tls_p () gate here: only two of its branches are about TLS
+   and both are already reached through DECL_THREAD_LOCAL_P, which is false
+   for every decl when TLS is off.  The rest is CSECT mapping class for
+   ordinary variables and functions and must keep running.  */
 static void
 rs6000_xcoff_encode_section_info (tree decl, rtx rtl, int first)
 {
@@ -22399,7 +22404,6 @@ rs6000_xcoff_encode_section_info (tree decl, rtx rtl, int first)
 	}
     }
 }
-#endif /* HAVE_AS_TLS */
 #endif /* TARGET_XCOFF */
 
 void

@@ -265,16 +265,8 @@
 #endif
 
 
-/* Define if your assembler supports DTPREL relocation. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_DTPREL_RELOC
-#endif
 
 
-/* Define if your assembler and linker support thread-local storage. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_TLS
-#endif
 
 
 /* Define to 1 if you have the `atoq' function. */

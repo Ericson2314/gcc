@@ -64,7 +64,12 @@ extern unsigned int ia64_section_threshold;
    assembler that supports TLS -- but the rest of the system does not
    support TLS -- that system should explicit define TARGET_HAVE_TLS
    to false in its own configuration file.  */
-#if !defined(TARGET_HAVE_TLS) && defined(HAVE_AS_TLS)
+/* The `&& defined(HAVE_AS_TLS)' half is gone: that asked the ASSEMBLER's
+   question, and the assembler's answer is targ_caps.as_tls, ANDed in by
+   target_have_tls_p ().  The `!defined(TARGET_HAVE_TLS)' half stays and is
+   what the comment above is about -- a configuration whose surrounding system
+   lacks TLS still says so by defining the macro false ahead of this header.  */
+#if !defined(TARGET_HAVE_TLS)
 #define TARGET_HAVE_TLS true
 #endif
 

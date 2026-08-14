@@ -503,10 +503,8 @@ TARGET_GNU_ATTRIBUTES (sh_attribute_table,
 #undef TARGET_DWARF_REGISTER_SPAN
 #define TARGET_DWARF_REGISTER_SPAN sh_dwarf_register_span
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 #undef TARGET_PROMOTE_FUNCTION_MODE
 #define TARGET_PROMOTE_FUNCTION_MODE sh_promote_function_mode

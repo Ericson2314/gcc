@@ -842,7 +842,7 @@ public:
   bool gate (function *) final override
     {
       /* If the target supports TLS natively, we need do nothing here.  */
-      return !targetm.have_tls && !seen_error ();
+      return !target_have_tls_p () && !seen_error ();
     }
 
   unsigned int execute (function *) final override

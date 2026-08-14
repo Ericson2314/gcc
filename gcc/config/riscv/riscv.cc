@@ -16736,10 +16736,8 @@ riscv_memtag_tag_bitsize ()
   riscv_set_handled_components
 
 /* The generic ELF target does not always have TLS support.  */
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
-#endif
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM riscv_cannot_force_const_mem

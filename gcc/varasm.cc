@@ -2548,7 +2548,7 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
   gcc_assert (VAR_P (decl));
 
   /* Emulated TLS had better not get this far.  */
-  gcc_checking_assert (targetm.have_tls || !DECL_THREAD_LOCAL_P (decl));
+  gcc_checking_assert (target_have_tls_p () || !DECL_THREAD_LOCAL_P (decl));
 
   last_assemble_variable_decl = 0;
 
@@ -6515,7 +6515,7 @@ do_assemble_alias (tree decl, tree target)
   tree id;
 
   /* Emulated TLS had better not get this var.  */
-  gcc_assert (!(!targetm.have_tls
+  gcc_assert (!(!target_have_tls_p ()
 		&& VAR_P (decl)
 		&& DECL_THREAD_LOCAL_P (decl)));
 

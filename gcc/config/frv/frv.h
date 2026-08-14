@@ -232,8 +232,20 @@
   (frv_cpu_type == FRV_CPU_FR405				\
    || frv_cpu_type == FRV_CPU_FR450)
 
-#ifndef HAVE_AS_TLS
-#define HAVE_AS_TLS 0
+/* GENERATORS ONLY -- the generated tm.h includes defaults.h only under
+   `!GENERATOR_FILE', so build/gencondmd*.o never sees the targ_caps
+   redirect and this back end's .md conditions would not compile without
+   something here.  For the compiler proper defaults.h #undef's this and
+   redefines it as `targ_caps.as_tls'.
+
+   THE VALUE IS 1, AND THE `#ifndef ... 0' FLOOR THAT USED TO BE HERE WAS
+   DEAD.  auto-host.h carried an unconditional `#define HAVE_AS_TLS 1' and
+   was read first, so the floor never fired and 1 is what every generator
+   has always seen.  Writing 0 here would delete this back end's TLS insn
+   patterns at build time -- see the note beside the same name in
+   defaults.h.  */
+#if defined (GENERATOR_FILE) || defined (USED_FOR_TARGET)
+#define HAVE_AS_TLS 1
 #endif
 
 #define LABEL_ALIGN_AFTER_BARRIER(LABEL) (TARGET_ALIGN_LABELS ? 3 : 0)

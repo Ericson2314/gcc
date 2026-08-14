@@ -173,6 +173,16 @@ struct target_caps targ_caps =
      than on the "modern gas" guess that used to justify this whole block.  */
   .gas_weak = true,
 
+  /* KEPT true, because true is what every back end already had.  The
+     `AC_DEFINE(HAVE_AS_TLS, 1)' this replaces was UNCONDITIONAL -- the
+     per-target assembler probe was deleted long before this -- so a `false'
+     here would not be conservative, it would silently switch 19 back ends
+     from real TLS to emutls.  The back end's own "do I have a TLS sequence"
+     answer is the targetm hook and is unaffected either way; see
+     target_have_tls_p () in target.h.  */
+  .as_tls = true,
+  .as_dtprel_reloc = true,
+
   /* FLIPPED to false.  This is the one field in the group that really IS
      GNU-specific -- `.weakref' is a gas invention with no counterpart
      elsewhere -- so it is exactly the field the old blanket default was
@@ -510,6 +520,10 @@ read_target_caps (const char *file)
 	targ_caps.gas_max_skip_p2align = value != 0;
       else if (strcmp (name, "gas_weak") == 0)
 	targ_caps.gas_weak = value != 0;
+      else if (strcmp (name, "as_tls") == 0)
+	targ_caps.as_tls = value != 0;
+      else if (strcmp (name, "as_dtprel_reloc") == 0)
+	targ_caps.as_dtprel_reloc = value != 0;
       else if (strcmp (name, "gas_weakref") == 0)
 	targ_caps.gas_weakref = value != 0;
       else if (strcmp (name, "gas_subsection_ordering") == 0)

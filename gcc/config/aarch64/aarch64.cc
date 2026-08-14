@@ -350,10 +350,8 @@ enum aarch64_tp_reg aarch64_tpidr_register;
 /* The number of 64-bit elements in an SVE vector.  */
 poly_uint16 aarch64_sve_vg;
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS 1
-#endif
 
 static bool aarch64_composite_type_p (const_tree, machine_mode);
 static bool aarch64_return_in_memory_1 (const_tree);
@@ -1566,11 +1564,30 @@ aarch64_debugger_regno (unsigned regno)
    return DWARF_FRAME_REGISTERS;
 }
 
-#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)
+/* THE GUARD HERE WAS HIDING A DEFINITION, WHICH IS THE ONE SHAPE THAT CANNOT
+   SIMPLY BE UNWRAPPED AT THE REGISTRATION SITE ALONE.  Both this function and
+   the `TARGET_ASM_OUTPUT_DWARF_DTPREL' line that names it were inside
+   `#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)'; with the macros
+   gone the two halves would have disagreed and the hook table would name a
+   function that does not exist.  Both are unconditional now, and the two
+   questions the guard was asking -- has this target a TLS sequence, does the
+   assembler take dtprel -- are asked where they can be answered at run time:
+   target_have_tls_p () and targ_caps.as_dtprel_reloc, in
+   aarch64_output_dwarf_dtprel below.  */
 /* Implementation of TARGET_ASM_OUTPUT_DWARF_DTPREL.  */
 static void
 aarch64_output_dwarf_dtprel (FILE *f, int size, rtx x)
 {
+  /* The assembler's half of the old compile-time guard.  dwarf2out only
+     reaches this hook for a thread-local variable, so target_have_tls_p ()
+     is already true here; what it did not ask, and this does, is whether the
+     assembler in front of us can spell the relocation at all.  */
+  if (!targ_caps.as_dtprel_reloc)
+    {
+      sorry ("DTPREL relocations are not supported by this assembler");
+      return;
+    }
+
   /* The AArch64 ABI defines static DTPREL relocations only for 8-byte (.xword)
      DWARF entries.  For any other size there is no valid dtprel(symbol)
      encoding and rejecting the request.  */
@@ -1584,7 +1601,6 @@ aarch64_output_dwarf_dtprel (FILE *f, int size, rtx x)
   output_addr_const (f, x);
   fputs (")", f);
 }
-#endif
 
 /* Implement TARGET_DWARF_FRAME_REG_MODE.  */
 static machine_mode
@@ -34261,10 +34277,8 @@ aarch64_libgcc_floating_mode_supported_p
 #undef TARGET_DWARF_FRAME_REG_MODE
 #define TARGET_DWARF_FRAME_REG_MODE aarch64_dwarf_frame_reg_mode
 
-#if defined(HAVE_AS_TLS) && defined(HAVE_AS_DTPREL_RELOC)
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL aarch64_output_dwarf_dtprel
-#endif
 
 #undef TARGET_OUTPUT_CFI_DIRECTIVE
 #define TARGET_OUTPUT_CFI_DIRECTIVE aarch64_output_cfi_directive

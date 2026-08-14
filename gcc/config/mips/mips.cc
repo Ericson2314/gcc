@@ -23620,7 +23620,7 @@ mips_print_patchable_function_entry (FILE *file ATTRIBUTE_UNUSED,
 #define TARGET_EXPAND_BUILTIN mips_expand_builtin
 
 #undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS HAVE_AS_TLS
+#define TARGET_HAVE_TLS true
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM mips_cannot_force_const_mem

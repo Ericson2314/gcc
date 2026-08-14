@@ -578,7 +578,7 @@ varpool_node::assemble_decl (void)
      Unfortunately at the moment emutls is not updating varpool correctly
      after turning real vars into value_expr vars.  */
   if (DECL_HAS_VALUE_EXPR_P (decl)
-      && !targetm.have_tls)
+      && !target_have_tls_p ())
     return false;
 
   /* Hard register vars do not need to be output.  */

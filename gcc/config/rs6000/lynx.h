@@ -81,12 +81,15 @@
 #undef SIZE_TYPE
 #undef ASM_OUTPUT_ALIGN
 
-/* The file rs6000.cc defines TARGET_HAVE_TLS unconditionally to the
-   value of HAVE_AS_TLS.  HAVE_AS_TLS is true as gas support for TLS
-   is detected by configure.  Override the definition to false.  */
+/* THE `#define HAVE_AS_TLS 0' THAT USED TO BE HERE MOVED TO target-specs.
+   rs6000.cc defines TARGET_HAVE_TLS unconditionally -- the back end's own "I
+   have a TLS sequence" -- and the assembler's half is targ_caps.as_tls, set
+   to 0 for `*-*-lynxos*' in target-specs/configure.ac.
 
-#undef HAVE_AS_TLS
-#define HAVE_AS_TLS 0
+   Per CONFIGURATION and not per back end: one rs6000 back end serves lynx and
+   every other powerpc target at once, so it cannot carry both answers.  Same
+   shape as vms_debug, and the same reason this is a capability rather than a
+   targetm hook.  */
 
 /* Use standard DWARF numbering for DWARF debugging information.  */
 #define RS6000_USE_DWARF_NUMBERING

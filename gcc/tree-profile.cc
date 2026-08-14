@@ -1243,7 +1243,7 @@ init_ic_make_global_vars (void)
   DECL_ARTIFICIAL (ic_tuple_var) = 1;
   DECL_INITIAL (ic_tuple_var) = NULL;
   DECL_EXTERNAL (ic_tuple_var) = 1;
-  if (targetm.have_tls)
+  if (target_have_tls_p ())
     set_decl_tls_model (ic_tuple_var, decl_default_tls_model (ic_tuple_var));
 }
 

@@ -300,13 +300,11 @@ static bool m68k_use_lra_p (void);
 #define TARGET_RETURN_IN_MEMORY m68k_return_in_memory
 #endif
 
-#ifdef HAVE_AS_TLS
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS (true)
 
 #undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 #define TARGET_ASM_OUTPUT_DWARF_DTPREL m68k_output_dwarf_dtprel
-#endif
 
 #undef TARGET_LRA_P
 #define TARGET_LRA_P m68k_use_lra_p
