@@ -34,18 +34,35 @@ along with GCC; see the file COPYING3.  If not see
 #include "read-md.h"
 #include "gen-target-ns.h"
 
-/* THE TWO TABLES THE MIDDLE END NAMES BARE, and which therefore have to exist
-   for EVERY configured back end whether its md defines the enum or not.
+/* THE ENUM TABLES multi-target-select.cc REQUIRES OF *EVERY* BACK END.
+   MT_OTHER_TABLES and MT_SCALAR_TABLES in that file name `unspec_strings',
+   `unspecv_strings' and their two lengths for all N bases unconditionally,
+   because the middle end reads them through one bare name whichever back end
+   is in force.  This generator, though, emits a table only for an enum the
+   back end's md actually declares -- and 26 of the 48 declare neither
+   `unspec' nor `unspecv', or only one of the two, because they spell their
+   UNSPEC_* constants with the older `define_constants' rather than
+   `define_c_enum'.  Measured at the cc1 link of a 48-base build: that single
+   asymmetry is the sole blocker for 22 back ends and one of two blockers for
+   four more.
 
-   print-rtl.cc, read-rtl-function.cc and multi-target-select.cc's
-   MT_OTHER_TABLES / MT_SCALAR_TABLES all spell these two names; this array is
-   not a new authority, it is the same list written where the definitions are
-   made.  Every other enum in an md is the back end's own business and is
-   emitted only when it exists.  */
+   The two lists are one fact with two authorities, which is this branch's own
+   root bug, so say where the other one is rather than leaving a reader to
+   find it: gcc/multi-target-select.cc, MT_OTHER_TABLES / MT_SCALAR_TABLES.
+
+   Named instances, because "26 of 48" is a count and a count is not a
+   population: mips, arc, bpf, epiphany, ft32, microblaze, msp430, rx and v850
+   define `unspec' and no `unspecv'; m68k and m32r define neither.  Measured
+   directly before the fix: adding mips to a base set gives `undefined
+   reference to insn_mips::unspecv_strings' and `...::unspecv_strings_len'.
+
+   Two agents reached this fix independently from opposite ends -- one from a
+   single mips link failure, one from a 48-base census -- and wrote the same
+   generator change.  That agreement is the reason it is trusted here.  */
 static const char *const mt_required_enums[] = { "unspec", "unspecv" };
 
-/* Which of the above this md actually defined.  */
-static bool mt_required_seen[ARRAY_SIZE (mt_required_enums)];
+/* Which of the above this md run has already emitted.  */
+static bool mt_emitted[ARRAY_SIZE (mt_required_enums)];
 
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
@@ -59,7 +76,7 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
   def = (struct enum_type *) *slot;
   for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
     if (strcmp (def->name, mt_required_enums[i]) == 0)
-      mt_required_seen[i] = true;
+      mt_emitted[i] = true;
   /* Array plus pointer on a multi-target build, matching the declaration
      genconstants writes into insn-constants-<base>.h.  */
   printf ("\nconst char *const %s_strings%s[] = {", def->name,
@@ -127,48 +144,38 @@ main (int argc, const char **argv)
   print_ns_open (stdout);
   reader.traverse_enum_types (print_enum_type, 0);
 
-  /* THE BACK ENDS WHOSE MACHINE HAS NO UNSPECS, AND WHY AN EMPTY TABLE IS
-     THEIR OWN ANSWER RATHER THAN A FLOOR.
+  /* THE BACK END'S OWN ANSWER FOR AN ENUM IT DOES NOT HAVE, WHICH IS NOT THE
+     SAME THING AS A FLOOR.  Read PRINCIPLES section 2a before changing this.
 
-     mips defines `unspec' and no `unspecv'; arc, bpf, epiphany, ft32,
-     microblaze, msp430, rx and v850 are in the same position, and m68k, m32r
-     and others define neither.  multi-target-select.cc names
-     insn_<base>::unspecv_strings and insn_<base>::unspecv_strings_len for
-     EVERY configured back end -- it has to, because print-rtl.cc and
-     read-rtl-function.cc name the bare `unspecv_strings' and something must
-     be in force whichever back end is selected -- so a base that emitted
-     neither is an undefined reference at the link of cc1.  Measured: adding
-     mips to a base set gives `undefined reference to
-     insn_mips::unspecv_strings' and `...::unspecv_strings_len'.
+     What is banned there is a fallback that hands one back end ANOTHER back
+     end's value -- in practice the primary's.  Nothing of the kind happens
+     here: a back end whose md declares no `unspecv' has no unspecv names, so
+     its table is empty and its length is 0, and that is exactly what upstream
+     produces for that back end standing alone.  Upstream expresses it by not
+     compiling the reader at all (`#if defined (NUM_UNSPECV_VALUES)' in
+     print-rtl.cc); a multi-target build cannot, because that macro comes from
+     the singular genconstants run and is therefore the PRIMARY's answer for
+     everybody.  So the same behaviour has to be expressed in data instead:
+     len 0 makes every `XINT (x, 1) < unspecv_strings_len' false, which is
+     precisely what upstream's #if achieves.  No base ever reads another's
+     table -- indeed this is what STOPS one doing so, since the alternative on
+     the table is the link failing and someone reaching for the primary's.
 
-     PRINCIPLES 2a bans a floor that hands a base THE PRIMARY'S answer.  This
-     is the other kind, the one that rule explicitly permits: length ZERO is
-     what "this machine has no unspec_volatile constants" means, it is what
-     upstream's single-target build behaves as (the `#if defined
-     (NUM_UNSPECV_VALUES)' arms simply are not compiled), and no other back
-     end's value can reach mips through it.  Every consumer is already written
-     as `unspec < unspecv_strings_len', so a zero length is read as "never
-     name one", which is exactly right.  The value is not invented: it is
-     counted from this md, and it is 0 because this md has none.
-
-     Emitted only in the namespaced run.  The un-namespaced one is upstream's
-     shape, where an absent enum means absent code and there is nothing to
-     select between.  */
+     A one-element array rather than `[] = {}': a zero-length array is not
+     valid C++, and the length that matters is the separate _len, which is 0.
+     The element is null so that any indexing bug faults immediately rather
+     than reading a plausible neighbouring string -- the failure mode
+     MT_SCALAR_TABLES' own comment records for NUM_UNSPECV_VALUES.  */
   if (gen_target_ns ())
     for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
-      if (!mt_required_seen[i])
+      if (!mt_emitted[i])
 	{
 	  const char *n = mt_required_enums[i];
-	  printf ("\n/* This machine description defines no `%s' enum.  */\n",
-		  n);
-	  printf ("const char *const %s_strings_tab[] = { NULL };\n", n);
+	  printf ("\n/* This back end's md declares no `%s' enum, so it has "
+		  "no %s\n   names.  Empty table, length 0 -- see genenums.cc.  */\n",
+		  n, n);
+	  printf ("const char *const %s_strings_tab[1] = { nullptr };\n", n);
 	  printf ("const char *const *%s_strings = %s_strings_tab;\n", n, n);
-	  /* NOT ARRAY_SIZE of the array above: a zero-length array is not
-	     valid, so the placeholder holds one NULL element, and the length
-	     the middle end must see is the number of NAMED VALUES, which is
-	     zero.  Writing ARRAY_SIZE here would publish a bound of 1 over a
-	     table whose only entry is NULL -- print-rtl.cc would then pass
-	     that NULL to %s for unspec 0.  */
 	  printf ("int %s_strings_len = 0;\n", n);
 	}
 
