@@ -953,8 +953,25 @@ fixed_size_mode::includes_p (machine_mode mode)
    doesn't need polynomial-sized modes, its header file can continue
    to treat everything as fixed_size_mode.  This should go away once
    macros are moved to target hooks.  It shouldn't be used in other
-   contexts.  */
-#if NUM_POLY_INT_COEFFS == 1
+   contexts.
+
+   KEYED ON ONLY_FIXED_SIZE_MODES, NOT ON `NUM_POLY_INT_COEFFS == 1', for the
+   reason given at that macro's definition above and at POLY_INT_CONVERSION in
+   coretypes.h: whether a back end wants the fixed-size shorthand is a
+   PER-BACK-END question, and this branch's build-wide constant is 2 for
+   everyone because the mode vocabulary is shared.  Conjoining on the constant
+   therefore made this the identity for ALL 47 back ends -- including the 37
+   that have not been converted -- so a target macro in an unconverted back
+   end's header received a `machine_mode' where it expects a
+   `fixed_size_mode'.  That is the same inertness `POLY_INT_CONVERSION' and
+   `ONLY_FIXED_SIZE_MODES' were already re-keyed to fix; these two wrappers
+   were simply not re-keyed with them.
+
+   Both halves are unchanged for the ten TARGET_POLY_AWARE back ends (identity,
+   as now) and for shared code, which defines no IN_TARGET_CODE and so keeps
+   the identity that N == 2 requires.  Of the back ends that actually spell
+   MACRO_MODE, mips, s390 and rs6000 are poly-aware and see no change.  */
+#if ONLY_FIXED_SIZE_MODES
 #define MACRO_MODE(MODE) (as_a <fixed_size_mode> (MODE))
 #else
 #define MACRO_MODE(MODE) (MODE)
