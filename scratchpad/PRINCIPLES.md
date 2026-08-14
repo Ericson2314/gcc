@@ -627,6 +627,38 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**"ASSEMBLES, RIGHT ELF MACHINE" IS NOT ENOUGH — riscv64 PASSED IT WHILE
+EMITTING 32-BIT CODE.** The acceptance bar this project used to promote
+aarch64 from "emits assembly" to "works" was: a real cross assembler accepts
+the output and `readelf -h` reports the right machine. Measured at eleven
+bases, riscv passes that bar on code that is wrong in the worst way:
+
+```
+long mt_shift (long, int)      ->  sw   (32-bit store of the return address)
+                                   .cfi_offset 1, -4
+                                   sll / srai on a 64-bit long
+                                   no `sd' or `ld' anywhere
+```
+
+In an **ELF64** object. Word size 4. Both-sided: aarch64 and s390 are correct
+64-bit on the identical function. Root cause is the `ix86_pmode Init (PMODE_SI)`
+shape — **the primary's unconfigured default reaching a base that never set
+it** — the same defect class as `Pmode` in #124, and the same root as riscv's
+empty `.attribute arch, ""`.
+
+The consequence is general: **fix the one directive the assembler rejects and
+the file assembles into a well-formed object `readelf` is happy with.** So the
+bar must include a *semantic* arm — word size, ABI, register widths — not only
+"a tool accepted it". Any back end promoted under the old bar needs
+re-checking.
+
+Corollary for this project's habit of trusting tools: an assembler validates
+*syntax for a machine*, not *that the compiler meant that machine*. The token
+arm (does aarch64's output contain x86 register names) is a real check and it
+passed — 40 hits on x86_64's own output, 0 on aarch64's and s390's — but it
+cannot see a target compiled at the wrong width, because every instruction it
+emits is genuinely a valid instruction of that architecture.
+
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
 
