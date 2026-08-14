@@ -211,6 +211,25 @@ static const char *const mt_reg_class_names[] = REG_CLASS_NAMES;
 static_assert (ARRAY_SIZE (mt_reg_class_names) >= (size_t) OWN_N_REG_CLASSES,
 	       "REG_CLASS_NAMES has FEWER than N_REG_CLASSES entries");
 
+/* ADDITIONAL_REGISTER_NAMES and OVERLAPPING_REGISTER_NAMES, evaluated in THIS
+   back end's translation unit.  See the fields in target-regs.h for what they
+   cost while they were `#ifdef's in varasm.cc.
+
+   `#ifdef'-ed here and NOT floored, and the distinction matters: the two names
+   are genuinely optional -- most back ends define neither -- so the answer for
+   a back end that defines nothing is "this back end has no aliases", which is
+   ITS OWN answer and is what NULL + 0 says.  Supplying anything else would be
+   supplying somebody's table to a base that never had one, which is the thing
+   being removed.  */
+#ifdef ADDITIONAL_REGISTER_NAMES
+static const struct mt_reg_alias mt_additional_reg_names[]
+  = ADDITIONAL_REGISTER_NAMES;
+#endif
+#ifdef OVERLAPPING_REGISTER_NAMES
+static const struct mt_reg_overlap mt_overlapping_reg_names[]
+  = OVERLAPPING_REGISTER_NAMES;
+#endif
+
 /* These are what the union COSTS, checked rather than assumed.  A back end
    configured into a build whose union widths are smaller than its own would
    overflow every one of the structures in target-globals.cc, silently.  The
@@ -293,6 +312,20 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
   &mt_reg_class_contents[0][0],
   mt_reg_names,
   mt_reg_class_names,
+#ifdef ADDITIONAL_REGISTER_NAMES
+  mt_additional_reg_names,
+  (int) ARRAY_SIZE (mt_additional_reg_names),
+#else
+  NULL,
+  0,
+#endif
+#ifdef OVERLAPPING_REGISTER_NAMES
+  mt_overlapping_reg_names,
+  (int) ARRAY_SIZE (mt_overlapping_reg_names),
+#else
+  NULL,
+  0,
+#endif
   sizeof (struct target_hard_regs),
   sizeof (struct target_regs),
   sizeof (struct target_ira),

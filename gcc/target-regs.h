@@ -101,6 +101,26 @@ along with GCC; see the file COPYING3.  If not see
    dispatch to `hard-reg-set.h') was what the earlier design did and it needs
    a second, poisoned, declaration of every macro to stay honest; plain `int'
    needs none.  */
+/* One `ADDITIONAL_REGISTER_NAMES' entry: an assembler-level alias for a
+   register, e.g. aarch64's `z0' for V0_REGNUM or i386's `eax' for 0.  The
+   field types are upstream's, from the anonymous struct varasm.cc used to
+   declare at its use site; every back end's initialiser conforms to them
+   because that use site is where they were all written.  */
+struct mt_reg_alias
+{
+  const char *name;
+  int number;
+};
+
+/* One `OVERLAPPING_REGISTER_NAMES' entry -- an alias naming NREGS registers
+   at once (ia64's `ar.bsp', rs6000's `mq').  Same provenance.  */
+struct mt_reg_overlap
+{
+  const char *name;
+  int number;
+  int nregs;
+};
+
 struct target_regs_desc
 {
   /* The cpu_type this describes, for diagnostics.  */
@@ -166,6 +186,38 @@ struct target_regs_desc
      (n_reg_classes entries).  */
   const char *const *d_reg_names;
   const char *const *d_reg_class_names;
+
+  /* ADDITIONAL_REGISTER_NAMES and OVERLAPPING_REGISTER_NAMES, which are the
+     REGISTER NAMES A USER MAY WRITE that are not in REGISTER_NAMES: the
+     `register ... __asm__ ("z0")' spelling, the names in an asm clobber list,
+     and `-ffixed-<reg>'.
+
+     THEY WERE `#ifdef's IN varasm.cc -- a MIDDLE-END translation unit -- so
+     they were the PRIMARY's, exactly as REGISTER_NAMES itself was before this
+     struct existed, and with the same absence of any diagnostic.  Measured on
+     the linked cc1 with i386 + aarch64 configured and aarch64 selected:
+
+	 register int v0 __asm__ ("v0");   accepted   (REGISTER_NAMES, per base)
+	 register int x1 __asm__ ("x1");   accepted   (REGISTER_NAMES, per base)
+	 register int z0 __asm__ ("z0");   error: invalid register name for 'z0'
+	 register int w2 __asm__ ("w2");   error: invalid register name for 'w2'
+
+     i.e. the half of aarch64's register vocabulary that lives in the macro was
+     simply absent, and i386's `eax'/`ax'/`al' were in its place.  In one run of
+     gcc.target/aarch64 that is 1,041,532 occurrences of `invalid register name
+     for zN' plus 462,112 for `pnN' and 283,212 for `wN': the SVE and SME ACLE
+     asm tests declare their operands as named-register variables, so the whole
+     of sve/acle/asm, sve2/acle/asm and sme/acle-asm fails on it.
+
+     Counts and not NULL-terminated arrays: a terminator would have to be an
+     entry with a NULL name, and varasm.cc's own loops already skip entries
+     whose name is empty, so a missed terminator would read past the end
+     rather than stop.  NULL + 0 when the back end defines neither macro,
+     which is most of them.  */
+  const struct mt_reg_alias *d_additional_reg_names;
+  int n_additional_reg_names;
+  const struct mt_reg_overlap *d_overlapping_reg_names;
+  int n_overlapping_reg_names;
 
   /* THE LAYOUT WITNESS.  `sizeof' of the structures that generic code
      allocates and every back end reads, as computed IN THIS BACK END'S OWN
