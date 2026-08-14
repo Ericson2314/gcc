@@ -1,0 +1,15 @@
+VARIABLE                          cfg.gcc    frags  files under config/ naming the MAKE variable
+user_headers_inc_next_pre               2        0  
+user_headers_inc_next_post              3        0  
+extra_programs                          3        0  
+inhibit_libc                            1        0  
+TM_MULTILIB_EXCEPTIONS_CONFIG           1        1  config/sh/t-sh
+d_target_objs                          29        0  
+fortran_target_objs                     3        0  
+rust_target_objs                       13        0  
+jit_target_objs                         3        0  
+tm_d_file                               2        0  
+tm_rust_file                            2        0  
+cxx_target_objs                        32        0  
+c_target_objs                          32        0  
+use_gcc_stdint                         47        0  

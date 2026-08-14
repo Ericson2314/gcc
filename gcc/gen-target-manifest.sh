@@ -119,6 +119,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     tm_defines= cpu_type= target_cpu_default=
     tm_file= tm_p_file= tmake_file=
     extra_objs= extra_options= extra_headers= c_target_objs=
+    cxx_target_objs=
     extra_gcc_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
@@ -177,6 +178,26 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # Recorded per target here so the build can compile each back end own
     # <cpu>-c.cc against that back end headers.
     echo "c_target_objs ${c_target_objs}"
+    # The C++-family target objects -- the exact sibling of the line above, in
+    # the same channel and with the same bug.  gcc/Makefile.in has
+    # CXX_TARGET_OBJS=@cxx_target_objs@, which gcc/configure.ac substitutes
+    # from the ONE legacy ${target} pass through config.gcc, and
+    # gcc/cp/Make-lang.in links exactly that into cc1plus.  So a cc1plus
+    # holding 47 back ends gets the PRIMARY target's C++ target objects alone:
+    # i386-c.o for an x86_64 primary, and not one of the other 15 back ends
+    # that have one.  aarch64_target_macros, arm_cpu_cpp_builtins,
+    # rs6000_cpu_cpp_builtins and s390_cpu_cpp_builtins are then absent from
+    # cc1plus while ix86_target_macros is present for every target.
+    #
+    # Measured over the 47 configured back ends by sourcing config.gcc per
+    # triple (scratchpad/t190-cxx-census.sh): the object each back end names
+    # under config/<cpu>/ is the SAME object its c_target_objs names, for all
+    # 47 -- SAME 47, DIFF 0.  That is why gen-multi-target-md.awk builds a
+    # second LIST over the objects it already compiles per base rather than a
+    # second set of rules, and why it REFUSES by name if a back end ever names
+    # a C++ object the C side does not build.  Recorded per target here so
+    # that identity is data the generator can check rather than a belief.
+    echo "cxx_target_objs ${cxx_target_objs}"
     echo "extra_options ${extra_options}"
     # The INTRINSICS HEADERS this back end installs for the user -- arm_neon.h,
     # emmintrin.h, riscv_vector.h and 177 others.  NO BACKTICK AND NO
@@ -504,7 +525,8 @@ rm -f ${gcc_mt_err}
 # a new key is a one-word edit that fails by name until it is made.
 gcc_mt_keys=" target cpu_type option_defaults decimal_float decimal_bid_format
  common_out_file common_out_symbol tm_file tm_p_file tmake_file
- tmake_file_present extra_objs extra_gcc_objs c_target_objs extra_options
+ tmake_file_present extra_objs extra_gcc_objs c_target_objs cxx_target_objs
+ extra_options
  extra_headers use_gcc_tgmath out_file md_file target_gtfiles extra_modes
  tm_defines target_cpu_default tm_include_list tm_generated_headers
  tm_multilib_config "

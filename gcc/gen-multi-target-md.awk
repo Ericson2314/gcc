@@ -1290,6 +1290,26 @@ function emit_c_ops_registry(	i, n, parts) {
 	  > "/dev/stderr";
     exit 1;
   }
+  # The same two lists for cc1plus.  `target-c-ops-select.o' is named here as
+  # well as in MT_C_TARGET_OBJS and that is not a duplicate: cc1 and cc1plus
+  # are two separate links, and the selector -- the thing that answers
+  # TARGET_CPU_CPP_BUILTINS for the base in force -- is needed in both.  Left
+  # out, cc1plus would have every back end's target_c_ops table linked and
+  # nothing choosing between them.
+  printf "MT_CXX_OBJS_MOVED = %s\n", cxx_moved_objs;
+  printf "MT_CXX_TARGET_OBJS =%s target-c-ops-select.o\n", cxx_target_objs_list;
+  # Same non-vacuity check as the C list above, and it is NOT redundant with
+  # it: the two lists are built from different manifest keys by different
+  # loops, so one can go empty while the other is full -- which is exactly the
+  # state this branch was in before this change, with cxx_target_objs not
+  # recorded at all.  An empty MT_CXX_TARGET_OBJS is a cc1plus in which no
+  # back end implements TARGET_CPU_CPP_BUILTINS.
+  if (cxx_target_objs_list == "") {
+    print "gen-multi-target-md.awk: no back end contributed a C++-family" \
+	  " object; cc1plus would have no TARGET_CPU_CPP_BUILTINS" \
+	  > "/dev/stderr";
+    exit 1;
+  }
   printf "multi-target-c-ops.h: multi-target.manifest\n";
   printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
   for (i = 1; i <= n; i++)
@@ -1549,6 +1569,9 @@ $1 == "md_file"   { md = $2 }
 $1 == "out_file"  { outf = $2 }
 $1 == "extra_objs" { xobjs = ""; for (i = 2; i <= NF; i++) xobjs = xobjs $i " " }
 $1 == "c_target_objs" { cobjs = ""; for (i = 2; i <= NF; i++) cobjs = cobjs $i " " }
+# Read on the first record for a back end, exactly like `cobjs' above and
+# deliberately not reset per record for the same reason.
+$1 == "cxx_target_objs" { xxobjs = ""; for (i = 2; i <= NF; i++) xxobjs = xxobjs $i " " }
 $1 == "extra_gcc_objs" { xgobjs = ""; for (i = 2; i <= NF; i++) xgobjs = xgobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "extra_headers" { xhdrs = ""; for (i = 2; i <= NF; i++) xhdrs = xhdrs $i " " }
@@ -2329,6 +2352,73 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
   printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", cpu;
   c_target_objs_list = c_target_objs_list " $(MT_C_OBJS_" cpu ")";
+
+  # ... and this back end's C++-family objects, for cc1plus.
+  #
+  # THE C LIST ITSELF, NOT A SECOND SET OF RULES AND NOT A SECOND ENUMERATION.
+  # Measured over
+  # all 47 configured back ends (scratchpad/t190-cxx-census.sh, committed):
+  # the object a back end names under `config/<cpu>/' in `cxx_target_objs' is
+  # the SAME object it names in `c_target_objs' -- SAME 47, DIFF 0 -- because
+  # `<cpu>-c.cc' serves both front ends.  Emitting `mt-<cpu>/<cpu>-c.o' a
+  # second time would give one object two recipes: make picks one, and which
+  # one is not a property of anything anybody wrote down.  So the object is
+  # built once, in the loop above, and named twice.
+  #
+  # The identity is CHECKED rather than assumed, because it is a fact about
+  # `config.gcc' and `config.gcc' changes.  A back end whose C++ object the C
+  # side does not build has no rule anywhere, and the symptom would be a
+  # missing prerequisite naming a file no line of this generator mentions.
+  # `$(error)' on ONE line and with no comma, for the reason recorded at the
+  # `frag_source_for' refusal above: a newline inside a make function call
+  # kills the parse before the message is printed.
+  #
+  # AND THE FIRST DRAFT ENUMERATED THE OBJECTS ITSELF, WHICH IS THE HALF-FIX
+  # THIS COMMENT EXISTS TO PREVENT.  It built the list from `cxx_target_objs'
+  # alone, i.e. `mt-<cpu>/<cpu>-c.o', and MISSED `target-c-ops-<cpu>.o' --
+  # which is not in `c_target_objs' either: this generator appends it to
+  # `cobjs_this' a hundred lines up, because it is the per-base table whose
+  # members CALL into `<cpu>-c.o'.  Measured, cc1plus then linked and failed:
+  #
+  #   target-c-ops-select.o:(.rodata+0x8): undefined reference to
+  #     `targetm_c_ops_aarch64'
+  #   target-c-ops-select.o:(.rodata+0x18): undefined reference to
+  #     `targetm_c_ops_i386'
+  #
+  # So the list is `$(MT_C_OBJS_<cpu>)' by reference.  Anything the C side
+  # adds to a back end's per-base C-family set follows automatically, which is
+  # the property a second enumeration cannot have -- and the failure it
+  # produces is a link error naming a symbol that appears nowhere in this
+  # file.
+  cxxobjs_this = "";
+  n = split(xxobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    obj = parts[i];
+    sub(/\.o$/, "", obj);
+    src = frag_source_for(obj, tmkp);
+    # The OS side -- default-c.o, glibc-c.o, winnt-cxx.o, sol2-cxx.o,
+    # msformat-c.o -- has no tmake rule and is built by gcc/Makefile.in's own
+    # rules from `@cxx_target_objs@'.  It stays shared, and stays a leak, in
+    # exactly the way glibc-c.o does on the C side; see the note there.
+    if (src !~ ("^\\$\\(srcdir\\)/config/" cpu "/"))
+      continue;
+    if (index(" " cobjs_own " ", " " parts[i] " ") == 0) {
+      printf "$(error multi-target: %s names %s in cxx_target_objs but not in" \
+	     " c_target_objs -- nothing builds a per-base copy of it so cc1plus" \
+	     " would link the primary object; add it to c_target_objs or give" \
+	     " gen-multi-target-md.awk a rule for it)\n\n", cpu, parts[i];
+      continue;
+    }
+    cxxobjs_this = " $(MT_C_OBJS_" cpu ")";
+    # Taken OUT of @cxx_target_objs@ by gcc/Makefile.in for the same reason as
+    # the C side: the shared i386-c.o and mt-i386/i386-c.o define the same
+    # `ix86_target_macros', and a link keeping one of them by member order is
+    # the COMDAT-body disguise of this branch's bug.
+    if (index(" " cxx_moved_objs " ", " " parts[i] " ") == 0)
+      cxx_moved_objs = cxx_moved_objs parts[i] " ";
+  }
+  printf "MT_CXX_OBJS_%s =%s\n\n", cpu, cxxobjs_this;
+  cxx_target_objs_list = cxx_target_objs_list " $(MT_CXX_OBJS_" cpu ")";
 
   mt_bases = mt_bases " " cpu;
   # One back end at a time, by name.  Needed for more than convenience: the
