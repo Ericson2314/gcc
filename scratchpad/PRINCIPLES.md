@@ -508,6 +508,36 @@ different things. Instances found so far:
 | bound by one, indexed by another | `NUM_UNSPECV_VALUES` 114 vs a 40-entry table |
 | guard hiding a *declaration* | `rs6000_gnu_attr`; `<ldfcn.h>` in collect2 |
 | **the union's answer leaking** | `HAVE_V8HFmode` — "exists somewhere" ≠ "exists here" |
+| **a MAKE variable with one authority** | `PASSES_EXTRA` — fed only by `-include $(tmake_file)`, which is the legacy single `${target}`'s fragments, so `pass-instances.def` held i386's three target passes and **not one** from the other seven configured back ends |
+
+**THE `PASSES_EXTRA` INSTANCE IS WORTH READING BECAUSE IT WAS IN A CHANNEL
+NOTHING HAD LISTED, AND IT SHOWED BOTH HALVES AT ONCE.** Leaked PRESENCE:
+shared `passes.cc` walks the list unconditionally, so `-fdump-passes` while
+compiling for **aarch64** reported `rtl-x86_cse : ON` — i386's pass gated on
+and running for another target. Leaked ABSENCE: aarch64's eight passes were
+not in the tree at all, so BTI insertion, `ldp_fusion` and early-ra had never
+run on this branch. Fixed in `b349257c0a2` by deriving the list from the
+back-end list, tagging each file with its owner, renaming the inserted pass
+`<pass>_mt_<base>` and gating on `multi_target_current_base ()`.
+
+Three transferable pieces:
+
+- **Ask which variable a `@substitution@` came from, not what it is named
+  after.** `tmake_file`, `extra_objs`, `c_target_objs`, `target_gtfiles` and
+  `out_file` are all `${target}`-shaped and all had this bug. When you meet a
+  make variable fed by `config.gcc`, the question is whether it was collected
+  once or per back end.
+- **`-fdump-passes` distinguishes ABSENT from OFF, and a generated file cannot.**
+  Before the fix, aarch64's passes did not appear in that dump at all; reading
+  their absence as "off" would have been the wrong conclusion from the same
+  silence. Prefer an instrument that reads the running compiler.
+- **An ordering trap between a rename and a shared consumer can be dissolved
+  rather than traded.** `make_pass_insert_bti` was in `MULTI_TARGET_RENAME_NAMES`
+  justified by "nothing shared names it", true only while the pass was absent.
+  Rather than revoking the rename, shared code was made to call a per-base
+  **forwarder** compiled inside that base's own TU, so the renamed name is
+  spelled only where the `-D` reaches. The rename list needed no edit. Reach
+  for this shape whenever shared code appears to need a renamed symbol.
 
 Note the last one runs **opposite** to the others: normally the primary's answer
 leaks to everyone; there the union's does. Same root — one authority answering
@@ -604,10 +634,12 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**THE ANCHOR VALUE IS 50 as of `89883e54f02`** (the eleven-back-end merge).
-Fourth value this line has had — 45 → 47 → 48 → 50. Set `WANT_ANCHOR=50`.
-Everything the paragraphs below say about *why* the assert stays exact still
-holds; only the number moved, which is the point they make.
+**THE ANCHOR VALUE IS 51 as of `b349257c0a2`** (task #171, the per-back-end
+`PASSES_EXTRA`). Fifth value this line has had — 45 → 47 → 48 → 50 → 51. Set
+`WANT_ANCHOR=51`. Everything the paragraphs below say about *why* the assert
+stays exact still holds; only the number moved, which is the point they make.
+
+It was **50 as of `89883e54f02`**, the eleven-back-end merge.
 
 **The anchor value was 48 as of the `add_clobbers` selector (task #150)**, which
 added the `build/genemit.o : BUILD_CPPFLAGS += -DGEN_MULTI_TARGET` rule and its
@@ -1146,6 +1178,18 @@ answer is still wrong is worse than the failure.**
   `gcc/Makefile.in` — **empty means wrong tree**.
 - **The git index is SHARED.** `git commit` commits whatever is staged, including
   another agent's files. `git diff --cached` immediately before every commit.
+- **EVERY `t<NNN>-build.sh` ON THIS BRANCH HAS THE SAME WRONG TEST, AND IT
+  COSTS A BUILD.** They run `make cc1` inside `$D/gcc` *if that directory
+  exists*, and `make all-gcc` at the top level otherwise. But `$D/gcc` exists
+  as soon as anything has run `configure-gcc` — including a script that only
+  wanted to make one generated file. The `cc1` link then fails with
+
+      No rule to make target '../libcpp/libcpp.a', needed by 'cc1-checksum.cc'
+
+  because libiberty, libcpp, libdecnumber and libbacktrace were never built.
+  **It reads as a broken tree and it is a broken heuristic.** Build the top
+  level (`scratchpad/t171-topbuild.sh`), or make the test "has `libcpp.a` been
+  built", never "does the directory exist".
 - **Build your own build dir.** Sharing `/tmp/b-objs` produces meaningless
   verdicts and spurious `mv: cannot stat tmp-*` failures; it has killed runs.
   **In a shared build dir, a file you did not write is not a fixture.**
