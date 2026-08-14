@@ -257,6 +257,29 @@ struct target_regs_desc
      implementation answers NO_REGS outside its own range, which lets
      reginfo.cc:405 fence `operand_reg_set' and `fixed_reg_set' by itself.  */
   int (*regno_reg_class) (int regno);
+
+  /* PIC_OFFSET_TABLE_REGNUM, evaluated in this back end's own translation
+     unit.  Twelve SHARED translation units spell this macro -- df-scan.cc,
+     emit-rtl.cc, cfgexpand.cc, builtins.cc, shrink-wrap.cc, reginfo.cc,
+     df-problems.cc and more -- and every one of them was reading the
+     PRIMARY's.
+
+     WHAT THAT COST, MEASURED.  i386's expands to `INVALID_REGNUM' for
+     x86_64, so `emit-rtl.cc:6361' left `pic_offset_table_rtx' NULL for EVERY
+     configured back end.  mips's prologue asks
+     `find_reg_fusage (insn, USE, pic_offset_table_rtx)', which hands the null
+     to `reg_overlap_mentioned_p' and segfaults in
+     `pass_late_thread_prologue_and_epilogue'.  Note the direction: the leak
+     was of the primary's ABSENCE, so no back end got i386's $ebx either --
+     they all got "there is no PIC register", which is a wrong answer for the
+     forty-four back ends that define the macro.
+
+     A FUNCTION and not a data field: the macro is not invariant in any of
+     the three back ends checked (i386 reads `ix86_use_pseudo_pic_reg ()' and
+     `pic_offset_table_rtx'; mips reads `reload_completed'; arm is the option
+     variable `arm_pic_register'), which is also why target-cdata.h:160
+     refuses it a cdata slot.  */
+  unsigned int (*pic_offset_table_regnum) (void);
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

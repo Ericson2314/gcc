@@ -153,6 +153,26 @@ mt_adjust_reg_alloc_order (void)
 }
 #endif
 
+/* PIC_OFFSET_TABLE_REGNUM, evaluated in THIS back end's translation unit.
+
+   A FUNCTION and not a data field, for the reason target-cdata.h:160 already
+   gives for refusing this macro a cdata slot: it is not invariant.  i386's
+   reads `ix86_use_pseudo_pic_reg ()' and `pic_offset_table_rtx', mips's reads
+   `reload_completed' and `REGNO (pic_offset_table_rtx)', arm's is the option
+   variable `arm_pic_register'.  Freezing any of those at
+   static-initialisation time would be the `ix86_pmode Init (PMODE_SI)' shape.
+
+   No `#ifdef' arm, and that is deliberate: `defaults.h:871' already supplies
+   `INVALID_REGNUM' for a back end that defines nothing, and unlike the
+   floors PRINCIPLES section 2a bans, that one is read HERE -- in the base's
+   own translation unit -- so it is that base's own answer rather than the
+   primary's.  Forty-four back-end headers define the macro.  */
+static unsigned int
+mt_pic_offset_table_regnum (void)
+{
+  return (unsigned int) PIC_OFFSET_TABLE_REGNUM;
+}
+
 /* REG_CLASS_CONTENTS is written as `{ {..}, {..} }' with a row per class, and
    the row width is the back end's own N_REG_INTS -- 32 bits per element, hard
    coded at 32 rather than HOST_BITS_PER_INT, exactly as reginfo.cc has always
@@ -296,5 +316,6 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
      which is the one-enumerator declaration in multi-target-macros.h whenever
      that TU has no `tm.h'.  See the field comment in target-regs.h.  */
   sizeof (enum reg_class),
-  mt_regno_reg_class
+  mt_regno_reg_class,
+  mt_pic_offset_table_regnum
 };

@@ -11266,7 +11266,15 @@ void
 arc_adjust_reg_alloc_order (void)
 {
   const int arc_default_alloc_order[] = REG_ALLOC_ORDER;
-  memcpy (reg_alloc_order, arc_default_alloc_order, sizeof (reg_alloc_order));
+  /* The size of the SOURCE, not of the destination: `reg_alloc_order' is
+     sized by MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER (hard-reg-set.h), the
+     union width over the configured back ends, while the array above is arc's
+     own.  See the same fix in arm.cc, where it was an ira_init segfault.  */
+  static_assert (sizeof (arc_default_alloc_order)
+		 == FIRST_PSEUDO_REGISTER * sizeof (int),
+		 "arc's REG_ALLOC_ORDER does not cover FIRST_PSEUDO_REGISTER");
+  memcpy (reg_alloc_order, arc_default_alloc_order,
+	  sizeof (arc_default_alloc_order));
   if (optimize_size)
     memcpy (reg_alloc_order, size_alloc_order, sizeof (size_alloc_order));
 }

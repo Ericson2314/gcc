@@ -1381,7 +1381,32 @@ simplifiable_subregs (const subreg_shape &shape)
   if (!*slot)
     {
       simplifiable_subreg *info = new simplifiable_subreg (shape);
-      for (unsigned int i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
+      /* THE SELECTED BASE'S OWN REGISTER COUNT, NOT THE UNION WIDTH, and here
+	 the distinction is not a latent one -- it is an FPE.
+
+	 This loop asks TWO BACK-END-supplied things about a register number:
+	 `targetm.hard_regno_mode_ok' and, through `simplify_subreg_regno',
+	 `targetm.hard_regno_nregs'.  Both are usually a lookup in an array
+	 the back end declared `[NUM_MACHINE_MODES][FIRST_PSEUDO_REGISTER]'
+	 with ITS OWN width -- `rs6000_hard_regno_mode_ok_p' and
+	 `rs6000_hard_regno_nregs' (rs6000.cc:155) are exactly that, 119 wide.
+	 The union width with the eleven back ends configured is 334 (ia64's),
+	 so this walk handed rs6000's tables register numbers 146..238 and
+	 read 215 entries past the end of each.
+
+	 Measured, at -O2 on scratchpad/t170-small.c: the last five calls to
+	 `subreg_get_info' arrive with xregno 146, 147, 148, 149 and 238, and
+	 the last of them divides by zero at rtlanal.cc:4195 because the
+	 out-of-bounds read of `rs6000_hard_regno_nregs' answered 0 registers.
+	 Unlike the sibling loop in `init_reg_sets_1' above, there is no
+	 `fixed_nonglobal_reg_set' test here to short-circuit the phantom tail,
+	 so nothing was standing in front of it.
+
+	 Not a floor and not a default: `MT_FIRST_PSEUDO_REGISTER' is the
+	 selected back end's own answer, and the registers it excludes are ones
+	 that back end does not have.  */
+      for (unsigned int i = 0;
+	   i < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++i)
 	if (targetm.hard_regno_mode_ok (i, shape.inner_mode)
 	    && simplify_subreg_regno (i, shape.inner_mode, shape.offset,
 				      shape.outer_mode) >= 0)
