@@ -140,7 +140,11 @@ for a in "$B/libiberty/libiberty.a" "$B/libcpp/libcpp.a" \
 done
 for l in libc.so.6 libm.so.6 libstdc++.so libgcc_s.so.1; do
   p=$(g++ -print-file-name=$l 2>/dev/null)
-  [ -f "$p" ] && nm -D --defined-only "$p" 2>/dev/null | awk '{print $NF}' >> "$O/LIB-def.txt"
+  # Shared-library symbols carry `@@GLIBC_2.2.5' version suffixes.  Left on,
+  # every comparison against an object-file name misses, and the whole LIB
+  # universe silently rescues nothing -- the witness names below are what
+  # caught this.
+  [ -f "$p" ] && nm -D --defined-only "$p" 2>/dev/null | awk '{print $NF}' | sed 's/@.*//' >> "$O/LIB-def.txt"
 done
 sort -u -o "$O/LIB-def.txt" "$O/LIB-def.txt"
 nl=$(grep -c . "$O/LIB-def.txt")
@@ -153,14 +157,58 @@ for w in strverscmp sqrtf fputs_unlocked; do
 done
 echo "arm 0f ok: LIB universe $nl symbols, witnesses present"
 
+# ------------------------------------------------------- ATTRIBUTION
+#
+# THE DEFECT THIS BLOCK EXISTS TO FIX, FOUND BY THE VALIDATION ARM AND NOT BY
+# ANY AMOUNT OF RE-READING.  The first version of this script predicted `mips'
+# LINKS.  The real {i386,aarch64,mips} build does not link:
+# `insn_mips::unspecv_strings' and `..._len' are undefined.
+#
+# Cause: in a 48-base build `multi-target-select.o' -- a SHARED object --
+# references `insn_<be>::' symbols for ALL 48 back ends.  Those references
+# therefore land in the {i386,aarch64} BASELINE, which is then subtracted from
+# every back end.  92 `unspecv_strings' references were being hidden that way,
+# and the one that mattered was hidden with them.
+#
+# So every symbol must be ATTRIBUTED to the base it belongs to, by two routes:
+#   - it is DEFINED by that base's objects, or
+#   - its mangled name lies in that base's `insn_<be>' namespace.
+# A symbol attributable to a base OUTSIDE the triple is dropped: a real 3-base
+# build's selector would never name it.  A symbol attributable to a base
+# INSIDE the triple is never absorbed into the baseline.
+: > "$O/attrib.txt"
+for b in $bases; do awk -v b="$b" '{print b, $0}' "$O/$b-def.txt" >> "$O/attrib.txt"; done
+cat "$O"/*-undef.txt | sort -u > "$O/ALLUNDEF.txt"
+# Parse the Itanium mangling by its LENGTH PREFIX, not by a character class.
+# `_ZN9insn_mips15unspecv_stringsE': the 9 is the length of `insn_mips'.  A
+# regex like `insn_\([a-z0-9_]*\)[0-9]' is greedy and swallows the following
+# length digits -- it attributed the symbol above to a base called
+# `mips10gen_absdf', and the witness assert below is what caught it.  Back-end
+# names contain digits (`i386', `h8300', `c6x'), so no character class can do
+# this job.
+awk '/^_ZN[0-9]+insn_/ {
+       n = 0; i = 4;
+       while (substr($0, i, 1) ~ /[0-9]/) { n = n * 10 + substr($0, i, 1); i++ }
+       ns = substr($0, i, n);
+       if (substr(ns, 1, 5) == "insn_") print substr(ns, 6), $0;
+     }' "$O/ALLUNDEF.txt" >> "$O/attrib.txt"
+sort -u -o "$O/attrib.txt" "$O/attrib.txt"
+# Non-vacuity BY NAME on the symbol that exposed the defect.
+grep -q '^mips _ZN9insn_mips15unspecv_stringsE$' "$O/attrib.txt" \
+  || { echo "REFUSING TO SCORE: attribution does not place insn_mips::unspecv_strings under mips"; exit 9; }
+echo "arm 0g ok: $(grep -c . "$O/attrib.txt") symbol/base attributions, mips witness present"
+
 # ------------------------------------------------------------- baseline
 sort -u "$O/SH-def.txt" "$O/i386-def.txt" "$O/aarch64-def.txt" > "$O/PAIR-strong.txt"
 sort -u "$O/PAIR-strong.txt" "$O/SH-weak.txt" "$O/i386-weak.txt" "$O/aarch64-weak.txt" \
         "$O/LIB-def.txt" > "$O/PAIR-def.txt"
 sort -u "$O/SH-undef.txt" "$O/i386-undef.txt" "$O/aarch64-undef.txt" > "$O/PAIR-undef.txt"
-comm -23 "$O/PAIR-undef.txt" "$O/PAIR-def.txt" > "$O/BASELINE-undef.txt"
+# The baseline is what the KNOWN-GOOD pair cannot resolve for reasons that
+# belong to nobody -- so anything attributable to any base is excluded from it.
+awk '{print $2}' "$O/attrib.txt" | sort -u > "$O/attrib-syms.txt"
+comm -23 "$O/PAIR-undef.txt" "$O/PAIR-def.txt" | comm -23 - "$O/attrib-syms.txt" > "$O/BASELINE-undef.txt"
 nbl=$(grep -c . "$O/BASELINE-undef.txt" || true)
-echo "arm 0g ok: the known-good {i386,aarch64} link leaves $nbl symbols unresolved by this model"
+echo "arm 0h ok: the known-good {i386,aarch64} link leaves $nbl unattributable symbols"
 
 # ------------------------------------------------------------- per base X
 printf '%-12s %5s %5s %5s %5s  %s\n' BASE NOBJ MULTI UNDEF EXTRN CAUSE > "$O/TABLE.txt"
@@ -173,7 +221,17 @@ for b in $bases; do
   comm -12 "$O/$b-def.txt" "$O/PAIR-strong.txt" > "$O/multi-$b.txt"
   nm_=$(grep -c . "$O/multi-$b.txt" || true)
 
-  sort -u "$O/PAIR-undef.txt" "$O/$b-undef.txt" > "$O/tu.txt"
+  # Symbols belonging to a base OUTSIDE this triple: a real 3-base build's
+  # selector never names them, so they are not this triple's problem.
+  # A name attributable to a base in the triple as well as to one outside it
+  # must NOT be dropped -- otherwise a symbol X genuinely needs disappears
+  # because some unrelated back end also defines it.
+  awk -v x="$b" '$1 != x && $1 != "i386" && $1 != "aarch64" {print $2}' "$O/attrib.txt" \
+    | sort -u > "$O/o1.txt"
+  awk -v x="$b" '$1 == x || $1 == "i386" || $1 == "aarch64" {print $2}' "$O/attrib.txt" \
+    | sort -u > "$O/o2.txt"
+  comm -23 "$O/o1.txt" "$O/o2.txt" > "$O/others-$b.txt"
+  sort -u "$O/PAIR-undef.txt" "$O/$b-undef.txt" | comm -23 - "$O/others-$b.txt" > "$O/tu.txt"
   sort -u "$O/PAIR-def.txt" "$O/$b-def.txt" "$O/$b-weak.txt" > "$O/td.txt"
   comm -23 "$O/tu.txt" "$O/td.txt" | comm -23 - "$O/BASELINE-undef.txt" > "$O/raw-undef-$b.txt"
   # LIB is already inside PAIR-def, so what survives here is genuinely
