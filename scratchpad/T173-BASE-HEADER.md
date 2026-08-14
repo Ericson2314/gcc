@@ -3,6 +3,23 @@
 Task #173. `-DMT_BASE=<cpu>-inc` is the authority; a per-back-end header is
 spelled `#include BASE_HEADER (<stem>.h)`.
 
+## The acceptance grep
+
+```
+$ git grep -- '-I.*-inc\>' ':(exclude)scratchpad'
+```
+
+84 lines over 47 files at the start, split **6 machinery / 78 prose**. The 78
+are gone. The **6 remain** and are the emissions themselves:
+
+```
+gcc/gen-multi-target-md.awk  2233 2292 2327 2459
+gcc/gen-target-manifest.sh    583  635
+```
+
+so the grep still exits 0. Why is the "Not done 1" section below: removing
+them today is a silent regression, not a build break.
+
 ## Done
 
 All **280** direct per-back-end include sites under `gcc/config/` name their
