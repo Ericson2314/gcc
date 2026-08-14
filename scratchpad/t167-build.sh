@@ -20,7 +20,7 @@ SRC=$(cat "$D/MY-SRC")
 grep -q "$SRC/configure" "$D/config.log" \
   || { echo "FATAL: $D/config.log does not name $SRC"; exit 9; }
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
-[ "$n" = "${WANT_ANCHOR:-52}" ] || { echo "FATAL: $SRC anchor=$n"; exit 9; }
+[ "$n" = "${WANT_ANCHOR:-54}" ] || { echo "FATAL: $SRC anchor=$n"; exit 9; }
 ( cd "$SRC" && git diff --quiet ) || { echo "FATAL: $SRC changed under the build"; exit 9; }
 SHA=$(cd "$SRC" && git rev-parse --short HEAD)
 

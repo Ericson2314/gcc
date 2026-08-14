@@ -1937,6 +1937,40 @@ MULTI_TARGET_INC =
 #			    question, so it belongs to the correctness pass; see
 #			    scratchpad/T157-STUBS.md.
 #
+#   debugger_register_map
+#			    THE `regno_reg_class' CASE A THIRD TIME, found by
+#			    going from sixteen bases to FORTY-SEVEN, where it is
+#			    the ONLY colliding name.  Two definers,
+#			    `i386.cc:185' and `c6x.cc:198', both
+#			    `unsigned int const debugger_register_map
+#			    [FIRST_PSEUDO_REGISTER]'.  Arm S is empty; arm M
+#			    hits, because `i386.h:2155' and `c6x.h:504' both put
+#			    the array in the body of `DEBUGGER_REGNO(N)'.
+#
+#			    Rename-safe for the same two reasons, and it is worth
+#			    recording that the argument did not have to be
+#			    re-derived -- the family now has a shape.  Shared
+#			    code: `multi-target-macros.h:1058' `#undef's
+#			    DEBUGGER_REGNO and redirects it to
+#			    `mt_debugger_regno', so `dwarf2out.cc' and
+#			    `except.cc' name no back end's array.  Back-end code:
+#			    the supply side is `target-cumargs.cc:566', which is
+#			    compiled once per base as `target-cumargs-<cpu>.o'
+#			    inside `$(MULTI_TARGET_OBJS_<cpu>)' and therefore
+#			    carries the rename with it.
+#
+#			    THE TEST THAT DECIDES THIS FAMILY, stated once so the
+#			    next one is cheap: an array reached only through a
+#			    target macro is rename-safe IFF that macro is
+#			    redirected for shared code in multi-target-macros.h
+#			    AND its per-base supply site is inside
+#			    MULTI_TARGET_OBJS.  Both halves are needed --
+#			    `constant_address_p' failed the first (no redirect,
+#			    so seven shared sites named the bare function) and
+#			    that is the whole difference between the two
+#			    outcomes.  Arm M cannot tell them apart, by design;
+#			    it flags the macro and leaves the judgement here.
+#
 #   AND FOUR OF THE SIX SIXTEEN-BASE BLOCKERS RECORDED ABOVE WERE ALREADY DEAD
 #   AT THIS ANCHOR, killed by two commits on a branch the measurement above
 #   could not see.  `immed_double_const' is described below as a structural
@@ -1999,6 +2033,7 @@ MULTI_TARGET_RENAME_NAMES = \
   legitimize_pic_address \
   regclass_map \
   regno_reg_class \
+  debugger_register_map \
   num_source_filenames \
   constant_address_p \
   output_probe_stack_range \

@@ -1,7 +1,7 @@
 #!/bin/sh
 # #167 -- configure a build dir with a chosen base set, from an IMMUTABLE
 # SNAPSHOT.  Derived from t165-conf.sh; the worktree name in the build-dir
-# assertion and WANT_ANCHOR=52 are the only differences, and the assertion is
+# assertion and WANT_ANCHOR=54 are the only differences, and the assertion is
 # the point of the copy (PRINCIPLES 5: an agent's /tmp/b<task-number> was
 # reconfigured underneath it by a second agent, so the dir is named for the
 # WORKTREE, which is unique).
@@ -13,7 +13,7 @@ SRC=${SRC:?set SRC to an immutable snapshot worktree}
 SRC=$(cd "$SRC" && pwd)
 D=${1:?build dir}
 LIST=${2:?comma-separated triple list}
-WANT=${WANT_ANCHOR:-52}
+WANT=${WANT_ANCHOR:-54}
 
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 [ "$n" = "$WANT" ] || { echo "FATAL: $SRC anchor=$n, expected exactly $WANT"; exit 9; }

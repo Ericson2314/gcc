@@ -604,14 +604,14 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**THE ANCHOR VALUE IS 52 as of the sixteen-back-end link (#167).** Fifth value
-this line has had — 45 → 47 → 48 → 50 → 52. Set `WANT_ANCHOR=52`. Everything
-the paragraphs below say about *why* the assert stays exact still holds; only
-the number moved, which is the point they make.
+**THE ANCHOR VALUE IS 54 as of the twenty-four-back-end link (#167).** Sixth
+value this line has had — 45 → 47 → 48 → 50 → 52 → 54. Set `WANT_ANCHOR=54`.
+Everything the paragraphs below say about *why* the assert stays exact still
+holds; only the number moved, which is the point they make.
 
-**AND THE LAST TWO MOVES CAME FROM COMMENT PROSE, NOT FROM MECHANISM.** 50 → 52
-is two `MULTI_TARGET_*` names appearing inside an explanatory comment block in
-`gcc/Makefile.in`. That is worth saying out loud because it predicts the shape
+**AND THE LAST THREE MOVES CAME FROM COMMENT PROSE, NOT FROM MECHANISM.**
+50 → 52 → 54 is four `MULTI_TARGET_*` names appearing inside explanatory
+comment blocks in `gcc/Makefile.in`. That is worth saying out loud because it predicts the shape
 of the next false alarm: an agent diffing the anchor against the *rules* will
 find nothing changed and conclude a script is broken. The anchor is a content
 hash of one file, deliberately including its comments — which is what makes it

@@ -14,7 +14,7 @@ SHA=$(git rev-parse HEAD)
 git worktree remove --force "$SNAP" >/dev/null 2>&1 || true
 rm -rf "$SNAP"
 git worktree add --detach "$SNAP" "$SHA" >/dev/null 2>&1 || { echo "FATAL: worktree add $SNAP"; exit 9; }
-WANT=${WANT_ANCHOR:-52}
+WANT=${WANT_ANCHOR:-54}
 n=$(grep -c MULTI_TARGET "$SNAP/gcc/Makefile.in" || true)
 [ "$n" = "$WANT" ] || { echo "FATAL: snapshot anchor=$n, expected exactly $WANT"; exit 9; }
 echo "snapshot $SNAP at $SHA anchor=$n OK"
