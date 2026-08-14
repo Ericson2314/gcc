@@ -3430,7 +3430,7 @@ find_reloads (rtx_insn *insn, int replace, int ind_levels, int live_known,
 			&& GET_CODE (operand) != SCRATCH
 			&& (! CONSTANT_P (operand)
 			    || ! flag_pic
-			    || LEGITIMATE_PIC_OPERAND_P (operand))
+			    || mt_legitimate_pic_operand_p (operand))
 			&& (GENERAL_REGS == ALL_REGS
 			    || !REG_P (operand)
 			    || (REGNO (operand) >= FIRST_PSEUDO_REGISTER

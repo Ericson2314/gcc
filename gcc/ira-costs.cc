@@ -802,7 +802,7 @@ record_reg_classes (int n_alts, int n_ops, rtx *ops,
 		case 'g':
 		  if (MEM_P (op)
 		      || (CONSTANT_P (op)
-			  && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))))
+			  && (! flag_pic || mt_legitimate_pic_operand_p (op))))
 		    win = 1;
 		  insn_allows_mem[i] = allows_mem[i] = 1;
 		  classes[i] = ira_reg_class_subunion[classes[i]][GENERAL_REGS];

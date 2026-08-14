@@ -1620,6 +1620,30 @@ MULTI_TARGET_INC =
 #			    Bare in i386, s390, sparc and arm.  Note i386 is one
 #			    of them: this collides with i386 + arm, not only with
 #			    the rs6000/s390 set that found it.
+#
+#			    AND THIS ONE IS *NOT* A PURE RENAME -- the paragraph
+#			    above about the print_operand family being reached
+#			    only from config/ is right for the other four and
+#			    WRONG for this one, and the way it was wrong is the
+#			    lesson.  Shared code reaches it through the MACRO
+#			    `LEGITIMATE_PIC_OPERAND_P', at reload1.cc:4088,
+#			    lra-constraints.cc:2131, recog.cc:1535 and :1715,
+#			    reload.cc:3433, ira-costs.cc:805 and ira.cc:4346.  A
+#			    grep for the SYMBOL over every shared .cc and .h
+#			    matched none of those, because the macro's name is
+#			    not the symbol's -- PRINCIPLES 4, "a zero from a
+#			    name-matching instrument is a claim about the
+#			    instrument".  The rename alone therefore turned a
+#			    `multiple definition' into `undefined reference to
+#			    legitimate_pic_operand_p' from lra-constraints.o,
+#			    which is the blind spot reporting itself.
+#
+#			    The rename STAYS and is correct; what it needed
+#			    alongside it is a per-base answer for the six shared
+#			    sites, which is now the fifth `target_addr' funnel --
+#			    `mt_legitimate_pic_operand_p', addresses.h.  See
+#			    target-addr.h for why that family and not a new
+#			    target.def hook.
 #   legitimize_pic_address
 #			    Bare in s390, m68k, sh and arm, with FOUR DIFFERENT
 #			    SIGNATURES (above).

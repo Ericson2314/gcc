@@ -1532,7 +1532,7 @@ general_operand (rtx op, machine_mode mode)
   if (CONSTANT_P (op))
     return ((GET_MODE (op) == VOIDmode || GET_MODE (op) == mode
 	     || mode == VOIDmode)
-	    && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))
+	    && (! flag_pic || mt_legitimate_pic_operand_p (op))
 	    && targetm.legitimate_constant_p (mode == VOIDmode
 					      ? GET_MODE (op)
 					      : mode, op));
@@ -1712,7 +1712,7 @@ immediate_operand (rtx op, machine_mode mode)
   return (CONSTANT_P (op)
 	  && (GET_MODE (op) == mode || mode == VOIDmode
 	      || GET_MODE (op) == VOIDmode)
-	  && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))
+	  && (! flag_pic || mt_legitimate_pic_operand_p (op))
 	  && targetm.legitimate_constant_p (mode == VOIDmode
 					    ? GET_MODE (op)
 					    : mode, op));
