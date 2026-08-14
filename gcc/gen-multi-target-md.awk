@@ -39,10 +39,15 @@
 function reset() {
   trg = ""; cpu = ""; md = ""; tmp = ""; xmodes = ""; cof = ""; inc = ""; def = "";
   tmk = ""; tmkp = ""; outf = ""; xobjs = ""; xgobjs = "";
-  # Cleared per record like the rest: `cobjs' is deliberately NOT in this list
-  # (it is read only on the first record for a back end), but extra_headers is
-  # unioned over every record, so a stale value here would attribute one
-  # triple's headers to the next triple's back end.
+  # `cobjs' and `xxobjs' ARE cleared here now, and that is a fix rather than
+  # tidying.  They used to be left standing on the reasoning that they were
+  # "read only on the first record for a back end" -- which was true and was
+  # the bug: `c_target_objs' is set by TRIPLE, so the first record decided
+  # whether a back end's `<cpu>-c.o' was built at all.  They are unioned over
+  # every record now (accumulate_c_target_objs), exactly as extra_headers and
+  # extra_gcc_objs are, so a value surviving into the next record would
+  # attribute one triple's objects to the next triple's back end.
+  cobjs = ""; xxobjs = "";
   xhdrs = ""; tgmath = "";
 }
 
@@ -349,6 +354,17 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # header set depend on the order targets were named -- one name, several
   # authorities, no diagnostic.
   accumulate_extra_headers();
+
+  # The back end's own C-family objects, unioned per back end over EVERY record
+  # for exactly the reason the two above are: `c_target_objs' and
+  # `cxx_target_objs' are set by TRIPLE.  `ia64*-*-hpux*' names `ia64-c.o' and
+  # `ia64-elf' names none, so reading the first record for a back end made
+  # `mt-ia64/ia64-c.o' appear or vanish according to which triple came first --
+  # one name, several authorities, no diagnostic.  Measured before the fix:
+  # permuting the two ia64 records in the manifest changed the generated make
+  # text, `MT_C_OBJS_ia64' losing `mt-ia64/ia64-c.o' and `MT_CXX_OBJS_ia64'
+  # going empty.  See scratchpad/mt-cobjs-order.sh.
+  accumulate_c_target_objs();
 
   # Every record gets its per-triple conditions rules; only the first record
   # for a back end gets the per-back-end ones.  The per-triple rules name
@@ -1580,7 +1596,12 @@ $1 == "tm_p_file" { tmp = ""; for (i = 2; i <= NF; i++) tmp = tmp $i " " }
 $1 == "tm_include_list" { inc = ""; for (i = 2; i <= NF; i++) inc = inc $i " " }
 $1 == "tm_defines" { def = ""; for (i = 2; i <= NF; i++) def = def $i " " }
 NF == 0		  { flush() }
-END		  { flush(); emit_condition_intersections();
+END		  { flush();
+		    # BEFORE emit_c_ops_registry, which prints the two lists
+		    # this fills in (MT_C_OBJS_MOVED, MT_C_TARGET_OBJS and
+		    # their C++ siblings).
+		    emit_c_target_objs();
+		    emit_condition_intersections();
 		    emit_asm_ops_registry(); emit_addr_registry();
 		    emit_cdata_registry();
 		    emit_c_ops_registry();
@@ -1963,87 +1984,17 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # first, so the recipe can compile the STAMP instead of the source -- and it
   # does so for some objects and not others, which reads as a broken source
   # file.
-  # ... and this back end's OWN C-family object.  `c_target_objs' for
-  # x86_64-linux is `i386-c.o glibc-c.o': the first is the back end's
-  # (config/i386/i386-c.cc, where `ix86_target_macros' lives), the second is
-  # the OS's and is shared by every glibc target.  Only the back end's own is
-  # moved per base here, and it is selected by asking the tmake fragments where
-  # the source lives rather than by matching the name -- `i386-c.o' would match
-  # a prefix test, `winnt-c.o' and `msformat-c.o' would not, and both of those
-  # belong to the OS side too.
+  # THE C-FAMILY OBJECTS USED TO BE APPENDED TO THIS LIST AND ARE NOT ANY MORE.
+  # They are built by the same rules -- same include directory, same renames --
+  # but they must NOT join MULTI_TARGET_OBJS_<cpu>, which goes into
+  # libbackend.a and therefore into lto1: <cpu>-c.cc calls `c_register_pragma'
+  # and `builtin_define_with_value', which exist only in cc1.  They go to
+  # MT_C_TARGET_OBJS instead, which gcc/Makefile.in appends to C_TARGET_OBJS.
   #
-  # glibc-c.o STAYS SHARED, and that is a remaining leak, not a decision that
-  # it is fine: it defines `targetcm', whose TARGETCM_INITIALIZER is filled
-  # from the primary's tm.h.  Making it per base needs `targetcm' to become a
-  # pointer the way `targetm' already has, which is a separate change.
-  cobjs_own = ""; cobjs_this = "";
-  n = split(cobjs, parts, " ");
-  for (i = 1; i <= n; i++) {
-    obj = parts[i];
-    sub(/\.o$/, "", obj);
-    src = frag_source_for(obj, tmkp);
-    # A c_target_obj NO FRAGMENT CLAIMS IS A DEFECT, NOT A NON-BACK-END OBJECT,
-    # AND IT USED TO LEAVE THIS LOOP SILENTLY.
-    #
-    # The refusal in the second loop below cannot catch it: that loop iterates
-    # over cobjs_own, and an object with src == "" fails the `^config/<cpu>/'
-    # test here and is therefore never put in cobjs_own to be refused.  The
-    # exclusion runs BEFORE the check, so the check cannot fire -- the
-    # `mitigation that cannot fire' shape in PRINCIPLES section 4.
-    #
-    # Measured: `v850e1-elf' set `c_target_objs="v850-c.o"' while its
-    # tmake_file omitted `v850/t-v850', the only fragment carrying the rule.
-    # v850-c.o disappeared from MT_C_OBJS_v850 with no word anywhere, and the
-    # link failed 8 symbols later at `ghs_pragma_*' -- a name that does not
-    # mention v850-c.o, config.gcc, or this loop.
-    #
-    # $(warning) rather than $(error): the point is that the operator SEES it.
-    # An $(error) here would also be defensible, and is deliberately not used
-    # yet because this generator runs for all 48 back ends at once and one
-    # unfixed fragment would block every one of them.
-    #
-    # SCOPED TO `<cpu>-c.o', AND THE FIRST DRAFT WAS NOT -- WHICH IS THE
-    # LESSON.  Unscoped it fired 48 times on a 48-back-end build, every one of
-    # them a FALSE POSITIVE: `default-c.o', `glibc-c.o', `sol2-c.o',
-    # `winnt-c.o' and friends are the OS side, built by generic rules in
-    # gcc/Makefile.in rather than by any tmake fragment, so src == "" is their
-    # NORMAL state.  A warning that fires once per back end on correct input is
-    # not a check, it is 48 lines nobody reads -- and it would have buried the
-    # one line that mattered.
-    #
-    # Only `<cpu>-c.o' is the back end's own, only it is expected to live under
-    # `config/<cpu>/', and only for it is a missing fragment a defect.  With
-    # this scope the warning reads ZERO on a correct 48-base tree; `v850' is
-    # its negative control, and reverting the `config.gcc' hunk that added
-    # `v850/t-v850' makes it fire by name.
-    if (src == "" && obj == (cpu "-c")) {
-      printf "$(warning multi-target: %s lists %s in c_target_objs but no" \
-	     " tmake fragment claims a rule for it -- it will NOT be built" \
-	     " and anything referencing its symbols will fail at link time)\n\n", \
-	     cpu, parts[i];
-      continue;
-    }
-    if (src ~ ("^\\$\\(srcdir\\)/config/" cpu "/")) {
-      cobjs_own = cobjs_own parts[i] " ";
-      # ... and record it so gcc/Makefile.in can take it OUT of C_TARGET_OBJS.
-      # C_TARGET_OBJS is @c_target_objs@, the PRIMARY target's list, and the
-      # primary's <cpu>-c.o is now built per base in mt-<cpu>/.  Leaving it in
-      # both places is not a harmless duplicate: the two objects define the
-      # same `ix86_target_macros' and the link would keep one of them by
-      # accident of order, which is the COMDAT-body disguise of this bug.
-      if (index(" " c_moved_objs " ", " " parts[i] " ") == 0)
-	c_moved_objs = c_moved_objs parts[i] " ";
-    }
-  }
-
-  # Objects at index > nback are the C-family ones.  They are built by the same
-  # rules -- same include directory, same renames -- but they must NOT join
-  # MULTI_TARGET_OBJS_<cpu>, which goes into libbackend.a and therefore into
-  # lto1: <cpu>-c.cc calls `c_register_pragma' and `builtin_define_with_value',
-  # which exist only in cc1.  They go to MT_C_TARGET_OBJS instead, which
-  # gcc/Makefile.in appends to C_TARGET_OBJS.
-  nback = split(outf " " xobjs, parts, " ");
-  n = split(outf " " xobjs " " cobjs_own, parts, " ");
+  # They moved to emit_c_target_objs() at END because `c_target_objs' is set by
+  # TRIPLE and not by back end, and this loop runs on the FIRST record for a
+  # cpu_type only; see the note on that function.
+  n = split(outf " " xobjs, parts, " ");
   for (i = 1; i <= n; i++) {
     if (i == 1) {
       # out_file is a PATH under config/, not an object name.
@@ -2107,10 +2058,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
     printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", cpu, obj, src, cpu;
     printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", cpu;
     printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", poly;
-    if (i > nback)
-      cobjs_this = cobjs_this " mt-" cpu "/" obj ".o";
-    else
-      objs = objs " mt-" cpu "/" obj ".o";
+    objs = objs " mt-" cpu "/" obj ".o";
   }
 
   # This back end's addressing register-class predicates -- the `addresses.h'
@@ -2163,9 +2111,11 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   printf "\t$(COMPILE) -DTARGET_C_OPS_SYMBOL=targetm_c_ops_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-c-ops.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
-  # Same reasoning as mt-<cpu>/<cpu>-c.o above: this table calls into that
-  # object, so it belongs to cc1 and not to libbackend.a.
-  cobjs_this = cobjs_this " target-c-ops-" cpu ".o";
+  # Same reasoning as mt-<cpu>/<cpu>-c.o: this table calls into that object, so
+  # it belongs to cc1 and not to libbackend.a.  It is put into
+  # MT_C_OBJS_<cpu> by emit_c_target_objs() at END, along with the <cpu>-c.o
+  # it calls into; the two must be in the same list and that list is now
+  # built there.
 
   # This back end's register vocabulary; see target-regs.h.  Same loop and the
   # same reason again -- the six data macros are plain macros in
@@ -2336,89 +2286,10 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n", cpu;
   printf "MULTI_TARGET_OBJS += $(MULTI_TARGET_OBJS_%s)\n", cpu;
 
-  # This back end's C-family objects.  A SECOND list with the SAME two
-  # target-specific assignments, because they need the identical treatment --
-  # their own include directory and their own renames -- and differ only in
-  # which link they belong to.  Folding them into MULTI_TARGET_OBJS_<cpu> to
-  # get the assignments for free is the obvious tidy-up and it breaks lto1;
-  # leaving them OUT of the assignments is the other obvious shortcut and it
-  # compiles config/aarch64/aarch64-c.cc against i386-inc, which fails with 40
-  # `TARGET_SIMD was not declared in this scope' -- loudly here, but only
-  # because the two back ends happen to spell their feature macros
-  # differently.
-  printf "MT_C_OBJS_%s =%s\n", cpu, cobjs_this;
-  printf "$(MT_C_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", cpu, cpu;
-  printf "$(MT_C_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", cpu;
-  printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", cpu;
-  printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", cpu;
-  c_target_objs_list = c_target_objs_list " $(MT_C_OBJS_" cpu ")";
-
-  # ... and this back end's C++-family objects, for cc1plus.
-  #
-  # THE C LIST ITSELF, NOT A SECOND SET OF RULES AND NOT A SECOND ENUMERATION.
-  # Measured over
-  # all 47 configured back ends (scratchpad/t190-cxx-census.sh, committed):
-  # the object a back end names under `config/<cpu>/' in `cxx_target_objs' is
-  # the SAME object it names in `c_target_objs' -- SAME 47, DIFF 0 -- because
-  # `<cpu>-c.cc' serves both front ends.  Emitting `mt-<cpu>/<cpu>-c.o' a
-  # second time would give one object two recipes: make picks one, and which
-  # one is not a property of anything anybody wrote down.  So the object is
-  # built once, in the loop above, and named twice.
-  #
-  # The identity is CHECKED rather than assumed, because it is a fact about
-  # `config.gcc' and `config.gcc' changes.  A back end whose C++ object the C
-  # side does not build has no rule anywhere, and the symptom would be a
-  # missing prerequisite naming a file no line of this generator mentions.
-  # `$(error)' on ONE line and with no comma, for the reason recorded at the
-  # `frag_source_for' refusal above: a newline inside a make function call
-  # kills the parse before the message is printed.
-  #
-  # AND THE FIRST DRAFT ENUMERATED THE OBJECTS ITSELF, WHICH IS THE HALF-FIX
-  # THIS COMMENT EXISTS TO PREVENT.  It built the list from `cxx_target_objs'
-  # alone, i.e. `mt-<cpu>/<cpu>-c.o', and MISSED `target-c-ops-<cpu>.o' --
-  # which is not in `c_target_objs' either: this generator appends it to
-  # `cobjs_this' a hundred lines up, because it is the per-base table whose
-  # members CALL into `<cpu>-c.o'.  Measured, cc1plus then linked and failed:
-  #
-  #   target-c-ops-select.o:(.rodata+0x8): undefined reference to
-  #     `targetm_c_ops_aarch64'
-  #   target-c-ops-select.o:(.rodata+0x18): undefined reference to
-  #     `targetm_c_ops_i386'
-  #
-  # So the list is `$(MT_C_OBJS_<cpu>)' by reference.  Anything the C side
-  # adds to a back end's per-base C-family set follows automatically, which is
-  # the property a second enumeration cannot have -- and the failure it
-  # produces is a link error naming a symbol that appears nowhere in this
-  # file.
-  cxxobjs_this = "";
-  n = split(xxobjs, parts, " ");
-  for (i = 1; i <= n; i++) {
-    obj = parts[i];
-    sub(/\.o$/, "", obj);
-    src = frag_source_for(obj, tmkp);
-    # The OS side -- default-c.o, glibc-c.o, winnt-cxx.o, sol2-cxx.o,
-    # msformat-c.o -- has no tmake rule and is built by gcc/Makefile.in's own
-    # rules from `@cxx_target_objs@'.  It stays shared, and stays a leak, in
-    # exactly the way glibc-c.o does on the C side; see the note there.
-    if (src !~ ("^\\$\\(srcdir\\)/config/" cpu "/"))
-      continue;
-    if (index(" " cobjs_own " ", " " parts[i] " ") == 0) {
-      printf "$(error multi-target: %s names %s in cxx_target_objs but not in" \
-	     " c_target_objs -- nothing builds a per-base copy of it so cc1plus" \
-	     " would link the primary object; add it to c_target_objs or give" \
-	     " gen-multi-target-md.awk a rule for it)\n\n", cpu, parts[i];
-      continue;
-    }
-    cxxobjs_this = " $(MT_C_OBJS_" cpu ")";
-    # Taken OUT of @cxx_target_objs@ by gcc/Makefile.in for the same reason as
-    # the C side: the shared i386-c.o and mt-i386/i386-c.o define the same
-    # `ix86_target_macros', and a link keeping one of them by member order is
-    # the COMDAT-body disguise of this branch's bug.
-    if (index(" " cxx_moved_objs " ", " " parts[i] " ") == 0)
-      cxx_moved_objs = cxx_moved_objs parts[i] " ";
-  }
-  printf "MT_CXX_OBJS_%s =%s\n\n", cpu, cxxobjs_this;
-  cxx_target_objs_list = cxx_target_objs_list " $(MT_CXX_OBJS_" cpu ")";
+  # The one per-back-end fact emit_c_target_objs() needs and cannot re-derive:
+  # `poly_aware' is read from this back end's own t-<cpu> fragment, and the C
+  # objects are compiled with the same flag as the rest of its sources.
+  mtc_poly[cpu] = poly;
 
   mt_bases = mt_bases " " cpu;
   # One back end at a time, by name.  Needed for more than convenience: the
@@ -2774,6 +2645,187 @@ function emit_extra_headers(	i, n, parts, c) {
 # both the object list and the tmake fragments that hold the rules naming their
 # sources.  Called for EVERY record; see the comment at the call site in
 # flush() for why the first record for a cpu_type is not enough.
+function accumulate_c_target_objs(	i, n, parts, j, m, fp) {
+  n = split(cobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "")
+      continue;
+    if (index(" " mtc_objs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_objs[cpu] = mtc_objs[cpu] parts[i] " ";
+  }
+  n = split(xxobjs, parts, " ");
+  for (i = 1; i <= n; i++) {
+    if (parts[i] == "")
+      continue;
+    if (index(" " mtc_cxxobjs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_cxxobjs[cpu] = mtc_cxxobjs[cpu] parts[i] " ";
+  }
+  # The tmake fragments are unioned along with the objects, and for the same
+  # reason accumulate_gcc_driver_objs unions them: the rule that says which
+  # source builds `ia64-c.o' lives in ia64/t-ia64, which need not be in the
+  # first record's tmake_file.  Field 1 of a manifest line is its key, which
+  # frag_source_for skips, so the accumulated list is re-given that shape at
+  # the point of use rather than carrying a stray token here.
+  m = split(tmkp, fp, " ");
+  for (j = 2; j <= m; j++)
+    if (index(" " mtc_frags[cpu] " ", " " fp[j] " ") == 0)
+      mtc_frags[cpu] = mtc_frags[cpu] fp[j] " ";
+}
+
+# THE BACK END'S OWN C-FAMILY OBJECTS, one list per back end, emitted at END.
+#
+# `c_target_objs' for x86_64-linux is `i386-c.o glibc-c.o': the first is the
+# back end's (config/i386/i386-c.cc, where `ix86_target_macros' lives), the
+# second is the OS's and is shared by every glibc target.  Only the back end's
+# own is moved per base, and it is selected by asking the tmake fragments where
+# the source lives rather than by matching the name -- `i386-c.o' would match a
+# prefix test, `winnt-c.o' and `msformat-c.o' would not, and both of those
+# belong to the OS side too.
+#
+# glibc-c.o STAYS SHARED, and that is a remaining leak, not a decision that it
+# is fine: it defines `targetcm', whose TARGETCM_INITIALIZER is filled from the
+# primary's tm.h.  Making it per base needs `targetcm' to become a pointer the
+# way `targetm' already has, which is a separate change.
+#
+# WHY AT END AND NOT IN THE PER-BACK-END BLOCK.  That block runs on the FIRST
+# record for a cpu_type, and `c_target_objs' is per TRIPLE.  Both halves of
+# this branch's defining bug follow from that: a back end whose C-family object
+# is named by a triple that is not first LOSES it silently (leaked absence),
+# and there is no diagnostic anywhere because MT_C_OBJS_<cpu> is still
+# non-empty -- target-c-ops-<cpu>.o is always in it.
+#
+# THE TWO TARGET-SPECIFIC ASSIGNMENTS ARE A SECOND SET, NOT A REUSE OF
+# MULTI_TARGET_OBJS_<cpu>'s.  These objects need the identical treatment --
+# their own include directory and their own renames -- and differ only in which
+# link they belong to.  Folding them into MULTI_TARGET_OBJS_<cpu> to get the
+# assignments for free is the obvious tidy-up and it breaks lto1; leaving them
+# OUT of the assignments is the other obvious shortcut and it compiles
+# config/aarch64/aarch64-c.cc against i386-inc, which fails with 40
+# `TARGET_SIMD was not declared in this scope' -- loudly, but only because the
+# two back ends happen to spell their feature macros differently.
+#
+# THE C++ LIST IS THE C LIST ITSELF, NOT A SECOND ENUMERATION.  Measured over
+# all 47 configured back ends (scratchpad/t190-cxx-census.sh, committed): the
+# object a back end names under `config/<cpu>/' in `cxx_target_objs' is the
+# SAME object it names in `c_target_objs' -- SAME 47, DIFF 0 -- because
+# `<cpu>-c.cc' serves both front ends.  Emitting `mt-<cpu>/<cpu>-c.o' a second
+# time would give one object two recipes: make picks one, and which one is not
+# a property of anything anybody wrote down.  So the object is built once, in
+# the loop below, and named twice.  The identity is CHECKED rather than
+# assumed, because it is a fact about `config.gcc' and `config.gcc' changes.
+#
+# AND AN EARLIER DRAFT ENUMERATED THE C++ OBJECTS ITSELF, WHICH IS THE HALF-FIX
+# THAT COMMENT EXISTS TO PREVENT.  It built the list from `cxx_target_objs'
+# alone and MISSED `target-c-ops-<cpu>.o', which is in neither manifest key --
+# this generator appends it.  cc1plus then linked and failed with `undefined
+# reference to targetm_c_ops_aarch64'.  So the list is `$(MT_C_OBJS_<cpu>)' by
+# reference: anything the C side adds follows automatically.
+function emit_c_target_objs(	nb, bases, i, b, n, parts, j, obj, src, own,
+				list, cxxlist, frags) {
+  nb = split(mt_bases, bases, " ");
+  for (i = 1; i <= nb; i++) {
+    b = bases[i];
+    frags = "tmake_file_present " mtc_frags[b];
+    own = ""; list = "";
+    n = split(mtc_objs[b], parts, " ");
+    for (j = 1; j <= n; j++) {
+      obj = parts[j];
+      sub(/\.o$/, "", obj);
+      src = frag_source_for(obj, frags);
+      # A c_target_obj NO FRAGMENT CLAIMS IS A DEFECT, NOT A NON-BACK-END
+      # OBJECT, AND IT USED TO LEAVE THIS LOOP SILENTLY.
+      #
+      # The refusal in the C++ loop below cannot catch it: that loop iterates
+      # over `own', and an object with src == "" fails the `^config/<cpu>/'
+      # test here and is therefore never put in `own' to be refused.  The
+      # exclusion runs BEFORE the check, so the check cannot fire -- the
+      # `mitigation that cannot fire' shape in PRINCIPLES section 4.
+      #
+      # Measured: `v850e1-elf' set `c_target_objs="v850-c.o"' while its
+      # tmake_file omitted `v850/t-v850', the only fragment carrying the rule.
+      # v850-c.o disappeared from MT_C_OBJS_v850 with no word anywhere, and the
+      # link failed 8 symbols later at `ghs_pragma_*'.
+      #
+      # SCOPED TO `<cpu>-c.o', AND THE FIRST DRAFT WAS NOT.  Unscoped it fired
+      # 48 times on a 48-back-end build, every one a FALSE POSITIVE:
+      # `default-c.o', `glibc-c.o', `sol2-c.o', `winnt-c.o' are the OS side,
+      # built by generic rules in gcc/Makefile.in, so src == "" is their NORMAL
+      # state.  With this scope the warning reads ZERO on a correct tree.
+      #
+      # $(warning) rather than $(error): the point is that the operator SEES
+      # it.  An $(error) here would block all 48 back ends over one fragment.
+      #
+      # NOW ASKED AGAINST THE UNION OF EVERY RECORD'S FRAGMENTS, which is a
+      # real change to what it reports: ia64-hp-hpux11.23 names ia64-c.o and
+      # ia64/t-ia64 carries the rule, but a build naming only a triple whose
+      # tmake_file lacked it would have warned.
+      if (src == "" && obj == (b "-c")) {
+	printf "$(warning multi-target: %s lists %s in c_target_objs but no" \
+	       " tmake fragment claims a rule for it -- it will NOT be built" \
+	       " and anything referencing its symbols will fail at link time)\n\n", \
+	       b, parts[j];
+	continue;
+      }
+      if (src !~ ("^\\$\\(srcdir\\)/config/" b "/"))
+	continue;
+      own = own parts[j] " ";
+      # ... and record it so gcc/Makefile.in can take it OUT of C_TARGET_OBJS.
+      # C_TARGET_OBJS is @c_target_objs@, the PRIMARY target's list, and the
+      # primary's <cpu>-c.o is now built per base in mt-<cpu>/.  Leaving it in
+      # both places is not a harmless duplicate: the two objects define the
+      # same `ix86_target_macros' and the link would keep one of them by
+      # accident of order, which is the COMDAT-body disguise of this bug.
+      if (index(" " c_moved_objs " ", " " parts[j] " ") == 0)
+	c_moved_objs = c_moved_objs parts[j] " ";
+      printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", b, obj, src, b;
+      printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b;
+      printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", mtc_poly[b];
+      list = list " mt-" b "/" obj ".o";
+    }
+    # target-c-ops-<cpu>.o is emitted with the back end's other per-base tables
+    # and belongs to THIS list, because its members call into <cpu>-c.o.
+    list = list " target-c-ops-" b ".o";
+
+    printf "MT_C_OBJS_%s =%s\n", b, list;
+    printf "$(MT_C_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", b, b;
+    printf "$(MT_C_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", b;
+    printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", b;
+    printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", b;
+    c_target_objs_list = c_target_objs_list " $(MT_C_OBJS_" b ")";
+
+    cxxlist = "";
+    n = split(mtc_cxxobjs[b], parts, " ");
+    for (j = 1; j <= n; j++) {
+      obj = parts[j];
+      sub(/\.o$/, "", obj);
+      src = frag_source_for(obj, frags);
+      # The OS side -- default-c.o, glibc-c.o, winnt-cxx.o, sol2-cxx.o,
+      # msformat-c.o -- has no tmake rule and is built by gcc/Makefile.in's own
+      # rules from `@cxx_target_objs@'.  It stays shared, and stays a leak, in
+      # exactly the way glibc-c.o does on the C side.
+      if (src !~ ("^\\$\\(srcdir\\)/config/" b "/"))
+	continue;
+      # `$(error)' on ONE line and with no comma, for the reason recorded at
+      # the `frag_source_for' refusal: a newline inside a make function call
+      # kills the parse before the message is printed.
+      if (index(" " own " ", " " parts[j] " ") == 0) {
+	printf "$(error multi-target: %s names %s in cxx_target_objs but not in" \
+	       " c_target_objs -- nothing builds a per-base copy of it so cc1plus" \
+	       " would link the primary object; add it to c_target_objs or give" \
+	       " gen-multi-target-md.awk a rule for it)\n\n", b, parts[j];
+	continue;
+      }
+      cxxlist = " $(MT_C_OBJS_" b ")";
+      # Taken OUT of @cxx_target_objs@ by gcc/Makefile.in for the same reason
+      # as the C side.
+      if (index(" " cxx_moved_objs " ", " " parts[j] " ") == 0)
+	cxx_moved_objs = cxx_moved_objs parts[j] " ";
+    }
+    printf "MT_CXX_OBJS_%s =%s\n\n", b, cxxlist;
+    cxx_target_objs_list = cxx_target_objs_list " $(MT_CXX_OBJS_" b ")";
+  }
+}
+
 function accumulate_gcc_driver_objs(	i, n, parts, j, m, fp) {
   n = split(xgobjs, parts, " ");
   for (i = 1; i <= n; i++) {
