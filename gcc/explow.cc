@@ -32,8 +32,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "profile-count.h"
 #include "emit-rtl.h"
 #include "recog.h"
-/* For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
+/* `regs.h' BEFORE `addresses.h': the latter's `regno_ok_for_base_p' reads
+   `reg_renumber', which regs.h declares.  The four shared files that already
+   included addresses.h all had regs.h above it, so the dependency was real and
+   unstated; adding a fifth and sixth includer is what surfaced it.
+   For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
    this is shared code.  See addresses.h.  */
+#include "regs.h"
 #include "addresses.h"
 #include "diagnostic-core.h"
 #include "stor-layout.h"
