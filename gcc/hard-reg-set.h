@@ -22,6 +22,13 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "array-traits.h"
 
+/* The conversion layer, for the translation units that include this header
+   without going through `rtl.h'.  `enum reg_class' -- used by three fields of
+   `struct target_hard_regs' below -- is declared there for a translation unit
+   that has no `tm.h', and the MULTI_TARGET_UNION_* widths come through it as
+   well.  A no-op wherever `tm.h' has already been read; see rtl.h.  */
+#include "multi-target-macros.h"
+
 /* THE ONE LAYOUT.  `struct target_hard_regs' below, `struct target_regs'
    (regs.h), `struct target_ira' (ira.h) and `struct target_ira_int'
    (ira-int.h) are allocated by TARGET-INDEPENDENT code -- XCNEW'd in

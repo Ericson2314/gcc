@@ -91,6 +91,50 @@ struct target_addr
   bool (*ok_for_base_p_1) (unsigned regno, machine_mode mode, addr_space_t as,
 			   int outer_code, int index_code, rtx_insn *insn);
   bool (*ok_for_index_p_1) (unsigned regno);
+  /* LEGITIMATE_PIC_OPERAND_P, AND IT IS HERE FOR THE SAME REASON AS THE FOUR
+     ABOVE RATHER THAN BY ANALOGY.
+
+     Six shared translation units spell the macro -- reload1.cc:4088,
+     lra-constraints.cc:2131, recog.cc:1535 and :1715, reload.cc:3433,
+     ira-costs.cc:805 and ira.cc:4346 -- and it is a `tm.h' macro with a
+     `defaults.h:1192' fallback of 1.  So in a compiler holding several back
+     ends every one of those sites asked the PRIMARY's headers a question
+     posed on behalf of another target, exactly as `BASE_REG_CLASS' did.
+
+     HOW IT WAS FOUND IS THE INSTRUCTIVE PART, and it is PRINCIPLES 4's
+     "a zero from a name-matching instrument is a claim about the instrument".
+     A grep for the SYMBOL `legitimate_pic_operand_p' over every shared .cc
+     and .h returned three hits, all spurious (a comment in targhooks.cc, a
+     struct member `targetm.asm_out.print_operand' in final.cc, a build-time
+     generator's own function in genmatch.cc), and the conclusion drawn was
+     that no shared code names it and a bare rename would do.  It is reached
+     through the MACRO, whose name the grep did not contain; the rename then
+     produced `undefined reference to legitimate_pic_operand_p' from
+     lra-constraints.o at the link of cc1, which is the instrument's blind
+     spot reporting itself.
+
+     `bool' not `int': i386 and sparc declare it `bool' and s390 and arm
+     `int', and every consumer is a condition.  The narrowing happens in each
+     base's own translation unit, where its own declaration is visible.  */
+  bool (*legitimate_pic_operand_p) (rtx x);
+  /* CONSTANT_ADDRESS_P, and it is here for the same reason and was found the
+     same way -- by configuring EIGHT back ends and reading the link.
+
+     Seven shared sites spell the macro: explow.cc:271 and :449,
+     emit-rtl.cc:3045, reload.cc:6922, fwprop.cc:122, recog.cc:2542,
+     final.cc:3551.  It has a `defaults.h:1283' fallback, and BOTH i386.h:1853
+     and sparc.h:1332 define it as `constant_address_p (X)' -- so the primary's
+     `tm.h' routes all seven at i386's function, and sparc's own definition
+     collides at the link (`mt-sparc/sparc.o: multiple definition of
+     constant_address_p').
+
+     NOTE THE TRAP THIS ONE SETS FOR THE RENAME ROUTE.  Renaming alone turns
+     the collision into `undefined reference' from those seven shared objects,
+     exactly as it did for `legitimate_pic_operand_p'.  The macro name is not
+     the symbol name, so a grep for the symbol over shared code finds nothing
+     and reports the rename as safe.  It is not.  Ask what the PRIMARY's `tm.h'
+     expands the macro to before concluding a rename suffices.  */
+  bool (*constant_address_p) (rtx x);
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

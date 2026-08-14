@@ -1532,7 +1532,7 @@ general_operand (rtx op, machine_mode mode)
   if (CONSTANT_P (op))
     return ((GET_MODE (op) == VOIDmode || GET_MODE (op) == mode
 	     || mode == VOIDmode)
-	    && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))
+	    && (! flag_pic || mt_legitimate_pic_operand_p (op))
 	    && targetm.legitimate_constant_p (mode == VOIDmode
 					      ? GET_MODE (op)
 					      : mode, op));
@@ -1712,7 +1712,7 @@ immediate_operand (rtx op, machine_mode mode)
   return (CONSTANT_P (op)
 	  && (GET_MODE (op) == mode || mode == VOIDmode
 	      || GET_MODE (op) == VOIDmode)
-	  && (! flag_pic || LEGITIMATE_PIC_OPERAND_P (op))
+	  && (! flag_pic || mt_legitimate_pic_operand_p (op))
 	  && targetm.legitimate_constant_p (mode == VOIDmode
 					    ? GET_MODE (op)
 					    : mode, op));
@@ -2539,7 +2539,7 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
 	     : memory_address_addr_space_p);
   poly_int64 mode_sz = GET_MODE_SIZE (mode);
 
-  if (CONSTANT_ADDRESS_P (y))
+  if (mt_constant_address_p (y))
     return true;
 
   /* Adjusting an offsettable address involves changing to a narrower mode.

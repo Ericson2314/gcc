@@ -826,6 +826,15 @@ mt_have_rotatert (void)
   return mt_insn ()->have_rotatert;
 }
 
+/* LOAD_EXTEND_OP (MODE).  `int' in and `int' out because target-insn.h is
+   reached before coretypes.h; `rtl.h''s use site casts back to
+   `enum rtx_code'.  */
+int
+mt_load_extend_op (int mode)
+{
+  return mt_insn ()->load_extend_op (mode);
+}
+
 /* ------------------------------------------------------------------------
    THE CONSTRAINT VOCABULARY; see target-preds.h for the measurement.
 

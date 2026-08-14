@@ -58,6 +58,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"
+/* For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
+   this is shared code.  See addresses.h.  */
+#include "addresses.h"
 #include "cgraph.h"
 #include "tree-pretty-print.h" /* for dump_function_header */
 #include "varasm.h"
@@ -3548,7 +3551,7 @@ output_asm_insn (const char *templ, rtx *operands)
 	      output_address (VOIDmode, operands[opnum]);
 	    else if (letter == 'c')
 	      {
-		if (letter2 == 'c' || CONSTANT_ADDRESS_P (operands[opnum]))
+		if (letter2 == 'c' || mt_constant_address_p (operands[opnum]))
 		  output_addr_const (asm_out_file, operands[opnum]);
 		else
 		  output_operand (operands[opnum], 'c');
@@ -4172,42 +4175,49 @@ only_leaf_regs_used (void)
   return true;
 }
 
-#else /* !LEAF_REGISTERS */
+#else
 
-/* MULTI-TARGET STUB -- RECORDED IN scratchpad/UR-STUBS.md.  DELIBERATELY
-   ABORTS BY NAME; it does NOT answer.
+/* THE ONE STUB THIS TASK LEAVES.  Recorded in scratchpad/T157-STUBS.md.
 
-   `final.cc' is compiled once, so `#ifdef LEAF_REGISTERS' is decided by the
-   PRIMARY back end's tm.h.  Only sparc and ia64 define LEAF_REGISTERS, so on
-   any build whose primary is neither, this function was compiled out --
-   while `sparc.cc', compiled with sparc's own headers, calls it from three
-   places.  `undefined reference to only_leaf_regs_used()'.
+   `only_leaf_regs_used' is SHARED code (declared in output.h, defined here)
+   whose definition is gated on `LEAF_REGISTERS' -- a per-back-end `tm.h'
+   macro.  Shared objects are compiled once, against the primary's `tm.h', and
+   i386 does not define `LEAF_REGISTERS', so the definition is not compiled at
+   all.  sparc's own `mt-sparc/sparc.o' calls it, and an eight-back-end link
+   fails with `undefined reference to only_leaf_regs_used()'.
 
-   The honest fix is a per-base answer for LEAF_REGISTERS (it is a per-back-end
-   string constant indexed by regno, so it wants the cdata treatment).  That is
-   a correctness change, not a link fix, and it is queued.
+   A guard on a per-base macro deciding whether a SHARED definition exists --
+   PRINCIPLES 3's "guard hiding a declaration", one row down from the version
+   that hides a definition.
 
-   What is NOT acceptable here is returning `false' -- or `true' -- as a
-   "sensible default".  Both are somebody's real answer, both compile, both
-   silently change sparc's leaf-register allocation, and neither leaves any
-   trace to find later.  PRINCIPLES section 2a.  So this aborts, naming itself,
-   the macro and the fact that the base did not supply it.
+   THIS ABORTS RATHER THAN ANSWERING, and that choice is the whole point.
+   Returning `true' would tell every back end its function uses only
+   renumberable registers; returning `false' would silently disable sparc's
+   leaf-register optimisation.  Both are plausible values and neither is any
+   back end's own, so both would be findable only by reading the assembly of a
+   sparc leaf function.  An abort naming the macro is findable by running it
+   once.
 
-   Reachability: the shared caller in `function.cc'
-   (`rest_of_handle_check_leaf_regs') is ITSELF under `#ifdef LEAF_REGISTERS'
-   and so is compiled out alongside this.  The only callers that survive are
-   inside sparc's and ia64's own objects, so this abort fires when one of those
-   two back ends is SELECTED, and never for the other 46.  */
+   THERE IS A SECOND, LARGER BUG BEHIND THIS ONE and it is NOT fixed here:
+   `function.cc:6491''s `rest_of_handle_check_leaf_regs' is gated on the SAME
+   macro, so on this branch `crtl->uses_only_leaf_regs' is never set for any
+   back end -- sparc's leaf-register pass has been silently inert, not merely
+   unlinkable.  Fixing that means moving `LEAF_REGISTERS' into the per-base
+   family (target-regs.h is its natural home), which is a correctness change
+   and is deferred under this task's relaxed bar.  */
 
 bool
 only_leaf_regs_used (void)
 {
-  internal_error ("%<only_leaf_regs_used%>: this build has no per-back-end "
-		  "%<LEAF_REGISTERS%>, so the answer would be another back "
-		  "end%'s; refusing to invent one");
+  internal_error ("%<only_leaf_regs_used%> was called, but this compiler was "
+		  "built without %<LEAF_REGISTERS%> reaching shared code: the "
+		  "macro is a per-back-end %<tm.h%> macro and %<final.cc%> is "
+		  "compiled once, against the primary's headers.  The selected "
+		  "back end needs this answer and there is deliberately no "
+		  "default -- see scratchpad/T157-STUBS.md");
 }
 
-#endif /* LEAF_REGISTERS */
+#endif
 
 #ifdef LEAF_REGISTERS
 

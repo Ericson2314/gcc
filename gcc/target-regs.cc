@@ -296,5 +296,10 @@ constexpr struct target_regs_desc TARGETM_REGS_SYMBOL = {
   sizeof (struct target_bb_reorder),
   sizeof (struct target_lower_subreg),
   sizeof (struct target_constraints),
+  /* THIS back end's `enum reg_class', measured where its real declaration is
+     visible.  Compared at start-up with the size target-independent code sees,
+     which is the one-enumerator declaration in multi-target-macros.h whenever
+     that TU has no `tm.h'.  See the field comment in target-regs.h.  */
+  sizeof (enum reg_class),
   mt_regno_reg_class
 };

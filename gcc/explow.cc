@@ -32,6 +32,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "profile-count.h"
 #include "emit-rtl.h"
 #include "recog.h"
+/* `regs.h' BEFORE `addresses.h': the latter's `regno_ok_for_base_p' reads
+   `reg_renumber', which regs.h declares.  The four shared files that already
+   included addresses.h all had regs.h above it, so the dependency was real and
+   unstated; adding a fifth and sixth includer is what surfaced it.
+   For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
+   this is shared code.  See addresses.h.  */
+#include "regs.h"
+#include "addresses.h"
 #include "diagnostic-core.h"
 #include "stor-layout.h"
 #include "langhooks.h"
@@ -268,7 +276,7 @@ static rtx
 break_out_memory_refs (rtx x)
 {
   if (MEM_P (x)
-      || (CONSTANT_P (x) && CONSTANT_ADDRESS_P (x)
+      || (CONSTANT_P (x) && mt_constant_address_p (x)
 	  && GET_MODE (x) != VOIDmode))
     x = force_reg (GET_MODE (x), x);
   else if (GET_CODE (x) == PLUS || GET_CODE (x) == MINUS
@@ -446,7 +454,7 @@ memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
 
   /* By passing constant addresses through registers
      we get a chance to cse them.  */
-  if (! cse_not_expected && CONSTANT_P (x) && CONSTANT_ADDRESS_P (x))
+  if (! cse_not_expected && CONSTANT_P (x) && mt_constant_address_p (x))
     x = force_reg (address_mode, x);
 
   /* We get better cse by rejecting indirect addressing at this stage.

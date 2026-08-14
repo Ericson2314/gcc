@@ -60,6 +60,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include BASE_HEADER (tm_p.h)
 #include "regs.h"
+/* `recog.h' FOR mips, AND THE REASON IS A GOOD ADVERTISEMENT FOR THE WHOLE
+   FILE.  mips.h:2671 defines
+
+       #define CONSTANT_ADDRESS_P(X) (CONSTANT_P (X) && memory_address_p (SImode, X))
+
+   and `memory_address_p' is a macro in recog.h.  So one back end's answer to
+   `is this a constant address' is expressed in terms of a middle-end
+   predicate, which is precisely the kind of thing that cannot be discovered by
+   reading i386's headers -- it appeared the moment mips was configured, as
+   `error: memory_address_p was not declared in this scope', naming the file
+   and the line.  Every base compiles its own copy of these bodies, so each one
+   drags in whatever its own macros need; the include list here is the union of
+   what the configured back ends ask for, and it will grow as back ends are
+   added.  That is the mechanism working, not a defect in it.  */
+#include "recog.h"
 #include "target-addr.h"
 
 /* --- BASE_REG_CLASS and friends ------------------------------------- */
@@ -139,6 +154,43 @@ gcc_taddr_ok_for_index_p_1 (unsigned regno ATTRIBUTE_UNUSED)
   return REGNO_OK_FOR_INDEX_P (regno);
 }
 
+/* --- LEGITIMATE_PIC_OPERAND_P --------------------------------------- */
+
+/* Not an `#ifdef' chain, because there is nothing to chain: `defaults.h:1192'
+   already supplies `1' when this base's headers define nothing, and
+   `defaults.h' is reached from BASE_HEADER (tm.h) above, i.e. IN THIS BASE'S
+   OWN preprocessor context.  That is the whole point of this file -- the
+   default a base falls back on here is its own and not the primary's, so the
+   `#ifndef' in defaults.h is a supply-side floor rather than the banned kind
+   (PRINCIPLES 2a: ask WHOSE answer the fallback is).
+
+   The `!= 0' is deliberate and not noise.  The macro expands to `1' for the
+   defaulting bases, to a `bool' function call for i386 and sparc and to an
+   `int' one for s390 and arm; doing the conversion here makes it happen where
+   each base's own declaration is visible rather than at the funnel, where
+   only one of them would be.  */
+
+static bool
+gcc_taddr_legitimate_pic_operand_p (rtx x ATTRIBUTE_UNUSED)
+{
+  return LEGITIMATE_PIC_OPERAND_P (x) != 0;
+}
+
+/* --- CONSTANT_ADDRESS_P --------------------------------------------- */
+
+/* Same shape as the one above: a `tm.h' macro with a `defaults.h:1283'
+   fallback, read by seven shared sites, and defined by i386.h and sparc.h as
+   a call to each one's own `constant_address_p'.  Evaluated here in THIS
+   base's preprocessor context, so a base that defines nothing gets
+   `defaults.h''s `CONSTANT_P (X) && GET_CODE (X) != CONST_DOUBLE' -- its own
+   answer, which is also what upstream gives it.  */
+
+static bool
+gcc_taddr_constant_address_p (rtx x ATTRIBUTE_UNUSED)
+{
+  return CONSTANT_ADDRESS_P (x) != 0;
+}
+
 /* `extern' is not redundant: a namespace-scope `const' object has internal
    linkage in C++, so without it the table is built correctly and then cannot
    be named from the selector.  See target-asm-ops.cc, where the same omission
@@ -159,5 +211,7 @@ const struct target_addr TARGETM_ADDR_SYMBOL =
   gcc_taddr_base_reg_class,
   gcc_taddr_index_reg_class,
   gcc_taddr_ok_for_base_p_1,
-  gcc_taddr_ok_for_index_p_1
+  gcc_taddr_ok_for_index_p_1,
+  gcc_taddr_legitimate_pic_operand_p,
+  gcc_taddr_constant_address_p
 };

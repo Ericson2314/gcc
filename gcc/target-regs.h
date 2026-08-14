@@ -231,6 +231,25 @@ struct target_regs_desc
   unsigned long sizeof_target_lower_subreg;
   unsigned long sizeof_target_constraints;
 
+  /* `sizeof (enum reg_class)' AS THIS BACK END SEES IT.
+
+     Not a struct, and that is the point.  A shared translation unit with no
+     `tm.h' takes the one-enumerator `enum reg_class' declared in
+     multi-target-macros.h; a back end's own translation unit takes its real
+     one, 34 enumerators for i386 and 20 for aarch64.  Three fields of
+     `struct target_hard_regs' are arrays of that type, so if the two
+     declarations disagreed on width the struct would have two layouts and
+     `sizeof_target_hard_regs' above would catch it -- but it would report a
+     struct size and name no cause.  This field makes the diagnostic name the
+     actual disagreement.
+
+     It is checked rather than assumed because the assumption is real: C++
+     leaves the underlying type of an unfixed enum implementation-defined, and
+     `-fshort-enums' would make the one-enumerator form narrower than any back
+     end's.  A silent agreement between two authorities is what this branch
+     exists to remove, so the agreement is measured on both sides.  */
+  unsigned long sizeof_enum_reg_class;
+
   /* REGNO_REG_CLASS, FENCED.  Generic code walks 0..FIRST_PSEUDO_REGISTER,
      which is the UNION width, so it will ask about register numbers this back
      end does not have; i386's REGNO_REG_CLASS is `regclass_map[REGNO]' and

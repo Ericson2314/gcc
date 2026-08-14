@@ -1529,7 +1529,17 @@ MULTI_TARGET_INC =
 # some back end later collides silently: libbackend.a is an archive, so a
 # duplicate is diagnosed only when both members happen to be pulled in for
 # other reasons -- `ld' once reported 7 of 40.  The check is an `nm' sweep over
-# the two object SETS (scratchpad/sweep.sh), never the linker.
+# the per-base object sets, never the linker.
+#
+# THAT SENTENCE USED TO NAME `scratchpad/sweep.sh', WHICH HAD NEVER BEEN
+# WRITTEN -- and a comment naming a guard reads as evidence the guard ran.  It
+# also said "the TWO object SETS", which is the two-back-end habit written into
+# the very instrument meant to police it: a list sized on today's pair expires
+# the moment a third base is configured.  The check is now
+# scratchpad/t155-rename-gap.sh, which sweeps every configured base and refuses
+# to score when `nm' read nothing or when a base contributed no symbols at all
+# -- under `make -k' a back end that never built and one that collides with
+# nothing are the same silence.
 #
 #   targetm                 the hook table.  Renaming it is not enough on its
 #			    own: the middle end reads the bare name, so
@@ -1575,25 +1585,241 @@ MULTI_TARGET_INC =
 #			    config/i386/ and config/riscv/.  So each back end
 #			    keeps its OWN function and there is no name for the
 #			    middle end to choose between -- a bare rename
-#			    suffices, with no selector entry, unlike the
-#			    print_operand family (scratchpad/t150-rename-gap.sh)
-#			    which targhooks.cc and final.cc DO name.
+#			    suffices, with no selector entry.
 #
-#			    Checks: scratchpad/sweep.sh compares the per-base
-#			    object sets pairwise and reports every colliding
-#			    strong symbol by name (three-base reading: aarch64 vs
-#			    i386 none, i386 vs riscv none, aarch64 vs riscv
-#			    exactly this one).  scratchpad/t150-rename-gap.sh is
-#			    the N-way replacement, because sweep.sh compares TWO
+#			    THIS COMMENT USED TO END "unlike the print_operand
+#			    family, which targhooks.cc and final.cc DO name."
+#			    THAT WAS WRONG, AND IT IS WORTH SAYING HOW, because
+#			    it is a grep whose result reads backwards.  The
+#			    three shared files that match those names match
+#			    them for three reasons and NONE is a reference to
+#			    the symbol:
+#
+#			      targhooks.cc:476   a COMMENT, "the `print_operand'
+#					         hook".
+#			      final.cc:3679,3695 `targetm.asm_out.print_operand'
+#					         -- a STRUCT MEMBER of the hook
+#					         table, already selected through
+#					         targetm_ptr.  A member name is
+#					         not a symbol.
+#			      genmatch.cc:1712   a BUILD-TIME generator's own
+#					         `print_operand (operand *, FILE
+#					         *, bool)', never linked with
+#					         libbackend.a.
+#
+#			    So the print_operand family is the SAME case as
+#			    extract_base_offset_in_addr and takes the same bare
+#			    rename.  The signatures settle it independently, and
+#			    more strongly than the grep does: `legitimize_pic_
+#			    address' is (rtx, rtx) for s390, (rtx, machine_mode,
+#			    rtx) for sh, (rtx, machine_mode, rtx, rtx, bool) for
+#			    arm and (rtx, machine_mode, rtx) for m68k.  There is
+#			    no one shape, so there is no forwarder that could be
+#			    written -- a selector is not merely unnecessary here,
+#			    it is unexpressible.
+#
+#   print_operand, print_operand_address
+#			    Bare in rs6000, s390, m68k, vax, xtensa, microblaze,
+#			    pdp11, gcn and bfin (each also declares them in its
+#			    -protos.h, which the -D renames in the same TU).
+#			    i386 and aarch64 spell `ix86_'/`aarch64_' prefixed
+#			    names, so THE PAIR THIS BRANCH BUILDS WITH CANNOT SEE
+#			    THIS -- it is a `multiple definition' on the first
+#			    link that configures any two of the nine.
+#   legitimate_pic_operand_p
+#			    Bare in i386, s390, sparc and arm.  Note i386 is one
+#			    of them: this collides with i386 + arm, not only with
+#			    the rs6000/s390 set that found it.
+#
+#			    AND THIS ONE IS *NOT* A PURE RENAME -- the paragraph
+#			    above about the print_operand family being reached
+#			    only from config/ is right for the other four and
+#			    WRONG for this one, and the way it was wrong is the
+#			    lesson.  Shared code reaches it through the MACRO
+#			    `LEGITIMATE_PIC_OPERAND_P', at reload1.cc:4088,
+#			    lra-constraints.cc:2131, recog.cc:1535 and :1715,
+#			    reload.cc:3433, ira-costs.cc:805 and ira.cc:4346.  A
+#			    grep for the SYMBOL over every shared .cc and .h
+#			    matched none of those, because the macro's name is
+#			    not the symbol's -- PRINCIPLES 4, "a zero from a
+#			    name-matching instrument is a claim about the
+#			    instrument".  The rename alone therefore turned a
+#			    `multiple definition' into `undefined reference to
+#			    legitimate_pic_operand_p' from lra-constraints.o,
+#			    which is the blind spot reporting itself.
+#
+#			    The rename STAYS and is correct; what it needed
+#			    alongside it is a per-base answer for the six shared
+#			    sites, which is now the fifth `target_addr' funnel --
+#			    `mt_legitimate_pic_operand_p', addresses.h.  See
+#			    target-addr.h for why that family and not a new
+#			    target.def hook.
+#   legitimize_pic_address
+#			    Bare in s390, m68k, sh and arm, with FOUR DIFFERENT
+#			    SIGNATURES (above).
+#   THE NEXT NINE CAME FROM CONFIGURING EIGHT BACK ENDS
+#			    (i386, aarch64, rs6000, s390, riscv, mips, sparc,
+#			    arm).  Every one of them is invisible to the four-
+#			    base set above, which is invisible to the two-base
+#			    set everything on this branch is built with.  The
+#			    list is not self-maintaining and the only instrument
+#			    that sizes it is a link with the back ends in it.
+#
+#   aarch_bti_arch_check, aarch_bti_enabled, aarch_bti_j_insn_p,
+#   aarch_fun_is_indirect_return, aarch_gen_bti_c, aarch_gen_bti_j,
+#   aarch_pac_insn_p
+#			    config/arm/aarch-common-protos.h, defined by
+#			    config/arm/arm.cc and config/aarch64/aarch64.cc and
+#			    used by config/arm/aarch-bti-insert.cc -- a pass
+#			    compiled once per base, like config/linux.cc, so the
+#			    -D reaches definition and use together.  ZERO shared
+#			    TUs name any of the seven, and no `tm.h' macro
+#			    expands to them, so this is a bare rename.
+#   output_probe_stack_range
+#			    Bare in sparc, arm, i386, ia64 (two arguments) and
+#			    rs6000 (THREE).  No shared TU and no macro; bare
+#			    rename.
+#   constant_address_p  A RENAME IS NOT ENOUGH, and this one is worth reading
+#			    before trusting a grep on any of the others.  Seven
+#			    SHARED sites spell the macro `CONSTANT_ADDRESS_P'
+#			    -- explow.cc:271 and :449, emit-rtl.cc:3045,
+#			    reload.cc:6922, fwprop.cc:122, recog.cc:2542,
+#			    final.cc:3551 -- and BOTH i386.h:1853 and
+#			    sparc.h:1332 define that macro as
+#			    `constant_address_p (X)'.  So the primary's `tm.h'
+#			    points all seven at i386's function, a grep for the
+#			    SYMBOL over shared code finds nothing, and renaming
+#			    alone converts `multiple definition' into `undefined
+#			    reference' -- which is exactly what happened to
+#			    `legitimate_pic_operand_p' one commit earlier.
+#			    It is renamed AND given a `target_addr' funnel
+#			    (`mt_constant_address_p', addresses.h).
+#
+#			    THE RULE THIS ESTABLISHES: before concluding a bare
+#			    rename suffices, ask what the PRIMARY'S `tm.h'
+#			    expands the corresponding MACRO to, not only whether
+#			    shared code spells the symbol.  Two of the eleven
+#			    names added by this task failed that test, and both
+#			    failed it silently until the link.
+#
+#   regclass_map        Bare DATA, not a function: `enum reg_class const
+#			    regclass_map[FIRST_PSEUDO_REGISTER]' in i386.cc:145
+#			    and s390.cc:3103, declared in each one's own .h.  No
+#			    shared TU names it at all -- REGNO_REG_CLASS, its
+#			    only consumer, is already a targetm_regs read -- so
+#			    it is the purest rename of the six.
+#
+#			    Checks: scratchpad/t155-rename-gap.sh sweeps EVERY
+#			    configured base and reports each colliding strong
+#			    symbol with how many bases define it (three-base
+#			    reading: aarch64 vs i386 none, i386 vs riscv none,
+#			    aarch64 vs riscv exactly this one).  It supersedes
+#			    scratchpad/t150-rename-gap.sh, which refuses any
+#			    build dir not named for the worktree that wrote it;
+#			    and both supersede a `sweep.sh' that compared TWO
 #			    object sets -- the two-back-end habit written into
-#			    the very instrument meant to police it.
+#			    the very instrument meant to police it -- AND THAT
+#			    HAD NEVER BEEN WRITTEN AT ALL.
+#
+#   THE N-WAY SWEEP (task #155).  Everything above this line was sized on
+#			    i386 + aarch64 plus what a third and a fourth base
+#			    found.  The names at the END of the list below are
+#			    what a 48-BACK-END sweep adds: for each of them BOTH
+#			    definers are back ends that pair never configures,
+#			    so not one could have been found by the pair
+#			    everything on this branch is built with.
+#
+#			    Measured population, over all 48 configured bases:
+#			    64 colliding hand-written names, of which 7 are the
+#			    deliberate mt_probe_* register probes -- compiled,
+#			    never linked, so benign.
+#
+#			    THE GENERATED HALF IS NOW CHECKED RATHER THAN
+#			    ASSERTED.  "Everything the generators emit is dealt
+#			    with by namespace insn_<base>" was a written
+#			    invariant; scratchpad/t155-gen-arm.sh tests it, and
+#			    across 48 bases reads 163,162 generated definitions
+#			    with ZERO collisions.
+#
+#			    THREE POPULATIONS THAT LOOK LIKE THIS ONE AND ARE
+#			    NOT, each measured rather than assumed:
+#			    gt_ggc_mx/gt_pch_nx (aarch64, arm, riscv) are C++
+#			    OVERLOADS on distinct parameter types -- already
+#			    distinct symbols -- and gengtype's shared output
+#			    calls them by the bare name, so renaming would BREAK
+#			    a working thing.  main, tool_cleanup and
+#			    maybe_unlink collide only across SEPARATE PROGRAMS
+#			    (gcn-run, nvptx-run, collect2, lto-wrapper), which
+#			    are never linked together.  host_detect_local_cpu is
+#			    bare in 8 back ends and IS latent, but it is
+#			    driver-side, already has a selector, and belongs to
+#			    the target-specs -march=native work.
+#
+#			    STILL OPEN, and the largest item is ONE CAUSE and
+#			    not twenty names: config/arm/aarch-common.cc is in
+#			    aarch64's extra_objs (config.gcc:377) AND arm's
+#			    (config.gcc:424), so every external it defines
+#			    collides -- exactly the config/linux.cc shape three
+#			    lines of this list already exist for.  Seven of its
+#			    24 are here; see scratchpad/t155-QUEUE.md for the
+#			    rest and for the one of them that carries a real
+#			    question (make_pass_insert_bti is a pass
+#			    constructor, registered from BOTH arm-passes.def and
+#			    aarch64-passes.def).
 MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
   extract_base_offset_in_addr \
+  print_operand \
+  print_operand_address \
+  legitimate_pic_operand_p \
+  legitimize_pic_address \
+  regclass_map \
+  constant_address_p \
+  output_probe_stack_range \
+  aarch_bti_arch_check \
+  aarch_bti_enabled \
+  aarch_bti_j_insn_p \
+  aarch_fun_is_indirect_return \
+  aarch_gen_bti_c \
+  aarch_gen_bti_j \
+  aarch_pac_insn_p \
   linux_libc_has_function \
   linux_libm_function_max_error \
-  linux_fortify_source_default_level
+  linux_fortify_source_default_level \
+  legitimize_tls_address \
+  init_cumulative_args \
+  symbolic_reference_mentioned_p \
+  symbol_mentioned_p \
+  label_mentioned_p \
+  tls_mentioned_p \
+  nonpic_symbol_mentioned_p \
+  pic_address_needs_scratch \
+  tls_symbolic_operand \
+  small_data_operand \
+  simple_memory_operand \
+  direct_return \
+  split_di \
+  prepare_move_operands \
+  expand_move \
+  expand_block_move \
+  gen_compare_reg \
+  final_prescan_insn \
+  compute_frame_size \
+  reg_unused_after \
+  empty_delay_slot \
+  machopic_output_stub \
+  output_move_double \
+  output_move_single \
+  output_cbranch \
+  output_ubranch \
+  output_sibcall \
+  output_shift_loop \
+  output_call \
+  output_ascii \
+  require_derived_vector_type \
+  require_derived_scalar_type \
+  finish_opt_n_resolution
 
 MULTI_TARGET_RENAMES =
 

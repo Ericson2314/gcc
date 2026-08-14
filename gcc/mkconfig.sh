@@ -81,6 +81,48 @@ done
 # that does not, or spells an option differently, is answered by
 # target-specs/configure probing the real linker and overriding the resulting
 # spec -- not by the driver silently omitting the option.
+#
+# THE LIST ABOVE WAS NOT THE WHOLE POPULATION, and the two names added below
+# are not spec strings -- they select CODEGEN.  Measured in a 48-back-end build
+# (/tmp/b-ad1798a2b26398cc6-48) by preprocessing the REAL chain, not by reading
+# the sources, `cpp -dM -DIN_GCC' on the generated `tm-rs6000.h':
+#
+#     #define TARGET_CMODEL RS6000_CMODEL_SMALL      <- the #else branch
+#     #define SET_CMODEL(opt) do {} while (0)        <- the #else branch
+#     #define DOT_SYMBOLS 1                          <- the #else branch
+#     #define HAVE_LD_LARGE_TOC (targ_caps.ld_large_toc)
+#     #define HAVE_LD_NO_DOT_SYMS (targ_caps.ld_no_dot_syms)
+#
+# The last two lines are the trap: defaults.h DOES redirect both to their
+# runtime `targ_caps' values, so a reader who greps for the conversion finds it
+# present and correct.  But defaults.h is appended LAST, and
+# `config/rs6000/linux64.h:66' tests `#ifdef HAVE_LD_LARGE_TOC' while the chain
+# is still being read -- so the guard had already been taken the other way.
+# The conversion is real, and it lands too late to be seen.
+#
+# Consequence, powerpc64: `SET_CMODEL' discards its argument, so `-mcmodel='
+# is silently a no-op, and `TARGET_CMODEL' is frozen at RS6000_CMODEL_SMALL
+# rather than following `rs6000_current_cmodel' -- which exists, is a real
+# option variable (`global_options.x_rs6000_current_cmodel'), and is now both
+# never written and never read.  `DOT_SYMBOLS' likewise loses the ELFv2 local
+# entry-point form.
+#
+# INVISIBLE TO EVERY MEASUREMENT THIS BRANCH HAS TAKEN: `tm-i386.h' contains
+# ZERO occurrences of HAVE_LD_LARGE_TOC, and aarch64 none either, so the
+# configured pair cannot express the bug.  This is the `correct by luck on
+# i386 + aarch64' class named in PRINCIPLES section 1, caught only by building
+# a third back end that has the guard.
+#
+# WHOSE ANSWER IS THIS FLOOR?  (PRINCIPLES section 2a requires stating it.)
+# Upstream's own, for rs6000 standing alone: both features have been in every
+# binutils that can link powerpc64 for many years, and upstream's configure
+# probe returns yes for them on any such linker.  It is NOT the primary's
+# answer -- i386 has no opinion on either macro and never tests them.  A
+# linker that genuinely lacks them is answered the same way the four above
+# are: target-specs/configure probes the real linker, and defaults.h's
+# redirect -- which survives this, exactly as HAVE_LD_PIE's does -- carries
+# that answer to every consumer that reads the macro as a VALUE rather than as
+# an `#ifdef'.
 case $output in
     tm.h | tm-*.h )
 	cat >> ${output}T <<EOF
@@ -95,6 +137,12 @@ case $output in
 #endif
 #ifndef HAVE_LD_PUSHPOPSTATE_SUPPORT
 # define HAVE_LD_PUSHPOPSTATE_SUPPORT 1
+#endif
+#ifndef HAVE_LD_LARGE_TOC
+# define HAVE_LD_LARGE_TOC 1
+#endif
+#ifndef HAVE_LD_NO_DOT_SYMS
+# define HAVE_LD_NO_DOT_SYMS 1
 #endif
 EOF
     ;;

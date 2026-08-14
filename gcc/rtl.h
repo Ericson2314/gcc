@@ -34,6 +34,31 @@ along with GCC; see the file COPYING3.  If not see
 #include "is-a.h"
 #endif  /* GENERATOR_FILE */
 
+/* THE CONVERSION LAYER, FOR THE SAME REASON THE FOUR CHANNEL HEADERS TAKE IT,
+   AND FOR ONE MORE.
+
+   `rtl.h' includes no `tm.h' and never did; it relies on its includers having
+   one.  That reliance is invisible in every instrument that reads a
+   translation unit's own text, and it is what revoked `lists.cc', `rtlhash.cc'
+   and `rtl-error.cc' after all three had been measured to use no target macro
+   at all: the errors came from here and from `hard-reg-set.h'.  Four causes,
+   all now answered without a back-end header --
+
+     hard-reg-set.h:551  enum reg_class      neutral declaration, and a
+			 (9 diagnostics)     start-up width check
+     rtl.h:2473-2479     target_unit         moved out of defaults.h; it is
+			 (4 diagnostics)     computed from insn-modes.h
+     rtl.h:4761          BITS_PER_WORD       already `targetm_cdata'; only the
+					     route was missing
+     rtl.h:4762          LOAD_EXTEND_OP      now `mt_load_extend_op ()'
+
+   -- so this line is what makes the answers reachable.  Placed after the
+   GENERATOR_FILE block and before `hard-reg-set.h', because that header is
+   the first consumer.  In a translation unit that still has `tm.h' the
+   include guard makes it a no-op and nothing changes; the `#undef'/`#define'
+   pairs it carries were already applied from `defaults.h'.  */
+#include "multi-target-macros.h"
+
 #include "hard-reg-set.h"
 
 class predefined_function_abi;

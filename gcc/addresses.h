@@ -111,4 +111,32 @@ regno_ok_for_base_p (unsigned regno, machine_mode mode, addr_space_t as,
   return ok_for_base_p_1 (regno, mode, as, outer_code, index_code, insn);
 }
 
+/* THE FIFTH FUNNEL, and it is spelled differently from the four above on
+   purpose.
+
+   `LEGITIMATE_PIC_OPERAND_P' is a `tm.h' macro of exactly the shape this
+   header exists to funnel, but unlike BASE_REG_CLASS and friends it has no
+   wrapper: six shared translation units spell the macro directly, so each of
+   them was asking the PRIMARY's headers a question posed on behalf of another
+   target.  The macro NAME is left alone -- back-end sources use it, and it is
+   correct there, where `tm.h' is that back end's own -- and the six shared
+   sites are changed to call this instead.  Keeping both spellings live is
+   what makes the distinction visible: `LEGITIMATE_PIC_OPERAND_P' in shared
+   code is now a bug you can grep for.  */
+
+inline bool
+mt_legitimate_pic_operand_p (rtx x)
+{
+  return targetm_addr->legitimate_pic_operand_p (x);
+}
+
+/* THE SIXTH, and the same rule applies: `CONSTANT_ADDRESS_P' in SHARED code
+   is a bug, `CONSTANT_ADDRESS_P' in a back end's own source is correct.  */
+
+inline bool
+mt_constant_address_p (rtx x)
+{
+  return targetm_addr->constant_address_p (x);
+}
+
 #endif /* GCC_ADDRESSES_H */

@@ -34,41 +34,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "read-md.h"
 #include "gen-target-ns.h"
 
-/* The enum types the MIDDLE END names bare and unconditionally.  Every back
-   end must export a table and a length for each of these, because
-   multi-target-select.cc's MT_OTHER_TABLES / MT_SCALAR_TABLES declare and
-   install them for ALL configured back ends -- not for the subset whose md
-   happens to declare the enum.
+/* THE TWO TABLES THE MIDDLE END NAMES BARE, and which therefore have to exist
+   for EVERY configured back end whether its md defines the enum or not.
 
-   Only 20 of the 48 back ends write `define_c_enum "unspecv"'; the other 28
-   emitted no unspecv_strings and no unspecv_strings_len at all, so the
-   installer referenced symbols that were never defined and cc1 failed to
-   link with `undefined reference to insn_<base>::unspecv_strings'.  */
+   print-rtl.cc, read-rtl-function.cc and multi-target-select.cc's
+   MT_OTHER_TABLES / MT_SCALAR_TABLES all spell these two names; this array is
+   not a new authority, it is the same list written where the definitions are
+   made.  Every other enum in an md is the back end's own business and is
+   emitted only when it exists.  */
 static const char *const mt_required_enums[] = { "unspec", "unspecv" };
 
-/* Set as each enum type is emitted, so main () can tell which of the above
-   the md did NOT supply.  */
+/* Which of the above this md actually defined.  */
 static bool mt_required_seen[ARRAY_SIZE (mt_required_enums)];
-
-/* Emit the EMPTY form of one of those tables: a real per-back-end answer,
-   not a borrowed one.  This back end genuinely has no names for this enum,
-   and a length of 0 says exactly that -- every consumer bound is
-   `i < <enum>_strings_len', so no index is ever accepted and no other back
-   end's strings can be reached.  Note this is NOT an `#ifndef' floor
-   supplying the primary's value; the primary's table is not consulted.
-
-   A one-element dummy rather than a zero-length array: `T x[] = {}' is a GCC
-   extension rather than valid C++, and the LENGTH is what any consumer
-   reads, never ARRAY_SIZE of this object.  */
-static void
-print_empty_enum_type (const char *name)
-{
-  printf ("\n/* This back end's md declares no `%s' enum.  Empty table with"
-	  "\n   length 0: the bound refuses every index.  */\n", name);
-  printf ("static const char *const %s_strings_empty[1] = { \"\" };\n", name);
-  printf ("const char *const *%s_strings = %s_strings_empty;\n", name, name);
-  printf ("int %s_strings_len = 0;\n", name);
-}
 
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
@@ -149,13 +126,52 @@ main (int argc, const char **argv)
      silently.  Namespaced; multi-target-select.cc supplies the bare names.  */
   print_ns_open (stdout);
   reader.traverse_enum_types (print_enum_type, 0);
-  /* AFTER the traversal, so mt_required_seen is complete.  Supplying the
-     missing ones here rather than making the installer conditional keeps ONE
-     authority for "which tables exist": the installer's list.  */
+
+  /* THE BACK ENDS WHOSE MACHINE HAS NO UNSPECS, AND WHY AN EMPTY TABLE IS
+     THEIR OWN ANSWER RATHER THAN A FLOOR.
+
+     mips defines `unspec' and no `unspecv'; arc, bpf, epiphany, ft32,
+     microblaze, msp430, rx and v850 are in the same position, and m68k, m32r
+     and others define neither.  multi-target-select.cc names
+     insn_<base>::unspecv_strings and insn_<base>::unspecv_strings_len for
+     EVERY configured back end -- it has to, because print-rtl.cc and
+     read-rtl-function.cc name the bare `unspecv_strings' and something must
+     be in force whichever back end is selected -- so a base that emitted
+     neither is an undefined reference at the link of cc1.  Measured: adding
+     mips to a base set gives `undefined reference to
+     insn_mips::unspecv_strings' and `...::unspecv_strings_len'.
+
+     PRINCIPLES 2a bans a floor that hands a base THE PRIMARY'S answer.  This
+     is the other kind, the one that rule explicitly permits: length ZERO is
+     what "this machine has no unspec_volatile constants" means, it is what
+     upstream's single-target build behaves as (the `#if defined
+     (NUM_UNSPECV_VALUES)' arms simply are not compiled), and no other back
+     end's value can reach mips through it.  Every consumer is already written
+     as `unspec < unspecv_strings_len', so a zero length is read as "never
+     name one", which is exactly right.  The value is not invented: it is
+     counted from this md, and it is 0 because this md has none.
+
+     Emitted only in the namespaced run.  The un-namespaced one is upstream's
+     shape, where an absent enum means absent code and there is nothing to
+     select between.  */
   if (gen_target_ns ())
     for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
       if (!mt_required_seen[i])
-	print_empty_enum_type (mt_required_enums[i]);
+	{
+	  const char *n = mt_required_enums[i];
+	  printf ("\n/* This machine description defines no `%s' enum.  */\n",
+		  n);
+	  printf ("const char *const %s_strings_tab[] = { NULL };\n", n);
+	  printf ("const char *const *%s_strings = %s_strings_tab;\n", n, n);
+	  /* NOT ARRAY_SIZE of the array above: a zero-length array is not
+	     valid, so the placeholder holds one NULL element, and the length
+	     the middle end must see is the number of NAMED VALUES, which is
+	     zero.  Writing ARRAY_SIZE here would publish a bound of 1 over a
+	     table whose only entry is NULL -- print-rtl.cc would then pass
+	     that NULL to %s for unspec 0.  */
+	  printf ("int %s_strings_len = 0;\n", n);
+	}
+
   print_ns_close (stdout);
 
   if (ferror (stdout) || fflush (stdout) || fclose (stdout))

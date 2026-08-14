@@ -1,0 +1,35 @@
+# EIGHT BACK ENDS, CHOSEN TO TEST THE FIX RATHER THAN TO PASS.
+#
+# `scratchpad/t155-checkset.sh` over the 48-base collision sweep reports, for
+# this set, four hand-written collisions and ZERO blocking ones:
+#
+#   print_operand_address   rs6000 m68k vax xtensa microblaze pdp11
+#   print_operand           rs6000 m68k vax xtensa microblaze
+#   simple_memory_operand   microblaze pdp11
+#   output_ascii            rs6000 pdp11
+#
+# All four are in MULTI_TARGET_RENAME_NAMES, so the set links only because of
+# this task's change.
+#
+# THE OBVIOUS SET WOULD HAVE PROVED NOTHING.  i386 + aarch64 + rs6000 has zero
+# hand-written collisions even in the UNFIXED tree: it links before and after,
+# and quoting it as evidence for the fix would have been a green with no arm
+# behind it.  A base set is evidence only when the fix is what makes the
+# difference.
+#
+# DELIBERATELY EXCLUDED, each for a measured reason and not by preference:
+#   s390, sparc  collide with i386 on `legitimate_pic_operand_p`, which this
+#                task took back OUT of the rename list -- shared code reaches
+#                it through the LEGITIMATE_PIC_OPERAND_P macro, so it needs the
+#                macro converted, not renaming.
+#   arm          24 names shared with aarch64 via config/arm/aarch-common.cc,
+#                which both back ends compile.  Same shape as config/linux.cc.
+#   c6x          `debugger_register_map`, shared with i386, not yet classified.
+aarch64-unknown-linux-gnu
+x86_64-pc-linux-gnu
+powerpc64-linux-gnu
+m68k-elf
+microblaze-elf
+pdp11-aout
+vax-linux-gnu
+xtensa-elf

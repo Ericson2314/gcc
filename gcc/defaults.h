@@ -1864,19 +1864,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define DWARF_VERSION_DEFAULT 5
 #endif
 
-#ifndef USED_FOR_TARGET
-/* Done this way to keep gengtype happy.  */
-#if BITS_PER_UNIT == 8
-#define TARGET_UNIT uint8_t
-#elif BITS_PER_UNIT == 16
-#define TARGET_UNIT uint16_t
-#elif BITS_PER_UNIT == 32
-#define TARGET_UNIT uint32_t
-#else
-#error Unknown BITS_PER_UNIT
-#endif
-typedef TARGET_UNIT target_unit;
-#endif
+/* `TARGET_UNIT' and `target_unit' MOVED TO multi-target-macros.h.
+
+   `rtl.h:2473-2479' declares `vec<target_unit> &' parameters, so a shared
+   translation unit that stops including `tm.h' loses the typedef and gets
+   four `'target_unit' was not declared in this scope' errors from a header it
+   does not itself spell.  It is target-neutral where it stands: the `#if' is
+   on `BITS_PER_UNIT', which comes from `insn-modes.h' -- reached through
+   `coretypes.h:553' in EVERY shared TU, independently of `tm.h' -- and not
+   from any back-end header.  So it can live in the neutral layer unchanged,
+   and the name it is computed from is the genmodes union quantity rather than
+   the primary's.  */
 
 /* Maximum length of COLLECT_GCC_OPTIONS before the driver spills it
    to a response file.  Hosts with tighter limits may override this.  */

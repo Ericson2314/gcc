@@ -1,0 +1,20 @@
+# The FOUR-BASE set from task #150's table, which recorded it as not linking:
+#
+#   i386 aarch64 rs6000 s390 | cc1 does not link: print_operand,
+#                              print_operand_address, legitimate_pic_operand_p,
+#                              legitimize_pic_address, regclass_map multiply
+#                              defined
+#
+# It is chosen precisely because every one of those five names is in the
+# population this task owns, so the set is a direct before/after arm rather
+# than a general "does a big build work" question.
+#
+# Both extra bases earn their place:
+#   rs6000  has already broken the i386+aarch64 pair once on this branch (six
+#           ELIMINABLE_REGS pairs against four).
+#   s390    is big-endian, so a divergence that happens to agree on three
+#           little-endian bases still has somewhere to show.
+x86_64-pc-linux-gnu
+aarch64-unknown-linux-gnu
+powerpc64-linux-gnu
+s390x-linux-gnu

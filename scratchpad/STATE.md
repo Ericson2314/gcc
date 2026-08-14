@@ -12967,3 +12967,796 @@ needs either the gengtype fix or a two-base tree, and should say which.
   * Only strong symbols are swept; COMDAT collisions are not visible.
   * `arm` also defines `extract_base_offset_in_addr` and is covered by the
     rename, but arm was not configured and so was not built.
+
+---
+
+# #143 / #154 / #49 -- THREE "COMPILED ONCE AND SHARED" ITEMS, RE-MEASURED
+
+Worktree `agent-ad1798a2b26398cc6`, anchor **48**, built from the immutable
+snapshot `/tmp/snap-ad1798a2` (`8b126bdce7d`, `git diff --quiet` asserted).
+Build dirs `/tmp/b-ad1798a2b26398cc6-48` (all 48 back ends, `make all-gcc`
+**rc=2** stamped -- the pre-existing failing set) and
+`/tmp/b-ad1798a2b26398cc6-rv` (i386 + aarch64 + riscv).
+
+**Two of the three briefs' stated mechanisms are wrong, and in both cases the
+real mechanism is either worse or already fixed.  Read the corrections, not the
+premises.**
+
+## 1. #49 -- THE CONVERSIONS ARE PRESENT, CORRECT, AND TWO OF THEM LAND TOO LATE
+
+This is the only one of the three that produced a code change
+(`6828710f385`).
+
+`defaults.h:1550+` redirects **60** `HAVE_{AS,GAS,LD}_*` names to `targ_caps`
+fields.  So a reader grepping for "was this converted?" finds every one of them
+converted.  **That is not the whole question: WHEN the macro is read matters,
+and `mkconfig.sh` appends `defaults.h` LAST.**
+
+Three populations, measured by `scratchpad/t49-caps.sh` / `t49-defined.sh` /
+`t49-shape.sh` on the source, then confirmed by `t49-preproc.sh` on the REAL
+generated chains:
+
+  * **108** `HAVE_{AS,GAS,LD}_*` names are still spelled in `gcc/`.
+  * **3** can still be defined by any build -- `HAVE_AS_TLS`,
+    `HAVE_AS_DTPREL_RELOC`, `HAVE_LD_RO_RW_SECTION_MIXING`, all from
+    `auto-host.h`, i.e. **still probed from the BUILD machine's binutils and
+    shared by all 48 back ends.**  These are unconverted, not mis-converted,
+    and are the largest remaining item here.
+
+    `HAVE_AS_TLS` is the big one: **59 uses across 19 back ends** (aarch64
+    alpha arc arm frv i386 ia64 loongarch m68k microblaze mips or1k pa riscv
+    rs6000 s390 sh sparc xtensa), `#define HAVE_AS_TLS 1` in this build's
+    `auto-host.h` purely because the BUILD host's `as` has TLS.  It has **no
+    `targ_caps` redirect at all**.  Converting it is harder than the ones
+    already done, and in exactly the way section 1 is about: `defaults.h:127`
+    is `#if defined (HAVE_AS_TLS) && !defined (ASM_OUTPUT_TLS_COMMON)`, gating
+    a macro DEFINITION -- a preprocessor line, which no `targ_caps` field can
+    satisfy.  Whoever takes it should expect the `mkconfig.sh`-prologue shape
+    rather than the `defaults.h`-redirect shape, or a union.
+  * **22** have a live preprocessor conditional.  The exactness arm
+    (`t49-defined.sh`, written eager-to-revoke because it GRANTS a finding)
+    struck **12** as legitimately redirected, leaving **10**.
+
+`t49-shape.sh` then separated a dead `#ifndef X / #define X 0` floor (benign --
+`defaults.h` `#undef`s and redirects afterwards, so value sites read the runtime
+field; `mips.h:250` is this shape and its comment says so) from a live `#ifdef`
+guard.
+
+### THE DEFECT, MEASURED ON THE REAL CHAIN
+
+`cpp -dM -DIN_GCC` on the generated `tm-rs6000.h`, in the 48-back-end build:
+
+    #define TARGET_CMODEL RS6000_CMODEL_SMALL        <- the #else branch
+    #define SET_CMODEL(opt) do {} while (0)          <- the #else branch
+    #define DOT_SYMBOLS 1                            <- the #else branch
+    #define HAVE_LD_LARGE_TOC (targ_caps.ld_large_toc)
+    #define HAVE_LD_NO_DOT_SYMS (targ_caps.ld_no_dot_syms)
+
+The last two lines are the trap.  The redirect **is** there, and it arrived
+after `config/rs6000/linux64.h:66` had already taken `#ifdef HAVE_LD_LARGE_TOC`
+the other way.  Consequence on powerpc64: **`-mcmodel=` is silently a no-op**
+(`SET_CMODEL` discards its argument), `TARGET_CMODEL` is frozen at
+`RS6000_CMODEL_SMALL`, and `rs6000_current_cmodel` -- a real option variable,
+`global_options.x_rs6000_current_cmodel` -- is neither written nor read.
+`DOT_SYMBOLS` likewise loses the ELFv2 local entry-point form.
+
+**Exactly the "correct by luck on i386 + aarch64" class.**  `tm-i386.h`
+contains **zero** occurrences of either macro, and aarch64 none, so the
+configured pair cannot express it.  It took preprocessing a third back end that
+has the guard.
+
+The fix extends the `mkconfig.sh` prologue that already carries four such names
+(`HAVE_LD_EH_FRAME_HDR`, `_AS_NEEDED`, `_PIE`, `_PUSHPOPSTATE_SUPPORT` -- found
+the same way, by an earlier agent whose comment predicted the rest of the
+population).  **The runtime redirect survives**, measured unchanged on both
+sides, exactly as `HAVE_LD_PIE`'s already does: the prologue answers the
+`#ifdef` sites that run too early, `defaults.h` answers the value sites, and
+`target-specs` still overrides those against the real linker.
+
+Whose answer is the floor (PRINCIPLES section 2a): upstream's own for rs6000
+standing alone.  **Not** the primary's -- i386 never tests either macro.
+
+Both-sided (`t49-verify.sh`): rs6000 moves as above; the i386 control
+preprocesses to a macro set **identical apart from the two new names**, total
+macro count **8358 on all four readings**.
+
+### THE COMPILE ARM -- because preprocessing does not prove it BUILDS
+
+The reading above proves what the macros become.  It does not prove
+`rs6000.cc` still compiles once the guards are taken, and this change turns on
+code that has **never been compiled in this tree**: `TARGET_CMODEL` becomes
+`rs6000_current_cmodel` and `DOT_SYMBOLS` becomes `dot_symbols`, both
+previously unreachable.  (`dot_symbols` is `int dot_symbols;` at
+`rs6000.cc:118` and is assigned at `rs6000.cc:3553`; `rs6000_current_cmodel` is
+`Var(rs6000_current_cmodel)` in `linux64.opt`.  Both exist, so the link is
+safe -- but that was checked, not assumed.)
+
+`scratchpad/t49-compile.sh` does it surgically, in the BASELINE build dir,
+because a full patched 48-back-end build could not be finished (section 4):
+inject the two prologue blocks into that build's own `tm-rs6000.h`, recompile
+`mt-rs6000/rs6000.o` with the build's OWN command line lifted from its log,
+then restore both files.
+
+    recompile rc=0
+    object 769744 -> 777192 bytes          <- MUST-MOVE arm passes
+    warnings 3, all pre-existing           <- both poly_int/format warnings
+                                              are in b48.err too
+
+**The MUST-MOVE arm is the load-bearing one.**  A compile that succeeded and
+produced a byte-identical object would mean the change reaches no code and the
+whole finding is wrong; +7448 bytes says it reaches a great deal.
+
+Two harness bugs of my own, both caught by asserts rather than by luck, and
+both worth recording because each would have read as a verdict about the tree:
+
+  * the injection check asserted **1** `HAVE_LD_LARGE_TOC` line when a correct
+    injection produces **2** (the `#ifndef` and the `# define`), and refused a
+    CORRECT injection -- the right direction for an assert to fail in;
+  * the compile command was lifted with `grep -o '...-o mt-rs6000/rs6000\.o
+    [^ ]*'`, which stopped at `-MMD` and dropped the source file.  The result
+    was `g++: fatal error: no input files`, which reads exactly like **"the
+    change does not build"**.  The script now requires the lifted command to
+    end in `rs6000.cc` and says so by name if it does not.
+
+### STILL OPEN, NOT FIXED HERE -- and why each was left
+
+  * `sol2.h:373` `#ifdef HAVE_LD_CTF` is silently false, so `SCTF_CC1_SPEC`
+    becomes `%e-gsctf is not supported in this configuration` -- a hard
+    user-facing error.  **Deliberately not floored to 1:** claiming CTF support
+    the linker may lack is worse than refusing, and `ld -z ctflabel` is
+    genuinely not universal.  A design question, not a floor.
+  * `darwin.h:707` `HAVE_AS_MMACOSX_VERSION_MIN_OPTION` silently false, so
+    `ASM_MMACOSX_VERSION_MIN_SPEC` drops `-mmacosx-version-min=`.
+  * `avr/gen-avr-mmcu-specs.cc:114,120` is the OPPOSITE direction: it includes
+    the shared `tm.h` (line 37), so `defaults.h` HAS been read, the `#ifdef` is
+    unconditionally TRUE, and `have_avrxmega{2,4}_flmap` are hardcoded `true`.
+  * Neither solaris nor darwin is in `scratchpad/all-backends.txt`, so those two
+    are **source-level readings only** -- no object-level confirmation.
+
+## 2. #154 -- ALREADY FIXED, AND THE STATED MECHANISM IS NOT THE REAL ONE
+
+**No change made.  The root cause is fixed on the branch by `5e54a43ab18`
+(2026-08-11), "driver: every target was given i386's multilib set, and searched
+its directories".**  Per the brief's own instruction, not duplicated.
+
+**The brief says `multilib_select` "is NULL for riscv".  It is not, and cannot
+be.**  `driver::build_multilib_strings()` (`gcc.cc:9054`) is called
+unconditionally at `gcc.cc:8924`, **before** `set_up_specs()`, and fills
+`multilib_select` from `multilib.h`'s `multilib_raw`.  Read directly out of the
+48-back-end build dir, `gcc/multilib.h` is:
+
+    ". !m64 !m32;", "64:../lib64 m64 !m32;", "32:../lib !m64 m32;"
+
+-- **i386's** multilib set, one file, shared by all 48 back ends.  So the bug
+was a *wrong value*, not a null pointer: every target searched i386's library
+directories.  A NULL would in any case have crashed `gcc.cc`'s own
+`set_multilib_dir` (`while (*p != '\0')` on the same variable, no guard) long
+before reaching riscv's hook.
+
+Also worth stating: `riscv_compute_multilib` early-returns
+(`select_kind == select_by_builtin`, the default) before touching
+`multilib_select` at all, so it is not the natural crash site either.
+
+**The landed fix verified for riscv specifically**, by running
+`gen-multilib-specs.sh` for `riscv64-unknown-linux-gnu` against the
+48-back-end build's `multi-target.multilib` (48 target records): it emits
+riscv's own five multilibs -- `.`, `lib32/ilp32`, `lib32/ilp32d`, `lib64/lp64`,
+`lib64/lp64d`, keyed on real `-march=rv*` / `-mabi=*` options -- not
+`m64`/`m32`.  Both-sided: i386's shared `multilib.h` says `m64`/`m32`, riscv's
+generated stanza says `march`/`mabi`.
+
+**I could not reproduce a segfault**, and I did not run a driver for riscv (see
+section 4).  "The mechanism is fixed" is as far as the evidence goes; **"the
+reported segfault is gone" is NOT claimed.**
+
+## 3. #143 -- THE PREMISE IS HALF FALSE, AND THE REAL ITEM IS A LATENT COLLISION
+
+**No change made; this is a design decision, with a route chosen.**
+
+`EXTRA_GCC_OBJS` in the 48-back-end build's `gcc/Makefile`:
+
+    EXTRA_GCC_OBJS = driver-i386.o  $(MT_GCC_OBJS)
+
+and `multi-target-md.mk` supplies the second half **per back end** -- arc, avr,
+loongarch and msp430 all contribute `mtd-<cpu>/` objects (commit
+`ba2e480125d`).  So "driver objects are compiled once and shared" is **no longer
+true of the target half**.
+
+`driver-i386.o` is **host-side**: it comes from `config.host`'s
+`host_extra_gcc_objs`, keyed by the HOST triple, and answers about the machine
+the driver RUNS on.  The host is singular, so one such object is correct by the
+branch's own rules.  "Only `driver-i386.o` is built" is explained by that, not
+by a bug -- as this file already recorded once and the brief did not carry.
+
+### WHAT THEY DECIDE, AND IT IS COHERENT TODAY (`scratchpad/t143-native.sh`)
+
+Read from each base's real chain in the 48-back-end build:
+
+    BASE      HAVE_LOCAL_CPU_DETECT   native spec text calls local_cpu_detect?
+    i386      yes                     yes
+    aarch64   no                      no
+    alpha     no                      no
+    arm       no                      no
+    mips      no                      no
+    rs6000    no                      no
+    s390      no                      no
+    sparc     no                      no
+    riscv     no                      no
+
+Only the back end matching the host publishes a native detector, and the others
+publish **neither** half.  The guard is a HOST predefine -- `aarch64.h:1576` is
+`#if defined(__aarch64__)`.
+
+**A FALSE ALARM WORTH RECORDING.**  A first pass counted
+`#define MCPU_MTUNE_NATIVE_SPECS` and scored aarch64 as "spec text present, spec
+function absent" -- the exact two-halves defect `spec-functions.cc` documents.
+Reading the VALUE instead of its presence gives `MCPU_MTUNE_NATIVE_SPECS ""`,
+the `#else` branch: both halves absent together, no defect.  PRINCIPLES
+section 7's "a count is the weakest evidence available" fired on a live case;
+the instrument now reads the value.
+
+### THE ACTUAL FINDING: EIGHT BARE DEFINERS, NOT IN THE RENAME LIST
+
+**Eight back ends define a bare `host_detect_local_cpu`** -- aarch64, alpha,
+arm, i386, mips, rs6000, s390, sparc -- and it is **not** in
+`MULTI_TARGET_RENAME_NAMES` (measured: 0 hits).  This is the
+`extract_base_offset_in_addr` shape with 8 definers instead of 3.  It cannot
+fire today only because `config.host` links exactly one of them.
+
+That inverts the framing: **"only `driver-i386.o` is built" is what is currently
+preventing a hard link failure**, not a symptom of one.
+
+### ROUTE CHOSEN: MOVE THE CAPABILITY INTO `target-specs`
+
+Against the three options the brief named:
+
+  * **Per-base compilation** would trigger the 8-way collision immediately and,
+    worse, **would not remove the freeze**: `config.host` still decides at GCC
+    build time which host the detector is for.  More objects, same bug.
+  * **A selector** has the same problem, and needs the rename first.
+  * **`target-specs`** passes PRINCIPLES section 2's test unambiguously: *could
+    this differ between two installations of the same compiler serving the same
+    target?*  **Yes** -- it is a fact about the deployed machine's CPU, so it is
+    a capability, not a hook.  It is also the only route under which a compiler
+    built on x86_64 can answer `-march=native` when deployed on an aarch64
+    machine.  And it **removes** the collision rather than triggering it: no
+    `driver-<cpu>.o` need be linked into the driver at all, so
+    `host_detect_local_cpu` never has to be renamed or selected.
+
+The channel already exists and already carries this exact shape of answer:
+`target-specs/configure.ac:823-835` turns `--with-cpu-type` into
+`%{!march=*:-march=<value>}`, an OPTION_DEFAULT spec in the target's own spec
+file.  `-march=native` becomes one more probed key in a file the driver already
+reads.
+
+**THE HONEST COST, which must not be dropped when this is implemented:**
+`target-specs` freezes the answer at post-install-configure time, whereas
+upstream re-runs CPUID on every invocation.  For a per-machine install these are
+identical.  For a shared install used from heterogeneous machines they are not
+-- though such an install already has one spec file per target and is already
+frozen in every other respect.  If that difference is judged unacceptable, the
+answer is still not per-base compilation; it is a probe the driver runs at
+invocation time using a *method* target-specs supplies, and that is a larger
+design than any of the three options offered.
+
+## 4. WHAT THIS DOES NOT CLAIM
+
+  * **No driver and no `cc1` was ever run.**  `make all-gcc` at 48 back ends is
+    **rc=2** (stamped `b48.rc`; 4560 objects), with my change NOT in the
+    snapshot, so it is a clean baseline and not a regression reading.  Every
+    #143 and #154 statement above comes from generated artefacts and
+    preprocessed chains, never from `xgcc` behaviour.
+
+    **THE BRIEF'S "28 FAILING TARGETS" WAS NOT REPRODUCED and should not be
+    quoted further without saying which make goal it counted.**  Measured here
+    for `all-gcc`, the whole failing set is **three rules over two back ends**:
+
+        build/gen-target-specs-amdgcn_unknown_amdhsa.o
+        insn-modes-avr.o
+        mt-avr/avr.o                (plus `all-gcc' itself)
+
+    with `error:` lines from exactly two files, `config/avr/avr.cc` and
+    `mt-avr/insn-modes-avr.cc`.  **rs6000 is not in the failing set**, which is
+    what makes section 1's change testable at object level at all.  Whether 28
+    counted a different goal, per-target subdirectories, or an older tree, I
+    cannot say -- only that it is not this build's `all-gcc`.
+  * **THE FULL PATCHED 48-BACK-END A/B WAS NOT COMPLETED, and the reason is
+    host contention, not a result.**  A second 48-back-end build was configured
+    from a snapshot of the fix (`/tmp/b-ad1798a2b26398cc6-48fix`) to compare
+    the failing-rule set and object count.  Its `tm-rs6000.h` was confirmed to
+    carry both prologue blocks, and then it was abandoned: `uptime` showed
+    **load average 51 with FIVE concurrent `make -k -j8` builds** from other
+    agents on this host, and the build was running roughly 20x slower than the
+    baseline (538 objects in ~3 hours against the baseline's 4560 in ~50
+    minutes).  It was stopped rather than left to contend.  `scratchpad/t49-ab.sh`
+    is written and ready for whoever has a quiet machine.  **This is a missing
+    measurement, not a passed one** -- what stands in its place is the compile
+    arm in section 1, which is narrower (one object, not 4560).
+  * **No bar is quoted.**  `12369 bytes / 378fc33c1e70`, `specs-config` 230
+    lines and `stock-compare` 5/5 all need a linked `cc1`/`xgcc`, which neither
+    build dir produced.  Per PRINCIPLES, `stock-compare` selects x86_64 and is
+    unscorable beyond two bases (#153) in any case.  **The `mkconfig.sh` change
+    is therefore verified by both-sided preprocessing of the generated headers
+    and NOT by codegen** -- a real gap, since it changes `TARGET_CMODEL`, which
+    is a codegen input.  A two-base build cannot close it either: neither
+    configured base has the guard.  Closing it needs a rs6000-capable `cc1`.
+  * `HAVE_AS_TLS` and the other two `auto-host.h` survivors are reported, not
+    converted.
+  * The darwin/solaris `#ifdef` findings are source-level only.
+  * `MT_GCC_OBJS_UNHANDLED` (the darwin/vxworks OS-side fork recorded earlier in
+    this file) emits **0** lines at 48 back ends, because none of those 48
+    triples is a darwin or vxworks target.  The fork is untouched and
+    unexercised, not closed.
+  * A harness bug of my own is worth recording because it is the file's own
+    named shape: `t143-build.sh` first wrote `make ... || true; rc=$?`, which
+    captures the status of `true` and **stamped rc=0 on a make that had printed
+    "Target 'multi-target-objs' not remade because of errors"**.  A stamped
+    exit code is only as good as the capture.
+
+# TASK #32 -- COMPILED-ONCE TUs GATED ON TARGET MACROS: THE CENSUS
+
+**RE-MEASURED. THE BRIEFED FIGURES ARE NOT REPRODUCIBLE AND WERE LOW.** The
+brief carried *146 files, 498 macros, 925 sites*. Those numbers appear in no
+`STATE.md` section and in no script in this tree; they could not be
+reproduced or even re-derived. Measured at `8b126bdce7d` from an immutable
+snapshot against a **48-back-end** build (`/tmp/b-a568476`):
+
+| | briefed | measured |
+|---|---|---|
+| macros | 498 | **413** |
+| sites | 925 | **2845** |
+| files | 146 | **224** |
+
+Macros are in the same range; **sites are 3x the briefed figure**. As
+PRINCIPLES predicts, the stale number was wrong in the direction that made
+the task look smaller.
+
+## The instruments, and what each one caught
+
+Four arms, in `scratchpad/t32-*.sh`. Each caught a defect in another, which
+is the only reason the final number is trustworthy.
+
+- **`t32-dump.sh`** -- dumps all **48** back ends through the real
+  `tm-<base>.h` chain. Prior art (`tgh-hdrmatrix.sh`) reached 46 bases and
+  recorded *definedness* only; this keeps the **body**, which is what makes
+  the divergence question answerable at all.
+- **`t32-census.sh`** -- sorts sites by **POSITION OF USE**, the axis that
+  decides the shape of the fix.
+- **`t32-valueall.sh`** -- EXPANDS each macro per base and compares **values**.
+
+**THREE FILTERS, EACH ADDED BECAUSE THE PREVIOUS COUNT WAS WRONG:**
+
+1. *Divergence across the 48 bases.* Also drops, for free, every macro this
+   branch already converted: a redirect is the same text in all 48 dumps.
+2. *Defined somewhere under `config/`.* `gcn`'s `tm.h` chain drags in
+   `gcc/system.h`, so `ATTRIBUTE_UNUSED` (1512 sites), `FOR_EACH_VEC_ELT`
+   (1050) and `ggc_strdup` scored as target macros. **The pollution was
+   larger than the signal.**
+3. *Defined in the PRIMARY's dump, for value uses only.* `SIGNED`/`UNSIGNED`
+   scored 602 sites and are the generic `signop` enumerators; they entered
+   via `config/arc/arc.h:626`'s function-like `SIGNED(X,V)`, which no shared
+   TU can see. Deliberately NOT applied to `#ifdef`/`#if`, where "the primary
+   does not define it" **is** the leak.
+
+**A BLIND SPOT FOUND IN MY OWN INSTRUMENT, WORTH INHERITING.** The first
+shared-context dump was preprocessed as **C**, and
+`multi-target-macros.h:164`'s guard has an `|| !defined (__cplusplus)` arm --
+so every redirect was switched off and `Pmode` read as i386's raw
+`(ix86_pmode == PMODE_DI ? DImode : SImode)`. I concluded from that, and from
+`defaults.h` alone, that **`Pmode` was unconverted. It is converted**
+(`mt_pmode ()`). Anything probing this branch's conversion layer with `cpp`
+must pass `-x c++` or it will report the unconverted tree.
+
+## THE IDENTITY CLASS -- 3 macros, 57 sites, and NOT work
+
+The brief asks for these to be named rather than counted. Measured by value
+over all 48 bases:
+
+- **`CHAR_TYPE_SIZE` -- 43 sites.** `BITS_PER_UNIT` in 45 bases, literal `8`
+  in 4: **two bodies, one value (8) in all 48.** A text-only instrument calls
+  it divergent. Converting it changes nothing and proves nothing.
+- **`SHORT_FRACT_TYPE_SIZE` -- 2 sites.** 8 everywhere.
+- **`ELIMINABLE_REGS` -- 12 sites.** Already POISONED, not a redirect, so the
+  census's "converted" regex missed it. Already done.
+
+My own value arm had to be fixed twice before it could say this, and both
+defects produced a WRONG answer rather than a missing one: `(8)` vs `8`
+scored as divergence (the identity trap, committed by the instrument written
+to catch it), and a **function-like** macro named alone expands to itself, so
+all 48 "agreed" and it scored IDENTITY -- a green for a macro never read.
+
+## THE CLASSIFICATION -- 2845 live sites
+
+| class | route | sites |
+|---|---|---|
+| **(a)** object-like, divergent, EXPR | `targetm` / `target-cdata` | **1078** |
+| **(a')** function-like, divergent, EXPR | ditto, but each needs its own signature | **1048** |
+| **(a'')** existence-only `#ifdef` | a `has_` flag, the `INIT_EXPANDERS` precedent | **469** |
+| **(b)** macros defined by <=4 of 48 | per-base compilation (`reg-stack.cc`, #51) | **166** |
+| **(d) HARD RESIDUE** | `#if` arithmetic, array bounds, case labels | **68** |
+| identity / already done | none -- do not count | 57 |
+
+**CLASS (d), NAMED AND SIZED, because it is what the next agent needs.**
+68 sites: **37 `#if`**, **30 array bounds**, **1 case label**. It is not
+spread thin -- it concentrates in `emit-rtl.cc` (9), `rtlanal.cc` (8),
+`target-regstack.cc` (6), `attribs.cc` (5), `varasm.cc` (4),
+`target-regs.cc` (4), `builtins.cc` (4).
+
+The `#if` half is dominated by `TARGET_SUPPORTS_WIDE_INT` (14),
+`STACK_GROWS_DOWNWARD` (9) and `ARGS_GROW_DOWNWARD` (5). The bound half is
+dominated by the **register vocabulary** -- and most of that is *already*
+handled by `MULTI_TARGET_UNION_*`; what remains after subtracting the union
+macros is 30 sites, not the 152 a raw count gives.
+
+**CLASS (b) IS ONE FAMILY, NOT A SCATTER.** 166 sites, and 166 of them are
+the register stack: `FIRST_STACK_REG` (98), `STACK_REG_P` (45),
+`LAST_STACK_REG` (12), `STACK_REGS` (11). Defined by **2 of 48** back ends.
+`target-regstack.cc` already exists for exactly this; these sites are the
+residue not yet routed through it.
+
+## LANDED: `STORE_FLAG_VALUE`
+
+155 sites. All 48 bases expand it to an integer **literal**, only `-1` and
+`1`, so it is invariant and evaluable at `target-cdata.cc`'s refresh point --
+`target-cdata.h`'s own two-part test for a field rather than a call.
+
+**Its two `#if` sites had to move WITH the macro**, which is the whole reason
+the census sorts by position. An identifier in a `#if` is silently `0`:
+
+- `optabs.cc:2026` would have read `0 == 1 || 0 == -1`, taken the `#else`,
+  and given `normalizep = 1` to **every** back end -- wrong code for every
+  target whose compares produce an all-ones mask, no diagnostic.
+- `emit-rtl.cc:529` would have read `0 != 1 && 0 != -1` -- true for everyone,
+  the opposite of what the line says.
+
+**BOTH-SIDED, AT OBJECT LEVEL, AND IT NEEDED A THIRD BACK END.** Only `gcn`
+and `m68k` are `-1` of all 48, so **the i386+aarch64 pair cannot tell** --
+the "correct by luck" shape PRINCIPLES names. An i386+aarch64+m68k build,
+same struct offset:
+
+```
+i386     movl $0x1,0x58(%rdi)
+aarch64  movl $0x1,0x58(%rdi)
+m68k     movl $0xffffffff,0x58(%rdi)      <- -1
+```
+
+Two-base `cc1` links (`rc=0`, stamped); `optabs.o` 44, `expmed.o` 67,
+`combine.o` 43, `emit-rtl.o` 12 relocations against `targetm_cdata`.
+
+`defaults.h:1086`'s `#ifndef STORE_FLAG_VALUE` fallback STAYS: it is a
+supply-side floor giving a back end that defines nothing upstream's own
+documented `1`, not the primary's answer to a base that never spoke.
+
+## WHAT THIS DOES NOT CLAIM
+
+- The census scans **`.cc` files only**. Headers are not in the population,
+  so 2845 is a **lower bound**. (`STORE_FLAG_VALUE` was swept across headers
+  by hand; nothing else was.)
+- A source line spelling **two** leaky macros is counted **once** -- also a
+  lower bound.
+- The 1048 function-like sites are classified by **body text**, not value:
+  the expansion arm cannot read a function-like macro by naming it alone.
+  Some unknown fraction of them are identities.
+- No test suite was run. The evidence for `STORE_FLAG_VALUE` is the
+  per-base object divergence and a linking `cc1`, not execution.
+- The 48-back-end build produces **no `cc1`** (28 failing targets,
+  pre-existing), so every 48-base figure here is object- or header-level.
+
+## #32 VERIFICATION, AND A BAR THAT DOES NOT REPRODUCE
+
+Two-base build at `3807a3b5a06` (`/tmp/b-a568476-two3`, from the immutable
+snapshot `/tmp/snap3-a568476`): `all-gcc` **rc=0** (stamped), `cc1` links,
+`specs-config` **230 lines for both targets** -- that bar is met.
+
+**BOTH-SIDED, AND BOTH CONVERSIONS NEEDED A THIRD BACK END TO SAY ANYTHING.**
+
+| macro | i386 | aarch64 | third base |
+|---|---|---|---|
+| `STORE_FLAG_VALUE` | 1 | 1 | **m68k: -1** |
+| `WORD_REGISTER_OPERATIONS` | 0 | 0 | **arm: 1** |
+
+Read off the per-base `target-cdata-<base>.o` at the same struct offset
+`0x58`; the two `int` fields merge into one 8-byte store, so i386 and aarch64
+both emit `movq $0x1` (= `{1, 0}`) while arm loads `.rodata.cst8` containing
+`01000000 01000000` (= `{1, 1}`) and m68k emits `movl $0xffffffff`.
+
+**The habitual pair is blind to both of these.** Of 48 back ends only `gcn`
+and `m68k` answer -1 to the first, and i386/aarch64 agree on the second. This
+is the "correct by luck" shape PRINCIPLES lists, met twice in one task.
+
+**[CORRECTION, coordinator, at `5d96686ea51`: THE CLAIM BELOW IS WRONG. The
+bar reproduces exactly. `12369`/`378fc33c1e70` is the ASSEMBLY (`cc1 ... -o
+x.s`); `6376`/`b55aaccf5ca7` is the OBJECT (`-c`). Same tree, same commit,
+same `big.c`, measured side by side:**
+
+```
+ASSEMBLY (-o .s):  12369 bytes  md5 378fc33c1e70
+OBJECT   (-c .o):   6376 bytes  md5 b55aaccf5ca7
+```
+
+**Both readings were correct; they are different artefacts. There is no
+inherited gap and nothing was "never re-measured". Third instance today of one
+quantity read two ways — see also `specs-config` `wc -l` 230 vs `grep -c .`
+222. The paragraph below is left in place because the reasoning around it is
+sound and only the conclusion is not.]**
+
+**THE CODEGEN BAR `12369 bytes / 378fc33c1e70` DOES NOT REPRODUCE AT HEAD,
+AND IT IS NOT THIS TASK.** Measured, cold, from immutable snapshots, with
+`specs-config` present and the real cross binutils:
+
+```
+                                        x86_64 -O2 -c big.c
+pre-task  8b126bdce7d  /tmp/b-a568476-ctl    6376  b55aaccf5ca7
+post      3807a3b5a06  /tmp/b-a568476-two3   6376  b55aaccf5ca7
+```
+
+The control and the change agree **byte for byte**, and aarch64 `-S` is
+byte-identical too (12210 bytes both sides, `cmp` clean). So the 2x gap
+against the recorded bar is inherited, not introduced; some earlier change
+moved it and the recorded figure was never re-measured. Per PRINCIPLES the
+build dir and commit are stated beside the number so the next reader can tell
+which of the two applies.
+
+**AND THE IDENTICAL md5 IS THE POINT, NOT A DISAPPOINTMENT.** Neither
+configured base changes its answer, because i386's `1` and `0` are exactly
+what the primary was already supplying to everyone -- the conversion moves
+the AUTHORITY, not the value. The pair that shows it is not a no-op is the
+object-level divergence above, which is why that arm exists.
+
+---
+
+# TASK #155 -- THE `multiple definition` HALF OF THE MULTI-BASE LINK WALL
+
+## 1. THE DECISION RULE, APPLIED RATHER THAN GUESSED
+
+`gcc/Makefile.in`'s `MULTI_TARGET_RENAME_NAMES` comment already states the
+rule: if NO shared translation unit names the symbol, each back end keeps its
+own function and a bare rename suffices; if a shared TU DOES name it, the
+middle end must choose and it needs a selector.
+
+**THE NAMES MISLEAD, AND THE FILE ITSELF HAD IT WRONG.** That comment asserted
+the `print_operand` family needs a selector "which targhooks.cc and final.cc DO
+name". Measured, and false on both halves:
+
+  * `targhooks.cc:476` is the word inside a **comment** describing the hook;
+  * `final.cc:3679` spells `targetm.asm_out.print_operand` -- a **struct
+    member** reached through the hook, not the bare symbol;
+  * `genmatch.cc` really does define its own `print_operand`, in a **separate
+    build-time program** that never enters cc1.
+
+`print_operand` is a target hook (`target.def`), `targhooks.cc` defines only
+`default_print_operand`, and the eight back ends defining a bare
+`print_operand` each register their own as their own hook. So it is a **bare
+rename**, and a selector there would have duplicated a hook GCC already has.
+A `grep -w` cannot tell a mention or a member access from a use, which is
+exactly how the claim was written down and believed.
+
+## 2. WHAT LANDED -- 43 NAMES
+
+`MULTI_TARGET_RENAME_NAMES` went from 6 entries to 49. **For every added name
+BOTH definers are back ends the i386 + aarch64 pair never configures**, so not
+one could have been found by the pair everything on this branch is built with.
+
+`regclass_map` is the interesting one: it looks like the classic
+shared-numbering case and is still a rename, because the selector already
+exists one level up -- `REGNO_REG_CLASS` is redirected to
+`targetm_regs->regno_reg_class`, so shared code never reaches the array.
+i386 and s390 are its only bare definers.
+
+**THREE POPULATIONS DELIBERATELY NOT RENAMED**, each measured:
+
+  * `gt_ggc_mx` / `gt_pch_nx` (aarch64, arm, riscv) are C++ **overloads on
+    distinct parameter types** -- already distinct symbols -- and gengtype's
+    shared output calls them by the bare name. Renaming them would BREAK a
+    working thing.
+  * `main`, `tool_cleanup`, `maybe_unlink` collide only across **separate
+    programs** (gcn-run, nvptx-run, collect2, lto-wrapper). Nothing links two
+    of those together.
+  * `host_detect_local_cpu` is bare in 8 back ends and **is latent**, but it is
+    driver-side, already has a selector, and `target-specs` is being chosen as
+    the route for the `-march=native` capability that reads it. Flagged, not
+    taken unilaterally.
+
+## 3. THE RESULT, SCORED AS DEFINITIONS AND BOTH-SIDED
+
+Scored as **definitions**, not references: `nm -u` reads identically before and
+after a rename fix -- the reference is still there, it merely resolves -- and it
+has fooled an agent here. `ld` is also an UNDER-count, since libbackend.a is an
+archive and a duplicate is diagnosed only when both members are pulled in for
+other reasons; it once reported 7 of 40.
+
+Base set `i386 aarch64 rs6000 s390` -- the set task #150 recorded as not
+linking, chosen because all five names it named are in this population.
+
+| | i386 | aarch64 | rs6000 | s390 | colliding names |
+|---|---|---|---|---|---|
+| BEFORE | 14 obj / 422 defs | 24 / 1704 | 13 / 322 | 5 / 139 | **12** |
+| AFTER  | 14 obj / 422 defs | 24 / 1704 | 13 / 322 | 5 / 139 | **7** |
+
+**THE DENOMINATORS ARE IDENTICAL, WHICH IS WHAT MAKES THE COMPARISON MEAN
+ANYTHING.** Every base contributes the same object count and the same number of
+global definitions in both trees, so 12 -> 7 is the fix and not an artefact of
+what happened to build. The first reading of the AFTER tree was taken when i386
+had only 3 objects / 10 definitions and three of the five names had "gone" --
+that is *absent artefact*, not *absent mechanism*, and it was NOT banked.
+
+The 7 that remain are all `mt_probe_*`, the deliberate
+`MULTI_TARGET_REG_PROBES`: compiled and never linked, so benign.
+
+The five real collisions are gone, confirmed **positively** rather than by
+absence -- each base now defines its own renamed symbol:
+
+    i386     regclass_map_i386, legitimate_pic_operand_p_i386,
+             legitimize_pic_address_i386
+    s390     regclass_map_s390, print_operand_s390, print_operand_address_s390
+    rs6000   print_operand_rs6000, print_operand_address_rs6000
+
+And the flag itself was asserted by name and value on real compile lines --
+`-Dprint_operand=print_operand_{i386,aarch64,rs6000,s390}` and the same for
+`regclass_map` -- because "the generator ran" is not evidence the generator did
+anything.
+
+## 4. THE GUARD THIS FILE CITED STILL DID NOT EXIST
+
+`gcc/Makefile.in` named `scratchpad/sweep.sh` as the authority policing the
+rename list. It had never been written, and a comment naming a guard reads as
+evidence the guard ran. It also described the check as comparing "the **two**
+object SETS" -- the two-back-end habit written into the very instrument meant to
+police it. The citation now points at `scratchpad/t155-rename-gap.sh`, which
+sweeps every configured base, reports how many bases define each colliding
+name, and refuses to score when `nm` read nothing or when a base contributed no
+symbols at all.
+
+## 5. TWO INSTRUMENT DEFECTS, BOTH CAUGHT BY NON-VACUITY ARMS
+
+Neither was caught by reading the script.
+
+  * A **backtick inside an `awk` comment**, itself inside a double-quoted shell
+    word, ran as command substitution: `syntax error near unexpected token`.
+  * The bracket expression `[([=]` puts `[` immediately before `=`, which POSIX
+    reads as the start of a **collating element** `[= =]`. gawk errored once
+    per file and matched nothing -- i.e. it reported **ZERO collisions**, which
+    is the answer that reads as success. The refusal fired on "only 0 candidate
+    definitions".
+
+The second is the sharper one and is the project's recurring shape: a broken
+instrument fails towards the reassuring answer.
+
+## 6. WHAT THIS DOES NOT CLAIM
+
+  * The `undefined reference` half is another agent's and is untouched here.
+  * `stock-compare` is unscorable beyond two bases (#153); not claimed.
+  * Only strong symbols are swept, so COMDAT collisions are invisible to this
+    instrument, as they were to its predecessors.
+  * The per-base object sets are PARTIAL (`s390` 5 objects), so 12 and 7 are
+    **lower bounds** on the collision set for this base set, not totals.
+  * The 48-back-end census build was stopped deliberately to free the box and
+    left **no `.rc` stamp**, so it is unscorable by name rather than a smaller
+    number. Its per-base objects were still usable for the BEFORE arm, which
+    needs no link.
+
+## 7. ADDENDUM -- THE LINK REFUTED TWO OF THE 43, AND THAT IS THE BEST FINDING HERE
+
+The 4-base build (`i386 aarch64 rs6000 s390`) came back **0 `multiple
+definition` diagnostics, 0 distinct names** -- and `cc1` still did not link, on
+**2 undefined names over 51 lines**. Both were names this task had just
+renamed:
+
+    constant_address_p(rtx_def*)          <- emit-rtl.o explow.o final.o
+    legitimate_pic_operand_p(rtx_def*)    <- insn-preds.o ira.o ira-costs.o
+                                             lra-constraints.o
+
+The classifier had scored both "no shared TU names the bare symbol". That was
+**true and misleading**: shared code does not spell the function, it spells the
+**macro**. `i386.h:1853` and `:1870` define `CONSTANT_ADDRESS_P` and
+`LEGITIMATE_PIC_OPERAND_P` to call them, and eight shared TUs use the macros.
+**An identifier grep cannot see an uppercase macro that expands to the symbol.**
+This is the file's own rule -- *a symbol's name does not tell you which macro
+pulled it in; search for the ACCESSOR, not only the name* -- met from the other
+direction.
+
+Note what the rename actually did: it converted a **silent wrong answer** --
+every base getting i386's `CONSTANT_ADDRESS_P` out of the primary's `tm.h` --
+into a loud link failure. Right direction, wrong mechanism. Both are backed
+out, and both need the macro converted so each base answers for itself.
+
+**A forwarder is not the answer either**, and `multi-target-select.cc` already
+argued this about `gen_movxf`: it is defined by i386 and not aarch64, so "fail
+to link naming the base" is right for names every base defines and wrong for
+that one, and that question was left *"to a ruling, not resolved here by
+whichever choice makes the build succeed."* These two are that shape -- 44 of
+48 back ends define neither, and s390 defines `CONSTANT_ADDRESS_P` as literal
+`0` with no function at all. **Reported, not resolved.**
+
+## 8. THE 48-BASE SWEEP, AND WHAT IS STILL OPEN
+
+`t155-rename-gap.sh` over all 48 configured bases: **64 colliding hand-written
+names**, 7 of them the benign `mt_probe_*`.
+
+**The generated-object arm is now CHECKED rather than written**: 163,162
+generated definitions across 48 bases, **ZERO** collisions. The claim that
+`namespace insn_<base>` makes generated code safe was a written invariant; it
+now has a test. (It nearly did not: running it as the second half of
+`t155-rename-gap.sh` and reading that through `| head` sent SIGPIPE and killed
+the script before the arm ran, leaving no output file -- which reads exactly
+like "the arm ran and found nothing".)
+
+**STILL OPEN, and these are a queue rather than a claim:**
+
+  * **`config/arm/aarch-common.cc` is compiled by BOTH aarch64 and arm**, so
+    all 24 of its externals collide -- `aarch_bti_enabled`, `aarch_gen_bti_j`,
+    `arm_early_load_addr_dep`, `make_pass_insert_bti`, `arm_md_asm_adjust` and
+    the rest. **This is the same shape as `config/linux.cc`**, whose three
+    `linux_*` names are already in the rename list for exactly this reason.
+    Four of the 24 are renamed; the other 20 are not, and the whole family
+    should go in together.
+  * `regno_reg_class` bare in **csky frv m68k mcore sh** -- the other agent's
+    half (#155's `print_operand` family owner), reported as a crossing.
+  * `debugger_register_map` (c6x, i386), `num_source_filenames` (alpha, mips),
+    `minipool_fix_head` / `minipool_fix_tail` / `minipool_barrier` (arm, csky)
+    -- unclassified.
+  * `host_detect_local_cpu`, bare in 8 back ends, driver-side, left to the
+    `target-specs` `-march=native` work.
+
+## 9. CORRECTION -- THOSE TWO NAMES WERE SOLVED, NOT BLOCKED, AND NOT BY ME
+
+Section 7 above reports `constant_address_p` and `legitimate_pic_operand_p` as
+backed out and left as a design question. **That verdict is superseded.**
+Another agent reached the same diagnosis independently and then did the thing
+section 7 declined to do: **rename PLUS a `target_addr` funnel**, so each base
+answers for itself instead of the primary answering for all.
+
+    gcc/target-addr.h:126-137   the hook member `constant_address_p`
+    gcc/target-addr.cc:183-189  `gcc_taddr_constant_address_p`, per base
+    gcc/Makefile.in             both names in MULTI_TARGET_RENAME_NAMES
+
+Two things worth keeping from that:
+
+**The independent convergence is the evidence, not the fix.** Two agents,
+separately, found that shared code reaches these through `CONSTANT_ADDRESS_P`
+and `LEGITIMATE_PIC_OPERAND_P` and that an identifier grep cannot see it. That
+is a stronger result than either finding alone, and it is why the rule --
+*search for the ACCESSOR, not only the name* -- is now written into
+`t155-macroref.sh` with the two names as its negative control.
+
+**My reasoning for refusing was right about the mechanism and wrong about the
+conclusion.** I argued from `multi-target-select.cc`'s `gen_movxf` precedent
+that a *forwarder* cannot serve bases that do not define the function. True --
+and the funnel is not a forwarder. A forwarder dispatches to a back end's
+function and has nothing to dispatch to when 44 of 48 back ends define none; a
+hook member holds each base's own *answer*, which for those 44 is whatever
+their own header says, including a constant. **"A forwarder cannot express
+this" is not "nothing can."** Reporting the design question was still correct;
+concluding it was unresolvable was not.
+
+## 10. THE EIGHT-BASE RESULT, AND WHAT IT IS AND IS NOT
+
+Base set `i386 aarch64 rs6000 m68k microblaze pdp11 vax xtensa`, chosen from
+the 48-base collision data so that its four collisions are all names this task
+renamed. **`multiple definition`: 0 lines, 0 distinct names, across eight back
+ends.** This half of the wall is clear for that set.
+
+`cc1` still does not link, on **10 distinct undefined names over 26 lines**,
+all of them the other half:
+
+    insn_m68k::unspec_strings{,_len}        insn_pdp11::unspec_strings{,_len}
+    insn_m68k::unspecv_strings{,_len}       immed_double_const
+    insn_microblaze::unspecv_strings{,_len}
+
+The `insn_<base>::unspec*_strings` family is the class task #150 already
+recorded for mips, now reproduced in **three more back ends**, which suggests
+it is a generator gap rather than a per-back-end quirk.
+
+**TWO HONEST LIMITS ON THIS READING:**
+
+  * **The build predates the `target_addr` funnel.** It was configured from a
+    snapshot in which those two names were backed out, so it is a measurement
+    of a tree that is no longer the branch. The `multiple definition` = 0
+    result does not depend on the funnel, but the figure should be re-taken
+    before anyone quotes it as a current bar.
+  * **Eight back ends already link** (i386, aarch64, rs6000, s390, riscv, mips,
+    sparc, arm, at `70c9d9b3194`). This set is **not** that set: it shares only
+    i386, aarch64 and rs6000, and adds **five back ends that have never been in
+    a linking configuration** -- m68k, microblaze, pdp11, vax, xtensa. So the
+    count of eight is not new; *which* eight is, and the `unspec_strings` gap
+    in three of the five is new information.
