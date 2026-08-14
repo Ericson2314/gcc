@@ -13502,3 +13502,135 @@ configured base changes its answer, because i386's `1` and `0` are exactly
 what the primary was already supplying to everyone -- the conversion moves
 the AUTHORITY, not the value. The pair that shows it is not a no-op is the
 object-level divergence above, which is why that arm exists.
+
+---
+
+# TASK #155 -- THE `multiple definition` HALF OF THE MULTI-BASE LINK WALL
+
+## 1. THE DECISION RULE, APPLIED RATHER THAN GUESSED
+
+`gcc/Makefile.in`'s `MULTI_TARGET_RENAME_NAMES` comment already states the
+rule: if NO shared translation unit names the symbol, each back end keeps its
+own function and a bare rename suffices; if a shared TU DOES name it, the
+middle end must choose and it needs a selector.
+
+**THE NAMES MISLEAD, AND THE FILE ITSELF HAD IT WRONG.** That comment asserted
+the `print_operand` family needs a selector "which targhooks.cc and final.cc DO
+name". Measured, and false on both halves:
+
+  * `targhooks.cc:476` is the word inside a **comment** describing the hook;
+  * `final.cc:3679` spells `targetm.asm_out.print_operand` -- a **struct
+    member** reached through the hook, not the bare symbol;
+  * `genmatch.cc` really does define its own `print_operand`, in a **separate
+    build-time program** that never enters cc1.
+
+`print_operand` is a target hook (`target.def`), `targhooks.cc` defines only
+`default_print_operand`, and the eight back ends defining a bare
+`print_operand` each register their own as their own hook. So it is a **bare
+rename**, and a selector there would have duplicated a hook GCC already has.
+A `grep -w` cannot tell a mention or a member access from a use, which is
+exactly how the claim was written down and believed.
+
+## 2. WHAT LANDED -- 43 NAMES
+
+`MULTI_TARGET_RENAME_NAMES` went from 6 entries to 49. **For every added name
+BOTH definers are back ends the i386 + aarch64 pair never configures**, so not
+one could have been found by the pair everything on this branch is built with.
+
+`regclass_map` is the interesting one: it looks like the classic
+shared-numbering case and is still a rename, because the selector already
+exists one level up -- `REGNO_REG_CLASS` is redirected to
+`targetm_regs->regno_reg_class`, so shared code never reaches the array.
+i386 and s390 are its only bare definers.
+
+**THREE POPULATIONS DELIBERATELY NOT RENAMED**, each measured:
+
+  * `gt_ggc_mx` / `gt_pch_nx` (aarch64, arm, riscv) are C++ **overloads on
+    distinct parameter types** -- already distinct symbols -- and gengtype's
+    shared output calls them by the bare name. Renaming them would BREAK a
+    working thing.
+  * `main`, `tool_cleanup`, `maybe_unlink` collide only across **separate
+    programs** (gcn-run, nvptx-run, collect2, lto-wrapper). Nothing links two
+    of those together.
+  * `host_detect_local_cpu` is bare in 8 back ends and **is latent**, but it is
+    driver-side, already has a selector, and `target-specs` is being chosen as
+    the route for the `-march=native` capability that reads it. Flagged, not
+    taken unilaterally.
+
+## 3. THE RESULT, SCORED AS DEFINITIONS AND BOTH-SIDED
+
+Scored as **definitions**, not references: `nm -u` reads identically before and
+after a rename fix -- the reference is still there, it merely resolves -- and it
+has fooled an agent here. `ld` is also an UNDER-count, since libbackend.a is an
+archive and a duplicate is diagnosed only when both members are pulled in for
+other reasons; it once reported 7 of 40.
+
+Base set `i386 aarch64 rs6000 s390` -- the set task #150 recorded as not
+linking, chosen because all five names it named are in this population.
+
+| | i386 | aarch64 | rs6000 | s390 | colliding names |
+|---|---|---|---|---|---|
+| BEFORE | 14 obj / 422 defs | 24 / 1704 | 13 / 322 | 5 / 139 | **12** |
+| AFTER  | 14 obj / 422 defs | 24 / 1704 | 13 / 322 | 5 / 139 | **7** |
+
+**THE DENOMINATORS ARE IDENTICAL, WHICH IS WHAT MAKES THE COMPARISON MEAN
+ANYTHING.** Every base contributes the same object count and the same number of
+global definitions in both trees, so 12 -> 7 is the fix and not an artefact of
+what happened to build. The first reading of the AFTER tree was taken when i386
+had only 3 objects / 10 definitions and three of the five names had "gone" --
+that is *absent artefact*, not *absent mechanism*, and it was NOT banked.
+
+The 7 that remain are all `mt_probe_*`, the deliberate
+`MULTI_TARGET_REG_PROBES`: compiled and never linked, so benign.
+
+The five real collisions are gone, confirmed **positively** rather than by
+absence -- each base now defines its own renamed symbol:
+
+    i386     regclass_map_i386, legitimate_pic_operand_p_i386,
+             legitimize_pic_address_i386
+    s390     regclass_map_s390, print_operand_s390, print_operand_address_s390
+    rs6000   print_operand_rs6000, print_operand_address_rs6000
+
+And the flag itself was asserted by name and value on real compile lines --
+`-Dprint_operand=print_operand_{i386,aarch64,rs6000,s390}` and the same for
+`regclass_map` -- because "the generator ran" is not evidence the generator did
+anything.
+
+## 4. THE GUARD THIS FILE CITED STILL DID NOT EXIST
+
+`gcc/Makefile.in` named `scratchpad/sweep.sh` as the authority policing the
+rename list. It had never been written, and a comment naming a guard reads as
+evidence the guard ran. It also described the check as comparing "the **two**
+object SETS" -- the two-back-end habit written into the very instrument meant to
+police it. The citation now points at `scratchpad/t155-rename-gap.sh`, which
+sweeps every configured base, reports how many bases define each colliding
+name, and refuses to score when `nm` read nothing or when a base contributed no
+symbols at all.
+
+## 5. TWO INSTRUMENT DEFECTS, BOTH CAUGHT BY NON-VACUITY ARMS
+
+Neither was caught by reading the script.
+
+  * A **backtick inside an `awk` comment**, itself inside a double-quoted shell
+    word, ran as command substitution: `syntax error near unexpected token`.
+  * The bracket expression `[([=]` puts `[` immediately before `=`, which POSIX
+    reads as the start of a **collating element** `[= =]`. gawk errored once
+    per file and matched nothing -- i.e. it reported **ZERO collisions**, which
+    is the answer that reads as success. The refusal fired on "only 0 candidate
+    definitions".
+
+The second is the sharper one and is the project's recurring shape: a broken
+instrument fails towards the reassuring answer.
+
+## 6. WHAT THIS DOES NOT CLAIM
+
+  * The `undefined reference` half is another agent's and is untouched here.
+  * `stock-compare` is unscorable beyond two bases (#153); not claimed.
+  * Only strong symbols are swept, so COMDAT collisions are invisible to this
+    instrument, as they were to its predecessors.
+  * The per-base object sets are PARTIAL (`s390` 5 objects), so 12 and 7 are
+    **lower bounds** on the collision set for this base set, not totals.
+  * The 48-back-end census build was stopped deliberately to free the box and
+    left **no `.rc` stamp**, so it is unscorable by name rather than a smaller
+    number. Its per-base objects were still usable for the BEFORE arm, which
+    needs no link.
