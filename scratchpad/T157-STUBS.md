@@ -120,6 +120,145 @@ eleven failed that test in this task. Renaming twenty blind on the strength of
 a sweep, with no link failure to check the result against, is how the
 `legitimate_pic_operand_p` mistake gets made twenty times instead of once.
 
+### RESOLVED by #165 — all twenty renamed, after the macro test
+
+`scratchpad/t165-macrotest.sh` runs the test on each of the twenty, in two arms
+that answer different questions: arm S (does a shared TU spell the bare
+symbol?) and arm M (does *any* `#define` under `config/` carry the name in its
+body?). Arm M is deliberately over-broad — it can only revoke a rename, never
+authorise one — and it carries a positive control (`constant_address_p`, known
+macro-reached) so that an all-clear cannot come from a broken instrument.
+
+**Nineteen are clean on both arms. The twentieth is a false positive**:
+`arm_md_asm_adjust` is found by arm.cc:838's
+`#define TARGET_MD_ASM_ADJUST arm_md_asm_adjust`, which is the `target.def`
+*hook* macro — expanded only by `target-def.h` inside arm.cc's own TU, so
+definition and use are in the same base's objects and the `-D` reaches both.
+
+Two blind spots of the source-level test were closed **against the generated
+artefact**, which is where both answers actually live:
+
+- the fourteen `arm_*` scheduling predicates are named by
+  `mt-arm/insn-attrtab-arm.cc`, which is generated and therefore invisible to
+  arm S. Safe, because `multi-target-md.mk` puts the `insn-*-<cpu>` objects
+  inside `MULTI_TARGET_OBJS_<cpu>`, which carries `MULTI_TARGET_RENAMES` — the
+  generated caller and the hand-written definition are renamed together.
+- `make_pass_insert_bti` is named by `arm-passes.def` and
+  `aarch64-passes.def`, which feed `pass-instances.def`, which **shared**
+  `passes.cc` includes twice. That would have revoked the rename. It does not,
+  for a reason that is itself a defect — see below.
+
+## #165: THE COUNT IS **ELEVEN**, AND THE CEILING ABOVE IT IS NAMED
+
+Measured both ways from an immutable snapshot, one build dir, per-base objects
+deleted between arms so the changed `-D` set could not be missed (GCC objects do
+not depend on `Makefile`, so an incremental build here is a false green):
+
+| bases | commit | anchor | result |
+|---|---|---|---|
+| 8 (i386 aarch64 rs6000 s390 riscv mips sparc arm) | `70c9d9b3194` | 48 | links, rc=0, 167,756,696 B — but the sweep reports **20** real collisions |
+| 8, same set | `4b25a706fd5` | 50 | links, rc=0, 167,770,896 B, sweep **0** real collisions |
+| **11** (the 8 + ia64, visium, xtensa) | `70c9d9b3194` | 48 | **FAILS**, rc=2, `multiple definition` of `empty_delay_slot`, `output_ubranch`, no `cc1` |
+| **11** (the 8 + ia64, visium, xtensa) | `4fc753a90b6` | 50 | **LINKS**, rc=0, 0 errors / 0 multiple definitions / 0 undefined references, 170,641,264 B |
+| 16 (the 11 + alpha, csky, m68k, nds32, sh) | `4fc753a90b6` | 50 | fails; all 16 **compile**, 3 collision names + 2 undefined-reference causes remain |
+
+**8 → 11.** The renames are load-bearing for exactly this set, not incidental:
+`empty_delay_slot` and `output_ubranch` are defined by **sparc and visium**, both
+in the 11.
+
+That the 20 aarch64/arm names had to be fixed first is the point of the #157
+finding — the 8-base build *linked* while carrying them, so the green said
+nothing. Renaming them is what made adding a ninth back end a question about the
+ninth back end rather than about arm.
+
+### Why these five are not in the 11, each by name
+
+- **nds32** — `undefined reference to gt_ggc_mx_machine_function_nds32` /
+  `gt_pch_nx_machine_function_nds32`. The gengtype-marker shape.
+- **m68k** — `undefined reference to immed_double_const`; see the wide-int
+  ceiling below.
+- **csky, m68k, sh** — `multiple definition of regno_reg_class`, which a rename
+  does **not** fix (five back ends define `REGNO_REG_CLASS` as `regno_reg_class[…]`;
+  the `constant_address_p` shape, caught by the macro test before the link).
+- **sh** — `multiple definition of tls_symbolic_operand` against the **singular
+  shared** `insn-preds.o`, which is a genpreds question, not a rename.
+- **alpha** — `multiple definition of num_source_filenames`, against **mips**.
+  Renameable for this base set; the over-broad arm M revoked it on
+  `iq2000.h:758`'s `SET_FILE_NUMBER()`, a back end this build never configures.
+  Recorded as a cost of the instrument's deliberate over-breadth, not a defect.
+
+### THE WIDE-INT CEILING — the `only_leaf_regs_used` shape, now a CLASS
+
+`insn-emit-m68k-8.o` fails with `undefined reference to immed_double_const`.
+That function is **shared** code, `emit-rtl.cc:708`, gated on
+`#if TARGET_SUPPORTS_WIDE_INT == 0` — a per-back-end `tm.h` macro. Shared objects
+are compiled once against the **primary's** `tm.h`; `i386.h:3109` says `1`, so
+the definition is not compiled **for anybody**.
+
+Only **11 of 48** back ends define the macro (`defaults.h:1374` gives the other
+37 a `0`), so every one of those 37 whose `.md` emits such a call cannot link.
+This is a *structural ceiling on the back-end count*, not a per-back-end defect,
+and it is the third instance of one shape:
+
+| shared function | gated on | who decides |
+|---|---|---|
+| `only_leaf_regs_used` | `LEAF_REGISTERS` | i386 does not define it → absent for all |
+| `rest_of_handle_check_leaf_regs` | `LEAF_REGISTERS` | same |
+| `immed_double_const` | `TARGET_SUPPORTS_WIDE_INT` | i386 says 1 → absent for all |
+
+The general form: **a shared TU's `#if` on a back-end macro makes the primary
+decide which shared functions exist.** Worth a sweep of its own — nobody has
+enumerated the population, and each instance costs one back end at link time
+while being invisible to any build that does not configure that back end.
+
+## `PASSES_EXTRA` IS i386's, SO EVERY OTHER BACK END'S TARGET PASSES ARE GONE
+
+Found by asking whether `make_pass_insert_bti` was safe to rename; it is, and
+the reason it is safe is that **nothing calls it, or any other back end's pass
+constructor**.
+
+`PASSES_EXTRA` is how a back end contributes its target passes to
+`pass-instances.def`, and it is set by the per-target `config/<cpu>/t-<cpu>`
+fragments reached through `-include $(tmake_file)`. In an **eight-base** build
+dir, `tmake_file` is substituted as **i386's list alone**:
+
+```
+tmake_file= .../config/t-slibgcc .../config/t-linux .../config/t-glibc
+            .../config/i386/t-linux64 .../config/i386/t-pmm_malloc
+            .../config/i386/t-i386 .../config/i386/t-linux
+            .../config/i386/t-gnu-property
+```
+
+because it comes from the single legacy `${target}` pass through `config.gcc`,
+not from the back-end list. Measured in `pass-instances.def` in that build dir:
+`pass_stv`, `pass_remove_partial_avx_dependency` and
+`pass_insert_endbr_and_patchable_area` are present — i386's, from
+`config/i386/t-i386`'s `PASSES_EXTRA` — and **not one pass from aarch64, arm,
+rs6000, s390, riscv, mips or sparc**, though `t-aarch64:195` and `t-arm:163`
+both still carry their `PASSES_EXTRA +=` lines.
+
+Both halves of this project's defining bug in one channel:
+
+- **leaked PRESENCE** — shared `passes.cc` walks `pass-instances.def`
+  unconditionally, so i386's target passes are in the pipeline whichever base
+  is selected;
+- **leaked ABSENCE** — every other back end's target passes are silently
+  missing. aarch64 and arm BTI insertion has never run on this branch. This is
+  the `AUTO_INC_DEC` (#162) and `LEAF_REGISTERS` shape: no diagnostic, and the
+  absence reads as "this back end has no target passes".
+
+**Not fixed here, and it is not a stub — it is a design change.**
+`pass-instances.def` is one shared authority and `passes.cc`'s `NEXT_PASS` walk
+is compiled once, so a per-base pass list means either a per-base `passes.cc`
+or a selector inside the walk. #165 is a link-level unblock and this is a
+correctness change; it is recorded here so the correctness pass inherits it as
+work rather than as archaeology.
+
+Note the ordering trap for whoever takes it: fixing `PASSES_EXTRA` **revokes
+the `make_pass_insert_bti` rename's justification**, since shared `passes.cc`
+would then name the bare symbol from two bases. The rename must stay and the
+pass list must select, not the other way round.
+
 ## Not fixed, and NOT stubbed — the real work queue
 
 These are open walls, left failing loudly rather than papered over. None of
