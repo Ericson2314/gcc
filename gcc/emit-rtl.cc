@@ -526,10 +526,18 @@ gen_rtx_CONST_INT (machine_mode mode ATTRIBUTE_UNUSED, HOST_WIDE_INT arg)
   if (arg >= - MAX_SAVED_CONST_INT && arg <= MAX_SAVED_CONST_INT)
     return const_int_rtx[arg + MAX_SAVED_CONST_INT];
 
-#if STORE_FLAG_VALUE != 1 && STORE_FLAG_VALUE != -1
-  if (const_true_rtx && arg == STORE_FLAG_VALUE)
-    return const_true_rtx;
-#endif
+  /* Was `#if STORE_FLAG_VALUE != 1 && STORE_FLAG_VALUE != -1'.  It moves with
+     the macro for the same reason as the site in `optabs.cc': STORE_FLAG_VALUE
+     is now a `targetm_cdata' read, and an identifier in a `#if' is silently 0,
+     so the guard would have read `0 != 1 && 0 != -1' -- true for everyone,
+     which is the opposite of what it says.  As a run-time condition it is also
+     no longer a claim about the primary: each back end answers for itself.  */
+  {
+    int sfv = STORE_FLAG_VALUE;
+    if (sfv != 1 && sfv != -1
+	&& const_true_rtx && arg == sfv)
+      return const_true_rtx;
+  }
 
   /* Look up the CONST_INT in the hash table.  */
   rtx *slot = const_int_htab->find_slot_with_hash (arg, (hashval_t) arg,

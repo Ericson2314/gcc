@@ -2023,11 +2023,15 @@ expand_binop (machine_mode mode, optab binoptab, rtx op0, rtx op1,
       /* We can handle either a 1 or -1 value for the carry.  If STORE_FLAG
 	 value is one of those, use it.  Otherwise, use 1 since it is the
 	 one easiest to get.  */
-#if STORE_FLAG_VALUE == 1 || STORE_FLAG_VALUE == -1
-      int normalizep = STORE_FLAG_VALUE;
-#else
-      int normalizep = 1;
-#endif
+      /* Was a `#if' on STORE_FLAG_VALUE, and it had to move with the macro
+	 rather than after it.  STORE_FLAG_VALUE is now
+	 `(targetm_cdata.store_flag_value)', and an identifier in a `#if' is
+	 not an error -- it is replaced by 0.  The condition would therefore
+	 have read `0 == 1 || 0 == -1', taken the `#else' arm, and given
+	 `normalizep = 1' to EVERY back end, including the ones whose compares
+	 produce an all-ones mask.  Wrong code, no diagnostic.  */
+      int sfv = STORE_FLAG_VALUE;
+      int normalizep = (sfv == 1 || sfv == -1) ? sfv : 1;
 
       /* Prepare the operands.  */
       xop0 = force_reg (int_mode, op0);

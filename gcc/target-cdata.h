@@ -191,7 +191,8 @@ along with GCC; see the file COPYING3.  If not see
 					STACK_CHECK_FIXED_FRAME_SIZE)	\
   NUM (int,	     stack_check_max_frame_size,			\
 					STACK_CHECK_MAX_FRAME_SIZE)	\
-  NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)
+  NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)	\
+  NUM (int,	     store_flag_value,		STORE_FLAG_VALUE)
 
 /* `DWARF_FRAME_RETURN_COLUMN' WAS HERE AND IS NOT A CDATA FIELD.
 

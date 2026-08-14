@@ -290,6 +290,18 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define STACK_CHECK_MAX_FRAME_SIZE (targetm_cdata.stack_check_max_frame_size)
 #undef MAX_FIXED_MODE_SIZE
 #define MAX_FIXED_MODE_SIZE (targetm_cdata.max_fixed_mode_size)
+/* `STORE_FLAG_VALUE' -- what a `set' of a comparison result stores for true.
+   It is `1' for most back ends and `-1' for those whose compares produce an
+   all-ones mask, and a shared TU compiled once answered `1' for every one of
+   them: the wrong sign here is silently wrong comparison code, not an ICE.
+
+   Fit for cdata rather than a call, on this file's own two tests: measured
+   over all 48 configured back ends, every one expands it to an integer
+   LITERAL (only `-1' and `1' occur), so it is invariant and it is evaluable
+   at `target-cdata.cc''s refresh point, where `cfun' is null and no back
+   end's functions are declared.  `scratchpad/t32-valueall.sh' is the arm.  */
+#undef STORE_FLAG_VALUE
+#define STORE_FLAG_VALUE (targetm_cdata.store_flag_value)
 /* `DWARF_FRAME_RETURN_COLUMN' WAS REDIRECTED HERE AND IS NOW A CALL, with the
    rest of the DWARF register family below.  epiphany's reads
    `current_function_decl', which is null when `target-cdata.cc' runs.  */
