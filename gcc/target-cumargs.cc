@@ -907,6 +907,45 @@ mt_base_regmode_natural_size (machine_mode mode ATTRIBUTE_UNUSED)
   return REGMODE_NATURAL_SIZE (mode);
 }
 
+/* `CASE_VECTOR_MODE' and `INCOMING_RETURN_ADDR_RTX', read in THIS base's
+   translation unit.  See target-frame.h for both field comments.
+
+   NEITHER GETS AN `#ifdef', and for the two reasons the pair above does not:
+
+     `CASE_VECTOR_MODE'        every back end that has a jump table defines
+                               it, and for one that does not, the name is
+                               simply undefined and this file fails to
+                               compile BY NAME for that base -- which is the
+                               fail-by-name PRINCIPLES asks for, at build
+                               time rather than at run time.
+     `INCOMING_RETURN_ADDR_RTX' likewise undefined, and `defaults.h' supplies
+                               no floor for it either, so the same by-name
+                               build failure applies.  `dwarf2cfi.cc:52' does
+                               carry a `(gcc_unreachable (), NULL_RTX)'
+                               fallback, but that lives in the `.cc' and not
+                               in any header, so it is NOT reachable from
+                               here and is deliberately not restated -- a
+                               copy would be a second authority for the
+                               value.  In a shared translation unit that
+                               fallback is not taken anyway, because the
+                               primary's `i386.h:2162' got there first, which
+                               is the whole defect.
+
+   `MACRO_MODE' is not used on the first: `CASE_VECTOR_MODE' is already a
+   plain `machine_mode' on every back end that defines it, including the eight
+   that spell it `Pmode' (itself a run-time call on this branch).  */
+static machine_mode
+mt_base_case_vector_mode (void)
+{
+  return (machine_mode) CASE_VECTOR_MODE;
+}
+
+static rtx
+mt_base_incoming_return_addr_rtx (void)
+{
+  return INCOMING_RETURN_ADDR_RTX;
+}
+
 #define MT_STR1(X) #X
 #define MT_STR(X) MT_STR1 (X)
 
@@ -1369,7 +1408,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_has_push_rounding,
   mt_base_push_rounding,
   mt_base_case_vector_pc_relative,
-  mt_base_regmode_natural_size
+  mt_base_regmode_natural_size,
+  mt_base_case_vector_mode,
+  mt_base_incoming_return_addr_rtx
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

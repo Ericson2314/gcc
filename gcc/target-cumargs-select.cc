@@ -563,6 +563,26 @@ mt_regmode_natural_size (machine_mode mode)
   return mt_frame ()->regmode_natural_size (mode);
 }
 
+/* `CASE_VECTOR_MODE' and `INCOMING_RETURN_ADDR_RTX'.  Uncached, through
+   `mt_frame ()', and here neither could be cached even in principle: the
+   first is `flag_pic'-dependent on i386 and seven others, and the second
+   BUILDS AN RTX, reading `stack_pointer_rtx' on i386 -- per-function state
+   that does not exist until `init_emit_regs' has run for the current
+   function.  A value sampled at selection time would be a dangling answer of
+   exactly the kind `target-cdata.h:160' records for
+   `PIC_OFFSET_TABLE_REGNUM'.  */
+machine_mode
+mt_case_vector_mode (void)
+{
+  return mt_frame ()->case_vector_mode ();
+}
+
+rtx
+mt_incoming_return_addr_rtx (void)
+{
+  return mt_frame ()->incoming_return_addr_rtx ();
+}
+
 /* emit-rtl.cc's two `#ifdef INIT_EXPANDERS' sites, answered by the selected
    back end instead of by whichever base compiled emit-rtl.cc.
 
