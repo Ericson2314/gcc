@@ -622,6 +622,23 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**NEVER BUILD FROM THE LIVE WORKING TREE.** The coordinator did, to check
+whether `cc1` links at HEAD, and merged a branch into that tree while `make`
+was running. The build reported `multiple definition of add_clobbers` — a
+perfect diagnosis of a state that never existed in any commit: `insn-emit-5.o`
+generated *before* the merge, `multi-target-select.o` compiled *after* it.
+**A torn read looks exactly like a real defect, and it names real symbols.**
+Build from an immutable snapshot: `git worktree add /tmp/snap <sha>`, assert
+the anchor AND `git diff --quiet` in the harness, and let the srcdir be
+something nobody can write. A build whose sources can change under it measures
+nothing, and it will not tell you that.
+
+**`specs-config` is 222 lines, not 230.** Measured on three separate targets
+with distinct md5s. The 230 came from an older shape and was propagated into
+brief after brief by the coordinator without re-measurement — including into
+briefs whose whole point was that stale figures must be re-measured. If a bar
+figure appears in a brief, it is a claim to check, not a constant.
+
 **A GUARD THE BUILD SYSTEM CITES BY NAME MAY NOT EXIST.** `gcc/Makefile.in`
 names `scratchpad/sweep.sh` as the check for bare duplicate symbols across back
 ends. It had never been written. The defect it was supposed to catch was live:
