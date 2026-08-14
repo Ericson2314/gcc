@@ -62,9 +62,8 @@ along with GCC; see the file COPYING3.  If not see
    gives: the per-base symbol declarations and the `TARGETM_*_TABLES' list are
    emitted by `gen-multi-target-md.awk', and a further registry would be a
    mechanical copy of the cumargs one there.  The supplying translation unit
-   is already compiled once per base with `-I<base>-inc' ahead of `-I.', which
-   is precisely what makes `#include "insn-config.h"' mean THIS base's file.
-   That include is the whole mechanism.  */
+   is already compiled once per base and names this base's insn-config.h at
+   the point of inclusion.  That include is the whole mechanism.  */
 
 #ifndef GCC_TARGET_INSN_H
 #define GCC_TARGET_INSN_H

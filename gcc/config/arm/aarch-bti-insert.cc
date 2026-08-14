@@ -30,7 +30,8 @@
 #include "tree.h"
 #include "memmodel.h"
 #include "gimple.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "emit-rtl.h"

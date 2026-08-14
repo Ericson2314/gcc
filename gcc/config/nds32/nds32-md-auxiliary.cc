@@ -31,11 +31,12 @@
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"		/* For GEN_FCN.  */
 #include "recog.h"
 #include "output.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "expr.h"
 #include "emit-rtl.h"
 #include "explow.h"

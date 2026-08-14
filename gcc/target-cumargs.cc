@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Compiled once per back end, with `-I<base>-inc' so every header it reaches
+/* Compiled once per back end, so every header it reaches
    is that back end's.  The SUPPLY side of target-cumargs.h; see that file for
    why five macros and why not a `target.def' hook.
 
@@ -36,9 +36,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "rtl.h"
@@ -67,13 +64,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "multi-target-reg-widths.h"
 /* THIS BASE'S insn-config.h, and that is the entire mechanism for the three
-   booleans at the bottom of this file.  It used to be spelled
-   `#include "insn-config.h"' and resolved by `-I<base>-inc' coming ahead of
-   `-I.' -- which worked, and which resolved to whichever base wrote the plain
-   file in the build root the moment that flag was missing or mis-ordered,
-   silently.  The base is now named here instead; see multi-target-base.h.  */
+   booleans at the bottom of this file.  */
 #include BASE_HEADER (insn-config.h)
-/* THIS BASE'S insn-attr.h, named the same way and for the same reason.  It is what makes `get_attr_preferred_for_size' below mean
+/* THIS BASE'S insn-attr.h, named the same way and for the same reason.  It is
+   what makes `get_attr_preferred_for_size' below mean
    `insn_aarch64::get_attr_preferred_for_size' where the attribute exists and
    `hook_int_rtx_1' where it does not -- the generated header carries both
    answers already, and this file simply gets compiled once per base so that
@@ -180,8 +174,7 @@ mt_base_override_abi_format (tree fndecl ATTRIBUTE_UNUSED)
    about what it buys: in shared code `STACK_BOUNDARY' means
    `(TARGET_64BIT_MS_ABI ? 128 : BITS_PER_WORD)' evaluated against i386's
    headers, for aarch64 too.  Here it means aarch64's 128 when this file is
-   compiled with `-Iaarch64-inc' and i386's expression when it is compiled with
-   `-Ii386-inc'.
+   compiled for aarch64 and i386's expression when it is compiled for i386.
 
    Nothing below has an `#else' arm or a default, because none of these six is
    an existence predicate: `defaults.h' gives all but STACK_BOUNDARY and
@@ -243,8 +236,8 @@ mt_base_function_arg_regno_p (int regno ATTRIBUTE_UNUSED)
    that changed is which translation unit evaluates it, and therefore which
    back end it is a fact about.  In emit-rtl.cc it was a fact about i386 (which
    defines no INIT_EXPANDERS) applied to all 48 back ends.  Here it is a fact
-   about MULTI_TARGET_TARGETM_BASE, because this file is compiled once per base
-   with `-I<base>-inc'.
+   about MULTI_TARGET_TARGETM_BASE, because this file is compiled once per
+   base.
 
    Note there is deliberately no `#else' arm supplying a generic
    INIT_EXPANDERS.  Unlike STACK_SLOT_ALIGNMENT above, defaults.h has no
@@ -935,9 +928,8 @@ static const struct target_insn_desc mt_base_insn = {
 
    Every one of these thunks is one line calling the wrapper `genpreds' has
    already written into THIS base's `tm-preds-<base>.h' -- reached because
-   this file includes `tm_p.h' and is compiled with `-I<base>-inc' ahead of
-   `-I.', so that spelling resolves to `tm_p-<base>.h'.  In the build root the
-   same spelling reaches the primary's, which is the bug.
+   this file spells BASE_HEADER (tm_p.h), which names this base's
+   `tm_p-<base>.h'.
 
    `int' rather than `enum constraint_num' at the boundary, deliberately: the
    enum is a distinct type per `namespace insn_<base>' and its VALUES are per

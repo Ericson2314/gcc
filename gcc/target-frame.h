@@ -56,8 +56,8 @@ along with GCC; see the file COPYING3.  If not see
    seventh registry would be a mechanical copy of the cumargs one there, and
    that file is under concurrent edit.  Hanging a `const struct
    target_frame_desc *' off the table that is ALREADY generated, and that is
-   already supplied from the same per-base translation unit compiled with
-   `-I<base>-inc', costs one pointer and no generator change.  The two structs
+   already supplied from the same per-base translation unit, costs one pointer
+   and no generator change.  The two structs
    stay separate so that the split is a fact about ownership and not about
    what the fields mean; if a registry is ever cheap, this lifts out whole.  */
 

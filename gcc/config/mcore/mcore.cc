@@ -28,7 +28,8 @@
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "emit-rtl.h"

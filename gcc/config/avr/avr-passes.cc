@@ -34,7 +34,8 @@
 #include "cfganal.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
@@ -43,8 +44,8 @@
 #include "cfgrtl.h"
 #include "context.h"
 #include "tree-pass.h"
-#include "insn-attr.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (tm-constrs.h)
 
 
 #define CONST_INT_OR_FIXED_P(X) (CONST_INT_P (X) || CONST_FIXED_P (X))

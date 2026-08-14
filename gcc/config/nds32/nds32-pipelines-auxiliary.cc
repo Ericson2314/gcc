@@ -28,8 +28,9 @@
 #include "coretypes.h"
 #include "backend.h"
 #include "rtl.h"
-#include "insn-attr.h"
-#include "insn-codes.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-codes.h)
 #include "target.h"
 
 #include "nds32-protos.h"

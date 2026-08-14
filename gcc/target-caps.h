@@ -800,8 +800,8 @@ struct target_caps
      no compile-time answer to fall back to, because there is no longer a
      compile-time directory: gcc's build does not create include-fixed.  A
      non-empty default would put a system include directory that nothing
-     creates into every target's search path, silently skipped -- the
-     `-I<base>-inc' failure again.  "" is a real answer meaning "this target
+     creates into every target's search path, silently skipped.  "" is a real
+     answer meaning "this target
      has no fixed headers", and cppdefault.cc compacts the entry away.
 
      Written by fixincludes/mkheaders, which is the one thing that creates the

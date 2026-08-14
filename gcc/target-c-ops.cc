@@ -18,24 +18,14 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 /* Compiled once per back end.  gen-multi-target-md.awk gives this translation
-   unit `-I<base>-inc', so the plain `tm.h' and `tm_p.h' below are THAT back
-   end's, and `-DTARGET_C_OPS_SYMBOL=targetm_c_ops_<base>' so that all of them
-   can be linked into one compiler.  See target-c-ops.h for why.
-
-   On the include path: this file lives in $(srcdir), which contains neither
-   `tm.h' nor `tm_p.h', so the quoted includes cannot be answered by the
-   directory of the including file and `-I<base>-inc' -- which INCLUDES puts
-   ahead of `-I.' -- decides them.  That is the same trap the generated
-   per-base sources are copied into mt-<base>/ to avoid, and it does not bite
-   here only because of where this file sits.  Do not move it into the build
-   root.  */
+   unit `-DMT_BASE=<base>-inc', so the `tm.h' and `tm_p.h' named through
+   BASE_HEADER below are THAT back end's, and
+   `-DTARGET_C_OPS_SYMBOL=targetm_c_ops_<base>' so that all of them can be
+   linked into one compiler.  See target-c-ops.h for why.  */
 
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 

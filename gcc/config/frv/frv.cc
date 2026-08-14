@@ -28,7 +28,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -40,7 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "stor-layout.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "expr.h"
 #include "cfgrtl.h"

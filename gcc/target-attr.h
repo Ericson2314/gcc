@@ -76,7 +76,7 @@ along with GCC; see the file COPYING3.  If not see
        #endif
 
    and `hooks.cc:253' defines `hook_int_rtx_1' as `return 1;'.  So in a
-   translation unit compiled with `-I<base>-inc', the spelling
+   translation unit compiled for one back end, the spelling
    `get_attr_preferred_for_size (insn)' is ALREADY the right answer for that
    base -- the real function where the attribute exists, `hook_int_rtx_1'
    where it does not.  The thunks in `target-cumargs.cc' spell exactly that

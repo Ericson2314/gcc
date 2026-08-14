@@ -33,7 +33,8 @@
 #include "attribs.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"		/* For GEN_FCN.  */
 #include "regs.h"
 #include "emit-rtl.h"
@@ -45,10 +46,10 @@
 #include "output.h"
 #include "explow.h"
 #include "expr.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "builtins.h"
 #include "cpplib.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "cfgrtl.h"
 #include "tree-pass.h"
 

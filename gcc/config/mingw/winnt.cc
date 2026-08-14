@@ -30,7 +30,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "gimple.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "emit-rtl.h"

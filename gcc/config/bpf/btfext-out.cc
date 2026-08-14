@@ -24,7 +24,8 @@
 #include "coretypes.h"
 #include "target.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "output.h"
 #include "dwarf2asm.h"
 #include "ctfc.h"

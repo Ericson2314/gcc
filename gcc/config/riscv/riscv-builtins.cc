@@ -23,7 +23,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "rtl.h"
 #include "tree.h"
 #include "gimple-expr.h"
@@ -37,7 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "expr.h"
 #include "langhooks.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "backend.h"
 #include "gimple.h"
 #include "gimple-iterator.h"

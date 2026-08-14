@@ -36,7 +36,8 @@
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "regs.h"
 #include "emit-rtl.h"
 #include "diagnostic-core.h"

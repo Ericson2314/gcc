@@ -23,9 +23,6 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* Compiled once per configured back end -- it is in arc's extra_gcc_objs, and
-   the driver serves every back end -- so name arc's own tm.h rather than
-   relying on -I<base>-inc.  See multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 

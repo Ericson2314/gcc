@@ -28,7 +28,8 @@
 #include "tree.h"
 #include "gimple-expr.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "profile-count.h"
 #include "optabs.h"
 #include "emit-rtl.h"

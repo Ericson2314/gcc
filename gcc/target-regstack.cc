@@ -161,18 +161,12 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  Note this file has no direct `tm.h': it arrives
-   through backend.h, and is still resolved by the -I -- as is everything else
-   reached transitively.  That is what the witness in multi-target-base.h is
-   for.  */
-#include "multi-target-base.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"
 #include "tree.h"
 #include "df.h"
+#include "multi-target-base.h"
 #include BASE_HEADER (insn-config.h)
 #include "memmodel.h"
 #include "regs.h"

@@ -33,7 +33,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "cfghooks.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -42,7 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "recog.h"
 #include "cgraph.h"
 #include "diagnostic.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "output.h"
 #include "alias.h"
 #include "fold-const.h"

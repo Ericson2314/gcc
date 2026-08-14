@@ -28,13 +28,14 @@
 #include "target.h"
 #include "rtl.h"
 #include "df.h"
-#include "insn-config.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-config.h)
 #include "regs.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "recog.h"
 #include "cfganal.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "context.h"
 #include "tree-pass.h"
 #include "function-abi.h"

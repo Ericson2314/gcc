@@ -21,8 +21,6 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* Compiled once per configured back end: name the back end's own
-   tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "basic-block.h"
@@ -30,9 +28,9 @@
 #include "function.h"
 #include "gimple.h"
 #include "rtl.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "memmodel.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "optabs.h"
 #include "aarch64-acle-builtins.h"
 #include "aarch64-sve-builtins-shapes.h"

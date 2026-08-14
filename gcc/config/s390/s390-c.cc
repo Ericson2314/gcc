@@ -37,7 +37,8 @@
 #include "c-family/c-common.h"
 #include "c/c-tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "c-family/c-pragma.h"
 #include "langhooks.h"

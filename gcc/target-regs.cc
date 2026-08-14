@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Compiled once per back end, with `-I<base>-inc' so every header it reaches
+/* Compiled once per back end, so every header it reaches
    is that back end's, and with -DTARGETM_REGS_SYMBOL naming its table.  This
    is the SUPPLY side of the redirection in defaults.h; see target-regs.h for
    what the three different numbers are and why.
@@ -31,9 +31,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* This source is compiled once per configured back end, so it names the back
-   end's headers rather than relying on -I<base>-inc.  See
-   multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 /* REGNO_REG_CLASS is not arithmetic on every back end: aarch64's is
@@ -67,10 +64,8 @@ along with GCC; see the file COPYING3.  If not see
 /* The remaining members of `class target_globals'.  Same list, same order as
    reginfo.cc's, for the same reason as above: the two sides must compute
    their `sizeof's after the same headers or they are not comparing the same
-   layout.  insn-opinit.h is named through BASE_HEADER rather than left to
-   -I<base>-inc, so that `struct target_optabs' here is sized by THIS base's
-   generated header and a missing -I cannot silently substitute the
-   primary's.  */
+   layout.  insn-opinit.h is named through BASE_HEADER, so `struct
+   target_optabs' here is sized by THIS base's generated header.  */
 #include "flags.h"
 #include "expmed.h"
 #include "libfuncs.h"

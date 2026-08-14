@@ -32,7 +32,8 @@
 #include "gimple-expr.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "regs.h"
 #include "emit-rtl.h"
 #include "varasm.h"
@@ -49,8 +50,8 @@
 #include "msp430-devices.h"
 #include "incpath.h"
 #include "prefix.h"
-#include "insn-config.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
 #include "recog.h"
 
 /* This file should be included last.  */

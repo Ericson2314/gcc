@@ -22,13 +22,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "function.h"
 #include "basic-block.h"
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "emit-rtl.h"
 #include "explow.h"
 #include "expr.h"

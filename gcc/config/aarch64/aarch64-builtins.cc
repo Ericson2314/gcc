@@ -23,8 +23,6 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* Compiled once per configured back end: name the back end's own
-   tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "function.h"
@@ -34,7 +32,7 @@
 #include "gimple.h"
 #include "ssa.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "expmed.h"
 #include "optabs.h"
 #include "recog.h"

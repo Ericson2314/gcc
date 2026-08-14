@@ -26,7 +26,8 @@
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "ira.h"
 #include "print-tree.h"
 #include "varasm.h"
@@ -38,7 +39,7 @@
 #include "optabs.h"
 #include "riscv-protos.h"
 #include "recog.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 
 /* Emit proper instruction depending on mode of dest.  */
 

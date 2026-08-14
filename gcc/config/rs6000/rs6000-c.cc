@@ -29,7 +29,8 @@
 #include "target-caps.h"
 #include "c-family/c-common.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "stor-layout.h"
 #include "c-family/c-pragma.h"

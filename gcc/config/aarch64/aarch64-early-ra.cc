@@ -53,8 +53,9 @@
 #include "expr.h"
 #include "cfgrtl.h"
 #include "print-rtl.h"
-#include "insn-attr.h"
-#include "insn-opinit.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-opinit.h)
 #include "reload.h"
 
 template<typename T>

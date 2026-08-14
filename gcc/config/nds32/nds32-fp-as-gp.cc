@@ -27,11 +27,12 @@
 #include "coretypes.h"
 #include "backend.h"
 #include "hard-reg-set.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "rtl.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "ira.h"

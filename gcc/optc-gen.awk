@@ -326,7 +326,7 @@ if (init_base != "") {
 # valid x86 ABI.  The table is DATA, kept per configuration, selected at run
 # time -- multi-target-options-select.cc.
 #
-# Compiled with -I<base>-inc for the same reason options-init-<base>.cc is: an
+# Compiled per back end for the same reason options-init-<base>.cc is: an
 # `EnumValue(... Value(AARCH64_ABI_LP64))' is a back-end MACRO, not a value, and
 # in this file it must resolve in ITS OWN back end's tm.h.
 if (tables_base != "" && init_base != "") {

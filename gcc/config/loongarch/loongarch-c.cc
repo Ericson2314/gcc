@@ -24,11 +24,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "c-family/c-common.h"
 #include "cpplib.h"
 #include "c-family/c-pragma.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 
 #define preprocessing_asm_p() (cpp_get_options (pfile)->lang == CLK_ASM)
 #define builtin_define(TXT) cpp_define (pfile, TXT)

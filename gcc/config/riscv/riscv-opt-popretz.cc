@@ -53,12 +53,13 @@
 #include "target.h"
 #include "rtl.h"
 #include "tree.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "emit-rtl.h"
 #include "dumpfile.h"
 #include "tree-pass.h"
-#include "insn-config.h"
-#include "insn-opinit.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-opinit.h)
 #include "recog.h"
 
 namespace {

@@ -31,7 +31,8 @@
 #include "cfghooks.h"
 #include "cfgloop.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "expmed.h"
 #include "optabs.h"
@@ -40,7 +41,7 @@
 #include "recog.h"
 #include "cgraph.h"
 #include "diagnostic-core.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "alias.h"
 #include "fold-const.h"

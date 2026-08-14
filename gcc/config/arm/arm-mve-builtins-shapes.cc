@@ -20,14 +20,12 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-/* Compiled once per configured back end: name the back end's own
-   tm.h rather than relying on -I<base>-inc.  See multi-target-base.h.  */
 #include "multi-target-base.h"
 #include BASE_HEADER (tm.h)
 #include "tree.h"
 #include "rtl.h"
 #include "memmodel.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "optabs.h"
 #include "arm-mve-builtins.h"
 #include "arm-mve-builtins-shapes.h"

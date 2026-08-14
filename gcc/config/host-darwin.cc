@@ -20,7 +20,8 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "options.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (options.h)
 #include "diagnostic-core.h"
 #include "config/host-darwin.h"
 #include <errno.h>

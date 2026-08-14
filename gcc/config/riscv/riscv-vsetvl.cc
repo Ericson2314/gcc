@@ -69,7 +69,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "backend.h"
 #include "rtl.h"
 #include "target.h"
@@ -77,10 +78,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "df.h"
 #include "rtl-ssa.h"
 #include "cfgcleanup.h"
-#include "insn-config.h"
-#include "insn-attr.h"
-#include "insn-opinit.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-opinit.h)
+#include BASE_HEADER (tm-constrs.h)
 #include "cfgrtl.h"
 #include "cfganal.h"
 #include "lcm.h"

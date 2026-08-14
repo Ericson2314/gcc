@@ -22,8 +22,9 @@
 #include "coretypes.h"
 #include "backend.h"
 #include "rtl.h"
-#include "insn-attr.h"
-#include "insn-attr-common.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-attr-common.h)
 #include "aarch64-protos.h"
 #include "aarch64-sched-dispatch.h"
 #include "regset.h"

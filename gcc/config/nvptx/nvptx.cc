@@ -31,7 +31,8 @@
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "expmed.h"
 #include "optabs.h"
 #include "regs.h"
@@ -39,9 +40,9 @@
 #include "recog.h"
 #include "diagnostic.h"
 #include "alias.h"
-#include "insn-flags.h"
+#include BASE_HEADER (insn-flags.h)
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "dojump.h"
 #include "explow.h"
@@ -49,8 +50,8 @@
 #include "varasm.h"
 #include "stmt.h"
 #include "expr.h"
-#include "tm-preds.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-preds.h)
+#include BASE_HEADER (tm-constrs.h)
 #include "langhooks.h"
 #include "cfgrtl.h"
 #include "gimple.h"

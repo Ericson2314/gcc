@@ -21,12 +21,13 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "tree.h"
 #include "rtl.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "memmodel.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "optabs.h"
 #include "riscv-vector-builtins.h"
 #include "riscv-vector-builtins-shapes.h"

@@ -31,7 +31,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "cfgloop.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "expmed.h"
 #include "optabs.h"
@@ -48,7 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "varasm.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "except.h"
 #include "explow.h"
@@ -59,7 +60,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "reload.h"
 #include "gimplify.h"
 #include "dwarf2.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "cselib.h"
 #include "sched-int.h"
 #include "opts.h"

@@ -875,10 +875,9 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     asm_ops_bases = asm_ops_bases " " cpu;
   }
 
-  # The include directory described at MULTI_TARGET_INC_STEMS in BEGIN.  Put
-  # `-I<base>-inc' ahead of `-I.' -- that is what MULTI_TARGET_INC in
-  # Makefile.in is for -- and this back end's objects see their OWN generated
-  # headers under the plain names their sources actually write.
+  # The forwarding-header directory described at MULTI_TARGET_INC_STEMS in
+  # BEGIN.  This back end's objects reach their own generated headers by
+  # naming this directory, through BASE_HEADER.
   #
   # Emitted for every back end, including the three that share
   # default-common.cc: their tm-<base>.h, options-<base>.h and
@@ -970,14 +969,11 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t  $(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t    %s-inc/$${stem}.h || exit 1; \\\n", cpu;
     printf "\tdone\n";
-    # THE WITNESS PAIR.  See multi-target-base.h for the whole argument; in
-    # short, `-DMT_BASE=<cpu>-inc' and `-I<cpu>-inc' are two statements of one
-    # fact, and these two files make them check each other rather than leaving
-    # a disagreement to compile silently against another target's headers.
+    # THE WITNESS PAIR, which makes the two flags that say which back end an
+    # object is compiled for check each other.  See multi-target-base.h.
     #
-    #   mt-inc-witness.h	reachable ONLY through -I<cpu>-inc, and naming
-    #			mt-inc-tag-<cpu>.h through BASE_HEADER, i.e.
-    #			through -DMT_BASE
+    #   mt-inc-witness.h	found through the include path, and naming
+    #			mt-inc-tag-<cpu>.h through BASE_HEADER
     #   mt-inc-tag-<cpu>.h	the tag it names, and the ONLY base whose
     #			directory holds it
     #
@@ -992,6 +988,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
     printf "\t  > tmp-inc-%s.h\n", cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
     printf "\t  %s-inc/mt-inc-tag-%s.h\n", cpu, cpu;
+#include "multi-target-base.h"
     printf "\techo \"#include BASE_HEADER (mt-inc-tag-%s.h)\" \\\n", cpu;
     printf "\t  > tmp-inc-%s.h\n", cpu;
     printf "\t$(SHELL) $(srcdir)/../move-if-change tmp-inc-%s.h \\\n", cpu;
@@ -1783,12 +1780,12 @@ function emit_modes_union(   i, c, m, deps, seen_modes) {
 # Three things make one uniform recipe enough, and all three were measured
 # rather than assumed:
 #
-#   * `-I<cpu>-inc' supplies every generated header under the plain name the
-#     sources actually write, transitively.  That is MULTI_TARGET_INC, and it
-#     must be reached through a target-specific variable inside a RECURSIVE
-#     assignment -- an `INCLUDES := $(MULTI_TARGET_INC) ...' expands before the
-#     target-specific value exists and both arms of the test then fail
-#     identically, which reads as "the mechanism does not work".
+#   * the per-back-end forwarding directory supplies every generated header
+#     this back end's sources reach.  It must be reached through a
+#     target-specific variable inside a RECURSIVE assignment: an immediate
+#     `:=' expands before the target-specific value exists and both arms of
+#     the test then fail identically, which reads as "the mechanism does not
+#     work".
 #   * `$(COMPILE) $<' is the whole recipe.  See frag_source_for for why the
 #     fragments' own recipes are ignored.
 #   * `<cpu>-inc/s-inc' covers the headers this back end generates: it already
@@ -1849,12 +1846,9 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
 
   # *** MT_SRC: WHY EVERY PER-BASE SOURCE LIVES IN mt-<cpu>/ ***
   #
-  # `-I<cpu>-inc' is NOT enough on its own, and the reason is a rule of the
-  # preprocessor rather than anything about this build.  `#include "tm.h"'
-  # searches the directory OF THE FILE CONTAINING THE DIRECTIVE first, before
-  # any -I at all.  A generated source sitting in the build root therefore
-  # finds the build root's own tm.h -- the PRIMARY target's -- and no -I can
-  # outrank it.
+  # `#include "tm.h"' searches the directory OF THE FILE CONTAINING THE
+  # DIRECTIVE first.  A generated source sitting in the build root therefore
+  # finds the build root's own tm.h -- the PRIMARY target's.
   #
   # This was live and it was nearly silent.  Only insn-modes-aarch64.cc failed,
   # with `aarch64_sve_vg was not declared', because its ADJUST_NUNITS text
@@ -1863,19 +1857,10 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # is the branch's own bug class -- right on the build's triple, wrong
   # everywhere else -- reproduced inside the machinery meant to remove it.
   #
-  # It also explains why the earlier spikes read as proof and were not: they
-  # compiled sources from $(srcdir)/config/<cpu>/, where the same rule works
-  # FOR us (no tm.h next to them), and generated sources whose first tm.h comes
-  # transitively through a $(srcdir) header, which likewise resolves by -I.
-  # The failing case is exactly a build-root source whose own `#include "tm.h"'
-  # is the first one reached.
-  #
-  # Three arms, all run, with -H to name the file actually opened:
-  #   ./insn-modes-aarch64.cc      + -Iaarch64-inc   -> 57 errors
-  #   mt-aarch64/insn-modes-...cc  + -Iaarch64-inc   -> 0, via aarch64-inc/tm.h
-  #   mt-aarch64/insn-modes-...cc  withOUT it        -> 499 errors
-  # The third arm matters: without it a pass is consistent with the directory
-  # doing nothing.
+  # The failing case is exactly a build-root source whose own
+  # `#include "tm.h"' is the first one reached.  Measured with -H, naming the
+  # file actually opened: a build-root insn-modes-aarch64.cc gave 57 errors,
+  # the same source under mt-aarch64/ gave 0 and opened aarch64's tm.h.
   n = split("attrtab automata dfatab extract latencytab modes opinit output " \
 	    "peep preds enums", parts, " ");
   for (i = 1; i <= n; i++) {
@@ -2065,7 +2050,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
     # is copied into mt-<cpu>/ before it is compiled, exactly as the generated
     # insn-*.cc are, and for the identical reason: `#include "insn-codes.h"'
     # from a file sitting in the build root finds the build ROOT's copy, which
-    # is the PRIMARY target's, before -I<cpu>-inc is ever consulted.
+    # is the PRIMARY target's, whatever the include path says.
     # rs6000-builtins.cc includes insn-codes.h by plain name, so compiling it
     # in place would bind rs6000's builtin table to another target's insn codes.
     #
@@ -2111,9 +2096,9 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # link, which is exactly the trap target-asm-ops.cc records for mmix.
   #
   # No -DTM_H_FILE: this object is in MULTI_TARGET_OBJS_<cpu>, so it inherits
-  # the `-I<cpu>-inc' target-specific assignment two lines below and its plain
-  # `#include "tm.h"' already resolves to this back end's.  Naming the file
-  # twice would be a second authority for the same fact.
+  # the target-specific assignments below and its BASE_HEADER (tm.h) already
+  # names this back end's.  Naming the file twice would be a second authority
+  # for the same fact.
   printf "target-addr-%s.o: $(srcdir)/target-addr.cc %s-inc/s-inc \\\n", cpu, cpu;
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h $(RTL_H) $(REGS_H) \\\n";
   printf "  $(srcdir)/target-addr.h\n";

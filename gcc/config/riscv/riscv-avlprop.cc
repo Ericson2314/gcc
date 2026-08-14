@@ -70,7 +70,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "backend.h"
 #include "rtl.h"
 #include "target.h"
@@ -79,9 +80,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-ssa.h"
 #include "rtl-iter.h"
 #include "cfgcleanup.h"
-#include "insn-attr.h"
-#include "tm-constrs.h"
-#include "insn-opinit.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (tm-constrs.h)
+#include BASE_HEADER (insn-opinit.h)
 
 using namespace rtl_ssa;
 using namespace riscv_vector;
