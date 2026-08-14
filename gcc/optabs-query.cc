@@ -743,8 +743,15 @@ supported_vec_convert_optab (optab op, machine_mode mode)
   enum insn_code icode = CODE_FOR_nothing;
   for (int i = start; i <= end; ++i)
     if (VECTOR_MODE_P ((machine_mode) i))
+      /* MIN_/MAX_MODE_VECTOR_INT are the SHARED numbering's run endpoints,
+	 so this range spans every configured back end's vector integer modes.
+	 The ones belonging to another back end are holes here -- class
+	 MODE_RANDOM -- and asking for a conversion optab at their ordinal is
+	 asking about a mode this back end does not have.  */
       for (int j = MIN_MODE_VECTOR_INT; j < MAX_MODE_VECTOR_INT; ++j)
 	{
+	  if (GET_MODE_CLASS ((machine_mode) j) != MODE_VECTOR_INT)
+	    continue;
 	  if ((icode
 	       = convert_optab_handler (op, (machine_mode) i,
 					(machine_mode) j)) != CODE_FOR_nothing)

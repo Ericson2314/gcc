@@ -6499,10 +6499,19 @@ init_emit_once (void)
       FOR_EACH_MODE_IN_CLASS (mode, MODE_INT)
 	const_tiny_rtx[i][(int) mode] = GEN_INT (i);
 
+      /* MIN_/MAX_MODE_<CLASS> are the SHARED numbering's run endpoints, so
+	 this range spans every configured back end's partial integer modes
+	 and not this one's.  The ones belonging to another back end are
+	 holes here -- class MODE_RANDOM, precision 0 -- and writing
+	 `const_tiny_rtx' at their ordinals installs constants for modes this
+	 back end does not have.  Ask the class, which is the one thing that
+	 says "absent"; on a single-target build there are no holes and this
+	 test is never true.  */
       for (mode = MIN_MODE_PARTIAL_INT;
 	   mode <= MAX_MODE_PARTIAL_INT;
 	   mode = (machine_mode)((int)(mode) + 1))
-	const_tiny_rtx[i][(int) mode] = GEN_INT (i);
+	if (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT)
+	  const_tiny_rtx[i][(int) mode] = GEN_INT (i);
     }
 
   const_tiny_rtx[3][(int) VOIDmode] = constm1_rtx;
@@ -6512,10 +6521,16 @@ init_emit_once (void)
 
   /* For BImode, 1 and -1 are unsigned and signed interpretations
      of the same value.  */
+  /* Same as above, and it BECAME live rather than merely being latent: the
+     shared numbering now carries booleanness, so MIN_/MAX_MODE_BOOL span
+     arm's B2I and B4I (arm-modes.def:88) for every base, and for the ten
+     that are not arm those two ordinals are holes.  */
   for (mode = MIN_MODE_BOOL;
        mode <= MAX_MODE_BOOL;
        mode = (machine_mode)((int)(mode) + 1))
     {
+      if (GET_MODE_CLASS (mode) != MODE_INT)
+	continue;
       const_tiny_rtx[0][(int) mode] = const0_rtx;
       if (mode == BImode)
 	{
@@ -6532,7 +6547,8 @@ init_emit_once (void)
   for (mode = MIN_MODE_PARTIAL_INT;
        mode <= MAX_MODE_PARTIAL_INT;
        mode = (machine_mode)((int)(mode) + 1))
-    const_tiny_rtx[3][(int) mode] = constm1_rtx;
+    if (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT)
+      const_tiny_rtx[3][(int) mode] = constm1_rtx;
 
   FOR_EACH_MODE_IN_CLASS (mode, MODE_COMPLEX_INT)
     {
