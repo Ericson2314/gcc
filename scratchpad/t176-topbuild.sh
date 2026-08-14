@@ -15,7 +15,7 @@ set -u
 S=$(cd "$(dirname "$0")" && pwd)
 D=${1:?build dir}
 case "$D" in
-  */b-a0c9*) ;;
+  */b-a0c9a9af72f076899*) ;;
   *) echo "FATAL: build dir $D is not named for this worktree"; exit 9 ;;
 esac
 [ -f "$D/MY-SRC" ] || { echo "FATAL: $D has no MY-SRC"; exit 9; }

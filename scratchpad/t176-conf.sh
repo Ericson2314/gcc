@@ -25,7 +25,7 @@ n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 grep -q 'gcc_backends_arg' "$SRC/configure" \
   || { echo "FATAL: $SRC/configure has no gcc_backends_arg mapping"; exit 9; }
 case "$D" in
-  */b-a0c9*) ;;
+  */b-a0c9a9af72f076899*) ;;
   *) echo "FATAL: build dir $D is not named for this worktree"; exit 9 ;;
 esac
 echo "srcdir $SRC anchor=$n clean OK; list=$LIST"
