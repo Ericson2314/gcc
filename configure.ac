@@ -131,6 +131,90 @@ if test "x${target_alias}" != x; then
   AC_MSG_WARN([privileged target, which this tree does not have.])
 fi
 
+# --enable-backends IS gcc/'s SPELLING FOR THIS SAME LIST, AND THE TOP LEVEL
+# MUST REFUSE IT.  It is derived below from --enable-targets; the refusal is
+# here, before the "--enable-targets is required" error, so that a user who
+# passed only --enable-backends is told about the flag they actually typed
+# rather than about a flag they did not.
+#
+# THE DERIVED VALUE IS APPENDED AFTER THE USER'S ARGUMENTS, WHICH IS WHY THIS
+# REFUSAL HAS TO EXIST.  Makefile.in's configure-gcc rule spells
+#
+#     $(HOST_CONFIGARGS) --build=... --host=... --target=... \
+#       @gcc_host_pie@ @gcc_backends_arg@
+#
+# and $(HOST_CONFIGARGS) is where a --enable-backends the user typed at the top
+# level lands, because autoconf auto-accepts unrecognised --enable-*.  So
+# gcc/configure is handed the name TWICE and takes the last, which is always
+# the derived one.  Measured (scratchpad/t158-repro.sh), configuring with
+# `--enable-targets=x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu
+#  --enable-backends=all':
+#
+#     gcc/config.log  --enable-backends=all
+#                     --enable-backends=aarch64-unknown-linux-gnu,x86_64-...
+#                     --enable-backends=all      (gcc_config_arguments)
+#
+# The user asked for 48 back ends and got 2, with no diagnostic anywhere -- and
+# the third line is the sharpest part: `gcc_config_arguments' is what `gcc -v'
+# reports, so the binary's own self-description keeps the spelling that LOST.
+# Anyone reading it would be told the build had all 48.
+#
+# THE DESIGN CALL, since this is a decision and not a patch.  Three shapes were
+# available and two of them are refused on this branch's own settled rules:
+#
+#   (b) HONOUR THE USER'S SPELLING over the derived one -- refused.  That makes
+#       --enable-backends a second authority for one fact at the top level,
+#       which is PRINCIPLES section 3 exactly.  It is also incoherent rather
+#       than merely untidy: --enable-targets instantiates a target TREE per
+#       triple (libgcc, target-specs), so honouring a different back-end list
+#       would build trees for targets the compiler cannot generate code for,
+#       and the failure would surface far downstream in libgcc.
+#
+#   (c) RE-SPELL ONE IN TERMS OF THE OTHER -- refused, and it is the tempting
+#       one.  Mapping --enable-backends=all onto --enable-targets would require
+#       the top level to invent a TRIPLE for each of the 48 back ends, which is
+#       a fact it does not have and nothing else in the tree has either
+#       (gcc/'s `all' reads contrib/config-list.mk, a list of back ends, not of
+#       deployment triples).  "all back ends" and "all targets" are not the
+#       same set and the second one does not exist.  Inventing the mapping
+#       would be a new authority for a fact, i.e. the bug rather than the fix.
+#
+#   (a) REFUSE THE CONFLICTING NAME, loudly, by name -- chosen.  It keeps the
+#       single authority, it removes the SILENCE that is the actual defect, and
+#       it cannot expire: it is a property of the two spellings, not of today's
+#       values.
+#
+# REFUSED UNCONDITIONALLY, NOT ONLY WHEN THE TWO DISAGREE, and that is the part
+# worth arguing.  "Do they agree" is not decidable here without the mapping
+# option (c) was just refused for -- `all' cannot be compared against a triple
+# list at all.  Worse, accepting the flag whenever it happens to match teaches
+# that it works, so the second authority is established and only bites later,
+# when the values drift, which is precisely the silent shape being removed.
+# The audit (scratchpad/t158-audit.sh) shows what that looks like in practice:
+# of 290 build dirs on this machine, 71 carry the name twice and 7 carry two
+# DIFFERENT values, all of which were tolerated because nothing ever said a
+# word.
+AC_ARG_ENABLE(backends,
+[AS_HELP_STRING([--enable-backends=LIST],
+		[NOT ACCEPTED HERE -- this is gcc/'s spelling.  The top level
+		 takes --enable-targets and derives it.])],
+[AC_MSG_ERROR([--enable-backends is not accepted at the top level.
+
+It is gcc/'s spelling for the same list, and this tree derives it from
+--enable-targets.  Accepting both would give one fact two authorities, and the
+derived value is appended after yours, so yours would be silently discarded --
+including in the `gcc -v' banner, which would report the value that lost.
+
+Say what you want a target tree for, and gcc/ gets the matching back ends:
+
+    --enable-targets=aarch64-unknown-linux-gnu,x86_64-pc-linux-gnu
+
+There is deliberately no `all' here.  `--enable-backends=all' is meaningful in
+gcc/, where it means every back end in contrib/config-list.mk; the top level
+instantiates a target TREE per triple, and "every target" is not a set this
+tree has.  Name the triples.
+])], [])
+
 # Canonicalise each element with config.sub, INDIVIDUALLY, so a bad triple
 # fails BY NAME rather than becoming an empty element that is silently
 # skipped.  "No element ever becomes empty and is skipped" -- an empty element
@@ -183,13 +267,15 @@ AC_SUBST(mt_target_subdirs)
 # which reads as a gcc/ bug rather than as a missing top-level mapping.  Every
 # build dir in this branch was configured by passing --enable-backends to the
 # top level BY HAND, where autoconf's auto-accept of unrecognised --enable-*
-# passed it down through HOST_CONFIGARGS.  That workaround hid the gap.
+# passed it down through HOST_CONFIGARGS.  That workaround hid the gap, and it
+# is now REFUSED rather than merely obsolete -- see the AC_ARG_ENABLE(backends)
+# stanza above, which is where the design call is argued.  A script still
+# passing it by hand will fail loudly by name; that is intended, and is the
+# whole point of the change.
 #
-# Deliberately NOT an AC_ARG_ENABLE of its own: two spellings for one list is
-# this branch's signature bug (one name, several authorities).  There is one
-# authority, --enable-targets, and this is a derived value.  It is passed as
-# an explicit configure argument rather than left to HOST_CONFIGARGS so that
-# it is visible in gcc/config.log next to the other gcc-specific flags.
+# There is ONE authority, --enable-targets, and this is a derived value.  It is
+# passed as an explicit configure argument rather than left to HOST_CONFIGARGS
+# so that it is visible in gcc/config.log next to the other gcc-specific flags.
 gcc_backends_arg="--enable-backends=`echo ${mt_target_subdirs} | tr ' ' ','`"
 AC_SUBST(gcc_backends_arg)
 

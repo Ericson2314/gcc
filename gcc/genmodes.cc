@@ -1679,11 +1679,18 @@ apply_union_order (void)
 static const char *cur_table_name;
 static const char *cur_table_type;
 
+/* Set for a table that hand-written source WRITES through the shared bare
+   name, so the pointer must not be const-qualified.  See the CONST_MODE_*
+   block in emit_insn_modes_h: measured, this is mode_ibit and mode_fbit and
+   nothing else.  */
+static bool cur_table_shared_writable;
+
 static void
 print_table_decl (const char *type, const char *name, const char *asize)
 {
   cur_table_name = name;
   cur_table_type = type;
+  cur_table_shared_writable = false;
   printf ("\n%s %s%s[%s] =\n{\n", type, name,
 	  multi_target_p () ? "_tab" : "", asize);
 }
@@ -1699,9 +1706,16 @@ print_table_closer (void)
 	 of the compiler shares is const-qualified whatever the back end, to
 	 match the CONST_MODE_* that the multi-target headers now emit
 	 unconditionally.  See emit_insn_modes_h.  A table whose type is
-	 already const stays as it is; `const const' is not a spelling.  */
+	 already const stays as it is; `const const' is not a spelling.
+
+	 EXCEPT where a real writer was measured.  mode_ibit and mode_fbit are
+	 written by avr.cc through tree.h's TYPE_IBIT/TYPE_FBIT, so their
+	 pointer is writable too -- otherwise the shared declaration and the
+	 definition disagree about const, which is a hard error rather than a
+	 silent one, but in the generated file where it is least readable.  */
       const char *add_const =
-	strncmp (cur_table_type, "const", 5) == 0 ? "" : "const ";
+	(cur_table_shared_writable
+	 || strncmp (cur_table_type, "const", 5) == 0) ? "" : "const ";
       printf ("%s%s *%s = %s_tab;\n",
 	      add_const, cur_table_type, cur_table_name, cur_table_name);
     }
@@ -2172,7 +2186,41 @@ enum machine_mode\n{");
      Dropping `const' from the shared declaration instead would also have
      made the types agree, and would have agreed on the weaker claim: it
      would have left the middle end able to write a table belonging to a
-     back end that may not even be selected, with nothing left to say so.  */
+     back end that may not even be selected, with nothing left to say so.
+
+     AND THE PARAGRAPH ABOVE IS TRUE OF SIX OF THE EIGHT.  It says "there is
+     not one assignment to one of them outside this generator -- and neither
+     does any hand-written back-end source", and for `mode_ibit' and
+     `mode_fbit' that is FALSE.  `tree.h:2503' spells
+
+	 #define TYPE_IBIT(NODE) (GET_MODE_IBIT (TYPE_MODE (NODE)))
+
+     and `GET_MODE_IBIT (MODE)' is `mode_ibit[MODE]', so `avr.cc:1245's
+
+	 TYPE_IBIT (*node) = GET_MODE_IBIT (mode);
+
+     is an assignment INTO the mode table from hand-written back-end source.
+     A grep for `mode_ibit' in any back end finds nothing, which is how the
+     invariant survived being written down; it is reached only through two
+     tree.h macros.  Swept over all of `gcc/' rather than over the configured
+     back ends (`scratchpad/t158-modewriters.sh'): exactly two writers exist
+     in the whole tree, avr.cc:1245 and avr.cc:1246, and no other table has
+     one.  avr is the only back end with `ADJUST_IBIT'/`ADJUST_FBIT', so the
+     i386 + aarch64 pair could not see this and neither could any pair
+     without avr in it.
+
+     So these two follow the measurement and are NOT const in a multi-target
+     build.  This is not "drop const so it compiles": it is the same
+     one-type-for-a-shared-name rule the paragraph above applies, resolved
+     the other way because the sweep found a real writer.  It has to be
+     unconditional across bases for exactly the reason the rest of this
+     comment gives -- `adj_ibit' is avr's property, this header is SHARED,
+     and answering it per back end is the bug being removed.  Every base's
+     array becomes writable and 47 of them still never write it, which costs
+     nothing and keeps one type.
+
+     The six keep `const'.  Weakening those as well would throw away a true
+     claim to make one wrong one uniform, which is the opposite trade.  */
   if (multi_target_p ())
     {
       puts ("#define CONST_MODE_NUNITS const");
@@ -2180,8 +2228,8 @@ enum machine_mode\n{");
       puts ("#define CONST_MODE_SIZE const");
       puts ("#define CONST_MODE_UNIT_SIZE const");
       puts ("#define CONST_MODE_BASE_ALIGN const");
-      puts ("#define CONST_MODE_IBIT const");
-      puts ("#define CONST_MODE_FBIT const");
+      puts ("#define CONST_MODE_IBIT");
+      puts ("#define CONST_MODE_FBIT");
       puts ("#define CONST_MODE_MASK const");
     }
   else
@@ -2755,13 +2803,26 @@ emit_mode_adjustments (void)
   struct mode_adjust *a;
   struct mode_data *m;
 
-  /* THE ONLY WRITER OF A MODE TABLE IN THE WHOLE COMPILER.
+  /* THE ONLY WRITER OF A MODE TABLE IN THE WHOLE COMPILER -- EXCEPT FOR TWO,
+     AND THAT HEADING WAS WRONG FOR AS LONG AS IT STOOD.  avr.cc writes
+     mode_ibit and mode_fbit through tree.h's TYPE_IBIT/TYPE_FBIT; see the
+     CONST_MODE_* block in emit_insn_modes_h, which carries the measurement.
 
-     In a multi-target build the bare names are const pointers shared with
-     every other back end (see emit_insn_modes_h), so this code writes the
+     In a multi-target build the bare names are pointers shared with every
+     other back end (see emit_insn_modes_h), so this code writes the
      underlying array instead.  Same storage, and it is this back end's own:
      the array is defined a few lines above in this same file, and it is
-     non-const precisely when this modes file adjusts it.
+     non-const precisely when this modes file adjusts it -- or, for those same
+     two, unconditionally, since the shared header cannot call const a table a
+     back end writes.
+
+     "A FEW LINES ABOVE" IS LOAD-BEARING, and it was FALSE for mode_ibit and
+     mode_fbit until emit_insn_modes_c was made to emit them ahead of this
+     function.  `<NAME>_tab' is declared nowhere but this file -- machmode.h
+     knows only the bare pointers -- so a forward reference to one does not
+     compile, and only avr, the sole back end with ADJUST_IBIT/ADJUST_FBIT,
+     ever emitted such a reference.  If a table is added to the #define list
+     below, emit it before this function too.
 
      Spelled as macros rather than by rewriting each printf below because
      there are forty-odd of them and a rewrite that missed one would fail in
@@ -2989,9 +3050,13 @@ emit_mode_ibit (void)
   int c;
   struct mode_data *m;
 
+  /* Writable in a multi-target build whatever THIS back end adjusts: the
+     shared insn-modes.h has one CONST_MODE_IBIT for every base, and avr
+     writes through it.  See emit_insn_modes_h.  */
   print_maybe_const_decl ("%sunsigned char",
 			  "mode_ibit", "NUM_MACHINE_MODES",
-			  adj_ibit);
+			  adj_ibit || multi_target_p ());
+  cur_table_shared_writable = multi_target_p ();
 
   for_all_modes (c, m)
     tagged_printf ("%u", m->ibit, m->name);
@@ -3007,9 +3072,11 @@ emit_mode_fbit (void)
   int c;
   struct mode_data *m;
 
+  /* Writable in a multi-target build; see emit_mode_ibit.  */
   print_maybe_const_decl ("%sunsigned char",
 			  "mode_fbit", "NUM_MACHINE_MODES",
-			  adj_fbit);
+			  adj_fbit || multi_target_p ());
+  cur_table_shared_writable = multi_target_p ();
 
   for_all_modes (c, m)
     tagged_printf ("%u", m->fbit, m->name);
@@ -3086,9 +3153,36 @@ emit_insn_modes_c (void)
   emit_mode_base_align ();
   emit_class_narrowest_mode ();
   emit_real_format_for_mode ();
+  /* THE ADJUSTMENT CODE MUST FOLLOW EVERY TABLE IT WRITES, and until now two
+     of the eight came after it.  In a multi-target build emit_mode_adjustments
+     redirects the eight bare names to the <NAME>_tab arrays, and _tab is a
+     name only this file declares -- machmode.h knows the bare pointers and
+     nothing else.  A forward reference to mode_ibit_tab therefore does not
+     compile, where in a single-target build machmode.h's own `extern
+     mode_ibit[]' covers it and the order never mattered.
+
+     It only ever fired for avr, the one back end with ADJUST_IBIT/ADJUST_FBIT:
+     every other back end emits an init_adjust_machine_modes that does not
+     mention these two tables, so the forward reference is not there to fail.
+     That is why emit_mode_adjustments's own comment can say "the array is
+     defined a few lines above in this same file" -- true of six, false of two,
+     and true of all eight from here on.
+
+     Hoisted only under multi_target_p () so that a single-target
+     insn-modes.cc is byte-identical to what it has always been; the ordering
+     is what changes, not a value, and there is no reason to move stock output
+     to prove a multi-target point.  */
+  if (multi_target_p ())
+    {
+      emit_mode_ibit ();
+      emit_mode_fbit ();
+    }
   emit_mode_adjustments ();
-  emit_mode_ibit ();
-  emit_mode_fbit ();
+  if (!multi_target_p ())
+    {
+      emit_mode_ibit ();
+      emit_mode_fbit ();
+    }
   emit_mode_int_n ();
   print_mode_ns_close ();
 }
