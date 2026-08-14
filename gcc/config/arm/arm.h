@@ -35,8 +35,7 @@
 #ifdef GENERATOR_FILE
 #define MACHMODE int
 #else
-#include "multi-target-base.h"
-#include BASE_HEADER (insn-modes.h)
+#include "insn-modes.h"
 #define MACHMODE machine_mode
 #endif
 
