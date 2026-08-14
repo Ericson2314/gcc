@@ -22,7 +22,12 @@ tag=$T$(echo "$OPT" | tr -d ' -')
 i=0
 while [ "$i" -lt "$N" ]; do
   i=$((i+1))
-  ( cd "$D/gcc" && ASAN_OPTIONS=detect_leaks=0:log_path="$O/$tag.$i.asan" \
+  # handle_segv=2:allow_user_segv_handler=0 -- GCC installs its OWN SIGSEGV
+  # handler (`crash_signal', toplev.cc:329), so a fault that ASAN would have
+  # described as a use-after-free or a wild read is printed by GCC as a bare
+  # "internal compiler error: Segmentation fault" and ASAN says nothing at all.
+  # An empty ASAN log next to a crashing cc1 is that, not a clean run.
+  ( cd "$D/gcc" && ASAN_OPTIONS=detect_leaks=0:handle_segv=2:allow_user_segv_handler=0:log_path="$O/$tag.$i.asan" \
       UBSAN_OPTIONS=print_stacktrace=1 \
       timeout 900s ./cc1 -quiet -nostdinc "$OPT" \
       -ftarget-config="$CFG" "$IN" -o "$O/$tag.$i.s" ) \
