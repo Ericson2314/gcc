@@ -71,6 +71,80 @@ bars exactly. That is the arm separating a real probe against cross binutils
 from one that fell back and wrote a file naming aarch64 while describing
 x86_64.
 
+## 4. The suite delta
+
+Both targets, `MT_COMPILE_ONLY=1`, `make -j8`, same mode as the baseline, both
+`rc=0`, all four `mtcheck.sh` guards green on both (specs md5, the compiler
+naming its own target back, non-vacuity, and the `multi-target.exp` banner).
+Counts grepped from the merged `.sum` agree **exactly** with DejaGnu's own
+`=== gcc Summary ===` on both targets — two instruments, same numbers.
+
+```
+                                   PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+x86_64   T173 baseline           162165    16290        3     1556     4451    13361       32
+x86_64   this run                162165    16290        3     1556     4451    13361       32
+         delta                        0        0        0        0        0        0        0
+
+aarch64  T173 baseline            83158   106277        6      816    11298   133718       32
+aarch64  this run                 88017    98009        3      832    11012   133396       32
+         delta                    +4859    -8268       -3      +16     -286     -322        0
+```
+
+**x86_64 is unchanged in all seven columns.** That is the control, and it is
+what makes the aarch64 movement attributable rather than atmospheric: one
+binary, two targets, the primary's numbers frozen.
+
+### The ICE column, which is what the fix was aimed at
+
+Counted from the merged `gcc.log`, not the `.sum` — a `.sum` records an ICE as
+an ordinary FAIL and says nothing about where the compiler died.
+
+```
+aarch64 ICEs by site        baseline   this run
+  in extract_insn, at recog.cc:2892       5103          0
+  in get_attr_type, at aarch64.md          26          0
+  in gen_lowpart_general, rtlhooks.cc:57  509        509
+  in aarch64_output_casesi                 68         68
+```
+
+`extract_insn` is **gone entirely**, and so is every `unrecognizable insn`
+message (`grep -c` = 0 for both). That matches the brief's own decomposition:
+`gen_nop` 9277 occurrences and `gen_blockage` 973 were stated to be 100% of
+that column with no third cause, and `a626931d29b` fixed both in one commit,
+so the whole column going to zero is the predicted result rather than a
+surprise. `get_attr_type` fell out with it — an unrecognizable insn has no
+attributes to query, so it was a downstream symptom of the same defect, not a
+separate one.
+
+The two ICE sites that did **not** move are the honest negative: 509
+`gen_lowpart_general` and 68 `aarch64_output_casesi` are untouched, which is
+what a targeted fix should look like. `aarch64_output_casesi`'s line number
+shifts 14446 → 14447 from an unrelated commit in the range, not from a change
+in the count.
+
+### What is NOT claimed
+
+- **The delta is HEAD vs baseline, not `gen_nop` in isolation.** The baseline
+  snapshot is `80bf400ae06` and this run is `ed7feb54b99`; ~40 commits sit
+  between them. The `extract_insn` collapse is attributed to `a626931d29b`
+  because the five-line reproducer in §2 demonstrates that mechanism directly,
+  not because it is the only change in the range. The PASS/FAIL movement is
+  the range's, not one commit's.
+- **The whole-suite totals fell by ~4000 results on aarch64** (335305 →
+  331301). Tests that ICE emit extra result lines; removing the ICE removes
+  them. Recorded rather than netted out.
+- **KILLED is 2 on aarch64 and 0 on x86_64**, counted from the log and never
+  subtracted. The 15-minute load average was 17 at scoring time (below the ~25
+  provisional threshold), but two OOM-killed compilations are still in the
+  aarch64 FAIL column as ordinary failures.
+- Execution still has zero observations: no target libgcc, so every `dg-do
+  run` was downgraded and a PASS means "it compiled". Much of *both* FAIL
+  columns is the absent runtime, which is why the aarch64-minus-x86_64 delta
+  is the signal and the common part is the build's shape.
+- 45 of 47 back ends remain unmeasured; only C and LTO were configured.
+
+## 5. Harness
+
 Harness note: `t175-conf.sh`, `t175-topbuild.sh` and `t175-mtcheck.sh` inherit
 a `( cd "$SRC" && git diff --quiet )` assert written for snapshots that were
 git worktrees. On a `git archive` snapshot there is no repository, so git walks
