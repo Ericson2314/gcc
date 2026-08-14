@@ -772,6 +772,40 @@ struct target_frame_desc
      a constant because cygming.h:96 makes it `(TARGET_64BIT ? 33 : 17)'.  */
   unsigned int (*dwarf_frame_registers) (void);
 
+  /* DWARF_FRAME_RETURN_COLUMN.  MOVED HERE OUT OF `target-cdata', AND IT IS
+     THE ONLY CDATA FIELD THAT EVER HAD TO MOVE.
+
+     It reads like a per-target constant -- i386 says `(TARGET_64BIT ? 16 : 8)',
+     m68k says 24 -- and it was a `target_cdata' NUM field on that reading.  It
+     is not one, because of exactly one back end:
+
+	 epiphany.h:544  EPIPHANY_RETURN_REGNO
+			   ((current_function_decl != NULL
+			     && epiphany_is_interrupt_p (current_function_decl))
+			    ? IRET_REGNUM : GPR_LR)
+	 epiphany.h:559  DWARF_FRAME_RETURN_COLUMN
+			   DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO)
+
+     `target-cdata.cc' is evaluated ONCE, at selection time, with
+     `current_function_decl' null; all eight shared readers are in
+     `dwarf2cfi.cc's per-function CFI, where upstream has that decl SET.  A
+     cached field therefore answers `GPR_LR' for every epiphany interrupt
+     handler -- a wrong CFI return column, emitted silently.
+
+     It belongs beside the two fields above rather than in a new registry: it
+     is *defined* in terms of them (epiphany, arm, aarch64, sparc, cris, ...
+     all spell `DWARF_FRAME_REGNUM (something)'), and defaults.h's fallback for
+     a base that defines neither is `DWARF_FRAME_REGNUM (PC_REGNUM)' or
+     `DWARF_FRAME_REGISTERS' -- both of which are answered in the per-base
+     translation unit, so a base with no macro of its own contributes its own
+     generic answer here rather than the primary's.
+
+     `unsigned short' in the old field, `unsigned int' here, to match the two
+     above and the `dwf_regno' / `DWARF2_FRAME_REG_OUT' arguments it is
+     compared against; every definition in the tree is a small register number
+     and none is negative.  */
+  unsigned int (*dwarf_frame_return_column) (void);
+
   /* ----------------------------------------------------------------------
      THE FOUR `*_POINTER_REGNUM' NAMES, PLUS THE TWO DERIVED PREDICATES.
      MACRO-LEAK.md class (d), and the fork that #124 and #126 both stopped at
@@ -1322,6 +1356,10 @@ extern machine_mode mt_function_mode (void);
 extern unsigned int mt_debugger_regno (unsigned int regno);
 extern unsigned int mt_dwarf_frame_regnum (unsigned int regno);
 extern unsigned int mt_dwarf_frame_registers (void);
+/* Uncached, like the two above and for a stronger reason than they have: on
+   epiphany this varies per FUNCTION, not merely per option state.  See the
+   field comment.  */
+extern unsigned int mt_dwarf_frame_return_column (void);
 
 /* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES, for shared code.
    See the field comments above for why all six move as one set and why they

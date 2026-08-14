@@ -377,6 +377,18 @@ mt_dwarf_frame_registers (void)
   return mt_frame ()->dwarf_frame_registers ();
 }
 
+/* Uncached through `mt_frame ()' for the same reason as the family above, and
+   for one more that none of them has: epiphany's answer depends on
+   `current_function_decl', so it changes between two functions of a single
+   compilation, not merely between two option settings.  Caching anywhere --
+   here, or in `target_cdata' where this used to live -- gives every epiphany
+   interrupt handler the ordinary function's return column.  */
+unsigned int
+mt_dwarf_frame_return_column (void)
+{
+  return mt_frame ()->dwarf_frame_return_column ();
+}
+
 /* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES.  Uncached through
    `mt_frame ()' like the family above, and here the reason is not hypothetical:
    arm's `HARD_FRAME_POINTER_REGNUM' is

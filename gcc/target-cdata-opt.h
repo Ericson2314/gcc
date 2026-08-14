@@ -107,7 +107,11 @@ whether every other target has a macro
 #endif
 
 /* DWARF_ALT_FRAME_RETURN_COLUMN -- 11 back ends.  The sibling of
-   DWARF_FRAME_RETURN_COLUMN, which is already a mandatory field above.  */
+   DWARF_FRAME_RETURN_COLUMN, which was a mandatory field above and is now a
+   CALL in `target_frame_desc' -- epiphany's reads `current_function_decl'.
+   This one stays here: no definition in the tree reads per-function state
+   (`scratchpad/cdata-perfn-sweep.sh' nominates only its sibling), and the 11
+   are plain constants or option-state arithmetic.  */
 #ifdef DWARF_ALT_FRAME_RETURN_COLUMN
 # define MT_HAS_DWARF_ALT_FRAME_RETURN_COLUMN 1
 # define MT_VAL_DWARF_ALT_FRAME_RETURN_COLUMN (DWARF_ALT_FRAME_RETURN_COLUMN)

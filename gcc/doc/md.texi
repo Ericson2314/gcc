@@ -4160,7 +4160,7 @@ Address operand without segment register.
 
 @end table
 
-@item Xstormy16---@file{config/stormy16/stormy16.h}
+@item Xstormy16---@file{config/xstormy16/xstormy16.h}
 @table @code
 @item a
 Register r0.

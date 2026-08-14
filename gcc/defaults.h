@@ -2096,8 +2096,9 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define STACK_CHECK_MAX_FRAME_SIZE (targetm_cdata.stack_check_max_frame_size)
 #undef MAX_FIXED_MODE_SIZE
 #define MAX_FIXED_MODE_SIZE (targetm_cdata.max_fixed_mode_size)
-#undef DWARF_FRAME_RETURN_COLUMN
-#define DWARF_FRAME_RETURN_COLUMN (targetm_cdata.dwarf_frame_return_column)
+/* `DWARF_FRAME_RETURN_COLUMN' WAS REDIRECTED HERE AND IS NOW A CALL, with the
+   rest of the DWARF register family below.  epiphany's reads
+   `current_function_decl', which is null when `target-cdata.cc' runs.  */
 
 /* ------------------------------------------------------------------------
    THE FRAME AND ARGUMENT-REGISTER MACROS.  See target-frame.h for what each
@@ -2750,6 +2751,8 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define DWARF_FRAME_REGNUM(REG) (mt_dwarf_frame_regnum ((unsigned int) (REG)))
 #undef DWARF_FRAME_REGISTERS
 #define DWARF_FRAME_REGISTERS (mt_dwarf_frame_registers ())
+#undef DWARF_FRAME_RETURN_COLUMN
+#define DWARF_FRAME_RETURN_COLUMN (mt_dwarf_frame_return_column ())
 
 /* ------------------------------------------------------------------------
    THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES -- MACRO-LEAK.md

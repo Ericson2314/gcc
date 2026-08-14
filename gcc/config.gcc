@@ -3734,13 +3734,45 @@ visium-*-elf*)
 	tmake_file="visium/t-visium visium/t-crtstuff"
 	;;
 xstormy16-*-elf)
-	# For historical reasons, the target files omit the 'x'.
-	tm_file="elfos.h newlib-stdint.h stormy16/stormy16.h"
-	tm_p_file=stormy16/stormy16-protos.h
-	md_file=stormy16/stormy16.md
-	out_file=stormy16/stormy16.cc
-	extra_options=stormy16/stormy16.opt
-	tmake_file="stormy16/t-stormy16"
+	# THE 'x' IS NO LONGER OMITTED.  Upstream's comment here read "for
+	# historical reasons, the target files omit the 'x'", and that made
+	# this the ONLY back end whose `config/' directory name differs from
+	# its `cpu_type' -- swept over the whole of config.gcc, not just the
+	# configured set: the only three explicit `out_file=<dir>/' spellings
+	# are iq2000, s390 and this one, and the first two agree with their
+	# cpu_type.
+	#
+	# On a multi-target build that difference is not cosmetic.  Every
+	# per-back-end channel is keyed on cpu_type -- `MT_BASE', the
+	# `mt-<cpu>/' object directories, `insn-modes-<cpu>.h', `tm-<cpu>.h',
+	# `gen-multi-target-md.awk's `mt_bases' -- and gen-target-manifest.sh
+	# says so in as many words ("KEYED ON cpu_type, NOT ON
+	# common_out_file.  Every other per-back-end artefact is named after
+	# cpu_type").  gengtype is the one authority that CANNOT use cpu_type:
+	# it never reads config.gcc, and names each back end by the directory
+	# under `config/' a definition came from, which is also what names the
+	# `gt-<D>.h' it emits into.  So the two disagreed for exactly this
+	# back end, and `multi_target_select' stopped the compiler by name
+	# rather than leaving a `machine_function' dispatcher pointing at
+	# whichever back end was selected before.
+	#
+	# The fix is to remove the second name, not to translate between them:
+	# an alias table would be a new authority for the same fact, which is
+	# the bug this branch exists to remove.  `common/config/xstormy16/'
+	# and `testsuite/gcc.target/xstormy16/' were already spelt with the
+	# 'x'; this directory was the outlier, and now there is one name.
+	tm_file="elfos.h newlib-stdint.h xstormy16/xstormy16.h"
+	tm_p_file=xstormy16/xstormy16-protos.h
+	md_file=xstormy16/xstormy16.md
+	out_file=xstormy16/xstormy16.cc
+	extra_options=xstormy16/xstormy16.opt
+	# NOTE: `stormy16/t-stormy16' named a file that does not exist under
+	# gcc/config/ and never has -- the fragment of that name is libgcc's.
+	# Repointing it would be inventing a file; dropping it lets
+	# configure.ac's default `${cpu_type}/t-${cpu_type}' apply, which is
+	# also absent.  Left naming the same non-existent fragment, spelt
+	# consistently, so that this rename changes exactly one thing.
+	tmake_file="xstormy16/t-xstormy16"
 	;;
 xtensa*-*-elf*)
 	tm_file="${tm_file} elfos.h newlib-stdint.h xtensa/elf.h"
