@@ -2446,4 +2446,38 @@ pdp11_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
 #undef TARGET_PRINT_OPERAND_ADDRESS
 #define TARGET_PRINT_OPERAND_ADDRESS pdp11_mt_print_operand_address
 
+/* Upstream's default_external_libcall for a back end that does not
+   define ASM_OUTPUT_EXTERNAL_LIBCALL: the `#ifdef' body is skipped, so
+   nothing is emitted.  (There is no hooks.h no-op with this signature;
+   `hook_void_rtx' does not exist -- measured, it fails to compile.)  */
+static void
+pdp11_mt_external_libcall (rtx)
+{
+}
+
+static enum unwind_info_type
+pdp11_mt_debug_unwind_info (void)
+{
+  /* Neither DWARF2_FRAME_INFO nor DWARF2_DEBUGGING_INFO is defined for
+     this back end, so upstream's default_debug_unwind_info falls all the
+     way through.  */
+  return UI_NONE;
+}
+
+/* MULTI-TARGET, SILENT HALF.  This back end defines neither
+   `ASM_OUTPUT_EXTERNAL_LIBCALL' nor (where noted) `DWARF2_DEBUGGING_INFO',
+   but `targhooks.cc' is compiled once against the PRIMARY's tm.h, where
+   `elfos.h' defines both.  The `#ifdef's have no `#else', so instead of
+   an ICE this back end silently inherits the primary's behaviour.
+
+   The values supplied here are UPSTREAM's own answers for this back end
+   standing alone -- with the macros undefined, default_external_libcall
+   emits nothing and default_debug_unwind_info returns UI_NONE.  A
+   supply-side floor giving a base its own documented value, not a
+   consumer-side fallback giving it somebody else's.  */
+#undef TARGET_ASM_EXTERNAL_LIBCALL
+#define TARGET_ASM_EXTERNAL_LIBCALL pdp11_mt_external_libcall
+#undef TARGET_DEBUG_UNWIND_INFO
+#define TARGET_DEBUG_UNWIND_INFO pdp11_mt_debug_unwind_info
+
 struct gcc_target targetm = TARGET_INITIALIZER;

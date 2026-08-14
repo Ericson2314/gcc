@@ -321,6 +321,29 @@ mmix_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
 #undef TARGET_CLASS_MAX_NREGS
 #define TARGET_CLASS_MAX_NREGS mmix_mt_class_max_nregs
 
+/* Upstream's default_external_libcall for a back end that does not
+   define ASM_OUTPUT_EXTERNAL_LIBCALL: the `#ifdef' body is skipped, so
+   nothing is emitted.  (There is no hooks.h no-op with this signature;
+   `hook_void_rtx' does not exist -- measured, it fails to compile.)  */
+static void
+mmix_mt_external_libcall (rtx)
+{
+}
+
+/* MULTI-TARGET, SILENT HALF.  This back end defines neither
+   `ASM_OUTPUT_EXTERNAL_LIBCALL' nor (where noted) `DWARF2_DEBUGGING_INFO',
+   but `targhooks.cc' is compiled once against the PRIMARY's tm.h, where
+   `elfos.h' defines both.  The `#ifdef's have no `#else', so instead of
+   an ICE this back end silently inherits the primary's behaviour.
+
+   The values supplied here are UPSTREAM's own answers for this back end
+   standing alone -- with the macros undefined, default_external_libcall
+   emits nothing and default_debug_unwind_info returns UI_NONE.  A
+   supply-side floor giving a base its own documented value, not a
+   consumer-side fallback giving it somebody else's.  */
+#undef TARGET_ASM_EXTERNAL_LIBCALL
+#define TARGET_ASM_EXTERNAL_LIBCALL mmix_mt_external_libcall
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Functions that are expansions for target macros.
