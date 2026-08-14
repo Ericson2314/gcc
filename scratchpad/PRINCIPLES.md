@@ -667,7 +667,12 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**THE ANCHOR VALUE IS 55**, measured at the forty-seven-back-end merge — not
+**THE ANCHOR VALUE IS 49 as of `b2b5b42b128`** — it went DOWN, because
+deleting `-I<base>-inc` removed comment blocks naming `MULTI_TARGET_INC`. A
+monotonic assumption about this number is wrong in both directions. Run the
+grep.
+
+**It was 55**, measured at the forty-seven-back-end merge — not
 51 and not 54, which are what the two sides of that merge each believed.
 Seventh value: 45 → 47 → 48 → 50 → 51 → 52 → 54 → 55. Set `WANT_ANCHOR=55`.
 
