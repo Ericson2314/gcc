@@ -46,6 +46,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"
+/* For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
+   this is shared code.  See addresses.h.  */
+#include "addresses.h"
 #include "diagnostic-core.h"
 #include "alias.h"
 #include "fold-const.h"
@@ -3042,7 +3045,7 @@ verify_rtx_sharing (rtx orig, rtx insn)
 
     case MEM:
       /* A MEM is allowed to be shared if its address is constant.  */
-      if (CONSTANT_ADDRESS_P (XEXP (x, 0))
+      if (mt_constant_address_p (XEXP (x, 0))
 	  || reload_completed || reload_in_progress)
 	return;
 

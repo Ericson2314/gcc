@@ -117,6 +117,24 @@ struct target_addr
      `int', and every consumer is a condition.  The narrowing happens in each
      base's own translation unit, where its own declaration is visible.  */
   bool (*legitimate_pic_operand_p) (rtx x);
+  /* CONSTANT_ADDRESS_P, and it is here for the same reason and was found the
+     same way -- by configuring EIGHT back ends and reading the link.
+
+     Seven shared sites spell the macro: explow.cc:271 and :449,
+     emit-rtl.cc:3045, reload.cc:6922, fwprop.cc:122, recog.cc:2542,
+     final.cc:3551.  It has a `defaults.h:1283' fallback, and BOTH i386.h:1853
+     and sparc.h:1332 define it as `constant_address_p (X)' -- so the primary's
+     `tm.h' routes all seven at i386's function, and sparc's own definition
+     collides at the link (`mt-sparc/sparc.o: multiple definition of
+     constant_address_p').
+
+     NOTE THE TRAP THIS ONE SETS FOR THE RENAME ROUTE.  Renaming alone turns
+     the collision into `undefined reference' from those seven shared objects,
+     exactly as it did for `legitimate_pic_operand_p'.  The macro name is not
+     the symbol name, so a grep for the symbol over shared code finds nothing
+     and reports the rename as safe.  It is not.  Ask what the PRIMARY's `tm.h'
+     expands the macro to before concluding a rename suffices.  */
+  bool (*constant_address_p) (rtx x);
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

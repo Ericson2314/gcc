@@ -130,4 +130,13 @@ mt_legitimate_pic_operand_p (rtx x)
   return targetm_addr->legitimate_pic_operand_p (x);
 }
 
+/* THE SIXTH, and the same rule applies: `CONSTANT_ADDRESS_P' in SHARED code
+   is a bug, `CONSTANT_ADDRESS_P' in a back end's own source is correct.  */
+
+inline bool
+mt_constant_address_p (rtx x)
+{
+  return targetm_addr->constant_address_p (x);
+}
+
 #endif /* GCC_ADDRESSES_H */

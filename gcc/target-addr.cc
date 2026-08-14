@@ -161,6 +161,21 @@ gcc_taddr_legitimate_pic_operand_p (rtx x ATTRIBUTE_UNUSED)
   return LEGITIMATE_PIC_OPERAND_P (x) != 0;
 }
 
+/* --- CONSTANT_ADDRESS_P --------------------------------------------- */
+
+/* Same shape as the one above: a `tm.h' macro with a `defaults.h:1283'
+   fallback, read by seven shared sites, and defined by i386.h and sparc.h as
+   a call to each one's own `constant_address_p'.  Evaluated here in THIS
+   base's preprocessor context, so a base that defines nothing gets
+   `defaults.h''s `CONSTANT_P (X) && GET_CODE (X) != CONST_DOUBLE' -- its own
+   answer, which is also what upstream gives it.  */
+
+static bool
+gcc_taddr_constant_address_p (rtx x ATTRIBUTE_UNUSED)
+{
+  return CONSTANT_ADDRESS_P (x) != 0;
+}
+
 /* `extern' is not redundant: a namespace-scope `const' object has internal
    linkage in C++, so without it the table is built correctly and then cannot
    be named from the selector.  See target-asm-ops.cc, where the same omission
@@ -182,5 +197,6 @@ const struct target_addr TARGETM_ADDR_SYMBOL =
   gcc_taddr_index_reg_class,
   gcc_taddr_ok_for_base_p_1,
   gcc_taddr_ok_for_index_p_1,
-  gcc_taddr_legitimate_pic_operand_p
+  gcc_taddr_legitimate_pic_operand_p,
+  gcc_taddr_constant_address_p
 };

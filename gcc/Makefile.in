@@ -1647,6 +1647,51 @@ MULTI_TARGET_INC =
 #   legitimize_pic_address
 #			    Bare in s390, m68k, sh and arm, with FOUR DIFFERENT
 #			    SIGNATURES (above).
+#   THE NEXT NINE CAME FROM CONFIGURING EIGHT BACK ENDS
+#			    (i386, aarch64, rs6000, s390, riscv, mips, sparc,
+#			    arm).  Every one of them is invisible to the four-
+#			    base set above, which is invisible to the two-base
+#			    set everything on this branch is built with.  The
+#			    list is not self-maintaining and the only instrument
+#			    that sizes it is a link with the back ends in it.
+#
+#   aarch_bti_arch_check, aarch_bti_enabled, aarch_bti_j_insn_p,
+#   aarch_fun_is_indirect_return, aarch_gen_bti_c, aarch_gen_bti_j,
+#   aarch_pac_insn_p
+#			    config/arm/aarch-common-protos.h, defined by
+#			    config/arm/arm.cc and config/aarch64/aarch64.cc and
+#			    used by config/arm/aarch-bti-insert.cc -- a pass
+#			    compiled once per base, like config/linux.cc, so the
+#			    -D reaches definition and use together.  ZERO shared
+#			    TUs name any of the seven, and no `tm.h' macro
+#			    expands to them, so this is a bare rename.
+#   output_probe_stack_range
+#			    Bare in sparc, arm, i386, ia64 (two arguments) and
+#			    rs6000 (THREE).  No shared TU and no macro; bare
+#			    rename.
+#   constant_address_p  A RENAME IS NOT ENOUGH, and this one is worth reading
+#			    before trusting a grep on any of the others.  Seven
+#			    SHARED sites spell the macro `CONSTANT_ADDRESS_P'
+#			    -- explow.cc:271 and :449, emit-rtl.cc:3045,
+#			    reload.cc:6922, fwprop.cc:122, recog.cc:2542,
+#			    final.cc:3551 -- and BOTH i386.h:1853 and
+#			    sparc.h:1332 define that macro as
+#			    `constant_address_p (X)'.  So the primary's `tm.h'
+#			    points all seven at i386's function, a grep for the
+#			    SYMBOL over shared code finds nothing, and renaming
+#			    alone converts `multiple definition' into `undefined
+#			    reference' -- which is exactly what happened to
+#			    `legitimate_pic_operand_p' one commit earlier.
+#			    It is renamed AND given a `target_addr' funnel
+#			    (`mt_constant_address_p', addresses.h).
+#
+#			    THE RULE THIS ESTABLISHES: before concluding a bare
+#			    rename suffices, ask what the PRIMARY'S `tm.h'
+#			    expands the corresponding MACRO to, not only whether
+#			    shared code spells the symbol.  Two of the eleven
+#			    names added by this task failed that test, and both
+#			    failed it silently until the link.
+#
 #   regclass_map        Bare DATA, not a function: `enum reg_class const
 #			    regclass_map[FIRST_PSEUDO_REGISTER]' in i386.cc:145
 #			    and s390.cc:3103, declared in each one's own .h.  No
@@ -1671,6 +1716,15 @@ MULTI_TARGET_RENAME_NAMES = \
   legitimate_pic_operand_p \
   legitimize_pic_address \
   regclass_map \
+  constant_address_p \
+  output_probe_stack_range \
+  aarch_bti_arch_check \
+  aarch_bti_enabled \
+  aarch_bti_j_insn_p \
+  aarch_fun_is_indirect_return \
+  aarch_gen_bti_c \
+  aarch_gen_bti_j \
+  aarch_pac_insn_p \
   linux_libc_has_function \
   linux_libm_function_max_error \
   linux_fortify_source_default_level

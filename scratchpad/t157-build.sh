@@ -25,11 +25,23 @@ n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 # attribution; a sha is.
 SHA=$(cd "$SRC" && git rev-parse --short HEAD)
 
+# -j4, NOT -j8.  The box is shared with several other agents; it was measured
+# at load average 38 with five concurrent `make -j8', and one agent's builds
+# ran ~20x slower than baseline.  PRINCIPLES 5 already warns that -j16 once
+# failed with NO DIAGNOSTIC AT ALL under memory pressure, which is the reason
+# this is a correctness knob and not a politeness one.
+#
+# The load is REPORTED, not asserted on: a threshold here would be a number
+# this project moves (PRINCIPLES 6), and refusing to build would be worse than
+# building slowly.  It is printed with every reading so a slow or odd result
+# can be attributed afterwards rather than guessed at.
+J=${MT_JOBS:-4}
+echo "load before build: $(uptime | sed 's/.*load average/load average/')  (-j$J)"
 if [ -d "$D/gcc" ]; then
-  sh "$S/eb-shell.sh" "cd $D/gcc && make -k -j8 $T" \
+  sh "$S/eb-shell.sh" "cd $D/gcc && make -k -j$J $T" \
     > "$D/make-$T.out" 2> "$D/make-$T.err"
 else
-  sh "$S/eb-shell.sh" "cd $D && make -k -j8 all-gcc" \
+  sh "$S/eb-shell.sh" "cd $D && make -k -j$J all-gcc" \
     > "$D/make-$T.out" 2> "$D/make-$T.err"
 fi
 rc=$?

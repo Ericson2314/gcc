@@ -2539,7 +2539,7 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
 	     : memory_address_addr_space_p);
   poly_int64 mode_sz = GET_MODE_SIZE (mode);
 
-  if (CONSTANT_ADDRESS_P (y))
+  if (mt_constant_address_p (y))
     return true;
 
   /* Adjusting an offsettable address involves changing to a narrower mode.

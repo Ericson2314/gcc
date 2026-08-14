@@ -37,6 +37,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "rtl-iter.h"
 #include "target.h"
+/* For mt_constant_address_p: `CONSTANT_ADDRESS_P' is a back-end macro and
+   this is shared code.  See addresses.h.  */
+#include "addresses.h"
 
 /* This pass does simple forward propagation and simplification when an
    operand of an insn can only come from a single def.  This pass uses
@@ -119,7 +122,7 @@ can_simplify_addr (rtx addr)
 {
   rtx reg;
 
-  if (CONSTANT_ADDRESS_P (addr))
+  if (mt_constant_address_p (addr))
     return false;
 
   if (GET_CODE (addr) == PLUS)
