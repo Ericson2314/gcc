@@ -622,6 +622,40 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**AN INSTRUMENT THAT CANNOT SHOW ITS OWN FIXES LANDING CANNOT BE USED TO GRIND
+A POPULATION.** Before working a queue an instrument produced, apply the test:
+*take a defect this project already fixed, and check the instrument now reports
+it clean.* `mta7-targhook-matrix.sh` failed that — it still listed all seven
+pairs `d65b829e7a8` had fixed for rs6000, because it had no arm asking whether
+the back end already supplied the hook. A queue from such a tool cannot
+converge: every pass re-finds the last pass's work.
+
+It was wrong two further ways, both of the kind a plausible-looking grep
+invites:
+
+- **Substring matching.** `grep "define PRINT_OPERAND"` also matches
+  `#define PRINT_OPERAND_ADDRESS`. Word-bounding took that macro from 19
+  definers to 14.
+- **Scope chosen by directory rather than by what the compiler reads.** The
+  definer grep looked only in `gcc/config/<be>/`, but `gcc/config/elfos.h`
+  sits one level up, is in nearly every ELF target's `tm.h` chain, and defines
+  two of the hooks — **66 of the 87 "silent" pairs**. The replacement
+  (`tgh-hdrmatrix.sh`) preprocesses each base's real `tm-<base>.h` with
+  `cpp -dM` instead of guessing from paths. Measured population: **6 pairs
+  over 4 back ends, not 90 over 45**, and one macro's 21 pairs were **zero** —
+  every base defines it.
+
+Generalise: **ask what the compiler actually reads, not what the directory
+layout suggests it reads.** And when replacing an instrument, run both and
+require them to agree on the part that is not in dispute — here both agreed on
+all 121 ICE pairs with zero contradictions, and that cross-check is what made
+the fixes safe to apply.
+
+Corollary already paid for twice: **the old instrument still reports the old
+numbers on the fixed tree.** Leave it in place unmodified rather than editing
+it to agree, so the two readings can be compared — zero movement in a blind
+instrument is evidence about the instrument, not about the work.
+
 **NEVER BUILD FROM THE LIVE WORKING TREE.** The coordinator did, to check
 whether `cc1` links at HEAD, and merged a branch into that tree while `make`
 was running. The build reported `multiple definition of add_clobbers` — a
