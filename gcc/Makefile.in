@@ -497,7 +497,7 @@ USER_H = $(srcdir)/ginclude/float.h \
 	 $(srcdir)/ginclude/stdckdint.h \
 	 $(srcdir)/ginclude/stdcountof.h
 # NO $(EXTRA_HEADERS) HERE ANY MORE.  USER_H is copied into ONE flat
-# `include/' by stmp-int-hdrs, and EXTRA_HEADERS is the configure substitution extra_headers_list,
+# `include/' by stmp-int-hdrs, and EXTRA_HEADERS is `@extra_headers_list@',
 # which gcc/configure.ac expands from the single legacy ${target} pass through
 # config.gcc -- so this line put i386's 118 intrinsics headers, and nobody
 # else's, on every configured back end's search path.  `#include <arm_neon.h>'
@@ -1046,7 +1046,7 @@ EXTRA_GCC_LIBS = @EXTRA_GCC_LIBS@
 
 # THE LEGACY CHANNEL, KEPT ONLY SO IT CAN CHECK THE NEW ONE.
 #
-# The extra_headers_list substitution is gcc/configure.ac:2252 expanding ${extra_headers} from
+# @extra_headers_list@ is gcc/configure.ac:2252 expanding ${extra_headers} from
 # the ONE legacy ${target} pass through config.gcc, with
 # `$(srcdir)/config/${cpu_type}/' prepended -- ${cpu_type} likewise being that
 # one target's.  It is therefore the primary back end's header list and no
@@ -5772,8 +5772,7 @@ stmp-int-hdrs: $(T_GLIMITS_H) $(T_STDINT_GCC_H) $(USER_H) fixinc_list \
 	  case " $(MT_EXTRA_HEADERS) " in \
 	    *" $$f "*) ;; \
 	    *) echo "stmp-int-hdrs: $$f reaches this rule through" >&2; \
-	       echo "  the extra_headers_list substitution, i.e. the single" >&2; \
-	       echo "  legacy \$${target}'s" >&2; \
+	       echo "  @extra_headers_list@, the single legacy \$${target}'s" >&2; \
 	       echo "  config.gcc pass, but no configured back end's manifest" >&2; \
 	       echo "  record claims it.  MT_EXTRA_HEADERS is derived from the" >&2; \
 	       echo "  back-end list and is the authority; a file only the" >&2; \
