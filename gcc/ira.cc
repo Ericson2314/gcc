@@ -1631,7 +1631,9 @@ ira_init_register_move_cost (machine_mode mode)
 	      && ira_may_move_in_cost[mode] == NULL
 	      && ira_may_move_out_cost[mode] == NULL);
   CLEAR_HARD_REG_SET (ok_regs);
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  /* MT_FIRST_PSEUDO_REGISTER: a back-end hook asked about a register number.
+     See the ASAN-named overflow of `mips_hard_regno_mode_ok_p'.  */
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     if (targetm.hard_regno_mode_ok (i, mode))
       SET_HARD_REG_BIT (ok_regs, i);
 
@@ -1813,7 +1815,10 @@ setup_prohibited_mode_move_regs (void)
   for (i = 0; i < NUM_MACHINE_MODES; i++)
     {
       SET_HARD_REG_SET (ira_prohibited_mode_move_regs[i]);
-      for (j = 0; j < FIRST_PSEUDO_REGISTER; j++)
+      /* MT_FIRST_PSEUDO_REGISTER: a back-end hook asked about a register
+	 number.  The set keeps the union layout; a register this base does
+	 not have stays PROHIBITED, which is what its absence means.  */
+      for (j = 0; j < MT_FIRST_PSEUDO_REGISTER; j++)
 	{
 	  if (!targetm.hard_regno_mode_ok (j, (machine_mode) i))
 	    continue;

@@ -646,8 +646,25 @@ init_reg_modes_target (void)
 {
   int i, j;
 
+  /* THE ARRAY IS THE UNION'S, THE WALK IS THIS BASE'S.  Both loops below ask
+     a BACK-END HOOK about a register number, and every back end answers from
+     a table it declared `[FIRST_PSEUDO_REGISTER]' with ITS OWN width --
+     `mips_hard_regno_mode_ok_p' (mips.cc:516) is 188 wide while the union
+     with eleven back ends configured is 334 (ia64's).  Measured by an ASAN
+     `cc1':
+
+       mips.cc:13404: index 188 out of bounds for type 'bool [188]'
+       AddressSanitizer: global-buffer-overflow ... 0 bytes after global
+       variable 'mips_hard_regno_mode_ok_p' ... of size 114492
+         #1 choose_hard_reg_mode  reginfo.cc:786
+         #2 init_reg_modes_target reginfo.cc:661
+
+     `x_hard_regno_nregs' and `reg_raw_mode' keep the union LAYOUT: the rows
+     this base does not have stay zero and VOIDmode, which is what "this
+     register does not exist here" means.  Same shape as the bound in
+     `simplifiable_subregs' below and in `init_reg_sets_1' above.  */
   this_target_regs->x_hard_regno_max_nregs = 1;
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     for (j = 0; j < MAX_MACHINE_MODE; j++)
       {
 	unsigned char nregs = targetm.hard_regno_nregs (i, (machine_mode) j);
@@ -656,7 +673,7 @@ init_reg_modes_target (void)
 	  this_target_regs->x_hard_regno_max_nregs = nregs;
       }
 
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     {
       reg_raw_mode[i] = choose_hard_reg_mode (i, 1, NULL);
 
