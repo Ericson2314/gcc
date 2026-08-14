@@ -1,4 +1,238 @@
 ================================================================================
+SESSION: TWO ICE CAUSES REMOVED -- riscv64's 6771-test driver ICE AND s390x's
+`as_a' mode hole.  Plus a THIRD, found while measuring the first: an explicit
+`-ftarget-config=' never read the target's own spec file, so every measurement
+this branch has taken through `xgcc' has been of a compiler with NO
+`*option_defaults', `*self_spec', `*asm' or `*link' for its target.
+
+Commits `12bc09b62e3', `42803494880', `a9db5c4b705', `2a606ef2889'.
+Worktree agent-a7481b2dba98203e0.  Anchor 49 -> 51 (measured, not quoted).
+Build dirs `/tmp/b-agent-a7481b2dba98203e0' (before, srcdir snapshot
+`ba415463e56') and `-fix' (after, `2a606ef2889'), four bases:
+x86_64-pc-linux-gnu, aarch64-unknown-linux-gnu, riscv64-unknown-linux-gnu,
+s390x-linux-gnu.  Both `make all-gcc rc=0', `error:' 0, multiple definition 0,
+undefined reference 0.  Real cross binutils and each target's own glibc
+headers per `tb1-tools.sh'.
+================================================================================
+
+## 1. CAUSE A -- `default_version, at common/config/riscv/riscv-common.cc:162'
+
+It is a DRIVER crash, not a `cc1' one.  riscv's `DRIVER_SELF_SPECS' expands
+`%:riscv_expand_arch(%*)' inside `gcc.cc'; that spec function calls
+`riscv_parse_arch_string', and `default_version ()' reads `riscv_isa_spec',
+i.e. `global_options.x_riscv_isa_spec'.
+
+`global_options_init_<base>' -- the per-back-end `Init()' values, which cannot
+live in `options.cc' because an `Init()' argument is a macro from that base's
+`tm.h' -- was called from `mt_install_<base>' in `multi-target-select.cc'.
+`multi_target_select' has ONE caller, `toplev.cc:2425'.  So the values reached
+`cc1' and nothing else, `x_riscv_isa_spec' was 0 = `ISA_SPEC_CLASS_NONE', no
+version of the base extensions matched, and the loop fell into its
+`gcc_unreachable ()'.
+
+THE DESIGN FORK, RESOLVED.  `multi-target-select.cc:352' argued the shape was
+right *because* "the DRIVER never selects a target".  That is false and was
+false when written: `gcc.cc:8873-8890' selects one three times over
+(`multi_target_options_select', `targetm_common_select',
+`spec_functions_select'), immediately above `decode_argv'.  The alternative --
+the driver reads no target option state and everything arrives via
+`target-specs' -- fails PRINCIPLES' own hook-vs-capability test:
+`riscv_expand_arch' computes `-march' FROM THE COMMAND LINE, and
+`TARGET_DEFAULT_ISA_SPEC' cannot differ between two installations of this
+compiler serving riscv64.  It is a static per-back-end default, i.e. a hook,
+not a probed capability.
+
+So the `Init()' values moved to where the option TABLES already are, keyed by
+the same base: `multi_target_options_select'.  `multi-target-select.cc' no
+longer names those functions at all -- ONE authority.
+`$(MT_OPTIONS_INIT_OBJS)' moved from `$(MULTI_TARGET_OBJS)' (libbackend.a) to
+`$(MULTI_TARGET_OPTION_TABLE_OBJS)' (libcommon-target.a, which `xgcc' links).
+
+## 2. CAUSE A2 -- the target's spec file was unread on the `-ftarget-config=' route
+
+Found by measuring A, and it is the bigger of the two in reach.
+`set_up_specs' reads the selected target's spec file as
+`dirname (found_target_config) / specs'.  `found_target_config' was set only
+by `find_target_config', which runs only when nothing has already supplied a
+configuration -- i.e. only for a `<triple>-gcc' invocation.  A driver given
+`-ftarget-config=FILE' left it NULL.
+
+`mtcheck.sh' drives `xgcc -B... -ftarget-config=<cfg>'.  So every board this
+branch has recorded was taken with no `*option_defaults' for any target.
+Measured, before:
+
+    xgcc -B.../gcc/ -ftarget-config=<riscv64 cfg> -O2 -S t.c
+      -> cc1 with NO -march= and NO -mabi=
+      -> `.attribute arch, ""', 32-bit code in an ELF64 object,
+         riscv64-...-as: "the architecture string of -march and elf
+         architecture attributes cannot be empty"
+
+    riscv64-unknown-linux-gnu-gcc -O2 -S t.c   (same compiler, same file)
+      -> Reading specs from .../riscv64-unknown-linux-gnu/specs
+      -> -march=rv64gc -mabi=lp64d, then cause A's ICE
+
+One compiler, two invocations, two paths through the target's own
+configuration, and the quieter path is the one everything was measured with.
+
+## 3. CAUSE B -- `as_a, at machmode.h:416', every non-primary target
+
+`MAX_MODE_INT' is an enumerator in the SINGULAR `insn-modes.h', whose
+vocabulary is unioned; it names the widest integer mode SOME back end has.
+For a back end lacking it, it is a HOLE: class MODE_RANDOM, precision 0,
+size 0.  `widest_int_mode_for_target ()' was written for exactly this and
+applied at ONE site (`expr.cc:936').  FIVE more remained, all "the largest int
+representable on the target":
+
+    optabs.cc:8353       create_integer_operand      <- THE MEASURED ONE
+    combine.cc:7475      gen_int_mode (subreg_lsb, MAX_MODE_INT)
+    simplify-rtx.cc:2048 op_mode = MAX_MODE_INT (VOIDmode CONST_INT)
+    simplify-rtx.cc:2085 ditto
+    simplify-rtx.cc:7239 cmode = MAX_MODE_INT
+    dse.cc:1745          known_le (access_bytes, GET_MODE_SIZE (MAX_MODE_INT))
+
+The `dse.cc' one is why the FAMILY was swept rather than the wall fixed: a
+hole's SIZE is 0, so that test is false for every access and the const-store
+simplification silently never ran on any back end lacking the union's widest
+integer mode.  No abort, nothing downstream to notice.  The loud member led to
+a quiet one.
+
+Every other `MAX_MODE_*' outside `config/' is a run ENDPOINT or an array
+BOUND, where the union's value is the correct one; each already carries a
+comment saying so.  `MAX_MODE_INT' as a VALUE is now zero sites.
+
+## 4. WHAT MOVED
+
+Reproducers, both-sided.
+
+    memcpy/memset/strchr at -O2, per target config, cc1 direct
+      x86_64   535 bytes / e51a7aa55389  ->  535 / e51a7aa55389   UNCHANGED
+      aarch64  668 bytes / 767a1c90c1ea  ->  668 / 767a1c90c1ea   UNCHANGED
+      s390x    ICE in as_a, machmode.h:416 ->  1560 bytes
+
+    `make configure-target-specs-<triple>' for all four
+      before  Error 1 at riscv64, `in default_version'
+      after   rc=0, four DISTINCT specs-config, all 230 lines
+              x86_64 a6c4c68bdf33 (== PRINCIPLES' bar), aarch64 f1a5ab201d95,
+              riscv64 9f68be7da0d2, s390x 46aad87470b1 -- byte-identical to
+              the before run's, so the abort was removed without changing the
+              artefact
+
+    x86_64 -O2 big.c -o x.s, cc1 direct:  12369 / 378fc33c1e70 BEFORE AND
+      AFTER -- the branch's strongest regression detector, unmoved.
+
+The DRIVER arm (`tb1-driver.sh'), `xgcc -B... -ftarget-config= -O2 -S', real
+cross `as' + `readelf' + a SEMANTIC witness (the target's own pointer-sized
+data directive carrying 8, chosen because `srai' is a valid rv32 AND rv64
+instruction and an instruction arm cannot tell 32-bit riscv code apart):
+
+    before   x86_64 ok   aarch64 ok   riscv64 AS FAIL, `.attribute arch, ""',
+             sizeof-witness ABSENT   s390x ok
+    after    all four: emit ok, AS ok, right ELF class and machine,
+             sizeof-witness PRESENT.  riscv64's arch attribute is now
+             rv64i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0_zifencei2p0_...
+
+`big.c' through the riscv64 driver: 5 errors and no output (`__int128' is not
+supported on this target -- TARGET_64BIT off) -> 9145 bytes, 0 errors,
+assembles to ELF64 RISC-V with `double-float ABI' and 58 `sd'/`ld'.  That
+answers the `MASK_64BIT' question: it is set by `riscv_parse_arch_string' off
+`-march=rv64gc', which now reaches `cc1'.
+
+THE BOUNDED BOARD -- `gcc.target/<dir>' ONLY, PER TARGET.  NOT TAA-BOARD; do
+not diff it against TAA-BOARD.  A subset, because the full per-target suite is
+~50 min per target and the host carried another agent's `-fsanitize' build at
+load 26-35 throughout the before run.  `MT_COMPILE_ONLY=1'; KILLED (`signal
+9') is 0 in all eight columns.
+
+    target      PASS            FAIL           UNRES          ICE lines
+    x86_64      26139 -> 26147   410 ->  402     14 ->    14   501 ->  501
+    aarch64      4111 ->  4121   703 ->  693   1453 ->  1453    84 ->   84
+    riscv64      6080 -> 31069 16130 ->  1378 11329 ->   378 22698 ->  216
+    s390x        1433 ->  1274   349 ->   249   553 ->   361   294 ->  129
+
+ICE sites, before -> after:
+
+    riscv64  default_version, riscv-common.cc:162   6771 tests  ->  0
+             operand_subword_force, emit-rtl.cc:1879  380       ->  34
+    s390x    as_a, machmode.h:416                       49      ->  0
+
+READ THE TWO CONTROL ROWS HONESTLY.  x86_64 and aarch64 are NOT unchanged:
+each gains 8 and 10 PASS and loses the same in FAIL, with ICE lines flat.
+That is cause A2 -- those targets' own `*option_defaults' now reach `cc1'
+where before nothing did.  It is a real change in what is being compiled, so
+the "x86_64 unchanged in all seven columns" control does NOT hold for A2 and
+should not be claimed.  The cc1-direct codegen bar (12369 / 378fc33c1e70) IS
+unchanged and is the control that survives, because it does not go through the
+driver.
+
+AND s390x's TOTALS ARE NOT COMPARABLE ROW TO ROW.  2521 results before, 2150
+after: with `*option_defaults' now supplied, different `dg-require' and
+effective-target decisions run, so UNSUP rises 173 -> 259 and the whole
+denominator moves.  The ICE halving (294 -> 129) and the disappearance of
+`as_a' are the readings that mean something there; the PASS column is not.
+
+## 5. NEXT WALLS, EACH A REPRODUCER
+
+  * s390x `big.c' now reaches `f_va': SEGV in `make_tree' via `s390_va_start'
+    via `expand_builtin_va_start'.
+  * s390x's memcpy output now EMITS but does not ASSEMBLE:
+    "operand 2: operand out of range (-160 is not between 0 and 4095)" --
+    a negative displacement, i.e. a frame-layout constant from another base.
+    PRINCIPLES' rule applies: it emits, and it is still wrong.
+  * riscv64's new top ICE is `extract_integral_bit_field, at expmed.cc:2011'
+    (35 tests), then `operand_subword_force' (34) and `convert_mode_scalar,
+    expr.cc:737' (20).
+  * s390x's new top ICE is a SEGV (32 tests) and `s390_match_ccmode_set,
+    config/s390/s390.cc:1518' (10).
+  * x86_64's own top ICE, untouched by any of this and never yet attributed:
+    `hashtab_chk_error, at hash-table.cc:126', 159 tests.
+
+## 6. THE 20.8 GB RUNAWAY -- diagnosed, and it is probably NOT ours
+
+`gcc.target/riscv/pr117506.c' (a four-line testcase) took `cc1' to 20.8 GB
+RSS.  Killed; `scratchpad/tb1-memcap.sh' now caps every `cc1' this agent runs
+(`ulimit -v', NOT `-m' -- Linux does not enforce RLIMIT_RSS, so `-m' is a
+mitigation that cannot fire; the script also reads the limit back).  Under a
+3 GB cap the same input dies in 4.0 s.
+
+It is NOT a walk bounded by the union.  It is unbounded RECURSION between two
+match.pd patterns that are exact inverses, each step allocating a fresh SSA
+name -- the whole 30-frame backtrace is
+`gimple_simplify_MIN_EXPR <-> gimple_simplify_CFN_REDUC_MIN':
+
+    match.pd:11912  reduc (op @0 VECTOR_CST@1) -> op (reduc @0) (reduc @1)
+                    2ef0e75d0bb, 2022, unguarded, no `:s'
+    match.pd:11942  op (reduc:s @0) (reduc:s @1) -> reduc (op @0 @1)
+                    c74d6b12af6, 2026-07-29, on master
+
+Both UPSTREAM.  The forward rule is normally self-limiting because
+`reduc (VECTOR_CST)' constant-folds to a scalar, leaving nothing for the
+reverse rule -- but riscv's RVV types under `-march=...zve64f' are
+VARIABLE-LENGTH (`VNx*'), so it does not fold and the cycle closes.
+Reproduced ONLY with riscv + zve64f: riscv without the vector extension,
+x86_64, aarch64 and s390x all compile the same input in under a second.
+
+BOUNDARY, stated rather than glossed: this was NOT confirmed against a stock
+riscv64 cross compiler -- none exists in this worktree and the host was at
+load 30.  What is established is that both patterns are upstream, that they
+are mutual inverses, that the recursion is the entire backtrace, and that no
+union-sized bound appears anywhere in it.  It should be reported upstream and
+re-checked against a stock cross when one is cheap.
+
+## 7. WHAT WAS NOT MEASURED
+
+  * The FULL per-target suite (TAA-BOARD's four columns).  One attempt was
+    started and killed mid-riscv64 with two of four columns stamped; the two
+    that finished were taken at load 26-35 under another agent's sanitizer
+    build and are not quoted here.  Only the bounded `gcc.target/<dir>' board
+    above is reported, and it is labelled a subset everywhere it appears.
+  * The A-only intermediate build.  It was built and then discarded: it hit a
+    compile error (`global_options_init' not declared -- `opts.h' does not
+    reach the shared `options.h', fixed in `2a606ef2889'), and rebuilding it
+    to separate A from B was not worth a second 40-minute build when the two
+    reproducers are independent by construction (riscv driver vs s390x cc1).
+    So the board delta above is A + A2 + B together, and the per-cause
+    attribution rests on the ICE-site counts in section 4, not on the board.
+================================================================================
 SESSION: THE 733-DIAGNOSTIC `TARGET_CPU_CPP_BUILTINS' CLASS DOES NOT EXIST.
 It was already closed by `76afb178601', which is an ANCESTOR of the commit the
 733 was reported from.  Measured at merge point `c25ceefb5a5', cold, 47 back
