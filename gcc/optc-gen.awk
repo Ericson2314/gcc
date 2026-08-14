@@ -25,7 +25,14 @@
 # opt-read.awk.
 #
 # Usage: awk -f opt-functions.awk -f opt-read.awk -f optc-gen.awk \
-#            [-v header_name=header.h] < inputfile > options.cc
+#            [-v header_name=header.h] [-v base_inc=<cpu>-inc/] \
+#            < inputfile > options.cc
+#
+# base_inc prefixes the per-back-end headers this file emits, so a file
+# generated for one back end names that back end's copies rather than leaving
+# the choice to the include path.  Empty for the shared options.cc, which is
+# compiled once and wants the build root's.  header_name arrives already
+# qualified by whoever passes it.
 
 # Record one element of the `global_options_init' brace initializer, keyed the
 # way opth-gen.awk keys `struct gcc_options' members so that the two can be
@@ -223,7 +230,7 @@ if (init_base != "") {
 		print "#include " quote headers[i] quote
 	print "#include " quote "opts.h" quote
 	print "#include " quote "intl.h" quote
-	print "#include " quote "insn-attr-common.h" quote
+	print "#include " quote base_inc "insn-attr-common.h" quote
 	print ""
 	# The same SourceInclude set options.cc gets.  An Init() argument is as
 	# likely to be an enumerator from one of these (`DIAGNOSTICS_COLOR_NO',
@@ -362,7 +369,7 @@ for (i = 1; i <= n_headers; i++)
 	print "#include " quote headers[i] quote
 print "#include " quote "opts.h" quote
 print "#include " quote "intl.h" quote
-print "#include " quote "insn-attr-common.h" quote
+print "#include " quote base_inc "insn-attr-common.h" quote
 print ""
 
 if (n_extra_c_includes > 0) {

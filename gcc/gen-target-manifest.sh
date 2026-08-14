@@ -568,7 +568,11 @@ ${AWK} '
       printf "\t@$(mkinstalldirs) mt-%s\n", b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       printf "\t  -f $(srcdir)/optc-gen.awk -v init_base=%s \\\n", b
-      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      # This file is compiled for ONE back end, so it names that back end
+      # headers.  Left plain they resolve to the build root copies, which are
+      # whichever back end the build root happened to hold.
+      printf "\t  -v base_inc=%s-inc/ \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h %s-inc/options.h %s-inc/tm.h\" \\\n", b, b
       printf "\t  < $< > tmp-options-init-%s.cc\n", b
       # A generator that fails and exits 0 has happened on this branch; an
       # empty or headers-only file would compile, link, and leave the bug in
@@ -617,7 +621,9 @@ ${AWK} '
       printf "\t@$(mkinstalldirs) mt-%s\n", b
       printf "\t$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/opt-read.awk \\\n"
       printf "\t  -f $(srcdir)/optc-gen.awk -v tables_base=%s \\\n", b
-      printf "\t  -v header_name=\"config.h system.h coretypes.h options.h tm.h\" \\\n"
+      # Named for this back end, exactly as options-init.cc above.
+      printf "\t  -v base_inc=%s-inc/ \\\n", b
+      printf "\t  -v header_name=\"config.h system.h coretypes.h %s-inc/options.h %s-inc/tm.h\" \\\n", b, b
       printf "\t  < $< > tmp-options-tables-%s.cc\n", b
       # Both tables, by name.  optc-gen.awk emits an #error when the record
       # set is empty, but an awk that dies partway writes a TRUNCATED file
