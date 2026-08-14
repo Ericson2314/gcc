@@ -25,7 +25,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "xregex.h"
 #include "obstack.h"
 #include "intl.h"
