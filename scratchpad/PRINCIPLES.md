@@ -622,6 +622,31 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**`tm.h` IS FOUR CHANNELS, NOT ONE — AND EVERY "WHO NEEDS `tm.h`" FIGURE IN
+THIS FILE MEASURES ONE OF THEM.** `mkconfig.sh` assembles it as: a
+target-neutral top half → `#include "options.h"` → the back end's header chain
+→ `insn-flags`/`insn-modes` → `defaults.h`. In a build dir, `gcc/tm.h:40` **is**
+the `options.h` line.
+
+So a TU can be perfectly clean against the `config/` target-macro vocabulary
+and still genuinely need `tm.h` — for `OPT_*` enumerators or `global_options`
+accessors, which that vocabulary does not contain and never could. Measured:
+`main.cc` (`flag_checking`) and `c-family/cppspec.cc` (`OPT_x`, `OPT_o`) both
+scored CLEAR and were revoked by the build.
+
+Consequence: **`t141-delete-ready.txt`'s 23 and Class A's 39 are upper
+bounds.** A second vocabulary — `options.h` names plus the `mkconfig.sh` top
+half — is required before any further deletion is authorised. Three of eight
+attempted deletions survived; five were revoked, two by this cause and three by
+the transitive one the plan already named (a TU whose own text is clean but
+which includes `rtl.h`, which reaches `hard-reg-set.h` and itself spells
+`BITS_PER_WORD`).
+
+The older framing in this file — "`tm.h` is the i386 `tm.h` wearing a name that
+does not say so" — is true of the *back end's header chain*, which is the third
+of the four. It is not true of the whole file, and reading it as though it were
+is what made a one-vocabulary scan look sufficient.
+
 **A LOG BEING WRITTEN LOOKS EXACTLY LIKE A LOG THAT FINISHED — STAMP THE
 EXIT.** An agent reported "13 errors → 7, 4 back ends → 2" and later withdrew
 **both** figures: neither build had completed when it read them, so the delta
