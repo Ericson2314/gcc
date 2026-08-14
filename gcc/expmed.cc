@@ -225,8 +225,22 @@ init_expmed_one_mode (struct init_expmed_rtl *all,
     {
       for (mode_from = MIN_MODE_INT; mode_from <= MAX_MODE_INT;
 	   mode_from = (machine_mode)(mode_from + 1))
-	init_expmed_one_conv (all, int_mode_to,
-			      as_a <scalar_int_mode> (mode_from), speed);
+	{
+	  /* MIN_MODE_INT and MAX_MODE_INT are the SHARED mode numbering's
+	     bounds, so on a multi-target build this range spans every
+	     configured back end's integer modes, not this one's.  The ones
+	     belonging to another back end are holes here -- class
+	     MODE_RANDOM, precision 0 -- and `as_a <scalar_int_mode>' on one
+	     is a hard abort.  Skip them: this loop wants the modes this back
+	     end actually has, which is exactly what the class now says.
+
+	     A single-target build has no holes, so this test is never true
+	     there and the behaviour is unchanged.  */
+	  if (!is_a <scalar_int_mode> (mode_from))
+	    continue;
+	  init_expmed_one_conv (all, int_mode_to,
+				as_a <scalar_int_mode> (mode_from), speed);
+	}
 
       scalar_int_mode wider_mode;
       if (GET_MODE_CLASS (int_mode_to) == MODE_INT
@@ -287,19 +301,34 @@ init_expmed (void)
       crtl->maybe_hot_insn_p = speed;
       set_zero_cost (speed, set_src_cost (const0_rtx, QImode, speed));
 
+      /* Each of these three ranges is stated in the SHARED mode numbering, so
+	 on a multi-target build it spans every configured back end's modes of
+	 that class.  The ones belonging to another back end are holes here --
+	 class MODE_RANDOM, precision 0, size 0 -- and `init_expmed_one_mode'
+	 on one reaches `expmed_mode_index', whose switch on GET_MODE_CLASS
+	 ends in `gcc_unreachable ()'.
+
+	 Before holes were reclassified this did not abort; it silently
+	 computed and cached RTL COSTS for zero-width modes belonging to other
+	 back ends, which is the wrong answer rather than the loud one.  The
+	 class test is what makes the range this back end's own.  A
+	 single-target build has no holes and is unaffected.  */
       for (mode = MIN_MODE_INT; mode <= MAX_MODE_INT;
 	   mode = (machine_mode)(mode + 1))
-	init_expmed_one_mode (&all, mode, speed);
+	if (GET_MODE_CLASS (mode) == MODE_INT)
+	  init_expmed_one_mode (&all, mode, speed);
 
       if (MIN_MODE_PARTIAL_INT != VOIDmode)
 	for (mode = MIN_MODE_PARTIAL_INT; mode <= MAX_MODE_PARTIAL_INT;
 	     mode = (machine_mode)(mode + 1))
-	  init_expmed_one_mode (&all, mode, speed);
+	  if (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT)
+	    init_expmed_one_mode (&all, mode, speed);
 
       if (MIN_MODE_VECTOR_INT != VOIDmode)
 	for (mode = MIN_MODE_VECTOR_INT; mode <= MAX_MODE_VECTOR_INT;
 	     mode = (machine_mode)(mode + 1))
-	  init_expmed_one_mode (&all, mode, speed);
+	  if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
+	    init_expmed_one_mode (&all, mode, speed);
     }
 
   if (alg_hash_used_p ())
