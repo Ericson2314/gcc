@@ -385,6 +385,90 @@ TARGET_GNU_ATTRIBUTES (m68k_attribute_table,
 #undef TARGET_DOCUMENTATION_NAME
 #define TARGET_DOCUMENTATION_NAME "m68k"
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+m68k_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+static rtx
+m68k_mt_function_value (const_tree ret_type, const_tree fn_decl_or_type, bool)
+{
+  /* The old interface does not handle receiving the function type; this is
+     default_function_value's own preamble, kept so the wrapper is behaviourally
+     identical to the default it replaces.  */
+  if (fn_decl_or_type && !DECL_P (fn_decl_or_type))
+    fn_decl_or_type = NULL;
+  return FUNCTION_VALUE (ret_type, fn_decl_or_type);
+}
+
+static bool
+m68k_mt_function_value_regno_p (const unsigned int regno)
+{
+  return FUNCTION_VALUE_REGNO_P (regno);
+}
+
+static rtx
+m68k_mt_libcall_value (machine_mode mode, const_rtx)
+{
+  return LIBCALL_VALUE (MACRO_MODE (mode));
+}
+
+static reg_class_t
+m68k_mt_preferred_reload_class (rtx x, reg_class_t rclass)
+{
+  return (reg_class_t) PREFERRED_RELOAD_CLASS (x, (enum reg_class) rclass);
+}
+
+static void
+m68k_mt_print_operand (FILE *stream, rtx x, int code)
+{
+  PRINT_OPERAND (stream, x, code);
+}
+
+static void
+m68k_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}
+
+static bool
+m68k_mt_print_operand_punct_valid_p (unsigned char code)
+{
+  return PRINT_OPERAND_PUNCT_VALID_P (code);
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS m68k_mt_class_max_nregs
+#undef TARGET_FUNCTION_VALUE
+#define TARGET_FUNCTION_VALUE m68k_mt_function_value
+#undef TARGET_FUNCTION_VALUE_REGNO_P
+#define TARGET_FUNCTION_VALUE_REGNO_P m68k_mt_function_value_regno_p
+#undef TARGET_LIBCALL_VALUE
+#define TARGET_LIBCALL_VALUE m68k_mt_libcall_value
+#undef TARGET_PREFERRED_RELOAD_CLASS
+#define TARGET_PREFERRED_RELOAD_CLASS m68k_mt_preferred_reload_class
+#undef TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND m68k_mt_print_operand
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS m68k_mt_print_operand_address
+#undef TARGET_PRINT_OPERAND_PUNCT_VALID_P
+#define TARGET_PRINT_OPERAND_PUNCT_VALID_P m68k_mt_print_operand_punct_valid_p
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Base flags for 68k ISAs.  */

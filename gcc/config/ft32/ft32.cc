@@ -927,6 +927,36 @@ ft32_elf_encode_section_info (tree decl, rtx rtl, int first)
 #undef TARGET_CONSTANT_ALIGNMENT
 #define TARGET_CONSTANT_ALIGNMENT constant_alignment_word_strings
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static void
+ft32_mt_print_operand (FILE *stream, rtx x, int code)
+{
+  PRINT_OPERAND (stream, x, code);
+}
+
+static void
+ft32_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}
+
+#undef TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND ft32_mt_print_operand
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS ft32_mt_print_operand_address
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-ft32.h"

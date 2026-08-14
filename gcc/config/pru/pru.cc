@@ -3337,6 +3337,39 @@ pru_unwind_word_mode (void)
 #undef TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+pru_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+static bool
+pru_mt_profile_before_prologue (void)
+{
+  /* default_profile_before_prologue returns true exactly when the macro is
+     defined; this back end defines it.  */
+  return true;
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS pru_mt_class_max_nregs
+#undef TARGET_PROFILE_BEFORE_PROLOGUE
+#define TARGET_PROFILE_BEFORE_PROLOGUE pru_mt_profile_before_prologue
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-pru.h"
