@@ -38,7 +38,7 @@ B=${1:?build dir}; shift
 [ $# -ge 1 ] || { echo "FATAL: name at least one target triple"; exit 9; }
 
 case "$B" in
-  */b-aa99*) ;;
+  */b-agent-aa9936*) ;;
   *) echo "FATAL: build dir $B is not named for this worktree (PRINCIPLES 5)"; exit 9 ;;
 esac
 [ -f "$B/MY-SRC" ] || { echo "FATAL: $B has no MY-SRC stamp"; exit 9; }
