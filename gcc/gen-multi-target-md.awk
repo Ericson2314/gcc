@@ -2355,7 +2355,8 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
 
   # ... and this back end's C++-family objects, for cc1plus.
   #
-  # A LIST OVER THE OBJECTS ABOVE, NOT A SECOND SET OF RULES.  Measured over
+  # THE C LIST ITSELF, NOT A SECOND SET OF RULES AND NOT A SECOND ENUMERATION.
+  # Measured over
   # all 47 configured back ends (scratchpad/t190-cxx-census.sh, committed):
   # the object a back end names under `config/<cpu>/' in `cxx_target_objs' is
   # the SAME object it names in `c_target_objs' -- SAME 47, DIFF 0 -- because
@@ -2371,6 +2372,24 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # `$(error)' on ONE line and with no comma, for the reason recorded at the
   # `frag_source_for' refusal above: a newline inside a make function call
   # kills the parse before the message is printed.
+  #
+  # AND THE FIRST DRAFT ENUMERATED THE OBJECTS ITSELF, WHICH IS THE HALF-FIX
+  # THIS COMMENT EXISTS TO PREVENT.  It built the list from `cxx_target_objs'
+  # alone, i.e. `mt-<cpu>/<cpu>-c.o', and MISSED `target-c-ops-<cpu>.o' --
+  # which is not in `c_target_objs' either: this generator appends it to
+  # `cobjs_this' a hundred lines up, because it is the per-base table whose
+  # members CALL into `<cpu>-c.o'.  Measured, cc1plus then linked and failed:
+  #
+  #   target-c-ops-select.o:(.rodata+0x8): undefined reference to
+  #     `targetm_c_ops_aarch64'
+  #   target-c-ops-select.o:(.rodata+0x18): undefined reference to
+  #     `targetm_c_ops_i386'
+  #
+  # So the list is `$(MT_C_OBJS_<cpu>)' by reference.  Anything the C side
+  # adds to a back end's per-base C-family set follows automatically, which is
+  # the property a second enumeration cannot have -- and the failure it
+  # produces is a link error naming a symbol that appears nowhere in this
+  # file.
   cxxobjs_this = "";
   n = split(xxobjs, parts, " ");
   for (i = 1; i <= n; i++) {
@@ -2390,9 +2409,7 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
 	     " gen-multi-target-md.awk a rule for it)\n\n", cpu, parts[i];
       continue;
     }
-    obj = parts[i];
-    sub(/\.o$/, "", obj);
-    cxxobjs_this = cxxobjs_this " mt-" cpu "/" obj ".o";
+    cxxobjs_this = " $(MT_C_OBJS_" cpu ")";
     # Taken OUT of @cxx_target_objs@ by gcc/Makefile.in for the same reason as
     # the C side: the shared i386-c.o and mt-i386/i386-c.o define the same
     # `ix86_target_macros', and a link keeping one of them by member order is

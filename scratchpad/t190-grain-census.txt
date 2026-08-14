@@ -1,0 +1,17 @@
+triples 188
+VARIABLE                         GRAIN     back ends that set it / that disagree with themselves
+use_gcc_stdint                   TRIPLE    set-by=48  disagree=10  rs6000 i386 pa ia64 arm s390 sparc mips alpha sh
+user_headers_inc_next_pre        TRIPLE    set-by=1  disagree=1  i386
+user_headers_inc_next_post       TRIPLE    set-by=1  disagree=1  i386
+extra_programs                   TRIPLE    set-by=2  disagree=2  ia64 alpha
+inhibit_libc                     BACKEND   set-by=1  disagree=0 
+TM_MULTILIB_EXCEPTIONS_CONFIG    BACKEND   set-by=0  disagree=0 
+d_target_objs                    TRIPLE    set-by=48  disagree=20  vax rs6000 or1k i386 pa frv microblaze aarch64 xtensa bfin ia64 arm s390 csky sparc arc mips alpha sh m68k
+fortran_target_objs              TRIPLE    set-by=4  disagree=4  rs6000 i386 ia64 alpha
+rust_target_objs                 TRIPLE    set-by=48  disagree=20  vax rs6000 or1k i386 pa frv microblaze aarch64 xtensa bfin ia64 arm s390 csky sparc arc mips alpha sh m68k
+jit_target_objs                  BACKEND   set-by=48  disagree=0 
+tm_d_file                        BACKEND   set-by=10  disagree=0 
+tm_rust_file                     BACKEND   set-by=1  disagree=0 
+cxx_target_objs                  TRIPLE    set-by=48  disagree=20  vax rs6000 or1k i386 pa frv microblaze aarch64 xtensa bfin ia64 arm s390 csky sparc arc mips alpha sh m68k
+c_target_objs                    TRIPLE    set-by=48  disagree=20  vax rs6000 or1k i386 pa frv microblaze aarch64 xtensa bfin ia64 arm s390 csky sparc arc mips alpha sh m68k
+extra_headers                    TRIPLE    set-by=16  disagree=5  rs6000 i386 sparc mips sh
