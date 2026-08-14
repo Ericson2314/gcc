@@ -14230,6 +14230,33 @@ not fire for a reason that a single new back end would remove.
 
 ## 7. BOTH-SIDED, AND THE BARS
 
+**Two full 11-base builds, before and after, both `make all-gcc` rc=0 with
+`error:` 0** -- `/tmp/b-ac0602-a` from `7f6febe5628` and `/tmp/b-ac0602-b` from
+`4b78f6fc998`. The witness, read out of the running `cc1` on the same input
+with the same `specs-config` (arm md5 `079e18edd511`, identical in both):
+
+```
+BEFORE  cc1: internal compiler error: back end 'arm' computes
+        'sizeof (struct target_expmed)' as 509504, but target-independent
+        code allocates 514168; a bound in its header is not spelled
+        MULTI_TARGET_UNION_*
+          reginfo.cc:238 init_reg_sets ();  rc=4;  NO OUTPUT AT ALL
+AFTER   silent;  rc=4 later, in ira_init, having EMITTED arm assembly
+```
+
+So the wall moved and it moved forward: `.cpu arm7tdmi` / `.arch armv4t` /
+`.fpu softvfp` now exist where there was no output. The segfault in section 8
+is newly *reached*, not newly caused -- before the fix `cc1` aborted at the
+witness, five calls earlier, and never entered `initialize_rtl`.
+
+And the x86_64 bar is byte-identical **on both builds**, which is the arm that
+says the change is not paying for arm with someone else:
+
+```
+BEFORE  12369 bytes  md5 378fc33c1e70   specs-config md5 a6c4c68bdf33
+AFTER   12369 bytes  md5 378fc33c1e70   specs-config md5 a6c4c68bdf33
+```
+
 11 bases, snapshot `4b78f6fc998`, `/tmp/b-ac0602-b`, `make all-gcc` rc=0,
 `error:` **0**:
 
@@ -14266,6 +14293,15 @@ own initialisation are working.
 
 - **No 47-base build.** Everything here is 11 bases. Cause B's 219 is therefore
   a **lower bound** on the shift count.
+- **Cause B was not read out of a running `cc1`.** 219 is computed from the
+  shared `insn-modes.h`'s class runs, which is what the macro expands against;
+  no arm observed a wrong ANSWER, because with NONE/ALL there is no wrong
+  answer to observe. That is the finding, not a gap in it -- but it does mean
+  the evidence for B is a shift count, not a miscompilation.
+- **No assembler ran.** arm's output was inspected for `.cpu`/`.arch` and
+  register names; it was not fed to a real `arm-*-as`. Given riscv64 passed
+  "assembles, right ELF machine" while emitting 32-bit code, that is the
+  weaker half anyway, but it is missing.
 - **`GET_MODE_CLASS` is the hole test everywhere in cause D.** That is sound
   only because `genmodes.cc:2412` emits `MODE_RANDOM` for holes; if a later
   change gives holes their run's class back, all four guards silently stop
