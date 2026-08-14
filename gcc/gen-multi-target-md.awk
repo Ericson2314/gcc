@@ -1906,6 +1906,47 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
     obj = parts[i];
     sub(/\.o$/, "", obj);
     src = frag_source_for(obj, tmkp);
+    # A c_target_obj NO FRAGMENT CLAIMS IS A DEFECT, NOT A NON-BACK-END OBJECT,
+    # AND IT USED TO LEAVE THIS LOOP SILENTLY.
+    #
+    # The refusal in the second loop below cannot catch it: that loop iterates
+    # over cobjs_own, and an object with src == "" fails the `^config/<cpu>/'
+    # test here and is therefore never put in cobjs_own to be refused.  The
+    # exclusion runs BEFORE the check, so the check cannot fire -- the
+    # `mitigation that cannot fire' shape in PRINCIPLES section 4.
+    #
+    # Measured: `v850e1-elf' set `c_target_objs="v850-c.o"' while its
+    # tmake_file omitted `v850/t-v850', the only fragment carrying the rule.
+    # v850-c.o disappeared from MT_C_OBJS_v850 with no word anywhere, and the
+    # link failed 8 symbols later at `ghs_pragma_*' -- a name that does not
+    # mention v850-c.o, config.gcc, or this loop.
+    #
+    # $(warning) rather than $(error): the point is that the operator SEES it.
+    # An $(error) here would also be defensible, and is deliberately not used
+    # yet because this generator runs for all 48 back ends at once and one
+    # unfixed fragment would block every one of them.
+    #
+    # SCOPED TO `<cpu>-c.o', AND THE FIRST DRAFT WAS NOT -- WHICH IS THE
+    # LESSON.  Unscoped it fired 48 times on a 48-back-end build, every one of
+    # them a FALSE POSITIVE: `default-c.o', `glibc-c.o', `sol2-c.o',
+    # `winnt-c.o' and friends are the OS side, built by generic rules in
+    # gcc/Makefile.in rather than by any tmake fragment, so src == "" is their
+    # NORMAL state.  A warning that fires once per back end on correct input is
+    # not a check, it is 48 lines nobody reads -- and it would have buried the
+    # one line that mattered.
+    #
+    # Only `<cpu>-c.o' is the back end's own, only it is expected to live under
+    # `config/<cpu>/', and only for it is a missing fragment a defect.  With
+    # this scope the warning reads ZERO on a correct 48-base tree; `v850' is
+    # its negative control, and reverting the `config.gcc' hunk that added
+    # `v850/t-v850' makes it fire by name.
+    if (src == "" && obj == (cpu "-c")) {
+      printf "$(warning multi-target: %s lists %s in c_target_objs but no" \
+	     " tmake fragment claims a rule for it -- it will NOT be built" \
+	     " and anything referencing its symbols will fail at link time)\n\n", \
+	     cpu, parts[i];
+      continue;
+    }
     if (src ~ ("^\\$\\(srcdir\\)/config/" cpu "/")) {
       cobjs_own = cobjs_own parts[i] " ";
       # ... and record it so gcc/Makefile.in can take it OUT of C_TARGET_OBJS.

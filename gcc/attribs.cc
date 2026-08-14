@@ -1859,7 +1859,24 @@ copy_attributes_to_builtin (tree decl)
 			     DECL_ATTRIBUTES (decl), "omp declare simd");
 }
 
-#if TARGET_DLLIMPORT_DECL_ATTRIBUTES
+/* MULTI-TARGET: the `#if TARGET_DLLIMPORT_DECL_ATTRIBUTES' that used to wrap
+   the next two functions is gone.  Same cause as `immed_double_const' in
+   emit-rtl.cc: `attribs.cc' is compiled ONCE, so that `#if' was read with the
+   PRIMARY back end's tm.h, while `mcore.cc' -- compiled with mcore's own
+   headers, where the macro IS 1 -- puts `merge_dllimport_decl_attributes' in
+   its `targetm' initialiser.  The link failed at `mt-mcore/mcore.o:(.data)'.
+
+   Compiling them unconditionally is not an invented answer: whether a back
+   end USES them is still decided entirely by that back end's own
+   `TARGET_MERGE_DECL_ATTRIBUTES' / attribute table.  All this changes is that
+   the primary no longer decides whether the code exists.
+
+   REMAINING LEAK, deliberately left and named rather than papered over: two
+   `#if TARGET_WIN32_TLS' blocks inside `handle_dll_attribute' below are still
+   read with the primary's headers.  They are only reachable from a back end
+   that registers the dllimport attributes at all, so they are not on any
+   currently-linking path, but they are the same defect one level down and
+   want a per-base answer.  */
 
 /* Specialization of merge_decl_attributes for various Windows targets.
 
@@ -2079,7 +2096,8 @@ handle_dll_attribute (tree * pnode, tree name, tree args, int flags,
   return NULL_TREE;
 }
 
-#endif /* TARGET_DLLIMPORT_DECL_ATTRIBUTES  */
+/* (No `#endif' here: see the MULTI-TARGET note above
+   merge_dllimport_decl_attributes.)  */
 
 /* Given two lists of attributes, return true if list l2 is
    equivalent to l1.  */

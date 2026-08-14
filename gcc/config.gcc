@@ -3716,6 +3716,21 @@ v850*-*-*)
 	esac
 	tm_file="elfos.h newlib-stdint.h v850/v850.h"
 	use_collect2=no
+	# MULTI-TARGET: `v850/t-v850' added.  This branch is the ONLY one that
+	# names `v850-c.o' without also naming the fragment that carries the
+	# rule for it -- the `v850-*-rtems*' branch above lists both.  The rule
+	# is in `v850/t-v850' and nowhere else, so `v850-c.o' was requested and
+	# never built.
+	#
+	# Upstream never noticed because upstream links `$(c_target_objs)' into
+	# one compiler for one target and the missing object simply failed to
+	# make.  Here it failed WORSE: gen-multi-target-md.awk asks each back
+	# end's tmake fragments where a c_target_obj's source lives, gets no
+	# answer, and drops it from MT_C_OBJS_v850 -- so `v850-c.o' vanished
+	# with no diagnostic and `target-c-ops-v850.o' was left referencing the
+	# eight `ghs_pragma_*' functions that only `v850-c.cc' defines.  Those
+	# eight were 8 of the 108 undefined symbols in the 48-back-end link.
+	tmake_file="${tmake_file} v850/t-v850"
 	c_target_objs="v850-c.o"
 	cxx_target_objs="v850-c.o"
 	use_gcc_stdint=wrap

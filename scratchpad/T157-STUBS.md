@@ -150,3 +150,87 @@ pass will read.
   not any #157 change — every one of those is a no-op when i386 is selected —
   but the two-base control at this commit is named in the report as **not
   measured**.
+
+---
+
+# The `undefined reference` half at 48 back ends — no new stubs
+
+Measured independently of #157, at 48 configured back ends, from an immutable
+snapshot with the log stamped before scoring: **108 distinct undefined symbols
+/ 323 linker lines -> 0**. Seven causes. `scratchpad/ur-score.sh`.
+
+**This work added NO stub.** `only_leaf_regs_used` above is the only one, and
+it was found twice independently — from sparc at eight bases (#157) and from
+sparc at 48 — which is worth recording as corroboration rather than
+duplication. Everything else here supplies a real per-base answer or deletes a
+guard that had no business being per-base:
+
+| change | whose answer |
+|---|---|
+| `immed_double_const` — `#if TARGET_SUPPORTS_WIDE_INT == 0` deleted from the definition (`emit-rtl.cc`) and the declaration (`rtl.h`) | nobody's — the body reads **no target macro at all**, only host quantities and mode queries. m68k calls it from `m68k.md:3270`; the primary's `1` had compiled it out. |
+| `merge_dllimport_decl_attributes` / `handle_dll_attribute` — `#if TARGET_DLLIMPORT_DECL_ATTRIBUTES` deleted (`attribs.cc`) | its own — whether a back end **uses** them is still decided by that back end's own `targetm`. mcore's `mcore.cc:169` puts it in `TARGET_MERGE_DECL_ATTRIBUTES` under its own headers, where the macro is 1. |
+| `ft32.md` — a local `extern void ft32_expand_prologue ();` **inside an insn body** deleted | its own — `ft32-protos.h` already declares it correctly. genemit wraps bodies in `namespace insn_ft32`, so the local extern declared a *different* function nothing defines. |
+| `epiphany-protos.h` — `get_attr_sched_use_fpu` moved **into** `namespace insn_epiphany` | its own — genattrtab defines it there; the bare declaration made twelve peephole2 calls bind to a global nothing defines. |
+| `config.gcc` — `v850/t-v850` added to the `v850*-*-*` branch | its own — that fragment carries the only rule for `v850-c.o`, which the branch already listed in `c_target_objs`. |
+| `nds32.cc`, `mmix.cc`, `epiphany.cc` — `#include "gt-<cpu>.h"` added | its own — gengtype already wrote each base's `machine_function` markers into that file, and nothing included it. |
+
+## The generalisable cause, and the instrument for it
+
+Three of the seven — `only_leaf_regs_used`, `immed_double_const`,
+`merge_dllimport_decl_attributes` — are **one** defect:
+
+> a **shared** TU compiles a function out under `#if <per-base target macro>`,
+> the macro is read with the **primary's** `tm.h`, and a per-base object calls
+> the function anyway.
+
+PRINCIPLES §3's "guard hiding a declaration", in its *definition*-hiding form.
+**A symbol sweep cannot find these before they fire** — the definition simply
+is not there to be found, and `nm` on the shared object shows nothing at all.
+The instrument that finds them ahead of the link is a grep for `#if TARGET_` /
+`#ifdef` on a per-back-end macro **in shared sources**, cross-referenced
+against what the guarded region defines. That sweep has not been run.
+
+## The two namespace shapes, which are mirror images
+
+Also worth naming together, because meeting either one alone teaches the wrong
+lesson:
+
+- **ft32** declared a function *inside* the generated namespace that is defined
+  *outside* it;
+- **epiphany** declared a function *outside* the generated namespace that is
+  defined *inside* it.
+
+Both produce `undefined reference`, and the fix runs in opposite directions.
+The rule is not "namespace it" or "don't" — it is **the declaration must be in
+the same namespace as the definition**, and generated per-base sources put
+their definitions inside.
+
+## A silently dropped `c_target_obj`, and a refusal that could not fire
+
+`v850e1-elf` listed `v850-c.o` in `c_target_objs` while its `tmake_file` omitted
+`v850/t-v850`, the only fragment carrying the rule.
+`gen-multi-target-md.awk` asks each fragment where a `c_target_obj`'s source
+lives, got no answer, and **dropped the object with no diagnostic**; the link
+failed eight symbols later at `ghs_pragma_*`, a name that mentions neither
+`v850-c.o` nor `config.gcc`.
+
+The generator's existing `$(error)` for this could not catch it: an object no
+fragment claims fails the `^config/<cpu>/` test and is dropped from `cobjs_own`
+*before* reaching the loop that refuses — **the exclusion runs before the
+check**. A `$(warning)` now sits at the drop site.
+
+**Its first draft was unscoped and fired 48 times on a correct tree**, every
+one a false positive on OS-side objects (`default-c.o`, `glibc-c.o`) which are
+built by generic rules and legitimately have no fragment. Scoped to
+`<cpu>-c.o` it reads **zero**, with `v850` as its negative control. That draft
+also produced a false finding — that `ia64` had the same defect — which is
+**withdrawn**: `ia64/t-ia64` does claim `ia64-c.o`, and it was never in the
+warning's output. A check tuned badly enough is a source of findings, not just
+noise.
+
+## Leak left in place, named rather than papered over
+
+Two `#if TARGET_WIN32_TLS` blocks inside `attribs.cc`'s `handle_dll_attribute`
+are still read with the **primary's** headers — the same defect one level down.
+Not on any currently-linking path, because only a back end that registers the
+dllimport attributes reaches them.
