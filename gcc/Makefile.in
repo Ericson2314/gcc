@@ -2292,7 +2292,20 @@ C_TARGET_OBJS = $(filter-out $(MT_C_OBJS_MOVED),@c_target_objs@) \
 		$(MT_C_TARGET_OBJS)
 
 # Target specific, C++ specific object file
-CXX_TARGET_OBJS=@cxx_target_objs@
+# The exact sibling of C_TARGET_OBJS above, in the same channel and with the
+# same bug: @cxx_target_objs@ is the PRIMARY target's list, and
+# gcc/cp/Make-lang.in links exactly it into cc1plus -- so a cc1plus holding 47
+# back ends had i386-c.o and none of the other 15 back ends' C-family objects.
+# $(MT_CXX_OBJS_MOVED) names the ones now built per base in mt-<base>/ (the
+# SAME objects the C side builds; multi-target-md.mk checks that identity
+# rather than assuming it), filtered out here so the shared copy and the
+# per-base copy do not both reach the link defining ix86_target_macros twice.
+#
+# RECURSIVE `=', not `:=', for the reason recorded on C_TARGET_OBJS:
+# multi-target-md.mk is included below this line, so an immediate assignment
+# would filter against an empty MT_CXX_OBJS_MOVED and quietly keep both.
+CXX_TARGET_OBJS = $(filter-out $(MT_CXX_OBJS_MOVED),@cxx_target_objs@) \
+		  $(MT_CXX_TARGET_OBJS)
 
 # Target specific, D specific object file
 D_TARGET_OBJS=@d_target_objs@
