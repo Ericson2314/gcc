@@ -71,8 +71,8 @@ must be given -DMT_BASE=<cpu>-inc.  See gcc/multi-target-base.h."
    Both operands are expanded because MT_HDR_XSTR's parameter is not adjacent
    to the `#'.
 
-   Objects carrying MT_BASE alone -- mt-<cpu>/reg-probe.o, mtd-<cpu>/*.o and
-   mt-<cpu>/options-{init,tables}.o, which cannot carry
+   Objects carrying MT_BASE alone -- mt-<cpu>/reg-probe.o, the mtd-<cpu>
+   driver objects and mt-<cpu>/options-{init,tables}.o, which cannot carry
    MULTI_TARGET_TARGETM_BASE because target.h requires it to be paired with
    -Dtargetm= -- have no second statement of their base to check against, and
    this arm is silent for them.  */

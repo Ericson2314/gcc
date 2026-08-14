@@ -29,7 +29,8 @@
 #include "config.h"
 #include "rust-system.h"
 #include "coretypes.h"
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 
 #include "optional.h"
 

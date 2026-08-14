@@ -27,7 +27,8 @@
 #include "rust-bir.h"
 #include "rust-bir-free-region.h"
 #include "rust-finalized-name-resolution-context.h"
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 #include "rust-rib.h"
 
 namespace Rust {

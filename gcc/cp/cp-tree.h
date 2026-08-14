@@ -21,7 +21,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_CP_TREE_H
 #define GCC_CP_TREE_H
 
-#include "tm.h"
+#include "multi-target-header.h"
+#include MT_HEADER (tm.h)
 /* The multi-target conversion layer.  It already arrives through the tm.h
    above (defaults.h ends with it), so the include guard makes this line a
    no-op today.  It is here so that deleting the tm.h line does not also

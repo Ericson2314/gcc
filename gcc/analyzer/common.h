@@ -34,7 +34,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "function.h"
 #include "basic-block.h"
 #include "gimple.h"
-#include "options.h"
+#include "multi-target-header.h"
+#include MT_HEADER (options.h)
 #include "bitmap.h"
 #include "diagnostic-core.h"
 #include "diagnostics/paths.h"

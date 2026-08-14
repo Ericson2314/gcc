@@ -1,5 +1,12 @@
 # `BASE_HEADER` — state, and the two things it does not cover
 
+> **#174 CLOSED "Not done 1".** The sixteen shared-header sites below are
+> converted, the `-I<base>-inc` is deleted, and the witness is rebuilt on a
+> second flag rather than on the include path. See the `#174` section at the
+> end; the sections below are kept as written so the reasoning that led there
+> is still readable.
+
+
 Task #173. `-DMT_BASE=<cpu>-inc` is the authority; a per-back-end header is
 spelled `#include BASE_HEADER (<stem>.h)`.
 
