@@ -4463,9 +4463,10 @@ static void
 reload_as_needed (int live_known)
 {
   class insn_chain *chain;
-#if AUTO_INC_DEC
+  /* Declared unconditionally: AUTO_INC_DEC is a run-time question now
+     (rtl.h:2901), so there is no `#if' to hang the declaration on.  Only the
+     auto-inc loop below uses it, and that loop is now guarded by an `if'.  */
   int i;
-#endif
   rtx_note *marker;
 
   memset (spill_reg_rtx, 0, sizeof spill_reg_rtx);
@@ -4485,9 +4486,7 @@ reload_as_needed (int live_known)
       rtx_insn *prev = 0;
       rtx_insn *insn = chain->insn;
       rtx_insn *old_next = NEXT_INSN (insn);
-#if AUTO_INC_DEC
       rtx_insn *old_prev = PREV_INSN (insn);
-#endif
 
       if (will_delete_init_insn_p (insn))
 	continue;
@@ -4630,11 +4629,18 @@ reload_as_needed (int live_known)
 	    if (NONJUMP_INSN_P (x) && GET_CODE (PATTERN (x)) == CLOBBER)
 	      note_stores (x, forget_old_reloads_1, NULL);
 
-#if AUTO_INC_DEC
 	  /* Likewise for regs altered by auto-increment in this insn.
 	     REG_INC notes have been changed by reloading:
 	     find_reloads_address_1 records substitutions for them,
-	     which have been performed by subst_reloads above.  */
+	     which have been performed by subst_reloads above.
+
+	     THE GUARD IS ON THE TWO LOOPS RATHER THAN ON THE REGION.  This was
+	     one `#if AUTO_INC_DEC' spanning 152 lines, and AUTO_INC_DEC is a
+	     run-time question now (rtl.h:2901).  Wrapping the region in a block
+	     would reindent every one of those lines and bury a six-line change
+	     in a whitespace diff; the region is exactly these two top-level
+	     loops, so guarding each is the same code with a reviewable diff.  */
+	  if (AUTO_INC_DEC)
 	  for (i = n_reloads - 1; i >= 0; i--)
 	    {
 	      rtx in_reg = rld[i].in_reg;
@@ -4769,7 +4775,9 @@ reload_as_needed (int live_known)
 	    }
 	  /* If a pseudo that got a hard register is auto-incremented,
 	     we must purge records of copying it into pseudos without
-	     hard registers.  */
+	     hard registers.  The second of the two loops the comment above
+	     describes.  */
+	  if (AUTO_INC_DEC)
 	  for (rtx x = REG_NOTES (insn); x; x = XEXP (x, 1))
 	    if (REG_NOTE_KIND (x) == REG_INC)
 	      {
@@ -4783,7 +4791,6 @@ reload_as_needed (int live_known)
 		if (i == n_reloads)
 		  forget_old_reloads_1 (XEXP (x, 0), NULL_RTX, NULL);
 	      }
-#endif
 	}
       /* A reload reg's contents are unknown after a label.  */
       if (LABEL_P (insn))
@@ -6478,15 +6485,16 @@ choose_reload_regs (class insn_chain *chain)
 		    }
 		  mode = GET_MODE (rld[r].in_reg);
 		}
-#if AUTO_INC_DEC
-	      else if (GET_RTX_CLASS (GET_CODE (rld[r].in_reg)) == RTX_AUTOINC
+	      /* An arm of an `else if' chain, so the run-time AUTO_INC_DEC
+		 (rtl.h:2901) joins the condition rather than wrapping the arm.  */
+	      else if (AUTO_INC_DEC
+		       && GET_RTX_CLASS (GET_CODE (rld[r].in_reg)) == RTX_AUTOINC
 		       && REG_P (XEXP (rld[r].in_reg, 0)))
 		{
 		  regno = REGNO (XEXP (rld[r].in_reg, 0));
 		  mode = GET_MODE (XEXP (rld[r].in_reg, 0));
 		  rld[r].out = rld[r].in;
 		}
-#endif
 #if 0
 	      /* This won't work, since REGNO can be a pseudo reg number.
 		 Also, it takes much more hair to keep track of all the things

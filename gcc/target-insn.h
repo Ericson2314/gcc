@@ -91,6 +91,41 @@ struct target_insn_desc
   bool have_rotate;
   bool have_rotatert;
 
+  /* AUTO_INC_DEC -- `rtl.h:2901', "does this machine have any sort of
+     auto-increment addressing".  Twenty-seven use sites across reload1.cc,
+     reload.cc, combine.cc, recog.cc, lra.cc, lower-subreg.cc, sched-deps.cc,
+     loop-invariant.cc, regrename.cc, emit-rtl.cc and auto-inc-dec.cc.
+
+     ONE FIELD FOR EIGHT MACROS, and that is not the shortcut it looks like.
+     rtl.h's own definition is the disjunction
+
+       #if (defined (HAVE_PRE_INCREMENT) || defined (HAVE_PRE_DECREMENT)
+            || defined (HAVE_POST_INCREMENT) || defined (HAVE_POST_DECREMENT)
+            || defined (HAVE_PRE_MODIFY_DISP) || defined (HAVE_POST_MODIFY_DISP)
+            || defined (HAVE_PRE_MODIFY_REG) || defined (HAVE_POST_MODIFY_REG))
+
+     so the question shared code asks is already the disjunction and never the
+     individual eight.  Storing the disjunction is storing the question that is
+     asked; storing the eight would be storing a vocabulary nothing reads.
+     (Contrast `have_rotate'/`have_rotatert' two lines up, which are two fields
+     precisely because two different questions ARE asked.)
+
+     WHY IT IS WRONG TODAY, MEASURED OVER ALL 48 REAL HEADER CHAINS
+     (scratchpad/t169-autoinc.sh): the eight come from `insn-flags-<base>.h',
+     which genflags writes from that back end's `.md'.  i386 defines NONE of
+     them.  rtl.h is shared, so it is preprocessed once against the primary's
+     chain, and AUTO_INC_DEC is therefore 0 for every configured back end --
+     while 25 of the 48 would compute 1 from their own headers, aarch64 among
+     them (which defines five of the eight).  Auto-increment addressing is
+     switched off compiler-wide for 25 back ends.
+
+     THIS IS THE SILENT HALF.  Nothing is undefined, nothing fails to link, no
+     value is out of range: the middle end simply stops looking for REG_INC
+     notes and stops forming auto-inc addresses, and emits correct, slower
+     code.  A symbol sweep cannot see it because there is no symbol; a build
+     cannot see it because it builds.  */
+  bool auto_inc_dec;
+
   /* LOAD_EXTEND_OP (MODE) -- `rtl.h:4762', inside `load_extend_op', which is
      an inline function in a header the whole compiler shares.
 
@@ -120,6 +155,7 @@ extern const struct target_insn_desc *targetm_insn;
 extern bool mt_have_lo_sum (void);
 extern bool mt_have_rotate (void);
 extern bool mt_have_rotatert (void);
+extern bool mt_auto_inc_dec (void);
 extern int mt_load_extend_op (int mode);
 
 #endif /* GCC_TARGET_INSN_H */

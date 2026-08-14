@@ -826,6 +826,15 @@ mt_have_rotatert (void)
   return mt_insn ()->have_rotatert;
 }
 
+/* AUTO_INC_DEC -- whether the base in force has any auto-increment addressing
+   at all.  25 of the 48 back ends say yes and i386 says no, so before this
+   existed every one of them read i386's no.  */
+bool
+mt_auto_inc_dec (void)
+{
+  return mt_insn ()->auto_inc_dec;
+}
+
 /* LOAD_EXTEND_OP (MODE).  `int' in and `int' out because target-insn.h is
    reached before coretypes.h; `rtl.h''s use site casts back to
    `enum rtx_code'.  */

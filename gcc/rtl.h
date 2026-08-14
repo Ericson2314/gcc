@@ -2898,6 +2898,25 @@ do {								        \
 /* Indicate whether the machine has any sort of auto increment addressing.
    If not, we can avoid checking for REG_INC notes.  */
 
+/* THE EIGHT NAMES BELOW ARE PER-BASE AND THIS HEADER IS SHARED, so the
+   disjunction can only be evaluated in a translation unit that has ONE base's
+   headers in scope.  The four names tested here are the same four
+   `multi-target-macros.h:189' tests, and mean the same four things: a back
+   end's own TU, a build-time generator, a supply-side TU, and a C consumer
+   such as libgcc.  Each of those legitimately has exactly one base's
+   `insn-flags.h', so each keeps upstream's real computation.  Everything else
+   -- the shared middle end -- asks the base in force at run time.
+
+   WHAT THIS FIXES, MEASURED OVER ALL 48 REAL HEADER CHAINS
+   (scratchpad/t169-autoinc.sh): i386 defines NONE of the eight, so the shared
+   arm computed 0, and 25 of the 48 back ends -- aarch64, arm, rs6000, riscv,
+   m68k, sh, pa, avr and seventeen more -- had auto-increment addressing
+   switched off compiler-wide while their own headers say 1.  Nothing failed
+   to link and nothing was diagnosed; see target-insn.h for why this is the
+   silent half of the class.  */
+#if defined (MULTI_TARGET_TARGETM_BASE) || defined (GENERATOR_FILE)	\
+    || defined (MULTI_TARGET_SUPPLY_TU) || defined (MULTI_TARGET_REG_PROBE) \
+    || !defined (__cplusplus)
 #if (defined (HAVE_PRE_INCREMENT) || defined (HAVE_PRE_DECREMENT) \
      || defined (HAVE_POST_INCREMENT) || defined (HAVE_POST_DECREMENT) \
      || defined (HAVE_PRE_MODIFY_DISP) || defined (HAVE_POST_MODIFY_DISP) \
@@ -2906,18 +2925,23 @@ do {								        \
 #else
 #define AUTO_INC_DEC 0
 #endif
+#else
+#define AUTO_INC_DEC (mt_auto_inc_dec ())
+#endif
 
 /* Define a macro to look for REG_INC notes,
-   but save time on machines where they never exist.  */
+   but save time on machines where they never exist.
 
-#if AUTO_INC_DEC
+   NO LONGER `#if'-SELECTED.  It cannot be: on the shared arm above
+   AUTO_INC_DEC is a call, and a call is not an integral constant expression.
+   The `#else' arm's `0' becomes the false branch of the conditional, spelled
+   NULL_RTX rather than 0 so the two arms have one type -- every caller uses
+   the result as an rtx.  */
 #define FIND_REG_INC_NOTE(INSN, REG)			\
-  ((REG) != NULL_RTX && REG_P ((REG))			\
+  (!AUTO_INC_DEC ? NULL_RTX				\
+   : (REG) != NULL_RTX && REG_P ((REG))			\
    ? find_regno_note ((INSN), REG_INC, REGNO (REG))	\
    : find_reg_note ((INSN), REG_INC, (REG)))
-#else
-#define FIND_REG_INC_NOTE(INSN, REG) 0
-#endif
 
 #ifndef HAVE_PRE_INCREMENT
 #define HAVE_PRE_INCREMENT 0

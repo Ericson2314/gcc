@@ -7080,11 +7080,15 @@ find_equiv_reg (rtx goal, rtx_insn *insn, enum reg_class rclass, int other,
 		}
 	    }
 
-#if AUTO_INC_DEC
 	  /* If this insn auto-increments or auto-decrements
 	     either regno or valueno, return 0 now.
 	     If GOAL is a memory ref and its address is not constant,
-	     and this insn P increments a register used in GOAL, return 0.  */
+	     and this insn P increments a register used in GOAL, return 0.
+
+	     Was `#if AUTO_INC_DEC'; that is a run-time question now
+	     (rtl.h:2901).  The region was already a braced block, so the guard
+	     goes in front of it and nothing is reindented.  */
+	  if (AUTO_INC_DEC)
 	  {
 	    rtx link;
 
@@ -7103,7 +7107,6 @@ find_equiv_reg (rtx goal, rtx_insn *insn, enum reg_class rclass, int other,
 		    return 0;
 		}
 	  }
-#endif
 	}
     }
 }

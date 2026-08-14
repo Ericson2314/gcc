@@ -916,6 +916,17 @@ static const struct target_insn_desc mt_base_insn = {
   HAVE_lo_sum != 0,
   HAVE_rotate != 0,
   HAVE_rotatert != 0,
+  /* AUTO_INC_DEC, in THIS base's preprocessor context.  This file is compiled
+     once per base with `-DMULTI_TARGET_SUPPLY_TU', which is one of the four
+     names rtl.h's redirect (rtl.h:2901) tests for, so the spelling below is
+     upstream's own eight-way `defined (HAVE_PRE_INCREMENT) || ...'
+     disjunction, evaluated against `insn-flags-<base>.h' -- the file
+     `BASE_HEADER (tm.h)' at the top of this TU brought in for THIS base.
+     Read in shared code the same eight names are the primary's, and the
+     primary defines none of them.  Same shape and same reason as
+     `mt_base_load_extend_op' above: the answer is computed where the base's
+     headers are the ones in scope.  */
+  AUTO_INC_DEC != 0,
   mt_base_load_extend_op
 };
 
