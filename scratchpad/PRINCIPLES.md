@@ -13,8 +13,41 @@ in one session and were right every time.
 
 ## 1. The goal
 
-One compiler binary serving all back ends, with **zero target-specific
-information baked in at compile time**.
+**GCC multi-target like LLVM: one compiler binary with all back ends linked,
+and ALL BACK ENDS PASSING TESTS** — with zero target-specific information baked
+in at compile time. The user's words: *"The tests were not written in terms of
+multiple targets so might have to adjust the tests, but at the very least we
+could build the test suite N ways for n targets, covering all the backends."*
+
+**Where that stands.** Linking is DONE — 47 of 47 back ends link into one
+`cc1` as of `80bf400ae06` (2 → 8 → 11 → 47 in one session). Passing tests is
+NOT: at last measurement only **4 of 47 emit assembly and 3 assemble**, and
+the testsuite has never run per-target. **The gap is correctness, and the
+testsuite is now due** — it was sequenced after "all back ends building", and
+that condition has been met.
+
+**SEQUENCING IS NOT SCOPE, and the coordinator got this wrong.** The user
+deferred the testsuite meaning *"do the back ends first, then come back to
+it"*; the coordinator converted that into "out of scope", stopped tracking it,
+and later reported it back as a **gap in the project** rather than as
+something it had dropped. The user, on seeing it: *"'deferred' never meant
+'out of scope' — it just meant deprioritize."*
+
+So, as standing law for anyone reading a brief here:
+
+- **An instruction to "go work on X" is the NEXT STEP toward this goal, not a
+  replacement for it.** The goal only changes when the user changes it.
+- **Nothing leaves the board silently.** If you stop tracking something, say
+  so explicitly and say why.
+- A deprioritised item is still a measurement obligation: when the condition
+  that deprioritised it is met, it becomes due without anyone re-authorising
+  it.
+- **DO NOT STOP AT A MILESTONE TO AWAIT INSTRUCTION.** The user, explicitly:
+  *"not stop after getting the backend working to await future instruction!"*
+  Finishing "all back ends link" is not the end of a task, it is the moment
+  the next one becomes due — and the next one was already written down. Report
+  the milestone and keep going in the same breath. Waiting for permission that
+  was already given is the most expensive thing an agent can do here.
 
 **THE BUILD CENSUS — several partially-overlapping figures are in circulation,
 so re-measure rather than quote, and say which build you measured.**
