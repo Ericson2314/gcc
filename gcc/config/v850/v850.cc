@@ -29,10 +29,11 @@
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"
@@ -42,7 +43,7 @@
 #include "calls.h"
 #include "conditions.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "expr.h"
 #include "cfgrtl.h"
 #include "builtins.h"

@@ -35,13 +35,14 @@
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"
 #include "conditions.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "reload.h"
 #include "varasm.h"
 #include "calls.h"

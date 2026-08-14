@@ -36,10 +36,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "varasm.h"
 #include "regs.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "conditions.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "recog.h"
 #include "diagnostic-core.h"
 #include "flags.h"
@@ -51,7 +51,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "stmt.h"
 #include "expr.h"
 #include "reload.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "target.h"
 #include "debug.h"
 #include "cfgrtl.h"
@@ -61,7 +62,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgcleanup.h"
 /* ??? Need to add a dependency between m68k.o and sched-int.h.  */
 #include "sched-int.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "opts.h"
 #include "optabs.h"
 #include "builtins.h"

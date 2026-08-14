@@ -29,7 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "emit-rtl.h"
 #include "explow.h"
 #include "expr.h"

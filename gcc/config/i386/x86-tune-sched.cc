@@ -26,13 +26,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "tree.h"
 #include "cfghooks.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "target.h"
-#include "insn-config.h"
-#include "insn-attr.h"
-#include "insn-opinit.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-opinit.h)
 #include "recog.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 
 /* Return the maximum number of instructions a cpu can issue.  */
 

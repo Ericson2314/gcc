@@ -40,7 +40,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "cfghooks.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -53,12 +54,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "calls.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "explow.h"
 #include "expr.h"
 #include "langhooks.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "reload.h" /* For operands_match_p */
 #include "cfgrtl.h"
 #include "tree-pass.h"

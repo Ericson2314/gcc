@@ -33,9 +33,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "df.h"
 #include "rtl-ssa.h"
 #include "cfgcleanup.h"
-#include "insn-attr.h"
-#include "tm-constrs.h"
-#include "insn-opinit.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (tm-constrs.h)
+#include BASE_HEADER (insn-opinit.h)
 #include "cfgrtl.h"
 
 /* So the basic idea of this pass is to identify loads of permutation

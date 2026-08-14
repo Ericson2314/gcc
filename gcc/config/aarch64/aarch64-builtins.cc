@@ -34,7 +34,7 @@
 #include "gimple.h"
 #include "ssa.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "expmed.h"
 #include "optabs.h"
 #include "recog.h"

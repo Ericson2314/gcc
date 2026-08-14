@@ -30,7 +30,8 @@
 #include "stor-layout.h"
 #include "langhooks.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 
 /* IDs for all the AVR builtins.  */
 

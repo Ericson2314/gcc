@@ -26,12 +26,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "rtl.h"
 #include "regs.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "recog.h"
 #include "function.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "riscv-protos.h"
 
 /* Implement TARGET_SCHED_MACRO_FUSION_P.  Return true if target supports

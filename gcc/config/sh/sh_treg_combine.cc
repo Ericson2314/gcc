@@ -37,7 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgrtl.h"
 #include "tree-pass.h"
 #include "expr.h"
-#include "tm-preds.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm-preds.h)
 
 /*
 This pass tries to optimize for example this:

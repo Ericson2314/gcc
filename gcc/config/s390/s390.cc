@@ -35,7 +35,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "expmed.h"
@@ -54,7 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "conditions.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "except.h"
 #include "dojump.h"
@@ -82,7 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ifcvt.h"
 #include "rtl-iter.h"
 #include "intl.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "tree-vrp.h"
 #include "symbol-summary.h"
 #include "sreal.h"

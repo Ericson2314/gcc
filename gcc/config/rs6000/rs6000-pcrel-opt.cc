@@ -115,7 +115,8 @@
 #include "optabs.h"
 #include "recog.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "ira.h"
 #include "print-tree.h"
 #include "varasm.h"
@@ -125,8 +126,8 @@
 #include "tree-pass.h"
 #include "rtx-vector-builder.h"
 #include "print-rtl.h"
-#include "insn-attr.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-attr.h)
+#include BASE_HEADER (insn-codes.h)
 
 /* Various counters.  */
 static struct {

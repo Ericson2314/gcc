@@ -32,8 +32,8 @@
 #include BASE_HEADER (tm.h)
 #include "backend.h"
 #include "rtl.h"
-#include "insn-config.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
 #include "recog.h"
 #include "alias.h"
 #include "tree.h"
@@ -42,12 +42,12 @@
 #include "explow.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "target.h"
 #include "targhooks.h"
 #include "expr.h"
 #include "optabs.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "rtx-vector-builder.h"
 #include "predict.h"
 #include "errors.h"

@@ -28,10 +28,11 @@
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "emit-rtl.h"
 #include "recog.h"
 #include "diagnostic-core.h"
@@ -40,10 +41,10 @@
 #include "varasm.h"
 #include "calls.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "expr.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "builtins.h"
 #include "opts.h"
 

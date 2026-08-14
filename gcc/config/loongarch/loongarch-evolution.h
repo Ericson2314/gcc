@@ -39,7 +39,8 @@ along with GCC; see the file COPYING3.  If not see
    primary target's header came first instead it silently gave loongarch the
    primary's options and lost every OPTION_MASK_ISA_*.  */
 #ifndef OPTIONS_H_INCLUDED
-#include "options.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (options.h)
 #endif
 
 static constexpr struct {

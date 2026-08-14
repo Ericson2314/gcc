@@ -29,7 +29,8 @@
 #include "tree.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -40,7 +41,7 @@
 #include "stor-layout.h"
 #include "calls.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "expr.h"
 #include "reload.h"
@@ -48,7 +49,8 @@
 #include "langhooks.h"
 #include "tree-pass.h"
 #include "context.h"
-#include "tm-constrs.h" /* for satisfies_constraint_*().  */
+/* For satisfies_constraint_*().  */
+#include BASE_HEADER (tm-constrs.h)
 #include "builtins.h"
 
 /* This file should be included last.  */

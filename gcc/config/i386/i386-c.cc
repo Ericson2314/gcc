@@ -25,7 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "c-family/c-common.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "c-family/c-pragma.h"
 
 static bool ix86_pragma_target_parse (tree, tree);

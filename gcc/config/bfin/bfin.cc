@@ -32,7 +32,8 @@
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
@@ -40,14 +41,14 @@
 #include "cgraph.h"
 #include "diagnostic-core.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "varasm.h"
 #include "calls.h"
 #include "explow.h"
 #include "expr.h"
 #include "cfgrtl.h"
 #include "langhooks.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "gt-bfin.h"
 #include "sel-sched.h"
 #include "hw-doloop.h"

@@ -32,7 +32,8 @@
 #include "gimple.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "optabs.h"
 #include "emit-rtl.h"

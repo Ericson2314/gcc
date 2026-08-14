@@ -34,7 +34,8 @@
 #include "cfghooks.h"
 #include "cfgloop.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -49,7 +50,7 @@
 #include "calls.h"
 #include "varasm.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "flags.h"
 #include "reload.h"
 #include "explow.h"
@@ -64,7 +65,7 @@
 #include "dumpfile.h"
 #include "target-globals.h"
 #include "builtins.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "rtl-iter.h"
 #include "optabs-libfuncs.h"
 #include "gimplify.h"

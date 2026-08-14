@@ -30,7 +30,7 @@
 #include "tree.h"
 #include "tree-pass.h"	/* for current_pass */
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "print-tree.h"
 
 /* This file supplies some functions for AVR back-end developers

@@ -33,7 +33,8 @@
 #include "cfgloop.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
@@ -44,11 +45,11 @@
 #include "varasm.h"
 #include "calls.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "reload.h"
 #include "explow.h"
 #include "expr.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "cfgrtl.h"
 #include "dumpfile.h"
 #include "builtins.h"

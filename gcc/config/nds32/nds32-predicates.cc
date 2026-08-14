@@ -30,12 +30,13 @@
 #include "rtl.h"
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"		/* For GEN_FCN.  */
 #include "emit-rtl.h"
 #include "recog.h"
-#include "tm-constrs.h"
-#include "insn-attr.h"
+#include BASE_HEADER (tm-constrs.h)
+#include BASE_HEADER (insn-attr.h)
 
 /* ------------------------------------------------------------------------ */
 

@@ -25,7 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "target.h"
 #include "tree.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "diagnostic.h"
 #include "opts.h"
 #include "riscv-subset.h"

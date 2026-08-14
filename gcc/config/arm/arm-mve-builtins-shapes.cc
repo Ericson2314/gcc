@@ -27,7 +27,7 @@
 #include "tree.h"
 #include "rtl.h"
 #include "memmodel.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "optabs.h"
 #include "arm-mve-builtins.h"
 #include "arm-mve-builtins-shapes.h"

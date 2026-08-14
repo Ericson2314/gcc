@@ -35,7 +35,8 @@
 #include "cfghooks.h"
 #include "cfgloop.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -44,7 +45,7 @@
 #include "recog.h"
 #include "cgraph.h"
 #include "diagnostic.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "alias.h"
 #include "fold-const.h"
 #include "stor-layout.h"
@@ -69,7 +70,7 @@
 #include "dumpfile.h"
 #include "builtins.h"
 #include "rtl-iter.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "sched-int.h"
 #include "target-globals.h"
 #include "common/common-target.h"

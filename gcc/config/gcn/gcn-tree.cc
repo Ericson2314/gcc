@@ -29,7 +29,8 @@
 #include "gimple-iterator.h"
 #include "cfghooks.h"
 #include "cfgloop.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "fold-const.h"
 #include "varasm.h"

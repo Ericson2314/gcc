@@ -31,9 +31,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
-#include "insn-config.h"
-#include "insn-attr.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"

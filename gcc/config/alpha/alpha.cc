@@ -34,7 +34,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "df.h"
 #include "predict.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "ssa.h"
 #include "expmed.h"
 #include "optabs.h"
@@ -48,7 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "varasm.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "expr.h"
 #include "reload.h"
@@ -62,7 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "gimplify.h"
 #include "tree-stdarg.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "libfuncs.h"
 #include "builtins.h"
 #include "rtl-iter.h"

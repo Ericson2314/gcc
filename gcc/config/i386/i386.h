@@ -2580,7 +2580,8 @@ constexpr wide_int_bitmask PTA_C86_4G_M8 = PTA_C86_4G_M7;
 
 #ifndef GENERATOR_FILE
 
-#include "insn-attr-common.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr-common.h)
 
 #include "common/config/i386/i386-cpuinfo.h"
 

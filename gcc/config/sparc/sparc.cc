@@ -32,7 +32,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include "gimple.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "expmed.h"
@@ -47,7 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "varasm.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "expr.h"
 #include "debug.h"

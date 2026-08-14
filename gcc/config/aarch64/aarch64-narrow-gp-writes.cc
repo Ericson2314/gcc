@@ -34,7 +34,8 @@
 #include "rtlhooks-def.h"
 #include "rtl-iter.h"
 #include "tree-pass.h"
-#include "insn-attr.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr.h)
 
 using namespace rtl_ssa;
 

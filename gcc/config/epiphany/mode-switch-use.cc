@@ -28,10 +28,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "emit-rtl.h"
 #include "tree-pass.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 
 #ifndef TARGET_INSERT_MODE_SWITCH_USE
 #define TARGET_INSERT_MODE_SWITCH_USE NULL

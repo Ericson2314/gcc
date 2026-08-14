@@ -32,7 +32,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
@@ -40,7 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "diagnostic-core.h"
 #include "conditions.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "alias.h"
 #include "varasm.h"
 #include "stor-layout.h"
@@ -49,7 +50,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "reload.h"
 #include "output.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "builtins.h"
 #include "cfgrtl.h"
 #include "tree-pass.h"

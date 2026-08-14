@@ -27,7 +27,8 @@
 #include "backend.h"
 #include "tree.h"
 #include "rtl.h"
-#include "insn-attr.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (insn-attr.h)
 #include "explow.h"
 #include "memmodel.h"
 #include "emit-rtl.h"

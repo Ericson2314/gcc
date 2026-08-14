@@ -28,14 +28,15 @@
 #include "rtl.h"
 #include "tree.h"
 #include "df.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "optabs.h"
 #include "regs.h"
 #include "emit-rtl.h"
 #include "recog.h"
 #include "diagnostic-core.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "fold-const.h"
 #include "calls.h"
 #include "explow.h"

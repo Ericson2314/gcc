@@ -26,7 +26,7 @@
 #include BASE_HEADER (tm.h)
 #include "tree.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "cpplib.h"
 #include "c-family/c-common.h"
 #include "target.h"

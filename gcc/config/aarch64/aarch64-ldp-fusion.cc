@@ -24,10 +24,11 @@
 #include "rtl.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "rtl-iter.h"
 #include "tree-pass.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "pair-fusion.h"
 
 static constexpr HOST_WIDE_INT LDP_IMM_BITS = 7;

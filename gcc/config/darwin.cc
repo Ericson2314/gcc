@@ -29,10 +29,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
-#include "insn-config.h"
+#include BASE_HEADER (insn-config.h)
 #include "emit-rtl.h"
 #include "cgraph.h"
 #include "lto-streamer.h"

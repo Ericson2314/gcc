@@ -25,7 +25,7 @@
 #include "tree.h"
 #include "rtl.h"
 #include "memmodel.h"
-#include "insn-codes.h"
+#include BASE_HEADER (insn-codes.h)
 #include "optabs.h"
 #include "expr.h"
 #include "basic-block.h"

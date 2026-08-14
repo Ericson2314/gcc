@@ -29,7 +29,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "memmodel.h"
 #include "gimple.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "optabs.h"
 #include "recog.h"
 #include "diagnostic.h"

@@ -33,8 +33,8 @@ along with GCC; see the file COPYING3.  If not see
 #include BASE_HEADER (tm.h)
 #include "rtl.h"
 #include "regs.h"
-#include "insn-config.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-config.h)
+#include BASE_HEADER (insn-attr.h)
 #include "recog.h"
 #include "output.h"
 #include "alias.h"
@@ -50,7 +50,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "reload.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "basic-block.h"
 #include "expr.h"
 #include "optabs.h"
@@ -64,7 +64,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "opts.h"
 #include "target-caps.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "rtl-iter.h"
 #include "gimple.h"
 #include "cfghooks.h"

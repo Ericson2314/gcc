@@ -35,7 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "targhooks.h"
 #include "cfgloop.h"
 #include "fold-const.h"
-#include "tm_p.h"
+#include BASE_HEADER (tm_p.h)
 #include "tree-vectorizer.h"
 #include "gimple-iterator.h"
 #include "bitmap.h"

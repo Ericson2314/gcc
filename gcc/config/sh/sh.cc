@@ -35,7 +35,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "df.h"
 #include "memmodel.h"
-#include "tm_p.h"
+#include "multi-target-base.h"
+#include BASE_HEADER (tm_p.h)
 #include "stringpool.h"
 #include "attribs.h"
 #include "optabs.h"
@@ -52,14 +53,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "reload.h"
 #include "output.h"
-#include "insn-attr.h"
+#include BASE_HEADER (insn-attr.h)
 #include "dwarf2.h"
 #include "langhooks.h"
 #include "cfgrtl.h"
 #include "intl.h"
 #include "sched-int.h"
 #include "gimplify.h"
-#include "tm-constrs.h"
+#include BASE_HEADER (tm-constrs.h)
 #include "opts.h"
 #include "tree-pass.h"
 #include "context.h"
