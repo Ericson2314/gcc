@@ -622,6 +622,32 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**A WRITTEN INVARIANT IS NOT A CHECKED ONE — AND A MACRO-MEDIATED ACCESS
+DEFEATS THE GREP THAT WOULD HAVE CHECKED IT.** `genmodes.cc`'s `CONST_MODE_*`
+block argues `const` is safe for all eight mode tables because "there is not
+one assignment to one of them outside this generator — and neither does any
+hand-written back-end source." That is true of **six** of the eight.
+`tree.h:2503` makes `TYPE_IBIT(NODE)` expand to `mode_ibit[TYPE_MODE(NODE)]`,
+so `avr.cc:1245-1246` really do write a mode table. **Grepping any back end
+for `mode_ibit` finds nothing** — it is reached only through two `tree.h`
+macros, which is exactly how the claim survived being written down and
+believed.
+
+So: **search for the ACCESSOR, not only the name.** And when a comment asserts
+"nothing does X", treat it as an unrun test — write the test.
+
+Invisible to any pair without avr, which is the only back end defining
+`ADJUST_IBIT`/`ADJUST_FBIT`. Another entry for the two-back-ends-cannot-tell
+list.
+
+Method note from the same task, worth copying: its first both-sided arm was
+**tautological** — it required avr's and i386's `mode_ibit` *bodies* to differ,
+and they are byte-identical **correctly**, because the mode vocabulary is
+unioned and the static table is the vocabulary's own data. The real
+discriminator was the *adjustment* (avr 2 writes, i386 0). The agent recorded
+the broken arm in the script rather than quietly swapping it out, which is what
+lets the next reader see why the obvious check is wrong.
+
 **`tm.h` IS FOUR CHANNELS, NOT ONE — AND EVERY "WHO NEEDS `tm.h`" FIGURE IN
 THIS FILE MEASURES ONE OF THEM.** `mkconfig.sh` assembles it as: a
 target-neutral top half → `#include "options.h"` → the back end's header chain
