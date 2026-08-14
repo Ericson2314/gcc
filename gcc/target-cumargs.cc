@@ -1115,6 +1115,79 @@ static const struct target_attr_desc mt_base_attr = {
   mt_base_insn_current_length
 };
 
+/* THIS BASE'S MODE-SWITCHING ENTITY LIST; see target-modeswitch.h for the
+   measurement and for why "this back end does no mode switching" is
+   `n_entities == 0' rather than a default.
+
+   The `#ifdef' is read HERE, where `OPTIMIZE_MODE_SWITCHING' is still this
+   base's own macro out of its own `tm.h'.  That is the only place it can be
+   read correctly: `mode-switching.o' is shared, so the same `#ifdef' there
+   was the primary's answer served to forty-three back ends that had never
+   defined it.
+
+   Both fields come off the SAME `#ifdef', so a base cannot end up listing
+   entities it will not optimise or the reverse.  */
+#ifdef OPTIMIZE_MODE_SWITCHING
+static const int mt_base_num_modes_for_mode_switching[]
+  = NUM_MODES_FOR_MODE_SWITCHING;
+
+/* A function and not a constant: `OPTIMIZE_MODE_SWITCHING' reads option state
+   or a global array in every back end that defines it, so evaluating it at
+   static-initialisation time would freeze it before option processing --
+   the `ix86_pmode Init (PMODE_SI)' shape this branch exists to remove.  */
+static bool
+/* ATTRIBUTE_UNUSED because two of the five definers ignore the entity --
+   riscv's macro is `(TARGET_VECTOR)' and sh's `(TARGET_FPU_DOUBLE)' -- and
+   this branch measures stderr, so a warning here would be a permanent two
+   lines in every build for a parameter the macro is entitled not to read.  */
+mt_base_optimize_mode_switching (int entity ATTRIBUTE_UNUSED)
+{
+  return OPTIMIZE_MODE_SWITCHING (entity) != 0;
+}
+
+static const struct target_modeswitch_desc mt_base_modeswitch = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  (int) ARRAY_SIZE (mt_base_num_modes_for_mode_switching),
+  mt_base_num_modes_for_mode_switching,
+  mt_base_optimize_mode_switching
+};
+#else
+static const struct target_modeswitch_desc mt_base_modeswitch = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+  0,
+  NULL,
+  NULL
+};
+#endif
+
+/* THIS BASE'S SCHEDULER-ATTRIBUTE INITIALISER; see target-sched.h for the
+   measurement.  `init_sched_attrs' resolves here through this base's own
+   `insn-attr-<base>.h' using-directive, so the address stored is
+   `insn_<base>::init_sched_attrs' and not the primary's -- which is the
+   entire mechanism, exactly as for the attribute thunks above.
+
+   `INSN_SCHEDULING' comes from this base's `insn-attr-common-<base>.h'.  Note
+   the failure mode if a base without a DFA is ever configured alongside a
+   primary with one: `tm.h' would define the macro, this `#ifdef' would be
+   true, and the compile would fail with `init_sched_attrs was not declared'.
+   That is loud and names the file, which is the direction to fail in.  */
+#ifdef INSN_SCHEDULING
+static void
+mt_base_init_sched_attrs (void)
+{
+  init_sched_attrs ();
+}
+#endif
+
+static const struct target_sched_desc mt_base_sched = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+#ifdef INSN_SCHEDULING
+  mt_base_init_sched_attrs
+#else
+  NULL
+#endif
+};
+
 /* `static' and reached through the `preds' pointer below, for the same reason
    `mt_base_frame' is.  */
 static const struct target_preds_desc mt_base_preds = {
@@ -1222,5 +1295,7 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   &mt_base_frame,
   &mt_base_insn,
   &mt_base_preds,
-  &mt_base_attr
+  &mt_base_attr,
+  &mt_base_modeswitch,
+  &mt_base_sched
 };
