@@ -302,6 +302,17 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    end's functions are declared.  `scratchpad/t32-valueall.sh' is the arm.  */
 #undef STORE_FLAG_VALUE
 #define STORE_FLAG_VALUE (targetm_cdata.store_flag_value)
+/* `WORD_REGISTER_OPERATIONS' -- whether an operation on a word-width register
+   yields a result valid for the whole word.  A pure 0/1 predicate that decides
+   how much shared code may assume about the high bits of a sub-word value, so
+   a shared TU compiled once handed every back end the primary's assumption.
+
+   Measured over all 48 back ends: every one expands it to the literal `0' or
+   `1', so it is invariant and evaluable at the refresh point.  No `#if' site
+   anywhere outside `defaults.h''s own supply-side fallback, so unlike
+   `STORE_FLAG_VALUE' above this redirect stands alone.  */
+#undef WORD_REGISTER_OPERATIONS
+#define WORD_REGISTER_OPERATIONS (targetm_cdata.word_register_operations)
 /* `DWARF_FRAME_RETURN_COLUMN' WAS REDIRECTED HERE AND IS NOW A CALL, with the
    rest of the DWARF register family below.  epiphany's reads
    `current_function_decl', which is null when `target-cdata.cc' runs.  */
