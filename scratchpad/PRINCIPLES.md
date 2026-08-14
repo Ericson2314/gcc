@@ -622,6 +622,41 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
+"DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
+
+```
+specs-config      wc -l 230        grep -c . 222      (8 blank lines)
+big.c at -O2      .s  12369 / 378fc33c1e70            .o  6376 / b55aaccf5ca7
+```
+
+Both pairs are the **same file at the same commit**. Each time, one party
+reported a figure, another reported a different one, and the reconciliation
+offered was a *story* — "different configurations", "an inherited gap some
+earlier change introduced and nobody re-measured". Each time the real answer
+was a different measuring command, and settling it took under a minute.
+
+The canonical bars, so this stops recurring — **two bases**, at
+`70c9d9b3194`, cold, from an immutable snapshot:
+
+```
+cc1 -quiet -nostdinc -O2 -ftarget-config=<specs-config> big.c -o x.s
+  x86_64   12369 bytes  md5 378fc33c1e70
+  aarch64  12210 bytes  md5 ce1b968e06b1
+specs-config  wc -l 230   grep -c . 222   md5 a6c4c68bdf33
+```
+
+Two rules follow. **State the artefact and the command**, not "12369 bytes".
+And **when two measurements of one thing disagree, first hypothesis: they are
+not measuring the same thing** — test that before constructing an account in
+which both are true. A reconciliation that explains everything and predicts
+nothing is not a finding.
+
+Third rule, from the same episode: **the bars are base-count dependent.** The
+figures above are two-base. At three and four bases x86_64 `-O2` currently
+ICEs in `type_natural_mode`. Quoting a bar without its base count invites an
+agent to score a real regression as a bar failure, or the reverse.
+
 **STANDING USER RULING — GET THE BACK ENDS BUILDING, EVEN IF EVERYTHING IS
 BUSTED.** Verbatim: *"just get those backends building — even if everything is
 busted it's OK, we'll figure it out. it should be mechanical, right? and the

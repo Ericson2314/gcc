@@ -13464,6 +13464,22 @@ both emit `movq $0x1` (= `{1, 0}`) while arm loads `.rodata.cst8` containing
 and `m68k` answer -1 to the first, and i386/aarch64 agree on the second. This
 is the "correct by luck" shape PRINCIPLES lists, met twice in one task.
 
+**[CORRECTION, coordinator, at `5d96686ea51`: THE CLAIM BELOW IS WRONG. The
+bar reproduces exactly. `12369`/`378fc33c1e70` is the ASSEMBLY (`cc1 ... -o
+x.s`); `6376`/`b55aaccf5ca7` is the OBJECT (`-c`). Same tree, same commit,
+same `big.c`, measured side by side:**
+
+```
+ASSEMBLY (-o .s):  12369 bytes  md5 378fc33c1e70
+OBJECT   (-c .o):   6376 bytes  md5 b55aaccf5ca7
+```
+
+**Both readings were correct; they are different artefacts. There is no
+inherited gap and nothing was "never re-measured". Third instance today of one
+quantity read two ways — see also `specs-config` `wc -l` 230 vs `grep -c .`
+222. The paragraph below is left in place because the reasoning around it is
+sound and only the conclusion is not.]**
+
 **THE CODEGEN BAR `12369 bytes / 378fc33c1e70` DOES NOT REPRODUCE AT HEAD,
 AND IT IS NOT THIS TASK.** Measured, cold, from immutable snapshots, with
 `specs-config` present and the real cross binutils:
