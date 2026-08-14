@@ -56,7 +56,11 @@ for f in "$@"; do
       > /dev/null 2> "$O/$n.$b.H" || true
     # The FIRST tm.h opened is the one the directive resolved to.
     t=$(grep -o '[A-Za-z0-9_-]*-inc/tm\.h' "$O/$n.$b.H" | head -1)
-    [ -n "$t" ] || t=$(grep -o '[^ ]*tm\.h' "$O/$n.$b.H" | head -1)
+    # Fallback, for a file that opened SOME tm.h but not a per-base one.
+    # Anchored on `/tm.h': an unanchored `[^ ]*tm\.h' also matches
+    # `bits/types/struct_tm.h', and reported a glibc header as the answer --
+    # the substring-matching trap, which makes a correct FAIL unreadable.
+    [ -n "$t" ] || t=$(grep -oE '(^|[^ ]*/)tm\.h' "$O/$n.$b.H" | head -1)
     got="$got $b=>${t:-NONE}"
   done
   ea="$A-inc/tm.h"; eb="$B-inc/tm.h"
