@@ -30,29 +30,79 @@ grep -q 'worktrees/agent-ad0e44242408b7fde/configure' "$B/config.log" \
 #           pair once on this branch (six ELIMINABLE_REGS pairs vs four).
 #   s390x   a fourth, and big-endian, so a divergence that happens to agree on
 #           three little-endian bases still has somewhere to show.
-TARGETS="x86_64-pc-linux-gnu aarch64-unknown-linux-gnu powerpc64-linux-gnu s390x-linux-gnu"
+#
+# THE FOURTH BASE WAS TRIED AND WITHDRAWN, WHICH IS ITSELF THE RESULT.
+# powerpc64 + s390x, and separately mips64, were configured first.  Neither
+# set links at HEAD, each for its own PRE-EXISTING reason:
+#   rs6000/s390 -- print_operand, print_operand_address,
+#                  legitimate_pic_operand_p, legitimize_pic_address,
+#                  regclass_map all multiply defined
+#   mips        -- insn_mips::unspecv_strings{,_len} undefined
+#   riscv       -- extract_base_offset_in_addr, FIXED in this branch so that
+#                  three bases became possible at all
+# So the base set below is three, and the reason it is not four is measured
+# and named rather than habitual.  See scratchpad/t150-rename-gap.sh.
+TARGETS="x86_64-pc-linux-gnu aarch64-unknown-linux-gnu riscv64-unknown-linux-gnu"
 IN=$(cd "$S" && pwd)/big.c
 [ -f "$IN" ] || { echo "FATAL: input $IN missing"; exit 9; }
 
 echo "== arm 0: NON-VACUITY (must pass before anything is scored)"
-vac=0
+#
+# A target that fails HERE is reported as UNSCORABLE BY NAME and excluded from
+# arm 1.  It is NOT silently dropped, and the exclusion is not a way of making
+# a red column disappear: a cc1 that dies before parsing reads as "no ICE" in
+# BOTH the before and after columns, i.e. as success, so naming it is the only
+# honest option.  PRINCIPLES section 7: a measured "still cannot be checked,
+# because X" is a useful result; an unexamined pass is not.
+#
+# The script still refuses to score unless BOTH of these hold:
+#   * aarch64 is scorable -- it is the reproducer, and without it there is no
+#     measurement at all, only a control;
+#   * x86_64 is scorable -- it is the both-sided half.  Showing aarch64 gets
+#     aarch64's answer proves nothing unless the primary still gets its own.
+SCORABLE=""
 for t in $TARGETS; do
   d="$B/gcc/$t-gcc"
   if [ ! -x "$d" ]; then
-    echo "  VACUOUS: no driver $d"; vac=1; continue
+    echo "  UNSCORABLE: no driver $d"; continue
   fi
-  # Can this driver emit a diagnostic at all?  A cc1 that dies before parsing
-  # would otherwise make every real arm read clean.
+  # Can this driver emit a diagnostic at all?
   e=$(sh "$S/eb-shell.sh" \
         "cd $B/gcc && ./$t-gcc -S -nostdinc -o /dev/null $B/t150-vac.c" 2>&1 \
         > /dev/null || true)
+  # `undeclared' AND NOT `fatal error', deliberately.  The first draft of this
+  # arm accepted any line containing "error", and x86_64 and aarch64 both
+  # PASSED it while being unable to compile anything at all: the string it
+  # matched was the driver's own
+  #     fatal error: no configuration file for target `x86_64-pc-linux-gnu'
+  # from target-specs never having been run.  A check that accepts the wrong
+  # error is the same defect as a check that accepts an empty read -- it was
+  # caught only because arm 1 then failed loudly on both targets.
+  #
+  # So the arm now requires the diagnostic the input was WRITTEN to provoke,
+  # by name, and rejects any driver-level fatal error outright.
   case "$e" in
-    *"undeclared"*|*"error"*) echo "  ok: $t emits diagnostics" ;;
-    *) echo "  VACUOUS: $t produced no diagnostic for a known-bad input:"
-       echo "    [$e]"; vac=1 ;;
+    *"fatal error"*)
+      echo "  UNSCORABLE BY NAME: $t fails before compiling:"
+      echo "    [$(printf '%s' "$e" | head -1)]" ;;
+    *"undeclared"*)
+      echo "  ok: $t emits the expected compile diagnostic"
+      SCORABLE="$SCORABLE $t" ;;
+    *)
+      echo "  UNSCORABLE BY NAME: $t produced no diagnostic for a known-bad"
+      echo "    input, so a clean arm-1 reading from it would be meaningless:"
+      echo "    [$e]" ;;
   esac
 done
-[ "$vac" = 0 ] || { echo "REFUSING TO SCORE: non-vacuity arm failed"; exit 9; }
+case "$SCORABLE" in
+  *aarch64*) ;;
+  *) echo "REFUSING TO SCORE: aarch64 is the reproducer and is unscorable"; exit 9 ;;
+esac
+case "$SCORABLE" in
+  *x86_64*) ;;
+  *) echo "REFUSING TO SCORE: x86_64 is the both-sided control and is unscorable"; exit 9 ;;
+esac
+TARGETS="$SCORABLE"
 
 echo
 echo "== arm 1: $IN, per base"
