@@ -53,7 +53,14 @@ for b in cc1 cc1plus; do
     exit 9
   fi
   echo "  $b: $tot symbols"
-  for s in ix86_target_macros aarch64_target_macros \
+  # `aarch64_target_macros' is NOT in this list and the first draft had it:
+  # aarch64 spells its TARGET_CPU_CPP_BUILTINS entry point
+  # `aarch64_cpu_cpp_builtins', so the arm read `defined=0' on a cc1 that
+  # demonstrably contains aarch64-c.o -- a zero that was a claim about my
+  # spelling, not about the binary.  `targetm_c_ops_<base>' is the name every
+  # back end has by construction (gen-multi-target-md.awk emits the table), so
+  # it is the one an arm can rely on.
+  for s in ix86_target_macros aarch64_cpu_cpp_builtins \
            ix86_pragma_target_parse aarch64_pragma_target_parse \
            targetm_c_ops_i386 targetm_c_ops_aarch64 target_c_ops_for; do
     # `grep -w' on the DEMANGLED name: an anchored or `()'-bearing pattern
