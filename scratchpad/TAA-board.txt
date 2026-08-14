@@ -1,0 +1,76 @@
+TARGET                             PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+--------------------------------------------------------------------------------------------
+x86_64-pc-linux-gnu              162118    16340        3     1556     4451    13366       26
+aarch64-unknown-linux-gnu         88001    98027        3      832    11012   133394       26
+riscv64-unknown-linux-gnu         75980    90931        4      626    23415    97787       27
+s390x-ibm-linux-gnu               90464    46009        5      651     7811    13948       29
+
+== KILLED (compiler killed, NOT a test result -- machine contamination)
+  x86_64-pc-linux-gnu          0
+  aarch64-unknown-linux-gnu    2
+      xgcc: fatal error: cc1 terminated by signal 9 (Killed)
+      xgcc: fatal error: cc1 terminated by signal 9 (Killed)
+  riscv64-unknown-linux-gnu    0
+  s390x-ibm-linux-gnu          0
+  load at scoring time: load average: 2.81, 6.57, 10.33
+  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is quoted)
+
+== NOT DOWNGRADED (drove the compiler outside dg-do: linked and/or ran)
+  x86_64-pc-linux-gnu          execution-shaped 5        gcov 1304
+  aarch64-unknown-linux-gnu    execution-shaped 61       gcov 1264
+  riscv64-unknown-linux-gnu    execution-shaped 61       gcov 1252
+  s390x-ibm-linux-gnu          execution-shaped 106      gcov 1271
+
+== top FAIL causes per target (first 12, by test file)
+-- x86_64-pc-linux-gnu
+    940 gcc.misc-tests/gcov-19.c
+     66 gcc.misc-tests/gcov-4.c
+     40 gcc.dg/analyzer/torture/boxed-int-1.c
+     35 gcc.misc-tests/gcov-22.c
+     30 gcc.dg/lto/pr80922-2
+     25 gcc.misc-tests/gcov-4b.c
+     24 gcc.dg/lto/pr80922-1
+     24 gcc.dg/analyzer/torture/asm-x86-linux-array_index_mask_nospec.c
+     20 gcc.dg/analyzer/torture/conditionals-2.c
+     19 gcc.misc-tests/gcov-7.c
+     16 outputs-348
+     16 outputs-346
+-- aarch64-unknown-linux-gnu
+    940 gcc.misc-tests/gcov-19.c
+    342 gcc.target/aarch64/advsimd-intrinsics/vcopy_lane_indices.c
+    223 gcc.target/aarch64/sve/acle/general-c/svwrite_lane_zt_1.c
+    218 gcc.target/aarch64/sve/acle/general-c/lut_4.c
+    201 gcc.target/aarch64/sve/acle/general-c/gnu_vectors_1.c
+    197 gcc.target/aarch64/sve/acle/general-c/gnu_vectors_2.c
+    186 gcc.target/aarch64/sve/acle/general-c/svwrite_zt_1.c
+    126 gcc.target/aarch64/fp8_scalar_typecheck_1.c
+    108 compiler
+    101 gcc.target/aarch64/simd/lut-incorrect-range.c
+     89 gcc.target/aarch64/sve/acle/general-c/sizeless-2.c
+     83 gcc.target/aarch64/sve/acle/general-c/sizeless-1.c
+-- riscv64-unknown-linux-gnu
+    942 gcc.misc-tests/gcov-19.c
+    478 gcc.dg/params/blocksort-part.c
+    228 gcc.target/riscv/rvv/base/abi-9.c
+    209 gcc.target/riscv/rvv/base/user-7.c
+    145 gcc.dg/tree-ssa/builtin-sprintf-warn-23.c
+    130 gcc.dg/Wstringop-overread.c
+    130 c-c++-common/Wrestrict.c
+    110 gcc.dg/Wstringop-overflow-78.c
+    110 gcc.dg/Wstringop-overflow-77.c
+    108 compiler
+     95 gcc.target/riscv/rvv/base/abi-14.c
+     95 gcc.target/riscv/rvv/base/abi-13.c
+-- s390x-ibm-linux-gnu
+    942 gcc.misc-tests/gcov-19.c
+    486 gcc.dg/params/blocksort-part.c
+    145 gcc.dg/tree-ssa/builtin-sprintf-warn-23.c
+    134 c-c++-common/Wrestrict.c
+    128 gcc.dg/Wstringop-overread.c
+    110 gcc.dg/Wstringop-overflow-78.c
+    110 gcc.dg/Wstringop-overflow-77.c
+    108 compiler
+     95 gcc.dg/Wstringop-overflow-18.c
+     91 gcc.dg/tree-ssa/builtin-sprintf-warn-13.c
+     85 c-c++-common/Warray-bounds.c
+     74 gcc.dg/Warray-bounds-47.c
