@@ -199,6 +199,52 @@ static int fr30_num_arg_regs (const function_arg_info &);
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+fr30_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+/* DECLARED here, DEFINED at end of file.  fr30 puts `struct gcc_target
+   targetm = TARGET_INITIALIZER;' near the top of this file, above
+   `fr30_print_operand', and fr30's `PRINT_OPERAND' macro expands to a call to
+   it.  So the wrapper body cannot go here -- it would name a function not yet
+   declared -- while the `#define TARGET_PRINT_OPERAND' must go here, before
+   TARGET_INITIALIZER expands.  Splitting declaration from definition is the
+   only placement that satisfies both.  (The other wrappers in this file expand
+   macros that are self-contained arithmetic, so they are fine in place.)  */
+static void fr30_mt_print_operand (FILE *, rtx, int);
+static void fr30_mt_print_operand_address (FILE *, machine_mode, rtx);
+
+static bool
+fr30_mt_print_operand_punct_valid_p (unsigned char code)
+{
+  return PRINT_OPERAND_PUNCT_VALID_P (code);
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS fr30_mt_class_max_nregs
+#undef TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND fr30_mt_print_operand
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS fr30_mt_print_operand_address
+#undef TARGET_PRINT_OPERAND_PUNCT_VALID_P
+#define TARGET_PRINT_OPERAND_PUNCT_VALID_P fr30_mt_print_operand_punct_valid_p
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 
@@ -1037,3 +1083,20 @@ fr30_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
 /* Local Variables: */
 /* folded-file: t   */
 /* End:		    */
+
+/* Definitions of the two wrappers forward-declared above, placed here because
+   fr30's TARGET_INITIALIZER sits above fr30_print_operand.  Each expands
+   fr30's OWN tm.h macro in fr30's OWN translation unit -- the per-base answer,
+   not a fallback.  */
+
+static void
+fr30_mt_print_operand (FILE *stream, rtx x, int code)
+{
+  PRINT_OPERAND (stream, x, code);
+}
+
+static void
+fr30_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}

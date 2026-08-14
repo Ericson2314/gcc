@@ -10841,6 +10841,38 @@ alpha_c_mode_for_floating_type (enum tree_index ti)
 #undef TARGET_C_MODE_FOR_FLOATING_TYPE
 #define TARGET_C_MODE_FOR_FLOATING_TYPE alpha_c_mode_for_floating_type
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static reg_class_t
+alpha_mt_preferred_reload_class (rtx x, reg_class_t rclass)
+{
+  return (reg_class_t) PREFERRED_RELOAD_CLASS (x, (enum reg_class) rclass);
+}
+
+static bool
+alpha_mt_profile_before_prologue (void)
+{
+  /* default_profile_before_prologue returns true exactly when the macro is
+     defined; this back end defines it.  */
+  return true;
+}
+
+#undef TARGET_PREFERRED_RELOAD_CLASS
+#define TARGET_PREFERRED_RELOAD_CLASS alpha_mt_preferred_reload_class
+#undef TARGET_PROFILE_BEFORE_PROLOGUE
+#define TARGET_PROFILE_BEFORE_PROLOGUE alpha_mt_profile_before_prologue
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 

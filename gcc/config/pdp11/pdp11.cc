@@ -2415,4 +2415,69 @@ pdp11_push_rounding (poly_int64 bytes)
   return (bytes + 1) & ~1;
 }
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+pdp11_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+static void
+pdp11_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS pdp11_mt_class_max_nregs
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS pdp11_mt_print_operand_address
+
+/* Upstream's default_external_libcall for a back end that does not
+   define ASM_OUTPUT_EXTERNAL_LIBCALL: the `#ifdef' body is skipped, so
+   nothing is emitted.  (There is no hooks.h no-op with this signature;
+   `hook_void_rtx' does not exist -- measured, it fails to compile.)  */
+static void
+pdp11_mt_external_libcall (rtx)
+{
+}
+
+static enum unwind_info_type
+pdp11_mt_debug_unwind_info (void)
+{
+  /* Neither DWARF2_FRAME_INFO nor DWARF2_DEBUGGING_INFO is defined for
+     this back end, so upstream's default_debug_unwind_info falls all the
+     way through.  */
+  return UI_NONE;
+}
+
+/* MULTI-TARGET, SILENT HALF.  This back end defines neither
+   `ASM_OUTPUT_EXTERNAL_LIBCALL' nor (where noted) `DWARF2_DEBUGGING_INFO',
+   but `targhooks.cc' is compiled once against the PRIMARY's tm.h, where
+   `elfos.h' defines both.  The `#ifdef's have no `#else', so instead of
+   an ICE this back end silently inherits the primary's behaviour.
+
+   The values supplied here are UPSTREAM's own answers for this back end
+   standing alone -- with the macros undefined, default_external_libcall
+   emits nothing and default_debug_unwind_info returns UI_NONE.  A
+   supply-side floor giving a base its own documented value, not a
+   consumer-side fallback giving it somebody else's.  */
+#undef TARGET_ASM_EXTERNAL_LIBCALL
+#define TARGET_ASM_EXTERNAL_LIBCALL pdp11_mt_external_libcall
+#undef TARGET_DEBUG_UNWIND_INFO
+#define TARGET_DEBUG_UNWIND_INFO pdp11_mt_debug_unwind_info
+
 struct gcc_target targetm = TARGET_INITIALIZER;

@@ -267,6 +267,36 @@ static HOST_WIDE_INT iq2000_starting_frame_offset (void);
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static bool
+iq2000_mt_function_value_regno_p (const unsigned int regno)
+{
+  return FUNCTION_VALUE_REGNO_P (regno);
+}
+
+static reg_class_t
+iq2000_mt_preferred_reload_class (rtx x, reg_class_t rclass)
+{
+  return (reg_class_t) PREFERRED_RELOAD_CLASS (x, (enum reg_class) rclass);
+}
+
+#undef TARGET_FUNCTION_VALUE_REGNO_P
+#define TARGET_FUNCTION_VALUE_REGNO_P iq2000_mt_function_value_regno_p
+#undef TARGET_PREFERRED_RELOAD_CLASS
+#define TARGET_PREFERRED_RELOAD_CLASS iq2000_mt_preferred_reload_class
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Return nonzero if we split the address into high and low parts.  */

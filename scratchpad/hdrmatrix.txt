@@ -1,0 +1,31 @@
+non-vacuity: 46/46 bases preprocessed; i386 dump 14610 macros
+
+=== per-macro definer counts, measured through the real tm.h chain
+ASM_OUTPUT_EXTERNAL_LIBCALL      defined-by=42  primary=i386,aarch64   not-defined-by:microblaze mmix nvptx pdp11
+CLASS_MAX_NREGS                  defined-by=23  primary=no             not-defined-by:aarch64 alpha avr bpf csky ft32 gcn h8300 i386 iq2000 lm32 m32r microblaze mn10300 moxie msp430 nds32 or1k riscv rx v850 vax xtensa
+DWARF2_DEBUGGING_INFO            defined-by=44  primary=i386,aarch64   not-defined-by:nvptx pdp11
+DWARF2_FRAME_INFO                defined-by=2   primary=no             not-defined-by:aarch64 alpha arc arm avr bfin c6x cris csky epiphany fr30 frv ft32 gcn h8300 i386 ia64 iq2000 lm32 m32r m68k mcore microblaze mips mmix mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rs6000 rx s390 sh sparc vax visium xtensa
+FUNCTION_VALUE                   defined-by=5   primary=no             not-defined-by:aarch64 alpha arc arm avr bpf c6x cris csky epiphany fr30 frv ft32 gcn h8300 i386 ia64 iq2000 m32r microblaze mips mmix mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rs6000 rx s390 sh sparc v850 visium xtensa
+FUNCTION_VALUE_REGNO_P           defined-by=15  primary=no             not-defined-by:aarch64 alpha arm avr bpf c6x cris csky epiphany fr30 ft32 gcn h8300 i386 ia64 m32r mips mmix moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv sh sparc v850 xtensa
+GO_IF_LEGITIMATE_ADDRESS         defined-by=1   primary=no             not-defined-by:aarch64 alpha arc arm avr bfin bpf c6x cris csky epiphany frv ft32 gcn h8300 i386 ia64 iq2000 lm32 m32r m68k mcore microblaze mips mmix mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rs6000 rx s390 sh sparc v850 vax visium xtensa
+LIBCALL_VALUE                    defined-by=12  primary=no             not-defined-by:aarch64 alpha arm avr c6x cris csky epiphany fr30 frv ft32 h8300 i386 ia64 iq2000 m32r mips mmix mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv s390 sh sparc v850 visium xtensa
+MOVE_RATIO                       defined-by=46  primary=i386,aarch64   not-defined-by:
+PREFERRED_RELOAD_CLASS           defined-by=10  primary=no             not-defined-by:aarch64 arm avr bpf c6x cris csky fr30 frv ft32 gcn h8300 i386 ia64 lm32 m32r mips mmix mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rx s390 sh sparc v850 vax xtensa
+PRINT_OPERAND                    defined-by=15  primary=no             not-defined-by:aarch64 alpha arm avr c6x cris csky epiphany frv h8300 i386 ia64 iq2000 m32r mcore mips mmix moxie msp430 nds32 nvptx or1k pdp11 pru riscv rl78 rx sh sparc v850 visium
+PRINT_OPERAND_ADDRESS            defined-by=16  primary=no             not-defined-by:aarch64 alpha arm avr c6x cris csky epiphany frv h8300 i386 ia64 iq2000 m32r mcore mips mmix moxie msp430 nds32 nvptx or1k pru riscv rl78 rx sh sparc v850 visium
+PRINT_OPERAND_PUNCT_VALID_P      defined-by=11  primary=no             not-defined-by:aarch64 alpha arm avr bpf c6x cris csky frv ft32 h8300 i386 ia64 iq2000 m32r mcore mips mmix mn10300 moxie msp430 nds32 nvptx pa pdp11 pru riscv rl78 rx s390 sh sparc v850 visium xtensa
+PROFILE_BEFORE_PROLOGUE          defined-by=12  primary=no             not-defined-by:aarch64 arc arm avr bpf c6x cris csky epiphany fr30 frv ft32 h8300 i386 iq2000 lm32 m32r m68k mcore microblaze mips mmix mn10300 moxie nds32 nvptx or1k pdp11 riscv sparc v850 vax visium xtensa
+SECONDARY_INPUT_RELOAD_CLASS     defined-by=4   primary=no             not-defined-by:aarch64 alpha arc avr bfin bpf c6x cris csky epiphany fr30 ft32 gcn h8300 i386 ia64 iq2000 lm32 m32r m68k mcore microblaze mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rs6000 rx s390 sh sparc v850 vax visium xtensa
+SECONDARY_OUTPUT_RELOAD_CLASS    defined-by=4   primary=no             not-defined-by:aarch64 alpha arc avr bfin bpf c6x cris csky epiphany fr30 ft32 gcn h8300 i386 ia64 iq2000 lm32 m32r m68k mcore microblaze mn10300 moxie msp430 nds32 nvptx or1k pa pdp11 pru riscv rl78 rs6000 rx s390 sh sparc v850 vax visium xtensa
+
+=== SILENT RISK, measured: a PRIMARY defines the macro and this base does not.
+    The shared targhooks.cc '#ifdef' is then TRUE for a reason that has
+    nothing to do with this base, and it silently receives the primary's
+    answer.  No ICE, no diagnostic.
+  microblaze ASM_OUTPUT_EXTERNAL_LIBCALL
+  mmix ASM_OUTPUT_EXTERNAL_LIBCALL
+  nvptx ASM_OUTPUT_EXTERNAL_LIBCALL
+  pdp11 ASM_OUTPUT_EXTERNAL_LIBCALL
+  nvptx DWARF2_DEBUGGING_INFO
+  pdp11 DWARF2_DEBUGGING_INFO
+  silent pairs=6 back ends=4

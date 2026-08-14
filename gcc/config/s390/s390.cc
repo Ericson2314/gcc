@@ -18715,6 +18715,63 @@ s390_bitint_type_info (int n, struct bitint_info *info)
 #define TARGET_LIBGCC_FLOATING_MODE_SUPPORTED_P	\
   s390_libgcc_floating_mode_supported_p
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+s390_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+static bool
+s390_mt_function_value_regno_p (const unsigned int regno)
+{
+  return FUNCTION_VALUE_REGNO_P (regno);
+}
+
+static void
+s390_mt_print_operand (FILE *stream, rtx x, int code)
+{
+  PRINT_OPERAND (stream, x, code);
+}
+
+static void
+s390_mt_print_operand_address (FILE *stream, machine_mode, rtx x)
+{
+  PRINT_OPERAND_ADDRESS (stream, x);
+}
+
+static bool
+s390_mt_profile_before_prologue (void)
+{
+  /* default_profile_before_prologue returns true exactly when the macro is
+     defined; this back end defines it.  */
+  return true;
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS s390_mt_class_max_nregs
+#undef TARGET_FUNCTION_VALUE_REGNO_P
+#define TARGET_FUNCTION_VALUE_REGNO_P s390_mt_function_value_regno_p
+#undef TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND s390_mt_print_operand
+#undef TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS s390_mt_print_operand_address
+#undef TARGET_PROFILE_BEFORE_PROLOGUE
+#define TARGET_PROFILE_BEFORE_PROLOGUE s390_mt_profile_before_prologue
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-s390.h"

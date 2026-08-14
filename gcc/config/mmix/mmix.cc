@@ -298,6 +298,52 @@ static HOST_WIDE_INT mmix_starting_frame_offset (void);
 #undef TARGET_STARTING_FRAME_OFFSET
 #define TARGET_STARTING_FRAME_OFFSET mmix_starting_frame_offset
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static unsigned char
+mmix_mt_class_max_nregs (reg_class_t rclass, machine_mode mode)
+{
+  return (unsigned char) CLASS_MAX_NREGS ((enum reg_class) rclass,
+					  MACRO_MODE (mode));
+}
+
+#undef TARGET_CLASS_MAX_NREGS
+#define TARGET_CLASS_MAX_NREGS mmix_mt_class_max_nregs
+
+/* Upstream's default_external_libcall for a back end that does not
+   define ASM_OUTPUT_EXTERNAL_LIBCALL: the `#ifdef' body is skipped, so
+   nothing is emitted.  (There is no hooks.h no-op with this signature;
+   `hook_void_rtx' does not exist -- measured, it fails to compile.)  */
+static void
+mmix_mt_external_libcall (rtx)
+{
+}
+
+/* MULTI-TARGET, SILENT HALF.  This back end defines neither
+   `ASM_OUTPUT_EXTERNAL_LIBCALL' nor (where noted) `DWARF2_DEBUGGING_INFO',
+   but `targhooks.cc' is compiled once against the PRIMARY's tm.h, where
+   `elfos.h' defines both.  The `#ifdef's have no `#else', so instead of
+   an ICE this back end silently inherits the primary's behaviour.
+
+   The values supplied here are UPSTREAM's own answers for this back end
+   standing alone -- with the macros undefined, default_external_libcall
+   emits nothing and default_debug_unwind_info returns UI_NONE.  A
+   supply-side floor giving a base its own documented value, not a
+   consumer-side fallback giving it somebody else's.  */
+#undef TARGET_ASM_EXTERNAL_LIBCALL
+#define TARGET_ASM_EXTERNAL_LIBCALL mmix_mt_external_libcall
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Functions that are expansions for target macros.

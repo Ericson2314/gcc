@@ -2340,6 +2340,28 @@ or1k_libm_function_max_error (unsigned cfn, machine_mode mode,
 #undef  TARGET_MAX_ANCHOR_OFFSET
 #define TARGET_MAX_ANCHOR_OFFSET  32767
 
+/* MULTI-TARGET: hooks this back end never needed to supply, because
+   `targhooks.cc' answered from its own `#ifdef <tm.h macro>'.  That
+   file is compiled ONCE, against the PRIMARY's tm.h, so in a
+   multi-target binary the `#ifdef' is resolved for somebody else and
+   this back end gets the `#else' arm -- `gcc_unreachable ()' for some
+   of these, and a silently wrong generic answer for the rest.
+
+   Each wrapper expands THIS back end's own macro in THIS back end's
+   own translation unit against its own tm.h.  That is the per-base
+   answer, identical to what a single-target build computes -- not a
+   fallback and not a floor.  See scratchpad/mta7-targhook-matrix2.sh
+   and commit d65b829e7a8, which did this for rs6000 first.  */
+
+static bool
+or1k_mt_print_operand_punct_valid_p (unsigned char code)
+{
+  return PRINT_OPERAND_PUNCT_VALID_P (code);
+}
+
+#undef TARGET_PRINT_OPERAND_PUNCT_VALID_P
+#define TARGET_PRINT_OPERAND_PUNCT_VALID_P or1k_mt_print_operand_punct_valid_p
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-or1k.h"
