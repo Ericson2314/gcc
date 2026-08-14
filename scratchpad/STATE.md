@@ -13116,3 +13116,48 @@ documented `1`, not the primary's answer to a base that never spoke.
   per-base object divergence and a linking `cc1`, not execution.
 - The 48-back-end build produces **no `cc1`** (28 failing targets,
   pre-existing), so every 48-base figure here is object- or header-level.
+
+## #32 VERIFICATION, AND A BAR THAT DOES NOT REPRODUCE
+
+Two-base build at `3807a3b5a06` (`/tmp/b-a568476-two3`, from the immutable
+snapshot `/tmp/snap3-a568476`): `all-gcc` **rc=0** (stamped), `cc1` links,
+`specs-config` **230 lines for both targets** -- that bar is met.
+
+**BOTH-SIDED, AND BOTH CONVERSIONS NEEDED A THIRD BACK END TO SAY ANYTHING.**
+
+| macro | i386 | aarch64 | third base |
+|---|---|---|---|
+| `STORE_FLAG_VALUE` | 1 | 1 | **m68k: -1** |
+| `WORD_REGISTER_OPERATIONS` | 0 | 0 | **arm: 1** |
+
+Read off the per-base `target-cdata-<base>.o` at the same struct offset
+`0x58`; the two `int` fields merge into one 8-byte store, so i386 and aarch64
+both emit `movq $0x1` (= `{1, 0}`) while arm loads `.rodata.cst8` containing
+`01000000 01000000` (= `{1, 1}`) and m68k emits `movl $0xffffffff`.
+
+**The habitual pair is blind to both of these.** Of 48 back ends only `gcn`
+and `m68k` answer -1 to the first, and i386/aarch64 agree on the second. This
+is the "correct by luck" shape PRINCIPLES lists, met twice in one task.
+
+**THE CODEGEN BAR `12369 bytes / 378fc33c1e70` DOES NOT REPRODUCE AT HEAD,
+AND IT IS NOT THIS TASK.** Measured, cold, from immutable snapshots, with
+`specs-config` present and the real cross binutils:
+
+```
+                                        x86_64 -O2 -c big.c
+pre-task  8b126bdce7d  /tmp/b-a568476-ctl    6376  b55aaccf5ca7
+post      3807a3b5a06  /tmp/b-a568476-two3   6376  b55aaccf5ca7
+```
+
+The control and the change agree **byte for byte**, and aarch64 `-S` is
+byte-identical too (12210 bytes both sides, `cmp` clean). So the 2x gap
+against the recorded bar is inherited, not introduced; some earlier change
+moved it and the recorded figure was never re-measured. Per PRINCIPLES the
+build dir and commit are stated beside the number so the next reader can tell
+which of the two applies.
+
+**AND THE IDENTICAL md5 IS THE POINT, NOT A DISAPPOINTMENT.** Neither
+configured base changes its answer, because i386's `1` and `0` are exactly
+what the primary was already supplying to everyone -- the conversion moves
+the AUTHORITY, not the value. The pair that shows it is not a no-op is the
+object-level divergence above, which is why that arm exists.
