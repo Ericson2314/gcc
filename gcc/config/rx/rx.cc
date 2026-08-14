@@ -1310,8 +1310,21 @@ rx_conditional_register_usage (void)
 	{
 	  unsigned int r;
 
-	  memcpy (saved_fixed_regs, fixed_regs, sizeof fixed_regs);
-	  memcpy (saved_call_used_regs, call_used_regs, sizeof call_used_regs);
+	  /* `sizeof saved_*', not `sizeof fixed_regs': the two arrays are no
+	     longer the same length.  `fixed_regs' and `call_used_regs' are
+	     fields of `struct target_hard_regs', sized by
+	     MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER (hard-reg-set.h) -- the
+	     union width over the configured back ends -- while the two static
+	     buffers above are rx's own FIRST_PSEUDO_REGISTER.  Copying the
+	     destination's size wrote past the end of both statics here and
+	     read past the end of both below.  rx only ever needs its own
+	     registers back, so the source/destination that is rx-sized is the
+	     right bound in both directions.  Same shape as the
+	     `reg_alloc_order' over-read fixed in arm.cc, arc.cc and
+	     nds32.cc.  */
+	  memcpy (saved_fixed_regs, fixed_regs, sizeof saved_fixed_regs);
+	  memcpy (saved_call_used_regs, call_used_regs,
+		  sizeof saved_call_used_regs);
 
 	  /* This is for fast interrupt handlers.  Any register in
 	     the range r10 to r13 (inclusive) that is currently
@@ -1331,8 +1344,9 @@ rx_conditional_register_usage (void)
       else
 	{
 	  /* Restore the normal register masks.  */
-	  memcpy (fixed_regs, saved_fixed_regs, sizeof fixed_regs);
-	  memcpy (call_used_regs, saved_call_used_regs, sizeof call_used_regs);
+	  memcpy (fixed_regs, saved_fixed_regs, sizeof saved_fixed_regs);
+	  memcpy (call_used_regs, saved_call_used_regs,
+		  sizeof saved_call_used_regs);
 	}
 
       using_fixed_regs = use_fixed_regs;

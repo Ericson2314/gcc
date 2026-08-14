@@ -4376,7 +4376,16 @@ nds32_adjust_reg_alloc_order (void)
 
   /* Copy the default register allocation order, which is designed
      to optimize for code size.  */
-  memcpy(reg_alloc_order, nds32_reg_alloc_order, sizeof (reg_alloc_order));
+  /* The size of the SOURCE, not of the destination: `reg_alloc_order' is
+     sized by MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER (hard-reg-set.h), the
+     union width over the configured back ends, while the array above is
+     nds32's own.  See the same fix in arm.cc, where it was an ira_init
+     segfault.  */
+  static_assert (sizeof (nds32_reg_alloc_order)
+		 == FIRST_PSEUDO_REGISTER * sizeof (int),
+		 "nds32's REG_ALLOC_ORDER does not cover FIRST_PSEUDO_REGISTER");
+  memcpy (reg_alloc_order, nds32_reg_alloc_order,
+	  sizeof (nds32_reg_alloc_order));
 
   /* Adjust few register allocation order when optimizing for speed.  */
   if (!optimize_size)

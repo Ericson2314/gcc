@@ -30861,7 +30861,22 @@ void
 arm_order_regs_for_local_alloc (void)
 {
   const int arm_reg_alloc_order[] = REG_ALLOC_ORDER;
-  memcpy(reg_alloc_order, arm_reg_alloc_order, sizeof (reg_alloc_order));
+  /* THE SIZE OF THE SOURCE, NOT OF THE DESTINATION.  `reg_alloc_order' is
+     `this_target_hard_regs->x_reg_alloc_order', and hard-reg-set.h declares
+     that field `[MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER]' -- the union
+     width over the configured back ends -- while `arm_reg_alloc_order' above
+     is arm's own 88 entries on the stack.  `sizeof (reg_alloc_order)' was
+     therefore a read of (union - 88) * 4 bytes off the end of this frame,
+     which is upstream-correct only because upstream's two widths are the same
+     number.  The static_assert says which one this array is supposed to be,
+     so a REG_ALLOC_ORDER that stops covering arm's registers is a compile
+     error naming this line rather than a wrong allocation order.
+     The tail beyond arm's own registers keeps the identity entries
+     `init_reg_sets' fenced it with.  */
+  static_assert (sizeof (arm_reg_alloc_order)
+		 == FIRST_PSEUDO_REGISTER * sizeof (int),
+		 "arm's REG_ALLOC_ORDER does not cover FIRST_PSEUDO_REGISTER");
+  memcpy (reg_alloc_order, arm_reg_alloc_order, sizeof (arm_reg_alloc_order));
   if (TARGET_THUMB)
     memcpy (reg_alloc_order, thumb_core_reg_alloc_order,
             sizeof (thumb_core_reg_alloc_order));
