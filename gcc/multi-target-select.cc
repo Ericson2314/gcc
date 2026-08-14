@@ -667,6 +667,25 @@ multi_target_select (const char *target)
 			  "its objects predate target-asmfprintf.h and are "
 			  "from a different build", base);
 
+	/* This back end's DFA PIPELINE-HAZARD entry points; see
+	   target-automata.h.  Rides on the same table and is checked for the
+	   same reason.
+
+	   Until this line existed, every shared scheduling object bound the
+	   BARE `state_size', `state_transition', `state_reset' and
+	   `insn_latency' -- the primary's automaton.  That is a wrong model
+	   for every other base and, because `state_size' is the LENGTH of the
+	   DFA state buffer, a heap overflow for any back end that allocates
+	   one from its own answer: ia64's `prev_cycle_state' is 4 bytes and
+	   `ia64_variable_issue' wrote i386's 116 into it, reproduced by ASAN
+	   six times in six.  */
+	targetm_automata = targetm_cumargs->automata;
+	if (targetm_automata == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no pipeline-automaton table attached; its "
+			  "objects predate target-automata.h and are from a "
+			  "different build", base);
+
 	/* Whether this back end has a REGISTER STACK; see target-regstack.h.
 
 	   A separate registry rather than a field riding on the cumargs table,

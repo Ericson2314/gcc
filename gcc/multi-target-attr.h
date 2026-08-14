@@ -54,6 +54,7 @@ along with GCC; see the file COPYING3.  If not see
 #if !defined GENERATOR_FILE && !defined MULTI_TARGET_ATTR_NO_REDIRECT
 
 #include "target-attr.h"
+#include "target-automata.h"
 
 /* WHICH ATTRIBUTES THE SELECTED BASE HAS.  Not a union: see target-attr.h.
    aarch64 has no `preferred_for_size' and i386 does, and telling shared code
@@ -95,6 +96,60 @@ along with GCC; see the file COPYING3.  If not see
 #undef insn_current_length
 #define insn_current_length mt_insn_current_length
 
+/* THE DFA PIPELINE-HAZARD ENTRY POINTS; see target-automata.h.
+
+   OBJECT-LIKE, NOT FUNCTION-LIKE, for the reason stated above, and because
+   `insn_default_latency' is a function POINTER upstream of this rename --
+   an object-like macro leaves every call site's spelling untouched whether
+   the name was a function or a pointer.
+
+   `max_insn_queue_index' is the one that is NOT a call in the original: it
+   is `extern const int'.  It appears in three macro BODIES in haifa-sched.cc
+   (`INVALID_TICK', `MIN_TICK', `NEXT_Q') as well as in 22 ordinary
+   expressions; macro bodies are expanded at their use, so the rewrite
+   reaches all 25 sites.  */
+#undef state_size
+#define state_size mt_state_size
+
+#undef max_insn_queue_index
+#define max_insn_queue_index mt_max_insn_queue_index ()
+
+#undef state_reset
+#define state_reset mt_state_reset
+
+#undef state_transition
+#define state_transition mt_state_transition
+
+#undef state_dead_lock_p
+#define state_dead_lock_p mt_state_dead_lock_p
+
+#undef min_insn_conflict_delay
+#define min_insn_conflict_delay mt_min_insn_conflict_delay
+
+#undef print_reservation
+#define print_reservation mt_print_reservation
+
+#undef dfa_start
+#define dfa_start mt_dfa_start
+
+#undef dfa_finish
+#define dfa_finish mt_dfa_finish
+
+#undef dfa_clear_single_insn_cache
+#define dfa_clear_single_insn_cache mt_dfa_clear_single_insn_cache
+
+#undef bypass_p
+#define bypass_p mt_bypass_p
+
+#undef insn_latency
+#define insn_latency mt_insn_latency
+
+#undef maximal_insn_latency
+#define maximal_insn_latency mt_maximal_insn_latency
+
+#undef insn_default_latency
+#define insn_default_latency mt_insn_default_latency
+
 /* NOT REDIRECTED, AND EACH FOR A STATED REASON -- silence about a name in
    this family would read as "checked and clean".
 
@@ -106,16 +161,26 @@ along with GCC; see the file COPYING3.  If not see
    `insn_variable_length_p' is stubbed by genattr but is named by no shared
    translation unit in this tree; measured, not assumed.
 
-   `internal_dfa_insn_code', `insn_default_latency', `state_transition' and
-   the rest of the SCHEDULING entry points are deliberately left alone: they
-   belong to `insn-automata' / `insn-dfatab' / `insn-latencytab', which are
-   three separate leaking families with `haifa-sched.o' as their dominant
-   consumer.  `internal_dfa_insn_code' is a function POINTER assigned by
-   `init_sched_attrs ()' -- genattrtab already makes it a pointer uniformly,
-   so the kind mismatch is gone, but selecting it means selecting which base's
-   `init_sched_attrs' RUNS, which is not a rename.  The leak ratchet in the
-   guard script asserts they are still unselected, so wiring one up fails a
-   check rather than landing unremarked.  */
+   THE SCHEDULING ENTRY POINTS ARE NO LONGER IN THIS PARAGRAPH -- they are
+   redirected above, and what changed the verdict is worth recording.  An
+   earlier version of this comment said they were "deliberately left alone"
+   because they were a modelling leak with `haifa-sched.o' as the dominant
+   consumer.  They are not only that: `state_size' is the LENGTH of the DFA
+   state buffer, so leaving it bare is a heap overflow and not a wrong
+   answer.  See target-automata.h for the ASAN report.
+
+   `internal_dfa_insn_code' is STILL not redirected, and that is measured
+   rather than inherited: outside comments, no shared translation unit names
+   it.  It is a function POINTER that each base's `init_sched_attrs ()'
+   assigns, and `mt_init_base_sched_attrs' (target-sched.h) is what makes the
+   selected base's copy non-null -- which the redirected `state_transition'
+   above then consumes.  The two fixes are used together and neither is
+   sufficient alone.
+
+   `min_issue_delay', `get_cpu_unit_code', `cpu_unit_reservation_p',
+   `insn_has_dfa_reservation_p', `dfa_clean_insn_cache', `state_alts' and
+   `insn_alts' are exported by `insn-automata.cc' and named by no shared
+   translation unit; measured, not assumed.  */
 
 #endif /* !GENERATOR_FILE && !MULTI_TARGET_ATTR_NO_REDIRECT */
 

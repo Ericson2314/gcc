@@ -9646,8 +9646,26 @@ main (int argc, const char **argv)
       if (!have_error)
 	{
 	  printf ("/* Generated automatically by the program `genautomata'\n"
-		"   from the machine description file `md'.  */\n\n"
-		"#define IN_TARGET_CODE 1\n"
+		"   from the machine description file `md'.  */\n\n");
+
+	  /* THE EXACT COMPANION OF genattrtab.cc's write_header, under the
+	     same condition and for the same reason.
+
+	     insn-automata.cc DEFINES `state_size', `state_transition',
+	     `state_reset', `insn_latency', `bypass_p' and the rest of the DFA
+	     interface.  multi-target-attr.h renames those names for shared
+	     code; if it reached here it would rename the DEFINITIONS, which
+	     would then collide with the forwarders in
+	     target-cumargs-select.cc.  The un-namespaced run therefore opts
+	     out; the per-base runs never see the header at all, since their
+	     insn-attr-<base>.h does not include it.
+
+	     Emitted under the same condition as the include genattr.cc writes,
+	     so the two cannot drift apart.  */
+	  if (gen_multi_target_p () && gen_target_ns () == NULL)
+	    printf ("#define MULTI_TARGET_ATTR_NO_REDIRECT 1\n");
+
+	  printf ("#define IN_TARGET_CODE 1\n"
 		"#include \"config.h\"\n"
 		"#include \"system.h\"\n"
 		"#include \"coretypes.h\"\n");

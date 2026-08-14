@@ -55,15 +55,26 @@ along with GCC; see the file COPYING3.  If not see
    `haifa-sched.o' and the rest of shared scheduling still bind the BARE
    `internal_dfa_insn_code', `state_transition', `insn_latency' and
    `dfa_start', i.e. they still schedule every target's insns against the
-   primary's automaton.  `multi-target-attr.h' records that family as
-   deliberately unselected, and it still is.  Replacing the bare call rather
-   than adding to it would have taken those consumers' pointers away and
-   turned a wrong answer into a crash for every base, which is why this is
-   additive.
+   primary's automaton.  Replacing the bare call rather than adding to it
+   would have taken those consumers' pointers away and turned a wrong answer
+   into a crash for every base, which is why this is additive.
 
    Say the residual out loud rather than let the smaller fix read as the
    larger one: after this change riscv and mips reach codegen; nothing here
-   makes the scheduler's own model per base.  */
+   makes the scheduler's own model per base.
+
+   THAT RESIDUAL IS NOW CLOSED, AND THE REASON IT COULD NOT WAIT IS THE PART
+   TO CARRY.  `target-automata.h' selects `state_size', `state_transition',
+   `state_reset' and the rest per base.  This file's judgement that the
+   residual was "a wrong answer" was too kind: `state_size' is the LENGTH of
+   the DFA state buffer, so a back end sizing its own buffer from its own
+   automaton while shared code overwrote `dfa_state_size' with the primary's
+   was a heap overflow -- ia64 writing 116 bytes into 4, six ASAN runs of six.
+
+   The two fixes are consumed together: the selected base's
+   `state_transition' calls its own `internal_dfa_insn_code' through the
+   pointer THIS file's initialiser fills in, so neither is sufficient alone
+   and the additive shape here is still the right one.  */
 
 #ifndef GCC_TARGET_SCHED_H
 #define GCC_TARGET_SCHED_H

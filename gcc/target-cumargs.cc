@@ -1323,6 +1323,137 @@ static const struct target_asmfprintf_desc mt_base_asmfprintf = {
 #endif
 };
 
+/* THIS BASE'S DFA PIPELINE-HAZARD ENTRY POINTS; see target-automata.h for the
+   measurement -- an ASAN-confirmed 116-byte write into a 4-byte buffer -- and
+   for why this family could not be fixed additively the way
+   `mt_init_base_sched_attrs' was.
+
+   Every name below resolves to `insn_<base>::' through this base's own
+   `insn-attr-<base>.h' using-directive, exactly as the attribute thunks
+   above do.  The `#ifdef INSN_SCHEDULING' is read HERE, where it is still
+   this base's own macro out of its own `insn-attr-common-<base>.h'; that is
+   the only place it can be read correctly, and a back end with no
+   `define_insn_reservation' has no such declarations to name.  */
+#ifdef INSN_SCHEDULING
+static int
+mt_base_state_size (void)
+{
+  return state_size ();
+}
+
+/* `max_insn_queue_index' is `extern const int' defined in this base's
+   `insn-automata-<base>.cc', so it is not a constant expression here and
+   cannot be a plain field without making the table dynamically initialised.
+   A thunk keeps the table static.  */
+static int
+mt_base_max_insn_queue_index (void)
+{
+  return max_insn_queue_index;
+}
+
+static void
+mt_base_state_reset (void *s)
+{
+  state_reset ((state_t) s);
+}
+
+static int
+mt_base_state_transition (void *s, rtx insn)
+{
+  return state_transition ((state_t) s, insn);
+}
+
+static int
+mt_base_state_dead_lock_p (void *s)
+{
+  return state_dead_lock_p ((state_t) s);
+}
+
+static int
+mt_base_min_insn_conflict_delay (void *s, rtx_insn *a, rtx_insn *b)
+{
+  return min_insn_conflict_delay ((state_t) s, a, b);
+}
+
+static void
+mt_base_print_reservation (FILE *f, rtx_insn *insn)
+{
+  print_reservation (f, insn);
+}
+
+static void
+mt_base_dfa_start (void)
+{
+  dfa_start ();
+}
+
+static void
+mt_base_dfa_finish (void)
+{
+  dfa_finish ();
+}
+
+static void
+mt_base_dfa_clear_single_insn_cache (rtx_insn *insn)
+{
+  dfa_clear_single_insn_cache (insn);
+}
+
+static int
+mt_base_bypass_p (rtx_insn *insn)
+{
+  return bypass_p (insn);
+}
+
+static int
+mt_base_insn_latency (rtx_insn *a, rtx_insn *b)
+{
+  return insn_latency (a, b);
+}
+
+static int
+mt_base_maximal_insn_latency (rtx_insn *insn)
+{
+  return maximal_insn_latency (insn);
+}
+
+/* `insn_default_latency' is a function POINTER assigned by this base's
+   `init_sched_attrs ()', which `mt_init_base_sched_attrs' runs (target-sched.h).
+   Called through the pointer here rather than captured into the table,
+   because the table is statically initialised and the pointer is null until
+   that initialiser has run.  */
+static int
+mt_base_insn_default_latency (rtx_insn *insn)
+{
+  return insn_default_latency (insn);
+}
+#endif /* INSN_SCHEDULING */
+
+static const struct target_automata_desc mt_base_automata = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+#ifdef INSN_SCHEDULING
+  true,
+  mt_base_state_size,
+  mt_base_max_insn_queue_index,
+  mt_base_state_reset,
+  mt_base_state_transition,
+  mt_base_state_dead_lock_p,
+  mt_base_min_insn_conflict_delay,
+  mt_base_print_reservation,
+  mt_base_dfa_start,
+  mt_base_dfa_finish,
+  mt_base_dfa_clear_single_insn_cache,
+  mt_base_bypass_p,
+  mt_base_insn_latency,
+  mt_base_maximal_insn_latency,
+  mt_base_insn_default_latency
+#else
+  false,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL, NULL, NULL, NULL
+#endif
+};
+
 /* `static' and reached through the `preds' pointer below, for the same reason
    `mt_base_frame' is.  */
 static const struct target_preds_desc mt_base_preds = {
@@ -1437,5 +1568,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   &mt_base_attr,
   &mt_base_modeswitch,
   &mt_base_sched,
-  &mt_base_asmfprintf
+  &mt_base_asmfprintf,
+  &mt_base_automata
 };

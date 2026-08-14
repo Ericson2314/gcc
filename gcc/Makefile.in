@@ -5433,6 +5433,28 @@ build/genattr.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 build/genattrtab.o : BUILD_CPPFLAGS += \
   $(if $(multi_target_base),-DGEN_MULTI_TARGET)
+# ... and the SINGULAR genautomata, for the identical reason and as part of the
+# identical mechanism.  It writes the un-namespaced insn-automata.cc that
+# DEFINES `state_size', `state_transition', `state_reset', `insn_latency' and
+# the rest of the DFA interface, and multi-target-attr.h now renames those
+# names for shared code (see target-automata.h -- ia64 was writing i386's
+# 116-byte DFA state into its own 4-byte buffer).  Without the opt-out that
+# rename reaches the DEFINITIONS, and the build fails a long way from the
+# cause:
+#
+#   multi-target-attr.h:115: error: ambiguating new declaration of
+#     `const int mt_max_insn_queue_index()'
+#   insn-automata.cc:100587: error: invalid pure specifier (only `= 0' is
+#     allowed) before `;' token
+#
+# which is `extern const int max_insn_queue_index = 65;' with the macro
+# applied.  MEASURED: the opt-out was written into genautomata.cc first and
+# did nothing, because gen_target_ns () is null in the singular run and
+# gen_multi_target_p () therefore answered false -- the generator ran, exited
+# 0, and emitted a file without the line.  The flag is the only way it can
+# know it is on a multi-target build at all.
+build/genautomata.o : BUILD_CPPFLAGS += \
+  $(if $(multi_target_base),-DGEN_MULTI_TARGET)
 # The SINGULAR genemit writes the insn-emit-*.cc that $(OBJS) links, and it
 # defined the bare `add_clobbers' / `added_clobbers_hard_reg_p' that combine.o,
 # recog.o, gcse.o and rtl-ssa/changes.o call.  Both switch on an insn code,

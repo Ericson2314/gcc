@@ -141,20 +141,47 @@ for f in get_attr_enabled get_attr_preferred_for_size get_attr_preferred_for_spe
 done
 
 echo
-echo "=== ARM 4b: RATCHET -- the SCHEDULING family is still unselected"
-# Not a pass: a statement of what is still leaking, so that wiring one of
-# these up fails this guard and has to be recorded rather than landing
-# unremarked.  Numbers are what #130 measured; see STATE.md section 4.
-for f in internal_dfa_insn_code insn_default_latency state_transition dfa_start; do
+echo "=== ARM 4b: the SCHEDULING family -- THE RATCHET FIRED AND HAS BEEN TURNED"
+# THIS ARM USED TO ASSERT THE OPPOSITE, AND THE INVERSION IS THE POINT.  It
+# read: "RATCHET -- the SCHEDULING family is still unselected", requiring each
+# bare name to have MORE THAN ZERO binders, so that selecting one would fail
+# this guard rather than land unremarked.  It has now been selected -- see
+# target-automata.h -- so the assertion turns over: `state_transition',
+# `insn_default_latency' and `dfa_start' must now have ZERO bare binders,
+# because shared code reaches them through `mt_*'.
+#
+# The reason it was selected is worth carrying here, because it is not the
+# reason the old ratchet gave.  That comment called it a modelling leak.
+# `state_size' is the LENGTH of the DFA state buffer, so it is a heap
+# overflow: ia64 sized `prev_cycle_state' at 4 bytes from its own automaton,
+# `sched_init' overwrote the shared `dfa_state_size' with the bare (i386) 116,
+# and `ia64_variable_issue' memcpyed 116 bytes into the 4-byte buffer --
+# reproduced by an ASAN cc1 six times in six.
+for f in state_size state_transition state_reset dfa_start insn_default_latency \
+         insn_latency bypass_p; do
   c=$(sh "$S/eb-shell.sh" \
         "cd $G && nm -C -u --print-file-name *.o | grep -cE ' U $f(\\(|\$)'" 2>/dev/null)
   [ -z "$c" ] && c=0
-  if [ "$c" -gt 0 ]; then
-    ok "RATCHET: bare $f still bound by $c object(s) -- still leaking, as recorded"
-  else
-    bad "RATCHET: bare $f now has 0 binders; something selected it -- update STATE.md"
-  fi
+  chk "bare $f binders" "$c" 0
 done
+# `internal_dfa_insn_code' is STILL not selected, and it stays on the ratchet
+# in its original direction.  No shared translation unit names it, so a
+# selector would be a change with no consumer -- but it is a bare function
+# POINTER that each base's `init_sched_attrs' assigns, and a shared object
+# starting to bind it has to be noticed.
+#
+# THE EXPECTED READING IS ONE BINDER, NOT ZERO, AND ASSERTING ZERO WAS WRONG.
+# Measured: the single bare binder is `insn-automata.o' -- the PRIMARY's own
+# generated automaton reaching the pointer its own `insn-dfatab.o' defines.
+# That pair is internally consistent and is not a leak; after this change
+# nothing shared calls into it at all.  So the arm names the binder rather
+# than counting it, which is the only form that can tell "still just the
+# generated pair" from "a shared object appeared".
+b=$(sh "$S/eb-shell.sh" \
+      "cd $G && nm -C -u --print-file-name *.o | grep -E ' U internal_dfa_insn_code\$' | sed 's,.*/,,;s/:.*//' | sort -u | tr '\\n' ' '" 2>/dev/null)
+b=$(echo $b)
+chk "bare internal_dfa_insn_code binders (expect the generated pair alone)" \
+    "$b" "insn-automata.o"
 
 echo
 echo "=== ARM 5: INJECTION -- every mitigation must fire, with control+restore"

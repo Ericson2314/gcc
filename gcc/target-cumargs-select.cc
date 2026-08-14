@@ -1248,3 +1248,127 @@ mt_assembler_dialect (void)
 		    "%<ASSEMBLER_DIALECT%> value", targetm_asmfprintf->name);
   return targetm_asmfprintf->assembler_dialect ();
 }
+
+/* ------------------------------------------------------------------------
+   THE DFA PIPELINE-HAZARD ENTRY POINTS; see target-automata.h for the
+   measurement.
+
+   These are the definitions of the names `multi-target-attr.h' renames
+   `insn-attr.h''s declarations onto, so `haifa-sched.o', `sched-rgn.o',
+   `modulo-sched.o' and `sel-sched*.o' drive the automaton of the back end in
+   force instead of the primary's.
+
+   THIS ONE IS A MEMORY-SAFETY FIX AND NOT ONLY A MODELLING ONE.  The DFA
+   state is a variable-length object, and `state_size' -- the length -- was
+   one of the leaking entry points: ia64 sized `prev_cycle_state' at 4 bytes
+   from its own automaton, `sched_init' then overwrote the shared
+   `dfa_state_size' with the bare (i386) 116, and `ia64_variable_issue'
+   memcpyed 116 bytes into the 4-byte buffer.  Six ASAN runs of six.  */
+const struct target_automata_desc *targetm_automata;
+
+/* NULL until a base is selected, like every other table here, and a base
+   with no automaton is refused BY NAME rather than answered.
+
+   That refusal is the honest state of a residual this change does not close:
+   shared scheduling code is wrapped in `#ifdef INSN_SCHEDULING', which is the
+   PRIMARY's macro, so a base with no `define_insn_reservation' beside a
+   primary that has one still reaches here.  Upstream that combination cannot
+   arise.  Failing by name is the loud direction; see target-automata.h.  */
+static const struct target_automata_desc *
+mt_automata (void)
+{
+  if (targetm_automata == NULL)
+    internal_error ("no back end has been selected, so it has no pipeline "
+		    "automaton; a target must be chosen with "
+		    "%<-ftarget-config=%> before instructions are scheduled");
+  if (!targetm_automata->has_dfa)
+    internal_error ("back end %qs has no pipeline automaton, but shared "
+		    "scheduling code compiled for a primary that has one is "
+		    "asking it for pipeline hazards",
+		    targetm_automata->name);
+  return targetm_automata;
+}
+
+int
+mt_state_size (void)
+{
+  return mt_automata ()->size ();
+}
+
+int
+mt_max_insn_queue_index (void)
+{
+  return mt_automata ()->max_queue_index ();
+}
+
+void
+mt_state_reset (void *s)
+{
+  mt_automata ()->reset (s);
+}
+
+int
+mt_state_transition (void *s, rtx insn)
+{
+  return mt_automata ()->transition (s, insn);
+}
+
+int
+mt_state_dead_lock_p (void *s)
+{
+  return mt_automata ()->dead_lock_p (s);
+}
+
+int
+mt_min_insn_conflict_delay (void *s, rtx_insn *a, rtx_insn *b)
+{
+  return mt_automata ()->min_conflict_delay (s, a, b);
+}
+
+void
+mt_print_reservation (FILE *f, rtx_insn *insn)
+{
+  mt_automata ()->print_res (f, insn);
+}
+
+void
+mt_dfa_start (void)
+{
+  mt_automata ()->start ();
+}
+
+void
+mt_dfa_finish (void)
+{
+  mt_automata ()->finish ();
+}
+
+void
+mt_dfa_clear_single_insn_cache (rtx_insn *insn)
+{
+  mt_automata ()->clear_single_cache (insn);
+}
+
+int
+mt_bypass_p (rtx_insn *insn)
+{
+  return mt_automata ()->bypass (insn);
+}
+
+int
+mt_insn_latency (rtx_insn *a, rtx_insn *b)
+{
+  return mt_automata ()->latency (a, b);
+}
+
+int
+mt_maximal_insn_latency (rtx_insn *insn)
+{
+  return mt_automata ()->max_latency (insn);
+}
+
+int
+mt_insn_default_latency (rtx_insn *insn)
+{
+  return mt_automata ()->default_latency (insn);
+}
