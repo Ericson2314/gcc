@@ -18,6 +18,17 @@ A=$D/after.err
 for f in "$B" "$A"; do
   [ -f "$f" ] || { echo "FATAL: $f does not exist"; exit 9; }
   [ -s "$f" ] || { echo "FATAL: $f is empty"; exit 9; }
+  # THE ARM THAT WAS MISSING, AND ITS ABSENCE COST THIS TASK BOTH ITS LOG
+  # FIGURES.  A build still in progress has a log that exists, is non-empty,
+  # and already carries `error:' lines -- so existence and non-emptiness both
+  # PASS on it, and the count read out is a lower bound at an unknown point.
+  # Two such snapshots, from two different builds stopped at two different
+  # places, are not a before and an after.  res-make.sh writes <tag>.rc only
+  # after make RETURNS; without it there is no evidence the build finished.
+  [ -f "${f%.err}.rc" ] \
+    || { echo "FATAL: no ${f%.err}.rc -- that build never finished (or predates"
+         echo "       the stamp), so this log is a mid-build snapshot, not a result"
+         exit 9; }
 done
 nb=$(grep -c 'error:' "$B" || true)
 [ "${nb:-0}" -gt 0 ] \
