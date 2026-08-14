@@ -1575,9 +1575,60 @@ MULTI_TARGET_INC =
 #			    config/i386/ and config/riscv/.  So each back end
 #			    keeps its OWN function and there is no name for the
 #			    middle end to choose between -- a bare rename
-#			    suffices, with no selector entry, unlike the
-#			    print_operand family (scratchpad/t150-rename-gap.sh)
-#			    which targhooks.cc and final.cc DO name.
+#			    suffices, with no selector entry.
+#
+#			    THIS COMMENT USED TO END "unlike the print_operand
+#			    family, which targhooks.cc and final.cc DO name."
+#			    THAT WAS WRONG, AND IT IS WORTH SAYING HOW, because
+#			    it is a grep whose result reads backwards.  The
+#			    three shared files that match those names match
+#			    them for three reasons and NONE is a reference to
+#			    the symbol:
+#
+#			      targhooks.cc:476   a COMMENT, "the `print_operand'
+#					         hook".
+#			      final.cc:3679,3695 `targetm.asm_out.print_operand'
+#					         -- a STRUCT MEMBER of the hook
+#					         table, already selected through
+#					         targetm_ptr.  A member name is
+#					         not a symbol.
+#			      genmatch.cc:1712   a BUILD-TIME generator's own
+#					         `print_operand (operand *, FILE
+#					         *, bool)', never linked with
+#					         libbackend.a.
+#
+#			    So the print_operand family is the SAME case as
+#			    extract_base_offset_in_addr and takes the same bare
+#			    rename.  The signatures settle it independently, and
+#			    more strongly than the grep does: `legitimize_pic_
+#			    address' is (rtx, rtx) for s390, (rtx, machine_mode,
+#			    rtx) for sh, (rtx, machine_mode, rtx, rtx, bool) for
+#			    arm and (rtx, machine_mode, rtx) for m68k.  There is
+#			    no one shape, so there is no forwarder that could be
+#			    written -- a selector is not merely unnecessary here,
+#			    it is unexpressible.
+#
+#   print_operand, print_operand_address
+#			    Bare in rs6000, s390, m68k, vax, xtensa, microblaze,
+#			    pdp11, gcn and bfin (each also declares them in its
+#			    -protos.h, which the -D renames in the same TU).
+#			    i386 and aarch64 spell `ix86_'/`aarch64_' prefixed
+#			    names, so THE PAIR THIS BRANCH BUILDS WITH CANNOT SEE
+#			    THIS -- it is a `multiple definition' on the first
+#			    link that configures any two of the nine.
+#   legitimate_pic_operand_p
+#			    Bare in i386, s390, sparc and arm.  Note i386 is one
+#			    of them: this collides with i386 + arm, not only with
+#			    the rs6000/s390 set that found it.
+#   legitimize_pic_address
+#			    Bare in s390, m68k, sh and arm, with FOUR DIFFERENT
+#			    SIGNATURES (above).
+#   regclass_map        Bare DATA, not a function: `enum reg_class const
+#			    regclass_map[FIRST_PSEUDO_REGISTER]' in i386.cc:145
+#			    and s390.cc:3103, declared in each one's own .h.  No
+#			    shared TU names it at all -- REGNO_REG_CLASS, its
+#			    only consumer, is already a targetm_regs read -- so
+#			    it is the purest rename of the six.
 #
 #			    Checks: scratchpad/sweep.sh compares the per-base
 #			    object sets pairwise and reports every colliding
@@ -1591,6 +1642,11 @@ MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
   extract_base_offset_in_addr \
+  print_operand \
+  print_operand_address \
+  legitimate_pic_operand_p \
+  legitimize_pic_address \
+  regclass_map \
   linux_libc_has_function \
   linux_libm_function_max_error \
   linux_fortify_source_default_level

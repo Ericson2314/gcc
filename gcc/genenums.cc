@@ -34,6 +34,19 @@ along with GCC; see the file COPYING3.  If not see
 #include "read-md.h"
 #include "gen-target-ns.h"
 
+/* THE TWO TABLES THE MIDDLE END NAMES BARE, and which therefore have to exist
+   for EVERY configured back end whether its md defines the enum or not.
+
+   print-rtl.cc, read-rtl-function.cc and multi-target-select.cc's
+   MT_OTHER_TABLES / MT_SCALAR_TABLES all spell these two names; this array is
+   not a new authority, it is the same list written where the definitions are
+   made.  Every other enum in an md is the back end's own business and is
+   emitted only when it exists.  */
+static const char *const mt_required_enums[] = { "unspec", "unspecv" };
+
+/* Which of the above this md actually defined.  */
+static bool mt_required_seen[ARRAY_SIZE (mt_required_enums)];
+
 /* Called via traverse_enum_types.  Emit an enum definition for
    enum_type *SLOT.  */
 
@@ -44,6 +57,9 @@ print_enum_type (void **slot, void *info ATTRIBUTE_UNUSED)
   struct enum_value *value;
 
   def = (struct enum_type *) *slot;
+  for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
+    if (strcmp (def->name, mt_required_enums[i]) == 0)
+      mt_required_seen[i] = true;
   /* Array plus pointer on a multi-target build, matching the declaration
      genconstants writes into insn-constants-<base>.h.  */
   printf ("\nconst char *const %s_strings%s[] = {", def->name,
@@ -110,6 +126,52 @@ main (int argc, const char **argv)
      silently.  Namespaced; multi-target-select.cc supplies the bare names.  */
   print_ns_open (stdout);
   reader.traverse_enum_types (print_enum_type, 0);
+
+  /* THE BACK ENDS WHOSE MACHINE HAS NO UNSPECS, AND WHY AN EMPTY TABLE IS
+     THEIR OWN ANSWER RATHER THAN A FLOOR.
+
+     mips defines `unspec' and no `unspecv'; arc, bpf, epiphany, ft32,
+     microblaze, msp430, rx and v850 are in the same position, and m68k, m32r
+     and others define neither.  multi-target-select.cc names
+     insn_<base>::unspecv_strings and insn_<base>::unspecv_strings_len for
+     EVERY configured back end -- it has to, because print-rtl.cc and
+     read-rtl-function.cc name the bare `unspecv_strings' and something must
+     be in force whichever back end is selected -- so a base that emitted
+     neither is an undefined reference at the link of cc1.  Measured: adding
+     mips to a base set gives `undefined reference to
+     insn_mips::unspecv_strings' and `...::unspecv_strings_len'.
+
+     PRINCIPLES 2a bans a floor that hands a base THE PRIMARY'S answer.  This
+     is the other kind, the one that rule explicitly permits: length ZERO is
+     what "this machine has no unspec_volatile constants" means, it is what
+     upstream's single-target build behaves as (the `#if defined
+     (NUM_UNSPECV_VALUES)' arms simply are not compiled), and no other back
+     end's value can reach mips through it.  Every consumer is already written
+     as `unspec < unspecv_strings_len', so a zero length is read as "never
+     name one", which is exactly right.  The value is not invented: it is
+     counted from this md, and it is 0 because this md has none.
+
+     Emitted only in the namespaced run.  The un-namespaced one is upstream's
+     shape, where an absent enum means absent code and there is nothing to
+     select between.  */
+  if (gen_target_ns ())
+    for (unsigned i = 0; i < ARRAY_SIZE (mt_required_enums); i++)
+      if (!mt_required_seen[i])
+	{
+	  const char *n = mt_required_enums[i];
+	  printf ("\n/* This machine description defines no `%s' enum.  */\n",
+		  n);
+	  printf ("const char *const %s_strings_tab[] = { NULL };\n", n);
+	  printf ("const char *const *%s_strings = %s_strings_tab;\n", n, n);
+	  /* NOT ARRAY_SIZE of the array above: a zero-length array is not
+	     valid, so the placeholder holds one NULL element, and the length
+	     the middle end must see is the number of NAMED VALUES, which is
+	     zero.  Writing ARRAY_SIZE here would publish a bound of 1 over a
+	     table whose only entry is NULL -- print-rtl.cc would then pass
+	     that NULL to %s for unspec 0.  */
+	  printf ("int %s_strings_len = 0;\n", n);
+	}
+
   print_ns_close (stdout);
 
   if (ferror (stdout) || fflush (stdout) || fclose (stdout))
