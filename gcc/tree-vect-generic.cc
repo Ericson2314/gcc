@@ -1474,20 +1474,24 @@ type_for_widest_vector_mode (tree original_vector_type, optab op)
   machine_mode best_mode = VOIDmode, mode;
   poly_int64 best_nunits = 0;
 
+  /* GET_CLASS_NARROWEST_MODE, not MIN_MODE_<CLASS>: MIN_MODE_* is the shared
+     numbering's first ordinal of the class and may be a hole for this back
+     end, whose `mode_next' is VOIDmode -- so the walk below would run zero
+     times.  See mode_for_vector in stor-layout.cc.  */
   if (SCALAR_FLOAT_MODE_P (inner_mode))
-    mode = MIN_MODE_VECTOR_FLOAT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FLOAT);
   else if (SCALAR_FRACT_MODE_P (inner_mode))
-    mode = MIN_MODE_VECTOR_FRACT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FRACT);
   else if (SCALAR_UFRACT_MODE_P (inner_mode))
-    mode = MIN_MODE_VECTOR_UFRACT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UFRACT);
   else if (SCALAR_ACCUM_MODE_P (inner_mode))
-    mode = MIN_MODE_VECTOR_ACCUM;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_ACCUM);
   else if (SCALAR_UACCUM_MODE_P (inner_mode))
-    mode = MIN_MODE_VECTOR_UACCUM;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UACCUM);
   else if (inner_mode == BImode)
-    mode = MIN_MODE_VECTOR_BOOL;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_BOOL);
   else
-    mode = MIN_MODE_VECTOR_INT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT);
 
   FOR_EACH_MODE_FROM (mode, mode)
     if (GET_MODE_INNER (mode) == inner_mode

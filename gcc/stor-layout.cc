@@ -487,7 +487,9 @@ bitwise_mode_for_size (poly_uint64 size)
     return mode_for_size (size, MODE_INT, true);
 
   machine_mode mode, ret = VOIDmode;
-  FOR_EACH_MODE_FROM (mode, MIN_MODE_VECTOR_INT)
+  /* GET_CLASS_NARROWEST_MODE, not MIN_MODE_VECTOR_INT: see the comment on
+     mode_for_vector below.  */
+  FOR_EACH_MODE_FROM (mode, GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT))
     if (known_eq (GET_MODE_BITSIZE (mode), size)
 	&& (ret == VOIDmode || GET_MODE_INNER (mode) == QImode)
 	&& have_regs_of_mode[mode]
@@ -512,19 +514,31 @@ mode_for_vector (scalar_mode innermode, poly_uint64 nunits)
 {
   machine_mode mode;
 
-  /* First, look for a supported vector type.  */
+  /* First, look for a supported vector type.
+
+     THE START OF A `FOR_EACH_MODE_FROM' WALK IS `GET_CLASS_NARROWEST_MODE',
+     NOT `MIN_MODE_<CLASS>'.  Under the shared mode numbering `MIN_MODE_*' is
+     the UNION's first ordinal of the class, which routinely belongs to some
+     other configured back end; here it is a HOLE, whose `mode_next' entry is
+     VOIDmode, so the walk stops before its first iteration and reports "this
+     target has no such vector mode" for every vector mode it has.
+     `class_narrowest_mode' is the one table genmodes emits with THIS back
+     end's own answer for exactly this question.  Measured at four bases
+     (i386 aarch64 rs6000 s390): MIN_MODE_VECTOR_INT is s390's V1QI while
+     i386's own narrowest is V2QI.  In a single-target build the two are equal
+     by construction, so this is a no-op there.  */
   if (SCALAR_FLOAT_MODE_P (innermode))
-    mode = MIN_MODE_VECTOR_FLOAT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FLOAT);
   else if (SCALAR_FRACT_MODE_P (innermode))
-    mode = MIN_MODE_VECTOR_FRACT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FRACT);
   else if (SCALAR_UFRACT_MODE_P (innermode))
-    mode = MIN_MODE_VECTOR_UFRACT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UFRACT);
   else if (SCALAR_ACCUM_MODE_P (innermode))
-    mode = MIN_MODE_VECTOR_ACCUM;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_ACCUM);
   else if (SCALAR_UACCUM_MODE_P (innermode))
-    mode = MIN_MODE_VECTOR_UACCUM;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UACCUM);
   else
-    mode = MIN_MODE_VECTOR_INT;
+    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT);
 
   /* Only check the broader vector_mode_supported_any_target_p here.
      We'll filter through target-specific availability and

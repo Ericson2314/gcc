@@ -13924,3 +13924,144 @@ Two pre-existing configure diagnostics were seen and NOT chased or silenced:
 `gcc/configure` line 24589 and 24612 `test: =: unary operator expected`.
 PRINCIPLES records that shape as having twice meant a silent truncation.
 
+
+# TASK #164 -- THE `type_natural_mode` ICE: A UNION ORDINAL USED AS A WALK START
+
+Snapshot `80bf400ae06` (anchor 55) before, `688b3afe25d` after; every build
+cold, top-level `all-gcc`, from an immutable `git worktree`, srcdir asserted
+in `config.log` and `git diff --quiet` in the harness.
+Scripts: `t164-conf.sh`, `t164-build.sh`, `t164-specs.sh`, `t164-bars.sh`.
+
+## 1. THE CAUSE -- WHOSE ANSWER THE BAD VALUE WAS
+
+**The union's.** `MIN_MODE_<CLASS>` is the SHARED numbering's first ordinal of
+a mode class. Used as the start of a `FOR_EACH_MODE_FROM` walk it is wrong for
+every back end whose own narrowest mode of that class is not the union's:
+
+```
+mode = MIN_MODE_VECTOR_INT;          /* the UNION's V1QI -- s390's */
+FOR_EACH_MODE_FROM (mode, mode)      /* i386: mode_next[V1QI] == VOIDmode */
+  ...                                /* zero iterations */
+gcc_unreachable ();                  /* i386.cc:2155 */
+```
+
+A mode this back end does not have is a HOLE. Holes were reclassified to
+`MODE_RANDOM` earlier on this branch, and their `mode_next` is `VOIDmode` --
+correctly, so that `FOR_EACH_MODE*` never walks INTO one. What nobody checked
+is a walk that *starts* on one: it terminates before its first iteration and
+reports "this target has no vector mode of that shape" for every vector mode
+it in fact has.
+
+Measured, four bases (`i386 aarch64 rs6000 s390`), from the build's own
+generated files:
+
+```
+insn-modes.h            MIN_MODE_VECTOR_INT = E_V1QImode
+                        MIN_MODE_VECTOR_FLOAT = E_V1HFmode      <- s390's
+min-insn-modes-i386.cc  class_narrowest_mode[MODE_VECTOR_INT] = E_V2QImode
+                        class_narrowest_mode[MODE_VECTOR_FLOAT] = E_V2BFmode
+                        mode_next[V1QI] = E_VOIDmode
+```
+
+`s390-modes.def:280` is the only one of the four defining a one-element vector
+mode. `class_narrowest_mode` is the one table `genmodes` already emits with
+THIS back end's own answer to exactly this question (`genmodes.cc:2731`), and
+`FOR_EACH_MODE_IN_CLASS` already starts there.
+
+## 2. IT WAS NEVER THE BASE COUNT
+
+PRINCIPLES, #157 and #170 all recorded this as tracking the number of
+configured bases (3, 4, 8, 11). It does not:
+
+| bases | set | `MIN_MODE_VECTOR_INT` | x86_64 `-O2` big.c, before |
+|---|---|---|---|
+| 2 | i386 aarch64 | `V2QI` | 12369 / `378fc33c1e70` |
+| 3 | i386 aarch64 rs6000 | `V2QI` | **12369 / `378fc33c1e70`** |
+| 4 | i386 aarch64 rs6000 s390 | `V1QI` | ICE `i386.cc:2155` |
+
+**Three bases reproduce the recorded two-base bar exactly.** Every base set
+that had been tried at 3 contained riscv (`VNx1*`) or s390; the count and the
+membership were confounded, and the count is what got written down.
+
+Transferable: *"it appears at N and not at N-1" is not evidence that N is the
+cause.* Name the back end that entered the set, then test a same-sized set
+without it.
+
+## 3. WHAT LANDED, AND WHOSE ANSWER THE NEW VALUE IS
+
+`688b3afe25d`. Five walk starts, `MIN_MODE_<CLASS>` -> `GET_CLASS_NARROWEST_MODE
+(<CLASS>)`:
+
+```
+stor-layout.cc        bitwise_mode_for_size, mode_for_vector
+expmed.cc             extract_bit_field_1
+tree-vect-generic.cc  type_for_widest_vector_mode
+config/i386/i386.cc   type_natural_mode
+```
+
+The new value is **that back end's own** -- not the primary's and not the
+union's. It supplies no answer that did not already exist: `class_narrowest_mode`
+is computed from that base's own modes file. In a single-target build
+`class_narrowest_mode[C] == MIN_MODE_<C>` by construction, so stock output is
+unchanged and this is a no-op there.
+
+## 4. BOTH-SIDED
+
+All after-arms from `/tmp/snap-a1c6fa-after` at `688b3afe25d`; input path
+quoted with every byte count; `specs-config` md5 `a6c4c68bdf33` (230 / 222) in
+every one of them, i.e. the compiler is being given the same target
+description each time.
+
+```
+                       before                     after
+2 bases   x86_64 -O2   12369 / 378fc33c1e70       12369 / 378fc33c1e70
+3 bases   x86_64 -O2   12369 / 378fc33c1e70       (not rebuilt; MIN == narrowest)
+4 bases   x86_64 -O2   ICE i386.cc:2155           12369 / 378fc33c1e70
+11 bases  x86_64 -O2   ICE (recorded, #170 C7)    12369 / 378fc33c1e70
+```
+
+`make -k all-gcc` rc=0 with `error:` 0, `multiple definition` 0 and
+`undefined reference` 0 in all four build dirs.
+
+**The two-base output is byte-identical, which is the no-op arm**: at two
+bases `MIN_MODE_VECTOR_INT` IS `V2QI`, so the fix provably changes nothing
+there, and it does not.
+
+**Consequence for the project: the x86_64 `-O2` codegen bar is no longer
+base-count dependent.** It scores `12369 / 378fc33c1e70` at 2, 4 and 11 bases.
+Agents working at >2 bases no longer have to write "bar not applicable".
+
+## 5. NOT FIXED, AND EACH A DIFFERENT QUESTION
+
+- **Ordinal RANGES** over the union numbering -- `emit-rtl.cc:6496,6509,6526`,
+  `optabs-query.cc:746`, `expmed.cc:316-330`. These are supersets of this
+  base's modes rather than truncations, so they do not lose anything; they
+  visit holes. `expmed.cc` already class-filters. `emit-rtl.cc` writes
+  `const_tiny_rtx` entries for foreign ordinals -- junk in a table, not an
+  ICE. Worth a sweep, not this task's.
+- **`BUILT_IN_COMPLEX_*` indexed by `mode - MIN_MODE_COMPLEX_FLOAT`** --
+  `tree.cc:10397`, `tree-complex.cc:1081`, `rs6000.cc:28872`. A union ordinal
+  used as an index into a *built-in* enumeration whose bound is
+  `MAX_MODE_COMPLEX_FLOAT - MIN_MODE_COMPLEX_FLOAT` (`tree-core.h:194`). Both
+  sides are the union's, so it may well be self-consistent -- but nothing has
+  checked it, and rs6000's `gcc_assert (IN_RANGE (...))` is the only guard.
+- **`aarch64-protos.h:495`** builds a **64-bit** mask from
+  `(MODE) - MIN_MODE_FLOAT` and `(MODE) - MIN_MODE_VECTOR_FLOAT + MAX_MODE_FLOAT
+  - MIN_MODE_FLOAT + 1`. Those class runs are the union's and grow with every
+  configured back end; at 11 bases the shift count is unaudited. A shift past
+  63 is UB with no diagnostic. **This is the sharpest of the three.**
+
+## 6. WHAT WAS NOT MEASURED
+
+- **No non-x86_64 target was compiled in these dirs.** `t164-specs.sh` probes
+  x86_64 only; the other targets need their own cross `as` (#170's
+  `t170-tools.sh`). So "aarch64 still gets aarch64's answer" is NOT shown here
+  by codegen -- it is shown only structurally, by the fix reading
+  `class_narrowest_mode`, which is per base by construction.
+- **No 3-base after-arm.** At 3 bases `MIN_MODE_VECTOR_INT` is already `V2QI`,
+  so before and after must agree; the 2-base pair demonstrates that no-op case
+  and a third build of it would add nothing.
+- **No gdb reading of the loop trip count.** The evidence is the generated
+  tables (`mode_next[V1QI] == VOIDmode`, `class_narrowest_mode` = `V2QI`) plus
+  the before/after ICE. A trip-count breakpoint would have said the same thing
+  less durably.

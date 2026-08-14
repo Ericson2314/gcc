@@ -1789,18 +1789,22 @@ extract_bit_field_1 (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
     {
       machine_mode new_mode;
 
+      /* GET_CLASS_NARROWEST_MODE, not MIN_MODE_<CLASS>: MIN_MODE_* is the
+	 shared numbering's first ordinal of the class and may be a hole for
+	 this back end, whose `mode_next' is VOIDmode -- so the walk below
+	 would run zero times.  See mode_for_vector in stor-layout.cc.  */
       if (GET_MODE_CLASS (tmode) == MODE_FLOAT)
-	new_mode = MIN_MODE_VECTOR_FLOAT;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FLOAT);
       else if (GET_MODE_CLASS (tmode) == MODE_FRACT)
-	new_mode = MIN_MODE_VECTOR_FRACT;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FRACT);
       else if (GET_MODE_CLASS (tmode) == MODE_UFRACT)
-	new_mode = MIN_MODE_VECTOR_UFRACT;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UFRACT);
       else if (GET_MODE_CLASS (tmode) == MODE_ACCUM)
-	new_mode = MIN_MODE_VECTOR_ACCUM;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_ACCUM);
       else if (GET_MODE_CLASS (tmode) == MODE_UACCUM)
-	new_mode = MIN_MODE_VECTOR_UACCUM;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_UACCUM);
       else
-	new_mode = MIN_MODE_VECTOR_INT;
+	new_mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT);
 
       FOR_EACH_MODE_FROM (new_mode, new_mode)
 	if (known_eq (GET_MODE_SIZE (new_mode), GET_MODE_SIZE (GET_MODE (op0)))
