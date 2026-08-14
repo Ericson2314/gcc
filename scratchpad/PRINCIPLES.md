@@ -714,6 +714,49 @@ does not say so" — is true of the *back end's header chain*, which is the thir
 of the four. It is not true of the whole file, and reading it as though it were
 is what made a one-vocabulary scan look sufficient.
 
+**THE SECOND VOCABULARY WAS BUILT (task #160) AND IT IS NOT WHERE THE LOSS IS.
+Read this before sizing any further deletion.** Four vocabularies now exist
+(`t160-vocab.sh`) and the channel count is **five**, not four: `insn-constants.h`
+has its own line in `tm.h` beside `options.h`. The brief's open question about
+`insn-flags`/`insn-modes` has opposite answers — `insn-flags.h` has no other
+includer, while `insn-modes.h` reaches every shared TU through `coretypes.h:553`
+ahead of `tm.h`, so it needs no vocabulary at all.
+
+Re-scored over all 625 shared TUs, the four vocabularies move the Class A
+population **not at all**: 31 CLEAR + 8 hit only by `options.h` names = the
+same 39. What actually revokes is the **transitive** channel, which no
+text-reading instrument can see:
+
+```
+             tm.h line deleted and rebuilt:   FAIL   PASS
+own text CLEAR                                  17     14
+own text OPTIONS-ONLY                            5      3
+
+causes:  13 flag_checking (options.h, via system.h's gcc_checking_assert)
+          8 enum reg_class (hard-reg-set.h:551, via rtl.h)
+          1 OPT_E          (the file's own text)
+```
+
+So **21 of the 22 revocations come through headers and exactly 1 from a file's
+own text.** Two consequences worth carrying: the `options.h` and top-half
+channels are **target-neutral** — `options.h` is generated from every
+configured back end's `.opt` files, so a TU that includes it directly gets no
+primary's answer, and the remedy is a missing include rather than a conversion;
+and the instrument that settles any of this is a **build with the line deleted**
+(`t160-amputate.sh`), not a scan.
+
+`c3ca86166f8` closed the 8 by giving `rtl.h`/`hard-reg-set.h` the conversion
+layer; the 23 direct includers now score 21 PASS / 2 FAIL, both on `options.h`.
+
+**AND A POISON CAN SUPPRESS THE FIX UNDER TEST.** That instrument's first
+version amputated with `-DGCC_TM_H`, the `t152-probe.sh` shape. It empties
+`tm.h` and it also answers "has `tm.h` been read here" with YES — which is the
+question the new neutral `enum reg_class` is guarded on. The arm reported all
+8 failures unchanged on a tree where they were fixed. **Before reusing a
+poisoned-guard arm, ask what else reads that guard**; the shape of the false
+negative is "the change did nothing", which is exactly the reading an agent
+will believe.
+
 **A LOG BEING WRITTEN LOOKS EXACTLY LIKE A LOG THAT FINISHED — STAMP THE
 EXIT.** An agent reported "13 errors → 7, 4 back ends → 2" and later withdrew
 **both** figures: neither build had completed when it read them, so the delta
@@ -794,9 +837,25 @@ aarch64-unknown-linux-gnu  230 lines  md5 f1a5ab201d95
 x86_64 -O2 big.c           12369 bytes  md5 378fc33c1e70
 ```
 
-Both figures were real; they are **different configurations**, and neither
-party said which build produced its number. So: a bar figure is a claim to
-check — **including when the claim is that a bar figure is wrong.** A
+**AND THE EXPLANATION IN THE PARAGRAPH ABOVE IS ALSO WRONG — MEASURED AT
+`bc7566b3bd4`.** The two figures are not different configurations. They are
+**the same file counted two ways**: `wc -l` says 230 and `grep -c .` says 222,
+the difference being 8 blank lines, and the md5s are `a6c4c68bdf33` /
+`f1a5ab201d95` — byte for byte the ones recorded below for the 230 reading.
+`t150-specs.sh` prints `grep -c .` and `t152-bars.sh` printed `wc -l`; nobody
+was wrong about the artefact and both harnesses were right about their own
+number.
+
+That makes this paragraph a better example than it was. Two agents each
+measured correctly, disagreed, and the disagreement was reconciled by a story
+("different configurations") that no one checked — for a second time on the
+same line. The lesson is not "say which build" alone, it is **quote the
+artefact's identity, not a statistic about it.** An md5 would have settled
+this the first time; a line count could not, because a line count is a
+function of the counting program as well as the file. `t160-bars.sh` prints
+both counts and the md5 for that reason.
+
+So: a bar figure is a claim to check — **including when the claim is that a bar figure is wrong.** A
 correction is not privileged over the thing it corrects. State the build dir
 and the commit beside any bar you quote, or the next reader cannot tell which
 of two true numbers applies to them.

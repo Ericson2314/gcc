@@ -90,6 +90,26 @@ struct target_insn_desc
      would silently stop being able to say so.  */
   bool have_rotate;
   bool have_rotatert;
+
+  /* LOAD_EXTEND_OP (MODE) -- `rtl.h:4762', inside `load_extend_op', which is
+     an inline function in a header the whole compiler shares.
+
+     THE ONLY ENTRY HERE THAT IS A CALL, and for the reason target-frame.h
+     gives rather than by preference: it takes an argument, so there is no
+     value to cache.  33 of the 48 back ends define it and i386 -- the base the
+     middle end is compiled against -- is not one of them, so today every
+     target reads i386's absence: `defaults.h:1386''s `LOAD_EXTEND_OP(M)
+     UNKNOWN'.  For aarch64, whose own answer is `ZERO_EXTEND', that turns
+     `load_extend_op' into "this machine does not widen on load" for every
+     narrow load in the compilation.  It is the leaked-ABSENCE shape again: no
+     value is mis-set, nothing is diagnosed, and the middle end simply stops
+     making an inference it is entitled to make.
+
+     `int' at the boundary, not `machine_mode' and not `enum rtx_code': this
+     header is reached from `defaults.h', i.e. from the tail of every `tm.h',
+     long before `coretypes.h', so neither type exists yet.  target-regs.h
+     records the same constraint and takes the same decision.  */
+  int (*load_extend_op) (int mode);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -100,5 +120,6 @@ extern const struct target_insn_desc *targetm_insn;
 extern bool mt_have_lo_sum (void);
 extern bool mt_have_rotate (void);
 extern bool mt_have_rotatert (void);
+extern int mt_load_extend_op (int mode);
 
 #endif /* GCC_TARGET_INSN_H */
