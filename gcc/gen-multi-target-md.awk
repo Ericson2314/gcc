@@ -1924,9 +1924,23 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen) {
     # $(warning) rather than $(error): the point is that the operator SEES it.
     # An $(error) here would also be defensible, and is deliberately not used
     # yet because this generator runs for all 48 back ends at once and one
-    # unfixed fragment would block every one of them.  If this warning is ever
-    # observed to be zero across a full 48-base run, promote it.
-    if (src == "") {
+    # unfixed fragment would block every one of them.
+    #
+    # SCOPED TO `<cpu>-c.o', AND THE FIRST DRAFT WAS NOT -- WHICH IS THE
+    # LESSON.  Unscoped it fired 48 times on a 48-back-end build, every one of
+    # them a FALSE POSITIVE: `default-c.o', `glibc-c.o', `sol2-c.o',
+    # `winnt-c.o' and friends are the OS side, built by generic rules in
+    # gcc/Makefile.in rather than by any tmake fragment, so src == "" is their
+    # NORMAL state.  A warning that fires once per back end on correct input is
+    # not a check, it is 48 lines nobody reads -- and it would have buried the
+    # one line that mattered.
+    #
+    # Only `<cpu>-c.o' is the back end's own, only it is expected to live under
+    # `config/<cpu>/', and only for it is a missing fragment a defect.  With
+    # this scope the warning reads ZERO on a correct 48-base tree; `v850' is
+    # its negative control, and reverting the `config.gcc' hunk that added
+    # `v850/t-v850' makes it fire by name.
+    if (src == "" && obj == (cpu "-c")) {
       printf "$(warning multi-target: %s lists %s in c_target_objs but no" \
 	     " tmake fragment claims a rule for it -- it will NOT be built" \
 	     " and anything referencing its symbols will fail at link time)\n\n", \

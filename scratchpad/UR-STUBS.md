@@ -47,7 +47,14 @@ Recorded here so nobody later "discovers" these and adds them to the queue:
 - Two `#if TARGET_WIN32_TLS` blocks inside `attribs.cc`'s
   `handle_dll_attribute` are still read with the **primary's** headers. Same
   defect one level down; not on any currently-linking path.
-- `ia64` lists `ia64-c.o` in `c_target_objs` with no tmake fragment claiming a
-  rule for it, exactly as `v850` did. It does not break the link today only
-  because nothing references `ia64-c.cc`'s symbols. `gen-multi-target-md.awk`
-  now emits a `$(warning)` for this class rather than dropping it silently.
+- `gen-multi-target-md.awk` now emits a `$(warning)` when a back end's OWN
+  `<cpu>-c.o` is listed in `c_target_objs` and no tmake fragment claims a rule
+  for it, rather than dropping it silently. On a correct 48-base tree it reads
+  **zero**; `v850` is its negative control.
+
+  **A claim that was in this file and is WITHDRAWN:** it said `ia64` had the
+  identical defect. It does not. That came from an unscoped first draft of the
+  warning which fired 48 times, all false positives on OS-side objects
+  (`default-c.o`, `glibc-c.o`), and `ia64-c.o` was never among them —
+  `ia64/t-ia64` does claim it. The measurement that produced the claim was the
+  broken instrument, not the tree.
