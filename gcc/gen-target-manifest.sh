@@ -207,7 +207,19 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # and every other back end user gets another architecture intrinsics.  So
     # each back end headers go to include-<cpu_type>/, keyed on the back end
     # because that is what the fact is a property of.
-    echo "extra_headers ${extra_headers}"
+    # UNQUOTED, and every other key here has been quoted, so this needs its
+    # reason recorded.  config.gcc:469 writes i386 extra_headers as a SINGLE
+    # assignment spanning 30 physical lines, so the value contains embedded
+    # newlines.  Quoted, echo reproduces them and the manifest record becomes
+    # 30 lines, of which the awk sees one: i386 got 5 of its 118 headers and
+    # the other 29 lines were parsed as unknown keys and silently dropped.
+    # Unquoted, word splitting on IFS turns the newlines into the separators
+    # they were always meant to be and echo joins with single spaces.
+    # Measured, not reasoned: the first build of this change produced exactly
+    # that 5-header record, and the stmp-int-hdrs cross-check against the
+    # legacy @extra_headers_list@ is what makes such a loss a hard failure
+    # rather than 113 headers quietly absent from a search path.
+    echo extra_headers ${extra_headers}
     # Whether this target wants the gcc <tgmath.h>.  Same channel, same bug:
     # configure appends ginclude/tgmath.h to extra_headers_list on the PRIMARY
     # target use_gcc_tgmath.  Recorded so it is asked per back end.
@@ -470,6 +482,56 @@ for gcc_mt in ${gcc_manifest_targets}; do
   fi
 done
 rm -f ${gcc_mt_err}
+
+# EVERY LINE OF THE MANIFEST MUST BEGIN WITH A KEY THIS FILE WROTE.
+#
+# The manifest format is `key value...' lines, blank-line separated, and every
+# consumer -- this file's awk stanzas, gen-multi-target-md.awk, and the awk in
+# gcc/Makefile.in -- dispatches on field 1 and SILENTLY IGNORES a line whose
+# field 1 it does not recognise.  So a value containing a newline does not fail;
+# it becomes a stanza of extra lines that every reader drops, and the recorded
+# value is truncated at the first newline with no diagnostic anywhere.
+#
+# That is not hypothetical.  config.gcc:469 writes the i386 extra_headers as
+# one assignment spanning 30 physical lines; the first version of the
+# extra_headers record echoed it QUOTED, and i386 arrived in the manifest with
+# 5 of its 118 headers and 29 orphan lines beginning `pmmintrin.h',
+# `avx512fintrin.h' and so on.  Loud here, invisible everywhere else.
+#
+# Deliberately a whitelist of the keys this file emits rather than a test for
+# embedded newlines: it catches the newline case, the stray-output case (a
+# config.gcc fragment echoing to stdout) and the typo case with one check, and
+# a new key is a one-word edit that fails by name until it is made.
+gcc_mt_keys=" target cpu_type option_defaults decimal_float decimal_bid_format
+ common_out_file common_out_symbol tm_file tm_p_file tmake_file
+ tmake_file_present extra_objs extra_gcc_objs c_target_objs extra_options
+ extra_headers use_gcc_tgmath out_file md_file target_gtfiles extra_modes
+ tm_defines target_cpu_default tm_include_list tm_generated_headers
+ tm_multilib_config "
+# Collapse the newlines in the list above to spaces before matching on
+# " ${key} ".  Without this, the last key on each physical line is followed by
+# a NEWLINE rather than a space and the pattern does not match it, so
+# `decimal_bid_format', `tmake_file', `extra_modes' and `tm_generated_headers'
+# were all rejected as unknown -- the check failing CLOSED, which is the right
+# direction but for the wrong reason, and measured only because it refused a
+# correct manifest on the very next run.  It is the same whitespace confusion
+# this check exists to catch, in the check, which is worth leaving recorded.
+gcc_mt_keys=" `echo ${gcc_mt_keys}` "
+gcc_mt_bad=`${AWK} 'NF == 0 { next } { print $1 }' ${gcc_target_manifest} \
+	    | sort -u`
+for gcc_mt_k in ${gcc_mt_bad}; do
+  case ${gcc_mt_keys} in
+    *" ${gcc_mt_k} "*) ;;
+    *)
+      gcc_mt_fatal="multi-target.manifest has a line beginning \`${gcc_mt_k}',
+which is not a key gen-target-manifest.sh writes.  Every consumer dispatches on
+field 1 and ignores what it does not recognise, so this is a value that spilled
+onto its own line -- most likely a config.gcc variable whose assignment spans
+several physical lines, echoed QUOTED so the newlines survived.  The record it
+belongs to is silently TRUNCATED at that newline.  Echo that variable unquoted."
+      return 1 ;;
+  esac
+done
 
 #
 #
