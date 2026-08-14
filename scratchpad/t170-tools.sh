@@ -38,14 +38,16 @@ NP="$HOME/src/nixos-configuration/dep/nixpkgs"
 
 # triple | nixpkgs pkgsCross attr (or "-" for the build machine) | expected
 # `readelf -h' Machine: substring
+# The triple here is the CANONICAL one (column 2 of t170-bases11.txt), because
+# that is the name target-specs/configure looks `${target}-as' up under.
 SETS='
 x86_64-pc-linux-gnu|-|X86-64
 aarch64-unknown-linux-gnu|aarch64-multiplatform|AArch64
-powerpc64-linux-gnu|ppc64|PowerPC64
-s390x-linux-gnu|s390x|IBM S/390
+powerpc64-unknown-linux-gnu|ppc64|PowerPC64
+s390x-ibm-linux-gnu|s390x|IBM S/390
 riscv64-unknown-linux-gnu|riscv64|RISC-V
-mips64-elf|mips64-linux-gnuabi64|MIPS
-arm-eabi|armv7l-hf-multiplatform|ARM
+mips64-unknown-elf|mips64-linux-gnuabi64|MIPS
+arm-unknown-eabi|armv7l-hf-multiplatform|ARM
 '
 
 rm -rf "$ROOT"; mkdir -p "$ROOT"

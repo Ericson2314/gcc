@@ -12,7 +12,9 @@ SNAP=${1:?snap dir}
 D=${2:?build dir}
 LIST=${3:-$S/t170-bases11.txt}
 if [ -f "$LIST" ]; then
-  LIST=$(grep -v '^#' "$LIST" | grep . | tr '\n' ',' | sed 's/,$//')
+  # Column 1 -- what --enable-targets is given.  Column 2 is the canonical
+  # spelling the build dir uses afterwards; see t170-bases11.txt.
+  LIST=$(grep -v '^#' "$LIST" | awk 'NF{print $1}' | tr '\n' ',' | sed 's/,$//')
 fi
 [ -n "$LIST" ] || { echo "FATAL: empty triple list"; exit 9; }
 

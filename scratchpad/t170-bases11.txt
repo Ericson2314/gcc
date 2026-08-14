@@ -1,14 +1,28 @@
 # THE ELEVEN BACK ENDS THAT LINK INTO ONE cc1 as of 89883e54f02.
-# Triples taken verbatim from scratchpad/all-backends.txt so that this set is
-# a subset of the 48-base census rather than a fresh set of spellings.
-x86_64-pc-linux-gnu
-aarch64-unknown-linux-gnu
-powerpc64-linux-gnu
-s390x-linux-gnu
-riscv64-unknown-linux-gnu
-mips64-elf
-sparc64-linux
-arm-eabi
-ia64-elf
-visium-elf
-xtensa-elf
+#
+# TWO COLUMNS, AND THE REASON IS A MEASURED TRAP.  The left column is what
+# `--enable-targets' is given (the spellings in all-backends.txt).  The right
+# is what the build dir CALLS that target afterwards: `config.sub' canonicalises
+# it, `MT_TARGET_SUBDIRS' holds the canonical form, and every per-target make
+# rule, spec directory and specs-config path is named after THAT.
+#
+# Measured: a harness keyed on the typed name got
+#     make: *** No rule to make target 'configure-target-specs-arm-eabi'.
+# for EIGHT of the eleven, while three "worked" -- and the three that worked are
+# exactly the three already spelled canonically.  So a run keyed on the typed
+# name reports a per-target failure for eight back ends that is not about the
+# back ends at all.  Both names are kept here so the next harness cannot pick
+# the wrong one.
+#
+# typed at --enable-targets     canonical (build dir, make rules, specs path)
+x86_64-pc-linux-gnu            x86_64-pc-linux-gnu
+aarch64-unknown-linux-gnu      aarch64-unknown-linux-gnu
+powerpc64-linux-gnu            powerpc64-unknown-linux-gnu
+s390x-linux-gnu                s390x-ibm-linux-gnu
+riscv64-unknown-linux-gnu      riscv64-unknown-linux-gnu
+mips64-elf                     mips64-unknown-elf
+sparc64-linux                  sparc64-unknown-linux-gnu
+arm-eabi                       arm-unknown-eabi
+ia64-elf                       ia64-unknown-elf
+visium-elf                     visium-unknown-elf
+xtensa-elf                     xtensa-unknown-elf

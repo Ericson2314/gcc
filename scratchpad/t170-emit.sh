@@ -42,7 +42,7 @@ grep -q "$SRC/configure" "$D/config.log" \
 [ -x "$D/gcc/cc1" ] || { echo "FATAL: no cc1"; exit 9; }
 
 OUT=$D/t170-emit; mkdir -p "$OUT"
-TRIPLES=$(grep -v '^#' "$S/t170-bases11.txt" | grep .)
+TRIPLES=$(grep -v '^#' "$S/t170-bases11.txt" | awk 'NF{print $2}')   # canonical
 
 printf '%-28s %-6s %-7s %-9s %-7s %s\n' TARGET EMITS X86LEAK ASSEMBLES MACHINE INPUT
 : > "$OUT/TABLE"

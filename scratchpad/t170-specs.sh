@@ -27,7 +27,12 @@ esac
 NP="$HOME/src/nixos-configuration/dep/nixpkgs"
 HDRX=/nix/store/q5wv2ldpcv5w8yb2wmsngsygvlxb73fk-glibc-2.42-67-dev/include
 
-TRIPLES=$(grep -v '^#' "$S/t170-bases11.txt" | grep .)
+# COLUMN 2 -- the CANONICAL triple.  Every per-target make rule, spec
+# directory and specs-config path is named after the canonicalised triple, not
+# after what --enable-targets was given; keying this on column 1 produced
+# "No rule to make target 'configure-target-specs-arm-eabi'" for eight of the
+# eleven.  See the header of t170-bases11.txt.
+TRIPLES=$(grep -v '^#' "$S/t170-bases11.txt" | awk 'NF{print $2}')
 
 export NIX_HARDENING_ENABLE="fortify stackprotector pic strictoverflow relro bindnow"
 : > "$B/specs-all.out"
