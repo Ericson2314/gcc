@@ -20,6 +20,42 @@ gcc/gen-target-manifest.sh    583  635
 so the grep still exits 0. Why is the "Not done 1" section below: removing
 them today is a silent regression, not a build break.
 
+## Verified, 47 back ends, `make -k -j8 all-gcc`, immutable snapshots
+
+```
+d37270ef30f  baseline   rc=2    1 error   3825 stderr lines
+48b10ab651c  converted  rc=2  251 errors  -- 8 bad include orders, one cause
+332d3a8d543  fixed      rc=2    1 error   3825 stderr lines   2421 objects
+```
+
+The surviving error is pre-existing and identical in all three:
+`gtype-desc.h: No such file` on
+`build/gen-target-specs-amdgcn_unknown_amdhsa.o`. `Killed` / `signal 9` /
+`out of memory`: 0 in every log, so no figure here is an OOM artefact.
+
+**`t173-depsdiff.sh`, baseline vs fixed, over the 2002 objects both builds
+produced** — the arm that says the conversion changed the *spelling* and not
+the *header*:
+
+```
+per-back-end headers LOST by any object:   0
+added:                                   500, every one mt-inc-witness.h
+                                              or mt-inc-tag-<base>.h
+objects carrying the witness:            364 -> 489   (+125)
+```
+
+Zero removals is the load-bearing half: no object stopped opening a per-back-end
+header it used to open. The 500 additions are one kind — 125 files that had no
+`multi-target-base.h` before now have one, so the witness pair that makes the
+two per-object flags check each other reaches **34% more objects** than it did.
+
+**`t173-dm.sh`**, replaying the real recipes with `-E -dM`, both-sided:
+
+```
+i386   mt-i386/i386-c.o    POINTER_SIZE  (TARGET_X32 ? 32 : BITS_PER_WORD)
+riscv  mt-riscv/riscv-c.o  POINTER_SIZE  (riscv_abi >= ABI_LP64 ? 64 : 32)
+```
+
 ## Done
 
 All **280** direct per-back-end include sites under `gcc/config/` name their
