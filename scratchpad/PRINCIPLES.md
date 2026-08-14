@@ -604,7 +604,12 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**The anchor value is 48 as of the `add_clobbers` selector (task #150)**, which
+**THE ANCHOR VALUE IS 50 as of `89883e54f02`** (the eleven-back-end merge).
+Fourth value this line has had — 45 → 47 → 48 → 50. Set `WANT_ANCHOR=50`.
+Everything the paragraphs below say about *why* the assert stays exact still
+holds; only the number moved, which is the point they make.
+
+**The anchor value was 48 as of the `add_clobbers` selector (task #150)**, which
 added the `build/genemit.o : BUILD_CPPFLAGS += -DGEN_MULTI_TARGET` rule and its
 comment. It was 47 before that, and the paragraph below — written when 47 was
 new — is kept verbatim because its argument is the durable part and its number
