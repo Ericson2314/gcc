@@ -13000,8 +13000,19 @@ generated chains:
   * **3** can still be defined by any build -- `HAVE_AS_TLS`,
     `HAVE_AS_DTPREL_RELOC`, `HAVE_LD_RO_RW_SECTION_MIXING`, all from
     `auto-host.h`, i.e. **still probed from the BUILD machine's binutils and
-    shared by all 48 back ends.**  `HAVE_AS_TLS` alone has 59 uses.  These are
-    unconverted, not mis-converted, and are the largest remaining item here.
+    shared by all 48 back ends.**  These are unconverted, not mis-converted,
+    and are the largest remaining item here.
+
+    `HAVE_AS_TLS` is the big one: **59 uses across 19 back ends** (aarch64
+    alpha arc arm frv i386 ia64 loongarch m68k microblaze mips or1k pa riscv
+    rs6000 s390 sh sparc xtensa), `#define HAVE_AS_TLS 1` in this build's
+    `auto-host.h` purely because the BUILD host's `as` has TLS.  It has **no
+    `targ_caps` redirect at all**.  Converting it is harder than the ones
+    already done, and in exactly the way section 1 is about: `defaults.h:127`
+    is `#if defined (HAVE_AS_TLS) && !defined (ASM_OUTPUT_TLS_COMMON)`, gating
+    a macro DEFINITION -- a preprocessor line, which no `targ_caps` field can
+    satisfy.  Whoever takes it should expect the `mkconfig.sh`-prologue shape
+    rather than the `defaults.h`-redirect shape, or a union.
   * **22** have a live preprocessor conditional.  The exactness arm
     (`t49-defined.sh`, written eager-to-revoke because it GRANTS a finding)
     struck **12** as legitimately redirected, leaving **10**.
