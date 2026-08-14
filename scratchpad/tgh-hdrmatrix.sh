@@ -32,7 +32,19 @@ MACROS=$(sed -n 's/^#ifdef \([A-Z_][A-Z_0-9]*\)$/\1/p' "$SRC/gcc/targhooks.cc" \
          | grep -v '^HAVE_' | sort -u)
 [ -n "$MACROS" ] || { echo "FATAL: read no #ifdef macros from targhooks.cc"; exit 9; }
 
-BASES=$(ls "$D/gcc"/tm-*.h | sed 's|.*/tm-||; s|\.h$||' | grep -v '_' | sort)
+# `tm-<base>.h' is not the only `tm-*.h' the build writes: `tm-preds-<base>.h'
+# and `tm-constrs-<base>.h' match the same glob and define none of these
+# macros, so leaving them in makes every macro look under-defined by ~95
+# spurious "bases".  Restrict to the real back ends, which are exactly the
+# cpu_type directories under gcc/config that carry a .md file -- the same
+# definition mta7-targhook-matrix.sh uses.
+BASES=""
+for d in "$SRC"/gcc/config/*/; do
+  b=$(basename "$d")
+  ls "$d" | grep -q '\.md$' || continue
+  [ -f "$D/gcc/tm-$b.h" ] && BASES="$BASES $b"
+done
+BASES=$(echo $BASES | tr ' ' '\n' | sort)
 [ -n "$BASES" ] || { echo "FATAL: no tm-<base>.h in $D/gcc"; exit 9; }
 
 WORK=$(mktemp -d)
@@ -51,7 +63,8 @@ done
 # NON-VACUITY, FIRST.  An all-empty dump is indistinguishable from "nothing is
 # defined anywhere", which is the reading that makes every back end look clean.
 [ "$NOK" -gt 0 ] || { echo "FATAL: preprocessed NO base successfully"; exit 9; }
-CTL=$(grep -c . "$WORK/i386.m" 2>/dev/null || echo 0)
+[ -s "$WORK/i386.m" ] || { echo "FATAL: i386 dump empty -- cpp is not reading the chain"; exit 9; }
+CTL=$(grep -c . "$WORK/i386.m")
 [ "$CTL" -gt 1000 ] || { echo "FATAL: i386 dump has only $CTL macros -- cpp is not reading the chain"; exit 9; }
 echo "non-vacuity: $NOK/$(echo $BASES|wc -w) bases preprocessed; i386 dump $CTL macros"
 echo
@@ -65,5 +78,26 @@ for m in $MACROS; do
     [ -s "$WORK/$b.m" ] || continue
     if has "$b" "$m"; then n=$((n + 1)); else miss="$miss $b"; fi
   done
-  printf '%-32s defined-by=%-3s not-defined-by:%s\n' "$m" "$n" "$(echo $miss)"
+  p=no
+  has i386 "$m" && p=i386
+  has aarch64 "$m" && p="$p,aarch64"
+  printf '%-32s defined-by=%-3s primary=%-14s not-defined-by:%s\n' \
+         "$m" "$n" "$p" "$(echo $miss)"
 done
+
+echo
+echo "=== SILENT RISK, measured: a PRIMARY defines the macro and this base does not."
+echo "    The shared targhooks.cc '#ifdef' is then TRUE for a reason that has"
+echo "    nothing to do with this base, and it silently receives the primary's"
+echo "    answer.  No ICE, no diagnostic."
+NS=0; SB=""
+for m in $MACROS; do
+  { has i386 "$m" || has aarch64 "$m"; } || continue
+  for b in $BASES; do
+    [ -s "$WORK/$b.m" ] || continue
+    has "$b" "$m" && continue
+    echo "  $b $m"
+    NS=$((NS + 1)); SB="$SB $b"
+  done
+done
+echo "  silent pairs=$NS back ends=$(echo $SB | tr ' ' '\n' | sort -u | grep -c .)"
