@@ -508,6 +508,15 @@ gcc_mt_keys=" target cpu_type option_defaults decimal_float decimal_bid_format
  extra_headers use_gcc_tgmath out_file md_file target_gtfiles extra_modes
  tm_defines target_cpu_default tm_include_list tm_generated_headers
  tm_multilib_config "
+# Collapse the newlines in the list above to spaces before matching on
+# " ${key} ".  Without this, the last key on each physical line is followed by
+# a NEWLINE rather than a space and the pattern does not match it, so
+# `decimal_bid_format', `tmake_file', `extra_modes' and `tm_generated_headers'
+# were all rejected as unknown -- the check failing CLOSED, which is the right
+# direction but for the wrong reason, and measured only because it refused a
+# correct manifest on the very next run.  It is the same whitespace confusion
+# this check exists to catch, in the check, which is worth leaving recorded.
+gcc_mt_keys=" `echo ${gcc_mt_keys}` "
 gcc_mt_bad=`${AWK} 'NF == 0 { next } { print $1 }' ${gcc_target_manifest} \
 	    | sort -u`
 for gcc_mt_k in ${gcc_mt_bad}; do
