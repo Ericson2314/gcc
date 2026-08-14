@@ -14429,3 +14429,101 @@ own initialisation are working.
 - The instrument reads generated headers and one compiled TU. **It cannot see
   ordinal arithmetic that spells neither `MIN_MODE_` nor a mode name** -- a
   helper taking an origin as a parameter would be invisible to it.
+
+---
+
+# #187 -- THE `tm.h` ACCEPTANCE TEST IS FOOLABLE, AND THE REAL NUMBER IS 451, NOT 59
+
+Measured at `7375c86aa4c`, anchor **49**, from an immutable snapshot
+(`/tmp/snap-agent-a85d505af66ec2223`, sha `7375c86aa4c88c6835bc7000b7f465f647c1ae2e`),
+in a cold **47-base** build (`/tmp/b-agent-a85d505af66ec2223`, `make -k -j8
+all-gcc` rc=2, one `error:`, 2894 `.Po`). Instrument
+`scratchpad/t187-perbase-read.sh` + `scratchpad/t187-stemclass.sh`.
+
+## The criterion can reach 0 with the channel fully open
+
+`git grep '#include *"tm.h"' gcc` (minus ChangeLogs) reads **59**. Three
+independent ways for that to be 0 while nothing has changed:
+
+- the four shared channel headers spell `#include MT_HEADER (tm.h)`, which the
+  grep cannot see, and `multi-target-header.h:56` expands `MT_HEADER` to a
+  plain `"tm.h"` whenever `MT_BASE` is unset -- **every shared object**;
+- `#  include` (space after `#`) slips past the pattern;
+- the criterion names one stem, and `tm_p.h` is the same defect under a name
+  no criterion mentions.
+
+Same shape as "assembles, right ELF machine" passing on 32-bit riscv64 code.
+
+## The honest number
+
+| question | figure |
+|---|---|
+| source files spelling `"tm.h"` (the criterion) | **59** |
+| same by an independent directive regex (catches `#  include`) | **59** -- no evasion present at this commit |
+| source files spelling `"tm_p.h"` | **106** |
+| files spelling `MT_HEADER (tm.h)` -- invisible to the criterion | **5** |
+| **shared objects that OPEN the build root's `tm.h`** | **451** |
+| **shared objects that OPEN the build root's `tm_p.h`** | **122** |
+| shared objects opening ANY per-base build-root header | **812 of 833** |
+
+**Reproduced independently**: a second 47-base build from another agent's
+snapshot (`/tmp/b-agent-aab545de8b02de843-47`) gives 812/833, `tm.h` 451,
+`tm_p.h` 122 -- the same figures from a different snapshot and a different
+configure run.
+
+`fold-mem-offsets.o` opens the build root's `tm.h` and `tm_p.h`, confirming
+the `cpp -H` observation the brief carried, by a different instrument.
+
+## The whole leak surface, measured rather than assumed
+
+`t187-stemclass.sh` compares each build-root stem against every base's
+resolved header three ways -- md5, the `config/<dir>/...` chain (decisive for
+`tm.h`/`tm_p.h`, which are include chains and say nothing to a `#define`
+scan), and the `#define` name set:
+
+```
+PER-BASE (it is i386's):  tm.h  tm_p.h  insn-attr-common.h  insn-attr.h
+                          insn-codes.h  insn-constants.h  insn-flags.h
+                          insn-modes.h  insn-modes-inline.h  insn-target-def.h
+PER-BASE (i386 rx xtensa): insn-config.h
+UNIONED (not a leak):     insn-opinit.h  tm-constrs.h  tm-preds.h
+UNDECIDED (reported, not scored): options.h   -- 579 shared objects read it
+no build-root copy:       insn-recog.h
+```
+
+**`insn-modes.h` and `insn-modes-inline.h` are the widest channel: 812 of 833
+shared objects**, i.e. every shared object that reads anything at all. They
+reach every shared TU through `coretypes.h:553`, and the build root's copy is
+**byte-identical to i386's**. PRINCIPLES §4 records `insn-modes.h` as needing
+no vocabulary because it arrives ahead of `tm.h`; that is true about ordering
+and it is not an argument that the file is neutral. It is not.
+
+## Why the instrument is believable
+
+- **Which objects are shared is not a path pattern.** The per-base set comes
+  from the generated makefile and is **expanded by make**, because the
+  `MULTI_TARGET_BASE_DEF` assignments target variable references
+  (`$(MULTI_TARGET_OBJS_aarch64)`). 141 per-base objects
+  (`insn-attrtab-aarch64.o`, `target-cdata-aarch64.o`) live nowhere near
+  `mt-<cpu>/`; a path pattern would have called them shared.
+- **Controls both ways.** The reader must see per-base objects opening
+  `<base>-inc/tm.h` (186 in the first 200), and a synthetic `.Po` must be
+  caught while `<base>-inc/tm.h` and `bits/types/struct_tm.h` are not.
+- **Two instruments, one question.** `cpp -H` on each object's OWN recipe from
+  `make -n` agreed with the `.Po` reading 6/6, with both signs present -- a
+  `.Po` is a record of a past compilation, and a stale one has misreported on
+  this branch before.
+
+## What was NOT measured
+
+- **`options.h` is UNDECIDED and 579 shared objects read it.** Its build-root
+  copy is identical to no base and is **not a superset** of every base's
+  `#define` names, so the union claim in PRINCIPLES §4 is not reproduced by
+  this instrument. It is deliberately excluded from the verdict rather than
+  passed. Someone should settle it.
+- **The name-set arm sees presence, not values.** A build-root header defining
+  every base's names with one base's *values* would score UNIONED. That is the
+  `HAVE_V8HFmode` shape and this instrument cannot see it.
+- **A `.Po` entry means the file was OPENED, not that its body was active.**
+  For shared objects the two coincide (nothing pre-sets `GCC_TM_H`), which is
+  why the arm is restricted to them; it would over-report on per-base objects.
