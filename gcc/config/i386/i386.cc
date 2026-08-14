@@ -2057,10 +2057,19 @@ type_natural_mode (const_tree type, const CUMULATIVE_ARGS *cum,
 	  if (DECIMAL_FLOAT_MODE_P (innermode))
 	    return mode;
 
+	  /* GET_CLASS_NARROWEST_MODE, not MIN_MODE_<CLASS>.  Under the shared
+	     mode numbering MIN_MODE_VECTOR_INT is the UNION's first ordinal of
+	     the class: at four bases (i386 aarch64 rs6000 s390) it is s390's
+	     V1QI, which i386 does not have.  A mode this back end lacks is a
+	     hole, and a hole's `mode_next' is VOIDmode, so the walk below ran
+	     ZERO times and fell straight into the gcc_unreachable () -- an ICE
+	     on any vector argument or return value.  class_narrowest_mode is
+	     i386's own answer (V2QI / V2BF).  No-op in a single-target build,
+	     where the two are equal by construction.  */
 	  if (SCALAR_FLOAT_TYPE_P (TREE_TYPE (type)))
-	    mode = MIN_MODE_VECTOR_FLOAT;
+	    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FLOAT);
 	  else
-	    mode = MIN_MODE_VECTOR_INT;
+	    mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT);
 
 	  /* Get the mode which has this inner mode and number of units.  */
 	  FOR_EACH_MODE_FROM (mode, mode)
