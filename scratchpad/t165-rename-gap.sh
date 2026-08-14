@@ -26,9 +26,49 @@ nb=$(printf '%s\n' "$bases" | grep -c . || true)
 [ "$nb" -ge 2 ] || { echo "REFUSING TO SCORE: found $nb base dirs under $G"; exit 9; }
 echo "arm 0b ok: $nb configured bases: $(printf '%s ' $bases)"
 
+# THE OBJECT SET IS WIDENED TO `insn-*-<base>.o' AND `target-*-<base>.o', AND
+# THAT WIDENING MOVED THE COLLISION COUNT BY ZERO.  Recorded rather than
+# quietly dropped, because the zero refuted the story that motivated it
+# (PRINCIPLES 4: "a fix that moves the count by ZERO has refuted your story,
+# and that is a result").
+#
+# The story was: at SIXTEEN bases `ld' reported `multiple definition of
+# tls_symbolic_operand(rtx_def*, machine_mode)' and this sweep did not list
+# it, so the sweep must be missing the generated objects, which live in the
+# build ROOT rather than in mt-<base>/.  Adding them took the per-base symbol
+# counts up ~40x (i386 423 -> 16871) and the collision set from 10 to 10.
+#
+# THE REAL MECHANISM, measured with `nm' on the two objects `ld' named:
+#
+#     insn-preds.o    T tls_symbolic_operand(rtx_def*, machine_mode)
+#     mt-sh/sh.o      T tls_symbolic_operand(rtx_def*, machine_mode)
+#
+# The per-base generated predicates are in fact namespaced correctly --
+# `insn_i386::tls_symbolic_operand', `insn_ia64::tls_symbolic_operand' -- so
+# the widening was looking for a defect that is not there.  The other definer
+# is `insn-preds.o', the SINGULAR SHARED predicates object, which belongs to
+# no base at all.
+#
+# So the blind spot is real and is NOT the one guessed: this sweep compares
+# bases against EACH OTHER, and is blind by construction to a base colliding
+# with SHARED code.  Arm 2 below is the arm that can see it.  The widening is
+# kept because target-*-<base>.o really are per-base and really were outside
+# the old set, but it is kept on completeness grounds, not on evidence -- it
+# has never yet caught anything.
+#
+# And the header note inherited from t157 -- "the sweep is the authority; the
+# linker is an UNDER-count of it" -- is therefore only half true. The two
+# instruments have COMPLEMENTARY blind spots:
+#
+#   * the linker misses a collision between two archive members that nothing
+#     happens to pull in (the twenty aarch_*/arm_* names of #157);
+#   * a base-vs-base sweep misses a base colliding with shared code.
+#
+# Neither alone is complete.  Run both and reconcile by NAME; a count that
+# agrees is not a set that agrees.
 tot=0
 for b in $bases; do
-  sh "$S/eb-shell.sh" "cd $G && nm -C --defined-only mt-$b/*.o 2>/dev/null" \
+  sh "$S/eb-shell.sh" "cd $G && nm -C --defined-only mt-$b/*.o insn-*-$b.o insn-*-$b-*.o target-*-$b.o 2>/dev/null" \
     | awk '$2 ~ /^[TDBR]$/ { $1=""; $2=""; sub(/^  /,""); print }' \
     | sort -u > "$B/t165-syms-$b.txt"
   n=$(grep -c . "$B/t165-syms-$b.txt" || true)
@@ -48,5 +88,32 @@ np=$(grep -c '^mt_probe_' "$B/t165-collisions.txt" || true)
 echo "  of which $np are the deliberate MULTI_TARGET_REG_PROBES (mt_probe_*,"
 echo "  compiled and never linked, so benign); REAL = $((nc - np))"
 echo
+echo "== ARM 2: names a base defines that SHARED code also defines"
+# The blind spot arm.  A base-vs-base sweep cannot see `mt-sh/sh.o' colliding
+# with `insn-preds.o', because insn-preds.o belongs to no base -- and that is a
+# real link failure at sixteen bases.  The shared set is every .o in the build
+# root that is NOT one of the per-base objects.
+sh "$S/eb-shell.sh" "cd $G && nm -C --defined-only insn-preds.o insn-attrtab.o insn-emit.o insn-recog.o insn-opinit.o insn-output.o insn-extract.o insn-peep.o insn-modes.o insn-enums.o insn-automata.o insn-dfatab.o insn-latencytab.o 2>/dev/null" \
+  | awk '$2 ~ /^[TDBR]$/ { $1=""; $2=""; sub(/^  /,""); print }' \
+  | sort -u > "$B/t165-syms-SHARED.txt"
+nsh=$(grep -c . "$B/t165-syms-SHARED.txt" || true)
+if [ "$nsh" = 0 ]; then
+  # Not fatal: which singular objects exist depends on the base count.  But say
+  # so BY NAME, because an empty shared set makes arm 2 vacuously green and
+  # that is indistinguishable from "no collisions" (PRINCIPLES 7).
+  echo "  ARM 2 VACUOUS: no shared generated objects read; this arm proved NOTHING"
+else
+  echo "  shared generated objects: $nsh global definitions"
+  cat "$B"/t165-syms-*.txt > "$B/t165-allbase.tmp"
+  # A name is a base-vs-shared collision if it is in the shared set AND in some
+  # base's set.  Exclude the SHARED file itself from the base side.
+  for b in $bases; do cat "$B/t165-syms-$b.txt"; done | sort -u > "$B/t165-allbase.txt"
+  comm -12 "$B/t165-syms-SHARED.txt" "$B/t165-allbase.txt" > "$B/t165-shared-collisions.txt"
+  n2=$(grep -c . "$B/t165-shared-collisions.txt" || true)
+  echo "  $n2 names defined by BOTH a base and shared generated code"
+  sed 's/^/    /' "$B/t165-shared-collisions.txt"
+fi
+echo
 echo "NOTE: ld reports only the subset whose archive members are both pulled"
-echo "in.  This sweep is the authority; the linker is an UNDER-count of it."
+echo "in, so it UNDER-counts arm 1.  Arm 1 compares bases against each other,"
+echo "so it cannot see arm 2's population at all.  Use both."

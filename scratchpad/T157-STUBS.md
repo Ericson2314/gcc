@@ -148,6 +148,69 @@ artefact**, which is where both answers actually live:
   `passes.cc` includes twice. That would have revoked the rename. It does not,
   for a reason that is itself a defect — see below.
 
+## #165: THE COUNT IS **ELEVEN**, AND THE CEILING ABOVE IT IS NAMED
+
+Measured both ways from an immutable snapshot, one build dir, per-base objects
+deleted between arms so the changed `-D` set could not be missed (GCC objects do
+not depend on `Makefile`, so an incremental build here is a false green):
+
+| bases | commit | anchor | result |
+|---|---|---|---|
+| 8 (i386 aarch64 rs6000 s390 riscv mips sparc arm) | `70c9d9b3194` | 48 | links, rc=0, 167,756,696 B — but the sweep reports **20** real collisions |
+| 8, same set | `4b25a706fd5` | 50 | links, rc=0, 167,770,896 B, sweep **0** real collisions |
+| **11** (the 8 + ia64, visium, xtensa) | `70c9d9b3194` | 48 | **FAILS**, rc=2, `multiple definition` of `empty_delay_slot`, `output_ubranch`, no `cc1` |
+| **11** (the 8 + ia64, visium, xtensa) | `4fc753a90b6` | 50 | **LINKS**, rc=0, 0 errors / 0 multiple definitions / 0 undefined references, 170,641,264 B |
+| 16 (the 11 + alpha, csky, m68k, nds32, sh) | `4fc753a90b6` | 50 | fails; all 16 **compile**, 3 collision names + 2 undefined-reference causes remain |
+
+**8 → 11.** The renames are load-bearing for exactly this set, not incidental:
+`empty_delay_slot` and `output_ubranch` are defined by **sparc and visium**, both
+in the 11.
+
+That the 20 aarch64/arm names had to be fixed first is the point of the #157
+finding — the 8-base build *linked* while carrying them, so the green said
+nothing. Renaming them is what made adding a ninth back end a question about the
+ninth back end rather than about arm.
+
+### Why these five are not in the 11, each by name
+
+- **nds32** — `undefined reference to gt_ggc_mx_machine_function_nds32` /
+  `gt_pch_nx_machine_function_nds32`. The gengtype-marker shape.
+- **m68k** — `undefined reference to immed_double_const`; see the wide-int
+  ceiling below.
+- **csky, m68k, sh** — `multiple definition of regno_reg_class`, which a rename
+  does **not** fix (five back ends define `REGNO_REG_CLASS` as `regno_reg_class[…]`;
+  the `constant_address_p` shape, caught by the macro test before the link).
+- **sh** — `multiple definition of tls_symbolic_operand` against the **singular
+  shared** `insn-preds.o`, which is a genpreds question, not a rename.
+- **alpha** — `multiple definition of num_source_filenames`, against **mips**.
+  Renameable for this base set; the over-broad arm M revoked it on
+  `iq2000.h:758`'s `SET_FILE_NUMBER()`, a back end this build never configures.
+  Recorded as a cost of the instrument's deliberate over-breadth, not a defect.
+
+### THE WIDE-INT CEILING — the `only_leaf_regs_used` shape, now a CLASS
+
+`insn-emit-m68k-8.o` fails with `undefined reference to immed_double_const`.
+That function is **shared** code, `emit-rtl.cc:708`, gated on
+`#if TARGET_SUPPORTS_WIDE_INT == 0` — a per-back-end `tm.h` macro. Shared objects
+are compiled once against the **primary's** `tm.h`; `i386.h:3109` says `1`, so
+the definition is not compiled **for anybody**.
+
+Only **11 of 48** back ends define the macro (`defaults.h:1374` gives the other
+37 a `0`), so every one of those 37 whose `.md` emits such a call cannot link.
+This is a *structural ceiling on the back-end count*, not a per-back-end defect,
+and it is the third instance of one shape:
+
+| shared function | gated on | who decides |
+|---|---|---|
+| `only_leaf_regs_used` | `LEAF_REGISTERS` | i386 does not define it → absent for all |
+| `rest_of_handle_check_leaf_regs` | `LEAF_REGISTERS` | same |
+| `immed_double_const` | `TARGET_SUPPORTS_WIDE_INT` | i386 says 1 → absent for all |
+
+The general form: **a shared TU's `#if` on a back-end macro makes the primary
+decide which shared functions exist.** Worth a sweep of its own — nobody has
+enumerated the population, and each instance costs one back end at link time
+while being invisible to any build that does not configure that back end.
+
 ## `PASSES_EXTRA` IS i386's, SO EVERY OTHER BACK END'S TARGET PASSES ARE GONE
 
 Found by asking whether `make_pass_insert_bti` was safe to rename; it is, and

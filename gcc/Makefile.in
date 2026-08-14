@@ -1773,6 +1773,64 @@ MULTI_TARGET_INC =
 #   arm_no_early_alu_shift_value_dep, arm_no_early_mul_dep,
 #   arm_no_early_store_addr_dep, arm_rtx_shift_left_p
 #
+#   THE NEXT EIGHT CAME FROM CONFIGURING SIXTEEN BACK ENDS -- i386, aarch64,
+#			    rs6000, s390, riscv, mips, sparc, arm plus alpha,
+#			    csky, ia64, m68k, nds32, sh, visium, xtensa.  All
+#			    sixteen COMPILE; `cc1' does not link, and the eleven
+#			    names `ld' reported decompose exactly into the two
+#			    arms of scratchpad/t165-rename-gap.sh: ten base-vs-
+#			    base (arm 1) and one base-vs-SHARED (arm 2).
+#
+#			    Eight of the ten pass the macro test and are renamed
+#			    here.  They are ordinary back-end-local helpers that
+#			    two back ends happen to spell the same way:
+#			    direct_return (alpha, and one other), empty_delay_slot
+#			    and output_ubranch (sparc), minipool_barrier /
+#			    minipool_fix_head / minipool_fix_tail (arm, bare
+#			    DATA), prepare_move_operands (sh),
+#			    symbolic_reference_mentioned_p (nds32 and s390).
+#
+#   THREE ARE **NOT** RENAMED, and each is a different reason -- worth reading,
+#   because "the sweep found it" is not "a rename fixes it":
+#
+#   regno_reg_class     THE `constant_address_p' SHAPE AGAIN, and the macro test
+#			    caught it before the link did.  FIVE back ends define
+#			    `REGNO_REG_CLASS(REGNO)' as `regno_reg_class[REGNO]'
+#			    -- csky.h:767, sh.h:982, frv.h:857, mcore.h:329,
+#			    m68k.h:448 -- so shared code reaches the array
+#			    through a macro whose name is not the symbol's, and a
+#			    bare rename would convert `multiple definition' into
+#			    `undefined reference'.  It needs the per-base funnel
+#			    treatment, not a -D; target-regs.h already names it.
+#   num_source_filenames
+#			    iq2000.h:758's `#define SET_FILE_NUMBER() ++
+#			    num_source_filenames'.  iq2000 is not configured in
+#			    this set, so this is the over-broad arm M revoking on
+#			    a back end the build never sees -- which is the arm
+#			    working as designed: it can only take away.
+#   tls_symbolic_operand
+#			    NOT a base-vs-base collision at all, and this is the
+#			    one `ld' saw that the old sweep could not.  Its two
+#			    definers are `mt-sh/sh.o' and `insn-preds.o' -- the
+#			    SINGULAR SHARED predicates object.  The per-base
+#			    predicate objects are namespaced correctly
+#			    (`insn_i386::tls_symbolic_operand'); the shared one
+#			    is not, because it belongs to no base.  Renaming sh's
+#			    copy would leave the shared definition standing, so
+#			    this is a genpreds question, not a rename.
+#
+#   AND THE OTHER SIXTEEN-BASE BLOCKER IS NOT A COLLISION AT ALL -- IT IS THE
+#   `only_leaf_regs_used' SHAPE, WHICH IS NOW A CLASS RATHER THAN AN INCIDENT.
+#   `insn-emit-m68k-8.o' fails with `undefined reference to immed_double_const'.
+#   That function is SHARED code, emit-rtl.cc:708, gated on
+#   `#if TARGET_SUPPORTS_WIDE_INT == 0' -- a per-back-end tm.h macro.  Shared
+#   objects are compiled once against the PRIMARY's tm.h; i386.h:3109 says 1, so
+#   the definition is not compiled at all, for anybody.  Only ELEVEN of 48 back
+#   ends define the macro (defaults.h:1374 gives the other 37 a 0), so every one
+#   of those 37 whose md emits such a call cannot link -- which is a structural
+#   ceiling on the back-end count, not a per-back-end defect.  Third instance of
+#   the shape after LEAF_REGISTERS and this one; see scratchpad/T157-STUBS.md.
+#
 #   NOT A RENAME PROBLEM, BUT FOUND BY LOOKING FOR ONE, AND IT IS THE PROJECT'S
 #   OWN BUG IN A CHANNEL NOTHING HAS LISTED.  `PASSES_EXTRA' is how a back end
 #   adds its target passes to pass-instances.def, and it is set by the per-target
@@ -1836,7 +1894,15 @@ MULTI_TARGET_RENAME_NAMES = \
   arm_no_early_alu_shift_value_dep \
   arm_no_early_mul_dep \
   arm_no_early_store_addr_dep \
-  arm_rtx_shift_left_p
+  arm_rtx_shift_left_p \
+  direct_return \
+  empty_delay_slot \
+  minipool_barrier \
+  minipool_fix_head \
+  minipool_fix_tail \
+  output_ubranch \
+  prepare_move_operands \
+  symbolic_reference_mentioned_p
 
 MULTI_TARGET_RENAMES =
 

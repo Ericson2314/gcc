@@ -29,14 +29,14 @@ S=$(cd "$(dirname "$0")" && pwd)
 G=$(cd "$S/../gcc" && pwd)
 cd "$G" || exit 9
 
-NAMES="aarch_accumulator_forwarding aarch_mm_needs_acquire aarch_mm_needs_release
+NAMES="${MT_NAMES:-aarch_accumulator_forwarding aarch_mm_needs_acquire aarch_mm_needs_release
 aarch_rev16_p aarch_rev16_shleft_mask_imm_p aarch_rev16_shright_mask_imm_p
 aarch_validate_mbranch_protection make_pass_insert_bti
 arm_early_load_addr_dep arm_early_load_addr_dep_ptr arm_early_store_addr_dep
 arm_early_store_addr_dep_ptr arm_mac_accumulator_is_mul_result
 arm_mac_accumulator_is_result arm_md_asm_adjust arm_no_early_alu_shift_dep
 arm_no_early_alu_shift_value_dep arm_no_early_mul_dep
-arm_no_early_store_addr_dep arm_rtx_shift_left_p"
+arm_no_early_store_addr_dep arm_rtx_shift_left_p}"
 
 # Non-vacuity: the harness must refuse to score if it cannot show it read
 # anything at all (PRINCIPLES 7).  A positive control -- `constant_address_p'
