@@ -185,11 +185,10 @@ static bool app_on;
 
 rtx_sequence *final_sequence;
 
-#ifdef ASSEMBLER_DIALECT
-
-/* Number of the assembler dialect to use, starting at 0.  */
+/* Number of the assembler dialect to use, starting at 0.  Was inside
+   `#ifdef ASSEMBLER_DIALECT'; this is a SHARED translation unit, so that was
+   the primary's.  See target-asmfprintf.h.  */
 static int dialect_number;
-#endif
 
 /* Nonnull if the insn currently being emitted was a COND_EXEC pattern.  */
 rtx current_insn_predicate;
@@ -223,9 +222,11 @@ init_final (const char *filename ATTRIBUTE_UNUSED)
   app_on = 0;
   final_sequence = 0;
 
-#ifdef ASSEMBLER_DIALECT
-  dialect_number = ASSEMBLER_DIALECT;
-#endif
+  /* The SELECTED base's dialect, asked at run time.  0 for a back end with
+     none is not a floor: `dialect_number' is read only by
+     `do_assembler_dialects', which the two guards below now stop such a back
+     end from reaching at all.  */
+  dialect_number = mt_have_assembler_dialect () ? mt_assembler_dialect () : 0;
 }
 
 /* Default target function prologue and epilogue assembler output.
@@ -3338,9 +3339,10 @@ output_asm_operand_names (rtx *operands, int *oporder, int nops)
     }
 }
 
-#ifdef ASSEMBLER_DIALECT
 /* Helper function to parse assembler dialects in the asm string.
-   This is called from output_asm_insn and asm_fprintf.  */
+   This is called from output_asm_insn and asm_fprintf.  Was wrapped in
+   `#ifdef ASSEMBLER_DIALECT', i.e. in the primary's answer; the two callers
+   now guard it at run time on the SELECTED base.  */
 static const char *
 do_assembler_dialects (const char *p, int *dialect)
 {
@@ -3426,7 +3428,6 @@ do_assembler_dialects (const char *p, int *dialect)
 
   return p;
 }
-#endif
 
 /* Output text from TEMPLATE to the assembler output file,
    obeying %-directions to substitute operands taken from
@@ -3449,9 +3450,9 @@ output_asm_insn (const char *templ, rtx *operands)
 {
   const char *p;
   int c;
-#ifdef ASSEMBLER_DIALECT
+  /* Was `#ifdef ASSEMBLER_DIALECT' -- the primary's.  See target-asmfprintf.h.  */
   int dialect = 0;
-#endif
+  const bool have_dialects = mt_have_assembler_dialect ();
   int oporder[MAX_RECOG_OPERANDS+1];
   char opoutput[MAX_RECOG_OPERANDS+1];
   int ops = 0;
@@ -3492,23 +3493,32 @@ output_asm_insn (const char *templ, rtx *operands)
 #endif
 	break;
 
-#ifdef ASSEMBLER_DIALECT
       case '{':
       case '}':
       case '|':
-	p = do_assembler_dialects (p, &dialect);
+	/* Only for a back end that HAS dialects.  Otherwise these are
+	   ordinary characters of the template and fall through to the
+	   `default:' arm's `putc', which is what upstream does for the
+	   forty-six back ends that define no ASSEMBLER_DIALECT.  */
+	if (have_dialects)
+	  {
+	    p = do_assembler_dialects (p, &dialect);
+	    break;
+	  }
+	putc (c, asm_out_file);
 	break;
-#endif
 
       case '%':
 	/* %% outputs a single %.  %{, %} and %| print {, } and | respectively
-	   if ASSEMBLER_DIALECT defined and these characters have a special
-	   meaning as dialect delimiters.*/
+	   if the SELECTED back end has dialects and these characters have a
+	   special meaning as dialect delimiters.
+
+	   THIS LINE IS THE arm `bx |lr' BUG.  With the `#ifdef' here answered
+	   by the primary, arm's `%|' -- which means "emit REGISTER_PREFIX",
+	   empty for the EABI -- printed a literal `|' instead of reaching
+	   arm's `print_operand' punct handler.  See target-asmfprintf.h.  */
 	if (*p == '%'
-#ifdef ASSEMBLER_DIALECT
-	    || *p == '{' || *p == '}' || *p == '|'
-#endif
-	    )
+	    || (have_dialects && (*p == '{' || *p == '}' || *p == '|')))
 	  {
 	    putc (*p, asm_out_file);
 	    p++;
@@ -3956,9 +3966,10 @@ asm_fprintf (FILE *file, const char *p, ...)
 {
   char buf[10];
   char *q, c;
-#ifdef ASSEMBLER_DIALECT
+  /* Was `#ifdef ASSEMBLER_DIALECT' -- the primary's.  See
+     target-asmfprintf.h.  */
   int dialect = 0;
-#endif
+  const bool have_dialects = mt_have_assembler_dialect ();
   va_list argptr;
 
   va_start (argptr, p);
@@ -3968,13 +3979,19 @@ asm_fprintf (FILE *file, const char *p, ...)
   while ((c = *p++))
     switch (c)
       {
-#ifdef ASSEMBLER_DIALECT
       case '{':
       case '}':
       case '|':
-	p = do_assembler_dialects (p, &dialect);
+	/* Only for a back end that HAS dialects; otherwise an ordinary
+	   character, as it is upstream for a target defining no
+	   ASSEMBLER_DIALECT.  */
+	if (have_dialects)
+	  {
+	    p = do_assembler_dialects (p, &dialect);
+	    break;
+	  }
+	putc (c, file);
 	break;
-#endif
 
       case '%':
 	c = *p++;

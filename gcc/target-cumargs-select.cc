@@ -1179,3 +1179,36 @@ mt_asm_fprintf_extension (FILE *file, va_list *args, int c)
     return false;
   return targetm_asmfprintf->extension (file, args, c);
 }
+
+/* Whether the selected back end has assembler dialects, and which.  Two of
+   forty-eight define `ASSEMBLER_DIALECT'; `final.o' is shared, so its
+   `#ifdef' was true for all forty-eight, and `%|' in arm's templates printed
+   a literal `|' instead of arm's (empty) REGISTER_PREFIX.  */
+
+bool
+mt_have_assembler_dialect (void)
+{
+  if (targetm_asmfprintf == NULL)
+    internal_error ("no back end has been selected, so it is not known "
+		    "whether this target has assembler dialects; a target "
+		    "must be chosen with %<-ftarget-config=%> before assembly "
+		    "is written");
+  return targetm_asmfprintf->has_assembler_dialect;
+}
+
+int
+mt_assembler_dialect (void)
+{
+  /* Not `if (assembler_dialect)': a base claiming dialects with no value is a
+     build bug, and answering 0 for it would silently select the first
+     alternative of every template -- the quiet direction.  The two fields
+     come off one `#ifdef' in target-cumargs.cc, so this cannot happen without
+     that file having been edited wrongly.  */
+  if (!mt_have_assembler_dialect ())
+    internal_error ("back end %qs has no assembler dialects, so none can be "
+		    "in force", targetm_asmfprintf->name);
+  if (targetm_asmfprintf->assembler_dialect == NULL)
+    internal_error ("back end %qs claims assembler dialects but supplies no "
+		    "%<ASSEMBLER_DIALECT%> value", targetm_asmfprintf->name);
+  return targetm_asmfprintf->assembler_dialect ();
+}

@@ -1221,11 +1221,30 @@ mt_base_asm_fprintf_extension (FILE *file, va_list *args, int c)
 }
 #endif
 
+/* ASSEMBLER_DIALECT, evaluated in this base's own translation unit.  A
+   function, not a constant: i386's is `(ix86_asm_dialect)', an option
+   variable.  See target-asmfprintf.h for what the primary's `#ifdef' cost --
+   `bx |lr' in arm's first-ever output.  */
+#ifdef ASSEMBLER_DIALECT
+static int
+mt_base_assembler_dialect (void)
+{
+  return ASSEMBLER_DIALECT;
+}
+#endif
+
 static const struct target_asmfprintf_desc mt_base_asmfprintf = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
 #ifdef ASM_FPRINTF_EXTENSIONS
-  mt_base_asm_fprintf_extension
+  mt_base_asm_fprintf_extension,
 #else
+  NULL,
+#endif
+#ifdef ASSEMBLER_DIALECT
+  true,
+  mt_base_assembler_dialect
+#else
+  false,
   NULL
 #endif
 };

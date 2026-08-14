@@ -81,6 +81,37 @@ struct target_asmfprintf_desc
      ARGS is `&argptr' from the caller and not a copy: a `%r' extension reads
      an argument off it, and the caller must see that argument consumed.  */
   bool (*extension) (FILE *file, va_list *args, int c);
+
+  /* Whether this back end defines ASSEMBLER_DIALECT, i.e. whether `{', `}'
+     and `|' are alternative-selection delimiters in ITS insn templates.
+
+     TWO of forty-eight define it -- i386 and i386/darwin -- and `final.o' is
+     shared, so `#ifdef ASSEMBLER_DIALECT' was true for all forty-eight.  This
+     is LEAKED PRESENCE, and unlike the extension letters above it produces no
+     diagnostic at all.  Measured, arm at `-O2' on scratchpad/t170-small.c:
+
+         bx      |lr
+
+     arm's `bx%?\t%|lr' spells `%|' meaning "emit REGISTER_PREFIX", which for
+     the EABI is the empty string.  `output_asm_insn' at final.cc:3507 has
+
+         if (*p == '%' #ifdef ASSEMBLER_DIALECT || *p == '{' || *p == '}'
+                       || *p == '|' #endif )
+           { putc (*p, asm_out_file); p++; }
+
+     so with i386's `#ifdef' in force `%|' printed a literal `|' instead of
+     reaching arm's `print_operand' punct handler.  A `|' in the operand
+     position of every register-prefixed insn -- assembly the target's own
+     assembler rejects, from a compiler that exited 0.  PRINCIPLES' "a wall
+     that moves may have become silent wrong code", arriving as the FIRST
+     output arm ever produced.  */
+  bool has_assembler_dialect;
+
+  /* ASSEMBLER_DIALECT itself, or NULL when HAS_ASSEMBLER_DIALECT is false.
+     A function because i386's is `(ix86_asm_dialect)', an option variable:
+     evaluating it at static-initialisation time would freeze it before
+     option processing -- the `ix86_pmode Init (PMODE_SI)' shape.  */
+  int (*assembler_dialect) (void);
 };
 
 /* The table in force, or NULL until a target is selected.  NULL and not the
@@ -90,5 +121,12 @@ extern const struct target_asmfprintf_desc *targetm_asmfprintf;
 /* Shared code's spelling.  False means "not one of this back end's letters".
    Fails BY NAME if no back end has been selected.  */
 extern bool mt_asm_fprintf_extension (FILE *file, va_list *args, int c);
+
+/* Whether the SELECTED back end has assembler dialects, and which one is in
+   force.  Two names because the `#ifdef' and the value are two questions and
+   shared code asks them separately; they come off one `#ifdef' in
+   target-cumargs.cc, so they cannot disagree.  */
+extern bool mt_have_assembler_dialect (void);
+extern int mt_assembler_dialect (void);
 
 #endif /* GCC_TARGET_ASMFPRINTF_H */
