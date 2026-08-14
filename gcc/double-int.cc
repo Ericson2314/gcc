@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"			/* For BITS_PER_UNIT and *_BIG_ENDIAN.  */
+#include "multi-target-macros.h"
 #include "tree.h"
 
 static int add_double_with_sign (unsigned HOST_WIDE_INT, HOST_WIDE_INT,

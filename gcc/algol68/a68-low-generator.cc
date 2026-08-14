@@ -26,7 +26,7 @@
 #include "fold-const.h"
 #include "diagnostic.h"
 #include "langhooks.h"
-#include "tm.h"
+#include "multi-target-macros.h"
 #include "function.h"
 #include "cgraph.h"
 #include "toplev.h"

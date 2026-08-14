@@ -23,7 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "alias.h"
 #include "predict.h"
-#include "tm.h"
+#include "options.h"
 #include "function.h"
 #include "dominance.h"
 #include "cfg.h"
