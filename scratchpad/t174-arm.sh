@@ -13,13 +13,17 @@
 #      sec 4).  arm is a 32-bit target, so the discriminator is the reverse:
 #      the output must NOT be 64-bit, and must name arm registers.
 #
-# usage: t174-arm.sh <builddir> <tag>
+# usage: t174-arm.sh <builddir> <tag> [target]
+#
+# The output directory is keyed on the TARGET, not just the tag: an earlier
+# version was not, and an aarch64 run silently overwrote the arm run's .s and
+# .err in place.
 set -u
 D=${1:?build dir}
 TAG=${2:?tag}
 V=17.0.0
-T=arm-unknown-eabi
-OUT=$D/$TAG-arm
+T=${3:-arm-unknown-eabi}
+OUT=$D/$TAG-$T
 mkdir -p "$OUT"
 [ -x "$D/gcc/cc1" ] || { echo "FATAL: no $D/gcc/cc1"; exit 9; }
 
