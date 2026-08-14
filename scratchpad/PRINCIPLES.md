@@ -740,9 +740,41 @@ which both are true. A reconciliation that explains everything and predicts
 nothing is not a finding.
 
 Third rule, from the same episode: **the bars are base-count dependent.** The
-figures above are two-base. At three and four bases x86_64 `-O2` currently
-ICEs in `type_natural_mode`. Quoting a bar without its base count invites an
+figures above are two-base. Quoting a bar without its base count invites an
 agent to score a real regression as a bar failure, or the reverse.
+
+**AND THE EXAMPLE THIS RULE CARRIED WAS ITSELF A MISATTRIBUTION — IT WAS NEVER
+THE COUNT.** This file said "at three and four bases x86_64 `-O2` currently
+ICEs in `type_natural_mode`", and #157 and #170 recorded the same at 3, 4, 8
+and 11. Measured (task #164, snapshot `80bf400ae06`, anchor 55, cold, from
+immutable snapshots):
+
+```
+2 bases  i386 aarch64                 MIN_MODE_VECTOR_INT = V2QI   12369 / 378fc33c1e70
+3 bases  i386 aarch64 rs6000          MIN_MODE_VECTOR_INT = V2QI   12369 / 378fc33c1e70
+4 bases  i386 aarch64 rs6000 s390     MIN_MODE_VECTOR_INT = V1QI   ICE at i386.cc:2155
+```
+
+**Three bases reproduce the two-base bar exactly.** The variable is not how
+many back ends are configured, it is *whether any configured back end defines
+a mode narrower than i386's narrowest of that class* — s390's `V1QI`
+(`s390-modes.def:280`), riscv's `VNx1*`. The union's `MIN_MODE_VECTOR_INT` is
+then a mode i386 does not have, i.e. a **hole**, whose `mode_next` is
+`VOIDmode`, so `FOR_EACH_MODE_FROM (mode, MIN_MODE_VECTOR_INT)` ran zero
+times. Fixed in `688b3afe25d` by starting such walks at
+`GET_CLASS_NARROWEST_MODE (C)` — the one table `genmodes` emits with *this*
+base's answer to exactly that question. After it, the bar is `12369 /
+378fc33c1e70` at **2, 3, 4 and 11 bases, byte for byte** (11 = the
+`t170-bases11.txt` set, `cc1` linking, `error:` 0). **So the x86_64 `-O2`
+codegen bar is no longer base-count dependent and may be quoted at any base
+count** — which is the point of fixing it: it is the branch's strongest
+regression detector and it was off in every configuration the project is
+actually aiming at.
+
+The transferable part: **"it appears at N and not at N−1" is not evidence that
+N is the cause.** Base sets on this branch grow by adding a *named* back end,
+so a count is always confounded with a membership change; say which back end
+entered the set, then test a same-sized set without it.
 
 **STANDING USER RULING — GET THE BACK ENDS BUILDING, EVEN IF EVERYTHING IS
 BUSTED.** Verbatim: *"just get those backends building — even if everything is
