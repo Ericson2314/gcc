@@ -54,6 +54,12 @@
 
 #include "insn-codes.h"
 #include "tm.h"
+/* The multi-target conversion layer.  It already arrives through the tm.h
+   above (defaults.h ends with it), so the include guard makes this line a
+   no-op today.  It is here so that deleting the tm.h line does not also
+   delete the CONVERTED macros -- see multi-target-macros.h.  It must precede
+   hard-reg-set.h, which reads MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER.  */
+#include "multi-target-macros.h"
 #include "hard-reg-set.h"
 
 #if CHECKING_P
