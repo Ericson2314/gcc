@@ -13697,3 +13697,66 @@ like "the arm ran and found nothing".)
     -- unclassified.
   * `host_detect_local_cpu`, bare in 8 back ends, driver-side, left to the
     `target-specs` `-march=native` work.
+
+## 9. CORRECTION -- THOSE TWO NAMES WERE SOLVED, NOT BLOCKED, AND NOT BY ME
+
+Section 7 above reports `constant_address_p` and `legitimate_pic_operand_p` as
+backed out and left as a design question. **That verdict is superseded.**
+Another agent reached the same diagnosis independently and then did the thing
+section 7 declined to do: **rename PLUS a `target_addr` funnel**, so each base
+answers for itself instead of the primary answering for all.
+
+    gcc/target-addr.h:126-137   the hook member `constant_address_p`
+    gcc/target-addr.cc:183-189  `gcc_taddr_constant_address_p`, per base
+    gcc/Makefile.in             both names in MULTI_TARGET_RENAME_NAMES
+
+Two things worth keeping from that:
+
+**The independent convergence is the evidence, not the fix.** Two agents,
+separately, found that shared code reaches these through `CONSTANT_ADDRESS_P`
+and `LEGITIMATE_PIC_OPERAND_P` and that an identifier grep cannot see it. That
+is a stronger result than either finding alone, and it is why the rule --
+*search for the ACCESSOR, not only the name* -- is now written into
+`t155-macroref.sh` with the two names as its negative control.
+
+**My reasoning for refusing was right about the mechanism and wrong about the
+conclusion.** I argued from `multi-target-select.cc`'s `gen_movxf` precedent
+that a *forwarder* cannot serve bases that do not define the function. True --
+and the funnel is not a forwarder. A forwarder dispatches to a back end's
+function and has nothing to dispatch to when 44 of 48 back ends define none; a
+hook member holds each base's own *answer*, which for those 44 is whatever
+their own header says, including a constant. **"A forwarder cannot express
+this" is not "nothing can."** Reporting the design question was still correct;
+concluding it was unresolvable was not.
+
+## 10. THE EIGHT-BASE RESULT, AND WHAT IT IS AND IS NOT
+
+Base set `i386 aarch64 rs6000 m68k microblaze pdp11 vax xtensa`, chosen from
+the 48-base collision data so that its four collisions are all names this task
+renamed. **`multiple definition`: 0 lines, 0 distinct names, across eight back
+ends.** This half of the wall is clear for that set.
+
+`cc1` still does not link, on **10 distinct undefined names over 26 lines**,
+all of them the other half:
+
+    insn_m68k::unspec_strings{,_len}        insn_pdp11::unspec_strings{,_len}
+    insn_m68k::unspecv_strings{,_len}       immed_double_const
+    insn_microblaze::unspecv_strings{,_len}
+
+The `insn_<base>::unspec*_strings` family is the class task #150 already
+recorded for mips, now reproduced in **three more back ends**, which suggests
+it is a generator gap rather than a per-back-end quirk.
+
+**TWO HONEST LIMITS ON THIS READING:**
+
+  * **The build predates the `target_addr` funnel.** It was configured from a
+    snapshot in which those two names were backed out, so it is a measurement
+    of a tree that is no longer the branch. The `multiple definition` = 0
+    result does not depend on the funnel, but the figure should be re-taken
+    before anyone quotes it as a current bar.
+  * **Eight back ends already link** (i386, aarch64, rs6000, s390, riscv, mips,
+    sparc, arm, at `70c9d9b3194`). This set is **not** that set: it shares only
+    i386, aarch64 and rs6000, and adds **five back ends that have never been in
+    a linking configuration** -- m68k, microblaze, pdp11, vax, xtensa. So the
+    count of eight is not new; *which* eight is, and the `unspec_strings` gap
+    in three of the five is new information.
