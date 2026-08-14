@@ -74,3 +74,14 @@ s390x-ibm-linux-gnu               90464    46009        5      651     7811    1
      91 gcc.dg/tree-ssa/builtin-sprintf-warn-13.c
      85 c-c++-common/Warray-bounds.c
      74 gcc.dg/Warray-bounds-47.c
+TARGET                             PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+--------------------------------------------------------------------------------------------
+visium-unknown-elf                73704    53439        8      607     8250    14016       29
+xtensa-unknown-elf                83083    41571        8      624     6056    14173       29
+
+== KILLED (compiler killed, NOT a test result -- machine contamination)
+  visium-unknown-elf           0
+  xtensa-unknown-elf           0
+  load at scoring time: load average: 17.94, 17.40, 15.35
+  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is quoted)
+

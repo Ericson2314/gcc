@@ -1,8 +1,8 @@
-# THE PER-TARGET TESTSUITE BOARD AT FOUR TARGETS
+# THE PER-TARGET TESTSUITE BOARD AT SIX TARGETS
 
 Extends `T173-BASELINE.md` / `T175-board.txt` (x86_64 + aarch64) with
 **riscv64** and **s390x** -- two back ends that had never had a test result of
-any kind. **2 of 47 measured becomes 4 of 47.** Read §6 before quoting §2.
+any kind. **2 of 47 measured becomes 6 of 47** (four with real cross binutils, two through a fallback config -- see §4b). Read §6 before quoting §2.
 
 ## 1. Provenance -- quote this with the board
 
@@ -182,6 +182,66 @@ s390x is the **best-behaved of the three non-primary targets** (2225/599 in its
 own directory) and its 219 scan-assembler failures are the most likely place to
 find real per-target codegen divergence today.
 
+## 4b. VISIUM AND XTENSA -- two more back ends, through a FALLBACK config
+
+`scan-assembler` needs no assembler, but the harness needs a `specs-config`,
+and `target-specs` probes `<triple>-as` and SKIPs without one. nixpkgs has no
+binutils for visium or xtensa (0 of 27,157 attributes, #170). So the #170
+technique was used on purpose: point `target-specs` at the BUILD MACHINE'S own
+`as`/`ld` (`taa-fallback-specs.sh`). **This is the #113b accident, requested
+deliberately**, and everything it produces carries that caveat:
+
+- **ASSEMBLES and ELF-MACHINE stay UNKNOWN** for both. No output can promote
+  them; there is no assembler to be right about.
+- **Any verdict that depends on an assembler CAPABILITY** (`.hidden`, TLS,
+  CFI, section flags) is reading x86_64's answer under this target's name.
+  Those are UNTRUSTED -- neither PASS nor FAIL.
+- The two configs happen to have distinct md5s (`47f002363b48`,
+  `ecd8ee496205`), so guard 6 passed; had they coincided the guard would have
+  refused, correctly, and the answer would have been to run them separately,
+  never to relax it.
+
+Second build dir, same snapshot: `/tmp/b-agent-aa9936ad7ccd9023c-6`,
+**six** bases (the four above plus `visium-elf`, `xtensa-elf`),
+`make all-gcc rc=0`, `error:` 0.
+
+```
+TARGET                             PASS     FAIL    XPASS    XFAIL    UNSUP    UNRES    ERROR
+visium-unknown-elf                73704    53439        8      607     8250    14016       29
+xtensa-unknown-elf                83083    41571        8      624     6056    14173       29
+KILLED: 0 and 0.  load at scoring: 17.94 / 17.40 / 15.35
+
+gcc.target/<dir>       PASS  FAIL  XFAIL  UNSUP  UNRES     FAIL kinds (whole run)
+visium/visium             8    19      2      0      7   scan-asm  11  ICE 16604
+xtensa/xtensa            44    10      0      0      3   scan-asm   5  ICE  8182
+```
+
+Their own `gcc.target/` directories are tiny upstream (29 and 57 results), so
+the interesting column is the whole-run one. **6 of 47 back ends now have a
+test result; it was 2.**
+
+## 4c. THE SAME THREE ICE SITES ON EVERY NON-PRIMARY TARGET
+
+Read across §4 and §4b rather than down them:
+
+```
+site                                    s390x   riscv64  visium  xtensa
+in as_a, at machmode.h:416               5782     2529     1816    4443
+in operand_subword_force, at emit-rtl.cc    -     1748     1504    1256
+in convert_mode_scalar, at expr.cc:737      -      977        -     757
+Segmentation fault                       4257        -    13215     519
+```
+
+Four back ends, three shared middle-end sites, and `as_a, at machmode.h:416`
+on all four. That is not four back-end bugs; it is the shape of one
+mode-vocabulary defect reaching every base that is not the primary --
+`as_a<scalar_int_mode>` failing means the mode reaching `trunc_int_for_mode`
+is not a scalar int for THAT base. The same ICE stops the `big.c` bar on
+s390x. **x86_64 has 10 ICEs in the entire run**; this is the both-sided shape.
+
+Whoever takes it has a free reproducer: `scratchpad/big.c` at `-O2` with the
+s390x config, failing on `__builtin_memcpy` at `big.c:57`.
+
 ## 5. WHAT THE NUMBERS DO NOT MEAN
 
 - **No failure floor is subtracted anywhere.**
@@ -216,14 +276,12 @@ find real per-target codegen divergence today.
 
 ## 7. WHAT WAS NOT MEASURED -- UNKNOWN, not zero
 
-- **43 of 47 back ends.** Only 4 are on this board.
-- **visium and xtensa**, which the brief lists as emitting, are still UNKNOWN
-  here. `scan-assembler` genuinely needs no assembler -- but the harness needs
-  a `specs-config`, and `target-specs` probes `<triple>-as`/`-ld` and SKIPs
-  without them, and this nixpkgs has no binutils for visium, xtensa, sparc or
-  ia64. **Whether a specs-config can be produced with no assembler is the
-  question that unblocks them, and I did not test it.**
-  `scratchpad/ta9f-nobinutils.sh` and `t170-nobinutils.sh` exist and appear to
-  be about exactly that; they were not run here.
+- **41 of 47 back ends.** Six are on this board (§2 and §4b).
+- **sparc64 and ia64** were not attempted. The fallback-config route of §4b
+  would work for them too -- it needs no cross binutils -- so they are cheap
+  next candidates, and the remaining 39 are limited by whether they emit at
+  all, not by tools.
+- **ASSEMBLES / ELF-MACHINE for visium and xtensa**: UNKNOWN by construction,
+  see §4b.
 - **Execution, and languages other than C.** `--enable-languages=c,lto`;
   `check-g++` and the rest were never invoked. Unchanged from T173.
