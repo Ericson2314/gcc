@@ -634,12 +634,30 @@ that task's own timestamp, with the anchor monotonic in time (23→27→28→30�
 39)**. A fired defect would show as an owner mismatch or an anchor going
 backwards against the clock; neither appears. `scratchpad/built-tree-audit.sh`.
 
-**THE ANCHOR VALUE IS 51 as of `b349257c0a2`** (task #171, the per-back-end
-`PASSES_EXTRA`). Fifth value this line has had — 45 → 47 → 48 → 50 → 51. Set
-`WANT_ANCHOR=51`. Everything the paragraphs below say about *why* the assert
-stays exact still holds; only the number moved, which is the point they make.
+**THE ANCHOR VALUE IS 55**, measured at the forty-seven-back-end merge — not
+51 and not 54, which are what the two sides of that merge each believed.
+Seventh value: 45 → 47 → 48 → 50 → 51 → 52 → 54 → 55. Set `WANT_ANCHOR=55`.
 
-It was **50 as of `89883e54f02`**, the eleven-back-end merge.
+That two concurrent branches each bumped this line to a different number, and
+the merged tree matched neither, is the clearest possible statement of why the
+assert is exact: **the value is a property of the tree, not of anybody's
+belief about it.** Run `grep -c MULTI_TARGET gcc/Makefile.in` on the tree you
+are about to build and use what it says. Do not copy a number out of a brief,
+including this one — check it.
+
+Everything the paragraphs below say about *why* the assert stays exact still
+holds; only the number moved, which is the point they make.
+
+**AND THE LAST THREE MOVES CAME FROM COMMENT PROSE, NOT FROM MECHANISM.**
+50 → 52 → 54 is four `MULTI_TARGET_*` names appearing inside explanatory
+comment blocks in `gcc/Makefile.in`. That is worth saying out loud because it predicts the shape
+of the next false alarm: an agent diffing the anchor against the *rules* will
+find nothing changed and conclude a script is broken. The anchor is a content
+hash of one file, deliberately including its comments — which is what makes it
+catch a stale tree at all. Do not "fix" it by narrowing the grep to rule lines;
+that would make it blind to exactly the tree-staleness it exists to detect.
+
+**THE ANCHOR VALUE WAS 50 as of `89883e54f02`** (the eleven-back-end merge).
 
 **The anchor value was 48 as of the `add_clobbers` selector (task #150)**, which
 added the `build/genemit.o : BUILD_CPPFLAGS += -DGEN_MULTI_TARGET` rule and its

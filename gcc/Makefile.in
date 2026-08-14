@@ -1867,34 +1867,142 @@ MULTI_TARGET_INC =
 #			    DATA), prepare_move_operands (sh),
 #			    symbolic_reference_mentioned_p (nds32 and s390).
 #
-#   THREE ARE **NOT** RENAMED, and each is a different reason -- worth reading,
-#   because "the sweep found it" is not "a rename fixes it":
+#   THREE WERE JUDGED **NOT** RENAMEABLE ABOVE, and #167 revisited all three
+#   from an anchor-50 build of the same sixteen bases.  ONE of the three
+#   verdicts survives, and the two that do not were BOTH revoked by arm M --
+#   the deliberately over-broad arm -- reading a `#define' body without asking
+#   who, if anyone, expands it.  That is the cost of over-breadth working as
+#   designed (it can only take away), and the way to pay it back is to answer
+#   the narrower question by hand rather than to relax the arm.
 #
-#   regno_reg_class     THE `constant_address_p' SHAPE AGAIN, and the macro test
-#			    caught it before the link did.  FIVE back ends define
+#   regno_reg_class     RENAMEABLE, AND THE PROOF IS ALREADY IN THIS LIST.
+#			    The verdict above is right that FIVE back ends define
 #			    `REGNO_REG_CLASS(REGNO)' as `regno_reg_class[REGNO]'
-#			    -- csky.h:767, sh.h:982, frv.h:857, mcore.h:329,
-#			    m68k.h:448 -- so shared code reaches the array
-#			    through a macro whose name is not the symbol's, and a
-#			    bare rename would convert `multiple definition' into
-#			    `undefined reference'.  It needs the per-base funnel
-#			    treatment, not a -D; target-regs.h already names it.
+#			    (csky.h:767, sh.h:982, frv.h:857, mcore.h:329,
+#			    m68k.h:448) and right that the macro's name is not
+#			    the symbol's.  It is wrong about where that macro is
+#			    expanded, and the decisive evidence is that
+#			    `i386.h:1517' has the SAME SHAPE to the character --
+#			    `#define REGNO_REG_CLASS(REGNO) (regclass_map[(REGNO)])'
+#			    -- while `regclass_map' is in this list already and
+#			    the eleven-base `cc1' links.  The two cases cannot
+#			    differ, so either both rename or neither does.
+#
+#			    The reason both do is that REGNO_REG_CLASS has TWO
+#			    expansion sites and neither reaches a bare array
+#			    across a base boundary.  In SHARED code
+#			    `multi-target-macros.h:302' `#undef's it and
+#			    redirects it to
+#			    `targetm_regs->regno_reg_class ((int) (REGNO))', so
+#			    no shared translation unit names any back end's array
+#			    at all -- which is exactly what `constant_address_p'
+#			    and `legitimate_pic_operand_p' did NOT have, and is
+#			    the whole difference between this case and that one.
+#			    In a BACK END's own code the redirect is switched off
+#			    by `-DMULTI_TARGET_TARGETM_BASE' (the `#else' arm at
+#			    multi-target-macros.h:188), so `target-regs-sh.o'
+#			    does expand `regno_reg_class[...]' -- and that object
+#			    is in `$(MULTI_TARGET_OBJS_sh)', so it is compiled
+#			    with `-Dregno_reg_class=regno_reg_class_sh' and binds
+#			    to `mt-sh/sh.o''s renamed array.  Supplier and
+#			    consumer move together because the same variable
+#			    covers both.
+#
+#			    So the macro test's question -- "what does the
+#			    PRIMARY's tm.h expand the macro to" -- has the answer
+#			    "not the array": for this macro the primary's
+#			    definition is `#undef'd out of shared code before any
+#			    shared TU sees it.
 #   num_source_filenames
-#			    iq2000.h:758's `#define SET_FILE_NUMBER() ++
-#			    num_source_filenames'.  iq2000 is not configured in
-#			    this set, so this is the over-broad arm M revoking on
-#			    a back end the build never sees -- which is the arm
-#			    working as designed: it can only take away.
+#			    RENAMEABLE.  The verdict above already says arm M
+#			    revoked it on `iq2000.h:758's `#define
+#			    SET_FILE_NUMBER() ++ num_source_filenames' in a back
+#			    end this set never configures, and stops there.  The
+#			    narrower question it did not ask is who expands
+#			    SET_FILE_NUMBER, and the answer is NOBODY: grepping
+#			    the whole tree for that name finds exactly its own
+#			    `#ifndef' guard and its own `#define', both in
+#			    iq2000.h, and not one use.  It is a dead macro left
+#			    behind by the old mips-style debug output.  Even
+#			    were it live, its only expansion would be inside
+#			    iq2000's own translation units, which carry the
+#			    rename themselves.
+#
+#			    Its two definers are `alpha.cc:8686' and
+#			    `mips.cc:442', with `mips.h:3268's `extern' read only
+#			    in mips's own TUs.  No shared TU spells either name.
 #   tls_symbolic_operand
-#			    NOT a base-vs-base collision at all, and this is the
-#			    one `ld' saw that the old sweep could not.  Its two
-#			    definers are `mt-sh/sh.o' and `insn-preds.o' -- the
-#			    SINGULAR SHARED predicates object.  The per-base
-#			    predicate objects are namespaced correctly
-#			    (`insn_i386::tls_symbolic_operand'); the shared one
-#			    is not, because it belongs to no base.  Renaming sh's
-#			    copy would leave the shared definition standing, so
-#			    this is a genpreds question, not a rename.
+#			    THE ONE VERDICT THAT SURVIVES AS WRITTEN, and it was
+#			    settled by a different route than expected: the name
+#			    was added to this list by the 48-back-end sweep
+#			    (`e55c19021e9') on a SEPARATE branch that was not an
+#			    ancestor of the sixteen-base measurement above, so
+#			    the collision that measurement reported was against
+#			    an UNRENAMED `mt-sh/sh.o'.  With the rename in force
+#			    sh's copy is `tls_symbolic_operand_sh' and the
+#			    singular shared `insn-preds.o' -- which holds i386's
+#			    predicate under the bare name -- has nothing left to
+#			    collide with.
+#
+#			    That does NOT make the analysis above wrong; it makes
+#			    it incomplete in the direction that matters.  The
+#			    shared `insn-preds.o' is still the primary's
+#			    predicates wearing a target-neutral name, which is
+#			    the `tm.h' bug in another artefact.  It is a real
+#			    genpreds question and it is simply no longer a LINK
+#			    question, so it belongs to the correctness pass; see
+#			    scratchpad/T157-STUBS.md.
+#
+#   debugger_register_map
+#			    THE `regno_reg_class' CASE A THIRD TIME, found by
+#			    going from sixteen bases to FORTY-SEVEN, where it is
+#			    the ONLY colliding name.  Two definers,
+#			    `i386.cc:185' and `c6x.cc:198', both
+#			    `unsigned int const debugger_register_map
+#			    [FIRST_PSEUDO_REGISTER]'.  Arm S is empty; arm M
+#			    hits, because `i386.h:2155' and `c6x.h:504' both put
+#			    the array in the body of `DEBUGGER_REGNO(N)'.
+#
+#			    Rename-safe for the same two reasons, and it is worth
+#			    recording that the argument did not have to be
+#			    re-derived -- the family now has a shape.  Shared
+#			    code: `multi-target-macros.h:1058' `#undef's
+#			    DEBUGGER_REGNO and redirects it to
+#			    `mt_debugger_regno', so `dwarf2out.cc' and
+#			    `except.cc' name no back end's array.  Back-end code:
+#			    the supply side is `target-cumargs.cc:566', which is
+#			    compiled once per base as `target-cumargs-<cpu>.o'
+#			    inside `$(MULTI_TARGET_OBJS_<cpu>)' and therefore
+#			    carries the rename with it.
+#
+#			    THE TEST THAT DECIDES THIS FAMILY, stated once so the
+#			    next one is cheap: an array reached only through a
+#			    target macro is rename-safe IFF that macro is
+#			    redirected for shared code in multi-target-macros.h
+#			    AND its per-base supply site is inside
+#			    MULTI_TARGET_OBJS.  Both halves are needed --
+#			    `constant_address_p' failed the first (no redirect,
+#			    so seven shared sites named the bare function) and
+#			    that is the whole difference between the two
+#			    outcomes.  Arm M cannot tell them apart, by design;
+#			    it flags the macro and leaves the judgement here.
+#
+#   AND FOUR OF THE SIX SIXTEEN-BASE BLOCKERS RECORDED ABOVE WERE ALREADY DEAD
+#   AT THIS ANCHOR, killed by two commits on a branch the measurement above
+#   could not see.  `immed_double_const' is described below as a structural
+#   ceiling; `emit-rtl.cc:706' now compiles the definition unconditionally, and
+#   the comment there argues -- correctly -- that this is not a floor, because
+#   the body reads no target macro at all.  `gt_ggc_mx_machine_function_nds32'
+#   and its pch sibling were closed by `e1b47e6fb51' adding `#include
+#   "gt-nds32.h"' to nds32.cc.  Neither commit is an ancestor of the tree the
+#   sixteen-base run above was taken from.
+#
+#   THE LESSON IS ABOUT BLOCKER LISTS, NOT ABOUT THESE FOUR.  A named-cause
+#   list is a measurement with a timestamp, and this branch merges parallel
+#   worktrees, so a list handed forward one merge later can be mostly stale
+#   while still reading as current -- every entry names a real symbol and a
+#   real file.  RE-MEASURE BEFORE WORKING A HANDED-DOWN QUEUE; the cost here
+#   was one build, and it moved four of six items to "already fixed".
 #
 #   AND THE OTHER SIXTEEN-BASE BLOCKER IS NOT A COLLISION AT ALL -- IT IS THE
 #   `only_leaf_regs_used' SHAPE, WHICH IS NOW A CLASS RATHER THAN AN INCIDENT.
@@ -1940,6 +2048,9 @@ MULTI_TARGET_RENAME_NAMES = \
   legitimate_pic_operand_p \
   legitimize_pic_address \
   regclass_map \
+  regno_reg_class \
+  debugger_register_map \
+  num_source_filenames \
   constant_address_p \
   output_probe_stack_range \
   aarch_bti_arch_check \
