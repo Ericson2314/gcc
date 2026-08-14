@@ -98,9 +98,42 @@ the before side.
   pa riscv rs6000 s390 sh sparc xtensa`, 0 missing. This is a separate arm from
   "the build succeeded" because under `-k` a failed object is a log line and
   the build carries on — PRINCIPLES §4's "never attempted and passed are the
-  same silence". **loongarch is the exception and is not covered**: it is not
-  in `backends-47.txt` (dropped from the branch), so its `loongarch.cc` and
-  `loongarch-opts.h` edits are compiled nowhere. Stated rather than counted.
+  same silence". **loongarch is the exception**: it is not in
+  `backends-47.txt` (dropped from the branch), so its two edits are compiled
+  nowhere. Not counted above, and not left as a bare unknown either — the
+  paragraph below says how far it can be bounded without a build.
+
+### How far loongarch can be bounded without compiling it
+
+Not "it looks right". Four statements, each checkable from the source, and the
+last two are transfer from back ends that *are* measured:
+
+- **Placement is the only real hazard for one of these blocks, and it is
+  clear.** A `#if defined (GENERATOR_FILE)` define is useless if something
+  reads the macro earlier in the header chain. The complete list of
+  `HAVE_AS_TLS` reads in `config/loongarch/` is **one**: `loongarch.md:4808`,
+  an insn condition, which gencondmd evaluates after reading the whole `tm.h`
+  chain. No header reads it, at any line.
+- **No static-initializer hazard is left.** `loongarch.cc:12350` is
+  `#define TARGET_HAVE_TLS true`; the old `HAVE_AS_TLS` spelling — which would
+  now be a non-constant in the `gcc_target` initializer, i.e. a hard error — is
+  gone.
+- **The idiom is already proven in this exact file at this exact position.**
+  The new block at `loongarch-opts.h:165-167` sits immediately above an
+  identical, already-landed one at `:178-183` supplying
+  `HAVE_AS_SUPPORT_CALL36`, `HAVE_AS_TLS_LE_RELAXATION`, `HAVE_AS_16B_ATOMIC`
+  and `HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT` to generators — and that one is
+  exercised by `loongarch.md:2937`. The mechanism is not new here; only the
+  name is.
+- **The condition shape is one that IS measured.** `loongarch.md:4808` is a
+  *bare* `"HAVE_AS_TLS"`, byte-for-byte the shape alpha and frv have, and both
+  of those were read in the 47-base build: they fold to `(1 "HAVE_AS_TLS")`,
+  pattern kept, decided at build time. loongarch will do the same.
+
+What that does **not** establish is that `loongarch.cc` compiles, which nothing
+on this branch currently establishes for any reason — loongarch's exclusion
+predates this work. If loongarch is ever restored to the back-end list,
+`tb1-beobj.sh` already names it and will score it without edit.
 
 - **`cc1` links at 47 back ends** (227 MB), 0 `multiple definition`, 0
   `undefined reference`. `rc=2` is the `gtype-desc.h` `-k` ordering artefact on
