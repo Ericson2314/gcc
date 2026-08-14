@@ -879,13 +879,83 @@ from the machine description file `md'.  */\n\n");
   fprintf (file, "#include \"regs.h\"\n");
   print_gen_include (file, "tm-constrs");
   fprintf (file, "#include \"ggc.h\"\n");
-  fprintf (file, "#include \"target.h\"\n\n");
+  fprintf (file, "#include \"target.h\"\n");
+  fprintf (file, "#include \"multi-target-md-entry.h\"\n\n");
 
   /* The gen_* definitions below go into the back end's own namespace so that
      two back ends' insn-emit objects can be linked into one compiler.  The
      using-directive keeps every existing unqualified call site working.  */
   print_ns_using (file);
   print_ns_open (file);
+}
+
+/* The md condition of each of the middle end's bare gen_* names, or NULL if
+   this back end has no such pattern.  Filled in as the queue is walked; see
+   gen-target-ns.cc for the list and output_md_entry_points below for what it
+   becomes.  */
+static const char *md_entry_cond[MT_MD_ENTRY_COUNT];
+
+/* If NAME is one of those names, record COND for it and return true.  */
+
+static bool
+note_md_entry (const char *name, const char *cond)
+{
+  for (unsigned i = 0; i < MT_MD_ENTRY_COUNT; i++)
+    if (strcmp (name, mt_md_entry_name (i)) == 0)
+      {
+	md_entry_cond[i] = cond ? cond : "";
+	return true;
+      }
+  return false;
+}
+
+/* Write this back end's `mt_md_entry_points' to FILE, inside its namespace.
+
+   The initialiser is the answer to "does this back end have this pattern",
+   asked of the machine description that is being read right now.  A back end
+   without a `blockage' pattern gets a null pointer, and multi-target-select.cc
+   turns that into the generic ASM_INPUT expansion -- upstream's own answer for
+   such a back end, reached without any back end reading another's HAVE_*.  */
+
+static void
+output_md_entry_points (FILE *file)
+{
+  for (unsigned i = 0; i < MT_MD_ENTRY_COUNT; i++)
+    if (md_entry_cond[i])
+      fprintf (file, "extern rtx gen_%s (void);\n", mt_md_entry_name (i));
+
+  /* The condition, not just the pointer: genflags emits HAVE_<pattern> as the
+     pattern's md condition, and default_have_speculation_safe_value reads it
+     as a run-time value.  */
+  if (md_entry_cond[2])
+    {
+      const char *cond = md_entry_cond[2];
+      fprintf (file, "static bool\nmt_have_%s (void)\n{\n  return ",
+	       mt_md_entry_name (2));
+      if (cond[0] == '\0' || maybe_eval_c_test (cond) == 1)
+	fprintf (file, "true");
+      else
+	fprintf (file, "(%s)", cond);
+      fprintf (file, ";\n}\n");
+    }
+
+  /* `extern' on the DEFINITION.  A namespace-scope `const' object has
+     INTERNAL linkage in C++, so without it the table is invisible outside
+     this translation unit and multi-target-select.o's reference to
+     insn_<base>::mt_md_entry_table is undefined at link time.  */
+  fprintf (file,
+	   "extern const struct mt_md_entry_points mt_md_entry_table;\n"
+	   "extern const struct mt_md_entry_points mt_md_entry_table = {\n");
+  for (unsigned i = 0; i < MT_MD_ENTRY_COUNT; i++)
+    if (md_entry_cond[i])
+      fprintf (file, "  gen_%s,\n", mt_md_entry_name (i));
+    else
+      fprintf (file, "  nullptr,  /* no `%s' pattern */\n",
+	       mt_md_entry_name (i));
+  if (md_entry_cond[2])
+    fprintf (file, "  mt_have_%s\n};\n\n", mt_md_entry_name (2));
+  else
+    fprintf (file, "  nullptr\n};\n\n");
 }
 
 auto_vec<FILE *, 10> output_files;
@@ -961,6 +1031,20 @@ main (int argc, const char **argv)
 	 question, about DECLARATIONS in insn-flags-<base>.h.  A definition at
 	 global scope is exactly the collision being removed: two back ends,
 	 one `::gen_blockage', an archive that keeps one of them quietly.  */
+
+      /* The middle end's bare names are recorded here for the table below,
+	 and in the UN-NAMESPACED run they are not written at all: that file's
+	 definitions are the ones every base was binding to, and suppressing
+	 them is what leaves multi-target-select.cc's forwarders a name to
+	 define.  The declarations stay -- they come from the singular
+	 insn-flags.h and from emit-rtl.h, and shared code still needs them.  */
+      if (GET_CODE (info.def) == DEFINE_INSN
+	  || GET_CODE (info.def) == DEFINE_EXPAND)
+	if (note_md_entry (XSTR (info.def, 0), XSTR (info.def, 2))
+	    && gen_multi_target_p ()
+	    && gen_target_ns () == NULL)
+	  continue;
+
       switch (GET_CODE (info.def))
 	{
 	case DEFINE_INSN:
@@ -1011,14 +1095,17 @@ main (int argc, const char **argv)
      and no gen_movxf-style question about a base that lacks the name, since
      genemit writes both functions for EVERY back end unconditionally.)
 
-     The rest of the singular file is untouched: gen_blockage, gen_nop,
-     gen_speculation_barrier and gen_movxf still come from it and are still
-     the primary's.  They are a separate ruling; see multi-target-select.cc.  */
+     `gen_blockage', `gen_nop' and `gen_speculation_barrier' are suppressed
+     from the same file for the same reason, in the queue loop above, and
+     answered by mt_md_entry_points.  `gen_movxf' still comes from this file
+     and is still the primary's; see multi-target-select.cc.  */
   if (!gen_multi_target_p () || gen_target_ns () != NULL)
     {
       print_ns_open (file);
       output_add_clobbers (file);
       output_added_clobbers_hard_reg_p (file);
+      if (gen_target_ns () != NULL)
+	output_md_entry_points (file);
       print_ns_close (file);
     }
 

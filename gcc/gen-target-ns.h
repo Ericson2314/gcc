@@ -97,6 +97,14 @@ gen_multi_target_p (void)
 }
 
 extern bool gen_name_is_global_p (const char *name);
+
+/* The md pattern names whose gen_NAME the MIDDLE END calls under a bare,
+   un-namespaced spelling, so that one definition has to answer for whichever
+   back end is in force.  Indexed 0 .. MT_MD_ENTRY_COUNT - 1, in the order of
+   the fields of `struct mt_md_entry_points'.  */
+#define MT_MD_ENTRY_COUNT 3
+extern const char *mt_md_entry_name (unsigned i);
+extern bool gen_name_is_md_entry_p (const char *name);
 extern void print_ns_open (FILE *outf);
 extern void print_ns_close (FILE *outf);
 extern void print_ns_using (FILE *outf);

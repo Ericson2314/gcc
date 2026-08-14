@@ -3378,8 +3378,11 @@ selftest: $(SELFTEST_TARGETS)
 compilations: $(BACKEND)
 
 # This archive is strictly for the host.
-# OBJS names $(MULTI_TARGET_OBJS) rather than the primary's insn-*.o and
-# $(out_object_file)/$(EXTRA_OBJS), so an empty MULTI_TARGET_OBJS does not
+# OBJS names $(MULTI_TARGET_OBJS) ALONGSIDE the primary's un-namespaced
+# insn-*.o -- $(INSNEMIT_SEQ_O) is on the list too, which is why a bare
+# definition in multi-target-select.cc collides with insn-emit-*.o unless
+# genemit declines to write that name; see genemit.cc.  An empty
+# MULTI_TARGET_OBJS therefore does not
 # produce a stopped build: it produces an archive with no back end in it at
 # all, and the failure surfaces 24k undefined references later with nothing
 # naming the cause.  Say it here instead.  The list is `+='d by

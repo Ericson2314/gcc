@@ -265,19 +265,14 @@ main (int argc, const char **argv)
 	 that is what used to happen, and it is why two back ends both defined
 	 `::gen_blockage' and the archive silently kept one.
 
-	 Omitting the declaration is the least wrong of three options and not
-	 a good one.  The one declaration left in force is emit-rtl.h's, and
-	 the definition behind it is the SINGULAR insn-emit.cc's -- the
-	 primary's -- so a back end calling gen_blockage from its own
-	 hand-written source reaches the primary's expansion.  That is wrong
-	 for every back end but the primary, and it is wrong the way this
-	 whole branch is about: quietly.  It cannot be fixed here, because
-	 fixing it means the middle end guarding on `HAVE_blockage' unioned
-	 over every configured back end rather than on the primary's, i.e.
-	 unioning the singular insn-flags.h the way insn-config.h has already
-	 been unioned.  Written down rather than papered over; the back end's
-	 own insn-emit file is unaffected either way, since unqualified lookup
-	 inside namespace insn_<base> finds the member first.  */
+	 The one declaration left in force is emit-rtl.h's, and the definition
+	 behind it is multi-target-select.cc's forwarder, which calls the back
+	 end IN FORCE through mt_md_entry_points.  So a back end calling
+	 gen_blockage from its own hand-written source reaches its own
+	 expansion at run time, and a back end with no `blockage' pattern
+	 reaches gen_asm_input_blockage ().  The back end's own insn-emit file
+	 is unaffected either way, since unqualified lookup inside namespace
+	 insn_<base> finds the member first.  */
       if (gen_name_is_global_p (XSTR (*insn_ptr, 0)))
 	continue;
       gen_proto (*insn_ptr);

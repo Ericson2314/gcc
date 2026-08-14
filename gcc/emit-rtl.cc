@@ -445,18 +445,24 @@ get_reg_attrs (tree decl, poly_int64 offset)
 }
 
 
-#if !HAVE_blockage
 /* Generate an empty ASM_INPUT, which is used to block attempts to schedule,
-   and to block register equivalences to be seen across this insn.  */
+   and to block register equivalences to be seen across this insn.
+
+   This is what a back end with no `blockage' pattern gets.  Which back ends
+   those are is decided per back end, by the null pointers in their
+   mt_md_entry_points, and multi-target-select.cc's `gen_blockage' calls this
+   for them.  It used to be decided by `#if !HAVE_blockage' here, out of the
+   singular insn-flags.h -- one back end's machine description choosing, for
+   every back end in the compiler, whether the bare name expands to a pattern
+   or to an ASM_INPUT.  */
 
 rtx
-gen_blockage (void)
+gen_asm_input_blockage (void)
 {
   rtx x = gen_rtx_ASM_INPUT (VOIDmode, "");
   MEM_VOLATILE_P (x) = true;
   return x;
 }
-#endif
 
 
 /* Set the mode and register number of X to MODE and REGNO.  */
