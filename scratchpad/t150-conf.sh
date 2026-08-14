@@ -16,7 +16,12 @@ if [ -f "$LIST" ]; then
   LIST=$(grep -v '^#' "$LIST" | grep . | tr '\n' ',' | sed 's/,$//')
 fi
 [ -n "$LIST" ] || { echo "FATAL: empty triple list"; exit 9; }
-WANT=${WANT_ANCHOR:-47}
+# 48 as of the `build/genemit.o : -DGEN_MULTI_TARGET' rule and its comment,
+# which added one hit.  It was 47 when this script was written and 45 before
+# that.  STILL EXACT, NOT `>=': the number is not the invariant, the
+# exactness is, and this script refusing its own earlier tree is the
+# mechanism working rather than a nuisance to be relaxed away.
+WANT=${WANT_ANCHOR:-48}
 
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 [ "$n" = "$WANT" ] || { echo "FATAL: $SRC anchor=$n, expected exactly $WANT"; exit 9; }
