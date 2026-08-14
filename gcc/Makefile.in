@@ -1546,9 +1546,30 @@ MULTI_TARGET_INC =
 #			    linux.o would be better and wants a proof that the
 #			    object really is target-independent; renaming is
 #			    correct either way.)
+#   extract_base_offset_in_addr
+#			    aarch64.cc and riscv.cc both define it at global
+#			    scope, and arm.cc and i386.cc define their own
+#			    too.  FOUND BY CONFIGURING A THIRD BASE: the list
+#			    above was sized on i386 + aarch64, which do not
+#			    both define it, so the pair this branch always
+#			    builds could not see it.  `ld' reports
+#			    `multiple definition of
+#			    extract_base_offset_in_addr(rtx_def*, rtx_def**,
+#			    rtx_def**)' for aarch64 + riscv.
+#
+#			    NO shared translation unit names it -- measured,
+#			    the only files that do are config/aarch64/,
+#			    config/arm/, config/i386/ and config/riscv/ -- so
+#			    each back end keeps its OWN function and there is
+#			    no name for the middle end to have to choose
+#			    between.  That is why this is a bare rename and
+#			    needs no selector entry, unlike the print_operand
+#			    family (see scratchpad/t150-rename-gap.sh), which
+#			    targhooks.cc and final.cc DO name.
 MULTI_TARGET_RENAME_NAMES = \
   targetm \
   ms_va_list_type_node \
+  extract_base_offset_in_addr \
   linux_libc_has_function \
   linux_libm_function_max_error \
   linux_fortify_source_default_level
