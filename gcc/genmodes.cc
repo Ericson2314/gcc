@@ -1367,6 +1367,7 @@ struct union_slot
 {
   const char *name;		/* the numbering key, unique */
   enum mode_class cl;
+  bool boolean;			/* BOOL_MODE, i.e. skipped by MIN_MODE_INT */
   const char *arch;		/* owning back end, or null if shared */
   const char *bare;		/* unqualified spelling; == name if shared */
 };
@@ -1448,19 +1449,39 @@ emit_union_list (void)
   printf ("#max_bitsize_any_int %d\n", resolve_max_any_int ());
   printf ("#max_bitsize_any_mode %d\n", resolve_max_any_mode ());
 
+  /* THE THIRD FIELD IS BOOLEANNESS AND IT IS NOT DECORATION.  `MIN_MODE_INT'
+     is not the MODE_INT run's first ordinal: `emit_insn_modes_h' skips the
+     leading BOOL_MODEs, because the middle end must not pick a boolean mode
+     for a bitfield.  That skip is a property of the SLOT -- the shared
+     numbering fixed which ordinals hold boolean modes when it was built --
+     but each per-back-end run could only see booleanness for the modes IT
+     defines, and a mode belonging to another back end is a hole here with
+     every flag cleared.
+
+     Measured at eleven bases before this field existed: arm defines
+     BOOL_MODE (B2I) and BOOL_MODE (B4I) (arm-modes.def:88), so arm's
+     insn-modes.h says MIN_MODE_INT = E_QImode while the shared header and
+     the other ten say E_B2Imode -- the same name, two ordinals, TWO APART.
+     `expmed_mode_index' (expmed.h:243) is an INLINE using it as an index
+     ORIGIN, so a shared TU and an arm TU index one `target_expmed' two
+     elements apart, with no diagnostic; and `NUM_MODE_INT' sizes the arrays,
+     so the struct's own size disagreed (the layout witness reported 509504
+     against 514168).  A wrong ELEMENT is worse than a wrong size, because
+     only the size has a witness.  */
   for_all_modes (c, m)
     if (strcmp (m->name, m->bare))
-      printf ("%s %s %s %s\n", m->name, mode_class_names[m->cl],
-	      m->arch, m->bare);
+      printf ("%s %s %s %s %s\n", m->name, mode_class_names[m->cl],
+	      m->boolean ? "bool" : "-", m->arch, m->bare);
     else
-      printf ("%s %s\n", m->name, mode_class_names[m->cl]);
+      printf ("%s %s %s\n", m->name, mode_class_names[m->cl],
+	      m->boolean ? "bool" : "-");
 }
 
 static void
 read_union_list (void)
 {
   FILE *f = fopen (union_list_file, "r");
-  char name[256], cl[64], arch[64], bare[256], line[640];
+  char name[256], cl[64], flags[64], arch[64], bare[256], line[704];
   unsigned int alloc = 64;
 
   if (!f)
@@ -1488,8 +1509,14 @@ read_union_list (void)
 	  continue;
 	}
 
-      nf = sscanf (line, "%255s %63s %63s %255s", name, cl, arch, bare);
-      if (nf != 2 && nf != 4)
+      /* `name class flags' or `name class flags arch bare'.  FLAGS is `bool'
+	 or `-'; it is always present, so a list written before the field
+	 existed reads as nf == 2 and fails BY NAME here rather than being
+	 silently taken as a list in which nothing is boolean -- which is
+	 exactly the state this field was added to remove.  */
+      nf = sscanf (line, "%255s %63s %63s %63s %255s", name, cl, flags,
+		   arch, bare);
+      if (nf != 3 && nf != 5)
 	{
 	  if (nf > 0)
 	    error ("%s: malformed line \"%s\"", union_list_file, name);
@@ -1510,11 +1537,19 @@ read_union_list (void)
 		 union_list_file, cl, name);
 	  break;
 	}
+      if (strcmp (flags, "bool") && strcmp (flags, "-"))
+	{
+	  error ("%s: unknown flags \"%s\" for mode \"%s\"",
+		 union_list_file, flags, name);
+	  break;
+	}
+
       union_slots[n_union_slots].name = xstrdup (name);
       union_slots[n_union_slots].cl = (enum mode_class) c;
-      union_slots[n_union_slots].arch = nf == 4 ? xstrdup (arch) : 0;
+      union_slots[n_union_slots].boolean = !strcmp (flags, "bool");
+      union_slots[n_union_slots].arch = nf == 5 ? xstrdup (arch) : 0;
       union_slots[n_union_slots].bare
-	= xstrdup (nf == 4 ? bare : name);
+	= xstrdup (nf == 5 ? bare : name);
       n_union_slots++;
     }
   fclose (f);
@@ -1602,6 +1637,18 @@ apply_union_order (void)
 	  m = 0;
 	}
 
+      /* BOOLEANNESS IS THE NUMBERING'S, LIKE THE CLASS, AND FOR THE SAME
+	 REASON: it decides where `MIN_MODE_INT' lands, so a back end that
+	 answered it locally would put the origin of every `mode -
+	 MIN_MODE_INT' index at a different ordinal from the shared TUs.  */
+      if (m && m->boolean != union_slots[i].boolean)
+	{
+	  error ("mode \"%s\" is %sboolean here but %sboolean in the shared "
+		 "numbering", m->name, m->boolean ? "" : "not ",
+		 union_slots[i].boolean ? "" : "not ");
+	  m = 0;
+	}
+
       if (m)
 	m->numbered = true;
       else
@@ -1617,6 +1664,12 @@ apply_union_order (void)
 	     ordinal, with no diagnostic anywhere.  */
 	  m->bare = union_slots[i].name;
 	  m->cl = (enum mode_class) c;
+	  /* A hole keeps the numbering's booleanness even though it keeps
+	     nothing else, because this flag is not data about the mode --
+	     it is which run of the enum the ordinal belongs to, the same
+	     kind of fact as `cl' above.  Clearing it is what made arm's
+	     MIN_MODE_INT disagree with everyone else's.  */
+	  m->boolean = union_slots[i].boolean;
 	  m->precision = 0;
 	  m->bytesize = 0;
 	  m->ncomponents = 0;
