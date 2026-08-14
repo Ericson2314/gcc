@@ -104,3 +104,32 @@ the safe and unsafe sets change.
 This stops being true only when the macros are converted — which is the same
 task as deleting the shared `tm.h`. Until then, **re-run
 `t155-macroref.sh` after any change to which base supplies `tm.h`.**
+
+---
+
+## F. TWO OF THE 33 ARE UNVERIFIED BY ANY BUILD I RAN
+
+`t155-macroref-all.sh` is over-broad by construction and flags ten names. Eight
+of those are settled:
+
+  * `constant_address_p`, `legitimate_pic_operand_p` -- now carry the
+    `target_addr` funnel, which is what makes the rename safe;
+  * `print_operand`, `print_operand_address`, `init_cumulative_args`,
+    `output_ascii`, `symbol_mentioned_p`, `label_mentioned_p` -- **exercised**
+    by the 4-base or 8-base build with a definer present, producing no
+    undefined reference.
+
+**Two were exercised by neither, and should be treated as unproven:**
+
+    final_prescan_insn         h8300 iq2000 sh   -- none configured in either build
+    nonpic_symbol_mentioned_p  lm32 sh           -- neither configured
+
+By inspection both are safe *while i386 supplies the shared `tm.h`*: i386.h
+defines no `FINAL_PRESCAN_INSN`, and its `LEGITIMATE_PIC_OPERAND_P` does not
+call `nonpic_symbol_mentioned_p`. **That is an argument, not a measurement**,
+and it is exactly the primary-dependent kind this file warns about at the
+bottom. Configure sh (which defines both macros) and re-read before trusting
+them.
+
+The cheap arm: configure a base set containing `sh`, and check for undefined
+references to those two names.
