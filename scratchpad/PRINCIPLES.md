@@ -493,6 +493,22 @@ have found a design question, not a bug. Stop and report.**
   end would change it, it is the primary's and it is banned. If it is the same
   value upstream would give that back end standing alone, it is that back end's
   own answer. **State which, in the commit, whenever you add one.**
+
+  **AN `#ifndef` IN A SHARED TU IS NEVER TAKEN IF THE PRIMARY DEFINES THE NAME,
+  SO "IT HAS A FALLBACK" IS NOT EVIDENCE THE FALLBACK RUNS.** #176 cost 509 ICEs
+  on this. `regs.h:30` guards `REGMODE_NATURAL_SIZE` with `#ifndef`, but
+  `i386.h:1112` defines it first, so **all eight shared consumers called
+  `ix86_regmode_natural_size`** — aarch64 answers `BYTES_PER_SVE_VECTOR` for
+  variable-width SVE modes, i386 answers `UNITS_PER_WORD`, and
+  `gen_lowpart_common` divided by the wrong granularity and returned 0.
+
+  **Worse, `multi-target-macros.h` ALREADY LISTED THAT NAME AS CONVERTED** —
+  through a `UNITS_PER_WORD` closure at `regs.h:31`. The entry was true for a
+  back end that defines nothing and **dead for the four that define it**. So a
+  name's presence on the converted list is not evidence either. When checking
+  any conversion, ask **what the primary's `tm.h` expands the macro to**, not
+  whether a fallback exists and not whether the list names it. Both answer a
+  different question than the one that matters.
 - **Deleting, relaxing, or narrowing a check that fails.** The check is usually
   the only thing standing between a silent wrong answer and a diagnostic. If
   `--enable-backends=all` reports "45 options blocks for 48 back ends", three
