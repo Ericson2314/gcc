@@ -298,6 +298,25 @@ Both builds are `make -k -j8 all-gcc` from read-only `git archive` snapshots
 with the anchor asserted at 49 and an `.rc` stamp written only after `make`
 returns; the scorer refuses a log without the stamp.
 
+### Bars, measured on BOTH arms rather than quoted
+
+One-sided evidence cannot separate "unchanged" from "both arms moved the same
+way", so the before arm was re-measured here, at **47 bases**, not quoted from
+PRINCIPLES:
+
+```
+                        specs-config x86_64          x86_64 -O2 big.c
+before  374fe605b2c     230 / 222 / a6c4c68bdf33     12369 / 378fc33c1e70
+after   ff19f9242d8     230 / 222 / a6c4c68bdf33     12369 / 378fc33c1e70
+```
+
+Both match the recorded bar exactly. Note this reproduces the two-base bar at
+47 bases, consistent with `688b3afe25d` having made the x86_64 codegen bar
+base-count independent.
+
+**aarch64's bar was NOT measured** — it needs a second `target-specs` run and
+was not done. Not "unchanged": unmeasured.
+
 **The build-count arm is the one that actually fired in this task**, and it is
 worth saying which arm did the work: the deps-diff was clean on the FINAL
 tree, but 4490-vs-1401 objects and 1-vs-4465 errors on the first attempt is
