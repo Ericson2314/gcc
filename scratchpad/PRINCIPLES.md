@@ -586,6 +586,26 @@ change fails here rather than reporting a green for a compiler that is not this
 one. Expect this line to need updating again; the number is not the invariant,
 the exactness is.
 
+**A GUARD THE BUILD SYSTEM CITES BY NAME MAY NOT EXIST.** `gcc/Makefile.in`
+names `scratchpad/sweep.sh` as the check for bare duplicate symbols across back
+ends. It had never been written. The defect it was supposed to catch was live:
+`extract_base_offset_in_addr` is defined bare by aarch64, riscv **and** arm — a
+hard link failure, and invisible to the i386+aarch64 pair. This is worse than
+`mechanism-present-but-never-invoked`: a comment naming a guard reads as
+evidence the guard ran. **Before trusting any named check, confirm the file
+exists and run it.**
+
+**A HOLE WITH A REAL CLASS IS A USABLE OBJECT.** `genmodes.cc` unions the mode
+*vocabulary* and keeps *data* per base, so a mode another configured back end
+defines and this one lacks is a hole: precision 0, size 0, null format —
+everything says "not here" **except its class**, which `read_union_list`
+(`genmodes.cc:1619`) set from the shared numbering. Every `machmode.h`
+predicate reads class *alone*, so a hole was a usable scalar int of width zero,
+and `init_expmed` cached RTL costs for other back ends' zero-width modes on
+every compilation. Generalise: **when you split data per base but keep one
+vocabulary, every discriminator field must say "absent" — one field still
+answering the old way is enough to make the absent thing usable.**
+
 **A fix that moves the count by ZERO has refuted your story, and that is a
 result.** Working the options-accessor leak, an agent's first draft put the
 `#undef` block at end-of-file and made things worse: 63 → **254** diagnostics,
