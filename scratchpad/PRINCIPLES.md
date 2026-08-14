@@ -808,6 +808,22 @@ end's `.h` may not name a base **unconditionally** (the shared `tm.h` includes
 those three convertible); and 8 bad include orders once amplified into 251
 diagnostics from one cause.
 
+**A MISSING TOOL LOOKS EXACTLY LIKE A ZERO RESULT.** The coordinator
+"refuted" an agent's evidence with `strings foo.o | grep -c 'include-'` → 0
+and called it definitive. `strings` **is not installed here**; the 0 was
+`command not found` piped into `grep -c`. The agent was right and the
+refutation was the false green — inside an investigation of a false green.
+
+Two habits that would have caught it: **run a negative control on the
+instrument itself** (a pattern that must NOT match — if it also reads 0 with
+no error, the tool ran; if the command is missing you see it immediately), and
+**prefer tools you have already used in this session**. `grep -a` on the object
+gave the answer in one line, with the control returning 0 as it should.
+
+Generalise: `command not found`, an empty file, a truncated log and a genuine
+zero are the same output through a counting pipe. Anything shaped
+`cmd | grep -c` needs `cmd` to have demonstrably run.
+
 **A GUARD THAT REPORTS PROTECTING NOTHING IS A STOP, NOT A GREEN.** Cleaning
 207 stale `/tmp` build dirs, the coordinator wrote a keep-list for the four
 live agents' directories. It printed `removed=207 kept_live=0` — and the delete
