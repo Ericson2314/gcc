@@ -13634,3 +13634,66 @@ instrument fails towards the reassuring answer.
     left **no `.rc` stamp**, so it is unscorable by name rather than a smaller
     number. Its per-base objects were still usable for the BEFORE arm, which
     needs no link.
+
+## 7. ADDENDUM -- THE LINK REFUTED TWO OF THE 43, AND THAT IS THE BEST FINDING HERE
+
+The 4-base build (`i386 aarch64 rs6000 s390`) came back **0 `multiple
+definition` diagnostics, 0 distinct names** -- and `cc1` still did not link, on
+**2 undefined names over 51 lines**. Both were names this task had just
+renamed:
+
+    constant_address_p(rtx_def*)          <- emit-rtl.o explow.o final.o
+    legitimate_pic_operand_p(rtx_def*)    <- insn-preds.o ira.o ira-costs.o
+                                             lra-constraints.o
+
+The classifier had scored both "no shared TU names the bare symbol". That was
+**true and misleading**: shared code does not spell the function, it spells the
+**macro**. `i386.h:1853` and `:1870` define `CONSTANT_ADDRESS_P` and
+`LEGITIMATE_PIC_OPERAND_P` to call them, and eight shared TUs use the macros.
+**An identifier grep cannot see an uppercase macro that expands to the symbol.**
+This is the file's own rule -- *a symbol's name does not tell you which macro
+pulled it in; search for the ACCESSOR, not only the name* -- met from the other
+direction.
+
+Note what the rename actually did: it converted a **silent wrong answer** --
+every base getting i386's `CONSTANT_ADDRESS_P` out of the primary's `tm.h` --
+into a loud link failure. Right direction, wrong mechanism. Both are backed
+out, and both need the macro converted so each base answers for itself.
+
+**A forwarder is not the answer either**, and `multi-target-select.cc` already
+argued this about `gen_movxf`: it is defined by i386 and not aarch64, so "fail
+to link naming the base" is right for names every base defines and wrong for
+that one, and that question was left *"to a ruling, not resolved here by
+whichever choice makes the build succeed."* These two are that shape -- 44 of
+48 back ends define neither, and s390 defines `CONSTANT_ADDRESS_P` as literal
+`0` with no function at all. **Reported, not resolved.**
+
+## 8. THE 48-BASE SWEEP, AND WHAT IS STILL OPEN
+
+`t155-rename-gap.sh` over all 48 configured bases: **64 colliding hand-written
+names**, 7 of them the benign `mt_probe_*`.
+
+**The generated-object arm is now CHECKED rather than written**: 163,162
+generated definitions across 48 bases, **ZERO** collisions. The claim that
+`namespace insn_<base>` makes generated code safe was a written invariant; it
+now has a test. (It nearly did not: running it as the second half of
+`t155-rename-gap.sh` and reading that through `| head` sent SIGPIPE and killed
+the script before the arm ran, leaving no output file -- which reads exactly
+like "the arm ran and found nothing".)
+
+**STILL OPEN, and these are a queue rather than a claim:**
+
+  * **`config/arm/aarch-common.cc` is compiled by BOTH aarch64 and arm**, so
+    all 24 of its externals collide -- `aarch_bti_enabled`, `aarch_gen_bti_j`,
+    `arm_early_load_addr_dep`, `make_pass_insert_bti`, `arm_md_asm_adjust` and
+    the rest. **This is the same shape as `config/linux.cc`**, whose three
+    `linux_*` names are already in the rename list for exactly this reason.
+    Four of the 24 are renamed; the other 20 are not, and the whole family
+    should go in together.
+  * `regno_reg_class` bare in **csky frv m68k mcore sh** -- the other agent's
+    half (#155's `print_operand` family owner), reported as a crossing.
+  * `debugger_register_map` (c6x, i386), `num_source_filenames` (alpha, mips),
+    `minipool_fix_head` / `minipool_fix_tail` / `minipool_barrier` (arm, csky)
+    -- unclassified.
+  * `host_detect_local_cpu`, bare in 8 back ends, driver-side, left to the
+    `target-specs` `-march=native` work.
