@@ -138,6 +138,35 @@ endian lane-correction path rather than at `aarch64_simd_lane_bounds`
 coincidence behind it, not a diagnosis; it needs the same both-sided dump
 treatment before anyone acts on it.
 
+## THE SCORE — my own two builds, same harness, same assembler
+
+Both runs `.rc`-stamped (`check-aarch64-unknown-linux-gnu.rc` = 0), scored
+from `mtcheck.sh`'s own summary and never from the `=== gcc Summary` marker.
+**KILLED 0 on every run, never subtracted.** Load 1.0–2.3 at scoring, well
+under the ~25 provisional threshold, so these are not provisional.
+
+```
+gcc.target/aarch64/sme2/acle-asm       PASS     FAIL      BODIES  COMPILE
+  baseline  (d3477e3c898, unfixed)    28544     9050        8926      124
+  + EPILOGUE_USES (9a15499d33c)       36850      744           0      744
+  stock (SC-BOARD, other harness)     37594        0
+
+gcc.target/aarch64/sme/acle-asm
+  baseline  (prior board)              3004     1154         962      104(+88 other)
+  + EPILOGUE_USES                      3886      272           0      184(+88 other)
+```
+
+**The baseline reproduces the brief's figures exactly (28544/9050)**, which is
+what makes my two builds comparable to the board the task was set from.
+
+`sme2`: **9,050 -> 744**, and every one of the 8,926
+`check-function-bodies` failures is gone. `sme`: **1,154 -> 272**, likewise
+all 962 BODIES gone. The `OTHER` column in `sme` is unchanged at 88, i.e. this
+fix neither helped nor hurt it.
+
+The residual in both is COMPILE, and it is the `ASM_DECLARE_FUNCTION_NAME`
+family below — a distinct defect that this fix made visible.
+
 ## BOTH-SIDED, AND riscv64 IS THE STRONGEST EVIDENCE IN THE TASK
 
 `scratchpad/a5764a65f9eec0063-bothsided.sh`, `-O2 scratchpad/big.c`, baseline
@@ -225,13 +254,65 @@ varasm.o   U ix86_asm_output_labelref(_IO_FILE*, char const*, char const*)
 for every target. `.variant_pcs` is missing because `aarch64.h:855`'s
 `ASM_DECLARE_FUNCTION_NAME` is not the one a shared TU sees.
 
-**It costs zero `check-function-bodies` results, and that is a fact about the
-harness, not about the defect's severity.** `scanasm.exp:964` sets
-`fluff` to `^\s*(?:\.|//|@|$|#)`, so every `.`-prefixed line is discarded
-before the body is compared. The bodies these tests check are instruction
-lines only. So this family is invisible to the directory that led me to it and
-must be sized against `scan-assembler` tests and against object correctness
-(`%function` vs `@function` is an ELF symbol-type difference; a missing
-`.variant_pcs` is an ABI marker a linker consumes). **Stated here rather than
-folded into the score, because a defect that cannot move the number I was sent
-to move is exactly the kind that gets lost.**
+### I FIRST WROTE THAT THIS COSTS ZERO RESULTS. THAT WAS WRONG, AND THE WAY IT WAS WRONG IS THE USEFUL PART.
+
+The reasoning was sound as far as it went: `scanasm.exp:964` sets `fluff` to
+`^\s*(?:\.|//|@|$|#)`, so every `.`-prefixed line IS discarded before a body is
+compared, and this family therefore costs zero **`check-function-bodies`**
+results. I then wrote the stronger sentence — that it "costs zero results" —
+which does not follow, and is false.
+
+It costs **COMPILE** results, and it is the whole of the SME residual. Measured
+after the `EPILOGUE_USES` fix, same test, same flags:
+
+```
+stock         .arch armv8-a+sme          (file level)
+              .arch armv8-a+sme-i16i64   (per function, line 7)
+multi-target  .arch armv8-a+sme          (file level only)
+```
+
+`aarch64_declare_function_name` emits the per-function `.arch` update that
+`#pragma GCC target "+sme-i16i64"` needs.
+`sme/aarch64-sme-acle-asm.exp:66` sets `dg-do-what-default` to **assemble**
+when the assembler supports `sme-i16i64`, so those tests really are assembled,
+and the assembler refuses instructions the compiler generated correctly:
+
+```
+Error: selected processor does not support `addha za0.d,p0/m,p1/m,z0.d'
+```
+
+**This defect was hidden BEHIND the `EPILOGUE_USES` one.** While the ZA
+instructions were being deleted, the assembler never saw them, so this could
+not surface — and fixing the first defect is what made the second one
+scoreable. That is why the COMPILE column ROSE (sme: 104 -> 184; sme2: 124 ->
+744) while the total FAIL column collapsed. A rising sub-count next to a
+falling total is not necessarily a regression; here it is previously-hidden
+work becoming visible, and the only way to tell the two apart was to read what
+the errors actually said.
+
+Fixed in `4620cbee33b`, by the `mt_init_expanders` move rather than a
+redirect: `varasm.cc:2218`'s `#ifdef`/`#else` pair goes into the per-base
+thunk, and the shared call site becomes one unconditional
+`mt_declare_function_name`.
+
+**A METHOD NOTE, BECAUSE I NEARLY BANKED A WRONG ANALYSIS.** My first attempt
+to explain the rising COMPILE column grepped
+`testsuite.<triple>/gcc/gcc.log` — while a *second* `mtcheck` run was
+overwriting it. `mtcheck.sh` writes every run to the same
+`gcc.sum`/`gcc.log` path, so launching the `sme` run destroyed the `sme2`
+artefacts. The errors I read (`addha_za64.c`) were `sme/acle-asm`'s, not
+`sme2`'s, and I attributed them to the wrong directory.
+
+What saved it was that the numbers did not line up: `kinds.sh` had grepped the
+literal string `sme2/acle-asm`, which a `sme/acle-asm` file cannot match, and
+its totals equalled `mtcheck`'s own stamped `36850/744` exactly — so that
+classification was provably of the right file while the log grep provably was
+not. **The `.rc`-stamped total is what made one reading checkable and the
+other not.** Copy the `.sum` and `.log` to a run-specific name immediately
+after each `mtcheck` invocation; the stamp tells you a run finished, it does
+not tell you the file still belongs to that run.
+
+Residual of this family, NOT addressed: `ix86_asm_output_labelref` and
+`ix86_output_addr_{vec,diff}_elt` are still undefined-referenced from
+`varasm.o`/`final.o`. Label references and jump-table entries are a separate
+family with separate consumers.
