@@ -75,7 +75,12 @@ B=/tmp/b-$ID TOOLS=/tmp/tools-$ID sh scratchpad/taa-specs.sh
 # 4. bars, and the guard that the specs are actually reaching cc1
 sh scratchpad/mt-bars.sh      /tmp/b-$ID
 sh scratchpad/mt-specsread.sh /tmp/b-$ID x86_64-pc-linux-gnu aarch64-unknown-linux-gnu
-sh scratchpad/mt-rename-sweep.sh /tmp/b-$ID
+# MT_STAMP must name the tag you passed to mt-build.sh; it defaults to
+# `make-cc1.rc' and refuses by name otherwise.  And it needs `nm', so it runs
+# INSIDE the dev shell -- outside it, `nm' is absent and a tool-not-found piped
+# into `grep -c' scores 0, which looks clean.
+sh scratchpad/eb-shell.sh \
+  "WANT_ANCHOR=$A MT_STAMP=all-gcc.rc sh scratchpad/mt-rename-sweep.sh /tmp/b-$ID"
 
 # 5. the board.  mt-specsread.sh is a PRECONDITION on this, not a nicety --
 #    see its header for what every board taken before it was measuring.
