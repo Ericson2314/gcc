@@ -934,6 +934,63 @@ struct target_frame_desc
   bool (*hard_frame_pointer_is_arg_pointer) (void);
 
   /* ----------------------------------------------------------------------
+     RETURN_ADDRESS_POINTER_REGNUM, AND IT IS THE LEAKED-ABSENCE SHAPE, NOT
+     THE LEAKED-VALUE ONE.
+
+     FIVE back ends define it -- `s390' (35), `sh', `h8300', `iq2000',
+     `microblaze' -- and i386 does not.  Every shared reader is an `#ifdef',
+     and a shared translation unit reads the PRIMARY's `tm.h', so all of them
+     are FALSE for all 47 back ends.  Nothing is mis-set, nothing fails to
+     link, and no value is out of range; a block of code simply is not there.
+
+     WHAT IT COST, MEASURED.  `emit-rtl.cc:6355' is
+
+	 #ifdef RETURN_ADDRESS_POINTER_REGNUM
+	   return_address_pointer_rtx = gen_raw_REG (Pmode, RETURN_ADDRESS_POINTER_REGNUM);
+	 #endif
+
+     so `return_address_pointer_rtx' (`rtl.h:4148', a `target_rtl' member) is
+     NEVER INITIALISED and stays NULL for every target.  `s390_va_start'
+     (`s390.cc:13646') does
+
+	 t = make_tree (TREE_TYPE (sav), return_address_pointer_rtx);
+
+     and `make_tree' (`expmed.cc:5530') opens with `switch (GET_CODE (x))',
+     which dereferences the null.  That is **683 bare
+     `internal compiler error: Segmentation fault' FAILs** on s390x -- the
+     target's second-largest cause after the CC-mode leak -- and a 15-line
+     varargs function reproduces it.  Both-sided: x86_64, aarch64 and riscv64
+     compile the identical function cleanly, because none of them has a return
+     address pointer to lose.  `s390.h:618's `EH_RETURN_HANDLER_RTX' builds a
+     `MEM' on the same null.
+
+     THE OTHER THREE READERS ARE THE QUIET HALF, and they are why this is a
+     field rather than a one-line repair at the crash site.  `emit-rtl.cc:859'
+     stops `gen_rtx_REG' from returning the unique RAP rtx, so a second,
+     non-identical one can be made for the same register; `varasm.cc:1577' and
+     `stmt.cc:238' stop `register' asm variables naming the return address
+     pointer from being rejected as "an internal GCC implementation detail",
+     which is a wrong-code path rather than a diagnostic one.
+
+     AN EXISTENCE FIELD AND NOT A SENTINEL REGNUM.  `INVALID_REGNUM' suggests
+     itself and is wrong here for the reason the four regnums above give about
+     `#ifndef'-derived predicates: "this back end has no return address
+     pointer" and "this back end's return address pointer is register N" are
+     two different facts, and a sentinel makes the first unrepresentable
+     except by convention.  42 of 47 back ends answer `false', which is their
+     OWN answer read in their OWN translation unit -- the supply-side floor
+     PRINCIPLES 2a permits -- and not the primary's `#ifdef' answering for
+     them.
+
+     NOTE FOR UPSTREAM, found here and NOT fixed here because it is not this
+     branch's bug: `read-rtl-function.cc:1431' guards its RAP branch with
+     `#ifdef return_ADDRESS_POINTER_REGNUM' -- lowercase `return_'.  That
+     identifier does not exist, so the branch is dead upstream too, on every
+     target that has a return address pointer.  */
+  bool (*has_return_address_pointer) (void);
+  unsigned int (*return_address_pointer_regnum) (void);
+
+  /* ----------------------------------------------------------------------
      THE TWO CFA-AT-ENTRY OFFSETS.  This pair is what made the aarch64
      prologue emit CORRECT instructions with WRONG unwind data, and it was
      invisible until #130 produced assembly to look at:
@@ -1756,6 +1813,17 @@ extern unsigned int mt_hard_frame_pointer_regnum (void);
 extern unsigned int mt_arg_pointer_regnum (void);
 extern bool mt_hard_frame_pointer_is_frame_pointer (void);
 extern bool mt_hard_frame_pointer_is_arg_pointer (void);
+
+/* RETURN_ADDRESS_POINTER_REGNUM, for shared code; see the field comment.
+   NOT redirected in `defaults.h', deliberately: every shared reader spells it
+   inside an `#ifdef RETURN_ADDRESS_POINTER_REGNUM', so a redirect would leave
+   the name defined, keep all four guards TRUE for all 47 back ends, and hand
+   the 42 with no return address pointer a call that must not be made.  The
+   existence question is the thing being converted, so the four call sites ask
+   `mt_has_return_address_pointer ()' directly and the macro is not redefined
+   at all.  */
+extern bool mt_has_return_address_pointer (void);
+extern unsigned int mt_return_address_pointer_regnum (void);
 
 /* THE TWO CFA-AT-ENTRY OFFSETS, for shared code.  See the field comments
    above for the gdb reading that named them and for why they move as a pair.

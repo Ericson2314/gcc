@@ -1572,11 +1572,15 @@ make_decl_rtl (tree decl)
       else if (!targetm.hard_regno_mode_ok (reg_number, mode))
 	error ("register specified for %q+D isn%'t suitable for data type",
                decl);
+      /* The `#ifdef RETURN_ADDRESS_POINTER_REGNUM' around the middle
+	 disjunct was the PRIMARY's answer, so on the five back ends that HAVE
+	 a return address pointer a `register' asm variable naming it was not
+	 rejected as an internal implementation detail.  See target-frame.h.  */
       else if (reg_number != HARD_FRAME_POINTER_REGNUM
 	       && (reg_number == FRAME_POINTER_REGNUM
-#ifdef RETURN_ADDRESS_POINTER_REGNUM
-		   || reg_number == RETURN_ADDRESS_POINTER_REGNUM
-#endif
+		   || (mt_has_return_address_pointer ()
+		       && reg_number
+			  == (int) mt_return_address_pointer_regnum ())
 		   || reg_number == ARG_POINTER_REGNUM)
 	       && eliminable_regno_p (reg_number))
 	error ("register specified for %q+D is an internal GCC "

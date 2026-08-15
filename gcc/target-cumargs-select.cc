@@ -490,6 +490,25 @@ mt_hard_frame_pointer_is_arg_pointer (void)
   return mt_frame ()->hard_frame_pointer_is_arg_pointer ();
 }
 
+/* RETURN_ADDRESS_POINTER_REGNUM; see target-frame.h.  The existence question
+   is the one that was leaking -- five back ends have a return address pointer
+   and the primary is not one of them, so `emit-rtl.cc:6355's `#ifdef' was
+   false for all 47 and `return_address_pointer_rtx' was never built.  */
+bool
+mt_has_return_address_pointer (void)
+{
+  return mt_frame ()->has_return_address_pointer ();
+}
+
+/* Callers must test `mt_has_return_address_pointer ()' first.  The per-base
+   thunk `gcc_unreachable ()'s for a back end that has none rather than
+   inventing a register number.  */
+unsigned int
+mt_return_address_pointer_regnum (void)
+{
+  return mt_frame ()->return_address_pointer_regnum ();
+}
+
 /* THE TWO CFA-AT-ENTRY OFFSETS.  Uncached through `mt_frame ()' like the
    families above, and here the reason is measured rather than hypothetical:
    i386's `INCOMING_FRAME_SP_OFFSET' reads `cfun->machine->func_type', so it

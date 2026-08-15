@@ -856,10 +856,13 @@ gen_rtx_REG (machine_mode mode, unsigned int regno)
 	  && FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
 	  && regno == ARG_POINTER_REGNUM)
 	return arg_pointer_rtx;
-#ifdef RETURN_ADDRESS_POINTER_REGNUM
-      if (regno == RETURN_ADDRESS_POINTER_REGNUM)
+      /* `#ifdef RETURN_ADDRESS_POINTER_REGNUM' upstream; see the sibling site
+	 in `init_emit_regs' and target-frame.h.  Without this the unique RAP
+	 rtx is never handed back, so a second, non-identical `REG' can be
+	 made for the same register -- the quiet half of the same leak.  */
+      if (mt_has_return_address_pointer ()
+	  && regno == mt_return_address_pointer_regnum ())
 	return return_address_pointer_rtx;
-#endif
       if (regno == (unsigned) PIC_OFFSET_TABLE_REGNUM
 	  && PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM
 	  && fixed_regs[PIC_OFFSET_TABLE_REGNUM])
@@ -6352,10 +6355,14 @@ init_emit_regs (void)
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     initial_regno_reg_rtx[i] = gen_raw_REG (reg_raw_mode[i], i);
 
-#ifdef RETURN_ADDRESS_POINTER_REGNUM
-  return_address_pointer_rtx
-    = gen_raw_REG (Pmode, RETURN_ADDRESS_POINTER_REGNUM);
-#endif
+  /* `#ifdef RETURN_ADDRESS_POINTER_REGNUM' upstream, i.e. the PRIMARY's
+     answer, and i386 has no return address pointer -- so this assignment did
+     not exist for any of the 47 back ends and `return_address_pointer_rtx'
+     stayed NULL.  s390 then dereferenced it in `s390_va_start': 683
+     segfaults.  See target-frame.h.  */
+  if (mt_has_return_address_pointer ())
+    return_address_pointer_rtx
+      = gen_raw_REG (Pmode, mt_return_address_pointer_regnum ());
 
   pic_offset_table_rtx = NULL_RTX;
   if ((unsigned) PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)

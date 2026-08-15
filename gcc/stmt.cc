@@ -233,11 +233,12 @@ hardreg_ok_p (int reg_number, machine_mode mode, int operand_num)
   else if (!targetm.hard_regno_mode_ok (reg_number, mode))
     error ("register %s for operand %i isn%'t suitable for data type",
 	   reg_names[reg_number], operand_num);
+  /* Same conversion and same reason as the sibling site in `varasm.cc'; see
+     target-frame.h.  */
   else if (reg_number != HARD_FRAME_POINTER_REGNUM
 	   && (reg_number == FRAME_POINTER_REGNUM
-#ifdef RETURN_ADDRESS_POINTER_REGNUM
-	       || reg_number == RETURN_ADDRESS_POINTER_REGNUM
-#endif
+	       || (mt_has_return_address_pointer ()
+		   && reg_number == (int) mt_return_address_pointer_regnum ())
 	       || reg_number == ARG_POINTER_REGNUM)
 	   && eliminable_regno_p (reg_number))
     error ("register for operand %i is an internal GCC "

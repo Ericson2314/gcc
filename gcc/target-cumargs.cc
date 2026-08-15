@@ -738,6 +738,44 @@ mt_base_hard_frame_pointer_is_arg_pointer (void)
   return HARD_FRAME_POINTER_IS_ARG_POINTER ? true : false;
 }
 
+/* RETURN_ADDRESS_POINTER_REGNUM, in THIS base's preprocessor context; see
+   target-frame.h for the 683 s390x segfaults this was worth and for the
+   15-line reproducer.
+
+   THE `#ifdef' IS CORRECT HERE AND WRONG EVERYWHERE ELSE, which is the whole
+   point of the file it is in: this translation unit's `tm.h' is
+   `BASE_HEADER (tm.h)', so the question "does this back end define
+   RETURN_ADDRESS_POINTER_REGNUM" is asked of the back end it is about.  The
+   four shared readers ask the same `#ifdef' of the PRIMARY and get `no' for
+   all 47.
+
+   `false' for the 42 back ends that define nothing is THEIR answer, not
+   i386's: a back end with no return address pointer genuinely has none, and
+   upstream compiles exactly these blocks out for it.  */
+static bool
+mt_base_has_return_address_pointer (void)
+{
+#ifdef RETURN_ADDRESS_POINTER_REGNUM
+  return true;
+#else
+  return false;
+#endif
+}
+
+static unsigned int
+mt_base_return_address_pointer_regnum (void)
+{
+#ifdef RETURN_ADDRESS_POINTER_REGNUM
+  return (unsigned int) RETURN_ADDRESS_POINTER_REGNUM;
+#else
+  /* Unreachable behind `has_return_address_pointer', and it FAILS BY NAME
+     rather than returning a plausible register number.  A `0' here would be
+     a real hard register on most back ends, so the wrong answer would be
+     indistinguishable from a right one -- the shape PRINCIPLES bans.  */
+  gcc_unreachable ();
+#endif
+}
+
 /* THE TWO CFA-AT-ENTRY OFFSETS, read in THIS base's translation unit.  The
    values this pair produces are 8 and 8 for i386 (both from i386.h:2177 and
    :2183, with a TYPE_NORMAL function) and 0 and 0 for aarch64, which defines
@@ -1666,6 +1704,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_arg_pointer_regnum,
   mt_base_hard_frame_pointer_is_frame_pointer,
   mt_base_hard_frame_pointer_is_arg_pointer,
+  mt_base_has_return_address_pointer,
+  mt_base_return_address_pointer_regnum,
   mt_base_incoming_frame_sp_offset,
   mt_base_default_incoming_frame_sp_offset,
   mt_base_accumulate_outgoing_args,
