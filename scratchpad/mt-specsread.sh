@@ -184,9 +184,29 @@ for T in "$@"; do
   b=$(cc1line "$BARE/specs-config")
   printf '%s\n' "$a" > "$W/cc1-real-$T.txt"
   printf '%s\n' "$b" > "$W/cc1-bare-$T.txt"
-  if [ -z "$a" ] || [ -z "$b" ]; then
-    echo "FAIL[$T] ARM4: \`-###' produced no cc1 line (real=[${a:-}] bare=[${b:-}])"
+  # THE THREE OUTCOMES, AND `bare' BEING EMPTY IS THE STRONGEST PASS, NOT A
+  # FAILURE.
+  #
+  # This arm originally failed whenever EITHER line was empty, on the reasoning
+  # that an empty read is indistinguishable from a command that did not run.
+  # That is right about `real' and wrong about `bare': measured on s390x, a
+  # driver given a target-config with NO per-target `specs' beside it cannot
+  # construct a `cc1' invocation at all -- `-###' prints its banner and stops.
+  # That is a bigger difference than any flag diff, and scoring it as a failure
+  # refused a run whose spec file was demonstrably load-bearing.
+  #
+  # BOTH empty is still a FAIL, because then nothing ran and the arm proves
+  # nothing -- which is the distinction the original test collapsed.
+  if [ -z "$a" ]; then
+    echo "FAIL[$T] ARM4: \`-###' produced no cc1 line for the REAL config."
+    echo "  Either the driver refused the file or the probe did not run; in"
+    echo "  both cases this arm cannot speak."
     fail=$((fail+1))
+  elif [ -z "$b" ]; then
+    echo "-- ARM4 PASS: without its own spec file the driver cannot build a"
+    echo "   cc1 command line AT ALL for this target -- the strongest form of"
+    echo "   'the spec file is load-bearing'.  With it:"
+    printf '     %s\n' "$a" | cut -c1-160
   elif [ "$a" = "$b" ]; then
     echo "FAIL[$T] ARM4: the cc1 command line is IDENTICAL with and without the"
     echo "  target's spec file.  The file was opened and contributed nothing to"
