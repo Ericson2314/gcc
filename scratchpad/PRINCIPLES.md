@@ -1768,6 +1768,37 @@ at all while every member after the first divergence held another member's
 value. Compare bodies, offsets and names; a count is the weakest evidence
 available and is silent in exactly the case that matters.
 
+**A BULK `sed` OVER SOURCE NEEDS A FIXTURE TEST FIRST, AND THE FIXTURE MUST
+CONTAIN THE SHAPES THAT MUST *NOT* MATCH.** Converting 176 register
+classifiers, a pattern rooted at `REGNO (` matched the TAIL of
+`DF_REF_REGNO (use)` and produced
+
+```c
+if (DF_REF_!HARD_REGISTER_NUM_P (REGNO (use))
+```
+
+in 16 places — an orphaned identifier prefix, from the same substring family
+as `grep "define PRINT_OPERAND"` matching `PRINT_OPERAND_ADDRESS`. It was
+caught by the compiler, which is the cheapest possible detector and also the
+LAST one: two of the three checks run beforehand (paren balance, and
+`FIRST_PSEUDO_REGISTER` surviving inside the replacement) both came back
+clean, because neither asks the question "did the match start where I meant".
+
+Two rules, and the second is the one that was missing:
+
+- **Word-anchor every identifier in a source-rewriting pattern** (`\<`), and
+  make the prefix group OPTIONAL rather than required — the corrected pattern
+  `\<\([A-Za-z_0-9]*REGNO\)` first silently converted **nothing**, because a
+  mandatory `[A-Za-z_]` prefix cannot match bare `REGNO`. A pattern that
+  matches too little looks exactly like a clean tree.
+- **Test the sed on a FIXTURE containing every shape, including the negative
+  ones, and read the output.** Six lines were enough here: bare `REGNO`,
+  nested `REGNO (SUBREG_REG (x))`, prefixed `DF_REF_REGNO`, `ORIGINAL_REGNO`,
+  a `for`-loop bound and an array-size use. The last two MUST come through
+  unchanged, and only a fixture shows that. Both failures above were visible
+  in that six-line output in under a second, and both had already cost a
+  twenty-minute build when found the other way.
+
 **`awk '$0 ~ f'` ON A DEMANGLED C++ NAME MATCHES NOTHING.** The `()` in
 `foo(rtx_insn*)` is an **empty regex group**, so the pattern matches nothing
 and six object-level arms scored EMPTY — which reads as *"there is no per-base
