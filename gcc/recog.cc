@@ -3820,15 +3820,34 @@ peep2_find_free_register (int from, int to, const char *class_str,
 
   cl = reg_class_for_constraint (lookup_constraint (class_str));
 
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  /* MT_FIRST_PSEUDO_REGISTER, NOT THE UNION'S BOUND.  This walk means "every
+     hard register this back end has", and the register number it settles on
+     is handed to `gen_rtx_REG' below -- so the union's 677 does not merely
+     waste iterations, it MANUFACTURES a register number the selected base does
+     not have.  `targetm.hard_regno_mode_ok' is then asked about it (i386 reads
+     its own tables past their end) and, if that answers yes, the REG is
+     returned into the insn stream, where the shared `general_operand' meets it
+     and `in_hard_reg_set_p' asserts.  Measured: 191 of the 1,756
+     `regs.h:312' ICEs on x86_64 survive the virtual-register fix and arrive
+     here instead -- `gcc.c-torture/compile/920625-1.c -O2 -w -std=gnu89',
+     during RTL pass `peephole2', `peep2_find_free_register' below
+     `insn_i386::peephole2_12'.
+
+     This is a LOOP BOUND, not a classifier, so the criterion in
+     `A57163422943AAA57-REGNO-CLASSIFIER-QUEUE.md' is satisfied trivially:
+     there is no pseudo branch and no producer-populated per-pseudo structure
+     on either side of it.  `reg_alloc_order' is union-sized and reginfo.cc
+     fills the tail with the identity, so indexing it with a smaller bound is
+     safe in both arms.  */
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     {
       int raw_regno, regno, j;
       bool success;
 
       /* Distribute the free registers as much as possible.  */
       raw_regno = search_ofs + i;
-      if (raw_regno >= FIRST_PSEUDO_REGISTER)
-	raw_regno -= FIRST_PSEUDO_REGISTER;
+      if (raw_regno >= MT_FIRST_PSEUDO_REGISTER)
+	raw_regno -= MT_FIRST_PSEUDO_REGISTER;
       /* Was `#ifdef REG_ALLOC_ORDER' -- the primary's headers, for every
 	 base.  See MT_HAVE_REG_ALLOC_ORDER in target-regs.h.  */
       if (MT_HAVE_REG_ALLOC_ORDER)
@@ -3897,7 +3916,7 @@ peep2_find_free_register (int from, int to, const char *class_str,
 	  add_to_hard_reg_set (reg_set, mode, regno);
 
 	  /* Start the next search with the next register.  */
-	  if (++raw_regno >= FIRST_PSEUDO_REGISTER)
+	  if (++raw_regno >= MT_FIRST_PSEUDO_REGISTER)
 	    raw_regno = 0;
 	  search_ofs = raw_regno;
 
