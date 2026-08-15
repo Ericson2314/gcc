@@ -118,6 +118,40 @@ difference between the two conclusions, and they were opposite.
 markers and 0 KILLED in the x86_64 log; the failing inputs are a few lines
 long and nowhere near 8 GB.
 
+## aarch64 — NOT MEASURED. The run was killed, and the `=== gcc Summary` guard PASSED on the wreckage.
+
+The four-target run was stopped during aarch64. What it left behind is worth
+recording, because it is a live instance of a guard this project already knew
+was insufficient and had not seen fail:
+
+```
+gcc.sum has `=== gcc Summary'      YES   -- the guard passes
+results in the merged sum          54,900
+a COMPLETE aarch64 run             ~331,000  (TAA-BOARD's own figure)
+check-aarch64-...rc stamp          ABSENT
+```
+
+The summary block is internally consistent — 28948 + 18908 + 223 + 5069 +
+1742 ≈ the 54,900 lines present — so **nothing about the file looks
+truncated.** It is a complete-looking summary of a sixth of a run. Had the
+scorer trusted the `=== gcc Summary` marker alone it would have printed
+`aarch64 28948 PASS / 18908 FAIL` beside x86_64's real numbers, and that row
+is not obviously wrong: it is the right shape, the right order of magnitude
+for a bad target, and it would have been quoted.
+
+**The `.rc` stamp is what caught it**, exactly as its comment claims:
+
+```
+aarch64-unknown-linux-gnu   REFUSED: no check-aarch64-...rc stamp -- the run did not finish
+```
+
+The post-conditions I ran by hand all PASS on this wreckage too — the
+`multi-target.exp` banner is present, and all 6 `site.exp` files attribute to
+aarch64. So four of the five guards are green on a partial run and only the
+stamp is red. That ratio is the argument for keeping it.
+
+**No aarch64 number from this run may be quoted, including by me.**
+
 ## Consequence for the re-baselining exercise
 
 x86_64 cannot serve as the control column until `cselib.cc`'s classifier sites
