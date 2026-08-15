@@ -1,10 +1,31 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
-> ## SUPERSEDED FOR aarch64 — RE-MEASURED AT `5eb6cb0e5e3`
+> ## SUPERSEDED — BOTH TARGETS, FINAL FIGURES AT `03cfa434d1c` + `6bdfe647912`
 >
 > ```
-> aarch64 debt   205,433  ->  93,526      (111,907 taken back)
+>            TAA-BOARD   after specs/headers/cselib   FINAL
+> aarch64     205,433              93,526            14,126
+> s390x        20,326              14,256             7,884
 > ```
+>
+> **93% of aarch64's recorded debt and 61% of s390x's are gone**, measured
+> against these same intact stock sums. aarch64 PASS is now **328,251 against
+> stock's 344,463** — within 16,212, having started the day at 88,001.
+>
+> Four causes, in order of what they were worth:
+>
+> | cause | fixed in | aarch64 | s390x |
+> |---|---|---|---|
+> | `extra_headers` per back end | before today | 114,447 | — |
+> | `register_filters[]` never filled (#205) | `6bdfe647912` | ~79,400 | — |
+> | the HOST x86 assembler (#204, HARNESS) | GUARD 3c | ~10,142 | 7,205 |
+> | `-ftarget-config=` read no specs | before today | — | large on riscv64 |
+>
+> The old §3a/§7 numbers below are all superseded. In particular **§3a's
+> 194,711 valuation of `extra_headers` was an over-attribution** (the true
+> figure is 114,447), and **§7's #2 item, `gcc.c-torture/compile`, was never a
+> compiler defect at all** — it was the host assembler, and that directory's
+> s390x debt fell 10,114 → 2,909 once the target's own `as` was used.
 >
 > **AND §3a's `extra_headers` VALUATION OF 194,711 IS WRONG — DO NOT QUOTE
 > IT.** That number is the whole `gcc.target/aarch64` debt, credited to
