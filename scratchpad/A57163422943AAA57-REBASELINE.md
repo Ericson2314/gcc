@@ -371,6 +371,64 @@ column must quote the scope change beside it.
 `s390_match_ccmode_set` rose 1,295 -> 3,860, which is what a cause left
 standing looks like once the ones in front of it are removed.
 
+## aarch64 AT BOARD SCALE — debt 205,433 -> 14,126, and the ACLE cluster is 85% gone
+
+The #205 acceptance, measured over the full suite rather than the 120-command
+replay. Build `/tmp/b-a57163422943aaa57-lra` with the register-filter fix
+(`6bdfe647912`) and GUARD 3c supplying aarch64's own assembler.
+
+```
+                            PASS      FAIL   XPASS  XFAIL  UNSUP   UNRES
+aarch64 (this run)        328251     36745       2   1988   7020   17625
+aarch64 (previous)        200002    136330       3   1246  11012   34980
+aarch64 (TAA-BOARD)        88001     98027       3    832  11012  133394
+STOCK                     344463     20443       2   1995   6731   17003
+
+KILLED 2 (the ulimit -v cap; counted, never subtracted)
+load at scoring 5.01 / 5.91 / 5.94 -- fifteen-minute 5.94, NOT provisional
+guard: assembler is aarch64-unknown-linux-gnu's own, and it produces: AArch64
+```
+
+**PASS is now within 16,212 of stock's**, having started the day at 88,001
+against the same 344,463.
+
+### THE DEBT
+
+```
+205,433   TAA-BOARD, before anything landed
+ 93,526   after extra_headers + specs + cselib
+ 14,126   with the register-filter fix and aarch64's own assembler
+```
+
+**93% of the recorded aarch64 debt is gone**, and what remains is almost
+entirely one directory:
+
+```
+13,976  gcc.target/aarch64
+    53  gcc.dg/torture
+    53  gcc.dg/lto
+    12  gcc.dg/tree-ssa
+```
+
+### THE ACLE CLUSTER — the #205 acceptance
+
+```
+directory          BEFORE P/F        NOW P/F        STOCK P/F
+sve/acle           59896/35027      77962/ 4034     79980/0
+sve2/acle          35177/34268      58463/ 1032     59021/0
+sme/acle-asm        1996/ 3186       3004/ 1154      4070/0
+sme2/acle-asm       2516/30146      28544/ 9050     37594/0
+                   ------------     -----------
+FAIL total              102,627          15,270
+PASS total               99,585         167,973
+```
+
+**FAIL 102,627 -> 15,270: 87,357 results recovered, 85% of the cluster**, and
+`sve2/acle` is now within 558 PASS of stock. The 15,270 that remain are a real
+residual — `sme2/acle-asm` holds 9,050 of them and is the obvious next look —
+but the cause identified in `A57163422943AAA57-CONSTRAINT-VOCABULARY.md`'s
+correction is closed.
+
 ## s390x RE-RUN under GUARD 3c — and the 10,200 contracted files are explained
 
 Same build, same snapshot, with the target's **own** assembler (GUARD 3c) and
