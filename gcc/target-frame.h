@@ -1379,6 +1379,55 @@ struct target_frame_desc
      three that turned a missing `#ifdef' here into a 47-base build failure.  */
   bool (*has_incoming_return_addr_rtx) (void);
   rtx (*incoming_return_addr_rtx) (void);
+
+  /* EPILOGUE_USES (REGNO) -- AND THIS ONE LEAKS AN ANSWER THAT IS TOO SMALL,
+     WHICH DELETES CODE RATHER THAN MIS-COMPILING IT.
+
+     `df-scan.cc:3647' is the single shared consumer:
+
+	 df_epilogue_uses_p (regno)
+	   = EPILOGUE_USES (regno) || TEST_HARD_REG_BIT (..., regno)
+
+     and it feeds `df_get_exit_block_use_set', i.e. the set of hard registers
+     considered live on return.  Compiled against the primary it is
+     `ix86_epilogue_uses', for all 47 back ends -- confirmed rather than
+     inferred: `nm -uC df-scan.o' names `ix86_epilogue_uses(int)' and no other
+     i386 symbol in that object.
+
+     25 of 47 back ends define the macro (aarch64 alpha arc arm avr epiphany
+     frv ft32 i386 ia64 loongarch m68k mips mmix moxie pru riscv s390 sh sparc
+     v850 visium xstormy16 xtensa, plus alpha/vms.h).  Each was answering with
+     i386's set.
+
+     WHY IT COSTS MORE THAN A WRONG VALUE USUALLY DOES.  A register the
+     selected back end needs live at exit, and that i386 does not name, is
+     simply absent from the exit block's use set.  Nothing is mis-set and
+     nothing complains; dataflow then concludes that whatever wrote that
+     register is dead and DCE deletes it.  Measured on aarch64 SME2, where
+     `EPILOGUE_USES' is what keeps the ZA state registers live:
+
+	 stock   exit block uses  ... 87 [lowering] 89 [sme_state]
+				     90 [tpidr2_setup] 92 [za_saved] 93 [za]
+	 leaked  exit block uses  ... (none of the five)
+	 => cse1 "DCE: Deleting insn 8", the `add za.s[w8, 0, vgx2], ...'
+	 => every ZA-writing function emitted as a bare `ret', rc=0, no
+	    diagnostic
+
+     That is the leaked-ABSENCE shape `init_expanders' above describes, in the
+     dataflow rather than in a `#ifdef': the compiler emits LESS code, exits
+     0, and the damage is a silently empty function body.  It is worth
+     `9,050' FAILs in `gcc.target/aarch64/sme2/acle-asm' alone, where stock
+     fails zero, and every one of them is a `check-function-bodies' mismatch
+     rather than a compile failure -- which is why no ICE or error count could
+     ever have found it.
+
+     NO EXISTENCE FIELD IS NEEDED, unlike `has_incoming_return_addr_rtx'.  The
+     shared consumer spells the macro unconditionally, never `#ifdef's it, and
+     `defaults.h:1335' gives a base that defines nothing the value `false'.
+     That fallback is the SUPPLY-side kind PRINCIPLES permits: it is reached in
+     that base's own translation unit and it is upstream's own answer for a
+     back end standing alone, not the primary's.  */
+  bool (*epilogue_uses) (int regno);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1396,6 +1445,11 @@ extern unsigned int mt_stack_slot_alignment (tree, machine_mode, unsigned int);
 extern unsigned int mt_minimum_alignment (tree, machine_mode, unsigned int);
 extern int mt_outgoing_reg_parm_stack_space (tree);
 extern bool mt_function_arg_regno_p (int);
+
+/* `EPILOGUE_USES'.  One shared consumer, `df-scan.cc:3647', an ordinary
+   run-time expression with no `#ifdef' around it, so a call-valued redirect in
+   `multi-target-macros.h' is legal.  */
+extern bool mt_epilogue_uses (int);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

@@ -235,6 +235,18 @@ mt_base_function_arg_regno_p (int regno ATTRIBUTE_UNUSED)
   return FUNCTION_ARG_REGNO_P (regno);
 }
 
+/* EPILOGUE_USES, asked of THIS base.  ATTRIBUTE_UNUSED because `defaults.h's
+   generic definition is the constant `false' and ignores the argument, which
+   is what the 22 back ends defining no `EPILOGUE_USES' get -- in their own
+   translation unit, which is the whole point.  See target-frame.h for what
+   the leaked i386 answer costs.  */
+
+static bool
+mt_base_epilogue_uses (int regno ATTRIBUTE_UNUSED)
+{
+  return EPILOGUE_USES (regno);
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1602,7 +1614,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_regmode_natural_size,
   mt_base_case_vector_mode,
   mt_base_has_incoming_return_addr_rtx,
-  mt_base_incoming_return_addr_rtx
+  mt_base_incoming_return_addr_rtx,
+  mt_base_epilogue_uses
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL

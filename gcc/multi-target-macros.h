@@ -526,6 +526,13 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef FUNCTION_ARG_REGNO_P
 #define FUNCTION_ARG_REGNO_P(N) (mt_function_arg_regno_p ((int) (N)))
 
+/* `EPILOGUE_USES'.  `df-scan.cc:3647' is the only shared consumer and spells
+   it unconditionally, so the redirect is safe; see target-frame.h for why the
+   leaked i386 answer emits a bare `ret' for every aarch64 SME2 ZA-writing
+   function instead of producing a wrong value.  */
+#undef EPILOGUE_USES
+#define EPILOGUE_USES(REGNO) (mt_epilogue_uses ((int) (REGNO)))
+
 /* THE STACK-ALIGNMENT CLOSURE.  See target-frame.h for the full argument; the
    short version is that the leak `nm -uC cfgexpand.o' names
    (`ix86_incoming_stack_boundary', from i386.h:803 -- and i386 is the only one

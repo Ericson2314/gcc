@@ -162,6 +162,18 @@ mt_function_arg_regno_p (int regno)
   return mt_frame ()->function_arg_regno_p (regno);
 }
 
+/* `EPILOGUE_USES'.  Through `mt_frame ()' like the others, so a compilation
+   with no target selected fails by name rather than reading a null table.
+   That matters here in the way target-frame.h describes: a wrong `false' does
+   not fault, it removes registers from the exit block's live set and lets DCE
+   delete the instructions that wrote them.  */
+
+bool
+mt_epilogue_uses (int regno)
+{
+  return mt_frame ()->epilogue_uses (regno);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here
