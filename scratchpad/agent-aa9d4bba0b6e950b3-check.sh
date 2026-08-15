@@ -16,10 +16,18 @@ set -eu
 W=/home/jcericson/src/gnu/gcc/.claude/worktrees/agent-aa9d4bba0b6e950b3
 TOOLS=/tmp/tools-agent-aa9d4bba0b6e950b3
 ARM=${1:?before|after}
+# THREE BUILD DIRS EXIST AND ONLY TWO ARE ARMS.  `-after' carries the CC-mode
+# fix ALONE and was built to isolate it; `-both' carries that and the
+# return-address-pointer fix, and is the tree the AFTER testsuite must run on.
+# Naming `-after' here would produce a complete, stamped, guard-green run of
+# the WRONG COMPILER -- the exact shape PRINCIPLES 4 describes for the 23
+# scripts with a hardcoded foreign `SRC='.  The srcdir is echoed below so the
+# arm and the tree can be checked against each other by eye as well.
 case "$ARM" in
   before) D=/tmp/b-aa9d4bba0b6e950b3 ;;
-  after)  D=/tmp/b-aa9d4bba0b6e950b3-after ;;
-  *) echo "FATAL: arm must be before|after" >&2; exit 9 ;;
+  after)  D=/tmp/b-aa9d4bba0b6e950b3-both ;;
+  cconly) D=/tmp/b-aa9d4bba0b6e950b3-after ;;
+  *) echo "FATAL: arm must be before|after|cconly" >&2; exit 9 ;;
 esac
 T=s390x-ibm-linux-gnu
 OUT=/tmp/board-agent-aa9d4bba0b6e950b3
