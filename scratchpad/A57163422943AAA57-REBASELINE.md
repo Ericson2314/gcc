@@ -371,6 +371,51 @@ column must quote the scope change beside it.
 `s390_match_ccmode_set` rose 1,295 -> 3,860, which is what a cause left
 standing looks like once the ones in front of it are removed.
 
+## s390x RE-RUN under GUARD 3c — and the 10,200 contracted files are explained
+
+Same build, same snapshot, with the target's **own** assembler (GUARD 3c) and
+the register-filter fix (`6bdfe647912`):
+
+```
+                     host as        own as + filter fix
+PASS                  77,778              121,026
+FAIL                  30,153               29,633
+UNRESOLVED             9,469               13,328
+total results        126,209              172,875     (+46,666)
+KILLED                     0                    0
+guard: assembler is s390x-ibm-linux-gnu's own, and it produces: IBM S/390
+```
+
+**THE OPEN QUESTION IS ANSWERED.** The 10,200 s390x files that "contracted"
+and the 32,679 missing results were not a scope change in the suite: they were
+tests dying at the assembler before producing their remaining results. Given
+its own assembler the target produces **46,666 more results** and PASS rises
+by 43,248. Nobody needs to diff the old numbers — they were taken through an
+x86 assembler.
+
+## THE DEBT, three readings of the same target
+
+```
+20,326   TAA-BOARD, before anything landed today
+14,256   after the specs + cselib fixes, still assembling with the HOST as
+ 7,884   with the target's own assembler and the register-filter fix
+```
+
+**s390x's debt is 7,884, not 20,326** — 61% of it was removed today, and the
+part attributable to the harness alone is visible in one directory:
+
+```
+gcc.c-torture/compile debt   10,114  ->  2,909
+```
+
+7,205 of that directory's "debt" was the host assembler, exactly as
+`A57163422943AAA57-HOST-ASSEMBLER.md` predicted. **The 2,909 that remain are
+real** and are now the honest top entry for this target.
+
+Current s390x debt by directory: `gcc.c-torture/compile` 2,909,
+`gcc.dg/torture` 1,581, `gcc.target/s390` 502, `gcc.dg/tree-ssa` 500,
+`gcc.dg/vect` 336, `gcc.dg/params` 243, `gcc.dg/debug` 243.
+
 ## The standing #2 work item is untouched and is now the largest after SVE/SME
 
 `gcc.c-torture/compile`: **aarch64 10,142 + s390x 10,114 = 20,256 results of
