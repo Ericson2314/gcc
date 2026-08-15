@@ -138,6 +138,35 @@ struct target_preds_desc
   size_t (*constraint_len) (char, const char *);
   bool (*const_int_ok) (HOST_WIDE_INT, int);
 
+  /* THE WRITER OF `this_target_constraints->register_filters[]', AND ITS
+     ABSENCE FROM THIS TABLE COST ~102,000 aarch64 TEST RESULTS.
+
+     The paragraph below reasons correctly about the READER and was silent
+     about the WRITER, which is the producer/consumer split arriving from the
+     other side.  `register_filters[]' is shared runtime storage, and
+     `multi-target-select.cc' says in as many words that "the selected back
+     end's init_reg_class_start_regs () fills [it] in" -- but `reginfo.cc'
+     called the BARE name, which is the SINGULAR `insn-preds.cc' generated
+     from the primary's machine description.  i386 defines no register
+     filters, so `register_filters.is_empty ()' held in that run and genpreds
+     emitted
+
+         void init_reg_class_start_regs () { }
+
+     an empty body.  Every bit of `register_filters[]' therefore stayed 0, so
+     `TEST_HARD_REG_BIT' answered NO for every register and every filtered
+     constraint became unsatisfiable.  Measured on aarch64: `Uw2' is
+     `FP_REGS' plus `regno % 2 == 0', and V24 (regno 56, even) failed it, so
+     LRA reloaded an operand that was already correct, could not satisfy the
+     reload, and died in `lra_split_hard_reg_for'.  The whole SVE/SME ACLE
+     family -- where stock GCC fails ZERO -- went with it.
+
+     Note the shape: the table selected every function that READS a filter and
+     none that WRITES one, and the reading half was demonstrably wired (`nm
+     -uC lra-constraints.o' shows `mt_get_register_filter'), which is exactly
+     what made the gap invisible.  */
+  void (*init_filters) (void);
+
   /* The register-filter side.  `test_register_filters' is NOT here: genpreds
      already emits an identical body in every back end's header, over the
      unioned `NUM_REGISTER_FILTERS' and the shared

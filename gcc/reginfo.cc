@@ -158,8 +158,13 @@ reginfo_cc_finalize (void)
   CLEAR_HARD_REG_SET (global_reg_set);
 }
 
-/* In insn-preds.cc.  */
+/* In insn-preds.cc.  Kept declared because per-base translation units still
+   call it under this name; SHARED code must go through `targetm_preds'
+   instead -- see the call site in init_reg_sets_1.  */
 extern void init_reg_class_start_regs ();
+
+/* For `targetm_preds->init_filters', the per-base filter writer.  */
+#include "target-preds.h"
 
 /* Given a register bitmap, turn on the bits in a HARD_REG_SET that
    correspond to the hard registers, if any, set in that map.  This
@@ -324,7 +329,29 @@ init_reg_sets (void)
   SET_HARD_REG_SET (accessible_reg_set);
   SET_HARD_REG_SET (operand_reg_set);
 
-  init_reg_class_start_regs ();
+  /* THE SELECTED BASE'S FILTER WRITER, NOT THE BARE NAME.
+
+     The bare `init_reg_class_start_regs' in a shared translation unit is the
+     SINGULAR `insn-preds.cc', generated from the primary's machine
+     description.  i386 declares no `define_register_constraint' filters, so
+     genpreds emitted an EMPTY BODY there, `register_filters[]' stayed all
+     zero, and every filtered constraint became unsatisfiable for every base.
+     Measured cost: aarch64's `Uw2' (`FP_REGS' plus `regno % 2 == 0') rejected
+     V24, LRA reloaded an operand that was already correct, and the whole
+     SVE/SME ACLE family died in `lra_split_hard_reg_for' -- ~102,000 results
+     against a stock GCC that fails zero of them.
+
+     FAIL BY NAME rather than fall back to the bare call.  A missing selection
+     is exactly the state that produced the bug, and it must not be able to
+     look like success: `targetm_preds' is NULL until a target is chosen, and
+     a compiler that reached register initialisation without choosing one has
+     a defect that a silent empty filter set would hide again.  */
+  if (targetm_preds == NULL || targetm_preds->init_filters == NULL)
+    internal_error ("no back end selected when initialising register class "
+		    "filters: %<this_target_constraints->register_filters%> "
+		    "would be left empty and every filtered constraint "
+		    "unsatisfiable");
+  targetm_preds->init_filters ();
 }
 
 /* We need to save copies of some of the register information which
