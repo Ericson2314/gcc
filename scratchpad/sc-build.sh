@@ -18,8 +18,15 @@ J=${2:--j12}
 SRC=$(cat "$D/MY-SRC") || exit 9
 n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 [ "$n" = 0 ] || { echo "FATAL: $D was configured from $SRC, anchor=$n, not stock"; exit 9; }
+# THE TOOLS DIR IS READ BACK FROM THE BUILD DIR, not hardcoded and not
+# re-derived.  sc-conf.sh stamps TARGET-TOOLS with the binutils the configure
+# actually recorded; putting a different directory on PATH here would assemble
+# with another target's tools and say nothing.  Older build dirs predate the
+# stamp, so the historical value is the fallback -- named, so it is visible.
+TOOLS=$(cat "$D/TARGET-TOOLS" 2>/dev/null || echo /tmp/tools-agent-a3464debf6893de84/bin)
+[ -d "$TOOLS" ] || { echo "FATAL: no tools dir $TOOLS"; exit 9; }
 rm -f "$D/build.rc"
-sh "$S/eb-shell.sh" "cd $D && PATH=/tmp/tools-agent-a3464debf6893de84/bin:\$PATH make $J all-gcc" \
+sh "$S/eb-shell.sh" "cd $D && PATH=$TOOLS:\$PATH make $J all-gcc" \
   > "$D/build.out" 2> "$D/build.err"
 rc=$?
 echo "$rc" > "$D/build.rc"

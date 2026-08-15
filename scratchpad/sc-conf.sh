@@ -91,18 +91,40 @@ n=$(grep -c MULTI_TARGET "$SRC/gcc/Makefile.in" || true)
 grep -q '^load_lib multi-target.exp$' "$SRC/gcc/testsuite/lib/gcc-dg.exp" \
   || { echo "FATAL: $SRC/gcc/testsuite/lib/gcc-dg.exp does not load multi-target.exp"; exit 9; }
 [ -d "$HDR" ] || { echo "FATAL: no target header dir $HDR"; exit 9; }
-TOOLS=/tmp/tools-agent-a3464debf6893de84/bin
+# THE TOOLS DIR AND THE BUILD-DIR GUARD ARE DERIVED, NOT HARDCODED.
+#
+# Both used to name `agent-a3464debf6893de84' literally, which is the one line
+# INSTRUMENTS.md identifies as the mechanism behind 63 copies of `*-conf.sh':
+# the guard is RIGHT (a harness must assert which tree it measures) and
+# unrunnable from the next worktree, so the next agent copies the file under a
+# new name and the branch acquires a second authority for one job.  The tag is
+# now read from this script's own path, exactly as mt-lib.sh does it, so the
+# guard still refuses another worktree's build dir without needing an edit.
+#
+# SC_TOOLS is the explicit override for the one legitimate case -- reusing the
+# cross binutils an earlier worktree materialised -- and is visible on the
+# command line rather than buried in an edit.  The FALLBACK IS A REFUSAL: if
+# the path does not look like a worktree the script stops, because "cannot
+# tell" must not read as "fine".
+_wt=$(basename "$(cd "$S/.." && pwd)")
+case "$_wt" in
+  agent-*) ;;
+  *) echo "FATAL: $S is not a .../worktrees/agent-<hash>/scratchpad checkout;"
+     echo "  REFUSING rather than accepting any build dir.  Set SC_TAG=."; exit 9 ;;
+esac
+SC_TAG=${SC_TAG:-b-stock-$_wt}
+TOOLS=${SC_TOOLS:-/tmp/tools-$_wt/bin}
 AS="$TOOLS/$T-as"; LD="$TOOLS/$T-ld"
 [ -x "$AS" ] || { echo "FATAL: no cross assembler $AS"; exit 9; }
 [ -x "$LD" ] || { echo "FATAL: no cross linker $LD"; exit 9; }
 case "$D" in
-  */b-stock-agent-a3464debf6893de84*) ;;
-  *) echo "FATAL: build dir $D is not named for this worktree"; exit 9 ;;
+  *"$SC_TAG"*) ;;
+  *) echo "FATAL: build dir $D is not named for this worktree (expected *$SC_TAG*)"; exit 9 ;;
 esac
 echo "stock srcdir $SRC sha=$(cat "$SRC/STOCK-SHA") anchor=$n; target=$T"
 
 rm -rf "$D"; mkdir -p "$D"
-sh "$S/eb-shell.sh" "cd $D && PATH=/tmp/tools-agent-a3464debf6893de84/bin:\$PATH $SRC/configure \
+sh "$S/eb-shell.sh" "cd $D && PATH=$TOOLS:\$PATH $SRC/configure \
   --target=$T \
   --disable-werror \
   --disable-bootstrap --disable-nls --disable-multilib \
@@ -117,4 +139,10 @@ echo "configure rc=$rc"
 [ -f "$D/Makefile" ] || { echo "FATAL: no Makefile"; tail -20 "$D/conf.err"; exit 9; }
 echo "$SRC" > "$D/MY-SRC"
 echo "$HDR" > "$D/TARGET-HDR"	# sc-check.sh guard S3 reads this back
+# STAMP THE TOOLS DIR THE CONFIGURE ACTUALLY USED, and have sc-build.sh and
+# sc-check.sh READ IT BACK rather than each deriving it again.  Three places
+# naming one fact independently is this branch's own root bug; and the failure
+# mode here is the silent one -- a later script putting a DIFFERENT binutils on
+# PATH would assemble with the wrong tool and say nothing.
+echo "$TOOLS" > "$D/TARGET-TOOLS"
 tail -3 "$D/conf.err" || true
