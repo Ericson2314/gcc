@@ -879,7 +879,14 @@ cselib_preserve_only_values (void)
 {
   int i;
 
-  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+  /* MT_FIRST_PSEUDO_REGISTER: this walk means "every HARD register", so its
+     bound is a classification, not a table size.  `reg_raw_mode' is
+     union-sized so indexing it is safe either way -- but running past the
+     SELECTED base's hard registers hands `cselib_invalidate_regno' a PSEUDO
+     number, and this loop is the caller in the backtrace of the 7,164
+     `in cselib_invalidate_regno, at cselib.cc:2650' ICEs on x86_64, where the
+     union's 95 (aarch64's) exceeds i386's own 92.  */
+  for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     cselib_invalidate_regno (i, reg_raw_mode[i]);
 
   cselib_invalidate_mem (callmem[0]);
@@ -2435,7 +2442,7 @@ cselib_lookup_1 (rtx x, machine_mode mode,
       if (! create)
 	return 0;
 
-      if (i < FIRST_PSEUDO_REGISTER)
+      if (HARD_REGISTER_NUM_P (i))
 	{
 	  unsigned int n = hard_regno_nregs (i, mode);
 
@@ -2477,7 +2484,7 @@ cselib_lookup_1 (rtx x, machine_mode mode,
 					 GET_MODE (lwider->elt->val_rtx))))
 	      {
 		struct elt_loc_list *el;
-		if (i < FIRST_PSEUDO_REGISTER
+		if (HARD_REGISTER_NUM_P (i)
 		    && hard_regno_nregs (i, lmode) != 1)
 		  continue;
 		for (el = l->elt->locs; el; el = el->next)
@@ -2638,14 +2645,14 @@ cselib_invalidate_regno (unsigned int regno, machine_mode mode)
   unsigned int i;
 
   /* If we see pseudos after reload, something is _wrong_.  */
-  gcc_assert (!reload_completed || regno < FIRST_PSEUDO_REGISTER
+  gcc_assert (!reload_completed || HARD_REGISTER_NUM_P (regno)
 	      || reg_renumber[regno] < 0);
 
   /* Determine the range of registers that must be invalidated.  For
      pseudos, only REGNO is affected.  For hard regs, we must take MODE
      into account, and we must also invalidate lower register numbers
      if they contain values that overlap REGNO.  */
-  if (regno < FIRST_PSEUDO_REGISTER)
+  if (HARD_REGISTER_NUM_P (regno))
     {
       gcc_assert (mode != VOIDmode);
 
@@ -2673,7 +2680,7 @@ cselib_invalidate_regno (unsigned int regno, machine_mode mode)
 	  cselib_val *v = (*l)->elt;
 	  unsigned int this_last = i;
 
-	  if (i < FIRST_PSEUDO_REGISTER && v != NULL)
+	  if (HARD_REGISTER_NUM_P (i) && v != NULL)
 	    this_last = end_hard_regno (GET_MODE (v->val_rtx), i) - 1;
 
 	  if (this_last < regno || v == NULL
@@ -2929,7 +2936,7 @@ cselib_record_set (rtx dest, cselib_val *src_elt, cselib_val *dest_addr_elt)
   if (REG_P (dest))
     {
       unsigned int dreg = REGNO (dest);
-      if (dreg < FIRST_PSEUDO_REGISTER)
+      if (HARD_REGISTER_NUM_P (dreg))
 	{
 	  unsigned int n = REG_NREGS (dest);
 
@@ -3062,6 +3069,13 @@ cselib_sp_derived_value_p (cselib_val *v)
 
 /* There is no good way to determine how many elements there can be
    in a PARALLEL.  Since it's fairly cheap, use a really large number.  */
+/* FIRST_PSEUDO_REGISTER, THE UNION'S, DELIBERATELY.  This is an array SIZE,
+   not a classification: the buffer must be large enough for any configured
+   base, and it must remain a constant expression -- MT_FIRST_PSEUDO_REGISTER
+   is a run-time load through `targetm_regs' and cannot size an array.  Sizing
+   this by the selected base while other union-sized structures are indexed
+   alongside it would be the opposite bug to the one the classifier sites in
+   this file carried.  */
 #define MAX_SETS (FIRST_PSEUDO_REGISTER * 2)
 
 struct cselib_record_autoinc_data
@@ -3369,7 +3383,11 @@ cselib_process_insn (rtx_insn *insn)
   if (CALL_P (insn))
     {
       function_abi callee_abi = insn_callee_abi (insn);
-      for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+      /* MT_FIRST_PSEUDO_REGISTER: the body asks the SELECTED base's ABI
+	 whether register I is clobbered by this call, so the bound is a
+	 classification.  Walking to the union's width would ask the ABI about
+	 register numbers that are pseudos for this base.  */
+      for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
 	{
 	  elt_list **l = &REG_VALUES (i);
 	  while (*l)

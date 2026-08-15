@@ -2019,8 +2019,49 @@ set_regno_raw (rtx x, unsigned int regno, unsigned int nregs)
 /* 1 if the given register REG corresponds to a hard register.  */
 #define HARD_REGISTER_P(REG) HARD_REGISTER_NUM_P (REGNO (REG))
 
-/* 1 if the given register number REG_NO corresponds to a hard register.  */
-#define HARD_REGISTER_NUM_P(REG_NO) ((REG_NO) < FIRST_PSEUDO_REGISTER)
+/* 1 if the given register number REG_NO corresponds to a hard register.
+
+   MT_FIRST_PSEUDO_REGISTER, NOT FIRST_PSEUDO_REGISTER, AND THIS IS A
+   CLASSIFIER RATHER THAN A BOUND.
+
+   `FIRST_PSEUDO_REGISTER' is the UNION's width -- the widest of every
+   configured back end -- because it sizes `regset', `HARD_REG_SET' and every
+   register-indexed table, and those must hold any base's registers.  This
+   macro asks a different question: *is this particular number one of the
+   SELECTED base's hard registers?*  Only that base's own count can answer it.
+
+   Measured, i386 + aarch64 + riscv + s390:
+
+       MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER   95   (aarch64's, the widest)
+       i386's own FIRST_PSEUDO_REG                92
+
+   so on x86_64 regnos 92, 93 and 94 are genuine PSEUDOS that the union
+   spelling calls hard registers.  That misclassification produced 7,164
+   `internal compiler error: in cselib_invalidate_regno, at cselib.cc:2650'
+   and 7,018 by-name test regressions on the PRIMARY target -- and the ICEs
+   are the loud minority.  A predicate that misfiles a pseudo as a hard
+   register does not have to abort: it can silently take a
+   hard-register-only path, and `dse.cc:1745' is the recorded case of exactly
+   that shape in another family, where a simplification simply never ran.
+
+   `HARD_REGISTER_NUM_P' is converted rather than its 227 call sites because
+   its NAME is the classification question -- there is no reading of it under
+   which the union is the right answer, so it needs no per-site judgement.
+   Sites that spell `< FIRST_PSEUDO_REGISTER' by hand DO need that judgement,
+   because the identical text is a bound in a `for' loop over a union-sized
+   table and must stay the union there; see multi-target-macros.h.  */
+   BOTH SIDES ARE CAST, and the reason is not cosmetic.  The union spelling
+   was an integer CONSTANT (95), so `unsigned regno < 95' warned about
+   nothing -- the compiler can see the constant is non-negative.
+   `MT_FIRST_PSEUDO_REGISTER' is a run-time load of an `int' field, so the
+   same comparison becomes signed-vs-unsigned and would emit
+   `-Wsign-compare' at a large share of the 227 call sites, which pass a mix
+   of `int' and `unsigned int'.  Casting both sides is warning-free for
+   either.  (Register numbers are never negative; a negative argument, which
+   no caller has, would answer "not a hard register" rather than the
+   original's "yes".)  */
+#define HARD_REGISTER_NUM_P(REG_NO) \
+  (((unsigned int) (REG_NO)) < ((unsigned int) MT_FIRST_PSEUDO_REGISTER))
 
 /* 1 if the given register REG corresponds to a virtual register.  */
 #define VIRTUAL_REGISTER_P(REG) VIRTUAL_REGISTER_NUM_P (REGNO (REG))
