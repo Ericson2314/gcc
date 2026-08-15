@@ -161,7 +161,12 @@ c_parse_init (void)
       ridpointers [(int) c_common_reswords[i].rid] = id;
     }
 
-  for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
+  /* The cast is because `i' is the `unsigned int' the reswords loop above
+     uses, while MT_NUM_INT_N_ENTS is a run-time `int' (the selected back
+     end's count) rather than the compile-time constant this loop used to
+     compare against.  The count is never negative -- genmodes derives it from
+     ARRAY_SIZE of the table -- so the cast changes no value.  */
+  for (i = 0; i < (unsigned int) MT_NUM_INT_N_ENTS; i++)
     {
       /* We always create the symbols but they aren't always supported.  */
       char name[50];
