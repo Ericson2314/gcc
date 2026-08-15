@@ -2226,15 +2226,17 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	     suffixing "cold" to the original function's name.  */
 	  if (in_cold_section_p)
 	    {
-#ifdef ASM_DECLARE_COLD_FUNCTION_NAME
-	      ASM_DECLARE_COLD_FUNCTION_NAME (asm_out_file,
-					      IDENTIFIER_POINTER
-					          (cold_function_name),
-					      current_function_decl);
-#else
-	      ASM_OUTPUT_LABEL (asm_out_file,
-				IDENTIFIER_POINTER (cold_function_name));
-#endif
+	      /* The cold-partition sibling of varasm.cc:2218.  Both arms of
+		 the `#ifdef' that was here were the primary's: elfos.h:319's
+		 ASM_DECLARE_COLD_FUNCTION_NAME expands to
+		 ASM_OUTPUT_FUNCTION_LABEL, which i386.h:2276 defines, so
+		 `nm -uC final.o' named `ix86_asm_output_function_label' even
+		 after varasm.cc was converted.  The condition now lives in the
+		 per-base thunk; see target-frame.h.  */
+	      mt_declare_cold_function_name (asm_out_file,
+					     IDENTIFIER_POINTER
+					         (cold_function_name),
+					     current_function_decl);
 	      if (dwarf2out_do_frame ()
 	          && cfun->fde->dw_fde_second_begin != NULL)
 		ASM_OUTPUT_LABEL (asm_out_file, cfun->fde->dw_fde_second_begin);

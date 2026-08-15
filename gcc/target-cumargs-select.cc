@@ -184,6 +184,14 @@ mt_declare_function_name (FILE *file, const char *name, tree decl)
   mt_frame ()->declare_function_name (file, name, decl);
 }
 
+/* The cold-partition sibling; `final.cc:2229'.  */
+
+void
+mt_declare_cold_function_name (FILE *file, const char *name, tree decl)
+{
+  mt_frame ()->declare_cold_function_name (file, name, decl);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here

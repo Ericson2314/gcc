@@ -1475,6 +1475,25 @@ struct target_frame_desc
      `mt_init_expanders' replaced `#ifdef INIT_EXPANDERS' rather than
      redirecting it.  The shared call site is therefore unconditional.  */
   void (*declare_function_name) (FILE *file, const char *name, tree decl);
+
+  /* ASM_DECLARE_COLD_FUNCTION_NAME, with ASM_OUTPUT_LABEL as its `#else' arm.
+     `final.cc:2229', the cold-partition sibling of the site above, and it was
+     found by the symbol REFUSING to go away: after `varasm.o' was fixed,
+     `nm -uC final.o' still named `ix86_asm_output_function_label', because
+     `elfos.h:319's ASM_DECLARE_COLD_FUNCTION_NAME expands to
+     `ASM_OUTPUT_FUNCTION_LABEL' too.
+
+     That is PRINCIPLES' "one symbol can have several macro paths" and
+     "sweep the family; do not meet it one wall at a time", arriving together:
+     closing the path you found does not close the symbol, and the second path
+     was one `#ifdef' away from the first.
+
+     It costs nothing in the ACLE directories -- cold partitions need
+     `-freorder-blocks-and-partition' and profile data, which these tests do
+     not use -- so it is converted because it is the same defect, not because
+     a number moved.  Stated plainly so nobody later reads its zero as
+     evidence the conversion was unnecessary.  */
+  void (*declare_cold_function_name) (FILE *file, const char *name, tree decl);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1505,6 +1524,7 @@ extern bool mt_epilogue_uses (int);
    note already refuses.  `varasm.cc:2218's whole `#ifdef' block becomes one
    call.  */
 extern void mt_declare_function_name (FILE *, const char *, tree);
+extern void mt_declare_cold_function_name (FILE *, const char *, tree);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

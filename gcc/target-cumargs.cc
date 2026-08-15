@@ -274,6 +274,21 @@ mt_base_declare_function_name (FILE *file, const char *name, tree decl)
 #endif
 }
 
+/* ASM_DECLARE_COLD_FUNCTION_NAME, asked of THIS base; `final.cc:2229's
+   `#ifdef'/`#else' pair, relocated for the same reason.  `decl' is unused in
+   the `#else' arm, which is what a base defining no such macro takes.  */
+
+static void
+mt_base_declare_cold_function_name (FILE *file, const char *name,
+				    tree decl ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_DECLARE_COLD_FUNCTION_NAME
+  ASM_DECLARE_COLD_FUNCTION_NAME (file, name, decl);
+#else
+  ASM_OUTPUT_LABEL (file, name);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1643,7 +1658,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_has_incoming_return_addr_rtx,
   mt_base_incoming_return_addr_rtx,
   mt_base_epilogue_uses,
-  mt_base_declare_function_name
+  mt_base_declare_function_name,
+  mt_base_declare_cold_function_name
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL
