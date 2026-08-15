@@ -2049,7 +2049,8 @@ set_regno_raw (rtx x, unsigned int regno, unsigned int nregs)
    which the union is the right answer, so it needs no per-site judgement.
    Sites that spell `< FIRST_PSEUDO_REGISTER' by hand DO need that judgement,
    because the identical text is a bound in a `for' loop over a union-sized
-   table and must stay the union there; see multi-target-macros.h.  */
+   table and must stay the union there; see multi-target-macros.h.
+
    BOTH SIDES ARE CAST, and the reason is not cosmetic.  The union spelling
    was an integer CONSTANT (95), so `unsigned regno < 95' warned about
    nothing -- the compiler can see the constant is non-negative.
