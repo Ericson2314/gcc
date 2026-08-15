@@ -68,6 +68,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-sched.h"
 #include "target-asmfprintf.h"
 #include "target-automata.h"
+#include "target-ccmode.h"
 
 /* Hand union-bounded storage to a back end.  `cumulative_args_t' is `void *'
    plus a token (target.h), so nothing about the LAYOUT crosses here -- which
@@ -192,6 +193,14 @@ struct target_cumargs_desc
      the same reason.  A back end with no automaton supplies a table saying
      `has_dfa == false', which is not the same thing as supplying no table.  */
   const struct target_automata_desc *automata;
+
+  /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h.  Rides
+     here for the same reason the seven above do, and is never null for the
+     same reason: the per-base translation unit that defines this table
+     defines that one too.  A back end that defines no `SELECT_CC_MODE'
+     supplies a table whose `select_cc_mode' is NULL, which is not the same
+     thing as supplying no table.  */
+  const struct target_ccmode_desc *ccmode;
 };
 
 /* One entry per configured back end, so a table can be found by name.  */

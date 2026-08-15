@@ -1686,6 +1686,71 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_cold_function_name
 };
 
+/* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what
+   these were answering before the table existed and for the measurement.
+
+   All three are evaluated HERE, in a translation unit whose `tm.h' is
+   `BASE_HEADER (tm.h)', i.e. this base's own header chain.  That is the whole
+   mechanism: read in shared code the same three names are `i386.h:2074',
+   `:2079' and `:2083' for all 47 back ends.  */
+
+#ifdef SELECT_CC_MODE
+/* This back end defines the macro, so this is ITS expression.  */
+static int
+mt_base_select_cc_mode (int code, rtx x, rtx y)
+{
+  return (int) SELECT_CC_MODE ((enum rtx_code) code, x, y);
+}
+#endif
+
+/* REVERSIBLE_CC_MODE, in THIS base's preprocessor context.  No `#ifdef' and
+   no fallback of its own: for a back end that defines the macro this is that
+   back end's expression, and for the 32 that do not it is `defaults.h:1215's
+   `0' -- read HERE, where it is upstream's own documented answer for a back
+   end that says nothing, rather than in shared code where `i386.h:2079's
+   unconditional `1' answers for everyone.  That is the supply-side floor
+   PRINCIPLES 2a permits, and evaluating it in this translation unit is the
+   entire distinction.
+
+   `(void) mode' because several definitions -- i386's `1', mn10300's `0' and
+   `defaults.h's `0' -- discard the argument, and an unused parameter here
+   would be a warning that says nothing about the target.  */
+static bool
+mt_base_reversible_cc_mode (int mode)
+{
+  (void) mode;
+  return REVERSIBLE_CC_MODE ((machine_mode) mode) != 0;
+}
+
+/* REVERSE_CONDITION, same shape and same reason.  The 41 back ends that
+   define nothing get `defaults.h:1420's `reverse_condition (code)', which is
+   upstream's answer for them; shared code was getting
+   `ix86_reverse_condition'.  */
+static int
+mt_base_reverse_condition (int code, int mode)
+{
+  (void) mode;
+  return (int) REVERSE_CONDITION ((enum rtx_code) code, (machine_mode) mode);
+}
+
+/* `static' and reached through the `ccmode' pointer below, for the same
+   reason `mt_base_frame' is.  */
+static const struct target_ccmode_desc mt_base_ccmode = {
+  MT_STR (MULTI_TARGET_TARGETM_BASE),
+#ifdef SELECT_CC_MODE
+  mt_base_select_cc_mode,
+#else
+  /* NULL, not a fallback.  `mt_has_select_cc_mode ()' is derived from this
+     pointer, so a back end with no `SELECT_CC_MODE' makes the run-time form
+     of `#ifdef SELECT_CC_MODE' false for itself -- which is what the
+     preprocessor did for it upstream and what the primary was overriding
+     here.  */
+  NULL,
+#endif
+  mt_base_reversible_cc_mode,
+  mt_base_reverse_condition
+};
+
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL
    linkage in C++, so without it the table is built correctly and then cannot
    be named from the registry.  target-regs.cc records the same lesson.
@@ -1711,5 +1776,6 @@ const struct target_cumargs_desc TARGETM_CUMARGS_SYMBOL = {
   &mt_base_modeswitch,
   &mt_base_sched,
   &mt_base_asmfprintf,
-  &mt_base_automata
+  &mt_base_automata,
+  &mt_base_ccmode
 };

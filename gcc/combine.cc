@@ -3213,24 +3213,31 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	     when modifying it.  */
 	  if (cc_use_loc)
 	    {
-#ifdef SELECT_CC_MODE
-	      machine_mode new_mode
-		= SELECT_CC_MODE (compare_code, op0, op1);
-	      if (new_mode != orig_compare_mode
-		  && can_change_dest_mode (SET_DEST (newpat),
-					   added_sets_2, new_mode))
+	      /* `#ifdef SELECT_CC_MODE' upstream.  It is the BACK END IN
+		 FORCE that either has a choice of CC modes or does not, and
+		 27 of 47 do not; asking the preprocessor asked the primary,
+		 which defines the macro, so this block ran for everybody
+		 with `ix86_cc_mode' choosing the mode.  See
+		 target-ccmode.h.  */
+	      if (mt_has_select_cc_mode ())
 		{
-		  unsigned int regno = REGNO (newpat_dest);
-		  compare_mode = new_mode;
-		  if (regno < FIRST_PSEUDO_REGISTER)
-		    newpat_dest = gen_rtx_REG (compare_mode, regno);
-		  else
+		  machine_mode new_mode
+		    = SELECT_CC_MODE (compare_code, op0, op1);
+		  if (new_mode != orig_compare_mode
+		      && can_change_dest_mode (SET_DEST (newpat),
+					       added_sets_2, new_mode))
 		    {
-		      subst_mode (regno, compare_mode);
-		      newpat_dest = regno_reg_rtx[regno];
+		      unsigned int regno = REGNO (newpat_dest);
+		      compare_mode = new_mode;
+		      if (regno < FIRST_PSEUDO_REGISTER)
+			newpat_dest = gen_rtx_REG (compare_mode, regno);
+		      else
+			{
+			  subst_mode (regno, compare_mode);
+			  newpat_dest = regno_reg_rtx[regno];
+			}
 		    }
 		}
-#endif
 	      /* Cases for modifying the CC-using comparison.  */
 	      if (compare_code != orig_compare_code
 		  && COMPARISON_P (*cc_use_loc))
@@ -6928,48 +6935,55 @@ simplify_set (rtx x)
       /* Simplify our comparison, if possible.  */
       new_code = simplify_comparison (new_code, &op0, &op1);
 
-#ifdef SELECT_CC_MODE
-      /* If this machine has CC modes other than CCmode, check to see if we
-	 need to use a different CC mode here.  */
-      if (GET_MODE_CLASS (GET_MODE (op0)) == MODE_CC)
-	compare_mode = GET_MODE (op0);
-      else if (inner_compare
-	       && GET_MODE_CLASS (GET_MODE (inner_compare)) == MODE_CC
-	       && new_code == old_code
-	       && op0 == XEXP (inner_compare, 0)
-	       && op1 == XEXP (inner_compare, 1))
-	compare_mode = GET_MODE (inner_compare);
-      else
-	compare_mode = SELECT_CC_MODE (new_code, op0, op1);
-
-      /* If the mode changed, we have to change SET_DEST, the mode in the
-	 compare, and the mode in the place SET_DEST is used.  If SET_DEST is
-	 a hard register, just build new versions with the proper mode.  If it
-	 is a pseudo, we lose unless it is only time we set the pseudo, in
-	 which case we can safely change its mode.  */
-      if (compare_mode != GET_MODE (dest))
+      /* `#ifdef SELECT_CC_MODE' upstream; see the note at the sibling site
+	 above and target-ccmode.h.  THIS is the site that produced s390x's
+	 top ICE: `compare_mode' came from `ix86_cc_mode' for every back end,
+	 and the `gen_rtx_REG (compare_mode, regno)' below then planted an
+	 i386 CC mode -- a number the selected back end has no mode for --
+	 straight onto its CC register.  */
+      if (mt_has_select_cc_mode ())
 	{
-	  if (can_change_dest_mode (dest, 0, compare_mode))
+	  /* If this machine has CC modes other than CCmode, check to see if we
+	     need to use a different CC mode here.  */
+	  if (GET_MODE_CLASS (GET_MODE (op0)) == MODE_CC)
+	    compare_mode = GET_MODE (op0);
+	  else if (inner_compare
+		   && GET_MODE_CLASS (GET_MODE (inner_compare)) == MODE_CC
+		   && new_code == old_code
+		   && op0 == XEXP (inner_compare, 0)
+		   && op1 == XEXP (inner_compare, 1))
+	    compare_mode = GET_MODE (inner_compare);
+	  else
+	    compare_mode = SELECT_CC_MODE (new_code, op0, op1);
+
+	  /* If the mode changed, we have to change SET_DEST, the mode in the
+	     compare, and the mode in the place SET_DEST is used.  If SET_DEST
+	     is a hard register, just build new versions with the proper mode.
+	     If it is a pseudo, we lose unless it is only time we set the
+	     pseudo, in which case we can safely change its mode.  */
+	  if (compare_mode != GET_MODE (dest))
 	    {
-	      unsigned int regno = REGNO (dest);
-	      rtx new_dest;
-
-	      if (regno < FIRST_PSEUDO_REGISTER)
-		new_dest = gen_rtx_REG (compare_mode, regno);
-	      else
+	      if (can_change_dest_mode (dest, 0, compare_mode))
 		{
-		  subst_mode (regno, compare_mode);
-		  new_dest = regno_reg_rtx[regno];
+		  unsigned int regno = REGNO (dest);
+		  rtx new_dest;
+
+		  if (regno < FIRST_PSEUDO_REGISTER)
+		    new_dest = gen_rtx_REG (compare_mode, regno);
+		  else
+		    {
+		      subst_mode (regno, compare_mode);
+		      new_dest = regno_reg_rtx[regno];
+		    }
+
+		  SUBST (SET_DEST (x), new_dest);
+		  SUBST (XEXP (*cc_use, 0), new_dest);
+		  other_changed = true;
+
+		  dest = new_dest;
 		}
-
-	      SUBST (SET_DEST (x), new_dest);
-	      SUBST (XEXP (*cc_use, 0), new_dest);
-	      other_changed = true;
-
-	      dest = new_dest;
 	    }
 	}
-#endif  /* SELECT_CC_MODE */
 
       /* If the code changed, we have to build a new comparison in
 	 undobuf.other_insn.  */

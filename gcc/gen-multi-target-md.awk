@@ -2177,8 +2177,13 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   # objects, and the symptom is a table whose layout disagrees with the
   # selector's idea of it: silent, and indistinguishable from a stale object.
   printf "  $(TM_P_H) $(TARGET_H) $(srcdir)/target-cumargs.h \\\n";
+  # ... and the same argument covers the other five siblings target-cumargs.h
+  # includes, which this list was missing.
   printf "  $(srcdir)/target-frame.h $(srcdir)/target-insn.h \\\n";
   printf "  $(srcdir)/target-preds.h $(srcdir)/target-attr.h \\\n";
+  printf "  $(srcdir)/target-modeswitch.h $(srcdir)/target-sched.h \\\n";
+  printf "  $(srcdir)/target-asmfprintf.h $(srcdir)/target-automata.h \\\n";
+  printf "  $(srcdir)/target-ccmode.h \\\n";
   printf "  multi-target-reg-widths.h\n";
   printf "\t$(COMPILE) -DTARGETM_CUMARGS_SYMBOL=targetm_cumargs_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-cumargs.cc\n";

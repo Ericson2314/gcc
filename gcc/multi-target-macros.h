@@ -484,6 +484,48 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    order.  */
 #include "target-insn.h"
 
+/* CONDITION-CODE MODE SELECTION; see target-ccmode.h for the measurement and
+   for what each of the three was answering.
+
+   These DO get `#undef'/`#define' pairs, unlike the `HAVE_<pattern>' block
+   above and for the reason it gives: all three come from the back end's own
+   `<cpu>.h' with a `defaults.h' fallback, exactly like `LOAD_EXTEND_OP' and
+   the frame macros below, so they are reached at a settled point and a
+   redirect here is the last word.
+
+   THE `#ifdef SELECT_CC_MODE' GUARDS ARE NOT CLOSED BY THE REDIRECT, and that
+   is the half a redirect alone would get wrong.  The name stays defined here,
+   so `#ifdef SELECT_CC_MODE' remains true -- which is what it already was for
+   every back end, because `i386.h:2074' defines it.  27 of the 47 back ends
+   define no such macro and upstream compiles those three blocks OUT for them.
+   `combine.cc' (two sites), `ccmp.cc' and `compare-elim.cc' therefore have
+   their guards rewritten as `if (mt_has_select_cc_mode ())', PRINCIPLES'
+   SHAPE 1 and SHAPE 2; the redirect below serves the bodies.
+
+   `REVERSIBLE_CC_MODE' and `REVERSE_CONDITION' need no existence predicate:
+   `defaults.h:1215' and `:1420' supply real answers for a back end that
+   defines nothing, and evaluated in the per-base translation unit those are
+   that back end's own answers rather than the primary's.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING, as the frame block
+   below records: outside `config/' the three appear only in ordinary run-time
+   expressions (`combine.cc:3218', `:6943', `ccmp.cc:309',
+   `compare-elim.cc:528', `:539', `:542', `jump.cc:373', `:374').  There is no
+   `#if' on any of them, and `compare-elim.cc:517's local
+   `#define SELECT_CC_MODE(A,B,C) (gcc_unreachable (), VOIDmode)' -- a dummy
+   under the `#ifndef' that could never be reached -- is deleted with the
+   guard it belonged to.  */
+#include "target-ccmode.h"
+
+#undef SELECT_CC_MODE
+#define SELECT_CC_MODE(OP, X, Y) \
+  ((machine_mode) mt_select_cc_mode ((int) (OP), (X), (Y)))
+#undef REVERSIBLE_CC_MODE
+#define REVERSIBLE_CC_MODE(MODE) (mt_reversible_cc_mode ((int) (MODE)))
+#undef REVERSE_CONDITION
+#define REVERSE_CONDITION(CODE, MODE) \
+  ((enum rtx_code) mt_reverse_condition ((int) (CODE), (int) (MODE)))
+
 /* THE MODE-SWITCHING ENTITY LIST AND THE SCHEDULER-ATTRIBUTE INITIALISER.
    Declarations only, and no `#undef'/`#define' pair for either, for the
    reason the `HAVE_<pattern>' paragraph above gives: the macros they replace

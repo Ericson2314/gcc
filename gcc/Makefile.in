@@ -4586,9 +4586,22 @@ target-regs-select.o: $(srcdir)/target-regs-select.cc $(srcdir)/target-regs.h
 # register one, `targetm_cumargs' NULL until selection for the same reason,
 # and IN OBJS rather than in the c-family list: function.o, calls.o, expr.o,
 # dse.o and var-tracking.o are all in libbackend.a, so lto1 needs this too.
+#
+# THE HEADER LIST WAS SHORT BY FIVE.  target-cumargs.h includes eight sibling
+# headers and only four were named here; make does not follow includes and the
+# `$(POSTCOMPILE)' .deps file does not exist until after a first successful
+# compile, so on a fresh tree a change to target-modeswitch.h, target-sched.h,
+# target-asmfprintf.h, target-automata.h or target-ccmode.h did not rebuild
+# this object -- leaving a selector whose idea of the table's LAYOUT disagrees
+# with the per-base tables', which is silent and indistinguishable from a
+# stale object.  The awk rule below carries the same list and had the same
+# gap; both are now complete.
 target-cumargs-select.o: $(srcdir)/target-cumargs-select.cc \
   $(srcdir)/target-cumargs.h $(srcdir)/target-frame.h $(srcdir)/target-insn.h \
-  $(srcdir)/target-preds.h $(srcdir)/target-attr.h
+  $(srcdir)/target-preds.h $(srcdir)/target-attr.h \
+  $(srcdir)/target-modeswitch.h $(srcdir)/target-sched.h \
+  $(srcdir)/target-asmfprintf.h $(srcdir)/target-automata.h \
+  $(srcdir)/target-ccmode.h
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 

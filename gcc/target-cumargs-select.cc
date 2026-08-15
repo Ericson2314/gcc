@@ -1438,3 +1438,65 @@ mt_insn_default_latency (rtx_insn *insn)
 {
   return mt_automata ()->default_latency (insn);
 }
+
+/* ------------------------------------------------------------------------
+   CONDITION-CODE MODE SELECTION; see target-ccmode.h for the measurement.
+
+   These are the definitions of the names `multi-target-macros.h' redirects
+   `SELECT_CC_MODE', `REVERSIBLE_CC_MODE' and `REVERSE_CONDITION' onto, so
+   `combine.o', `ccmp.o', `compare-elim.o' and `jump.o' ask the back end in
+   force which CC mode a comparison wants instead of asking the primary.
+
+   Until this existed, `combine.cc:6943' computed a comparison's CC mode with
+   `ix86_cc_mode' and then planted the result on the CC register of whatever
+   target was selected.  The mode vocabulary is unioned and the mode DATA is
+   per base, so an i386 CC mode arriving in an s390 insn is not a wrong
+   flavour of the right thing -- it is a number s390 has never heard of, and
+   `s390_match_ccmode_set' reaches its `default: gcc_unreachable ()'.  */
+const struct target_ccmode_desc *targetm_ccmode;
+
+static const struct target_ccmode_desc *
+mt_ccmode (void)
+{
+  if (targetm_ccmode == NULL)
+    internal_error ("no back end has been selected, so which condition-code "
+		    "modes exist is unknown; a target must be chosen with "
+		    "%<-ftarget-config=%> before a comparison is expanded");
+  return targetm_ccmode;
+}
+
+/* The run-time form of `#ifdef SELECT_CC_MODE'.  Derived from the pointer
+   rather than carried as a second boolean: one fact, one authority.  */
+bool
+mt_has_select_cc_mode (void)
+{
+  return mt_ccmode ()->select_cc_mode != NULL;
+}
+
+/* Fails BY NAME rather than returning a plausible mode.  A caller reaching
+   here has skipped `mt_has_select_cc_mode ()', and the plausible answer -- any
+   other back end's selection function -- is precisely the answer that was
+   wrong.  */
+int
+mt_select_cc_mode (int code, rtx x, rtx y)
+{
+  const struct target_ccmode_desc *d = mt_ccmode ();
+  if (d->select_cc_mode == NULL)
+    internal_error ("back end %qs defines no %<SELECT_CC_MODE%>, but shared "
+		    "code is asking it to choose a condition-code mode; the "
+		    "call site must test %<mt_has_select_cc_mode ()%> first",
+		    d->name);
+  return d->select_cc_mode (code, x, y);
+}
+
+bool
+mt_reversible_cc_mode (int mode)
+{
+  return mt_ccmode ()->reversible_cc_mode (mode);
+}
+
+int
+mt_reverse_condition (int code, int mode)
+{
+  return mt_ccmode ()->reverse_condition (code, mode);
+}

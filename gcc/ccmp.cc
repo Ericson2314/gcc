@@ -305,9 +305,10 @@ expand_ccmp_expr (gimple *g, machine_mode mode)
       machine_mode cc_mode = CCmode;
       rtx_code cmp_code = GET_CODE (tmp);
 
-#ifdef SELECT_CC_MODE
-      cc_mode = SELECT_CC_MODE (cmp_code, XEXP (tmp, 0), const0_rtx);
-#endif
+      /* `#ifdef SELECT_CC_MODE' upstream, i.e. the primary's answer for every
+	 back end; see target-ccmode.h.  */
+      if (mt_has_select_cc_mode ())
+	cc_mode = SELECT_CC_MODE (cmp_code, XEXP (tmp, 0), const0_rtx);
       icode = optab_handler (cstore_optab, cc_mode);
       if (icode != CODE_FOR_nothing)
 	{

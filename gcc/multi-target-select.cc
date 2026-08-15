@@ -713,6 +713,29 @@ multi_target_select (const char *target)
 			  "objects predate target-automata.h and are from a "
 			  "different build", base);
 
+	/* This back end's CONDITION-CODE MODE SELECTION; see target-ccmode.h.
+	   Rides on the same table and is checked for the same reason as the
+	   seven above.
+
+	   Until this line existed, `combine.cc', `ccmp.cc', `compare-elim.cc'
+	   and `jump.cc' -- all shared -- read `SELECT_CC_MODE',
+	   `REVERSIBLE_CC_MODE' and `REVERSE_CONDITION' out of the PRIMARY's
+	   headers, so every back end's comparisons were assigned i386's CC
+	   modes by `ix86_cc_mode' and reversed by `ix86_reverse_condition'.
+	   The mode NUMBERING is unioned while the mode DATA is per base, so
+	   i386's `CCGCmode' is not a mode s390 has: `combine.cc:6943' put one
+	   on the s390 CC register and `s390_match_ccmode_set' ran into its
+	   `default: gcc_unreachable ()'.  That was s390x's top ICE on the
+	   47-base board, 1,671 FAILs.  `REVERSIBLE_CC_MODE' is the silent
+	   half -- i386's is the constant 1, so every CC mode of every back end
+	   was declared reversible and then reversed by i386's rule.  */
+	targetm_ccmode = targetm_cumargs->ccmode;
+	if (targetm_ccmode == NULL)
+	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
+			  "with no condition-code-mode table attached; its "
+			  "objects predate target-ccmode.h and are from a "
+			  "different build", base);
+
 	/* Whether this back end has a REGISTER STACK; see target-regstack.h.
 
 	   A separate registry rather than a field riding on the cumargs table,

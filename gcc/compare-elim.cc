@@ -511,11 +511,16 @@ maybe_select_cc_mode (struct comparison *cmp, rtx a ATTRIBUTE_UNUSED,
   const int n = cmp->n_uses;
   rtx flags = NULL;
 
-#ifndef SELECT_CC_MODE
-  /* Minimize code differences when this target macro is undefined.  */
-  return NULL;
-#define SELECT_CC_MODE(A,B,C) (gcc_unreachable (), VOIDmode)
-#endif
+  /* `#ifndef SELECT_CC_MODE / return NULL' upstream, with a dummy
+     `#define SELECT_CC_MODE(A,B,C) (gcc_unreachable (), VOIDmode)' after it
+     that the `return' made unreachable.  Both are gone: the primary defines
+     the macro, so the `#ifndef' was false for all 47 back ends and this whole
+     function ran -- with `ix86_cc_mode' choosing modes -- for the 27 that
+     define no `SELECT_CC_MODE' and for which upstream returns here.  The
+     dummy `#define' goes with the guard it belonged to; nothing could reach
+     it then and nothing spells it now.  See target-ccmode.h.  */
+  if (!mt_has_select_cc_mode ())
+    return NULL;
 
   /* If we don't have access to all of the uses, we can't validate.  */
   if (cmp->missing_uses || n == 0)
