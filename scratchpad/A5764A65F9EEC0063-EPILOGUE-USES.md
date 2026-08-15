@@ -150,13 +150,24 @@ gcc.target/aarch64/sme2/acle-asm            PASS     FAIL   BODIES  COMPILE
   baseline      d3477e3c898  (unfixed)     28544     9050     8926      124
   + EPILOGUE_USES              9a15499d33c 36850      744        0      744
   + ASM_DECLARE_FUNCTION_NAME  b2fc4c0b9f8 37594        0        0        0
+  + ASM_DECLARE_COLD_...       e3cdfe218ab 37594        0        0        0
   stock (SC-BOARD)                         37594        0
 
 gcc.target/aarch64/sme/acle-asm
   baseline      (prior board)               3004     1154      962   104 (+88 other)
   + EPILOGUE_USES                           3886      272        0   184 (+88 other)
   + ASM_DECLARE_FUNCTION_NAME               3982      176        0    88 (+88 other)
+  + ASM_DECLARE_COLD_...       e3cdfe218ab  3982      176        0    88 (+88 other)
 ```
+
+**The last row is a PREDICTION THAT WAS CHECKED.** `e3cdfe218ab`'s commit
+message says the cold-partition conversion moves no number, because cold
+partitioning needs `-freorder-blocks-and-partition` and profile data that the
+ACLE suites do not use. Scored on its own 47-base build, both directories come
+back byte-identical to the previous row. A conversion claimed to be neutral
+and then measured neutral is worth more than an unmeasured one — and had it
+moved, that would have meant the reasoning was wrong, not that the fix was
+good.
 
 **`sme2/acle-asm` is at 37,594 PASS / 0 FAIL — exact parity with stock, from
 9,050 failures.** `.rc` stamp 0, 37,594 preserved result lines, KILLED 0, load
