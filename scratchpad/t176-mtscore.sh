@@ -32,9 +32,9 @@ B=${1:?build dir}; shift
 # from the LOG (the .sum cannot carry it) and printed BESIDE the board, never
 # subtracted from FAIL: subtracting it would be a failure floor, and the point
 # is to make the contamination visible, not to net it out.
-printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' \
-  TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERROR
-printf '%s\n' "--------------------------------------------------------------------------------------------"
+printf '%-30s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n' \
+  TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERRUNQ ERRTCL ERRLIN
+printf '%s\n' "----------------------------------------------------------------------------------------------------------------"
 
 any=0
 for T in "$@"; do
@@ -63,14 +63,21 @@ for T in "$@"; do
   xf=$(grep -c '^XFAIL: '      "$SUM" || true)
   u=$(grep -c '^UNSUPPORTED: ' "$SUM" || true)
   ur=$(grep -c '^UNRESOLVED: ' "$SUM" || true)
-  e=$(grep -c '^ERROR: '       "$SUM" || true)
-  tot=$((p+f+xp+xf+u+ur+e))
+  # ERROR COUNTED LINES, NOT FAILURES.  One aborted `.exp' emits THREE
+  # `^ERROR: ' lines and GCC's parallel harness repeats the block once per
+  # runtest slot, so the column SCALED WITH `-j'.  Ported verbatim from
+  # mtscore.sh, which is the live scorer.
+  errlin=$(grep -c '^ERROR: ' "$SUM" || true)
+  e=$(grep '^ERROR: ' "$SUM" | sed 's/[0-9][0-9]*/N/g' | sort -u | wc -l)
+  errtcl=$(sed -n 's/^ERROR: tcl error sourcing \(.*\)\.$/\1/p' "$SUM" | sort -u | wc -l)
+  # A harness error is not a test result and must not certify the run.
+  tot=$((p+f+xp+xf+u+ur))
   if [ "$tot" -eq 0 ]; then
     printf '%-30s %s\n' "$T" "REFUSED: 0 results scored -- a board of zeroes is not a clean sweep"
     continue
   fi
   any=1
-  printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' "$T" "$p" "$f" "$xp" "$xf" "$u" "$ur" "$e"
+  printf '%-30s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n' "$T" "$p" "$f" "$xp" "$xf" "$u" "$ur" "$e" "$errtcl" "$errlin"
 done
 
 if [ "$any" = 0 ]; then
