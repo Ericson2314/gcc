@@ -1,5 +1,49 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## THE SME/SME2 ACLE CLUSTER IS CLOSED AT `b2fc4c0b9f8` (SME2 at PARITY)
+>
+> ```
+> directory              BEFORE (14,126 board)      NOW           STOCK
+> sme2/acle-asm          28544 /  9050          37594 /   0    37594 / 0
+> sme/acle-asm            3004 /  1154           3982 / 176     4070 / 0
+> ```
+>
+> **`sme2/acle-asm` is at 37,594 PASS / 0 FAIL — exact parity with stock**, and
+> the 9,050 that were the single largest entry on the whole board are gone.
+> `sme/acle-asm` is 1,154 -> 176. Measured on a 47-base build against a
+> baseline build of the same tree, same harness, GUARD 3c supplying the
+> target's own assembler, both `.rc`-stamped, **KILLED 0**, load ~1 at scoring
+> (not provisional).
+>
+> **Two causes, cleanly separable, both "one name, several authorities":**
+>
+> | cause | fixed in | what it was worth |
+> |---|---|---|
+> | `EPILOGUE_USES` was i386's (`df-scan.cc:3647`) | `9a15499d33c` | all 8,926 `check-function-bodies` in sme2, all 962 in sme |
+> | `ASM_DECLARE_FUNCTION_NAME` was i386's (`varasm.cc:2218`) | `4620cbee33b` + `b2fc4c0b9f8` | the 744 COMPILE the first fix EXPOSED |
+>
+> The second was **hidden behind the first**: while `EPILOGUE_USES` was
+> causing DCE to delete every ZA-writing instruction, the assembler never saw
+> them, so the missing per-function `.arch` could not surface. That is why the
+> COMPILE column ROSE (124 -> 744) while the FAIL total collapsed. A rising
+> sub-count beside a falling total was previously-hidden work becoming
+> visible, not a regression — and only reading the errors could tell them
+> apart.
+>
+> **The other two ACLE directories do NOT share the cause, measured rather than
+> assumed:** `sve/acle` and `sve2/acle` have **zero** `check-function-bodies`
+> failures, so a defect whose entire effect is wrong emitted code cannot
+> explain them. `aarch64_epilogue_uses` touches only LR and the ZA/SME state
+> registers, so the mechanism agrees with the numbers. They are compile
+> failures and are a separate investigation.
+>
+> Also found and NOT fixed: **multi-target aarch64 emits no DWARF CFI at all**
+> (no `.cfi_startproc`, and `-freorder-blocks-and-partition` is silently
+> disabled where stock leaves it on), and `riscv64` had been losing its `ra`
+> restore before a sibcall — a latent wrong-code bug the `EPILOGUE_USES` fix
+> removes. Full detail, with the instruments and one retracted claim, in
+> `A5764A65F9EEC0063-EPILOGUE-USES.md`.
+
 > ## SUPERSEDED — BOTH TARGETS, FINAL FIGURES AT `03cfa434d1c` + `6bdfe647912`
 >
 > ```

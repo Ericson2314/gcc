@@ -2098,6 +2098,67 @@ descendant, and `timeout -s INT <n>s gdb -batch -x cmds` then interrupts it
 and runs `bt` exactly as it would after a signal. One script covers SIGSEGV,
 SIGFPE, SIGABRT and non-termination. `scratchpad/ta76-gdb.sh`.
 
+**A LEAKED ANSWER THAT IS TOO SMALL DELETES CODE, AND THAT IS A DIFFERENT
+SEARCH FROM A LEAKED ANSWER THAT IS WRONG.** `EPILOGUE_USES` was i386's in
+`df-scan.cc:3647` — the only shared consumer — so the registers a back end
+needs live on return were simply absent from the exit block's use set.
+Dataflow then concluded the instructions writing them were dead and **DCE
+deleted them**. On aarch64 SME2 that emptied every ZA-writing function to a
+bare `ret`: rc=0, empty stderr, a well-formed `.s` that a real cross assembler
+accepts, and **9,050 FAILs in one directory where stock fails zero**.
+
+Three transferable pieces:
+
+- **The compiler emitting LESS code is a leak symptom, and nothing in this
+  project's instrument set was looking for it.** ICE counts, error counts,
+  assembler acceptance and `readelf` all pass on an empty function. The only
+  thing that sees it is comparing the emitted body against a control.
+- **`defaults.h`'s `#ifndef EPILOGUE_USES` was dead** because `i386.h:1767`
+  defines the name first — the `REGMODE_NATURAL_SIZE` trap already in this
+  file, in a new place. **25 of 47 back ends define the macro**; all 25 were
+  answered by i386.
+- **It was worth a latent wrong-code bug on a target nobody was looking at.**
+  `riscv_epilogue_uses` returns true for `RETURN_ADDR_REGNUM` unconditionally,
+  so `ra`'s restore was dead and DCE removed it — in a function ending in a
+  sibcall, which would then return through a stale `ra`. Found by the
+  both-sided arm, at `-O2`, in ordinary code with no SME anywhere near it.
+
+**ASK WHETHER THE FAIL COLUMN IS COMPILE FAILURES OR WRONG CODE BEFORE
+INVESTIGATING ANYTHING — THEY ARE DIFFERENT SEARCHES AND THE COLUMN DOES NOT
+SAY.** One classifier (`a5764a65f9eec0063-kinds.sh`) split the four ACLE
+directories in seconds and redirected the whole task:
+
+```
+sme2/acle-asm   FAIL 9050   BODIES 8926  COMPILE 124   <- wrong code
+sve/acle        FAIL 4034   BODIES    0  COMPILE 2016  <- a DIFFERENT bug
+```
+
+**`sve/acle` and `sve2/acle` have ZERO `check-function-bodies` failures**, so
+a cause whose entire effect is wrong emitted code cannot explain them — a
+one-line result that would otherwise have been an afternoon of assuming the
+cluster was homogeneous because it looks homogeneous.
+
+**AND A DEFECT CAN HIDE BEHIND ANOTHER DEFECT, IN THE DIRECTION THAT MAKES THE
+FIRST LOOK WORSE.** With `EPILOGUE_USES` fixed, `sme2`'s COMPILE column ROSE
+124 -> 744 while its FAIL total fell 9050 -> 744. Nothing had regressed: the
+instructions were now reaching the assembler for the first time, and the
+assembler was refusing them because
+`ASM_DECLARE_FUNCTION_NAME` — **also i386's**, `varasm.cc:2218` — meant
+aarch64 never emitted the per-function `.arch` directive `#pragma GCC target`
+needs. Fixing that took the directory to **37,594 / 0, parity with stock.**
+
+So: **a rising sub-count beside a falling total is not evidence of a
+regression, and neither is it evidence of progress.** Read what the new
+failures actually SAY. Here the difference between "my fix broke 620 tests"
+and "620 tests got far enough to fail somewhere new" was one line of assembler
+diagnostic — and the first reading was the natural one.
+
+Corollary, paid for twice in that same hour: **`mtcheck.sh` writes every run to
+the same `gcc.sum`/`gcc.log`**, so a second run destroys the first's
+artefacts, and the destroyed file reads as a present one. The `.rc` stamp says
+a run FINISHED; it does not say the file still belongs to that run. Copy both
+artefacts to a run-specific name before starting anything else.
+
 **A THIRD INSTANCE OF "THE BOUND IS THE UNION'S, THE NUMBERING IS PER BASE",
 AND IT IS THE COMMONEST REMAINING SHAPE.** `MULTI_TARGET_UNION_*` is the
 LAYOUT; a **loop** or a **`memcpy` length** must be the selected base's own

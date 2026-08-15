@@ -18,6 +18,33 @@ task**. If you are about to write `t<NNN>-conf.sh`, the answer is already here.
 | the testsuite, once per target | `mtcheck.sh` |
 | score its runs | `mtscore.sh` |
 | every cited `scratchpad/` path exists | `mt-cite-check.sh` |
+| **run one `.exp` and PRESERVE its `.sum`/`.log`** | `a5764a65f9eec0063-score.sh` |
+| classify a `.sum`'s FAILs: COMPILE vs BODIES vs SCAN | `a5764a65f9eec0063-kinds.sh` |
+| both-sided codegen, all four targets, two build dirs | `a5764a65f9eec0063-bothsided.sh` |
+| is a `-g` md5 difference real or just the path? | `a5764a65f9eec0063-gcheck.sh` |
+
+## TWO TRAPS THESE FOUR EXIST FOR, BOTH HIT IN ONE SESSION
+
+**`mtcheck.sh` OVERWRITES THE PREVIOUS RUN'S `gcc.sum` AND `gcc.log`.** Every
+run writes `testsuite.<triple>/gcc/gcc.sum`, so launching a second `.exp`
+destroys the first's artefacts — and a destroyed file looks exactly like a
+present one. I read a `sme/acle-asm` log believing it was `sme2/acle-asm`'s and
+built a wrong explanation on it. **The `.rc` stamp says a run FINISHED; it does
+not say the file on disk still belongs to that run.** What caught it was that
+the classifier greps a literal directory string a foreign `.sum` cannot match,
+and its totals equalled `mtcheck`'s own stamped figures — so one reading was
+provably of the right file and the other provably was not.
+`a5764a65f9eec0063-score.sh` copies both artefacts before returning.
+
+**`mt-bars.sh`'s `-g` ARM IS PATH-SENSITIVE.** It compiles
+`$SRC/scratchpad/big.c`, and `-ftarget-config=<builddir>/...` lands in
+`DW_AT_producer`. Two build dirs whose names differ by one character give
+different `-g` md5s with an identical compiler, because the string length
+change also reshuffles the `.LASF` table. The `-O2` bar has no debug info and
+is immune. Same shape as the aarch64 `-S` bar being filename-sensitive via
+`.file`, which PRINCIPLES already records. **Never quote the `-g` md5 without
+its input path AND its build dir**; `a5764a65f9eec0063-gcheck.sh` settles it by
+compiling one constant absolute path with both compilers.
 | a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
 
 ## THE EXAMPLE IN THIS FILE WAS WRONG IN TWO WAYS AND BOTH COST BUILDS
