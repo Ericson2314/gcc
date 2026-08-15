@@ -806,6 +806,62 @@ struct target_frame_desc
      and none is negative.  */
   unsigned int (*dwarf_frame_return_column) (void);
 
+  /* `DWARF2_UNWIND_INFO' -- does this back end have DWARF 2 frame unwind at
+     all.  THE CAUSE OF #208: aarch64 emitted NO CFI WHATSOEVER, and silently
+     disabled `-freorder-blocks-and-partition', from this one missing answer.
+
+     It sits beside the three fields above because it is the same question
+     asked one level up: those say how to NUMBER a frame register, this says
+     whether there is a frame description to number at all.  And it is
+     literally derived from a sibling of theirs -- `defaults.h:418' is
+
+	 #if !defined (DWARF2_UNWIND_INFO) && defined (INCOMING_RETURN_ADDR_RTX)
+	 #define DWARF2_UNWIND_INFO 1
+
+     i.e. the answer is `does this base define INCOMING_RETURN_ADDR_RTX',
+     which #194 already made a per-base fact on this very struct
+     (`has_incoming_return_addr_rtx').  The family had form and this was the
+     member still missing.
+
+     WHY THE ANSWER HAD GONE MISSING, because the shape recurs.  The only
+     shared consumer is `default_except_unwind_info'
+     (`common/common-targhooks.cc:41'), and it reads the macro as
+
+	 #ifdef DWARF2_UNWIND_INFO
+	   if (DWARF2_UNWIND_INFO)
+	     return UI_DWARF2;
+	 #endif
+	 return UI_SJLJ;
+
+     `953cf9eda76' deleted that file's `#include "tm.h"'.  Nothing broke,
+     nothing warned, and the `#ifdef' silently became FALSE -- so every back
+     end without a `TARGET_EXCEPT_UNWIND_INFO' of its own started answering
+     UI_SJLJ.  That is PRINCIPLES section 4's "`#if FOO' on an undefined FOO
+     evaluates to false" trap, and note that the sweep which removed the line
+     had a guard AGAINST exactly it: it required the TU to have genuinely lost
+     `tm.h'.  That guard asks whether the amputation HAPPENED, not whether a
+     conditional CHANGED SIDES, so it could not have fired here.  Before it,
+     the file was reading i386's `DWARF2_UNWIND_INFO' for all 47 back ends --
+     a leak that happened to give aarch64 the right answer, which is why the
+     removal reads as the regression and the leak does not.
+
+     A POD, NOT A CALL.  Every definition of the macro in the tree is a
+     preprocessor constant (`aarch64.h:844' 1, `epiphany.h:553' 0,
+     `i386/cygming.h:369/371' selected by `#ifdef'), so there is no option
+     state to read and none of the `Pmode' caching trap applies.  Back ends
+     whose answer really is computed -- arm, c6x, ia64, i386 -- supply
+     `TARGET_EXCEPT_UNWIND_INFO' in their own `<be>-common.cc' and never reach
+     this field at all.
+
+     `0' FOR A BASE THAT DEFINES NEITHER MACRO IS THAT BASE'S OWN ANSWER, not
+     a floor.  `nvptx' and `pdp11' define no `INCOMING_RETURN_ADDR_RTX' and no
+     `DWARF2_UNWIND_INFO', so upstream's `#ifdef' is false for them standing
+     alone and `default_except_unwind_info' returns UI_SJLJ.  This field
+     reproduces that, in the base's own translation unit, and no base can read
+     another's.  PRINCIPLES section 2a's supply-side test: a second configured
+     back end cannot change it.  */
+  int (*dwarf2_unwind_info) (void);
+
   /* ----------------------------------------------------------------------
      THE FOUR `*_POINTER_REGNUM' NAMES, PLUS THE TWO DERIVED PREDICATES.
      MACRO-LEAK.md class (d), and the fork that #124 and #126 both stopped at
@@ -1664,6 +1720,11 @@ extern unsigned int mt_dwarf_frame_registers (void);
    epiphany this varies per FUNCTION, not merely per option state.  See the
    field comment.  */
 extern unsigned int mt_dwarf_frame_return_column (void);
+/* `DWARF2_UNWIND_INFO' for the selected base.  Shared code does NOT call this
+   directly -- see the definition in target-cumargs-select.cc for the archive
+   boundary that forbids it, and `mt_dwarf2_unwind_info_hook' in
+   common/common-targhooks.h for the pointer it travels through.  */
+extern int mt_dwarf2_unwind_info (void);
 
 /* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES, for shared code.
    See the field comments above for why all six move as one set and why they

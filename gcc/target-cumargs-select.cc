@@ -419,6 +419,29 @@ mt_dwarf_frame_return_column (void)
   return mt_frame ()->dwarf_frame_return_column ();
 }
 
+/* `DWARF2_UNWIND_INFO' for the selected base; see target-frame.h.
+
+   THIS ONE CANNOT BE CALLED DIRECTLY BY ITS CONSUMER, AND THE ARCHIVE
+   BOUNDARY IS THE REASON.  The consumer is `default_except_unwind_info' in
+   `common/common-targhooks.cc', which is in `libcommon-target.a' -- linked
+   into `xgcc', `cpp' and `lto-wrapper' as well as into `cc1'.  This file is
+   in `libbackend.a', which the drivers do not link.  A call from there to
+   here is an undefined symbol in three programs.
+
+   So the answer travels through `mt_dwarf2_unwind_info_hook', a pointer
+   DEFINED in libcommon-target and STORED by `multi_target_select' beside
+   `targetm_frame' itself.  In a driver it stays null, which is correct rather
+   than merely tolerable: measured, no driver source calls
+   `except_unwind_info' at all, and the null path fails BY NAME rather than
+   answering, so a future caller in a driver gets a diagnostic instead of
+   UI_SJLJ for every target -- which is precisely the silent answer this whole
+   change removes.  */
+int
+mt_dwarf2_unwind_info (void)
+{
+  return mt_frame ()->dwarf2_unwind_info ();
+}
+
 /* THE FOUR POINTER REGNUMS AND THE TWO DERIVED PREDICATES.  Uncached through
    `mt_frame ()' like the family above, and here the reason is not hypothetical:
    arm's `HARD_FRAME_POINTER_REGNUM' is

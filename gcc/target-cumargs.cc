@@ -659,6 +659,29 @@ mt_base_dwarf_frame_return_column (void)
   return (unsigned int) DWARF_FRAME_RETURN_COLUMN;
 }
 
+/* `DWARF2_UNWIND_INFO', read in THIS base's translation unit; see
+   target-frame.h for why the field exists and what reading it in a SHARED one
+   cost.  Both branches are this back end's own answer: `defaults.h:418' has
+   already turned "defines INCOMING_RETURN_ADDR_RTX" into a 1 by the time this
+   file is preprocessed, because BASE_HEADER (tm.h) ends with defaults.h and
+   this base's header chain comes before it.
+
+   The `#ifdef' is NOT the trap it is elsewhere in this project.  There it is
+   a shared TU silently taking the primary's side of a conditional; here the
+   conditional is evaluated once per base against that base's own headers, and
+   the `#else' reproduces what upstream's own `#ifdef' in
+   `default_except_unwind_info' does for a back end that defines neither macro
+   -- nvptx and pdp11 -- rather than inventing a value for it.  */
+static int
+mt_base_dwarf2_unwind_info (void)
+{
+#ifdef DWARF2_UNWIND_INFO
+  return (DWARF2_UNWIND_INFO) != 0;
+#else
+  return 0;
+#endif
+}
+
 /* THE FOUR POINTER REGNUMS, read in THIS base's translation unit.  The values
    this pair produces are 7/19/6/16 for i386 and 31/64/29/65 for aarch64, and
    the divergence is the whole content of the `aarch64_can_eliminate' ICE --
@@ -1636,6 +1659,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_dwarf_frame_regnum,
   mt_base_dwarf_frame_registers,
   mt_base_dwarf_frame_return_column,
+  mt_base_dwarf2_unwind_info,
   mt_base_stack_pointer_regnum,
   mt_base_frame_pointer_regnum,
   mt_base_hard_frame_pointer_regnum,

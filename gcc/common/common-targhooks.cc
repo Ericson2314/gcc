@@ -24,6 +24,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target.h"
 #include "common/common-targhooks.h"
 #include "opts.h"
+#include "diagnostic-core.h"	/* fatal_error, for the unselected-target case */
+
+/* The selected back end's `DWARF2_UNWIND_INFO'; see common-targhooks.h for
+   why it is a pointer rather than a call and why null must be fatal.  */
+int (*mt_dwarf2_unwind_info_hook) (void);
 
 /* Determine the exception handling mechanism for the target.  */
 
@@ -37,11 +42,37 @@ default_except_unwind_info (struct gcc_options *opts ATTRIBUTE_UNUSED)
   if (targ_caps.sjlj_exceptions > 0)
     return UI_SJLJ;
 
-  /* ??? Change all users to the hook, then poison this.  */
-#ifdef DWARF2_UNWIND_INFO
-  if (DWARF2_UNWIND_INFO)
+  /* Upstream this is
+
+	 #ifdef DWARF2_UNWIND_INFO
+	   if (DWARF2_UNWIND_INFO)
+	     return UI_DWARF2;
+	 #endif
+
+     and it is THE CAUSE OF #208.  This file has no `tm.h' (`953cf9eda76'
+     removed it), so the `#ifdef' was silently FALSE and every back end
+     without a `TARGET_EXCEPT_UNWIND_INFO' of its own -- aarch64 among them --
+     fell through to UI_SJLJ.  Two symptoms, one predicate: `dwarf2cfi.cc:3723'
+     stopped emitting ANY CFI, and `opts.cc:1564' silently turned off
+     `-freorder-blocks-and-partition'.  Restoring the include is not the fix:
+     the macro would then be i386's for all 47 back ends, which is the leak
+     this project exists to remove and which merely happened to give aarch64
+     the right answer.
+
+     The answer now comes from the SELECTED base's own translation unit.  A
+     null hook is fatal rather than defaulting, because "nobody installed an
+     answer" and "this target has no DWARF unwind" are different facts and
+     letting them share the UI_SJLJ return is what made this invisible for a
+     day.  */
+  if (mt_dwarf2_unwind_info_hook == NULL)
+    fatal_error (UNKNOWN_LOCATION,
+		 "the exception-unwinding method was asked for before any "
+		 "back end was selected, so it is not known whether this "
+		 "target has DWARF 2 frame unwind; a target must be chosen "
+		 "with %<-ftarget-config=%> first");
+
+  if (mt_dwarf2_unwind_info_hook ())
     return UI_DWARF2;
-#endif
 
   return UI_SJLJ;
 }

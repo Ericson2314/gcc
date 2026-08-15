@@ -84,6 +84,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "target-regs.h"
 #include "target-cumargs.h"
 #include "target-regstack.h"
+/* mt_dwarf2_unwind_info_hook -- the frame answer published across the
+   libbackend/libcommon-target boundary; see the store below.  */
+#include "common/common-targhooks.h"
 #include "multi-target-reg-widths.h"
 #include "multi-target-md-entry.h"
 /* For `optab', `struct target_optabs' and the four optab entry points below.
@@ -583,6 +586,16 @@ multi_target_select (const char *target)
 	  internal_error ("back end %qs supplies a %<CUMULATIVE_ARGS%> table "
 			  "with no frame table attached; its objects predate "
 			  "target-frame.h and are from a different build", base);
+
+	/* And publish the one frame answer that a SHARED consumer cannot
+	   reach by calling: `default_except_unwind_info' lives in
+	   libcommon-target.a, which the drivers link without libbackend.a, so
+	   it reads this pointer instead.  Stored HERE rather than lazily,
+	   beside the table it comes from, so that "a base is selected" and
+	   "the unwind answer is available" cannot come apart -- the two facts
+	   being separable is what let #208 sit undetected.  Its consumer runs
+	   during `decode_options', which toplev.cc calls after this.  */
+	mt_dwarf2_unwind_info_hook = mt_dwarf2_unwind_info;
 
 	/* Which insn patterns this back end has; see target-insn.h.  Rides on
 	   the same table, checked rather than assumed for the same reason as
