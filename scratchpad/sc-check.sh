@@ -39,9 +39,19 @@ S=$(cd "$(dirname "$0")" && pwd)
 B=${1:?build dir}
 T=${2:?target triple}
 
+# DERIVED, NOT HARDCODED -- see sc-conf.sh for why this one line mattered.
+# SC_TAG is the explicit override for reading a stock build dir an earlier
+# worktree produced; the fallback when the path is not a worktree is a REFUSAL.
+_wt=$(basename "$(cd "$S/.." && pwd)")
+case "$_wt" in
+  agent-*) ;;
+  *) echo "FATAL: $S is not a .../worktrees/agent-<hash>/scratchpad checkout;"
+     echo "  REFUSING rather than accepting any build dir.  Set SC_TAG=."; exit 9 ;;
+esac
+SC_TAG=${SC_TAG:-b-stock-$_wt}
 case "$B" in
-  */b-stock-agent-a3464debf6893de84*) ;;
-  *) echo "FATAL: $B is not this worktree's stock build dir"; exit 9 ;;
+  *"$SC_TAG"*) ;;
+  *) echo "FATAL: $B is not this worktree's stock build dir (expected *$SC_TAG*)"; exit 9 ;;
 esac
 [ -f "$B/MY-SRC" ] || { echo "FATAL: $B has no MY-SRC"; exit 9; }
 SRC=$(cat "$B/MY-SRC")
@@ -107,11 +117,22 @@ printf 'int sc_as_probe (int x) { return x + 1; }\n' > "$B/as-probe-$T.c"
   > "$B/as-probe-$T.err" 2>&1 \
   || { echo "FATAL[$T]: the control cannot assemble a one-line function:";
        sed -n '1,10p' "$B/as-probe-$T.err"; exit 9; }
-mach=$("/tmp/tools-agent-a3464debf6893de84/bin/$T-readelf" -h "$B/as-probe-$T.o" \
+TOOLS=$(cat "$B/TARGET-TOOLS" 2>/dev/null || echo /tmp/tools-agent-a3464debf6893de84/bin)
+[ -x "$TOOLS/$T-readelf" ] || { echo "FATAL: no $TOOLS/$T-readelf"; exit 9; }
+mach=$("$TOOLS/$T-readelf" -h "$B/as-probe-$T.o" \
         | sed -n 's/^ *Machine: *//p')
+# THE EXPECTED MACHINE IS NAMED PER TARGET AND THE DEFAULT ARM IS A REFUSAL.
+# An `x86_64' arm is NOT a formality here: it is the one target for which the
+# HOST assembler produces the RIGHT answer, so a mis-resolved `as' is invisible
+# on this row and on no other -- which is exactly the reason the whole
+# host-assembler defect went unnoticed for the life of the project.  The arm
+# still earns its place because it is the difference between "the machine was
+# checked and is x86-64" and "the machine was never checked".
 case "$T:$mach" in
   aarch64*:*AArch64*) ;;
   s390x*:*S/390*|s390x*:*IBM*) ;;
+  riscv64*:*RISC-V*) ;;
+  x86_64*:*X86-64*|x86_64*:*x86-64*) ;;
   *) echo "FATAL[$T]: the control assembled to machine '$mach' -- wrong target."
      echo "  (ORIGINAL_AS_FOR_TARGET pointing at the host assembler produces"
      echo "   exactly this, and it is silent until something looks.)"
@@ -124,8 +145,24 @@ rm -f "$B/gcc/site.exp"
 rm -rf "$B/gcc/$TSD"
 rm -f "$B/check-$T.rc"
 
-( sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
-    PATH=/tmp/tools-agent-a3464debf6893de84/bin:\$PATH \
+# THE ADDRESS-SPACE CAP, THE SAME ONE mtcheck.sh PUTS ON THE SUBJECT SIDE.
+#
+# It was NOT here when the aarch64 and s390x controls were taken, and those two
+# runs recorded KILLED 0, so it changed nothing for them.  It is added because
+# the riscv64 control is new and riscv64 is the target that took cc1 to 20.8 GB
+# on `gcc.target/riscv/pr117506.c' -- an uncapped control run can take the box,
+# and a control that dies is worse than a slow one.
+#
+# `-v', never `-m': Linux does not enforce RLIMIT_RSS, so `-m' is accepted and
+# does nothing -- the mitigation-that-cannot-fire shape.  Read back
+# immediately, and REFUSE if it did not take: a silently absent cap is the one
+# outcome that must not be possible.  Anything it kills is counted as KILLED by
+# the scorer and is never subtracted from any column.
+CAP=${MT_MEMCAP_KB:-8388608}
+( ulimit -v "$CAP" || exit 9
+  [ "$(ulimit -v)" = "$CAP" ] || { echo "FATAL: ulimit -v $CAP did not take"; exit 9; }
+  sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
+    PATH=$TOOLS:\$PATH \
     MT_TARGET_NAME=$T \
     MT_COMPILE_ONLY='${MT_COMPILE_ONLY:-}' \
     export MT_TARGET_NAME MT_COMPILE_ONLY PATH; \

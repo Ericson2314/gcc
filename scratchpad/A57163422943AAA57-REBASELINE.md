@@ -1,5 +1,43 @@
 # THE RE-BASELINED BOARD at `5eb6cb0e5e3` — x86_64 first, and it is CONTAMINATED
 
+> ## EVERY ROW IN THIS FILE IS SUPERSEDED BY `AB1900D5279BA137F-BOARD.md`
+> ## (`cad1a29fbdc`, 47 bases, one build, all four targets)
+>
+> ```
+>                    HERE (4 bases)              NOW (47 bases)      STOCK
+> x86_64      155030 / 29955  CONTAMINATED    159267 / 20882   163816 / 16223
+> aarch64     328251 / 36745                  338676 / 26327   344463 / 20443
+> riscv64     205641 / 23455                  267437 / 18542   270248 / 15904
+> s390x       121026 / 29633                  124291 / 22429   130895 / 15627
+>
+> debt        aarch64 14,126 -> 3,708      s390x 7,884 -> 4,711
+>             x86_64  never measured -> 2,971
+>             riscv64 never measured -> 2,218
+> ```
+>
+> **THE ROWS ARE NOT DIRECTLY COMPARABLE AND THE BASE COUNT IS WHY.** These are
+> four bases; the new board is 47. At least one cause is a direct function of
+> the base set: `MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER` is **128 at four
+> bases and 677 at 47**, so the band of regnos that unconverted classifier
+> sites misjudge widens from 92..127 to 92..676. Where a comparison was worth
+> making it was made BY NAME, and it is labelled with that caveat.
+>
+> **This file's own headline result is confirmed and extended.** The `cselib`
+> fix holds: `cselib_invalidate_regno` is **0** on all four targets at 47
+> bases. What replaced it as `x86_64`'s top cause is
+> `in_hard_reg_set_p, at regs.h:312` (1,756) — which is
+> `A57163422943AAA57-REGNO-CLASSIFIER-QUEUE.md`'s own prediction, from its
+> 200-command replay, arriving at full-suite scale.
+>
+> **The LRA cluster this file nominated as "the next target" is gone.**
+> `lra_split_hard_reg_for` (23,154), `unable to find a register to spill`
+> (7,718), `could not split insn` (2,556) and `maximum LRA assignment passes`
+> (1,884) are all absent from the new `aarch64` run except `could not split
+> insn`, which survives as the *sole* top cause at 2,600 and is an SVE poly-int
+> splitter failure rather than a register-allocation one. The hypothesis in
+> this file — "the same family as the `cselib` fix" — was **not** borne out for
+> aarch64.
+
 Re-run after the `-ftarget-config=` specs fix, because every board this
 project held was measured on a compiler that read no per-target spec file.
 
