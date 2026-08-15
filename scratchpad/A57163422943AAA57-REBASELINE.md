@@ -155,7 +155,145 @@ stamp is red. That ratio is the argument for keeping it.
 ## Consequence for the re-baselining exercise
 
 x86_64 cannot serve as the control column until `cselib.cc`'s classifier sites
-are converted. The aarch64/riscv64/s390x rows are **not** expected to carry
+are converted. ~~The aarch64/riscv64/s390x rows are **not** expected to carry
 this cause — the union's 95 *is* aarch64's own number, so aarch64 is not the
-victim — but any cross-target comparison that leans on x86_64 as "the back end
-that is served correctly" is currently invalid.
+victim~~ — **THAT SENTENCE IS FALSE AND IS RETRACTED; see the aarch64 section
+below. The union is 128 at four bases, not 95, so every base except the widest
+has a band and aarch64 carries 122,646 of these ICEs.** Any cross-target
+comparison that leans on x86_64 as "the back end that is served correctly" is
+currently invalid.
+
+---
+
+# aarch64 — MEASURED, and I WAS WRONG ABOUT WHY IT WAS SAFE
+
+## The row
+
+```
+TARGET                       PASS     FAIL  XPASS  XFAIL  UNSUP   UNRES  ERRUNQ ERRTCL ERRLIN
+aarch64-unknown-linux-gnu  200002   136330      3   1246  11012   34980       6      1     26
+
+KILLED 2   (`virtual memory exhausted' -- the ulimit -v cap firing, i.e. two
+            compilations that would otherwise have taken the box.  Counted,
+            never subtracted.)
+load at scoring   8.86 / 10.73 / 9.65 -- fifteen-minute 9.65, well under 25.
+                                         NOT provisional.
+.rc stamp         PRESENT (asserted; the `=== gcc Summary' marker is NOT
+                  sufficient -- it passed on a sixth of a run, above)
+```
+
+Against TAA-BOARD's aarch64 run at `555482db346`: **PASS 88,001 -> 200,002**,
+**UNRESOLVED 133,394 -> 34,980**.
+
+## MY "aarch64 IS IMMUNE TO THE cselib BUG" CLAIM WAS FALSE
+
+I told the coordinator this board could run on the pre-`cselib` compiler
+because aarch64's own `FIRST_PSEUDO_REGISTER` **is** the union's. Measured:
+
+```
+MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER   128    <- at FOUR bases
+i386's own                                  92
+aarch64's own                               95
+```
+
+**The union is 128.** The recorded diagnosis measured 95 in a TWO-base build,
+where 95 was aarch64's own. At four bases every base except the widest has a
+band; aarch64's is regnos 95..127. The log carries **122,646**
+`cselib_invalidate_regno` ICEs against **0** in the old run.
+
+**AND MY CORROBORATION COULD NOT HAVE DETECTED THE ERROR.** I offered, as an
+independent second direction, that aarch64 codegen was byte-identical between
+the fixed and unfixed compilers. That comparison was run at `-O2` **without
+`-g`**, and `cselib` is reached through `vartrack`, which only runs with debug
+info — so it never entered the affected path and was structurally incapable of
+firing. Same shape as the paren-balance check that passed on 16 corruptions:
+**a check that answers a different question than the one asked comes back
+clean and reads as confirmation.** Third instance today.
+
+What survives: a base whose own count EQUALS the union has no band. What was
+wrong was believing aarch64 was that base at four bases.
+
+## THE CORRECTED DEBT — 205,433 -> 93,526
+
+Both ends confirmed rather than quoted: stock re-verified at 344463/20443, and
+`sc-diff.sh` reproduces the recorded 205,433 exactly including its
+121250/84180/3 split.
+
+```
+                       BEFORE (TAA-BOARD)   NOW (5eb6cb0e5e3)
+debt                        205,433              93,526
+  -> UNRESOLVED             121,250              23,250
+  -> FAIL                    84,180              70,273
+```
+
+**111,907 results taken back.** The figure is still an UPPER bound on the true
+debt: this compiler carries the `cselib` regression, which is fixed in
+`2e5f4730465` and not in this build.
+
+## AND IT DISAGREES WITH SC-BOARD §3a — THAT IS THE FINDING
+
+§3a attributed **194,711** — the entire `gcc.target/aarch64` debt — to
+`extra_headers`, because the missing-header diagnostics were that directory's
+top cause. Measured:
+
+```
+gcc.target/aarch64 debt   194,711  ->  80,264
+                          taken back: 114,447   (59%)
+                          REMAINING:   80,264   (41%)
+```
+
+`extra_headers` was worth **114,447, not 194,711**. The estimate
+over-attributed in the familiar way: **the top diagnostic in a directory was
+credited with the whole directory.** 80,264 results there fail for causes that
+sat underneath the missing headers and were invisible until they were
+supplied. Do not quote 194,711 again.
+
+## RANKED RESIDUAL — the work-list
+
+```
+122,646  cselib_invalidate_regno, at cselib.cc:2650    FIXED in 2e5f4730465,
+                                                       absent from this build
+ 23,154  lra_split_hard_reg_for, at lra-assigns.cc:1907  \
+  7,718  unable to find a register to spill              |  plausibly ONE
+  2,556  could not split insn                            |  register-allocation
+  1,884  maximum number of LRA assignment passes (30)    /  family
+  7,668  final_scan_insn_1, at final.cc:2844
+     45  hashtab_chk_error, at hash-table.cc:126
+      6  find_strided_accesses, at aarch64-early-ra.cc:2373
+```
+
+The LRA cluster is the next target. "Unable to find a register to spill" and
+"maximum assignment passes achieved" are what a register allocator says when
+its notion of the register file disagrees with the target's — and the union is
+128 while aarch64's own is 95. **That is the first hypothesis to test, and it
+is the same family as the `cselib` fix rather than a new one.**
+
+## BY-NAME DIFF — the cardinality arm earning its place
+
+```
+PASS   88,001 -> 200,002   (+112,001)
+FAIL   98,027 -> 136,330   (+38,303)     <- a RISE
+UNRES 133,394 ->  34,980   (-98,414)
+
+CARDINALITY: 10,099 test files produce MORE results, +52,876 in total
+  e.g. gcc.target/aarch64/sve/acle/asm/dup_s16.c   248 -> 258
+
+*** 52,876 of the new run's results come from tests that produced fewer
+    results before.  The +38,303 FAIL rise is SMALLER than that, i.e. inside
+    the noise the effect creates.
+
+TRANSITIONS      87,963  UNRESOLVED -> PASS
+                 26,789  FAIL       -> PASS
+                 10,203  UNRESOLVED -> FAIL
+                  2,677  PASS       -> FAIL
+                    166  PASS       -> UNRESOLVED
+
+REAL REGRESSIONS (PASS -> NOT PASS, by name): 2,843
+  1,656 gcc.dg/torture   369 gcc.dg/debug   164 gcc.target/aarch64
+  named: overwhelmingly `-O2 -g' and `-O3 -g' variants
+```
+
+**This is the #188 shape and the arm resolves it.** As columns, FAIL rose
+38,303 and reads as a regression. As names, 114,752 results moved INTO PASS
+and only 2,843 tests genuinely got worse — and those are `-g`-shaped, i.e. the
+`cselib` regression the old run did not have and which is already fixed.
