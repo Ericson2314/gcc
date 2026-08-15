@@ -62,6 +62,56 @@ RTF=${MT_RUNTESTFLAGS:-}
 echo "== mtcheck: srcdir $SRC $kind anchor=$n  gcc $VER  targets: $*"
 echo "== runtestflags: [$RTF]  compile-only: [${MT_COMPILE_ONLY:-}]"
 
+# ---- PRE-FLIGHT: THE RENAME SWEEP, ONCE, BEFORE ANY TARGET ------------------
+#
+# A strong-symbol collision between two bases is a property of the BUILD, not
+# of a target, so it runs once here rather than inside the loop.
+#
+# WHY IT IS WIRED IN AT ALL.  `mt-rename-sweep.sh' spent an unknown period
+# reporting collisions against a `cc1' that links with ZERO `multiple
+# definition' -- 51 of them at four bases, every one a C++ OVERLOAD set inside
+# a single base, because the awk keyed on `$1' of a demangled signature and
+# counted OCCURRENCES rather than BASES.  An agent read a version of that
+# output as "identical pre-fix, therefore pre-existing" and moved on; it was
+# reasoning about an instrument that was wrong in the same way on both sides of
+# its comparison.  A false RED costs what a false green costs, and the remedy
+# it prints -- add N names to MULTI_TARGET_RENAME_NAMES -- is a real edit made
+# for no reason.  Running it here means nobody meets it cold again.
+#
+# The sweep carries its own ARM 0e, which refuses unless it can still tell a
+# real two-base collision from an overload set, so a `0' from it is falsifiable.
+#
+# THE STAMP IS DETECTED, NOT ASSUMED.  The sweep requires the build stamp
+# `mt-build.sh' wrote and defaults to `make-cc1.rc'; a caller that built with a
+# different tag gets a refusal that reads as a broken tree.  Both known tags
+# are looked for and the ABSENCE of either is a REFUSAL, never a skip: "the
+# sweep did not run" and "the sweep found nothing" must not be the same output.
+if [ -z "${MT_SKIP_SWEEP:-}" ]; then
+  SWEEPSTAMP=
+  for s in all-gcc.rc make-cc1.rc; do
+    [ -f "$B/$s" ] && { SWEEPSTAMP=$s; break; }
+  done
+  if [ -z "$SWEEPSTAMP" ]; then
+    echo "FATAL: no build stamp in $B (looked for all-gcc.rc, make-cc1.rc)."
+    echo "  The rename sweep cannot certify this build, and a skipped sweep"
+    echo "  reads exactly like a clean one.  Build with mt-build.sh, or set"
+    echo "  MT_SKIP_SWEEP=1 to state deliberately that it was not run."
+    exit 9
+  fi
+  # `nm' is not on PATH outside the nix-shell, and a tool-not-found piped into
+  # `grep -c' scores 0 -- in the direction that looks clean.  Hence mt_shell.
+  if mt_shell "WANT_ANCHOR=$n MT_STAMP=$SWEEPSTAMP sh $S/mt-rename-sweep.sh $B" \
+       > "$B/sweep.out" 2>&1; then
+    echo "-- guard: $(grep -E '^arm 0e ok' "$B/sweep.out")"
+    echo "-- guard: $(grep -E '^SWEEP ' "$B/sweep.out")"
+  else
+    echo "FATAL: mt-rename-sweep.sh failed against this build."
+    grep -E '^arm 0e|^SWEEP|colliding names|^FATAL' "$B/sweep.out" | sed 's/^/    /'
+    echo "  Full log: $B/sweep.out"
+    exit 9
+  fi
+fi
+
 for T in "$@"; do
   echo
   echo "################ $T"
