@@ -1,5 +1,40 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## THE STOCK SIDE STANDS. THE MULTI-TARGET SIDE, AND THEREFORE THE DEBT, DOES NOT.
+>
+> **The debt figures — aarch64 205,433 and s390x 20,326 — are UPPER BOUNDS and
+> are overstated by an unknown amount.** They are `stock PASS -> multi-target
+> NOT PASS`, and the multi-target side of that subtraction is `TAA-BOARD.md`'s
+> run, which was taken on a compiler that **read no per-target spec file at
+> all**: an explicit `-ftarget-config=FILE` left `found_target_config` NULL, so
+> `set_up_specs` never opened `dirname(cfg)/specs`, and `mtcheck.sh` drives
+> exactly that flag. aarch64 was compiled without `-mabi=lp64
+> -mlittle-endian`; s390x without `-march=z900`. See TAA-BOARD.md's header.
+>
+> The `extra_headers` fix has also landed since, and section 3a values that one
+> defect at **194,711 of the 205,433** aarch64 regressions. So the aarch64
+> figure in particular should be expected to move by something of that order.
+>
+> **The stock side is unaffected and has been re-verified.** Re-read at
+> `5eb6cb0e5e3` from the same build dirs, which survive intact:
+>
+> ```
+> /tmp/b-stock-agent-a3464debf6893de84-aarch64  344463 PASS  20443 FAIL
+> /tmp/b-stock-agent-a3464debf6893de84-s390x    130895 PASS  15627 FAIL
+> ```
+>
+> — reproducing section 2 row for row, including XPASS/XFAIL/UNSUP/UNRES/ERROR.
+> The control never used `-ftarget-config=`; stock GCC has no such flag. So
+> section 0 (what the control cost to get right), section 1 (provenance),
+> section 4 (the common part) and the stock rows of section 2 all stand, and
+> re-deriving the debt needs **only a fresh multi-target run**, not a fresh
+> control.
+>
+> One figure in section 2 is additionally an artefact on BOTH sides: the ERROR
+> column counted `^ERROR: ` LINES, and one aborted `.exp` emits three of them
+> once per `runtest` slot, so it scaled with `-j`. `mtscore.sh` now reports
+> distinct causes and distinct aborted `.exp` files beside the raw line count.
+
 `#61` recorded it plainly: **no arm had ever compared against an unmodified
 GCC** except for x86_64. This is that control for `aarch64` and `s390x`, and
 it changes what every number on `TAA-BOARD.md` means.

@@ -1,5 +1,55 @@
 # THE PER-TARGET TESTSUITE BOARD AT SIX TARGETS
 
+> ## EVERY NUMBER BELOW WAS MEASURED ON A COMPILER WITH NO PER-TARGET SPECS
+>
+> **Do not quote any figure in this file as current.** An explicit
+> `-ftarget-config=FILE` left `found_target_config` NULL, so `set_up_specs`
+> never read `dirname(cfg)/specs`. `mtcheck.sh` drives exactly that flag, on
+> `xgcc`, which carries no triple. So every run recorded here was taken with
+> **no `*option_defaults`, no `*self_spec`, no `*asm` and no `*link` for its
+> own target**.
+>
+> Measured at `5eb6cb0e5e3` (`mt-specsread.sh` ARM 4), this is what each
+> target's spec file contributes to the `cc1` command line -- i.e. exactly what
+> every run below was missing:
+>
+> ```
+> x86_64    -march=x86-64 -mtune=generic
+> aarch64   -mabi=lp64 -mlittle-endian
+> s390x     -march=z900
+> riscv64   -march=rv64gc -mabi=lp64d -misa-spec=20191213 -mtls-dialect=trad
+>           -imultilib lib64/lp64d
+>           -march=rv64imafdc_zicsr_zifencei_zmmul_zaamo_zalrsc_zca_zcd
+> ```
+>
+> **riscv64 was compiled with no `-march` and no `-mabi` at all**, which is the
+> direct cause of section 4's 26,718 `default_version` ICEs and of the empty
+> `.attribute arch, ""`. At `5eb6cb0e5e3` that string reads
+> `rv64i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_...`, a real
+> `riscv64-unknown-linux-gnu-as` accepts it, and `__riscv_xlen` is 64.
+>
+> Two further reasons the file is stale, both independent of the above:
+>
+> * **`extra_headers` has landed.** Section 4 names
+>   `arm_neon_sve_bridge.h: No such file` as aarch64's top cause at 62,464
+>   occurrences, and SC-BOARD.md values the whole defect at 194,711 aarch64
+>   results. At `5eb6cb0e5e3` the build dir holds `include-aarch64/` (10 files)
+>   beside `include-i386/` (120), the driver puts the right one on the right
+>   target's search path, and `#include <arm_neon.h>` compiles.
+> * **The ERROR column counted LINES.** `mtscore.sh` counted `^ERROR: ` lines;
+>   one aborted `.exp` emits three of them and GCC's parallel harness repeats
+>   the block once per `runtest` slot, so the column **scaled with `-j`**. The
+>   26/26/27/29 and 29/29 readings here decompose to far fewer distinct causes
+>   (visium/xtensa: 29 lines = 8 distinct causes = 1 aborted `.exp`).
+>
+> The provenance in section 1 also predates all of this: anchor **49**, and
+> `specs-config` 230 lines / `a6c4c68bdf33`. Current is anchor **52** and 232
+> lines / `cfbc7a65e54e`.
+>
+> What survives: section 5 ("what the numbers do not mean"), section 6
+> (provisional, and why) and section 7 (what was not measured) are statements
+> about method and scope, not readings, and they still hold.
+
 Extends `T173-BASELINE.md` / `T175-board.txt` (x86_64 + aarch64) with
 **riscv64** and **s390x** -- two back ends that had never had a test result of
 any kind. **2 of 47 measured becomes 6 of 47** (four with real cross binutils, two through a fallback config -- see §4b). Read §6 before quoting §2.
