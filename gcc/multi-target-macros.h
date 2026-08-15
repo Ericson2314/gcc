@@ -190,6 +190,37 @@ typedef TARGET_UNIT target_unit;
     || !defined (__cplusplus)
 /* A back end's own translation unit, a build-time generator, another
    supply-side TU, or a C consumer such as libgcc: keep the real macros.  */
+
+/* AND `MT_FIRST_PSEUDO_REGISTER' MUST STILL HAVE A MEANING HERE, because
+   `rtl.h' spells it unconditionally in `HARD_REGISTER_NUM_P'.
+
+   `MT_FIRST_PSEUDO_REGISTER' normally reads `targetm_regs', which arrives
+   with `target-regs.h' from the `#else' branch below -- so in every exempt
+   context it would be an undeclared identifier.  Measured: three
+   `gencondmd' objects failed with `'MT_FIRST_PSEUDO_REGISTER' was not
+   declared in this scope' the moment `HARD_REGISTER_NUM_P' was converted,
+   because generators reach `regs.h' -> `rtl.h' and never link
+   `target-regs-select.o'.
+
+   THE FALLBACK IS THIS TU'S OWN `FIRST_PSEUDO_REGISTER', AND THAT IS A REAL
+   PER-BASE ANSWER RATHER THAN A FLOOR.  Every exempt context is
+   single-target BY CONSTRUCTION: a back end's TU and a supply-side TU are
+   compiled against that base's own `tm-<base>.h', a generator runs on the
+   build machine against one base's headers before any compiler exists, and a
+   runtime library is single-host by ruling.  So `FIRST_PSEUDO_REGISTER'
+   there IS the answer for the only target that TU serves.  This is the
+   supply-side floor PRINCIPLES section 2a permits, not the consumer-side one
+   it bans -- no base ever reads another's value through it.
+
+   It is defined HERE rather than as an `#ifdef' in `rtl.h' on purpose.  An
+   `#ifdef MT_FIRST_PSEUDO_REGISTER' in `rtl.h' would be decided at the point
+   `rtl.h' is PARSED, so it would silently pick the wrong branch for any TU
+   that includes `rtl.h' before `tm.h' -- a second authority for one fact,
+   resolved by include order, with no diagnostic.  Defining it in both
+   branches of the one `#if' that already makes this decision keeps the
+   decision in one place, and the macro body is expanded at USE time.  */
+#define MT_FIRST_PSEUDO_REGISTER FIRST_PSEUDO_REGISTER
+
 #else
 #include "target-cdata.h"
 
