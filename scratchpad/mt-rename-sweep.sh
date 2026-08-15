@@ -196,6 +196,66 @@ else
   below would be unfalsifiable.  REFUSING to report a sweep result."
 fi
 
+# ---- ARM 0f: THE SUBSTRING TRIPWIRE FOR PREFIXED `*_REGNO' IDENTIFIERS ------
+#
+# A STANDING CHECK, NOT A ONE-TIME VERIFICATION.  Converting 176 register
+# classifiers, a `sed' rooted at `REGNO (' matched the TAIL of
+# `DF_REF_REGNO (use)' and left 16 orphaned prefixes in the tree:
+#
+#     if (DF_REF_!HARD_REGISTER_NUM_P (REGNO (use))
+#
+# The next agent to rewrite anything regno-shaped will meet the same trap, and
+# the obvious pre-checks will pass for them exactly as they did here: paren
+# balance and "the old macro name is gone" both answer *is the output
+# well-formed*, and this corruption is well-formed text.  Only asking whether
+# the identifiers still EXIST catches it.
+#
+# Deliberately over-broad and source-only: it can revoke a sweep, never bless
+# one (PRINCIPLES 4 -- "when an instrument can only take away, make it too
+# eager").  It reads the SOURCE tree rather than objects, so it runs before
+# anything is compiled and costs nothing.
+#
+# NON-VACUITY: each name must be found at least once.  A typo in this list, or
+# an identifier legitimately retired upstream, would otherwise make the arm
+# pass by matching nothing -- which is the failure it exists to detect,
+# committed by the detector.
+SRCG=${MT_SRC_FOR_GREP:-$SRC}
+if [ -d "$SRCG/gcc" ]; then
+  bad=0
+  # THE LIST IS DERIVED FROM THE TREE, NOT GUESSED.  Its first draft named
+  # `SUBREG_REGNO', which does not exist in GCC at all -- and the non-vacuity
+  # check below caught it on the first run, which is the only reason this list
+  # is not silently three-quarters inert.  Regenerate with:
+  #   grep -rhoE '\b[A-Za-z_0-9]+_REGNO\b' gcc --include='*.cc' --include='*.h' \
+  #     | sort | uniq -c | sort -rn
+  # These are the most frequent shared-code spellings that END in REGNO and so
+  # are what a pattern rooted at `REGNO (' will silently eat the prefix of.
+  for id in DF_REF_REGNO ALLOCNO_REGNO ORIGINAL_REGNO END_REGNO REGNO; do
+    k=$(grep -rlw "$id" "$SRCG/gcc" --include="*.cc" --include="*.h" 2>/dev/null | wc -l)
+    if [ "$k" = 0 ]; then
+      echo "  arm 0f: '$id' occurs in NO source file -- either it was renamed"
+      echo "          or this list is stale.  A tripwire that matches nothing"
+      echo "          cannot fire; treat this as a FAILURE, not a pass."
+      bad=$((bad+1))
+    fi
+  done
+  # The corruption itself: an identifier character immediately before a call to
+  # the classifier, i.e. a swallowed prefix.
+  orph=$(grep -rnE "[A-Za-z_0-9]+!?HARD_REGISTER_NUM_P" "$SRCG/gcc" \
+           --include="*.cc" --include="*.h" 2>/dev/null | wc -l)
+  if [ "$orph" != 0 ]; then
+    echo "  arm 0f FAILED: $orph site(s) have an identifier fragment fused to"
+    echo "  HARD_REGISTER_NUM_P -- the *_REGNO substring trap.  Sites:"
+    grep -rnE "[A-Za-z_0-9]+!?HARD_REGISTER_NUM_P" "$SRCG/gcc" \
+      --include="*.cc" --include="*.h" 2>/dev/null | sed 's/^/    /' | head -20
+    bad=$((bad+1))
+  fi
+  [ "$bad" = 0 ] || mt_die "arm 0f: the *_REGNO substring tripwire fired (see above)"
+  echo "arm 0f ok: prefixed *_REGNO identifiers intact, no fused HARD_REGISTER_NUM_P"
+else
+  echo "arm 0f SKIPPED: no $SRCG/gcc to grep (set MT_SRC_FOR_GREP)"
+fi
+
 report () {            # report <kind> <headline>
   _k=$1; _h=$2
   echo

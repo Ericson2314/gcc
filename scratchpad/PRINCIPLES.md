@@ -1768,36 +1768,53 @@ at all while every member after the first divergence held another member's
 value. Compare bodies, offsets and names; a count is the weakest evidence
 available and is silent in exactly the case that matters.
 
-**A BULK `sed` OVER SOURCE NEEDS A FIXTURE TEST FIRST, AND THE FIXTURE MUST
-CONTAIN THE SHAPES THAT MUST *NOT* MATCH.** Converting 176 register
-classifiers, a pattern rooted at `REGNO (` matched the TAIL of
-`DF_REF_REGNO (use)` and produced
+**A CHECKLIST OF OUTPUT PROPERTIES CANNOT SUBSTITUTE FOR A FIXTURE WITH
+KNOWN-BAD CASES, BECAUSE YOU CAN ONLY CHECK FOR CORRUPTIONS YOU ALREADY
+IMAGINED.** This is the general statement; the episode below is one instance
+of it, and the instance is less important than the shape.
+
+A bulk `sed` converting 176 register classifiers was run behind two
+hand-written pre-checks — paren balance, and "no `FIRST_PSEUDO_REGISTER`
+survives inside the replacement". **Both came back clean on a tree with 16
+corruptions in it, and neither could have done otherwise**, because both
+answer *is the output well-formed* and the actual question was *did the match
+start where I meant*. The pattern was rooted at `REGNO (` and matched the TAIL
+of `DF_REF_REGNO (use)`:
 
 ```c
 if (DF_REF_!HARD_REGISTER_NUM_P (REGNO (use))
 ```
 
-in 16 places — an orphaned identifier prefix, from the same substring family
-as `grep "define PRINT_OPERAND"` matching `PRINT_OPERAND_ADDRESS`. It was
-caught by the compiler, which is the cheapest possible detector and also the
-LAST one: two of the three checks run beforehand (paren balance, and
-`FIRST_PSEUDO_REGISTER` surviving inside the replacement) both came back
-clean, because neither asks the question "did the match start where I meant".
+— an orphaned identifier prefix, same substring family as
+`grep "define PRINT_OPERAND"` matching `PRINT_OPERAND_ADDRESS`. The compiler
+caught it: the cheapest detector available and, on that route, the LAST one.
 
-Two rules, and the second is the one that was missing:
+**Then the corrected pattern matched NOTHING and looked identical to a clean
+tree.** `\<\([A-Za-z_][A-Za-z_0-9]*REGNO\)` requires at least one character
+before `REGNO`, so it cannot match bare `REGNO` at all — the null-result-as-a-
+pass shape, arriving inside the regex this time, and invisible to every
+output-property check by construction: an unmodified file has perfect paren
+balance.
 
-- **Word-anchor every identifier in a source-rewriting pattern** (`\<`), and
-  make the prefix group OPTIONAL rather than required — the corrected pattern
-  `\<\([A-Za-z_0-9]*REGNO\)` first silently converted **nothing**, because a
-  mandatory `[A-Za-z_]` prefix cannot match bare `REGNO`. A pattern that
-  matches too little looks exactly like a clean tree.
-- **Test the sed on a FIXTURE containing every shape, including the negative
-  ones, and read the output.** Six lines were enough here: bare `REGNO`,
-  nested `REGNO (SUBREG_REG (x))`, prefixed `DF_REF_REGNO`, `ORIGINAL_REGNO`,
-  a `for`-loop bound and an array-size use. The last two MUST come through
-  unchanged, and only a fixture shows that. Both failures above were visible
-  in that six-line output in under a second, and both had already cost a
-  twenty-minute build when found the other way.
+So the two failure modes are **matched too much** and **matched too little**,
+and no amount of inspecting the *output* distinguishes either from success.
+Only an input with known answers does.
+
+- **Test the pattern on a FIXTURE containing every shape, INCLUDING the ones
+  that must not match, and read the output before touching a file.** Six lines
+  sufficed: bare `REGNO`, nested `REGNO (SUBREG_REG (x))`, prefixed
+  `DF_REF_REGNO`, `ORIGINAL_REGNO`, a `for`-loop bound, and an array-size use.
+  The last two must come through UNCHANGED — a fixture is the only thing that
+  shows a negative case staying negative. Both failures were visible in that
+  output in under a second; each had already cost a twenty-minute build when
+  found the other way.
+- **Word-anchor every identifier** (`\<`) and make the prefix group OPTIONAL
+  rather than required.
+- **Leave a standing tripwire for the substring victims**, not a one-time
+  verification. `mt-rename-sweep.sh` now asserts that the prefixed `*_REGNO`
+  identifiers are intact in the tree, because the next agent to sed anything
+  regno-shaped will meet this same trap and the same two clean-looking checks
+  will pass for them too.
 
 **`awk '$0 ~ f'` ON A DEMANGLED C++ NAME MATCHES NOTHING.** The `()` in
 `foo(rtx_insn*)` is an **empty regex group**, so the pattern matches nothing
