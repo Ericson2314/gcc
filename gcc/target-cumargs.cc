@@ -1131,6 +1131,19 @@ mt_base_insn_const_int_ok_for_constraint (HOST_WIDE_INT v, int c)
   return insn_const_int_ok_for_constraint (v, (enum constraint_num) c);
 }
 
+/* THE FILTER WRITER.  This translation unit is compiled once per back end
+   against that base's own `tm-preds-<base>.h', so the unqualified name here
+   is that base's `init_reg_class_start_regs' -- the one genpreds generated
+   from ITS machine description, with its `define_register_constraint'
+   conditions in it.  The bare name in a SHARED translation unit is the
+   primary's, whose body is empty whenever the primary declares no filters.
+   See target-preds.h for what that cost.  */
+static void
+mt_base_init_reg_class_start_regs (void)
+{
+  init_reg_class_start_regs ();
+}
+
 static const HARD_REG_SET *
 mt_base_get_register_filter (int c)
 {
@@ -1518,6 +1531,7 @@ static const struct target_preds_desc mt_base_preds = {
   mt_base_insn_extra_constraint_allows_reg_mem,
   mt_base_insn_constraint_len,
   mt_base_insn_const_int_ok_for_constraint,
+  mt_base_init_reg_class_start_regs,
   mt_base_get_register_filter,
   mt_base_get_register_filter_id,
   mt_base_get_dependent_filter_id,

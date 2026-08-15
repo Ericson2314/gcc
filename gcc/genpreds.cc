@@ -1991,6 +1991,15 @@ write_tm_preds_h (void)
   write_get_register_filter_id ();
   write_dependent_filter_helpers_h ();
 
+  /* DECLARE THE FILTER WRITER, so a per-base translation unit can NAME it.
+     Its definition goes into insn-preds{,-<base>}.cc inside this back end's
+     namespace, and until now nothing declared it in the header at all --
+     `reginfo.cc' carried a hand-written `extern' for the bare, SINGULAR one
+     and no per-base caller could reach the namespaced one.  That is why the
+     shared build called the primary's, whose body is empty whenever the
+     primary declares no register filters; see target-preds.h.  */
+  puts ("extern void init_reg_class_start_regs (void);");
+
   print_ns_close (stdout);
   print_ns_using (stdout);
 
