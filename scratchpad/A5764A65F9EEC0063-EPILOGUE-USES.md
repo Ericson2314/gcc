@@ -138,6 +138,63 @@ endian lane-correction path rather than at `aarch64_simd_lane_bounds`
 coincidence behind it, not a diagnosis; it needs the same both-sided dump
 treatment before anyone acts on it.
 
+## BOTH-SIDED, AND riscv64 IS THE STRONGEST EVIDENCE IN THE TASK
+
+`scratchpad/a5764a65f9eec0063-bothsided.sh`, `-O2 scratchpad/big.c`, baseline
+build vs fixed build, every configured target:
+
+```
+x86_64-pc-linux-gnu          IDENTICAL   md5 378fc33c1e70
+aarch64-unknown-linux-gnu    IDENTICAL   md5 2f0385292971
+riscv64-unknown-linux-gnu    CHANGED     fc79f4e1abad -> 564e39d275c8  (1 line)
+s390x-ibm-linux-gnu          rc=1 on BOTH sides (pre-existing, see below)
+```
+
+**x86_64 byte-identical and equal to the recorded bar** — required, because
+i386 was already reading its own macro, so any movement there would mean the
+redirect had broken the supply side.
+
+**aarch64 identical on `big.c` is the correct result, not a null one.**
+`aarch64_epilogue_uses` fires only for LR after `epilogue_completed` and for
+the ZA/SME state registers; `big.c` contains no SME code and no sibcall, so
+there is nothing for it to change. The aarch64 evidence is the SME2 reproducer
+and the directory score, not this file.
+
+**riscv64's one line is a latent wrong-code bug this fix removes**, and it is
+ordinary code with no SME anywhere near it:
+
+```
+  f_builtin:
+        addi  sp,sp,-16
+        sd    ra,8(sp)         <- saves the return address
+        ...   call memcpy / memset / strchr
++       ld    ra,8(sp)         <- ADDED BY THE FIX
+        ld    s0,0(sp)
+        addi  sp,sp,16
+        tail  sink             <- SIBLING CALL
+```
+
+`riscv_epilogue_uses` (`riscv.cc:10852`) returns true for `RETURN_ADDR_REGNUM`
+unconditionally; `aarch64.h:677`'s comment states the purpose outright —
+registers "considered live for sibcalls; `EPILOGUE_USES` helps achieve that".
+With i386 answering, `ra` was not live at exit, so the restore was dead and
+DCE removed it. The function then tail-called `sink` with `ra` still holding
+the return address of `strchr`, so `sink`'s `ret` would have jumped back into
+the middle of `f_builtin`. Silent, at `-O2`, on a target that is not the one I
+was sent to fix.
+
+This is the both-sided arm doing what PRINCIPLES asks of it: showing target A
+gets A's answer proves nothing unless another target still gets its own — and
+here a *third* target turned out to have been getting the primary's all along.
+
+**s390x's `rc=1` is PRE-EXISTING and is NOT this change.** Both sides fail
+identically: `internal compiler error: Segmentation fault` in `RTL pass:
+expand` at `big.c:82`, `__builtin_va_start (ap, n)`. Byte-identical failure
+before and after, so this fix neither causes nor cures it. Recorded because a
+target that cannot compile the bar file at all is worth someone's attention,
+and because an unexplained `rc=1` in a both-sided table otherwise reads as
+damage from the change under test.
+
 ## A SECOND, DISTINCT DEFECT FOUND ON THE WAY — REAL, AND IT DOES NOT SCORE HERE
 
 With the bodies restored, the remaining diff against stock is entirely
