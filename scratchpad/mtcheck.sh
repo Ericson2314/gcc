@@ -111,6 +111,30 @@ for T in "$@"; do
   fi
   echo "-- guard: non-vacuity OK (bare xgcc refuses to compile without the flag)"
 
+  # GUARD 3b -- THE TARGET'S OWN SPEC FILE MUST ACTUALLY BE READ.
+  #
+  # Guards 1-3 establish that a specs-CONFIG exists and that the flag selects a
+  # target.  None of them establishes that `dirname(cfg)/specs' -- where the
+  # target's *option_defaults, *self_spec, *asm and *link live -- was opened.
+  # It was not: an explicit `-ftarget-config=FILE' left `found_target_config'
+  # NULL, and `set_up_specs' derives that path from it.  This script drives
+  # exactly that flag, on `xgcc', which carries no triple, so EVERY board this
+  # project recorded through this file -- TAA-BOARD.md, SC-BOARD.md's
+  # multi-target column, every per-target score -- was taken on a compiler
+  # whose target had contributed nothing to the spec set.
+  #
+  # It is a PRECONDITION and not a note, because the two states are
+  # indistinguishable downstream: a compiler that read no spec file and one
+  # whose spec file says nothing emit identical output and identical
+  # diagnostics.  mt-specsread.sh carries its own negative control.
+  if ! sh "$S/mt-specsread.sh" "$B" "$T" > "$B/specsread-$T.out" 2>&1; then
+    echo "FATAL[$T]: the target's own spec file is not reaching the compiler."
+    sed -n '/^FAIL\|^SPECSREAD/p' "$B/specsread-$T.out" | sed 's/^/    /'
+    echo "  Full log: $B/specsread-$T.out"
+    exit 9
+  fi
+  echo "-- guard: mt-specsread PASSES ($(grep -c '^-- ARM' "$B/specsread-$T.out") arms)"
+
   # ---- the run itself ----
   TSD="testsuite.$T"
   # See note 2 in the header: site.exp does not depend on TEST_TARGET.
@@ -133,7 +157,31 @@ for T in "$@"; do
   # environment.  Exported in the shell rather than passed only as make
   # variables, so that reaching runtest's environment does not depend on
   # GNU make's command-line-variable export rule.
-  ( cd "$B/gcc" && sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
+  # THE ADDRESS-SPACE CAP, INHERITED BY EVERY cc1 THE SUITE RUNS.
+  #
+  # `gcc.target/riscv/pr117506.c' took cc1 to 20.8 GB RSS on a four-line
+  # testcase and caused visible memory pressure on the user's machine.  There
+  # is no seam at which to wrap an individual cc1 here -- DejaGnu execs
+  # GCC_UNDER_TEST directly -- so the limit is set once on the shell that
+  # launches runtest and inherited by the whole process tree.  RLIMIT_AS is
+  # per-process, so this caps each cc1 at MT_MEMCAP_KB rather than capping
+  # their sum, which is what is wanted: a compilation needing 20 GB is not one
+  # that is going to pass, and it must die in seconds and be recorded as a
+  # failure instead of taking the box.
+  #
+  # `-v' and not `-m': Linux does not enforce RLIMIT_RSS, so `-m' is accepted
+  # and does nothing -- the "mitigation that cannot fire" shape.  Same reasoning
+  # as tb1-memcap.sh, which is the single-command form of this.
+  #
+  # NON-VACUITY: the cap is read back and the run REFUSES if it did not take.
+  # Set in THIS subshell, before anything is exec'd, rather than inside the
+  # nix-shell --run string: that string is re-quoted twice on its way in, and a
+  # cap that failed to parse would be silently absent -- the one outcome that
+  # must not be possible.  Here it is plain shell and is read back immediately.
+  CAP=${MT_MEMCAP_KB:-8388608}
+  ( ulimit -v "$CAP" || exit 9
+    [ "$(ulimit -v)" = "$CAP" ] || { echo "FATAL: ulimit -v $CAP did not take"; exit 9; }
+    cd "$B/gcc" && sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
       MT_TARGET_NAME=$T \
       MT_TARGET_CONFIG=$CFG \
       MT_COMPILE_ONLY='${MT_COMPILE_ONLY:-}' \

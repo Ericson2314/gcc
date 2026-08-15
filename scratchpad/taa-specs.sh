@@ -46,7 +46,16 @@ nix-shell -I "nixpkgs=$NP" \
   " > "$B/specs.out" 2> "$B/specs.err"
 echo "rc=$?"
 tail -15 "$B/specs.err"
-VER=$(cat "$B/gcc/BASE-VER")
+# BASE-VER IS IN THE SRCDIR, NOT THE BUILD DIR.  This read `$B/gcc/BASE-VER',
+# which does not exist, so VER was EMPTY, every path below became
+# `$B/lib/gcc//<triple>/specs-config', and the loop printed ABSENT for all four
+# targets -- on a run where all four had in fact been written correctly.  The
+# `cat' error went to stderr and the report read as "target-specs SKIPped
+# everything".  A false negative in the direction that says the work did not
+# happen: PRINCIPLES 4, "absence of an artefact is not absence of a mechanism",
+# arriving through the instrument rather than through make.
+VER=$(cat "$(cat "$B/MY-SRC")/gcc/BASE-VER")
+[ -n "$VER" ] || { echo "FATAL: empty BASE-VER"; exit 9; }
 echo "-- specs-config per target (identity, not a statistic):"
 for T in $TX aarch64-unknown-linux-gnu riscv64-unknown-linux-gnu s390x-ibm-linux-gnu; do
   F="$B/lib/gcc/$VER/$T/specs-config"

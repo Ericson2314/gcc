@@ -128,14 +128,27 @@ for T in "$@"; do
   fi
 
   # ---- ARM 3: NEGATIVE CONTROL ON THE INSTRUMENT ---------------------------
-  if grep -q 'Reading specs from' "$W/bare-$T-run.err"; then
-    echo "FAIL[$T] ARM3 (control): the driver reports reading specs even with"
-    echo "  the target-config alone in $BARE, where no \`specs' file exists:"
-    grep -i 'Reading specs' "$W/bare-$T-run.err" | sed 's/^/    /'
+  #
+  # ANCHORED ON THE PER-TARGET DIRECTORY, NOT ON THE PHRASE.  The first version
+  # of this arm grepped for `Reading specs from' alone and FIRED on all four
+  # targets -- because `-B$B/gcc/' makes the driver read `$B/gcc/specs' in BOTH
+  # configurations.  That file is the build dir's target-NEUTRAL skeleton
+  # (`*asm:' empty, `*option_defaults:' empty, 6044 bytes), so reading it is
+  # correct and says nothing about the target; a control that counts it is
+  # measuring the -B flag.  The claim under test is specifically "a file under
+  # `lib/gcc/<ver>/<triple>/' was read", so that is what the control denies.
+  # Kept as a comment rather than silently retuned: the arm firing was the
+  # instrument being wrong, and a reader has to be able to see which.
+  sed -n 's/^Reading specs from //p' "$W/bare-$T-run.err" | sed 's/^/    bare read: /'
+  sed -n 's/^Reading specs from //p' "$W/real-$T.err"     | sed 's/^/    real read: /'
+  if grep -q "^Reading specs from $B/lib/gcc/" "$W/bare-$T-run.err"; then
+    echo "FAIL[$T] ARM3 (control): the driver read a PER-TARGET spec file even"
+    echo "  with the target-config alone in $BARE:"
+    grep "^Reading specs from $B/lib/gcc/" "$W/bare-$T-run.err" | sed 's/^/    /'
     echo "  ARM2's green therefore proves nothing.  REFUSING."
     fail=$((fail+1))
   else
-    echo "-- ARM3 PASS (control): no \`Reading specs from' when none is there"
+    echo "-- ARM3 PASS (control): no per-target spec file read when none is there"
   fi
 
   # ---- ARM 4: the contents reach cc1 ---------------------------------------
