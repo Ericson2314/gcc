@@ -149,22 +149,99 @@ if [ -n "$empty" ]; then
 fi
 
 fail=0
+
+# ---- ARM 0e: THE COLLISION TEST MUST BE ABLE TO REPORT NON-ZERO ------------
+#
+# Run on EVERY invocation, before any real reporting, because this arm's whole
+# job is to make "0 colliding names" mean something.  A null result must be
+# impossible to confuse with a pass, and this instrument spent an unknown
+# period reporting 51 FALSE collisions -- so the corrected version reporting 0
+# is exactly the reading a reader would most like to believe and least be able
+# to check.
+#
+# The fixture is the two shapes that must be told apart, and they are the two
+# real ones this arm got wrong:
+#
+#   MUST NOT REPORT  two C++ OVERLOADS of one name, in ONE base
+#                    (the 51 false positives were all of this shape)
+#   MUST REPORT      one name defined bare by TWO bases
+#                    (the shape MULTI_TARGET_RENAME_NAMES exists for)
+#
+# It exercises the awk that classifies, which is the part that was wrong;
+# `nm' and the object enumeration are covered by arms 0c/0d and by the
+# non-zero definition counts printed above.
+sweep_selftest () {
+  _t=$(mktemp -d) || return 1
+  printf 'ov(machine_mode, bool, int)\t/x/a.o\nov(machine_mode, int)\t/x/a.o\nboth(int)\t/x/a.o\n' > "$_t/A"
+  printf 'both(int)\t/y/b.o\nonlyb(void)\t/y/b.o\n'                                                  > "$_t/B"
+  for _b in A B; do
+    cut -f1 "$_t/$_b" | awk -v b="$_b" -F'\t' '{ print $0 "\t" b }'
+  done \
+    | awk -F'\t' '{ if (!(($1 SUBSEP $2) in seen)) { seen[$1 SUBSEP $2]=1;
+                                                     c[$1]++; d[$1] = d[$1] " " $2 } }
+                  END { for (n in c) if (c[n] > 1) printf "%3d\t%s\t%s\n", c[n], n, d[n] }' \
+    | LC_ALL=C sort -rn > "$_t/out"
+  _got=$(grep -c . "$_t/out" || true)
+  _name=$(cut -f2 "$_t/out" | head -1)
+  rm -rf "$_t"
+  [ "$_got" = 1 ] || { echo "  self-test reported $_got rows, expected exactly 1"; return 1; }
+  [ "$_name" = "both(int)" ] || { echo "  self-test named '$_name', expected 'both(int)'"; return 1; }
+  return 0
+}
+if sweep_selftest; then
+  echo "arm 0e ok: the collision test reports the two-base name and NOT the overload pair"
+else
+  mt_die "arm 0e FAILED: the collision test cannot distinguish a real two-base
+  collision from a C++ overload set in one base.  Every '0 colliding names'
+  below would be unfalsifiable.  REFUSING to report a sweep result."
+fi
+
 report () {            # report <kind> <headline>
   _k=$1; _h=$2
   echo
   echo "== $_h: names defined by MORE THAN ONE base"
-  for b in $bases; do cut -f1 "$work/$_k-$b.syms" | sed "s/\$/ $b/"; done \
-    | awk '{ c[$1]++; d[$1] = d[$1] " " $2 }
-           END { for (n in c) if (c[n] > 1) printf "%3d %s %s\n", c[n], n, d[n] }' \
+  # TWO DEFECTS FIXED HERE, AND THEY COMPOUNDED INTO A FALSE RED OF 51.
+  #
+  # This was `cut -f1 ... | awk '{ c[$1]++; d[$1] = d[$1] " " $2 }'', i.e. the
+  # key was `$1' -- THE FIRST WHITESPACE TOKEN OF A DEMANGLED C++ SIGNATURE.
+  # `riscv_v_adjust_nunits(machine_mode, bool, int, int)' and
+  # `riscv_v_adjust_nunits(machine_mode, int)' are two OVERLOADS, two distinct
+  # symbols, in ONE object in ONE base -- and both truncate to the key
+  # `riscv_v_adjust_nunits(machine_mode,'.  PRINCIPLES section 7 already
+  # records this family ("a demangled C++ name" defeating a name-matching
+  # instrument); it arrived here through the KEY rather than through the regex.
+  #
+  # And the count was of OCCURRENCES, not of BASES, so even with a correct key
+  # a name defined in two objects of the SAME base scored as a collision.  The
+  # arm's own headline says "defined by MORE THAN ONE base", which is the
+  # question; it was not the one being asked.
+  #
+  # Measured at four bases before the fix: `SWEEP FAILS: 51 colliding entries',
+  # every one of them an overload set inside a single base, against a `cc1'
+  # that links with ZERO `multiple definition'.  A false RED is as expensive as
+  # a false green here and worse in one way: the remedy it prints is to add 51
+  # names to MULTI_TARGET_RENAME_NAMES, which would be a real edit made for no
+  # reason.
+  #
+  # The key is now the WHOLE tab-delimited name field and the count is of
+  # DISTINCT bases.
+  for b in $bases; do
+    cut -f1 "$work/$_k-$b.syms" | awk -v b="$b" -F'\t' '{ print $0 "\t" b }'
+  done \
+    | awk -F'\t' '{ if (!(($1 SUBSEP $2) in seen)) { seen[$1 SUBSEP $2]=1;
+                                                     c[$1]++; d[$1] = d[$1] " " $2 } }
+                  END { for (n in c) if (c[n] > 1) printf "%3d\t%s\t%s\n", c[n], n, d[n] }' \
     | LC_ALL=C sort -rn > "$work/collide-$_k.txt"
   _n=$(grep -c . "$work/collide-$_k.txt" || true)
   echo "  $_n colliding names"
   sed 's/^/    /' "$work/collide-$_k.txt"
   # Name the defining object for each, per base.  A collision with no object
   # named sends the reader back to the archive by hand.
+  # The rows are now TAB-delimited (count, name, bases), so the name is field 2
+  # verbatim -- it used to be reconstructed by deleting the first and last
+  # WHITESPACE tokens, which mangles any demangled signature it is handed.
   while IFS= read -r line; do
-    s=$(echo "$line" | awk '{ $1=""; NF=NF-0; print }' | sed 's/^ //')
-    nm_=$(echo "$s" | sed 's/ [^ ]*$//')
+    nm_=$(printf '%s\n' "$line" | cut -f2)
     for b in $bases; do
       awk -F'\t' -v s="$nm_" '$1 == s { print "        " FILENAME ": " $2 }' "$work/$_k-$b.syms"
     done
