@@ -79,6 +79,15 @@ along with GCC; see the file COPYING3.  If not see
    answers already, and this file simply gets compiled once per base so that
    it picks up each.  See target-attr.h.  */
 #include BASE_HEADER (insn-attr.h)
+/* For `assemble_function_label_raw' and `assemble_name', which are what
+   `ASM_OUTPUT_FUNCTION_LABEL' (defaults.h:182) and `ASM_OUTPUT_TYPE_DIRECTIVE'
+   (defaults.h:266, reached through most bases' `ASM_DECLARE_FUNCTION_NAME')
+   expand to.  Without it the build failed BY NAME --
+   `defaults.h:183: assemble_function_label_raw was not declared in this
+   scope' -- which is the same mechanism `crtl' and `cfun' above record: the
+   expansion now happens in the translation unit where the macro is that
+   base's own, so that base's headers have to be satisfiable here.  */
+#include "output.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
