@@ -6749,6 +6749,41 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	      info.separate_options = true;
 	      info.realpaths = false;
 
+	      /* MULTI-TARGET: the selected back end's own intrinsics headers,
+		 `include-<base>', AHEAD of the generic `include' -- the same
+		 order cppdefault.cc's table uses, so that a back end could
+		 shadow a generic header if it ever needed to.
+
+		 This is the BUILD-TREE half of that table entry and it is not
+		 a second authority for it.  cppdefault names
+		 $(libsubdir)/include-<base>, which is where install-headers
+		 puts the directory; an uninstalled compiler has it at
+		 <builddir>/gcc/include-<base>, under no path below
+		 $(libsubdir), so the entry is reported as
+		 `ignoring nonexistent directory' and every `#include
+		 <arm_neon.h>' in gcc.target/aarch64 fails.  The plain
+		 `include' directory sits in exactly the same position and has
+		 always been rescued by this loop; this makes the per-back-end
+		 one behave the same way, rather than being a mechanism that
+		 exists and never reaches a compilation.
+
+		 NULL only when no target has been selected, which the driver
+		 has already refused above by name; skipped rather than
+		 defaulted, because the one thing that must never happen here
+		 is another back end's intrinsics silently on the path.  */
+	      {
+		const char *mt_base = multi_target_options_base ();
+		if (mt_base != NULL)
+		  {
+		    info.append = concat ("include-", mt_base, NULL);
+		    info.append_len = strlen (info.append);
+		    for_each_path (&include_prefixes, false, info.append_len,
+				   info);
+		    info.append = "include";
+		    info.append_len = strlen (info.append);
+		  }
+	      }
+
 	      for_each_path (&include_prefixes, false, info.append_len, info);
 
 	      info.append = "include-fixed";

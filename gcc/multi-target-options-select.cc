@@ -156,6 +156,34 @@ const struct cl_option *cl_options;
 const struct cl_enum *cl_enums;
 unsigned int cl_enums_count;
 
+/* THE BACK END SERVING THE SELECTED TARGET, for the DRIVER.
+
+   The driver needs the base name for one job: naming `include-<base>' beside
+   `include' when it walks its exec prefixes for system header directories
+   (gcc.cc, spec `%I').  cppdefault.cc names the same directory for an
+   INSTALLED compiler -- $(libsubdir)/include-<base>, which install-headers
+   creates -- but in a BUILD TREE the headers are at <builddir>/gcc/include-
+   <base>, which no path under $(libsubdir) reaches; the plain `include'
+   directory is in exactly the same position and is rescued by exactly this
+   spec.  Without it every `#include <arm_neon.h>' in gcc.target/aarch64 fails
+   in an uninstalled tree while the install rule is perfectly correct, i.e. a
+   mechanism that is present and does not reach its consumer.
+
+   It is not `multi_target_current_base ()': that lives in
+   multi-target-select.cc, which is libbackend.a, and the driver does not link
+   it.  The triple -> back end map is already here, and it is the same map, so
+   this is a reader on the selection this file has already made rather than a
+   second authority for it.  NULL until multi_target_options_select succeeds --
+   a driver that was told no target names no directory, and the caller has
+   already failed by name before it could ask.  */
+static const char *mt_options_base;
+
+const char *
+multi_target_options_base (void)
+{
+  return mt_options_base;
+}
+
 bool
 multi_target_options_select (const char *target)
 {
@@ -190,6 +218,11 @@ multi_target_options_select (const char *target)
 	if (b->apply_init == NULL)
 	  return false;
 	b->apply_init (&global_options_init);
+	/* Set from the TABLE's own name, not from the map's, so that the thing
+	   the driver puts on the include path is the back end whose tables are
+	   actually installed -- the two agree by the strcmp above, and taking
+	   the other one would make this a claim rather than a reading.  */
+	mt_options_base = b->base;
 	return true;
       }
 

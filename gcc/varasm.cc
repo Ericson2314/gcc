@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm_p.h"
 #include "stringpool.h"
 #include "regs.h"
+#include "target-regs.h"
 #include "emit-rtl.h"
 #include "cgraph.h"
 #include "diagnostic-core.h"
@@ -1044,37 +1045,41 @@ decode_reg_name_and_count (const char *asmspec, int *pnregs)
 	    && ! strcmp (asmspec, strip_reg_name (reg_names[i])))
 	  return i;
 
-#ifdef OVERLAPPING_REGISTER_NAMES
-      {
-	static const struct
-	{
-	  const char *const name;
-	  const int number;
-	  const int nregs;
-	} table[] = OVERLAPPING_REGISTER_NAMES;
+      /* OVERLAPPING_REGISTER_NAMES and ADDITIONAL_REGISTER_NAMES, FROM THE
+	 SELECTED BACK END rather than from this translation unit's `tm.h'.
 
-	for (i = 0; i < (int) ARRAY_SIZE (table); i++)
-	  if (table[i].name[0]
-	      && ! strcmp (asmspec, table[i].name))
+	 These were two `#ifdef' blocks holding a `static const ... table[] =
+	 <MACRO>' -- in a middle-end TU, so the macro was the PRIMARY's and
+	 every other base got i386's `eax'/`ax'/`al' as the complete set of
+	 register aliases it has.  `REGISTER_NAMES' had exactly this bug and is
+	 already in `target_regs_desc'; these are the other half of the same
+	 vocabulary and now travel with it.  The loops are upstream's, unchanged
+	 except for where the table comes from.  See target-regs.h.  */
+      {
+	const struct target_regs_desc *r = targetm_regs;
+
+	/* Reached only during a compilation, i.e. after selection.  Checked
+	   rather than assumed, and by name: answering with any base's aliases
+	   here is the defect being removed, and answering with none would
+	   silently reject every legitimate alias instead.  */
+	if (r == NULL)
+	  internal_error ("no target configuration was selected, so there are "
+			  "no register names to decode %qs against", asmspec);
+
+	for (i = 0; i < r->n_overlapping_reg_names; i++)
+	  if (r->d_overlapping_reg_names[i].name[0]
+	      && ! strcmp (asmspec, r->d_overlapping_reg_names[i].name))
 	    {
-	      *pnregs = table[i].nregs;
-	      return table[i].number;
+	      *pnregs = r->d_overlapping_reg_names[i].nregs;
+	      return r->d_overlapping_reg_names[i].number;
 	    }
-      }
-#endif /* OVERLAPPING_REGISTER_NAMES */
 
-#ifdef ADDITIONAL_REGISTER_NAMES
-      {
-	static const struct { const char *const name; const int number; } table[]
-	  = ADDITIONAL_REGISTER_NAMES;
-
-	for (i = 0; i < (int) ARRAY_SIZE (table); i++)
-	  if (table[i].name[0]
-	      && ! strcmp (asmspec, table[i].name)
-	      && reg_names[table[i].number][0])
-	    return table[i].number;
+	for (i = 0; i < r->n_additional_reg_names; i++)
+	  if (r->d_additional_reg_names[i].name[0]
+	      && ! strcmp (asmspec, r->d_additional_reg_names[i].name)
+	      && reg_names[r->d_additional_reg_names[i].number][0])
+	    return r->d_additional_reg_names[i].number;
       }
-#endif /* ADDITIONAL_REGISTER_NAMES */
 
       if (!strcmp (asmspec, "redzone"))
 	return -5;
