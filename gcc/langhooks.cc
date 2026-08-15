@@ -565,7 +565,7 @@ lhd_type_for_size (unsigned precision, int unsignedp)
 	   ? long_long_unsigned_type_node
 	   : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& precision == int_n_data[i].bitsize)
       return (unsignedp ? int_n_trees[i].unsigned_type

@@ -1137,7 +1137,67 @@ and avr's `PSI` (24) lands at [0] before `TI` (128).
 loop that reads `int_n_data[1]` past the end of a one-element
 `const int_n_data_t` table. Correct shape is the settled one —
 `MULTI_TARGET_UNION_NUM_INT_N_ENTS` sizing the shared arrays, and the loop
-bound coming from the SELECTED base at run time. Not landed; named.
+bound coming from the SELECTED base at run time.
+
+**LANDED (`ebf24b3f2fc`), AND THE BRIEF'S PRESCRIBED MECHANISM WAS THE WRONG
+ONE — the reason generalises to every future union bound.** The obvious home
+was `multi-target-reg-probe.cc` + `gen-reg-widths.sh`, which is where
+`MAX_BITS_PER_WORD` and four other union bounds come from, and it carries the
+identical argument (an array bound must be a constant expression). It cannot
+work here, and not by accident: that probe's answer arrives in
+`multi-target-reg-widths.h`, which is *generated from the probe objects*, and
+a probe object is a translation unit including `coretypes.h` and hence
+`machmode.h`. Sizing `machmode.h`'s arrays from it makes `machmode.h` depend
+on a file generated from a compile of `machmode.h`. **`expmed.h`,
+`hard-reg-set.h` and `lower-subreg.h` can include that header because they are
+downstream of `tm.h`; `machmode.h` and `tree.h` are upstream of everything.**
+So before routing a bound through the reg probe, ask which side of `tm.h` its
+consumers sit on.
+
+The channel that does work is the one already answering `NUM_POLY_INT_COEFFS`
+and both `MAX_BITSIZE_MODE_ANY_*`: a `#`-prefixed setting line in
+`modes-union.list`. The union run has read every configured back end's modes
+file by the time it writes that list, so the number is free there and arrives
+through a header every translation unit already has. Measured, 47 bases:
+
+```
+modes-union.list      #num_int_n_ents 3          (msp430 PSI 20, avr PSI 24, TI 128)
+insn-modes.h          NUM_INT_N_ENTS 1   MULTI_TARGET_UNION_NUM_INT_N_ENTS 3
+insn-modes-aarch64.h  NUM_INT_N_ENTS 1   MULTI_TARGET_UNION_NUM_INT_N_ENTS 3
+insn-modes-avr.h      NUM_INT_N_ENTS 2   MULTI_TARGET_UNION_NUM_INT_N_ENTS 3
+insn-modes-msp430.h   NUM_INT_N_ENTS 2   MULTI_TARGET_UNION_NUM_INT_N_ENTS 3
+```
+
+Note the union is **3 where no back end has more than 2** — avr's and
+msp430's `PSI` are distinct qualified modes. Correct for a layout bound, and
+exactly what no loop may use. Three names now: `NUM_INT_N_ENTS` (this base's
+own), `MULTI_TARGET_UNION_NUM_INT_N_ENTS` (the layout), `MT_NUM_INT_N_ENTS`
+(the selected base's run-time count, a `num_int_n_ents` variable that
+`genmodes` emits beside `int_n_data` and `MT_SCALAR_TABLES` installs with it,
+exactly as `unspec_strings_len` travels with `unspec_strings`).
+
+**AND THE EVIDENCE ARM PICKED THE WRONG OBSERVABLE FIRST, WHICH IS THE MORE
+USEFUL HALF.** It asserted avr would gain `__SIZEOF_INT128__` once index 1 was
+reachable. It does not and must not: `c-cppbuiltin.cc:1710` is guarded by
+`int_n_enabled_p[i]`, which `toplev.cc:2218` sets from
+`scalar_mode_supported_p`, and **avr has no `TImode`**. The arm reported
+`FAILED` on a green tree. The observable that discriminates is the KEYWORD,
+because `c-parser.cc` creates the identifiers unconditionally:
+
+```
+index 1 not registered   error: unknown type name '__int128'
+index 1 registered       error: '__int128' is not supported on this target
+```
+
+avr and msp430 now give the second. Control (so the two messages are known to
+be distinguishable rather than assumed): `__int24` on x86_64 and on msp430
+gives the first, with the "did you mean" suggestion naming that base's own
+registered set. Both-sided: x86_64 and aarch64 still accept `__int128` and
+still reject `__int24`. `scratchpad/agent-a3cea52a56e315ee4-intn.sh`.
+
+Generalise: **when a value's consumer is guarded by a second predicate, the
+value becoming reachable does not make the consumer fire.** Find an observable
+downstream of the bound and *upstream* of every other gate.
 
 Corollary, same measurement: `git grep '"tm.h"'` **undercounts the real
 population by 7.6×** — 59 source spellings against 451 shared objects that

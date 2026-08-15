@@ -242,7 +242,7 @@ enum rid
      is for __int13.  */
 
   /* Note that the range to use is RID_FIRST_INT_N through
-     RID_FIRST_INT_N + NUM_INT_N_ENTS - 1 and c-parser.cc has a list of
+     RID_FIRST_INT_N + MT_NUM_INT_N_ENTS - 1 and c-parser.cc has a list of
      all RID_INT_N_* in a case statement.  */
 
   RID_INT_N_0,

@@ -1434,6 +1434,58 @@ static int union_poly_int_coeffs;
 static int union_max_bitsize_any_int;
 static int union_max_bitsize_any_mode;
 
+/* NUM_INT_N_ENTS AS THE SHARED NUMBERING SAYS IT IS, or 0 before the list has
+   been read.  A THIRD kind of number again, and the reason it is here rather
+   than in the register-width probe is worth stating, because the probe is
+   where it looks like it belongs.
+
+   `int_n_data' is a per-back-end table already (machmode.h declares it through
+   GCC_TARGET_TABLE and multi-target-select.cc aims the pointer), but the two
+   arrays that travel WITH it are not:
+
+     tree.cc:294   bool int_n_enabled_p[NUM_INT_N_ENTS];
+     tree.cc:295   struct int_n_trees_t int_n_trees[NUM_INT_N_ENTS];
+
+   They are storage in a shared translation unit, so their bound is the
+   PRIMARY's -- 1, because only avr (PSI 24) and msp430 (PSI 20) declare a
+   second __intN and every other back end has just TI 128.  Measured over 47
+   back ends: 45 headers say 1 and two say 2.  So `avr.cc:16328', compiled
+   against avr's own insn-modes.h, loops to 2 and indexes a ONE-element
+   `int_n_trees'; and every shared registration loop stops at 1, so avr's and
+   msp430's second entry was never registered at all.
+
+   It cannot be measured by multi-target-reg-probe.cc, which is where every
+   other union bound on this branch comes from.  That probe's answer arrives in
+   `multi-target-reg-widths.h', which is generated FROM the probe objects, and
+   the probe object is a translation unit that includes coretypes.h and hence
+   machmode.h.  Sizing machmode.h's arrays from that header would make
+   machmode.h depend on a file generated from a compile of machmode.h: a
+   genuine cycle, not an ordering nuisance.  The union RUN, by contrast, has
+   already read every configured back end's modes file by the time it writes
+   this list -- it is how NUM_POLY_INT_COEFFS and the two MAX_BITSIZE_MODE_ANY_*
+   above are answered -- so the number is free here and arrives through a
+   header every translation unit already has.
+
+   It is the union MAXIMUM in the strict sense: the union run sees avr's PSI
+   and msp430's PSI as distinct (qualified) modes, so a 47-base build counts
+   three (20, 24, 128) where no single back end has more than two.  That is
+   correct for a LAYOUT bound and deliberately not what any loop should use --
+   the loops take the selected base's own count from `num_int_n_ents'.  */
+static int union_num_int_n_ents;
+
+/* How many modes this run has an __intN for.  */
+static int
+count_int_n_ents (void)
+{
+  int c, n = 0;
+  struct mode_data *m;
+
+  for_all_modes (c, m)
+    if (m->int_n)
+      n++;
+  return n;
+}
+
 /* Write the shared numbering: one line per ordinal, in enum order.  This
    is the union run's output; `read_union_list' is its reader.  */
 static void
@@ -1448,6 +1500,7 @@ emit_union_list (void)
   printf ("#poly_int_coeffs %d\n", NUM_POLY_INT_COEFFS);
   printf ("#max_bitsize_any_int %d\n", resolve_max_any_int ());
   printf ("#max_bitsize_any_mode %d\n", resolve_max_any_mode ());
+  printf ("#num_int_n_ents %d\n", count_int_n_ents ());
 
   /* THE THIRD FIELD IS BOOLEANNESS AND IT IS NOT DECORATION.  `MIN_MODE_INT'
      is not the MODE_INT run's first ordinal: `emit_insn_modes_h' skips the
@@ -1504,6 +1557,8 @@ read_union_list (void)
 	    union_max_bitsize_any_int = v;
 	  else if (sscanf (line, "#max_bitsize_any_mode %d", &v) == 1)
 	    union_max_bitsize_any_mode = v;
+	  else if (sscanf (line, "#num_int_n_ents %d", &v) == 1)
+	    union_num_int_n_ents = v;
 	  else
 	    error ("%s: unknown setting \"%s\"", union_list_file, line);
 	  continue;
@@ -1580,6 +1635,14 @@ read_union_list (void)
 	   union_list_file);
   if (union_max_bitsize_any_mode <= 0)
     error ("%s: no #max_bitsize_any_mode line; regenerate the shared numbering",
+	   union_list_file);
+
+  /* Same rule once more.  Falling back to this run's own count would restore
+     the exact defect the setting exists to remove -- the primary's 1 sizing
+     everybody's `int_n_trees' -- and would do so silently, since 1 is a
+     perfectly plausible value that 45 of 47 back ends really do have.  */
+  if (union_num_int_n_ents <= 0)
+    error ("%s: no #num_int_n_ents line; regenerate the shared numbering",
 	   union_list_file);
 }
 
@@ -2305,11 +2368,67 @@ enum machine_mode\n{");
     }
   emit_max_int ();
 
-  for_all_modes (c, m)
-    if (m->int_n)
-      n_int_n_ents ++;
+  n_int_n_ents = count_int_n_ents ();
 
   printf ("#define NUM_INT_N_ENTS %d\n", n_int_n_ents);
+
+  /* THE SAME NUMBER TWICE, DELIBERATELY, BECAUSE IT IS TWO NUMBERS.
+
+     NUM_INT_N_ENTS above is THIS back end's count and is what avr.cc and the
+     __intN registration mean when they ask "how many are there".
+     MULTI_TARGET_UNION_NUM_INT_N_ENTS is the LAYOUT: the bound on
+     `int_n_enabled_p' and `int_n_trees', which are storage in tree.cc, a
+     SHARED translation unit, and are therefore one size for every back end.
+     Sizing them by the per-base number is what made avr's second entry
+     unregisterable; sizing the LOOPS by the union number would make 45 back
+     ends read `int_n_data[1]' past the end of a one-element table.
+
+     Identical in every insn-modes*.h by construction -- it comes from the
+     shared numbering, not from this run's modes -- which is the property the
+     `target_rtl' layout witness exists to check for the mode tables.
+
+     A run with no shared numbering (no -U, i.e. a single-target build) has no
+     back end but its own to agree with and answers as it always did.  */
+  printf ("#define MULTI_TARGET_UNION_NUM_INT_N_ENTS %d\n",
+	  union_list_file ? union_num_int_n_ents : n_int_n_ents);
+
+  /* THE RUN-TIME COUNT, spelled differently from both of the above on purpose
+     -- the same distinction target-regs.h draws between MT_N_REG_CLASSES and
+     N_REG_CLASSES, and for the same reason: making one name mean both the
+     bound and the count is what put i386's answer over avr's data.
+
+     It is a VARIABLE, not a macro, because the answer belongs to whichever
+     back end is selected at run time.  genmodes defines it beside
+     `int_n_data' -- one authority, and it is the authority that owns the
+     table -- and on a multi-target build multi-target-select.cc installs the
+     selected base's copy through MT_SCALAR_TABLES, exactly as it does for
+     `unspec_strings_len' beside `unspec_strings'.  Declared for the
+     single-target build too, where it is simply equal to NUM_INT_N_ENTS, so
+     that every use site has one spelling rather than an #ifdef.  */
+  puts ("\
+\n/* The SELECTED back end's count; see MT_NUM_INT_N_ENTS in machmode.h.  */\n\
+extern int num_int_n_ents;");
+
+  /* RID_INT_N_0 .. RID_INT_N_3 are four fixed slots in c-common.h's `enum
+     rid', and `RID_FIRST_INT_N + <index>' is how a __intN keyword is named.
+     A union wider than four would run the keyword range off the end of that
+     enum, in the front ends, with no diagnostic here.  Say so here, where the
+     number is decided.  */
+  if ((union_list_file ? union_num_int_n_ents : n_int_n_ents) > 4)
+    error ("the configured back ends need %d __intN entries; `enum rid' has "
+	   "four (RID_INT_N_0 .. RID_INT_N_3)",
+	   union_list_file ? union_num_int_n_ents : n_int_n_ents);
+
+  /* And the direction that matters for the storage: a base whose own count
+     exceeds the shared bound would index `int_n_trees' past its end.  This
+     cannot happen -- the union run reads this back end's modes file too --
+     so it is a check on the WIRING (a stale modes-union.list, a back end
+     missing from the union input), which is exactly the failure the shared
+     numbering has had before.  */
+  if (union_list_file && n_int_n_ents > union_num_int_n_ents)
+    error ("this back end has %d __intN entries but the shared numbering "
+	   "allows %d; modes-union.list is stale or does not include it",
+	   n_int_n_ents, union_num_int_n_ents);
 
   /* The shared answer when there is one; see union_poly_int_coeffs.  This is
      the ONE value in insn-modes-<base>.h that is deliberately not this back
@@ -3177,6 +3296,36 @@ emit_mode_int_n (void)
     }
 
   print_closer ();
+
+  /* THE TABLE'S OWN LENGTH, NEXT TO THE TABLE, and derived from the array
+     just emitted rather than from `n_modes' -- the middle end indexes the
+     ARRAY, so the count has to be the array's.  Writing it any other way is
+     the shared-numbering defect this whole file guards against, and it is the
+     one NUM_INT_N_ENTS committed: one name computed from the primary's modes
+     and used as a bound on somebody else's table.
+
+     Same shape and same reasoning as `unspec_strings_len' beside
+     `unspec_strings' in genenums.cc; multi-target-select.cc installs it
+     through MT_SCALAR_TABLES, on the same list as the table itself so that
+     one cannot be selected without the other.  */
+  printf ("int num_int_n_ents = (int) ARRAY_SIZE (int_n_data%s);\n",
+	  multi_target_p () ? "_tab" : "");
+
+  /* The cross-check against the header, which this same run wrote from the
+     same modes but through a different function.  It catches a stale
+     insn-modes-<base>.h against a fresh table.  */
+  printf ("static_assert (ARRAY_SIZE (int_n_data%s) == NUM_INT_N_ENTS,\n"
+	  "\t       \"int_n_data does not have NUM_INT_N_ENTS entries\");\n",
+	  multi_target_p () ? "_tab" : "");
+
+  /* And the bound this back end's entries must fit inside: `int_n_enabled_p'
+     and `int_n_trees' are sized by the shared number in tree.cc, so a base
+     with more entries than that would index them off the end.  Checked here,
+     in the translation unit that has both numbers, rather than trusted.  */
+  printf ("static_assert (ARRAY_SIZE (int_n_data%s)\n"
+	  "\t       <= MULTI_TARGET_UNION_NUM_INT_N_ENTS,\n"
+	  "\t       \"int_n_data outgrows the shared int_n_trees bound\");\n",
+	  multi_target_p () ? "_tab" : "");
 }
 
 

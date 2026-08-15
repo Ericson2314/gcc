@@ -569,7 +569,7 @@ cp_common_type (tree t1, tree t2)
 	 priority than the types checked above, but higher than other
 	 128-bit types) or it's known to not be the same size as other
 	 types (enforced in toplev.cc).  Prefer the unsigned type. */
-      for (i = 0; i < NUM_INT_N_ENTS; i ++)
+      for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
 	{
 	  if (int_n_enabled_p [i]
 	      && (same_type_p (TYPE_MAIN_VARIANT (t1), int_n_trees[i].signed_type)

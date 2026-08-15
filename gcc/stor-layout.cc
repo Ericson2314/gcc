@@ -313,7 +313,7 @@ mode_for_size (poly_uint64 size, enum mode_class mclass, int limit)
       return mode;
 
   if (mclass == MODE_INT || mclass == MODE_PARTIAL_INT)
-    for (i = 0; i < NUM_INT_N_ENTS; i ++)
+    for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
       if (known_eq (int_n_data[i].bitsize, size)
 	  && int_n_enabled_p[i])
 	return int_n_data[i].m;
@@ -357,7 +357,7 @@ smallest_mode_for_size (poly_uint64 size, enum mode_class mclass)
     return opt_machine_mode ();
 
   if (mclass == MODE_INT || mclass == MODE_PARTIAL_INT)
-    for (i = 0; i < NUM_INT_N_ENTS; i ++)
+    for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
       if (known_ge (int_n_data[i].bitsize, size)
 	  && known_lt (int_n_data[i].bitsize, GET_MODE_PRECISION (mode))
 	  && int_n_enabled_p[i])
@@ -2950,7 +2950,7 @@ initialize_sizetypes (void)
       int i;
 
       precision = -1;
-      for (i = 0; i < NUM_INT_N_ENTS; i++)
+      for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
 	if (int_n_enabled_p[i])
 	  {
 	    char name[50], altname[50];

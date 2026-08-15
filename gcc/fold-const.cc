@@ -7894,7 +7894,7 @@ find_bitfield_repr_type (int fieldsize, int len)
 	  }
     }
 
-  for (int i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (int i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& int_n_data[i].bitsize >= (unsigned) (BITS_PER_UNIT * fieldsize)
 	&& int_n_trees[i].unsigned_type)

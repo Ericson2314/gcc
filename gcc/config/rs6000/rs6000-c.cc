@@ -172,7 +172,7 @@ rid_int128(void)
 {
   int i;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& int_n_data[i].bitsize == 128)
       return RID_INT_N_0 + i;

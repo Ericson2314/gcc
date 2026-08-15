@@ -182,7 +182,7 @@ s390_categorize_keyword (const cpp_token *tok)
 static inline int
 rid_int128 (void)
 {
-  for (int i = 0; i < NUM_INT_N_ENTS; ++i)
+  for (int i = 0; i < MT_NUM_INT_N_ENTS; ++i)
     if (int_n_enabled_p[i]
 	&& int_n_data[i].bitsize == 128)
       return RID_INT_N_0 + i;

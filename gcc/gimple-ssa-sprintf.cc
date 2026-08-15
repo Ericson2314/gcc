@@ -1009,7 +1009,7 @@ build_intmax_type_nodes (tree *pintmax, tree *puintmax)
     }
   else
     {
-      for (int i = 0; i < NUM_INT_N_ENTS; i++)
+      for (int i = 0; i < MT_NUM_INT_N_ENTS; i++)
 	if (int_n_enabled_p[i])
 	  {
 	    char name[50], altname[50];

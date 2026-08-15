@@ -258,9 +258,27 @@ tree ms_va_list_type_node;
    object in .rodata -- so print_exp's `unspec < NUM_UNSPECV_VALUES' let
    indices 40..113 read the neighbouring table and print a plain UNSPEC's name
    for an UNSPEC_VOLATILE.  An out-of-bounds read that never faults and never
-   diagnoses: one name, two authorities, again.  */
+   diagnoses: one name, two authorities, again.
+
+   `num_int_n_ents' is the same shape a third time, for `int_n_data' on the
+   MT_MODE_TABLES line above: a per-base COUNT beside a per-base TABLE.  The
+   compile-time NUM_INT_N_ENTS cannot serve, because a shared translation unit
+   gets the primary's -- 1, since only avr (PSI 24) and msp430 (PSI 20)
+   declare a second __intN.  Measured over 47 back ends: every shared loop
+   `for (i = 0; i < NUM_INT_N_ENTS; i++)' stopped at 1, so avr's and msp430's
+   second entry was NEVER REGISTERED; meanwhile avr.cc:16328 is compiled
+   against avr's own header, loops to 2, and indexes the one-element shared
+   `int_n_trees'.  That last one is in bounds today only because genmodes
+   bubble-sorts the table by precision and PSI (24) lands at [0] ahead of TI
+   (128) -- correct by sort order, not by construction.
+
+   The storage keeps the union bound (MULTI_TARGET_UNION_NUM_INT_N_ENTS, three
+   at 47 bases); this is the LOOP bound, and giving the loops the union number
+   instead would have 45 back ends read `int_n_data[1]' off the end of a
+   one-element table.  */
 #define MT_SCALAR_TABLES(F, NS)						\
-  F (unspec_strings_len, NS) F (unspecv_strings_len, NS)
+  F (unspec_strings_len, NS) F (unspecv_strings_len, NS)		\
+  F (num_int_n_ents, NS)
 
 #define MT_ALL_TABLES(F, NS)						\
   MT_MODE_TABLES (F, NS) MT_OTHER_TABLES (F, NS) MT_SCALAR_TABLES (F, NS)

@@ -217,7 +217,11 @@ grs_langhook_type_for_mode (machine_mode mode, int unsignedp)
      TODO Clean all this up (either locally, or preferably per PR46805:
      "Ideally we'd never use lang_hooks.types.type_for_mode (or _for_size) in
      the middle-end but had a pure middle-end based implementation".  */
-  for (size_t i = 0; i < NUM_INT_N_ENTS; i++)
+  /* `int', not `size_t': MT_NUM_INT_N_ENTS is a run-time `int' (the selected
+     back end's count) rather than the compile-time constant this loop used to
+     compare against, so an unsigned index would be a signed/unsigned
+     comparison.  */
+  for (int i = 0; i < MT_NUM_INT_N_ENTS; i++)
     if (int_n_enabled_p[i] && mode == int_n_data[i].m)
       return (unsignedp ? int_n_trees[i].unsigned_type
 			: int_n_trees[i].signed_type);

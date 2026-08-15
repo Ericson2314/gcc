@@ -2373,7 +2373,7 @@ c_common_type_for_size (unsigned int bits, int unsignedp)
     return (unsignedp ? long_long_unsigned_type_node
 	    : long_long_integer_type_node);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& bits == int_n_data[i].bitsize)
       return (unsignedp ? int_n_trees[i].unsigned_type
@@ -2489,7 +2489,7 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
   if (mode == TYPE_MODE (long_long_integer_type_node))
     return unsignedp ? long_long_unsigned_type_node : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& mode == int_n_data[i].m)
       return (unsignedp ? int_n_trees[i].unsigned_type
@@ -2732,7 +2732,7 @@ c_common_signed_or_unsigned_type (int unsignedp, tree type)
   if (type1 == long_long_integer_type_node || type1 == long_long_unsigned_type_node)
     return unsignedp ? long_long_unsigned_type_node : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& (type1 == int_n_trees[i].unsigned_type
 	    || type1 == int_n_trees[i].signed_type))
@@ -2857,7 +2857,7 @@ c_common_signed_or_unsigned_type (int unsignedp, tree type)
     return (unsignedp ? long_long_unsigned_type_node
 	    : long_long_integer_type_node);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& TYPE_MODE (type) == int_n_data[i].m
 	&& TYPE_PRECISION (type) == int_n_data[i].bitsize)
@@ -2905,7 +2905,7 @@ c_build_bitfield_integer_type (unsigned HOST_WIDE_INT width, int unsignedp)
   if (width == TYPE_PRECISION (long_long_integer_type_node))
     return (unsignedp ? long_long_unsigned_type_node
 	    : long_long_integer_type_node);
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& width == int_n_data[i].bitsize)
       return (unsignedp ? int_n_trees[i].unsigned_type
@@ -4497,7 +4497,7 @@ c_common_nodes_and_builtins (void)
   record_builtin_type (RID_MAX, "long unsigned int",
 		       long_unsigned_type_node);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     {
       char name[25];
 
@@ -9380,7 +9380,7 @@ keyword_begins_type_specifier (enum rid keyword)
       return true;
     default:
       if (keyword >= RID_FIRST_INT_N
-	  && keyword < RID_FIRST_INT_N + NUM_INT_N_ENTS
+	  && keyword < RID_FIRST_INT_N + MT_NUM_INT_N_ENTS
 	  && int_n_enabled_p[keyword-RID_FIRST_INT_N])
 	return true;
       return false;

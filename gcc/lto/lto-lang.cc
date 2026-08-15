@@ -996,7 +996,7 @@ lto_type_for_mode (machine_mode mode, int unsigned_p)
   if (mode == TYPE_MODE (long_long_integer_type_node))
     return unsigned_p ? long_long_unsigned_type_node : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& mode == int_n_data[i].m)
       return (unsigned_p ? int_n_trees[i].unsigned_type
@@ -1306,7 +1306,7 @@ lto_build_c_type_nodes (void)
       int i;
 
       signed_size_type_node = NULL_TREE;
-      for (i = 0; i < NUM_INT_N_ENTS; i++)
+      for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
 	if (int_n_enabled_p[i])
 	  {
 	    char name[50], altname[50];
@@ -1412,7 +1412,7 @@ lto_init (void)
   NAME_TYPE (complex_float_type_node, "complex float");
   NAME_TYPE (complex_double_type_node, "complex double");
   NAME_TYPE (complex_long_double_type_node, "complex long double");
-  for (i = 0; i < NUM_INT_N_ENTS; i++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
     if (int_n_enabled_p[i])
       {
 	char name[50];

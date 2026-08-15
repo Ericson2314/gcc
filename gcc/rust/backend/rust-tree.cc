@@ -5325,7 +5325,7 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
     return unsignedp ? long_long_unsigned_type_node
 		     : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
     if (int_n_enabled_p[i] && mode == int_n_data[i].m)
       return (unsignedp ? int_n_trees[i].unsigned_type
 			: int_n_trees[i].signed_type);

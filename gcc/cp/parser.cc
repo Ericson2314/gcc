@@ -1358,7 +1358,7 @@ cp_keyword_starts_decl_specifier_p (enum rid keyword)
 
     default:
       if (keyword >= RID_FIRST_INT_N
-	  && keyword < RID_FIRST_INT_N + NUM_INT_N_ENTS
+	  && keyword < RID_FIRST_INT_N + MT_NUM_INT_N_ENTS
 	  && int_n_enabled_p[keyword - RID_FIRST_INT_N])
 	return true;
       return false;
