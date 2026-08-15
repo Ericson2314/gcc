@@ -185,6 +185,75 @@ for T in "$@"; do
   fi
   echo "-- guard: mt-specsread PASSES ($(grep -c '^-- ARM' "$B/specsread-$T.out") arms)"
 
+  # GUARD 3c -- THE ASSEMBLER MUST BE THIS TARGET'S, AND IT WAS NOT.
+  #
+  # SC-BOARD.md section 0 records this defect and FIXED IT ON THE STOCK SIDE
+  # ONLY.  The multi-target side has carried it in every board this project
+  # has taken.  `<builddir>/gcc/as' is a libtool-style shim whose
+  # ORIGINAL_AS_FOR_TARGET is the nixpkgs gcc-wrapper's `as' -- the HOST x86
+  # assembler -- and `-print-prog-name=as' returns THE SAME FILE for all four
+  # targets.  So every `dg-do assemble' and every `-c' compilation in
+  # `gcc.c-torture/compile' fed s390x and aarch64 assembly to an x86
+  # assembler.
+  #
+  # Measured cost: `invalid -march= option: `z900'' 9,184 times on s390x, and
+  # ~10,114 of that target's 14,256 "debt" -- 71% of it -- plus ~10,142 of
+  # aarch64's.  It is NOT a compiler defect: the same compiler's `.s' output
+  # assembles cleanly with the real cross assembler into a correct
+  # ELF64 / IBM S/390 object.
+  #
+  # THE FIX IS A PER-TARGET DIRECTORY HOLDING A PLAIN `as'.  `-B<tools>/'
+  # alone does NOT work: the tools are named `<triple>-as' and the driver
+  # searches for `as', so it falls through to the build dir's shim.  A
+  # directory containing `as' -> `<triple>-as' and passed FIRST is what the
+  # driver actually honours.
+  #
+  # MT_TOOLS_<triple-with-dashes-as-underscores> names that target's binutils
+  # bin directory (taa-tools.sh output).  Absent, the run REFUSES rather than
+  # silently assembling with the host tool -- "cannot tell" is not "fine",
+  # and this whole guard exists because a silent wrong assembler looked like
+  # a compiler bug for the entire life of the project.
+  TVAR=MT_TOOLS_$(printf '%s' "$T" | tr - _)
+  eval "TDIR=\${$TVAR:-}"
+  if [ -z "$TDIR" ]; then
+    echo "FATAL[$T]: no $TVAR set."
+    echo "  Without this target's binutils the driver resolves \`as' to"
+    echo "  $B/gcc/as, a shim around the HOST assembler, and every"
+    echo "  assemble-shaped test fails for a reason that is not the compiler."
+    echo "  Run scratchpad/taa-tools.sh and pass $TVAR=<its bin dir>."
+    echo "  Set MT_ALLOW_HOST_AS=1 to state deliberately that you accept it."
+    [ -n "${MT_ALLOW_HOST_AS:-}" ] || exit 9
+    ASDIR=
+  else
+    ASDIR="$B/asdir-$T"; rm -rf "$ASDIR"; mkdir -p "$ASDIR"
+    for tool in as ld nm ar ranlib objcopy objdump strip readelf; do
+      [ -x "$TDIR/$T-$tool" ] && ln -sf "$TDIR/$T-$tool" "$ASDIR/$tool"
+    done
+    [ -x "$ASDIR/as" ] || { echo "FATAL[$T]: no $TDIR/$T-as to link"; exit 9; }
+
+    # NON-VACUITY, and it is the arm SC-BOARD's S4 already prescribes: ask the
+    # RUNNING driver, then ASSEMBLE A REAL FUNCTION and require the target's
+    # own readelf to name the machine.  A host `as' accepts an empty file, so
+    # "no complaint" would be another way to see nothing.
+    got=$("$B/gcc/xgcc" -B"$ASDIR/" -B"$B/gcc/" -ftarget-config="$CFG" \
+            -print-prog-name=as)
+    case "$got" in
+      "$ASDIR/as") ;;
+      *) echo "FATAL[$T]: driver resolves \`as' to $got, not $ASDIR/as"; exit 9 ;;
+    esac
+    printf 'int mt_as_probe (int x) { return x + 1; }\n' > "$B/mt-as-$T.c"
+    if ! "$B/gcc/xgcc" -B"$ASDIR/" -B"$B/gcc/" -ftarget-config="$CFG" \
+           -O1 -w -c -o "$B/mt-as-$T.o" "$B/mt-as-$T.c" 2> "$B/mt-as-$T.err"; then
+      echo "FATAL[$T]: the target's own assembler rejected the compiler's output:"
+      sed -n '1,5p' "$B/mt-as-$T.err"
+      exit 9
+    fi
+    mach=$("$TDIR/$T-readelf" -h "$B/mt-as-$T.o" 2>/dev/null \
+             | sed -n 's/.*Machine: *//p')
+    [ -n "$mach" ] || { echo "FATAL[$T]: $T-readelf named no machine"; exit 9; }
+    echo "-- guard: assembler is $T's own, and it produces: $mach"
+  fi
+
   # ---- the run itself ----
   TSD="testsuite.$T"
   # See note 2 in the header: site.exp does not depend on TEST_TARGET.
@@ -239,7 +308,7 @@ for T in "$@"; do
       make ${MT_MAKEFLAGS:-} check-gcc \
         TEST_TARGET=$T \
         TESTSUITEDIR=$TSD \
-        RUNTESTFLAGS=\"GCC_UNDER_TEST='$B/gcc/xgcc -B$B/gcc/ -ftarget-config=$CFG' $RTF\"" \
+        RUNTESTFLAGS=\"GCC_UNDER_TEST='$B/gcc/xgcc ${ASDIR:+-B$ASDIR/ }-B$B/gcc/ -ftarget-config=$CFG' $RTF\"" \
   ) > "$B/check-$T.out" 2> "$B/check-$T.err"
   rc=$?
   # Stamp the exit, and let the scorer refuse a run with no stamp: a log being
