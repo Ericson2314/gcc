@@ -1,5 +1,45 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## SUPERSEDED FOR ALL FOUR TARGETS BY `AB1900D5279BA137F-BOARD.md` (`cad1a29fbdc`, 47 bases)
+>
+> **Every multi-target row and every debt figure below is stale.** One build,
+> at tip, four targets, all guards green, all runs `.rc`-stamped, load 17.54:
+>
+> ```
+> target     debt HERE   debt NOW      stock (the control)
+> aarch64      205,433      3,708      344463 / 20443   <- unchanged, re-read
+> s390x         20,326      4,711      130895 / 15627   <- unchanged, re-read
+> x86_64        (none)      2,971      163816 / 16223   <- NEW control
+> riscv64       (none)      2,218      270248 / 15904   <- NEW control
+> ```
+>
+> **THE STOCK SIDE OF THIS DOCUMENT STANDS AND HAS BEEN RE-VERIFIED.** The
+> `aarch64` and `s390x` build dirs survive; re-read from them, they reproduce
+> section 2 row for row. What is superseded is the multi-target column and
+> therefore the debt.
+>
+> **The two missing controls now exist**, built from this same snapshot
+> (`c31b7a09eea`, anchor 0 on the inverted assert), the same cross binutils and
+> the same target glibc headers. Building them needed no new argument, only
+> four hardcoded lines removed from `sc-{conf,build,check}.sh` — the
+> `agent-a3464debf6893de84` tag and tools path, which are now derived from the
+> running script's own path with `SC_TAG` / `SC_TOOLS` as named overrides.
+> `sc-check.sh`'s guard S4 gained `riscv64` and `x86_64` machine arms; its
+> default arm is still a refusal.
+>
+> **Section 5's scope difference is largely gone**, which changes how section 2
+> may be read: only-in-stock test names are **2,267** on `aarch64` (was 66,465)
+> and **2,310** on `s390x` (was 21,727). The two sides now attempt essentially
+> the same work.
+>
+> **Section 7's work queue is superseded and its item #2 has moved.**
+> `gcc.c-torture/compile` is no longer a two-target item: it is 2,408 on
+> `s390x` (stock 0) and **78** on `x86_64`, **32** on `riscv64`, and does not
+> appear in `aarch64`'s top directories at all. The SVE/SME ACLE family it
+> ranked #1 at ~102,000 is now 2,584 and is ONE cause rather than four
+> directories. Full ranked residual, per target, with stock's column beside
+> every row, in `AB1900D5279BA137F-BOARD.md` section 3.
+
 > ## THE SME/SME2 ACLE CLUSTER IS CLOSED AT `b2fc4c0b9f8` (SME2 at PARITY)
 >
 > ```
