@@ -18,8 +18,25 @@
 > The new figure is itself an UPPER bound: the compiler measured carries the
 > `cselib.cc:2650` regression (122,646 ICEs), fixed in `2e5f4730465` and not
 > in that build. Full row, ranked residual and by-name diff in
-> `A57163422943AAA57-REBASELINE.md`. s390x has NOT been re-measured, so its
-> 20,326 still stands unrevised below.
+> `A57163422943AAA57-REBASELINE.md`.
+>
+> **s390x is ALSO superseded, measured at tip `03cfa434d1c` with the `cselib`
+> fix in:**
+>
+> ```
+> s390x debt     20,326  ->  14,256
+> ```
+>
+> Read that row with its scope change: s390x produced **32,679 fewer results
+> in total** and 10,200 test files produce fewer results than before, so its
+> PASS fall of 90,464 -> 77,778 is overwhelmingly scope, not quality — only
+> **620** named tests regressed. Neither figure is `-j`-sensitive any more
+> (the ERROR column is decomposed).
+>
+> **Both boards' §7 work queue is now stale.** Re-ranked from the tip runs:
+> the SVE/SME ACLE family (~102,000 aarch64 FAILs, stock **0**) is #1, and
+> `gcc.c-torture/compile` (aarch64 10,142 + s390x 10,114 = 20,256, stock **0**
+> on both) is #2 and untouched by anything that landed today.
 >
 > ## THE STOCK SIDE STANDS. THE MULTI-TARGET SIDE, AND THEREFORE THE DEBT, DOES NOT.
 >
