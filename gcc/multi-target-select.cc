@@ -258,7 +258,8 @@ tree ms_va_list_type_node;
    object in .rodata -- so print_exp's `unspec < NUM_UNSPECV_VALUES' let
    indices 40..113 read the neighbouring table and print a plain UNSPEC's name
    for an UNSPEC_VOLATILE.  An out-of-bounds read that never faults and never
-   diagnoses: one name, two authorities, again.  */
+   diagnoses: one name, two authorities, again.
+
    `num_int_n_ents' is the same shape a third time, for `int_n_data' on the
    MT_MODE_TABLES line above: a per-base COUNT beside a per-base TABLE.  The
    compile-time NUM_INT_N_ENTS cannot serve, because a shared translation unit
