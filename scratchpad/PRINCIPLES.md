@@ -1093,6 +1093,52 @@ check separately whether the thing that reaches them is per-base; the two
 questions are independent and this file conflated them for the widest file in
 the tree.
 
+**AND "WIDEST LEAK CHANNEL" IS THE WRONG NAME FOR IT — 812 IS A COUNT OF AN
+`#include`, NOT OF A DEPENDENCE ON ANYTHING THAT DIFFERS (#193).** The
+paragraph above is right that byte-identity to i386 is a fact worth having and
+wrong to stop there. Measured, same 47-base build, `dc7507542ce`, anchor 52
+(`t193-agent-a167f499b5c9c334c-modeprov.sh`, `-modediff.sh`):
+
+```
+insn-modes.h         47 files,  3 distinct bodies    (comments stripped)
+insn-modes-inline.h  47 files,  1 distinct body      -- TARGET-NEUTRAL, measured
+insn-flags-<base>.h  45 files, 45 distinct bodies    -- the negative control
+```
+
+The whole divergence of `insn-modes.h` over 47 back ends is **five names**:
+`PSImode`, `CPSImode`, `E_PSImode`, `E_CPSImode` — defined only by `avr` and
+`msp430`, which both declare a `PSI` mode, so genmodes qualifies them
+(`avr_PSImode`) and aliases the bare name to whichever base is in force — and
+**`NUM_INT_N_ENTS`**. The shared copy defines none of the first four, so a
+shared TU spelling `PSImode` is a compile error, not a silent leak. The union
+did its job; the numbering, the class ranges, `MAX_BITSIZE_MODE_ANY_*`,
+`NUM_POLY_INT_COEFFS` and every `mode_*` accessor in
+`insn-modes-inline.h` are byte-identical across all 47.
+
+`NUM_INT_N_ENTS` is the one real item and it is the **union-bound-as-SIZE vs
+as-PREDICATE** distinction again, live:
+
+```
+insn-modes.h (= i386's), and 45 bases         NUM_INT_N_ENTS 1   int_n_data = { TI 128 }
+insn-modes-avr.h                              NUM_INT_N_ENTS 2   { avr_PSI 24,    TI 128 }
+insn-modes-msp430.h                           NUM_INT_N_ENTS 2   { msp430_PSI 20, TI 128 }
+```
+
+`tree.cc:294-295` allocates `int_n_enabled_p[NUM_INT_N_ENTS]` and
+`int_n_trees[NUM_INT_N_ENTS]` from the SHARED header, i.e. **1**, and ~25
+shared TUs loop `for (i = 0; i < NUM_INT_N_ENTS; i++)`. So on avr and msp430
+the second `int_n` entry is never registered. `avr.cc:16327` is compiled with
+avr's header, loops to **2**, and indexes the shared 1-element `int_n_trees`;
+it is in bounds today only because genmodes bubble-sorts the table by precision
+and avr's `PSI` (24) lands at [0] before `TI` (128).
+
+**The trap, stated because it is the obvious fix and it is wrong:** making
+`NUM_INT_N_ENTS` the union maximum (2) everywhere gives the other 45 bases a
+loop that reads `int_n_data[1]` past the end of a one-element
+`const int_n_data_t` table. Correct shape is the settled one —
+`MULTI_TARGET_UNION_NUM_INT_N_ENTS` sizing the shared arrays, and the loop
+bound coming from the SELECTED base at run time. Not landed; named.
+
 Corollary, same measurement: `git grep '"tm.h"'` **undercounts the real
 population by 7.6×** — 59 source spellings against 451 shared objects that
 actually open it, plus 5 files spelling `MT_HEADER (tm.h)` that the grep cannot
@@ -1122,6 +1168,62 @@ configured back end's `.opt` files, so a TU that includes it directly gets no
 primary's answer, and the remedy is a missing include rather than a conversion;
 and the instrument that settles any of this is a **build with the line deleted**
 (`t160-amputate.sh`), not a scan.
+
+**THE `options.h` HALF OF THAT SENTENCE IS FALSE, MEASURED (#193). THE SHARED
+`options.h` IS i386's, AND IT IS THE SECOND-WIDEST LEAK CHANNEL — 579 shared
+readers.** #187 declined to score it and left it UNDECIDED rather than
+inheriting the claim, which was the right call. Cold 47-base build,
+`dc7507542ce`, anchor 52, `t193-agent-a167f499b5c9c334c-optionsclass.sh`:
+
+```
+root options.h vs options-i386.h      base-only    1   root-only    1
+root options.h vs options-aarch64.h   base-only   13   root-only  869
+root options.h vs options-riscv.h     base-only  845   root-only  862
+bases with a name the root lacks:  47 of 47      -> it is NOT the union
+i386's 829 back-end-private option macros, in the shared options.h:  828
+EVERY other back end's private macros,   in the shared options.h:      0
+```
+
+**Two true halves made one false sentence, and that is the transferable
+part.** The option-code VOCABULARY (`enum opt_code`) *is* unioned, by
+`optionlist-vocab` + `opt-stub.awk`, and so is the `struct gcc_options`
+LAYOUT. Both facts are real and both are about the parts of the header that
+must agree between bases. The MACROS are the third part and they are the
+primary's, because `gcc/Makefile.in`'s `s-options-h` rule generates the shared
+header with **`-v union_base=$(multi_target_base)`**. `opth-gen.awk` says so
+itself, twice, under "Residual, stated rather than hidden": it puts back out of
+scope only what is foreign **to that one base**. Nobody read past the vocabulary
+claim to the macro one.
+
+**And the values arm is where it bites, which is the arm a name-set scan cannot
+have.** 96 names have more than one body across the 47 bases; the shared
+`options.h` defines **36** of them, with the primary's body:
+
+```
+TARGET_64BIT   root/i386  ((ix86_isa_flags   & OPTION_MASK_ISA_64BIT) != 0)
+               mips       ((target_flags     & MASK_64BIT)            != 0)
+               riscv      ((riscv_isa_flags  & MASK_64BIT)            != 0)
+               rs6000     ((rs6000_isa_flags & OPTION_MASK_64BIT)     != 0)
+MASK_LONG_DOUBLE_128   i386 (1U<<16)  alpha (1U<<12)  s390 (1U<<5)  sparc (1U<<9)
+MASK_ACCUMULATE_OUTGOING_ARGS   i386 (1U<<3)   avr (1U<<1)
+also TARGET_FDPIC, TARGET_GENERAL_REGS_ONLY, TARGET_BMI, TARGET_DEBUG,
+     TARGET_DIV, TARGET_EMBEDDED_DATA, SET_TARGET_64BIT, ...
+```
+
+`dwarf2codeview.cc:2111,:2498,:6848` is a **shared** TU spelling `TARGET_64BIT`,
+so CodeView output asks i386's ISA flag for all 47 back ends — and
+`ix86_isa_flags` is `global_options.x_ix86_isa_flags`, i.e. the option-state
+class `nm` cannot see and whose pre-`ix86_option_override` value is the
+*unconfigured* default, the `Pmode`/riscv-32-bit shape again.
+`ada/gcc-interface/decl.cc:62` and `targtyps.cc:226` guard on
+**`#ifdef TARGET_64BIT`**, which is true for every target because i386 defines
+it. Only 13 shared sources spell any of the 36, so the blast radius is small —
+but "579 shared readers" was never the right number for it, and neither is 0.
+
+**Generalise: "this header is generated from every back end's inputs" does not
+make its OUTPUT neutral.** Ask which back end the generator was told it was
+generating *for*. Here the answer is a make variable, `$(multi_target_base)`,
+named in the rule.
 
 `c3ca86166f8` closed the 8 by giving `rtl.h`/`hard-reg-set.h` the conversion
 layer; the 23 direct includers now score 21 PASS / 2 FAIL, both on `options.h`.

@@ -43,8 +43,38 @@ for s in $STEMS; do
     [ "$(md5sum "$f" | cut -c1-12)" = "$r" ] && eq="$eq $b"
   done
   cnt=$(echo $eq | wc -w)
+  # ARM (#193): COMMENT-ONLY DIVERGENCE.  md5 equality to exactly one base is
+  # the primary-leak verdict, and for two stems it is produced by a COMMENT.
+  # Every generated header genmodes writes opens with
+  #     /* Generated automatically from machmode.def and
+  #        config/<be>/<be>-modes.def  by genmodes.  */
+  # and stamps each enumerator with `/* config/<be>/<be>-modes.def:NN */'.
+  # Those name the back end, so every base's file differs from every other's
+  # while the C does not: measured, `insn-modes-inline.h' has ONE distinct
+  # body across all 47 bases and still classifies `PER-BASE-it-is i386' here.
+  #
+  # REPORTED, NOT SUBTRACTED.  The verdict is deliberately left alone -- a
+  # stem staying on the leak list costs nothing, and moving one off it on a
+  # comment-stripping heuristic is the shape of §2a's "deleting a check that
+  # fails".  The annotation tells the reader which of the two a stem is.
+  # `insn-modes.h' keeps a real divergence (NUM_INT_N_ENTS, and the
+  # PSImode/CPSImode aliases avr and msp430 collide on) and is NOT annotated.
+  ann=""
+  if [ "$cnt" -ge 1 ] && [ "$cnt" -lt "$n" ]; then
+    nosee () { sed -e 's,/\*[^*]*\*/,,g' -e '1,2d' -e 's/[[:space:]]*$//' "$1"; }
+    nosee "$G/$s" > /tmp/t187-cm-root.$$
+    same=0; tot=0
+    for b in $BASES; do
+      f=$(resolve "$b" "$s") || continue
+      tot=$((tot + 1))
+      nosee "$f" > /tmp/t187-cm-b.$$
+      cmp -s /tmp/t187-cm-root.$$ /tmp/t187-cm-b.$$ && same=$((same + 1))
+    done
+    rm -f /tmp/t187-cm-root.$$ /tmp/t187-cm-b.$$
+    [ "$same" = "$tot" ] && ann="  [COMMENT-ONLY: identical to all $tot bases once comments and the 2-line provenance header are removed]"
+  fi
   if [ "$cnt" = "$n" ]; then cls="UNIONED-identical-to-all-$n"
-  elif [ "$cnt" = 1 ]; then cls="PER-BASE-it-is$eq"
+  elif [ "$cnt" = 1 ]; then cls="PER-BASE-it-is$eq$ann"
   elif [ "$cnt" = 0 ]; then
     # ARM: THE CONFIG-DIR SET.  `tm.h' and `tm_p.h' are include CHAINS, not
     # definition files, so a #define name set says almost nothing about them
@@ -99,7 +129,52 @@ for s in $STEMS; do
     done
     rm -f /tmp/t187-nm-b.$$ /tmp/t187-nm-root.$$
     if [ "$sup" = 1 ]; then cls="UNIONED-by-name-set-superset-of-all-$n"
-    else cls="UNDECIDED-not-a-superset-closest=$best"; fi
+    else
+      # ARM (#193): THE EXCLUSIVE-NAME ARM, WHICH SETTLES `options.h'.
+      #
+      # A header can be neither a copy of any base nor the union of all of
+      # them and STILL be one back end's, and `options.h' is exactly that: the
+      # `struct gcc_options' member set is unioned, so it carries names no
+      # single base has, while `s-options-h' generates it with
+      # `-v union_base=$(multi_target_base)' so the MACROS are one base's.
+      # Set equality and superset-ness both decline, correctly, and #187 left
+      # it UNDECIDED rather than guessing.
+      #
+      # What decides it is the EXCLUSIVE set: for each base, the names no
+      # OTHER base defines.  A neutral header shares none of anybody's; a
+      # header generated for base B carries B's.  Measured on `options.h' in a
+      # 47-base build: i386 828 of its 829 exclusive names are in the shared
+      # header, and every other back end contributes 0.  That is not a close
+      # call and it is not a heuristic -- it names the back end and says how
+      # much of it is visible.
+      excl_all=/tmp/t187-ex-all.$$
+      names "$G/$s" > /tmp/t187-ex-root.$$
+      win=""; winn=0; winof=0; nz=0
+      for b in $BASES; do
+        f=$(resolve "$b" "$s") || continue
+        names "$f" > /tmp/t187-ex-b.$$
+        : > "$excl_all"
+        for o in $BASES; do
+          [ "$o" = "$b" ] && continue
+          g=$(resolve "$o" "$s") || continue
+          names "$g" >> "$excl_all"
+        done
+        sort -u "$excl_all" -o "$excl_all"
+        comm -23 /tmp/t187-ex-b.$$ "$excl_all" > /tmp/t187-ex-x.$$
+        nx=$(wc -l < /tmp/t187-ex-x.$$)
+        nin=$(comm -12 /tmp/t187-ex-x.$$ /tmp/t187-ex-root.$$ | wc -l)
+        [ "$nin" -gt 0 ] && nz=$((nz + 1))
+        [ "$nin" -gt "$winn" ] && { winn=$nin; win=$b; winof=$nx; }
+      done
+      rm -f /tmp/t187-ex-root.$$ /tmp/t187-ex-b.$$ /tmp/t187-ex-x.$$ "$excl_all"
+      if [ "$nz" = 1 ]; then
+        cls="PER-BASE-by-exclusive-names-it-is $win ($winn of its $winof back-end-private names are in the shared copy; every other base contributes 0)"
+      elif [ "$nz" = 0 ]; then
+        cls="NEUTRAL-by-exclusive-names-no-base-private-name-is-in-the-shared-copy"
+      else
+        cls="UNDECIDED-not-a-superset-closest=$best ($nz bases contribute private names; top $win with $winn)"
+      fi
+    fi
   else cls="PER-BASE-shared-by$eq"
   fi
   printf '%-22s %-12s %-6s %s\n' "$s" "$r" "$cnt/$n" "$cls"
