@@ -297,3 +297,82 @@ REAL REGRESSIONS (PASS -> NOT PASS, by name): 2,843
 38,303 and reads as a regression. As names, 114,752 results moved INTO PASS
 and only 2,843 tests genuinely got worse — and those are `-g`-shaped, i.e. the
 `cselib` regression the old run did not have and which is already fixed.
+
+---
+
+# s390x and riscv64 at `03cfa434d1c` (tip, `cselib` fix IN)
+
+Build `/tmp/b-a57163422943aaa57-lra`, snapshot `/tmp/snap-a57163422943aaa57-lra`,
+anchor 52, four bases, `make all-gcc` rc=0 / `error:` 0. Bars at tip: x86_64
+`-O2` **12369 / `378fc33c1e70`**, and the new `-g` arm rc=0 with debug
+sections present.
+
+```
+TARGET                       PASS    FAIL  XPASS  XFAIL  UNSUP   UNRES  ERRUNQ ERRTCL ERRLIN
+s390x-ibm-linux-gnu         77778   30153      3    620   8186    9469       6      1     26
+riscv64-unknown-linux-gnu  205641   23455     19    868  21911    9345       6      1     26
+
+was (TAA-BOARD)  s390x    90464   46009 ... 13948
+                 riscv64  75980   90931 ... 97787
+KILLED   s390x 0   riscv64 10   (`virtual memory exhausted' = the ulimit -v cap
+                                 firing; counted, never subtracted)
+```
+
+**`cselib_invalidate_regno` is 0 on both** — the fix confirmed on two further
+targets, not only on x86_64.
+
+## riscv64 — the largest single movement on the board
+
+**PASS 75,980 -> 205,641; FAIL 90,931 -> 23,455; UNRESOLVED 97,787 -> 9,345.**
+TAA-BOARD's top riscv cause was 26,718 `default_version, at
+riscv-common.cc:162` — the driver reaching `cc1` with no `-march` and no
+`-mabi`, which is exactly what the `-ftarget-config=` specs defect caused.
+This is that fix measured over a full suite.
+
+## s390x — the debt: 20,326 -> 14,256
+
+```
+                    BEFORE      NOW
+debt                20,326    14,256
+  -> FAIL           19,683    14,076
+  -> UNRESOLVED        643       177
+```
+
+**AND ITS TOTALS FELL ON EVERY AXIS, WHICH THE CARDINALITY ARM EXPLAINS AND A
+COLUMN READING WOULD NOT.** PASS fell 90,464 -> 77,778 — but so did FAIL
+(46,009 -> 30,153) and UNRESOLVED (13,948 -> 9,469). The run produced **32,679
+fewer results in total.**
+
+```
+test files producing FEWER results:  10,200
+test files gone entirely:               361
+test files producing MORE:               78  (+87)
+REAL REGRESSIONS (PASS -> NOT PASS, by name):  620
+  495 gcc.c-torture/compile   44 gcc.target/s390   22 gcc.dg/torture
+```
+
+This is the **inverse** of aarch64's shape — there, tests expanded because
+they began compiling; here they contracted. **The PASS drop is overwhelmingly
+a scope change, not 12,686 tests getting worse: only 620 named tests
+regressed.** *Why* 10,200 files yield fewer results is NOT established here
+and is the honest open question on this row. Anyone quoting s390x's PASS
+column must quote the scope change beside it.
+
+## s390x ranked residual
+
+```
+3,860  s390_match_ccmode_set, at config/s390/s390.cc:1518
+   21  hashtab_chk_error, at hash-table.cc:126
+    3  assert_rtx_eq_at, at selftest-rtl.cc:57
+```
+
+**TAA-BOARD's top two s390x causes are GONE**: `as_a, at machmode.h:416`
+(5,782) and `Segmentation fault` (4,257) are both **0**.
+`s390_match_ccmode_set` rose 1,295 -> 3,860, which is what a cause left
+standing looks like once the ones in front of it are removed.
+
+## The standing #2 work item is untouched and is now the largest after SVE/SME
+
+`gcc.c-torture/compile`: **aarch64 10,142 + s390x 10,114 = 20,256 results of
+debt, and stock fails ZERO there on both targets.** SC-BOARD ranked it #2
+before today; nothing that landed today touched it.
