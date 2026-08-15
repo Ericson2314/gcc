@@ -31,6 +31,15 @@ mkdir -p "$OUT"
 A=$(grep -c MULTI_TARGET "$(cat "$D/MY-SRC")/gcc/Makefile.in")
 echo "== arm=$ARM builddir=$D anchor=$A src=$(cat "$D/MY-SRC")"
 
+# `MT_MAKEFLAGS' IS NOT OPTIONAL AND ITS ABSENCE IS EXPENSIVE.  mtcheck.sh
+# passes it straight to `make check-gcc', and unset it means `-j1': the first
+# BEFORE run here reached 15,145 of an expected 170,106 `.sum' lines in fifty
+# minutes, i.e. roughly nine hours per arm and eighteen for the pair.  The
+# boards on this branch were all taken under `-j' (PRINCIPLES notes ERRLIN
+# scales with it, which is only true if it was used).  Nothing about the
+# RESULTS changes -- ERRTCL is the number that means something and it is
+# -j-independent -- only the wall clock.
+MT_MAKEFLAGS="${MT_MAKEFLAGS:--j8}" \
 MT_TOOLS_s390x_ibm_linux_gnu="$TOOLS/bin" \
 MT_COMPILE_ONLY=1 \
 WANT_ANCHOR=$A \
