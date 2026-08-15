@@ -174,6 +174,16 @@ mt_epilogue_uses (int regno)
   return mt_frame ()->epilogue_uses (regno);
 }
 
+/* `ASM_DECLARE_FUNCTION_NAME' and its `#else' arm, collapsed into one call.
+   The `#ifdef' now lives in the per-base thunk, so this is unconditional --
+   see target-frame.h for why that is the point rather than a simplification.  */
+
+void
+mt_declare_function_name (FILE *file, const char *name, tree decl)
+{
+  mt_frame ()->declare_function_name (file, name, decl);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here

@@ -2214,13 +2214,21 @@ assemble_start_function (tree decl, const char *fnname)
     targetm.asm_out.print_patchable_function_entry (asm_out_file,
 						    patch_area_entry, true);
 
-  /* Do any machine/system dependent processing of the function name.  */
-#ifdef ASM_DECLARE_FUNCTION_NAME
-  ASM_DECLARE_FUNCTION_NAME (asm_out_file, fnname, current_function_decl);
-#else
-  /* Standard thing is just output label for the function.  */
-  ASM_OUTPUT_FUNCTION_LABEL (asm_out_file, fnname, current_function_decl);
-#endif /* ASM_DECLARE_FUNCTION_NAME */
+  /* Do any machine/system dependent processing of the function name.
+
+     THE `#ifdef ASM_DECLARE_FUNCTION_NAME' PAIR THAT WAS HERE WAS ANSWERED BY
+     THE PRIMARY, IN BOTH ARMS.  `nm -uC varasm.o' named
+     `ix86_asm_output_function_label' for all 47 back ends, so aarch64 never
+     emitted the per-function `.arch' update that `#pragma GCC target' needs,
+     nor `.variant_pcs', nor `%function'.  The assembler then rejected
+     correctly-generated SME instructions (`selected processor does not
+     support addha za0.d').
+
+     The condition is a fact about a back end, so it is evaluated in that back
+     end's own translation unit -- `mt_base_declare_function_name' in
+     target-cumargs.cc keeps the identical `#ifdef'/`#else' -- and the call
+     here is unconditional.  Same move as `mt_init_expanders'.  */
+  mt_declare_function_name (asm_out_file, fnname, current_function_decl);
 
   /* And the area after the label.  Record it if we haven't done so yet.  */
   if (patch_area_size > patch_area_entry)

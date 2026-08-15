@@ -1428,6 +1428,53 @@ struct target_frame_desc
      that base's own translation unit and it is upstream's own answer for a
      back end standing alone, not the primary's.  */
   bool (*epilogue_uses) (int regno);
+
+  /* ASM_DECLARE_FUNCTION_NAME, WITH ASM_OUTPUT_FUNCTION_LABEL AS ITS `#else'
+     ARM -- AND THIS IS THE OTHER HALF OF THE SME RESIDUAL.
+
+     `varasm.cc:2218' is the only shared consumer and it is an `#ifdef':
+
+	 #ifdef ASM_DECLARE_FUNCTION_NAME
+	   ASM_DECLARE_FUNCTION_NAME (asm_out_file, fnname, current_function_decl);
+	 #else
+	   ASM_OUTPUT_FUNCTION_LABEL (asm_out_file, fnname, current_function_decl);
+	 #endif
+
+     Both arms were the primary's: `nm -uC varasm.o' names
+     `ix86_asm_output_function_label(_IO_FILE*, char const*, tree_node*)', and
+     `final.o' names it too.  `elfos.h:303' supplies a generic
+     ASM_DECLARE_FUNCTION_NAME to most ELF targets and `aarch64.h:855'
+     overrides it, so the `#ifdef' is true for nearly everyone and the
+     question was never existence -- it was WHOSE.
+
+     WHAT IT COSTS, AND IT IS NOT COSMETIC.  aarch64's
+     `aarch64_declare_function_name' emits the per-function `.arch' update for
+     `#pragma GCC target', plus `.variant_pcs' and `%function'.  Without it:
+
+	 stock         .arch armv8-a+sme          (file level)
+		       .arch armv8-a+sme-i16i64   (per function, line 7)
+	 multi-target  .arch armv8-a+sme          (file level only)
+
+     `gcc.target/aarch64/sme/aarch64-sme-acle-asm.exp:66' sets
+     `dg-do-what-default' to ASSEMBLE when the assembler supports
+     `sme-i16i64', so the `*_za64.c' tests really are assembled -- and the
+     assembler then refuses instructions the compiler generated CORRECTLY:
+
+	 Error: selected processor does not support `addha za0.d,p0/m,p1/m,z0.d'
+
+     That is 184 of `sme/acle-asm's residual and the bulk of `sme2's, and it
+     only became visible once `EPILOGUE_USES' stopped deleting the
+     instructions before the assembler could see them.  A defect hidden behind
+     another defect, in the direction that made the first one look worse.
+
+     WHY NO EXISTENCE FIELD, unlike `has_incoming_return_addr_rtx'.  The
+     `#ifdef' has an `#else' that is itself a valid action, so both arms end
+     in a call and there is no absence to represent.  The condition moves into
+     the per-base translation unit -- where it is a fact about that back end
+     rather than about whichever base compiled `varasm.cc' -- exactly as
+     `mt_init_expanders' replaced `#ifdef INIT_EXPANDERS' rather than
+     redirecting it.  The shared call site is therefore unconditional.  */
+  void (*declare_function_name) (FILE *file, const char *name, tree decl);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1450,6 +1497,14 @@ extern bool mt_function_arg_regno_p (int);
    run-time expression with no `#ifdef' around it, so a call-valued redirect in
    `multi-target-macros.h' is legal.  */
 extern bool mt_epilogue_uses (int);
+
+/* `ASM_DECLARE_FUNCTION_NAME' / `ASM_OUTPUT_FUNCTION_LABEL'.  Spelled at the
+   call site rather than redirected, because the site is an `#ifdef' pair and
+   a redirect would leave the GUARD answered by the primary while the BODY was
+   answered by the selected base -- the shape target-frame.h's `DATA_ALIGNMENT'
+   note already refuses.  `varasm.cc:2218's whole `#ifdef' block becomes one
+   call.  */
+extern void mt_declare_function_name (FILE *, const char *, tree);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

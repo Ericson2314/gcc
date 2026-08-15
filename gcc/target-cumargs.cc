@@ -247,6 +247,24 @@ mt_base_epilogue_uses (int regno ATTRIBUTE_UNUSED)
   return EPILOGUE_USES (regno);
 }
 
+/* ASM_DECLARE_FUNCTION_NAME, asked of THIS base.  The `#ifdef' is the SAME
+   one `varasm.cc:2218' used to spell, `#else' arm included; the only thing
+   that changed is which translation unit evaluates it, and therefore which
+   back end it is a fact about.  In varasm.cc it was a fact about i386 applied
+   to all 47 back ends -- and both arms then called i386's function, which is
+   why aarch64 lost its per-function `.arch' directive, its `.variant_pcs' and
+   its `%function'.  See target-frame.h.  */
+
+static void
+mt_base_declare_function_name (FILE *file, const char *name, tree decl)
+{
+#ifdef ASM_DECLARE_FUNCTION_NAME
+  ASM_DECLARE_FUNCTION_NAME (file, name, decl);
+#else
+  ASM_OUTPUT_FUNCTION_LABEL (file, name, decl);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1615,7 +1633,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_case_vector_mode,
   mt_base_has_incoming_return_addr_rtx,
   mt_base_incoming_return_addr_rtx,
-  mt_base_epilogue_uses
+  mt_base_epilogue_uses,
+  mt_base_declare_function_name
 };
 
 /* `extern' is not redundant: a namespace-scope `const' object has INTERNAL
