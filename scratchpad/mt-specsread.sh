@@ -59,7 +59,30 @@ VER=$(cat "$SRC/gcc/BASE-VER")
 [ -n "$VER" ] || mt_die "empty BASE-VER"
 CAP=${MT_MEMCAP_KB:-8388608}
 
-W="$B/specsread"; rm -rf "$W"; mkdir -p "$W"
+# PER-TARGET WORK DIRECTORY, AND THE `rm -rf' IS SCOPED TO THE TARGETS THIS
+# INVOCATION OWNS.
+#
+# This was `W="$B/specsread"; rm -rf "$W"', which is correct for a one-shot
+# run over all targets and WRONG the moment `mtcheck.sh' GUARD 3b started
+# calling this file once per target: each call deleted the previous target's
+# `bare-<T>/' fixture.  Those fixtures are the negative control -- the
+# target-config alone in a directory with no `specs' beside it -- so the
+# wreckage is a `-ftarget-config=' pointing at a file that no longer exists.
+#
+# THE CONSEQUENCE WAS A FALSE NEGATIVE THAT REVERSED A CONCLUSION.  Using a
+# deleted fixture by hand afterwards, `xgcc' answered
+# `fatal error: no target selected' and produced no object -- and a grep for
+# the ICE string found nothing, so `rc=1' with no object read exactly like
+# `rc=0' with an object.  That reading briefly made the specs fix look like
+# the cause of the cselib regression; it is not.  See
+# A57163422943AAA57-REBASELINE.md.
+#
+# Only this invocation's own targets are cleared, so a per-target caller
+# accumulates fixtures instead of destroying them, and `probe.c' is written
+# once per call rather than being a shared file some other call may have
+# removed mid-run.
+W="$B/specsread"; mkdir -p "$W"
+for _t in "$@"; do rm -rf "$W/bare-$_t" "$W/bare-$_t-run".*; done
 echo 'int mt_specsread_probe (void) { return 0; }' > "$W/probe.c"
 
 echo "== mt-specsread: srcdir $SRC $kind anchor=$n  gcc $VER  targets: $*"
