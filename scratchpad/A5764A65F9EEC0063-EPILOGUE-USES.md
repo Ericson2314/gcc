@@ -312,7 +312,77 @@ other not.** Copy the `.sum` and `.log` to a run-specific name immediately
 after each `mtcheck` invocation; the stamp tells you a run finished, it does
 not tell you the file still belongs to that run.
 
-Residual of this family, NOT addressed: `ix86_asm_output_labelref` and
-`ix86_output_addr_{vec,diff}_elt` are still undefined-referenced from
-`varasm.o`/`final.o`. Label references and jump-table entries are a separate
-family with separate consumers.
+### The family, closed and not closed — measured on the linked objects
+
+```
+                                            before      after (e3cdfe218ab)
+varasm.o  ix86_asm_output_function_label      yes            NO
+final.o   ix86_asm_output_function_label      yes            NO
+varasm.o  ix86_asm_output_labelref            yes            yes   (not addressed)
+final.o   ix86_output_addr_vec_elt            yes            yes   (not addressed)
+final.o   ix86_output_addr_diff_elt           yes            yes   (not addressed)
+```
+
+**The two I did not fix still being reported is the non-vacuity arm**: the
+instrument can still say non-zero on the same run that says zero for the one I
+did fix, so the zero is a result rather than a broken grep.
+
+`final.o`'s copy was found by the symbol REFUSING to disappear after
+`varasm.cc` was converted — `final.cc:2229`'s `ASM_DECLARE_COLD_FUNCTION_NAME`,
+which `elfos.h:319` defines in terms of `ASM_OUTPUT_FUNCTION_LABEL`. That is
+PRINCIPLES' "one symbol can have several macro paths": closing the path you
+found does not close the symbol. Fixed in `e3cdfe218ab`, and it moves **no
+number** — cold partitioning needs `-freorder-blocks-and-partition` and profile
+data, which the ACLE suites do not use. Stated so its zero is not later read as
+evidence the conversion was unneeded.
+
+`ASM_OUTPUT_LABELREF` (`varasm.cc:2962`) and `ASM_OUTPUT_ADDR_{VEC,DIFF}_ELT`
+(`final.cc:2566`/`:2575`, jump-table entries) have their own consumers and are
+left for a separate task.
+
+## A THIRD THING, FOUND WHILE TESTING THE COLD PATH, AND NOT DIAGNOSED
+
+Trying to exercise the cold-partition conversion, both multi-target compilers
+answered:
+
+```
+cc1: note: '-freorder-blocks-and-partition' does not support unwind info
+     on this architecture
+```
+
+**The stock aarch64 cross does not emit that note**, on the same source with
+the same flags. So multi-target silently turns the optimisation OFF for
+aarch64 where upstream leaves it on.
+
+It is the same thread as the missing `.cfi_startproc`/`.cfi_endproc`/`.LFB`
+labels still visible in every ACLE diff above: multi-target aarch64 is
+emitting no DWARF CFI at all. `opts.cc:456` is
+
+```c
+opts->x_flag_unwind_tables = targetm_common->unwind_tables_default;
+```
+
+and `opts.cc:1581` gates the partitioning on that same field plus
+`except_unwind_info`. `targetm_common` IS properly per-base selected here —
+`common/common-target-select.cc` builds a registry from `common-target.def` and
+starts at a `targetm_common_none` that names itself — so this is **not** the
+plain leak the rest of this document is about, and I am not claiming a
+mechanism.
+
+The candidate worth testing first is **ordering**: whether
+`targetm_common_select` has run by the time `opts.cc:456` reads the field, or
+whether that read gets `targetm_common_none`'s all-zero POD defaults.
+`multi-target-select.cc:148-151` asserts the ordering is safe —
+
+> "nothing reaches `targetm` before option decoding, and option decoding needs
+> targetm_common, which toplev.cc installs immediately before this"
+
+— which is a **written invariant with an observed counterexample**, i.e.
+exactly the shape PRINCIPLES says to treat as an unrun test. Whoever picks this
+up should read the field in the running `cc1` rather than reasoning from the
+comment.
+
+Cost: unknown and not sized here. But "no CFI on aarch64" means no working
+unwinding, so it is unlikely to be cheap, and it is invisible to
+`check-function-bodies` for the same `fluff`-regex reason as everything else in
+this section.
