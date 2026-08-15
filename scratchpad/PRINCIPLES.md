@@ -1533,6 +1533,32 @@ answer is still wrong is worse than the failure.**
   itself*. If the brief does not contain the finding, it is not available to
   you; say so rather than reconstructing it from `STATE.md`, which for several
   numbers has no section at all.
+- **NEVER EDIT A SCRIPT AN IN-FLIGHT RUN IS EXECUTING — `sh` READS BY BYTE
+  OFFSET, NOT ALL AT ONCE.** A near-miss, reported because it nearly cost a
+  six-hour four-target board. `mtcheck.sh` was running; 50 lines were inserted
+  near line 64 while the interpreter was executing the target loop several
+  hundred lines below. POSIX shells read the script file lazily and keep a file
+  OFFSET, so **inserting lines ABOVE the current position shifts every later
+  byte and the shell can resume mid-statement**, executing a fragment of a line
+  that never existed in any version of the file. The run survived (22 `expect`
+  processes, 6 `cc1`, 221 files written in 60s, all verified rather than
+  assumed) — but survival was luck, not design.
+
+  The failure mode is the worst shape this file tracks: it produces a **real
+  syntax error, or worse a valid-but-different command, in a script that reads
+  correctly when you `cat` it afterwards.** There is no artefact to inspect
+  because the file on disk is the *new* one and the damage was to a *read in
+  progress*. INSTRUMENTS.md already says "if you must fork, an in-flight run
+  must not see your edits"; this is the mechanism behind that sentence, and it
+  applies to every file the run will still open — including the ones it calls
+  only at the END, which is the easy one to forget. `mtcheck.sh` invokes the
+  scorer after the last target, hours later.
+
+  So: **before editing any harness file, check whether a run is executing it or
+  will still source it**, and if so copy it to a name that says why, or wait.
+  `pgrep -af <script>` answers the first half; reading the script for what it
+  invokes late answers the second.
+
 - **Build your own build dir.** Sharing `/tmp/b-objs` produces meaningless
   verdicts and spurious `mv: cannot stat tmp-*` failures; it has killed runs.
   **In a shared build dir, a file you did not write is not a fixture.**
