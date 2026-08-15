@@ -10,24 +10,81 @@ task**. If you are about to write `t<NNN>-conf.sh`, the answer is already here.
 | shared guards, sourced by all | `mt-lib.sh` |
 | configure a build dir with a base set | `mt-conf.sh` |
 | build in it, stamped | `mt-build.sh` |
-| run `target-specs` per target | `mt-specs.sh` |
+| run `target-specs` per target (2 targets, hardcoded) | `mt-specs.sh` |
+| run `target-specs` for the 4-target set, real cross tools | `taa-tools.sh` + `taa-specs.sh` |
 | the x86_64 `-O2` codegen bar | `mt-bars.sh` |
+| **the target's own `specs` file was actually READ** | `mt-specsread.sh` |
 | `MULTI_TARGET_RENAME_NAMES` completeness | `mt-rename-sweep.sh` |
 | the testsuite, once per target | `mtcheck.sh` |
 | score its runs | `mtscore.sh` |
 | every cited `scratchpad/` path exists | `mt-cite-check.sh` |
+| a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
 
-Typical run:
+## THE EXAMPLE IN THIS FILE WAS WRONG IN TWO WAYS AND BOTH COST BUILDS
+
+Recorded verbatim rather than quietly replaced, because both are shapes an
+agent will reproduce from memory:
+
+**1. `--enable-targets=i386,aarch64` DOES NOT WORK. Triples are required.**
+`--enable-targets` is the TOP LEVEL's flag and the top level is the target
+dispatcher: it hands each entry to `config.sub` and then to `config.gcc`.
+Measured at `5eb6cb0e5e3`:
+
+```
+$ sh config.sub aarch64   ->  aarch64-unknown-none
+$ sh config.sub i386      ->  i386-pc-none
+```
+
+and `gcc/config.gcc` has no case matching `*-*-none` for either (`aarch64*-*-elf`,
+`aarch64*-*-linux*`, ... but nothing bare), so it reports the target
+unsupported and the build dies inside `configure-gcc`. The failure is one
+layer below where the flag was typed, which is why it reads as a broken tree.
+A bare back-end NAME is what `gcc/configure`'s `--enable-backends` takes, and
+that flag is DERIVED by the top level (`configure.ac:279`) — you do not spell
+it yourself.
+
+**2. `SRC=$PWD` BUILDS THE LIVE WORKING TREE, which PRINCIPLES §4 forbids at
+length.** A merge or an edit landing mid-build produces a torn read that
+diagnoses a state no commit ever had, naming real symbols. Snapshot first.
+
+## Typical run — this one was executed at `5eb6cb0e5e3`
 
 ```sh
-A=$(grep -c MULTI_TARGET gcc/Makefile.in)          # 49 today; run it, do not copy it
-export WANT_ANCHOR=$A
-SRC=$PWD sh scratchpad/mt-conf.sh  /tmp/b-<hash> i386,aarch64
-         sh scratchpad/mt-build.sh /tmp/b-<hash> make-cc1 all-gcc
-         sh scratchpad/mt-specs.sh /tmp/b-<hash>
-         sh scratchpad/mt-bars.sh  /tmp/b-<hash>
-         sh scratchpad/mt-rename-sweep.sh /tmp/b-<hash>
+W=$PWD                                             # the worktree
+ID=<full worktree id, e.g. agent-a57163422943aaa57>
+A=$(grep -c MULTI_TARGET gcc/Makefile.in)          # 52 at 5eb6cb0e5e3;
+export WANT_ANCHOR=$A                              #   run it, do not copy it
+
+# 1. an IMMUTABLE snapshot -- never $PWD
+rm -rf /tmp/snap-$ID && mkdir -p /tmp/snap-$ID
+git archive HEAD | tar -x -C /tmp/snap-$ID
+git rev-parse --short HEAD > /tmp/snap-$ID/SNAP-SHA
+chmod -R a-w /tmp/snap-$ID
+
+# 2. TRIPLES, comma-separated, and the build dir named for the FULL worktree id
+SRC=/tmp/snap-$ID sh scratchpad/mt-conf.sh /tmp/b-$ID \
+  x86_64-pc-linux-gnu,aarch64-unknown-linux-gnu,\
+riscv64-unknown-linux-gnu,s390x-linux-gnu
+sh scratchpad/mt-build.sh /tmp/b-$ID all-gcc all-gcc
+
+# 3. per-target specs.  mt-specs.sh serves the two-base pair ONLY; the
+#    four-target set needs real cross binutils, which taa-tools.sh materialises.
+sh scratchpad/taa-tools.sh /tmp/tools-$ID
+B=/tmp/b-$ID TOOLS=/tmp/tools-$ID sh scratchpad/taa-specs.sh
+
+# 4. bars, and the guard that the specs are actually reaching cc1
+sh scratchpad/mt-bars.sh      /tmp/b-$ID
+sh scratchpad/mt-specsread.sh /tmp/b-$ID x86_64-pc-linux-gnu aarch64-unknown-linux-gnu
+sh scratchpad/mt-rename-sweep.sh /tmp/b-$ID
+
+# 5. the board.  mt-specsread.sh is a PRECONDITION on this, not a nicety --
+#    see its header for what every board taken before it was measuring.
+MT_COMPILE_ONLY=1 sh scratchpad/mtcheck.sh /tmp/b-$ID <triples...>
 ```
+
+Note `s390x-linux-gnu` on the command line and `s390x-ibm-linux-gnu`
+everywhere afterwards: `config.sub` canonicalises it, and the canonical form is
+what names the per-target directory, the `specs-config` and the tools.
 
 ## Why the names carry no task number
 

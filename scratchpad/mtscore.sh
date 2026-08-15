@@ -32,9 +32,13 @@ B=${1:?build dir}; shift
 # from the LOG (the .sum cannot carry it) and printed BESIDE the board, never
 # subtracted from FAIL: subtracting it would be a failure floor, and the point
 # is to make the contamination visible, not to net it out.
-printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' \
-  TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERROR
-printf '%s\n' "--------------------------------------------------------------------------------------------"
+printf '%-30s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n' \
+  TARGET PASS FAIL XPASS XFAIL UNSUP UNRES ERRUNQ ERRTCL ERRLIN
+printf '%s\n' "----------------------------------------------------------------------------------------------------------------"
+# ERRUNQ = distinct ERROR causes;  ERRTCL = distinct .exp files aborted by a
+# tcl error;  ERRLIN = raw `^ERROR: ' lines, printed ONLY so boards recorded
+# before this fix can be reconciled -- it scales with -j and is not a result.
+# None of the three is added into any total.
 
 any=0
 for T in "$@"; do
@@ -63,14 +67,55 @@ for T in "$@"; do
   xf=$(grep -c '^XFAIL: '      "$SUM" || true)
   u=$(grep -c '^UNSUPPORTED: ' "$SUM" || true)
   ur=$(grep -c '^UNRESOLVED: ' "$SUM" || true)
-  e=$(grep -c '^ERROR: '       "$SUM" || true)
-  tot=$((p+f+xp+xf+u+ur+e))
+  # ERROR IS COUNTED AS FAILURES, NOT AS LINES, AND IT IS NOT A TEST RESULT.
+  #
+  # This line used to be `grep -c "^ERROR: "', and that number is an artefact
+  # of the harness rather than an observation about the compiler, in two
+  # compounding ways.  Measured on
+  # /tmp/b-agent-aa9936ad7ccd9023c-6 .../testsuite.visium-unknown-elf, where
+  # the raw count is 29:
+  #
+  #     6  ERROR: tcl error sourcing .../gcc.dg/asan/asan.exp.
+  #     6  ERROR: tcl error code CHILDSTATUS <pid> 1
+  #     6  ERROR: xgcc: fatal error: no target selected
+  #     ...
+  #
+  # ONE tcl failure in ONE .exp emits THREE `^ERROR: ' lines (the sourcing
+  # notice, the child status, and the compiler's own stderr echoed as a further
+  # ERROR whose continuation lines are indented and so uncounted).  AND GCC's
+  # parallel harness has every runtest slot source the same .exp, so the whole
+  # block repeats once per slot: 3 x 6 = 18 of the 29 lines are one .exp
+  # aborting, and the column SCALES WITH `-j'.  A board compared across two
+  # runs at different -j would show an ERROR "regression" that is a make flag.
+  #
+  # So three numbers are printed instead of one, and none of them is folded
+  # into the total:
+  #   ERRLIN  raw `^ERROR: ' lines            (kept, so old boards can be
+  #                                            reconciled with new ones)
+  #   ERRUNQ  distinct ERROR messages, with pids and slot numbers normalised
+  #           away -- the count of DISTINCT CAUSES
+  #   ERRTCL  distinct .exp files that aborted with a tcl error -- the count of
+  #           actual failures, which is what the column was always meant to be
+  #
+  # The board column is ERRTCL+ERRUNQ-shaped, not line-shaped; see the header.
+  errlin=$(grep -c '^ERROR: '  "$SUM" || true)
+  errunq=$(grep '^ERROR: ' "$SUM" | sed 's/[0-9][0-9]*/N/g' | sort -u | wc -l)
+  errtcl=$(sed -n 's/^ERROR: tcl error sourcing \(.*\)\.$/\1/p' "$SUM" \
+             | sort -u | wc -l)
+  e=$errunq
+  # THE TOTAL IS TEST RESULTS ONLY.  ERROR was in this sum, which made the
+  # non-vacuity test below satisfiable by a run that produced no test result at
+  # all -- a suite that died in its first .exp scores `tot' > 0 and is printed
+  # as a board.  A harness error is not a test result and must not be able to
+  # certify the run.
+  tot=$((p+f+xp+xf+u+ur))
   if [ "$tot" -eq 0 ]; then
     printf '%-30s %s\n' "$T" "REFUSED: 0 results scored -- a board of zeroes is not a clean sweep"
     continue
   fi
   any=1
-  printf '%-30s %8s %8s %8s %8s %8s %8s %8s\n' "$T" "$p" "$f" "$xp" "$xf" "$u" "$ur" "$e"
+  printf '%-30s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n' \
+    "$T" "$p" "$f" "$xp" "$xf" "$u" "$ur" "$e" "$errtcl" "$errlin"
 done
 
 if [ "$any" = 0 ]; then
