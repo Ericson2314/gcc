@@ -2692,7 +2692,7 @@ gimple_signed_or_unsigned_type (bool unsignedp, tree type)
            ? long_long_unsigned_type_node
 	   : long_long_integer_type_node;
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& (type1 == int_n_trees[i].unsigned_type
 	    || type1 == int_n_trees[i].signed_type))
@@ -2813,7 +2813,7 @@ gimple_signed_or_unsigned_type (bool unsignedp, tree type)
 	    ? long_long_unsigned_type_node
 	    : long_long_integer_type_node);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i]
 	&& TYPE_MODE (type) == int_n_data[i].m
 	&& TYPE_PRECISION (type) == int_n_data[i].bitsize)

@@ -1275,7 +1275,7 @@ c_cpp_builtins (cpp_reader *pfile)
     }
 
   if (c_dialect_cxx ())
-    for (i = 0; i < NUM_INT_N_ENTS; i ++)
+    for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
       if (int_n_enabled_p[i])
 	{
 	  char buf[35+20+20];
@@ -1707,7 +1707,7 @@ c_cpp_builtins (cpp_reader *pfile)
   if (flag_openmp)
     cpp_define (pfile, "_OPENMP=202111");
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (int_n_enabled_p[i])
       {
 	char buf[15+20];

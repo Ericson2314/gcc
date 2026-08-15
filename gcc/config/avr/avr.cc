@@ -16325,7 +16325,7 @@ avr_builtin_decl (unsigned id, bool /*initialize_p*/)
 static void
 avr_init_builtin_int24 (void)
 {
-  for (int i = 0; i < NUM_INT_N_ENTS; ++i)
+  for (int i = 0; i < MT_NUM_INT_N_ENTS; ++i)
     if (int_n_data[i].bitsize == 24)
       {
 	tree uint24_type = int_n_trees[i].unsigned_type;

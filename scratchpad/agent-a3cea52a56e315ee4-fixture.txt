@@ -1,0 +1,10 @@
+MUST-MATCH:
+  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  && keyword < RID_FIRST_INT_N + NUM_INT_N_ENTS
+  for (size_t i = 0; i < NUM_INT_N_ENTS; i++)
+MUST-NOT-MATCH:
+  extern bool int_n_enabled_p[MULTI_TARGET_UNION_NUM_INT_N_ENTS];
+  #define MT_NUM_INT_N_ENTS num_int_n_ents
+  <= MULTI_TARGET_UNION_NUM_INT_N_ENTS,
+  printf ("#define NUM_INT_N_ENTS_SUFFIX %d\n", n);
+  XNUM_INT_N_ENTS

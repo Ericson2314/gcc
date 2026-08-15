@@ -291,8 +291,14 @@ static void print_value_expr_statistics (void);
 tree global_trees[TI_MAX];
 tree integer_types[itk_none];
 
-bool int_n_enabled_p[NUM_INT_N_ENTS];
-struct int_n_trees_t int_n_trees [NUM_INT_N_ENTS];
+/* THE UNION'S BOUND, NOT THE PRIMARY'S.  This is a shared translation unit,
+   so these two arrays are one size for the whole compiler; sizing them by
+   this file's own NUM_INT_N_ENTS gave them the PRIMARY's 1 and left avr's and
+   msp430's second __intN entry with nowhere to be registered.  The loops that
+   fill and read them are bounded by MT_NUM_INT_N_ENTS, the selected base's
+   own count.  See machmode.h.  */
+bool int_n_enabled_p[MULTI_TARGET_UNION_NUM_INT_N_ENTS];
+struct int_n_trees_t int_n_trees [MULTI_TARGET_UNION_NUM_INT_N_ENTS];
 
 bool tree_contains_struct[MAX_TREE_CODES][64];
 
@@ -9505,7 +9511,7 @@ make_or_reuse_type (unsigned size, int unsignedp)
     return (unsignedp ? long_long_unsigned_type_node
             : long_long_integer_type_node);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     if (size == int_n_data[i].bitsize
 	&& int_n_enabled_p[i])
       return (unsignedp ? int_n_trees[i].unsigned_type
@@ -9637,7 +9643,7 @@ unsigned_integer_tree_node_for_type (const char *type)
       int i;
 
       type_node = nullptr;
-      for (i = 0; i < NUM_INT_N_ENTS; i++)
+      for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
 	if (int_n_enabled_p[i])
 	  {
 	    char name[50], altname[50];
@@ -9707,7 +9713,7 @@ build_common_tree_nodes (bool signed_char)
   long_long_integer_type_node = make_signed_type (LONG_LONG_TYPE_SIZE);
   long_long_unsigned_type_node = make_unsigned_type (LONG_LONG_TYPE_SIZE);
 
-  for (i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     {
       int_n_trees[i].signed_type = make_signed_type (int_n_data[i].bitsize);
       int_n_trees[i].unsigned_type = make_unsigned_type (int_n_data[i].bitsize);
@@ -9741,7 +9747,7 @@ build_common_tree_nodes (bool signed_char)
   else
     {
       ptrdiff_type_node = NULL_TREE;
-      for (int i = 0; i < NUM_INT_N_ENTS; i++)
+      for (int i = 0; i < MT_NUM_INT_N_ENTS; i++)
 	if (int_n_enabled_p[i])
 	  {
 	    char name[50], altname[50];

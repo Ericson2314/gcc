@@ -161,7 +161,7 @@ c_parse_init (void)
       ridpointers [(int) c_common_reswords[i].rid] = id;
     }
 
-  for (i = 0; i < NUM_INT_N_ENTS; i++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
     {
       /* We always create the symbols but they aren't always supported.  */
       char name[50];
@@ -648,7 +648,7 @@ c_keyword_starts_typename (enum rid keyword)
       return true;
     default:
       if (keyword >= RID_FIRST_INT_N
-	  && keyword < RID_FIRST_INT_N + NUM_INT_N_ENTS
+	  && keyword < RID_FIRST_INT_N + MT_NUM_INT_N_ENTS
 	  && int_n_enabled_p[keyword - RID_FIRST_INT_N])
 	return true;
       return false;
@@ -855,7 +855,7 @@ c_token_starts_declspecs (c_token *token)
 	  return true;
 	default:
 	  if (token->keyword >= RID_FIRST_INT_N
-	      && token->keyword < RID_FIRST_INT_N + NUM_INT_N_ENTS
+	      && token->keyword < RID_FIRST_INT_N + MT_NUM_INT_N_ENTS
 	      && int_n_enabled_p[token->keyword - RID_FIRST_INT_N])
 	    return true;
 	  return false;

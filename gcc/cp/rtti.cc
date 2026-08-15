@@ -1684,7 +1684,7 @@ emit_support_tinfos (void)
 	emit_support_tinfo_1 (fallback);
 	*fundamentals_with_fallback[ix] = NULL_TREE;
       }
-  for (ix = 0; ix < NUM_INT_N_ENTS; ix ++)
+  for (ix = 0; ix < MT_NUM_INT_N_ENTS; ix ++)
     if (int_n_enabled_p[ix])
       {
 	emit_support_tinfo_1 (int_n_trees[ix].signed_type);

@@ -7002,9 +7002,12 @@ struct GTY(()) int_n_trees_t {
   tree unsigned_type;
 };
 
-/* This is also in machmode.h */
-extern bool int_n_enabled_p[NUM_INT_N_ENTS];
-extern GTY(()) struct int_n_trees_t int_n_trees[NUM_INT_N_ENTS];
+/* This is also in machmode.h.  The bound is the UNION's, because these are
+   storage in tree.cc and a shared translation unit has one size for every
+   back end; the LOOPS over them take MT_NUM_INT_N_ENTS, the selected base's
+   own count.  See machmode.h for the measurement.  */
+extern bool int_n_enabled_p[MULTI_TARGET_UNION_NUM_INT_N_ENTS];
+extern GTY(()) struct int_n_trees_t int_n_trees[MULTI_TARGET_UNION_NUM_INT_N_ENTS];
 
 /* Like bit_position, but return as an integer.  It must be representable in
    that way (since it could be a signed value, we don't have the

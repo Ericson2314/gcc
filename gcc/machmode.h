@@ -1125,9 +1125,41 @@ struct int_n_data_t {
 };
 
 /* This is also in tree.h.  genmodes.cc guarantees the're sorted from
-   smallest bitsize to largest bitsize. */
-extern bool int_n_enabled_p[NUM_INT_N_ENTS];
-extern GCC_TARGET_TABLE (const int_n_data_t, int_n_data, NUM_INT_N_ENTS);
+   smallest bitsize to largest bitsize.
+
+   THE BOUND IS THE UNION'S AND THE COUNT IS THE SELECTED BASE'S, and they are
+   different numbers here: 45 of 47 back ends have one __intN (TI 128) while
+   avr has two (PSI 24, TI 128) and msp430 two (PSI 20, TI 128), so the shared
+   numbering counts three and no back end has more than two.
+
+   `int_n_enabled_p' is STORAGE in tree.cc, a shared translation unit, so its
+   bound must be one number for the whole compiler -- the union's -- exactly
+   like every other MULTI_TARGET_UNION_* layout on this branch.  `int_n_data'
+   is a per-back-end table selected at run time, so the SIZE argument is not
+   used on a multi-target build at all (GCC_TARGET_TABLE makes it a pointer);
+   it is spelled with the same name so the single-target build, where the two
+   numbers coincide, gets the array it always had.
+
+   Neither of them is the bound for a LOOP.  See MT_NUM_INT_N_ENTS below.  */
+extern bool int_n_enabled_p[MULTI_TARGET_UNION_NUM_INT_N_ENTS];
+extern GCC_TARGET_TABLE (const int_n_data_t, int_n_data,
+			 MULTI_TARGET_UNION_NUM_INT_N_ENTS);
+
+/* HOW MANY __intN ENTRIES THE SELECTED BACK END ACTUALLY HAS.
+
+   Spelled differently from NUM_INT_N_ENTS on purpose, the same way
+   target-regs.h spells MT_N_REG_CLASSES apart from N_REG_CLASSES: a site that
+   wants "how many are there really" says so, and a site that wants "how big
+   is the array" says that.  Making one name mean both is what left avr's and
+   msp430's second entry unregistered -- every shared registration loop was
+   bounded by the PRIMARY's 1 -- while avr.cc, compiled against its own
+   header, looped to 2 over a one-element `int_n_trees'.
+
+   `num_int_n_ents' is defined by genmodes beside `int_n_data' and installed
+   with it by multi-target-select.cc, so the count cannot drift from the table
+   it counts.  In a single-target build it is that build's own number, i.e.
+   NUM_INT_N_ENTS, and every use site keeps one spelling.  */
+#define MT_NUM_INT_N_ENTS num_int_n_ents
 
 /* Return true if MODE has class MODE_INT, storing it as a scalar_int_mode
    in *INT_MODE if so.  */

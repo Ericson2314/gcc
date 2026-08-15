@@ -275,7 +275,7 @@ init_reswords (void)
 	set_identifier_kind (id, cik_keyword);
     }
 
-  for (i = 0; i < NUM_INT_N_ENTS; i++)
+  for (i = 0; i < MT_NUM_INT_N_ENTS; i++)
     {
       char name[50];
       sprintf (name, "__int%d", int_n_data[i].bitsize);

@@ -292,7 +292,7 @@ d_build_bitfield_integer_type (unsigned HOST_WIDE_INT width, int unsignedp)
   if (width == TYPE_PRECISION (d_cent_type))
     return unsignedp ? d_ucent_type : d_cent_type;
 
-  for (int i = 0; i < NUM_INT_N_ENTS; i ++)
+  for (int i = 0; i < MT_NUM_INT_N_ENTS; i ++)
     {
       if (int_n_enabled_p[i] && width == int_n_data[i].bitsize)
 	{

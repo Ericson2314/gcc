@@ -2215,7 +2215,7 @@ do_compile ()
       /* This must happen after the backend has a chance to process
 	 command line options, but before the parsers are
 	 initialized.  */
-      for (i = 0; i < NUM_INT_N_ENTS; i ++)
+      for (i = 0; i < MT_NUM_INT_N_ENTS; i ++)
 	if (targetm.scalar_mode_supported_p (int_n_data[i].m)
 	    && ! standard_type_bitsize (int_n_data[i].bitsize))
 	  int_n_enabled_p[i] = true;
