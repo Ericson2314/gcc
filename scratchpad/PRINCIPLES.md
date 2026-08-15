@@ -1768,6 +1768,30 @@ at all while every member after the first divergence held another member's
 value. Compare bodies, offsets and names; a count is the weakest evidence
 available and is silent in exactly the case that matters.
 
+**BEFORE A CHECK CLEARS A HYPOTHESIS, ASK WHETHER IT COULD HAVE FIRED — THREE
+TIMES IN ONE SESSION THE ANSWER WAS NO, AND EACH TIME THE CLEAN RESULT READ AS
+CONFIRMATION.** This is the session's dominant failure mode and it is worth
+recognising by shape rather than by instance:
+
+| the claim | the "evidence" | why it could not fire |
+|---|---|---|
+| the specs fix caused the cselib ICE | a no-specs fixture compiled "clean" | the fixture had been `rm -rf`'d; `xgcc` said *no target selected*, produced no object, and the grep was for the ICE string, which that message lacks |
+| the `sed` was correct | paren balance; no `FIRST_PSEUDO_REGISTER` left inside the replacement | both ask *is the output well-formed*; the bug was *did the match start where I meant* — clean on 16 corruptions |
+| aarch64 is immune to the cselib bug | aarch64 codegen byte-identical, fixed vs unfixed | measured at `-O2` **without `-g`**, and `cselib` is reached through `vartrack`, which only runs with debug info — the affected path was never entered |
+
+Each is a check that answers a *different question* than the one being
+settled, and a negative from such a check is worth nothing while looking
+exactly like a strong result. **State the question your check asks, out loud,
+and compare it to the question you need answered.** If they differ, the clean
+result is not evidence.
+
+The third row also carries a second lesson: **a figure measured at one base
+count does not survive a change in the base set.** The union
+`FIRST_PSEUDO_REGISTER` is **95 at two bases and 128 at four**, so "aarch64's
+own value equals the union" was true when recorded and false when reused —
+and at four bases *every base except the widest* has a misclassified band.
+Re-measure a union width in the configuration you are actually in.
+
 **A CHECKLIST OF OUTPUT PROPERTIES CANNOT SUBSTITUTE FOR A FIXTURE WITH
 KNOWN-BAD CASES, BECAUSE YOU CAN ONLY CHECK FOR CORRUPTIONS YOU ALREADY
 IMAGINED.** This is the general statement; the episode below is one instance

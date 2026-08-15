@@ -1,5 +1,26 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## SUPERSEDED FOR aarch64 — RE-MEASURED AT `5eb6cb0e5e3`
+>
+> ```
+> aarch64 debt   205,433  ->  93,526      (111,907 taken back)
+> ```
+>
+> **AND §3a's `extra_headers` VALUATION OF 194,711 IS WRONG — DO NOT QUOTE
+> IT.** That number is the whole `gcc.target/aarch64` debt, credited to
+> `extra_headers` because missing headers were the directory's top diagnostic.
+> Measured after the fix, that directory's debt is **194,711 -> 80,264**: the
+> fix was worth **114,447 (59%)** and **80,264 (41%) remains**, for causes that
+> sat underneath the missing headers and were invisible until they were
+> supplied. **Crediting a directory's whole debt to its top diagnostic
+> over-attributed by 80,264 results.**
+>
+> The new figure is itself an UPPER bound: the compiler measured carries the
+> `cselib.cc:2650` regression (122,646 ICEs), fixed in `2e5f4730465` and not
+> in that build. Full row, ranked residual and by-name diff in
+> `A57163422943AAA57-REBASELINE.md`. s390x has NOT been re-measured, so its
+> 20,326 still stands unrevised below.
+>
 > ## THE STOCK SIDE STANDS. THE MULTI-TARGET SIDE, AND THEREFORE THE DEBT, DOES NOT.
 >
 > **The debt figures — aarch64 205,433 and s390x 20,326 — are UPPER BOUNDS and
