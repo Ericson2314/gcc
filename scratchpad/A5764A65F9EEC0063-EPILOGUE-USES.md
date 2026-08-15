@@ -146,15 +146,38 @@ from `mtcheck.sh`'s own summary and never from the `=== gcc Summary` marker.
 under the ~25 provisional threshold, so these are not provisional.
 
 ```
-gcc.target/aarch64/sme2/acle-asm       PASS     FAIL      BODIES  COMPILE
-  baseline  (d3477e3c898, unfixed)    28544     9050        8926      124
-  + EPILOGUE_USES (9a15499d33c)       36850      744           0      744
-  stock (SC-BOARD, other harness)     37594        0
+gcc.target/aarch64/sme2/acle-asm            PASS     FAIL   BODIES  COMPILE
+  baseline      d3477e3c898  (unfixed)     28544     9050     8926      124
+  + EPILOGUE_USES              9a15499d33c 36850      744        0      744
+  + ASM_DECLARE_FUNCTION_NAME  b2fc4c0b9f8 37594        0        0        0
+  stock (SC-BOARD)                         37594        0
 
 gcc.target/aarch64/sme/acle-asm
-  baseline  (prior board)              3004     1154         962      104(+88 other)
-  + EPILOGUE_USES                      3886      272           0      184(+88 other)
+  baseline      (prior board)               3004     1154      962   104 (+88 other)
+  + EPILOGUE_USES                           3886      272        0   184 (+88 other)
+  + ASM_DECLARE_FUNCTION_NAME               3982      176        0    88 (+88 other)
 ```
+
+**`sme2/acle-asm` is at 37,594 PASS / 0 FAIL — exact parity with stock, from
+9,050 failures.** `.rc` stamp 0, 37,594 preserved result lines, KILLED 0, load
+1.01 at scoring.
+
+`sme/acle-asm` is 1,154 -> 176, KILLED 0, load 1.18. Its entire residual is
+**one ICE**, and only at `-O0 -g`:
+
+```
+44  -std=c90 -O0 -g -DTEST_OVERLOADS (internal compiler error:
+                                     in final_scan_insn_1, at final.cc:2844)
+44  -std=c90 -O0 -g -DTEST_FULL      (same)
++88 "excess errors" companion lines for the same tests
+```
+
+`final.cc:2844` is `fatal_insn ("could not split insn", insn)` — an insn whose
+template is `"#"` did not split. **`split_insns` IS correctly per-base
+selected** (`multi-target-select.cc:805` dispatches through
+`mt_in_force ("split_insns")`), so this is not the wrong-splitter-table shape
+and I am not claiming a cause. That it appears only with `-g` puts it near the
+CFI/unwind item below.
 
 **The baseline reproduces the brief's figures exactly (28544/9050)**, which is
 what makes my two builds comparable to the board the task was set from.
