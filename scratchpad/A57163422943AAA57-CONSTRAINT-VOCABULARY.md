@@ -1,4 +1,38 @@
-# #203: the SVE/SME ACLE cluster is `enum constraint_num` — the PRIMARY'S, in every shared TU
+# #203/#205: the SVE/SME ACLE cluster — DIAGNOSIS BELOW IS WRONG, see the correction
+
+> ## CORRECTED, AND FIXED IN `6bdfe647912`. READ THIS FIRST.
+>
+> **The headline below — "shared code cannot resolve the name" — is FALSE, and
+> the 94-vs-143 table, while accurate, is not the cause.** `nm -uC
+> lra-constraints.o` shows `mt_lookup_constraint`, `mt_constraint_satisfied_p`
+> and `mt_get_register_filter`: the per-base redirect layer in
+> `multi-target-preds.h` is present **and invoked**. The vocabulary needs no
+> union and `grep -c Uw2 tm-preds.h` is still 0 by design.
+>
+> **The real cause is that the constraint table selected every function that
+> READS a register filter and none that WRITES them.**
+> `this_target_constraints->register_filters[]` is shared runtime storage
+> filled by `init_reg_class_start_regs ()`; `reginfo.cc` called the BARE name,
+> which is the singular `insn-preds.cc` generated from the primary's md.
+> i386 declares no filters, so genpreds emitted `void
+> init_reg_class_start_regs () { }` — an empty body — every bit stayed 0,
+> `TEST_HARD_REG_BIT` said NO for every register, and every filtered
+> constraint was unsatisfiable for every base. `Uw2` rejected V24 (regno 56,
+> even), LRA reloaded a correct operand and died.
+>
+> Fixed by adding an `init_filters` slot to `target_preds_desc`. Measured:
+> the reload dump now reads `overall=0,losers=0,rld_nregs=0`, identical to
+> stock, and a 120-command ACLE replay goes 0/120 → 120/120 compiling, with
+> all four targets' `-O2` codegen byte-identical.
+>
+> **Why the wrong diagnosis was reachable, and it is worth keeping:** I
+> checked that the shared table lacked the name and stopped, without checking
+> whether shared code *used* that table. "The shared artefact is the
+> primary's" was true and load-bearing-looking, and the next question — *is it
+> the artefact this code reads?* — was the one that mattered. The same
+> question that settled #204.
+
+# (original, superseded) the ACLE cluster is `enum constraint_num` — the PRIMARY'S, in every shared TU
 
 **~102,000 aarch64 FAILs where stock fails zero, and the cause is that
 `lra-constraints.o` and `recog.o` evaluate aarch64's constraints against
