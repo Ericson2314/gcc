@@ -31,6 +31,15 @@ mkdir -p "$OUT"
 A=$(grep -c MULTI_TARGET "$(cat "$D/MY-SRC")/gcc/Makefile.in")
 echo "== arm=$ARM builddir=$D anchor=$A src=$(cat "$D/MY-SRC")"
 
+# DELETE THE PREVIOUS RUN'S ARTEFACTS RATHER THAN LET THEM BE OVERWRITTEN.
+# The BEFORE arm was started once, killed, and restarted; a killed run leaves a
+# `testsuite.<triple>/' full of per-slot `gcc.sum.sep' files that the merge step
+# would happily fold into the next run's totals.  A stale slot file is
+# indistinguishable from a fresh one, and the result would be a `.sum' that
+# double-counts part of one run and part of another -- with a valid `.rc' stamp
+# on it, because the second run really did finish.
+rm -rf "$D/gcc/testsuite.$T"
+
 # `MT_MAKEFLAGS' IS NOT OPTIONAL AND ITS ABSENCE IS EXPENSIVE.  mtcheck.sh
 # passes it straight to `make check-gcc', and unset it means `-j1': the first
 # BEFORE run here reached 15,145 of an expected 170,106 `.sum' lines in fifty
