@@ -577,9 +577,22 @@ mt_case_vector_mode (void)
   return mt_frame ()->case_vector_mode ();
 }
 
+/* The existence half is a question shared code asks in its own right --
+   `df-scan.cc:3558' used to spell it `#ifdef' -- so it is not merely a guard
+   on the value below.  The `gcc_assert' is: the value thunk of a base that
+   answers `false' here is `gcc_unreachable ()', so a value site reaching it
+   would abort inside the back end's thunk with no clue which shared caller
+   asked.  Failing at the boundary names the selection instead.  */
+bool
+mt_has_incoming_return_addr_rtx (void)
+{
+  return mt_frame ()->has_incoming_return_addr_rtx ();
+}
+
 rtx
 mt_incoming_return_addr_rtx (void)
 {
+  gcc_assert (mt_frame ()->has_incoming_return_addr_rtx ());
   return mt_frame ()->incoming_return_addr_rtx ();
 }
 

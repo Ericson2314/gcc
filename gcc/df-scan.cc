@@ -3555,10 +3555,19 @@ df_get_entry_block_def_set (bitmap entry_block_defs)
 	bitmap_set_bit (entry_block_defs, picreg);
     }
 
-#ifdef INCOMING_RETURN_ADDR_RTX
-  if (REG_P (INCOMING_RETURN_ADDR_RTX))
-    bitmap_set_bit (entry_block_defs, REGNO (INCOMING_RETURN_ADDR_RTX));
-#endif
+  /* Upstream this is `#ifdef INCOMING_RETURN_ADDR_RTX'.  That question is
+     decided at PARSE time, i.e. by whichever base's headers this shared file
+     was compiled against, and the conversion layer keeps the name defined for
+     every base -- so the `#ifdef' answered `yes' unconditionally and the
+     three back ends that define no such macro (`bpf', `nvptx', `pdp11') would
+     have run this block.  Ask the SELECTED base at run time instead; see
+     target-frame.h's field comment.  */
+  if (mt_has_incoming_return_addr_rtx ())
+    {
+      rtx ra = INCOMING_RETURN_ADDR_RTX;
+      if (REG_P (ra))
+	bitmap_set_bit (entry_block_defs, REGNO (ra));
+    }
 
   targetm.extra_live_on_entry (entry_block_defs);
 }

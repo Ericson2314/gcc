@@ -910,29 +910,56 @@ mt_base_regmode_natural_size (machine_mode mode ATTRIBUTE_UNUSED)
 /* `CASE_VECTOR_MODE' and `INCOMING_RETURN_ADDR_RTX', read in THIS base's
    translation unit.  See target-frame.h for both field comments.
 
-   NEITHER GETS AN `#ifdef', and for the two reasons the pair above does not:
+   `CASE_VECTOR_MODE' GETS NO `#ifdef': every back end that has a jump table
+   defines it, and for one that does not, the name is simply undefined and
+   this file fails to compile BY NAME for that base -- which is the
+   fail-by-name PRINCIPLES asks for, at build time rather than at run time.
 
-     `CASE_VECTOR_MODE'        every back end that has a jump table defines
-                               it, and for one that does not, the name is
-                               simply undefined and this file fails to
-                               compile BY NAME for that base -- which is the
-                               fail-by-name PRINCIPLES asks for, at build
-                               time rather than at run time.
-     `INCOMING_RETURN_ADDR_RTX' likewise undefined, and `defaults.h' supplies
-                               no floor for it either, so the same by-name
-                               build failure applies.  `dwarf2cfi.cc:52' does
-                               carry a `(gcc_unreachable (), NULL_RTX)'
-                               fallback, but that lives in the `.cc' and not
-                               in any header, so it is NOT reachable from
-                               here and is deliberately not restated -- a
-                               copy would be a second authority for the
-                               value.  In a shared translation unit that
-                               fallback is not taken anyway, because the
-                               primary's `i386.h:2162' got there first, which
-                               is the whole defect.
+   `INCOMING_RETURN_ADDR_RTX' DOES GET ONE, AND AN EARLIER VERSION OF THIS
+   FILE DID NOT, WHICH IS WHY THIS PARAGRAPH IS LONG.  The reasoning above
+   was applied to it as well -- "likewise undefined, so the same by-name
+   build failure applies" -- and that is exactly what happened: `bpf',
+   `nvptx' and `pdp11' define no `INCOMING_RETURN_ADDR_RTX', so a 47-base
+   `make all-gcc' stopped with three copies of
 
-   `MACRO_MODE' is not used on the first: `CASE_VECTOR_MODE' is already a
-   plain `machine_mode' on every back end that defines it, including the eight
+       target-cumargs.cc:946: `INCOMING_RETURN_ADDR_RTX' was not declared
+                              in this scope
+
+   and `cc1' never linked.  Fail-by-name is the right answer for a base that
+   is SILENT about something upstream requires every back end to answer; it
+   is the wrong answer here, because upstream does not require this one.
+   Upstream's shared code asks the existence question explicitly, in two
+   places, and has TWO different documented behaviours for a back end that
+   defines nothing:
+
+     `df-scan.cc:3558'   `#ifdef INCOMING_RETURN_ADDR_RTX' around the whole
+                         `if (REG_P (...))' -- for a back end that defines
+                         nothing the entry-block def is simply NOT MARKED.
+                         Not an error, not a value: the block does not run.
+     `dwarf2cfi.cc:52'   `#ifndef' -> `(gcc_unreachable (), NULL_RTX)' -- for
+                         a back end that defines nothing, ASKING for the
+                         value at all is a bug, and upstream aborts.
+
+   So the pair below is the `PUSH_ROUNDING' shape a few functions up, for the
+   same reason `PUSH_ROUNDING' has it: the macro is `#ifdef'-TESTED in shared
+   code, so the existence question is a real per-base answer in its own right
+   and must be carried as one.  A base that defines the macro answers `true'
+   and its own expression; a base that does not answers `false', and the
+   value thunk is then upstream's own `dwarf2cfi.cc:52' behaviour for that
+   back end -- `gcc_unreachable ()', reached HERE, in that base's own
+   translation unit, where it is that back end's answer and not a shared
+   fallback anybody else can receive.
+
+   This is the supply-side floor PRINCIPLES 2a permits, and the test it
+   prescribes -- WHOSE answer is it? -- has the same answer for both arms: a
+   second configured back end cannot change either one, because both are read
+   in a TU compiled with `-DMULTI_TARGET_SUPPLY_TU' against exactly one base's
+   `tm.h'.  Nothing here restates i386's `gen_rtx_MEM (Pmode,
+   stack_pointer_rtx)' or anyone else's value, which is what a banned floor
+   would have done.
+
+   `MACRO_MODE' is not used on `CASE_VECTOR_MODE': it is already a plain
+   `machine_mode' on every back end that defines it, including the eight
    that spell it `Pmode' (itself a run-time call on this branch).  */
 static machine_mode
 mt_base_case_vector_mode (void)
@@ -940,10 +967,29 @@ mt_base_case_vector_mode (void)
   return (machine_mode) CASE_VECTOR_MODE;
 }
 
+static bool
+mt_base_has_incoming_return_addr_rtx (void)
+{
+#ifdef INCOMING_RETURN_ADDR_RTX
+  return true;
+#else
+  return false;
+#endif
+}
+
 static rtx
 mt_base_incoming_return_addr_rtx (void)
 {
+#ifdef INCOMING_RETURN_ADDR_RTX
   return INCOMING_RETURN_ADDR_RTX;
+#else
+  /* `dwarf2cfi.cc:52's answer for this back end, evaluated in this back
+     end's own translation unit.  NOT a plausible value: a wrong `rtx' here
+     would build a wrong CIE initial row and fail hundreds of lines away in
+     `maybe_record_trace_start', which is the defect this field exists to
+     remove.  */
+  gcc_unreachable ();
+#endif
 }
 
 #define MT_STR1(X) #X
@@ -1541,6 +1587,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_case_vector_pc_relative,
   mt_base_regmode_natural_size,
   mt_base_case_vector_mode,
+  mt_base_has_incoming_return_addr_rtx,
   mt_base_incoming_return_addr_rtx
 };
 

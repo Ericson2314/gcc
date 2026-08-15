@@ -1359,7 +1359,25 @@ struct target_frame_desc
      name.  The thunk below is compiled per base, so for a base that genuinely
      defines nothing that fallback is reached HERE, in that base's own
      translation unit, and aborts naming the base rather than handing out
-     i386's stack pointer.  */
+     i386's stack pointer.
+
+     AND THAT REQUIRED AN EXISTENCE FIELD, WHICH THE FIRST VERSION DID NOT
+     HAVE.  Restating the abort alone would have been wrong for the OTHER
+     shared consumer: `df-scan.cc:3558's `#ifdef' means "if this back end has
+     no such thing, do not mark the entry-block def" -- upstream SKIPS the
+     block, it does not abort.  With the redirect keeping the name defined,
+     that `#ifdef' is unconditionally true, so an abort-only thunk would have
+     turned three back ends' correct upstream silence into an ICE in
+     dataflow.  `has_incoming_return_addr_rtx' is therefore a real per-base
+     answer of its own -- the `has_push_rounding' shape, and for the same
+     reason: the macro is `#ifdef'-tested in shared code, so its EXISTENCE is
+     a target property that has to be carried rather than derived from
+     whichever base compiled the shared file.
+
+     45 of 48 back ends define the macro; `bpf', `nvptx' and `pdp11' do not
+     (none of the three has DWARF CFI to build a CIE for), and it was those
+     three that turned a missing `#ifdef' here into a 47-base build failure.  */
+  bool (*has_incoming_return_addr_rtx) (void);
   rtx (*incoming_return_addr_rtx) (void);
 };
 
@@ -1624,9 +1642,12 @@ extern poly_uint64 mt_regmode_natural_size (machine_mode mode);
    that guard stays true -- which is CORRECT here and not a leak, because the
    thing behind it is now a call to the selected back end rather than to
    whichever base compiled `df-scan.cc'.  The existence question that guard is
-   really asking is answered inside the per-base thunk, where a base defining
-   nothing hits `dwarf2cfi.cc:52's `gcc_unreachable ()' by name.  */
+   really asking is answered by `mt_has_incoming_return_addr_rtx ()', and
+   `df-scan.cc' now asks it that way instead of by `#ifdef'.  A base that
+   defines nothing answers `false' there and hits `dwarf2cfi.cc:52's
+   `gcc_unreachable ()' by name if the VALUE is ever asked for anyway.  */
 extern machine_mode mt_case_vector_mode (void);
+extern bool mt_has_incoming_return_addr_rtx (void);
 extern rtx mt_incoming_return_addr_rtx (void);
 
 #endif /* GCC_TARGET_FRAME_H */
