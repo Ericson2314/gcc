@@ -126,6 +126,56 @@ top progress directories: gcc.dg/vect 1134, gcc.target/i386 255,
 The baseline row **reproduces `AB1900D5279BA137F-BOARD.md`'s x86_64 row exactly**
 (159267 / 20882), which is what makes the deltas comparable with that board.
 
+## BOTH-SIDED — AND aarch64 MOVED AWAY FROM STOCK BY 505. STATED FIRST.
+
+```
+target    base PASS/FAIL     fix2 PASS/FAIL    DEBT base -> fix2   by-name
+x86_64    159267/20882       161826/16843       2,971 ->   412     +2559 / -0
+aarch64   338728/26294       338215/27352       3,675 -> 4,180     +271 / -776
+riscv64   267535/18493       267551/18477       2,169 -> 2,153       +16 / -0
+s390x     see board doc      (run pending at time of writing)
+```
+
+**The 776 aarch64 regressions are ALL `gcc.target/aarch64`, and every one of
+them is the board's item #1 — not a new defect.** Named reproducer, compiled
+with both compilers from the same command
+(`agent-a97cff7619d3cabd9-aa.sh`):
+
+```
+gcc.target/aarch64/sme/acle-asm/addha_za32.c -std=c90 -O0 -g -DTEST_FULL
+                                             -march=armv8.5-a+sve2+sme
+base  rc=0
+fix2  rc=1  error: could not split insn
+      (insn 21 (set (reg:DI 1 x1 [689])
+               (plus:DI (reg/f:DI 31 sp)
+                        (const_poly_int:DI [-48, -40]))) 160 {*adddi3_poly_1}
+      during RTL pass: final
+      internal compiler error: in final_scan_insn_1, at final.cc:2846
+```
+
+Sized at file level (`mt-debt-attribute.sh`, an UPPER bound):
+
+```
+aarch64 `final_scan_insn_1'   base  806 files / 2,899 debt (78%)
+                              fix2 1026 files / 3,455 debt (82%)
+```
+
+The mechanism is the *other* half of cause 1. `aarch64.cc:11671`
+`virt_or_elim_regno_p` was comparing a real virtual regno (677..681) against
+aarch64's own 96..100 and was therefore **always false**, so
+`aarch64_classify_address` declined an addressing form it should have accepted.
+With one numbering it accepts it, forms `plus (sp, const_poly_int)`, and that
+insn meets `*adddi3_poly_1`'s missing splitter — the single highest-value item
+on `AB1900D5279BA137F-BOARD.md`, owned by another worktree and in flight.
+
+**So this is a leaked ABSENCE becoming visible, not new breakage**, and the
+honest statement is both halves at once: net across the three targets measured
+is **−2,070 debt**, and aarch64 alone is **+505 until the `const_poly_int`
+split lands**. If the coordinator wants no aarch64 regression at any point,
+land the split first; the two changes are independent and commute.
+Deliberately NOT mitigated here: gating `virt_or_elim_regno_p` back off would
+be re-introducing the leak to keep a number down, which §2a names.
+
 ## THE TWO RESIDUAL ICEs, NAMED
 
 ```
