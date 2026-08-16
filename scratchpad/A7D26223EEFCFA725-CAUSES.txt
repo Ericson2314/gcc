@@ -1,0 +1,46 @@
+=== logs read: 28   distinct (backend, ICE cause) pairs: 17
+
+=== ORDERING 1: by NUMBER OF BACK ENDS sharing the ICE (breadth) ===
+  6  back end 'BE' has no pipeline automaton, but shared scheduling code compiled for a primary that has one is asking it for pipeline hazards
+     backends: avr cris h8300 rl78 vax xstormy16
+  2  Segmentation fault
+     backends: mips visium
+  1  verify_flow_info failed
+     backends: aarch64
+  1  maximum number of LRA assignment passes is achieved (N)
+     backends: s390
+  1  in mips_pop_asm_switch_N, at config/mips/mips.cc:N
+     backends: mips
+  1  in mips_load_store_insns, at config/mips/mips.cc:N
+     backends: mips
+  1  in lra_create_new_reg_with_unique_value, at lra.cc:N
+     backends: riscv
+  1  in in_hard_reg_set_p, at regs.h:N
+     backends: i386
+  1  in iaN_zero_call_used_regs, at config/iaN/iaN.cc:N
+     backends: ia64
+  1  in extract_insn, at recog.cc:N
+     backends: vax
+  1  in emit_move_insn, at expr.cc:N
+     backends: mips
+
+=== ORDERING 2: by TOTAL ICE OCCURRENCES (volume) ===
+   1449 back end 'BE' has no pipeline automaton, but shared scheduling code compiled for a primary that has one is asking it for pipeline hazards
+    420 Segmentation fault
+     20 in extract_insn, at recog.cc:N
+     15 in mips_pop_asm_switch_N, at config/mips/mips.cc:N
+      7 in emit_move_insn, at expr.cc:N
+      6 in mips_load_store_insns, at config/mips/mips.cc:N
+      2 in lra_create_new_reg_with_unique_value, at lra.cc:N
+      2 in in_hard_reg_set_p, at regs.h:N
+      1 verify_flow_info failed
+      1 maximum number of LRA assignment passes is achieved (N)
+      1 in iaN_zero_call_used_regs, at config/iaN/iaN.cc:N
+
+=== the excluded bloc, stated rather than dropped ===
+ 28 back ends       168 results  GCC is not configured to support
+ 28 back ends       139 results  C++ compiler not installed
+ 12 back ends       173 results  ld returned
+  7 back ends      1058 results  no include path in which to search
+(no target libc, no libstdc++, no linker exist in a MT_COMPILE_ONLY run --
+ these are the harness's environment, not any back end's defect)
