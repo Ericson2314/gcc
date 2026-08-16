@@ -62,11 +62,40 @@ export MT_RUNTESTFLAGS="${MT_RUNTESTFLAGS:-compile.exp}"
 echo "== subset: [$MT_RUNTESTFLAGS]  makeflags: [$MT_MAKEFLAGS]"
 echo "== load at launch: $(uptime | sed 's/.*load average: //')"
 
+# ONE mtcheck INVOCATION PER TARGET, NOT ONE FOR ALL OF THEM.
+#
+# mtcheck exits on the first target that fails a guard, so a single blocked
+# back end takes the whole board down with it and every target BEHIND it is
+# never attempted -- which in the artefact dir is indistinguishable from
+# "attempted and produced nothing".  Measured: `m68k-unknown-elf' failed
+# GUARD 3b and killed a 17-target run at target 6, leaving 11 targets with no
+# `.sum' and no explanation.
+#
+# The guard itself is RIGHT and is not touched: refusing to score a compiler
+# whose spec file is not reaching it is the whole point.  What changes is that
+# the refusal is now scoped to its own target and recorded BY NAME, so
+# BLOCKED and NOT-ATTEMPTED and SCORED are three distinct outcomes.
 rm -f "$OUT/score17.rc"
-sh "$S/mtcheck.sh" "$B" "$@" > "$OUT/score17.log" 2>&1
-rc=$?
-echo "$rc" > "$OUT/score17.rc"
-echo "== mtcheck rc=$rc"
+nscored=0; nblocked=0
+: > "$OUT/BLOCKED"
+for T in "$@"; do
+  rm -f "$OUT/$T.rc"
+  sh "$S/mtcheck.sh" "$B" "$T" > "$OUT/$T.mtcheck.log" 2>&1
+  trc=$?
+  echo "$trc" > "$OUT/$T.rc"
+  if [ "$trc" = 0 ]; then
+    nscored=$((nscored+1))
+    echo "-- SCORED  $T"
+  else
+    nblocked=$((nblocked+1))
+    why=$(grep -m1 '^FATAL\[' "$OUT/$T.mtcheck.log" | cut -c1-120)
+    echo "-- BLOCKED $T rc=$trc  ${why:-no FATAL line -- read $OUT/$T.mtcheck.log}"
+    printf '%s\t%s\n' "$T" "${why:-unknown}" >> "$OUT/BLOCKED"
+  fi
+done
+cat "$OUT"/*.mtcheck.log > "$OUT/score17.log" 2>/dev/null
+echo "$nblocked" > "$OUT/score17.rc"
+echo "== scored=$nscored blocked=$nblocked of $#"
 
 # PRESERVE PER TARGET.  mtcheck makes TESTSUITEDIR per-target, but the sums are
 # copied out anyway so a later run cannot quietly redefine what a number meant.
