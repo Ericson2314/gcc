@@ -1,0 +1,23 @@
+# Overnight run: build did not complete.  Machine saturation, measured.
+#
+# The 47-base `all-gcc' build was launched from an immutable snapshot
+# (/tmp/snap-agent-acda89931a903ec27-fe6a8ffd02b, sha fe6a8ffd02b, anchor 52)
+# into /tmp/b-acda89931a903ec27 and is STILL RUNNING at report time.  It did
+# not reach `cc1', so NO target was scored and no row of the board exists.
+#
+# The reason is measured, not inferred:
+#
+#   configure rc=0
+#   objects after ~2.5h   735
+#   objects after ~3.5h   785      (+50 in 50 min)
+#   objects after ~4.5h   806      (+21 in 50 min)
+#   still in the GENERATOR phase   build/genextract-microblaze.o
+#   fifteen-minute load   40 -> 59 throughout, on 32 cores
+#
+# ~1,500 objects remain.  At the last observed rate that is on the order of
+# DAYS, not hours.  Five other agents were building concurrently all night.
+#
+# Nothing here is a property of the tree: no `error:' appeared, the build is
+# progressing monotonically, and the two driver faults that stopped earlier
+# attempts (WANT_ANCHOR unexported; build dir named `b-agent-...' when
+# mt_assert_builddir strips the `agent-' prefix) are both fixed and committed.
