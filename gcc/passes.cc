@@ -178,6 +178,51 @@ pass_gate_p (opt_pass *pass, function *fun)
   return pass_owner_selected_p (pass) && pass->gate (fun);
 }
 
+/* MULTI-TARGET: clone PASS, CARRYING ITS OWNER ACROSS.
+
+   `clone ()' is overridden by every pass that supports several instances, and
+   every one of those overrides calls its own RAW factory:
+
+     opt_pass *clone () final override
+     { return make_avr_pass_fuse_add (m_ctxt); }
+
+   The raw factory is not the `make_<pass>_mt_<base>' forwarder that
+   gen-target-passes.awk emits, and only the forwarder sets `mt_base'.  So a
+   cloned target pass came out with `mt_base == NULL', which
+   pass_owner_selected_p () reads as "target-independent, always runs" -- the
+   ONE value that means "no owner" is also the value a lost tag produces.
+
+   That is not a per-pass slip.  pass_manager's NEXT_PASS macro takes the
+   forwarder for instance 1 and `clone ()' for instances 2..N, so EVERY back
+   end pass its own passes.def inserts more than once lost its owner, while
+   the first instance kept it.  Three exist across the 47 configured back
+   ends, and all three were live leaks:
+
+     avr      avr_pass_fuse_add   (before peephole2, after cprop_hardreg)
+     i386     pass_stv            (after late_combine, before cse2)
+     aarch64  pass_ldp_fusion     (before early_remat, before peephole2)
+
+   avr's is the one that crashed: its `execute ()' writes
+   `func->machine->n_avr_fuse_add_executed' BEFORE testing anything, and
+   `struct machine_function' is declared separately by every back end, so
+   instance 2 wrote through microblaze's, rx's and sh's `machine_function' at
+   avr's offset.  Past the allocation it segfaults; inside it, it silently
+   corrupts whatever member sits there, which is why eight back ends compiled
+   the same input "cleanly" and were NOT thereby shown unaffected.
+
+   Fixed here rather than in the three passes, because a gate added to
+   avr_pass_fuse_add would leave the other two, and would leave the next back
+   end that inserts a pass twice to rediscover this.  The tag is lost by the
+   CLONE, so the clone is where it is restored.  */
+
+static opt_pass *
+mt_clone_pass (opt_pass *pass)
+{
+  opt_pass *p = pass->clone ();
+  p->mt_base = pass->mt_base;
+  return p;
+}
+
 
 void
 pass_manager::execute_early_local_passes ()
@@ -1464,7 +1509,7 @@ position_pass (struct register_pass_info *new_pass_info, opt_pass **pass_list)
 
 	  if (new_pass_info->ref_pass_instance_number == 0)
 	    {
-	      new_pass = new_pass_info->pass->clone ();
+	      new_pass = mt_clone_pass (new_pass_info->pass);
 	      add_pass_instance (new_pass, true, new_pass_info->pass);
 	    }
 	  else
@@ -1684,7 +1729,7 @@ pass_manager::pass_manager (context *ctxt)
     else                                         \
       {                                          \
         gcc_assert (m_ ## PASS ## _1);                 \
-        m_ ## PASS ## _ ## NUM = m_ ## PASS ## _1->clone (); \
+        m_ ## PASS ## _ ## NUM = mt_clone_pass (m_ ## PASS ## _1); \
       }                                          \
     p = next_pass_1 (p, m_ ## PASS ## _ ## NUM, m_ ## PASS ## _1);  \
   } while (0)
