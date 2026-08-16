@@ -1785,11 +1785,22 @@ answer is still wrong is worse than the failure.**
   failure modes point at the same evidence and the same evidence does not
   separate them.
 
+  **THE BRANCH IS `multi-target-0`.** It was renamed from `multi-target`, and
+  for a while afterwards a bare `multi-target` still resolved — by git's DWIM to
+  the surviving remote-tracking ref — to a tree that happened to be identical to
+  the tip. One name, two authorities, agreeing **by luck**, and it would have
+  gone stale silently as commits landed: the ancestor check passing, the anchor
+  reading 52, every file probe passing, right up until it quietly didn't. The
+  remote ref has since been deleted, so `git rev-parse multi-target` now fails
+  with *"Needed a single revision"* — **the loud failure, which is the one we
+  want.** Any brief still naming `multi-target` now errors instead of resolving
+  to a plausible wrong tree. If you are reading such a brief, that is why.
+
   **Check, in this order, and do not stop at the first:**
   ```sh
-  git merge-base --is-ancestor HEAD multi-target   # ancestor, not tip => STALE
-  git rev-parse HEAD; git rev-parse multi-target   # must be EQUAL
-  ls scratchpad/INSTRUMENTS.md                     # a RECENT file must exist
+  git merge-base --is-ancestor HEAD multi-target-0  # ancestor, not tip => STALE
+  git rev-parse HEAD; git rev-parse multi-target-0  # must be EQUAL
+  ls scratchpad/INSTRUMENTS.md                      # a RECENT file must exist
   ```
   `--is-ancestor` returns **true** on a stale ancestor, so it alone says
   nothing; it is the *equality* that localises. And before concluding a brief
