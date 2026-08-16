@@ -100,8 +100,28 @@ along with GCC; see the file COPYING3.  If not see
    above record, arriving for a fourth macro: the expansion now happens in the
    translation unit where the macro is that base's own, so that base's headers
    have to be satisfiable HERE.  One back end of 47 needed it, and the build
-   named the back end, the file, the line and the identifier.  */
+   named the back end, the file, the line and the identifier.
+
+   `stringpool.h' FIRST, and not by style: `attribs.h:165's
+   `canonicalize_attr_name' calls `get_identifier_with_length', which
+   stringpool.h declares.  Including attribs.h alone failed the next 47-base
+   build by name --
+
+     attribs.h:165: error: get_identifier_with_length was not declared in this
+     scope
+
+   -- which is the same one-error-at-a-time shape as the epiphany diagnostic
+   above, one header deeper.  This is the pairing the rest of GCC uses.  */
+#include "stringpool.h"
 #include "attribs.h"
+/* For `recog_memoized', which `msp430.h:541's ADJUST_INSN_LENGTH calls to get
+   an insn's code before adjusting its length.  Third in the same series and
+   found the cheap way: `-syncheck.sh' compiles this file for 22 bases against
+   an existing build dir with `-fsyntax-only', so all the missing declarations
+   of a conversion turn up in ONE run instead of one 47-base build each.  The
+   first two (epiphany/attribs.h, attribs.h/stringpool.h) cost a build apiece
+   before that harness existed.  */
+#include "recog.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
