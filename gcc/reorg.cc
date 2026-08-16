@@ -3835,7 +3835,10 @@ dbr_schedule (rtx_insn *first)
 static void
 rest_of_handle_delay_slots (void)
 {
-  if (DELAY_SLOTS)
+  /* The PRIMARY's `DELAY_SLOTS' -- i386's 0 -- for all 47 bases, which is why
+     delay-slot filling had never run for any of the twelve back ends that
+     have them.  See target-automata.h.  */
+  if (mt_delay_slots ())
     dbr_schedule (get_insns ());
 }
 
@@ -3874,8 +3877,14 @@ public:
 bool
 pass_delay_slots::gate (function *)
 {
-  /* At -O0 dataflow info isn't updated after RA.  */
-  if (DELAY_SLOTS)
+  /* At -O0 dataflow info isn't updated after RA.  The gate asked the PRIMARY;
+     see target-automata.h.  NOTE the residual named there: `opts.cc:623' is
+     still `#if DELAY_SLOTS' and therefore still i386's, so `flag_delayed_branch'
+     is not turned on by `-O1' for these back ends and this gate is reached by
+     an explicit `-fdelayed-branch' only.  That is a LINK boundary, not an
+     oversight -- `opts.o' is in `libcommon-target.a', which the driver links
+     and which does not contain `targetm_automata'.  */
+  if (mt_delay_slots ())
     return optimize > 0 && flag_delayed_branch && !crtl->dbr_scheduled_p;
 
   return false;

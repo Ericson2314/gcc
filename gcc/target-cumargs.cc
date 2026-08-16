@@ -97,6 +97,9 @@ along with GCC; see the file COPYING3.  If not see
    up to date, so the first draft looked like it built.  */
 #include "explow.h"
 #include "target-cumargs.h"
+/* For MT_LEGITADDR_STRICT_FN -- the name of the strict GO_IF_LEGITIMATE_ADDRESS
+   thunk this base's `target-legitaddr-strict.o' defines.  */
+#include "target-legitaddr.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
    "missing terminating character" warning on top of the error -- target-regs.cc
@@ -295,6 +298,80 @@ mt_base_declare_cold_function_name (FILE *file, const char *name,
 #else
   ASM_OUTPUT_LABEL (file, name);
 #endif
+}
+
+/* FINAL_PRESCAN_INSN, asked of THIS base.  Two `#ifdef' sites in `final.cc'
+   (:2666 for `asm' bodies, :2801 for ordinary insns), both answered by
+   whichever base compiled that file.  i386 defines no FINAL_PRESCAN_INSN, so
+   both were FALSE for all 47 bases and the hook ran for NONE of the fourteen
+   back ends that define it: aarch64, alpha, arc, arm, avr, c6x, epiphany,
+   frv, h8300, iq2000, m68k, mips, rs6000, sh.  See target-frame.h for what
+   each of them loses -- arm's is the entry point of its conditional-execution
+   state machine, not an optimisation.
+
+   Every definer's macro is a three-argument STATEMENT taking
+   (INSN, OPVEC, NOPERANDS) and assigning to nothing, so the thunk needs no
+   in/out parameter.  The parameters are ATTRIBUTE_UNUSED because a base
+   defining no such macro leaves the body empty, and because some definers
+   (aarch64's, alpha's) ignore OPVEC and NOPERANDS even when they do define
+   it.  */
+
+static void
+mt_base_final_prescan_insn (rtx_insn *insn ATTRIBUTE_UNUSED,
+			    rtx *opvec ATTRIBUTE_UNUSED,
+			    int noperands ATTRIBUTE_UNUSED)
+{
+#ifdef FINAL_PRESCAN_INSN
+  FINAL_PRESCAN_INSN (insn, opvec, noperands);
+#endif
+}
+
+/* GO_IF_LEGITIMATE_ADDRESS, asked of THIS base, in its NON-strict form --
+   this translation unit does not define `REG_OK_STRICT', so what the header
+   chain handed us above is the non-strict body.  The strict body cannot be
+   reached from here at all and lives in `target-legitaddr-strict.cc'; see
+   that file for why, and target-frame.h for what was wrong.
+
+   Returns whether this base defines the macro; `*win' is the answer when it
+   does.  Two results rather than one because "no such macro" and "not a
+   legitimate address" are different facts and the caller does different
+   things with them: the first falls through to
+   `targetm.addr_space.legitimate_address_p', the second is a `false'.  */
+
+static bool
+mt_base_go_if_legitimate_address_nonstrict (machine_mode mode ATTRIBUTE_UNUSED,
+					    rtx addr ATTRIBUTE_UNUSED,
+					    bool *win ATTRIBUTE_UNUSED)
+{
+#ifdef GO_IF_LEGITIMATE_ADDRESS
+  GO_IF_LEGITIMATE_ADDRESS (mode, addr, mt_legit_ok);
+  *win = false;
+  return true;
+
+ mt_legit_ok:
+  *win = true;
+  return true;
+#else
+  return false;
+#endif
+}
+
+/* The strict half, defined in `target-legitaddr-strict.cc' compiled for THIS
+   base.  Declared through the shared header so the name is derived from
+   `MULTI_TARGET_TARGETM_BASE' on both sides rather than written out twice.  */
+extern bool MT_LEGITADDR_STRICT_FN (machine_mode, rtx, bool *);
+
+/* The one entry point the table holds, dispatching on `strict'.  The two
+   arms are different TRANSLATION UNITS, not different branches of one
+   expansion, which is the whole difficulty this macro presents.  */
+
+static bool
+mt_base_go_if_legitimate_address (machine_mode mode, rtx addr, bool strict,
+				  bool *win)
+{
+  if (strict)
+    return MT_LEGITADDR_STRICT_FN (mode, addr, win);
+  return mt_base_go_if_legitimate_address_nonstrict (mode, addr, win);
 }
 
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
@@ -1739,6 +1816,13 @@ mt_base_insn_default_latency (rtx_insn *insn)
 
 static const struct target_automata_desc mt_base_automata = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
+  /* `DELAY_SLOTS' out of THIS base's `insn-attr-common-<base>.h'.  Outside the
+     `#ifdef INSN_SCHEDULING' arms below because the two are independent: fr30,
+     h8300, iq2000, microblaze, or1k and visium have delay slots and no
+     automaton at all, and genattr-common emits this `#define' unconditionally
+     while it emits `INSN_SCHEDULING' only for a back end with a
+     `define_insn_reservation'.  */
+  DELAY_SLOTS != 0,
 #ifdef INSN_SCHEDULING
   true,
   mt_base_state_size,
@@ -1860,7 +1944,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_incoming_return_addr_rtx,
   mt_base_epilogue_uses,
   mt_base_declare_function_name,
-  mt_base_declare_cold_function_name
+  mt_base_declare_cold_function_name,
+  mt_base_final_prescan_insn,
+  mt_base_go_if_legitimate_address
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what

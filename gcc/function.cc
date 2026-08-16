@@ -6763,7 +6763,15 @@ public:
 	 late prologue/epilogue, since the latter has to run before
 	 the former, and the former won't honor whatever restrictions
 	 the latter is trying to enforce.  */
-      gcc_assert (!DELAY_SLOTS);
+      /* THIS ASSERT HELD ONLY BECAUSE THE ANSWER WAS WRONG.  `DELAY_SLOTS'
+	 was the primary's -- i386's 0 -- for all 47 bases, so
+	 `gcc_assert (!DELAY_SLOTS)' was `gcc_assert (true)': a check that
+	 appears to protect something while being satisfied by the bug it
+	 sits next to.  Asked of the selected base it becomes a real check,
+	 and it does not fire today: `TARGET_USE_LATE_PROLOGUE_EPILOGUE' is
+	 supplied by aarch64 alone, whose `DELAY_SLOTS' is 0.  Measured, not
+	 assumed -- if a back end ever has both, this is where it says so.  */
+      gcc_assert (!mt_delay_slots ());
       rest_of_handle_thread_prologue_and_epilogue (fn);
       return 0;
     }

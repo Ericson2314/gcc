@@ -105,15 +105,24 @@ default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
 			      bool strict ATTRIBUTE_UNUSED,
 			      code_helper ATTRIBUTE_UNUSED)
 {
-#ifdef GO_IF_LEGITIMATE_ADDRESS
-  /* Defer to the old implementation using a goto.  */
-  if (strict)
-    return strict_memory_address_p (mode, addr);
-  else
-    return memory_address_p (mode, addr);
-#else
+  /* THE `#else' ARM HERE IS `gcc_unreachable ()', AND IT WAS THE PRIMARY'S
+     ANSWER.  i386 defines no GO_IF_LEGITIMATE_ADDRESS, so this took the
+     `#else' for all 47 bases -- including fr30, the tree's only definer,
+     which supplies no TARGET_LEGITIMATE_ADDRESS_P of its own and therefore
+     had THIS function as its address predicate.  See target-frame.h.
+
+     Asking the selected base directly rather than going back through
+     `memory_address_p' / `strict_memory_address_p': those two are the same
+     thunk with the same `strict' argument now, so the round trip would be a
+     second path to one answer for no gain.  */
+  bool win;
+  if (mt_go_if_legitimate_address (mode, addr, strict, &win))
+    return win;
+
+  /* Genuinely nothing to answer with: this base defines neither the macro nor
+     a hook.  Unchanged from upstream, and still the right shape -- never let
+     the absence of an answer be an answer.  */
   gcc_unreachable ();
-#endif
 }
 
 void

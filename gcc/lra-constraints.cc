@@ -353,17 +353,17 @@ static bool
 valid_address_p (machine_mode mode ATTRIBUTE_UNUSED,
 		 rtx addr, addr_space_t as)
 {
-#ifdef GO_IF_LEGITIMATE_ADDRESS
-  lra_assert (ADDR_SPACE_GENERIC_P (as));
-  GO_IF_LEGITIMATE_ADDRESS (mode, addr, win);
-  return false;
-
- win:
-  return true;
-#else
+  /* NON-strict, and deliberately so: this file spells `#undef REG_OK_STRICT'
+     above its includes, so upstream expands the non-strict body here.  That
+     choice is preserved exactly.  See target-frame.h.  */
+  bool win;
+  if (mt_go_if_legitimate_address (mode, addr, false, &win))
+    {
+      lra_assert (ADDR_SPACE_GENERIC_P (as));
+      return win;
+    }
   return targetm.addr_space.legitimate_address_p (mode, addr, 0, as,
 						  ERROR_MARK);
-#endif
 }
 
 namespace {

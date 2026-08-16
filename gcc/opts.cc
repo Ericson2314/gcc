@@ -620,6 +620,27 @@ static const struct default_options default_options_table[] =
 
     /* -O1 (and not -Og) optimizations.  */
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fbranch_count_reg, NULL, 1 },
+    /* NOT CONVERTED, AND THIS IS A LINK BOUNDARY RATHER THAN AN OVERSIGHT --
+       the same one target-automata.h records for the `INSN_SCHEDULING'
+       entries below.  `DELAY_SLOTS' here is the SHARED `insn-attr-common.h',
+       i.e. i386's 0, so this entry is compiled out for all 47 bases and
+       `-fdelayed-branch' is not enabled at `-O1' for the twelve back ends
+       that have delay slots (arc, cris, fr30, h8300, iq2000, microblaze,
+       mips, or1k, pa, sh, sparc, visium).  `opts.o' is in
+       `libcommon-target.a', which the driver links and which does not contain
+       `targetm_automata', so a call to `mt_delay_slots ()' does not link here.
+
+       The five CONSUMERS -- `cfgrtl.cc:493', `final.cc:1067',
+       `function.cc:6766', `reorg.cc:3838' and `:3878' -- and the
+       `toplev.cc:1433' warning ARE converted, so `-fdelayed-branch' asked for
+       explicitly now works on those twelve where it previously did nothing.
+       What remains is default ENABLEMENT only, and the route for it is
+       `TARGET_OPTION_OPTIMIZATION_TABLE' in each back end's
+       `common/config/<cpu>/<cpu>-common.cc', which IS in this archive and IS
+       selected before `decode_options'.  That is a second authority for a
+       fact `genattr-common' already derives from the `.md', so it needs an
+       agreement check against `mt_delay_slots ()' and belongs in its own
+       change.  */
 #if DELAY_SLOTS
     { OPT_LEVELS_1_PLUS_NOT_DEBUG, OPT_fdelayed_branch, NULL, 1 },
 #endif

@@ -192,6 +192,31 @@ mt_declare_cold_function_name (FILE *file, const char *name, tree decl)
   mt_frame ()->declare_cold_function_name (file, name, decl);
 }
 
+/* `FINAL_PRESCAN_INSN'; `final.cc' :2666 and :2801.  Through `mt_frame ()'
+   like the rest, so a compilation with no target selected fails BY NAME
+   rather than silently not prescanning -- which is precisely the failure this
+   converts, and would be indistinguishable from it.  */
+
+void
+mt_final_prescan_insn (rtx_insn *insn, rtx *opvec, int noperands)
+{
+  mt_frame ()->final_prescan_insn (insn, opvec, noperands);
+}
+
+/* `GO_IF_LEGITIMATE_ADDRESS'; see target-frame.h.  Through `mt_frame ()' like
+   the rest: a compilation with no target selected must fail BY NAME rather
+   than answer `false', because `false' here means "this base has no such
+   macro" and would send the caller down the `targetm' path -- a plausible
+   answer, silently wrong for fr30, and indistinguishable from the correct one
+   for the other 46.  */
+
+bool
+mt_go_if_legitimate_address (machine_mode mode, rtx addr, bool strict,
+			     bool *win)
+{
+  return mt_frame ()->go_if_legitimate_address (mode, addr, strict, win);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here
@@ -1440,6 +1465,33 @@ mt_has_insn_scheduling (void)
 		    "must be chosen with %<-ftarget-config=%> before "
 		    "instructions are scheduled");
   return targetm_automata->has_dfa;
+}
+
+/* `DELAY_SLOTS' for the SELECTED base -- the same shape as
+   `mt_has_insn_scheduling ()' above, for the second macro `genattr-common'
+   writes into `insn-attr-common-<base>.h'.
+
+   A QUERY, not an assertion: a base with no `define_delay' must be ANSWERED
+   `false' rather than refused, which is the whole point.  It still refuses
+   when no base is selected at all, for the same reason -- a `false' there
+   would be an invented answer, and it is the quiet direction: it would leave
+   delay-slot filling switched off and say nothing, which is exactly the
+   defect this converts.
+
+   Measured, cold 47-base build, from the generator's own headers: the shared
+   `insn-attr-common.h' says 0 and is i386's, and TWELVE back ends say 1 --
+   arc, cris, fr30, h8300, iq2000, microblaze, mips, or1k, pa, sh, sparc,
+   visium.  All twelve were answered by i386's 0.  See target-automata.h for
+   the shape note: this macro's consumers are already runtime `if's, so an
+   `#ifdef'-keyed sweep scores every one of these files clean.  */
+bool
+mt_delay_slots (void)
+{
+  if (targetm_automata == NULL)
+    internal_error ("no back end has been selected, so it is not known "
+		    "whether this target has delay slots; a target must be "
+		    "chosen with %<-ftarget-config=%> first");
+  return targetm_automata->delay_slots;
 }
 
 /* NULL until a base is selected, like every other table here, and a base

@@ -1701,6 +1701,77 @@ struct target_frame_desc
      a number moved.  Stated plainly so nobody later reads its zero as
      evidence the conversion was unnecessary.  */
   void (*declare_cold_function_name) (FILE *file, const char *name, tree decl);
+
+  /* FINAL_PRESCAN_INSN -- TWO DEAD `#ifdef's IN `final.cc', AND THE RECORDED
+     DESCRIPTION OF THIS ONE SAID THE OPPOSITE OF THE TRUTH.
+
+     The board carried it as "safe ONLY BECAUSE i386 is the primary", i.e. as
+     a leak of i386's ANSWER.  Measured, i386 defines no FINAL_PRESCAN_INSN at
+     all: `git grep' over `gcc/config/' finds fourteen definers and i386 is
+     not among them.  So `final.cc:2666' and `:2801' were FALSE for all 47
+     bases and the hook ran for NONE of the fourteen -- aarch64, alpha (elf.h),
+     arc, arm, avr, c6x, epiphany, frv, h8300, iq2000, m68k, mips, rs6000, sh.
+     Leaked ABSENCE, not leaked presence, which is a different search: there is
+     no primary's value to find in a dump, only a call that never happens.
+
+     WHAT IS LOST, per back end, and it is not cosmetic.  arm's
+     (`arm.h:2328') is the entry point of the whole conditional-execution
+     engine: `arm_final_prescan_insn' is what scans forward from a `cc_out'
+     compare and converts the following insns into an IT/cond-exec block, and
+     it also drives `arm_ccfsm_state'.  Never calling it does not merely lose
+     an optimisation -- the `.md' output templates and the `length' attribute
+     are written expecting that state machine to have run.  aarch64's
+     (`aarch64.h:1045') is `aarch64_final_prescan_insn', avr's
+     (`avr.h:431') sizes and validates inline-asm insns, alpha's resets the
+     per-insn literal/gpdisp sequence numbers that its `%' operand letters
+     then read, and c6x's assigns functional units for its VLIW packets.
+
+     Both sites are unconditional now.  For a base defining nothing the thunk
+     body is empty, which is precisely what the dead `#ifdef' did; the
+     difference is that the fourteen which DO define it now get theirs.
+
+     Same three-argument statement-macro interface at every definer
+     (INSN, OPVEC, NOPERANDS), so no in/out parameter is needed -- unlike
+     ADJUST_INSN_LENGTH, whose definers assign to their LENGTH argument.  */
+  void (*final_prescan_insn) (rtx_insn *insn, rtx *opvec, int noperands);
+
+  /* GO_IF_LEGITIMATE_ADDRESS -- FOUR `#ifdef' SITES, AND THE ONE WHOSE `#else'
+     ARM IS `gcc_unreachable ()'.
+
+     `fr30' is the tree's ONLY definer (`fr30.h:549' and `:571').  Shared code
+     asked the primary, and i386 defines no such macro, so
+     `recog.cc:1894' (`memory_address_addr_space_p'), `reload.cc:2167'
+     (`strict_memory_address_addr_space_p') and `lra-constraints.cc:356'
+     (`valid_address_p') all took the `#else' arm and went through
+     `targetm.addr_space.legitimate_address_p'.  That is CORRECT for the 46
+     bases that define nothing.  The fourth site is not: `targhooks.cc:108's
+     `default_legitimate_address_p' has `gcc_unreachable ()' as its `#else',
+     and fr30 supplies no `TARGET_LEGITIMATE_ADDRESS_P' of its own, so that
+     default IS fr30's address predicate.  Every memory reference fr30
+     compiled reached that `gcc_unreachable'.
+
+     Leaked ABSENCE again, and the LOUD kind -- an ICE rather than a wrong
+     answer, which is why this is the least dangerous of the three macros in
+     this change and is still the same defect.
+
+     TWO ANSWERS, NOT ONE, and the `strict' parameter is not a convenience.
+     `REG_OK_STRICT' is defined before the includes in `reload.cc' and
+     `#undef'ed in `lra-constraints.cc', and a definer supplies two whole
+     macro bodies selected by `#ifdef REG_OK_STRICT' -- fr30's differ in
+     `REG_OK_FOR_BASE_P' (a real register-number test versus a constant 1) and
+     in whether ARG_POINTER_REGNUM may be a base.  A translation unit reads
+     its header chain once, so it holds exactly one of them.  Hence a second
+     per-base object, `target-legitaddr-strict.o', which defines
+     `REG_OK_STRICT' ahead of every include; `target-cumargs.o' supplies the
+     non-strict half and dispatches.  See target-legitaddr-strict.cc.
+
+     RETURNS whether this base DEFINES the macro, with `*win' the answer when
+     it does.  "No such macro" and "not a legitimate address" are different
+     facts and every caller does something different with them; collapsing
+     them into one `bool' would tell the 46 non-definers that no address is
+     ever legitimate, which is the silent direction.  */
+  bool (*go_if_legitimate_address) (machine_mode mode, rtx addr, bool strict,
+				    bool *win);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -2016,5 +2087,19 @@ extern poly_uint64 mt_regmode_natural_size (machine_mode mode);
 extern machine_mode mt_case_vector_mode (void);
 extern bool mt_has_incoming_return_addr_rtx (void);
 extern rtx mt_incoming_return_addr_rtx (void);
+
+/* `FINAL_PRESCAN_INSN'; `final.cc' :2666 and :2801.  Unconditional at both
+   sites on purpose: a base defining no such macro gets a thunk with an empty
+   body, which is the same nothing the dead `#ifdef' did -- the difference
+   being that the fourteen bases which DO define it now get theirs.  */
+extern void mt_final_prescan_insn (rtx_insn *, rtx *, int);
+
+/* `GO_IF_LEGITIMATE_ADDRESS'; `recog.cc:1894', `reload.cc:2167',
+   `lra-constraints.cc:356' and `targhooks.cc:108'.  Returns whether the
+   SELECTED base defines the macro at all -- `false' for 46 of 47, and the
+   caller then falls through to `targetm.addr_space.legitimate_address_p'
+   exactly as the `#else' arm did.  `*win' is written only when it returns
+   `true'.  */
+extern bool mt_go_if_legitimate_address (machine_mode, rtx, bool, bool *);
 
 #endif /* GCC_TARGET_FRAME_H */

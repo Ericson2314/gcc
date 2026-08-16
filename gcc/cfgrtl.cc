@@ -490,7 +490,10 @@ pass_free_cfg::execute (function *)
 {
   /* The resource.cc machinery uses DF but the CFG isn't guaranteed to be
      valid at that point so it would be too late to call df_analyze.  */
-  if (DELAY_SLOTS && optimize > 0 && flag_delayed_branch)
+  /* `DELAY_SLOTS' was the PRIMARY's -- i386's 0 -- for all 47 bases; see
+     target-automata.h.  Note the shape: this was already a runtime `if', so
+     no `#ifdef'-keyed sweep could see it.  */
+  if (mt_delay_slots () && optimize > 0 && flag_delayed_branch)
     {
       df_note_add_problem ();
       df_analyze ();
