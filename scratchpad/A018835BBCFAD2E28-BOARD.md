@@ -220,19 +220,41 @@ a `#undef`/`#define` would leave the GUARD permanently true while the BODY came
 from the selected base, and the 16 bases that define none would silently start
 promoting.
 
-**PREDICTED SCORE** (`-predict.sh`, top 40 debt files, codegen identity against
-stock — a stronger statement than "the test passes", and one compilation per
-file):
+**SCORE, by name, base `3b9f7c8f695` -> tip `d5ad77b33b3` (all four fixes):**
 
 ```
-                   SAME   DIFFER   MTFAIL
-four fixes           2      37       1
-+ PROMOTE_MODE      16      23       1        <- +186 results in this window
+1315  FAIL  -> PASS
+  22  XPASS -> XFAIL          (a fix direction: they stop passing unexpectedly)
+  13  PASS  -> NOT PASS       <- real regressions, ALL of them lra.cc:192
+riscv64 debt          2,074 -> 772     -63%
+gcc.target/riscv      1,374 -> 384     -72%
+gcc.dg/params           239 -> 1
 ```
 
-Surviving diffs also shrank sharply (`bclr-lowest-set-bit-1` 60 lines -> 6,
-`zbb-min-max-04` 62 -> 24). The suite figure is IN FLIGHT; what is measured is
-codegen identity.
+Predicted beforehand from codegen identity alone (`-predict.sh`, top 40 files):
+2 -> 16 SAME, worth 195 results in that window. The suite found far more,
+because the window covers only 612 of the 1,188 and the SImode families run
+right through the tail.
+
+### 2c-bis. AND IT LARGELY CLOSES BOARD ITEM #2, WHICH WAS NOT THE PLAN
+
+The board's #2 is riscv64's `lra_assert (mode != VOIDmode)` at `lra.cc:192`,
+432 ICEs bounding 686 results, with the instruction: *"A MODE question; do NOT
+file it with the register-numbering family."* That was right, and the mode
+question is `PROMOTE_MODE`:
+
+```
+lra.cc:192 ICE occurrences in the riscv64 log   1285 -> 493
+gcc.dg/params debt                               239 -> 1
+```
+
+**The 13 real regressions are all the same ICE**, in `gcc.dg/autopar`,
+`gcc.dg/torture` and four singletons: with promotion correct, a handful of new
+paths reach LRA in a shape that trips the same assert. So the trade is 1,315
+results fixed against 13 newly hitting an ICE that was already the board's
+second item and is now two-thirds gone. Stated as a trade and not netted out.
+
+Two board items, one macro. Item #1 and item #2 were not independent.
 
 ### 2d. `taa-tools.sh` did not pin the substituter
 
@@ -285,34 +307,56 @@ nothing".
 ## 5. THE BOARD ROW
 
 ```
-                      riscv64 debt   gcc.target/riscv
-board (e3fac057ae4)       2,074           1,374
-base   3b9f7c8f695        2,074           1,374   <- reproduces EXACTLY
-auto-inc 784a5b556d9      1,888           1,188   -186, 0 regressions
-+align   bd6f4dbe3ae      1,888           1,188   -0
-+PROMOTE d5ad77b33b3      in flight; predicted a further ~186 in the top 40
+                        PASS    FAIL   riscv64 debt   gcc.target/riscv
+stock                 270248   15904          --             --
+board (e3fac057ae4)   267630   18329       2,074          1,374
+base   3b9f7c8f695    267630   18329       2,074          1,374  <- EXACT
+auto-inc 784a5b556d9  267816   18143       1,888          1,188  -186, 0 regr
++align   bd6f4dbe3ae  267816   18143       1,888          1,188  -0
++PROMOTE d5ad77b33b3  268932   16762         772            384  -1116
 ```
 
-The base run reproducing 267630/18329 — the board's riscv64 row to the result
-— is the control that says the rest of this column is about the changes.
+**riscv64's debt falls 2,074 -> 772, and the board's #1 item 1,374 -> 384.**
+riscv64 was 72% of the whole board's remaining debt; on these numbers it is
+0.29% of stock's PASS count, against x86_64's 0.04% and s390x's 0.16%.
+
+The base run reproducing `267630 / 18329` — the board's riscv64 row to the
+result, on a tree built here from a snapshot of my own sha — is the control
+that says the rest of this column is about the changes and not about the
+harness.
+
+By name over the whole span: **1,315 FAIL -> PASS, 22 XPASS -> XFAIL, 13
+PASS -> NOT PASS**, the last all `lra.cc:192`. Cardinality moved by 16
+results, so every figure here is an order of magnitude outside that noise.
 
 ## 6. WHAT I WOULD HAND THE NEXT AGENT
 
-1. **Score `d5ad77b33b3`'s riscv64 run** and `-predict.sh` the next 40 files.
-   `PROMOTE_MODE` is the largest of the four and only its codegen is measured.
-2. **`ASM_OUTPUT_MAX_SKIP_ALIGN`** — the third macro of the alignment family,
+1. **The 13 `lra.cc:192` regressions, and the 493 occurrences that remain.**
+   `PROMOTE_MODE` took this ICE from 1,285 log occurrences to 493 and
+   `gcc.dg/params` from 239 to 1, so the board's #2 is mostly gone -- but 13
+   tests that used to PASS now reach it. It is the same assert in both
+   directions and it is now the largest single named thing left on riscv64.
+2. **The remaining 384 in `gcc.target/riscv`.** `pr56096.c` (42) is the head
+   of it and is instruction-for-instruction identical to stock, differing only
+   in REGISTER ALLOCATION (`t0`/`t1` against `a5`/`a1`). `REG_ALLOC_ORDER` is
+   NOT the cause -- it is already converted in `target-regs.h`; that was
+   checked, and checking it is what caught the census bug in section 1.
+3. **`ASM_OUTPUT_MAX_SKIP_ALIGN`** — the third macro of the alignment family,
    still i386's. aarch64 carries a spurious `.p2align 3` stock does not emit,
    because `varasm.cc:2182-2186` emits both levels and i386's second is 3 where
    aarch64's is 0. LEAK-PRIMARY, 6 back ends, 3 files. riscv64 does not define
    it, so this is aarch64's item.
-3. **s390x's missing `.machinemode zarch` / `.machine "z900"`** — the whole of
+4. **s390x's missing `.machinemode zarch` / `.machine "z900"`** — the whole of
    that target's residual on a four-line file after these fixes. New, unfiled.
-4. **The other 405 macros in `-leakcensus.sh`.** Ranked by back-end count and
+5. **The other 296 macros in `-leakcensus.sh`.** Ranked by back-end count and
    by shared readers. `STATIC_CHAIN_REGNUM` (45 back ends), `CUMULATIVE_ARGS`
    (26), `CLASS_MAX_NREGS` (24), `PRINT_OPERAND` (15) are the head of it.
-5. **riscv64's `lra_assert (mode != VOIDmode)`** — untouched here, still 432
-   ICEs bounding 686 results. Given 2c, ask whether it is also a promotion
-   question before assuming it is not.
+   `PROMOTE_MODE` was 31 back ends and it moved 1,116 results on one target;
+   that is the calibration to size the rest against, not a promise.
+6. **A suite run for aarch64 and s390x on this tip.** Both are CHANGED by 2a
+   and 2b and neither is scored here. aarch64 is the one to do first: it is
+   the target whose explicit `USE_* 0` the auto-inc work had to be extended
+   for, so it is where an unnoticed regression would live.
 
 ## 7. WHAT IS NOT IN THIS BOARD
 
