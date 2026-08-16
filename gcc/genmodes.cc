@@ -2928,6 +2928,70 @@ emit_class_narrowest_mode (void)
   print_closer ();
 }
 
+/* THIS BACK END'S OWN DENSE POSITION FOR EACH MODE WITHIN ITS CLASS, and the
+   count of its own modes in each class.
+
+   Upstream, `MODE - MIN_MODE_<CLASS>' is a dense 0-based index over the modes
+   of that class, because upstream's numbering contains exactly one back end's
+   modes and the class runs are contiguous.  A back end that wants a bit per
+   mode of a class writes `1 << (MODE - MIN_MODE_FLOAT)' and that is a shift by
+   at most the number of ITS OWN modes of the class.
+
+   Under the shared numbering that arithmetic silently changes meaning.
+   `MIN_MODE_FLOAT' and `MAX_MODE_FLOAT' are the UNION's -- they must be, the
+   enum is the vocabulary -- so the difference counts every configured back
+   end's modes of the class, not this one's.  Measured on this branch,
+   `AARCH64_APPROX_MODE' (aarch64-protos.h) shifted a `uint64_t' by up to 219
+   at eleven bases and at forty-seven: undefined behaviour, at a site whose
+   upstream maximum is 59.
+
+   So the numbering stays shared and the INDEX comes from a per-base table --
+   the same split as `class_narrowest_mode' just above, and for the same
+   reason.  A hole gets 0xffff rather than a plausible small number: it is not
+   a mode of any class here (see `emit_mode_class'), so nothing may ask, and if
+   something does the answer must not be a usable bit position.  */
+
+static void
+emit_mode_class_index (void)
+{
+  int c;
+  struct mode_data *m;
+
+  print_decl ("unsigned short", "mode_class_index", "NUM_MACHINE_MODES");
+
+  for (c = 0; c < MAX_MODE_CLASS; c++)
+    {
+      unsigned int i = 0;
+      for (m = modes[c]; m; m = m->next)
+	if (m->is_hole)
+	  tagged_printf ("%u", 0xffffu, m->name);
+	else
+	  tagged_printf ("%u", i++, m->name);
+    }
+
+  print_closer ();
+}
+
+static void
+emit_class_num_modes (void)
+{
+  int c;
+  struct mode_data *m;
+
+  print_decl ("unsigned short", "class_num_modes", "MAX_MODE_CLASS");
+
+  for (c = 0; c < MAX_MODE_CLASS; c++)
+    {
+      unsigned int n = 0;
+      for (m = modes[c]; m; m = m->next)
+	if (!m->is_hole)
+	  n++;
+      tagged_printf ("%u", n, mode_class_names[c]);
+    }
+
+  print_closer ();
+}
+
 static void
 emit_real_format_for_mode (void)
 {
@@ -3353,6 +3417,8 @@ emit_insn_modes_c (void)
   emit_mode_unit_precision ();
   emit_mode_base_align ();
   emit_class_narrowest_mode ();
+  emit_mode_class_index ();
+  emit_class_num_modes ();
   emit_real_format_for_mode ();
   /* THE ADJUSTMENT CODE MUST FOLLOW EVERY TABLE IT WRITES, and until now two
      of the eight came after it.  In a multi-target build emit_mode_adjustments
@@ -3398,6 +3464,8 @@ emit_min_insn_modes_c (void)
   emit_mode_wider ();
   emit_mode_inner ();
   emit_class_narrowest_mode ();
+  emit_mode_class_index ();
+  emit_class_num_modes ();
 }
 
 /* Master control.  */
