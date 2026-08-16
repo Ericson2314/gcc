@@ -1000,6 +1000,41 @@ include-i386/     120 files   incl. mm_malloc.h (tmake-fragment channel)
 include-aarch64/   10 files   incl. arm_neon_sve_bridge.h
 ```
 
+**AND THE `specs-config` md5 IS ENVIRONMENT-SENSITIVE, SO THOSE FOUR MD5s ARE
+NOT A BAR — THE LINE COUNT IS.** Measured at `3b9f7c8f695`, anchor 52, cold,
+47 bases (`scratchpad/abe9f294136236fc8-specsdiff.sh`). A fresh build
+reproduces `232 / 224 non-blank / all md5s distinct / no duplicate-md5
+fallback signature` exactly, and reproduces **none** of the recorded md5s:
+
+```
+x86_64-pc-linux-gnu         2 differing lines of 232
+  < native_system_header_dir /nix/store/q5wv2ldp...-glibc-2.42-67-dev/include
+  > native_system_header_dir /usr/include
+aarch64 / riscv64 / s390x   the same ONE line, each with its own glibc path
+alpha / avr / mips64 / or1k IDENTICAL, 232 lines, byte for byte
+```
+
+One line of 232, and it is an absolute path into the nix store. The four that
+differ are exactly the four **glibc** targets, for which `taa-specs.sh` writes
+that target's own header directory into the command; the four bare-metal ELF
+targets have no libc, take `target-specs/configure.ac:570`'s own `/usr/include`
+default on both runs, and are byte-identical. **That identity is the control**
+— it says the compiler is the same and only the environment moved.
+
+So these md5s encode a **glibc store path**, reproducible only by a run that
+used `taa-specs.sh` with those store paths still live. Same shape as
+`mt-bars.sh`'s `-g` arm, which INSTRUMENTS.md already records as
+path-sensitive and never-quotable-bare — and the same shape as the aarch64
+`-S` bar being filename-sensitive. **Quote it as 232 / 224 / all distinct plus
+a line-diff against a named control, never as four md5s.** An agent holding
+the md5s will otherwise score a correct build as a failed bar, which is the
+direction that wastes a day.
+
+Note the general form, since this is the third artefact on this branch to have
+it: **an md5 is the right instrument for "is this the same file" and says
+nothing about WHY when the answer is no.** Pair every md5 bar with a
+line-differ, or the first mismatch produces a story instead of a diff.
+
 **QUOTE EVERY BAR WITH THE COMMAND THAT PRODUCED IT. THREE TIMES IN ONE DAY, A
 "DISAGREEMENT" WAS ONE QUANTITY READ TWO WAYS.**
 
