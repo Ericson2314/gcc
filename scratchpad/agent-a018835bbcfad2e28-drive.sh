@@ -6,8 +6,12 @@ set -eu
 W=$(cd "$(dirname "$0")/.." && pwd)
 ID=agent-a018835bbcfad2e28
 SHA=$(cd "$W" && git rev-parse --short HEAD)
+# The snapshot is named for the SHA as well as the worktree, and the build dir
+# takes the same suffix: overwriting a snapshot that an already-configured
+# build dir points at breaks nothing loudly, because a build dir re-reads its
+# srcdir long after configure (INSTRUMENTS.md, a51a0e8b2b458063b-snap.sh).
 SNAP=/tmp/snap-$ID-$SHA
-B=/tmp/b-a018835bbcfad2e28
+B=/tmp/b-a018835bbcfad2e28-$SHA
 
 A=$(grep -c MULTI_TARGET "$W/gcc/Makefile.in")
 export WANT_ANCHOR=$A
