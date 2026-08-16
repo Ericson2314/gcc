@@ -136,11 +136,14 @@ Look how much rests on it, every item a recorded honest negative:
   defines them, so no arm can be both-sided.
 - ~~The DFA-absent case — both configured bases have reservations.~~
   **SETTLED, AND IT IS THE BEST ARGUMENT ON THIS LIST.** Not by "a third back
-  end would help" but by forty-seven: **13 of the 47 have no
-  `define_insn_reservation` at all** — avr cris fr30 ft32 h8300 mmix moxie
+  end would help" but by forty-seven: **14 of the 47 have no
+  `define_insn_reservation` at all** — avr cris fr30 ft32 gcn h8300 mmix moxie
   msp430 nvptx pdp11 rl78 vax xstormy16 — measured from each
   `insn-attr-common-<base>.h`, i.e. from `genattr-common`'s own answer
-  (`scratchpad/a98009045f7229938-dfacensus.sh`). Shared code read the
+  (`scratchpad/a98009045f7229938-dfacensus.sh`), **over all 47 headers** —
+  the first reading of that census said 13 of 45 because it was taken while
+  the build was still generating them, and a directory read mid-write looks
+  exactly like a complete one. Shared code read the
   **primary's** `#ifdef INSN_SCHEDULING`, so **eleven** of them ICEd on
   `int f (int x) { return x + 1; }` at `-O2` — no header, no libc — with
   *"back end 'X' has no pipeline automaton"*. Widest cause by breadth **and**

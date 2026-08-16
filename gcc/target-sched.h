@@ -101,15 +101,26 @@ struct target_sched_desc
      than a `grep' over `config/<be>/' which asks a different question
      (`a98009045f7229938-dfacensus.sh'):
 
-	 HAS an automaton   34
-	 NO automaton       13   avr cris fr30 ft32 h8300 mmix moxie msp430
-				 nvptx pdp11 rl78 vax xstormy16
+	 47 headers
+	 HAS an automaton   33
+	 NO automaton       14   avr cris fr30 ft32 gcn h8300 mmix moxie
+				 msp430 nvptx pdp11 rl78 vax xstormy16
 
      The figure matters because it is the population every `#ifdef
      INSN_SCHEDULING' in shared code was answering for with the primary's
-     yes.  Eleven of those thirteen ICEd on `int f (int x) { return x + 1; }'
+     yes.  ELEVEN of those fourteen ICEd on `int f (int x) { return x + 1; }'
      at `-O2'; see target-automata.h.  Note also that the arithmetic in the
-     old sentence never closed -- 1 + 47 = 48 in a 47-back-end tree.  */
+     old sentence never closed -- 1 + 47 = 48 in a 47-back-end tree.
+
+     AND THE FIRST READING OF THIS CENSUS SAID 34/13 OVER 45 HEADERS, WHICH IS
+     WORTH RECORDING BECAUSE IT IS THIS FILE'S OWN SUBJECT.  It was taken
+     while the build was still generating headers, so two of them did not
+     exist yet -- `i386' (the primary) and `gcn'.  A directory being read
+     mid-write looks exactly like a directory that is complete, and the
+     missing entries were silently absent rather than reported: PRINCIPLES'
+     "a log being written looks exactly like a log that finished", in a glob.
+     The 47 is now printed beside the split so the two cannot be quoted
+     apart.  */
   void (*init_attrs) (void);
 };
 

@@ -28,18 +28,42 @@ TX=x86_64-pc-linux-gnu
 TARGETS=${TARGETS:?comma or newline separated triples}
 LIST=$(echo "$TARGETS" | tr ',' '\n' | grep .)
 
+# THE PER-TARGET MAKES ARE SEPARATED BY `;', NOT BY `&&', AND THAT ONE
+# CHARACTER WAS WORTH 24 TARGETS.
+#
+# This script used to `&&'-chain all 47 invocations into a single command.
+# m68k fails in the middle -- its driver refuses `-mcpu=m68020' (#218) -- so
+# every target after it in the list was NEVER ATTEMPTED, and the report below
+# calls an unattempted target `SPECS-FAIL (has an as; target-specs produced
+# nothing)'.  "Never attempted" and "failed" arriving as the same silence is
+# PRINCIPLES' `-k' rule, failing in the direction that makes the branch look
+# worse: it read OK=21 SPECS-FAIL=24 where the truth is 45 OK, 0 FAIL.
+#
+# THE BOARD THAT FOUND THIS DID NOT FIX IT.  `A7D26223EEFCFA725-BOARD.md' 6.1
+# records the defect and the corrected figures, and left the script as it was
+# -- so the next run reproduced OK=21 exactly, from a report that already
+# explained why.  A defect that is written down and not repaired reads, to the
+# next agent, as a defect that was repaired.  Same family as the `sweep.sh'
+# citation.  Fixed here, and the per-target rc is now recorded so a real
+# failure is still visible rather than being swallowed with the spurious ones.
+#
+# The setup steps keep `&&': if `make multi-target-specs' fails there is
+# nothing to configure and continuing would produce 45 identical spurious
+# failures.
 cmds="cd $B/gcc && make multi-target-specs && cd $B"
 have=0; skip=""
 for T in $LIST; do
   if [ "$T" = "$TX" ]; then
-    cmds="$cmds && make configure-target-specs-$TX TOOLS_DIR_FOR_$TX=\$nat \
-      TARGET_SPECS_FLAGS_FOR_$TX=--with-native-system-header-dir=$HDRX"
+    cmds="$cmds; make configure-target-specs-$TX TOOLS_DIR_FOR_$TX=\$nat \
+      TARGET_SPECS_FLAGS_FOR_$TX=--with-native-system-header-dir=$HDRX \
+      || echo \"MT-SPECS-RC $TX \$?\""
     have=$((have+1)); continue
   fi
   if [ ! -x "$TOOLS/$T-as" ]; then
     skip="$skip $T"; continue
   fi
-  cmds="$cmds && make configure-target-specs-$T TOOLS_DIR_FOR_$T=$TOOLS"
+  cmds="$cmds; make configure-target-specs-$T TOOLS_DIR_FOR_$T=$TOOLS \
+    || echo \"MT-SPECS-RC $T \$?\""
   have=$((have+1))
 done
 
@@ -60,6 +84,12 @@ nix-shell -I "nixpkgs=$NP" \
 rc=$?
 echo "target-specs rc=$rc"
 [ "$rc" = 0 ] || tail -20 "$B/specs.err"
+# The per-target rcs, which the `&&' chain used to hide behind the first one.
+# Printed even when empty, and labelled, so "no target failed" cannot be
+# confused with "this arm did not run".
+echo "-- per-target make failures (empty == none):"
+grep '^MT-SPECS-RC ' "$B/specs.out" "$B/specs.err" 2>/dev/null | sed 's/^/  /' \
+  || echo "  (none)"
 
 VER=$(cat "$(cat "$B/MY-SRC")/gcc/BASE-VER")
 [ -n "$VER" ] || { echo "FATAL: empty BASE-VER"; exit 9; }

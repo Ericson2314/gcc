@@ -13,6 +13,11 @@ S=$(cd "$(dirname "$0")" && pwd)
 B=${1:?build dir}
 TOOLS=${TOOLS:?dir holding <triple>-as}
 VER=$(cat "$(cat "$B/MY-SRC")/gcc/BASE-VER")
+# mt-bars.sh asserts the anchor too, EXACTLY, and refuses without it.  Taken
+# from the srcdir this build dir actually names rather than from a constant:
+# PRINCIPLES lists ten values for this line and warns against copying any.
+WANT_ANCHOR=$(grep -c MULTI_TARGET "$(cat "$B/MY-SRC")/gcc/Makefile.in")
+export WANT_ANCHOR
 
 echo "############ 0. WHAT WAS BUILT"
 echo "srcdir     $(cat "$B/MY-SRC")"
