@@ -22,15 +22,30 @@
 # are `glibc.dev', the same store path mt-conf.sh names as MT_HDR -- so the
 # x86_64 row is built from the same materials as the other three rather than
 # from the host's ambient environment.
+#
+# PIN THE SUBSTITUTER.  INSTRUMENTS.md records this for the arbitrary-triple
+# route and `taa-specs.sh'/`eb-shell.sh' already do it; this file did not, and
+# it is the file that runs first.  The ambient nix config lists caches on
+# `obsidian.webhop.org' that are unreachable here, retried 5x at a 15s timeout
+# PER nix-build.  Measured on a cold run of this script: 12 MINUTES between
+# the x86_64 row and the aarch64 one, entirely network dead time, with every
+# store path already substitutable from cache.nixos.org.  The same script with
+# the tools already in the store then took 6 SECONDS.
+#
+# The failure mode is worse than the delay: it reads as "cross binutils are
+# expensive to build", which is the conclusion INSTRUMENTS.md warns turns a
+# non-finding into a finding, and it is what makes an agent reach for another
+# worktree's tools dir -- GUARD 3c's own failure mode.
 set -e
 NP="$HOME/src/nixos-configuration/dep/nixpkgs"
+NIXOPT="--substituters https://cache.nixos.org/ --option connect-timeout 5"
 OUT=${1:?output dir}
 mkdir -p "$OUT" "$OUT/bin"
 
 # ---- the native target.  Attr paths differ (no pkgsCross), so it is its own
 # ---- block rather than a case inside the loop below.
-nbu=$(nix-build --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A binutils-unwrapped)
-nhd=$(nix-build --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A glibc.dev)
+nbu=$(nix-build $NIXOPT --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A binutils-unwrapped)
+nhd=$(nix-build $NIXOPT --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A glibc.dev)
 ncanon=x86_64-pc-linux-gnu
 echo "$ncanon binutils=$nbu headers=$nhd"
 [ -x "$nbu/bin/as" ] || { echo "FATAL: no $nbu/bin/as"; exit 9; }
@@ -49,8 +64,8 @@ for spec in \
 do
   set -- $spec
   attr=$1; canon=$2
-  bu=$(nix-build --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A "pkgsCross.$attr.buildPackages.binutils")
-  hd=$(nix-build --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A "pkgsCross.$attr.stdenv.cc.libc.dev")
+  bu=$(nix-build $NIXOPT --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A "pkgsCross.$attr.buildPackages.binutils")
+  hd=$(nix-build $NIXOPT --no-out-link -I "nixpkgs=$NP" '<nixpkgs>' -A "pkgsCross.$attr.stdenv.cc.libc.dev")
   echo "$canon binutils=$bu headers=$hd"
   # assert the real tool exists before shimming; a dangling link would make the
   # probe fall back to the host tools with no diagnostic.

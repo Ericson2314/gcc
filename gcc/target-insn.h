@@ -68,12 +68,66 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TARGET_INSN_H
 #define GCC_TARGET_INSN_H
 
-/* One back end's answers.  Plain booleans and not function pointers, unlike
-   target-frame.h: these are settled by the back end's machine description
-   before any option is decoded, they cannot vary with `cfun' or with
-   `__attribute__((target))', and there is nothing to evaluate.  The frame
-   entries pay for a call because i386's `STACK_BOUNDARY' really does read
-   `cfun'; nothing here does.  */
+/* The eight auto-increment addressing forms, as an argument to
+   `have_autoinc'.  A plain enum with no GCC type in it: this header is
+   reached from the tail of every `tm.h', before `coretypes.h'.  */
+enum mt_autoinc_form
+{
+  MT_AUTOINC_PRE_INC,
+  MT_AUTOINC_PRE_DEC,
+  MT_AUTOINC_POST_INC,
+  MT_AUTOINC_POST_DEC,
+  MT_AUTOINC_PRE_MODIFY_DISP,
+  MT_AUTOINC_POST_MODIFY_DISP,
+  MT_AUTOINC_PRE_MODIFY_REG,
+  MT_AUTOINC_POST_MODIFY_REG,
+  MT_AUTOINC_NFORMS
+};
+
+/* The eight `USE_{LOAD,STORE}_{PRE,POST}_{INC,DEC}REMENT (MODE)' macros, which
+   are a DIFFERENT question from the eight above and must not be folded into
+   them.  `HAVE_POST_INCREMENT' asks whether the machine CAN post-increment;
+   these ask whether it is WORTH doing for a given mode, and `rtl.h:3062' makes
+   the second default to the first only for back ends that say nothing.
+
+   FOUND BY THE FIX TO THE EIGHT ABOVE MAKING IT MATTER.  `aarch64.h:1408-1414'
+   defines all eight of these to a literal `0' -- aarch64 has the addressing
+   modes and deliberately tells `tree-ssa-loop-ivopts.cc' not to prefer them.
+   Shared code read i386's absence, so it took `rtl.h''s fallback, which is
+   `HAVE_POST_INCREMENT' -- and while that was stuck at 0 the fallback
+   ACCIDENTALLY produced aarch64's real answer.  Correcting the eight above
+   turned it into 1 and started overriding a back end's explicit `0'.
+
+   That is the trap PRINCIPLES records from the other direction: "a leak
+   serving the primary's real value would have produced the right mode by luck
+   and hidden this indefinitely".  Here the luck ran the other way, and the
+   only reason it surfaced is that the both-sided instrument compared against
+   STOCK rather than against the previous multi-target output.  */
+enum mt_useinc_form
+{
+  MT_USEINC_LOAD_POST_INC,
+  MT_USEINC_LOAD_POST_DEC,
+  MT_USEINC_LOAD_PRE_INC,
+  MT_USEINC_LOAD_PRE_DEC,
+  MT_USEINC_STORE_POST_INC,
+  MT_USEINC_STORE_POST_DEC,
+  MT_USEINC_STORE_PRE_INC,
+  MT_USEINC_STORE_PRE_DEC,
+  MT_USEINC_NFORMS
+};
+
+/* One back end's answers.  MOSTLY plain booleans rather than function
+   pointers, unlike target-frame.h: those entries are settled by the back
+   end's machine description before any option is decoded, they cannot vary
+   with `cfun' or with `__attribute__((target))', and there is nothing to
+   evaluate.  The frame entries pay for a call because i386's
+   `STACK_BOUNDARY' really does read `cfun'.
+
+   THE TWO EXCEPTIONS ARE MARKED WHERE THEY SIT, and each says why it cannot
+   be a bool: `load_extend_op' takes an argument, and `have_autoinc' is option
+   state (`riscv.h:1313' answers it with `TARGET_XTHEADMEMIDX').  The sentence
+   above was written when neither existed; do not read it as a rule that the
+   next entry must be a constant, only as the reason to prefer one.  */
 struct target_insn_desc
 {
   /* The cpu_type this describes, for diagnostics.  */
@@ -95,19 +149,49 @@ struct target_insn_desc
      reload.cc, combine.cc, recog.cc, lra.cc, lower-subreg.cc, sched-deps.cc,
      loop-invariant.cc, regrename.cc, emit-rtl.cc and auto-inc-dec.cc.
 
-     ONE FIELD FOR EIGHT MACROS, and that is not the shortcut it looks like.
-     rtl.h's own definition is the disjunction
+     ONE FIELD FOR EIGHT MACROS, AND THAT WAS WRONG.  This comment used to
+     read:
 
-       #if (defined (HAVE_PRE_INCREMENT) || defined (HAVE_PRE_DECREMENT)
-            || defined (HAVE_POST_INCREMENT) || defined (HAVE_POST_DECREMENT)
-            || defined (HAVE_PRE_MODIFY_DISP) || defined (HAVE_POST_MODIFY_DISP)
-            || defined (HAVE_PRE_MODIFY_REG) || defined (HAVE_POST_MODIFY_REG))
+       "the question shared code asks is already the disjunction and never the
+        individual eight.  Storing the disjunction is storing the question that
+        is asked; storing the eight would be storing a vocabulary nothing
+        reads."
 
-     so the question shared code asks is already the disjunction and never the
-     individual eight.  Storing the disjunction is storing the question that is
-     asked; storing the eight would be storing a vocabulary nothing reads.
+     Measured instead of reasoned (scratchpad/agent-a018835bbcfad2e28-eight.sh):
+     target-independent code reads the individual eight **34 times**, in
+     `auto-inc-dec.cc' (26), `expr.cc' (4) and `cse.cc' (4).  They are not a
+     vocabulary nothing reads; they are the decision table of the pass this
+     field switches on.  `auto-inc-dec.cc:200-299' is nothing but
+
+       if (HAVE_PRE_INCREMENT || HAVE_PRE_MODIFY_DISP) ...
+       value = (HAVE_POST_INCREMENT) ? SIMPLE_POST_INC : DISP_POST;
+
+     eight times over, and `expr.cc:1373' is `gcc_assert (HAVE_POST_INCREMENT)'.
+
+     SO THE HALF-CONVERSION HAD A WORSE SHAPE THAN THE ORIGINAL BUG.  With
+     `auto_inc_dec' per-base and the eight still the primary's, the pass is
+     switched ON for all 25 back ends that have auto-increment addressing and
+     then declines every candidate, because every form it can ask for reads
+     i386's absence.  Measured both-sided on
+     `gcc.target/riscv/xtheadmemidx-modify.c'
+     (scratchpad/agent-a018835bbcfad2e28-autoinc.sh): the `auto_inc_dec' dump
+     is PRODUCED on both sides -- 2224 lines stock, 1647 multi-target -- and
+     contains 22 auto-inc rtx on stock and 0 here.  A pass that runs and finds
+     nothing and a pass that never ran are the same empty result, which is why
+     one field looked sufficient for as long as it did.
+
      (Contrast `have_rotate'/`have_rotatert' two lines up, which are two fields
-     precisely because two different questions ARE asked.)
+     precisely because two different questions ARE asked.  That reasoning was
+     right; it was simply not applied here.)
+
+     WHY THE EIGHT ARE A FUNCTION AND `auto_inc_dec' STAYS A BOOL.  The
+     disjunction is over `defined (...)', so it is settled by which headers
+     exist and is a constant per base.  The eight are not: `riscv.h:1313' makes
+     `HAVE_POST_MODIFY_DISP' equal to `TARGET_XTHEADMEMIDX', i.e. option state
+     decided long after this table is initialised.  A `static const struct'
+     initialiser cannot hold it, so the eight are answered by a call evaluated
+     in the base's own translation unit, the same shape and for the same reason
+     as `load_extend_op' below.
 
      WHY IT IS WRONG TODAY, MEASURED OVER ALL 48 REAL HEADER CHAINS
      (scratchpad/t169-autoinc.sh): the eight come from `insn-flags-<base>.h',
@@ -124,6 +208,16 @@ struct target_insn_desc
      code.  A symbol sweep cannot see it because there is no symbol; a build
      cannot see it because it builds.  */
   bool auto_inc_dec;
+
+  /* The eight individual forms, answered in THIS base's preprocessor context.
+     `int' in and `bool' out for the reason `load_extend_op' gives: this header
+     is reached from the tail of every `tm.h', before `coretypes.h', so no
+     enum of GCC's own exists yet.  The argument is one of `MT_AUTOINC_*'.  */
+  bool (*have_autoinc) (int form);
+
+  /* The `USE_*' preference question; see `enum mt_useinc_form'.  Takes a mode
+     as well as a form, so a call and not a table however it is typed.  */
+  bool (*use_autoinc) (int form, int mode);
 
   /* LOAD_EXTEND_OP (MODE) -- `rtl.h:4762', inside `load_extend_op', which is
      an inline function in a header the whole compiler shares.
@@ -156,5 +250,7 @@ extern bool mt_have_rotate (void);
 extern bool mt_have_rotatert (void);
 extern bool mt_auto_inc_dec (void);
 extern int mt_load_extend_op (int mode);
+extern bool mt_have_autoinc (int form);
+extern bool mt_use_autoinc (int form, int mode);
 
 #endif /* GCC_TARGET_INSN_H */

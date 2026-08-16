@@ -420,6 +420,34 @@ mt_base_data_abi_alignment (tree type, unsigned int align)
 # define MT_BASE_DATA_ABI_ALIGNMENT NULL
 #endif
 
+/* PROMOTE_MODE, asked of THIS base; see target-frame.h for the measurement.
+
+   The macro ASSIGNS to its first two arguments, so the thunk takes pointers
+   and copies through local lvalues: `riscv.h:298' expands to a bare `if'
+   whose body is `(UNSIGNEDP) = 0; (MODE) = word_mode;', and handing it `*mode'
+   directly would work but reads as if the macro were a function.  The locals
+   also keep the expansion's own `if' from binding to anything outside it --
+   riscv's definition is an `if' with NO `else' and no `do { } while (0)'
+   wrapper, which is exactly the shape that swallows a following `else'.  */
+#ifdef PROMOTE_MODE
+static void
+mt_base_promote_mode (scalar_mode *mode, int *unsignedp, const_tree type)
+{
+  scalar_mode m = *mode;
+  int u = *unsignedp;
+  {
+    PROMOTE_MODE (m, u, type);
+  }
+  *mode = m;
+  *unsignedp = u;
+}
+# define MT_BASE_HAS_PROMOTE_MODE true
+# define MT_BASE_PROMOTE_MODE mt_base_promote_mode
+#else
+# define MT_BASE_HAS_PROMOTE_MODE false
+# define MT_BASE_PROMOTE_MODE NULL
+#endif
+
 /* THE STACK-ALIGNMENT CLOSURE, asked of THIS base; see target-frame.h for why
    all four move together and for why the one the `nm' output names is not the
    one that stops `big.c'.
@@ -1139,6 +1167,63 @@ mt_base_load_extend_op (int mode)
   return (int) LOAD_EXTEND_OP ((machine_mode) mode);
 }
 
+/* The eight individual auto-increment forms, in THIS base's preprocessor
+   context; see target-insn.h.
+
+   A FUNCTION AND NOT EIGHT BOOLS IN THE INITIALISER BELOW, and the reason is
+   not style: `riscv.h:1313' defines `HAVE_POST_MODIFY_DISP' as
+   `TARGET_XTHEADMEMIDX', which reads option state.  As a field of a
+   `static const struct' that is not a constant expression and does not
+   compile; evaluated here, per call, it is that back end's own answer for the
+   options actually in force.  Ten of the 25 back ends that define any of the
+   eight define at least one of them in terms of a `TARGET_' macro.
+
+   No `#ifdef' and no fallback of its own, exactly as `mt_base_load_extend_op'
+   above: for a back end that defines the macro this is that back end's
+   expression, and for one that does not it is `rtl.h''s own `0' -- read HERE,
+   where "this back end says nothing" is the answer, rather than in shared code
+   where the PRIMARY saying nothing would answer for everyone.  That difference
+   is the entire defect this file exists to close.  */
+static bool
+mt_base_have_autoinc (int form)
+{
+  switch (form)
+    {
+    case MT_AUTOINC_PRE_INC:		return HAVE_PRE_INCREMENT != 0;
+    case MT_AUTOINC_PRE_DEC:		return HAVE_PRE_DECREMENT != 0;
+    case MT_AUTOINC_POST_INC:		return HAVE_POST_INCREMENT != 0;
+    case MT_AUTOINC_POST_DEC:		return HAVE_POST_DECREMENT != 0;
+    case MT_AUTOINC_PRE_MODIFY_DISP:	return HAVE_PRE_MODIFY_DISP != 0;
+    case MT_AUTOINC_POST_MODIFY_DISP:	return HAVE_POST_MODIFY_DISP != 0;
+    case MT_AUTOINC_PRE_MODIFY_REG:	return HAVE_PRE_MODIFY_REG != 0;
+    case MT_AUTOINC_POST_MODIFY_REG:	return HAVE_POST_MODIFY_REG != 0;
+    default:				return false;
+    }
+}
+
+/* The eight `USE_*' preference macros, in THIS base's context; see
+   target-insn.h for why they are a separate question from the eight above and
+   for how the omission was found.  `int mode' at the boundary, cast back here,
+   for `mt_base_load_extend_op''s reason.  */
+static bool
+mt_base_use_autoinc (int form, int mode)
+{
+  machine_mode m = (machine_mode) mode;
+
+  switch (form)
+    {
+    case MT_USEINC_LOAD_POST_INC:   return USE_LOAD_POST_INCREMENT (m) != 0;
+    case MT_USEINC_LOAD_POST_DEC:   return USE_LOAD_POST_DECREMENT (m) != 0;
+    case MT_USEINC_LOAD_PRE_INC:    return USE_LOAD_PRE_INCREMENT (m) != 0;
+    case MT_USEINC_LOAD_PRE_DEC:    return USE_LOAD_PRE_DECREMENT (m) != 0;
+    case MT_USEINC_STORE_POST_INC:  return USE_STORE_POST_INCREMENT (m) != 0;
+    case MT_USEINC_STORE_POST_DEC:  return USE_STORE_POST_DECREMENT (m) != 0;
+    case MT_USEINC_STORE_PRE_INC:   return USE_STORE_PRE_INCREMENT (m) != 0;
+    case MT_USEINC_STORE_PRE_DEC:   return USE_STORE_PRE_DECREMENT (m) != 0;
+    default:			    return false;
+    }
+}
+
 static const struct target_insn_desc mt_base_insn = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
   HAVE_lo_sum != 0,
@@ -1155,6 +1240,8 @@ static const struct target_insn_desc mt_base_insn = {
      `mt_base_load_extend_op' above: the answer is computed where the base's
      headers are the ones in scope.  */
   AUTO_INC_DEC != 0,
+  mt_base_have_autoinc,
+  mt_base_use_autoinc,
   mt_base_load_extend_op
 };
 
@@ -1682,6 +1769,8 @@ static const struct target_frame_desc mt_base_frame = {
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,
   MT_BASE_DATA_ABI_ALIGNMENT,
+  MT_BASE_HAS_PROMOTE_MODE,
+  MT_BASE_PROMOTE_MODE,
   mt_base_incoming_stack_boundary,
   mt_base_max_stack_alignment,
   mt_base_max_supported_stack_alignment,

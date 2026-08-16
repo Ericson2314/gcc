@@ -895,11 +895,13 @@ machine_mode
 promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
 	      int *punsignedp ATTRIBUTE_UNUSED)
 {
-#ifdef PROMOTE_MODE
+  /* Was `#ifdef PROMOTE_MODE'.  The macro is per back end and this file is
+     shared, so the test is `mt_has_promote_mode ()' at the point of use; see
+     target-frame.h.  The declarations become unconditional because the
+     condition is no longer a preprocessor one.  */
   enum tree_code code;
   int unsignedp;
   scalar_mode smode;
-#endif
 
   /* For libcalls this is invoked without TYPE from the backends
      TARGET_PROMOTE_FUNCTION_MODE hooks.  Don't do anything in that
@@ -910,7 +912,11 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
   /* FIXME: this is the same logic that was there until GCC 4.4, but we
      probably want to test POINTERS_EXTEND_UNSIGNED even if PROMOTE_MODE
      is not defined.  The affected targets are S390, SPARC.  */
-#ifdef PROMOTE_MODE
+  /* The `#else' arm of the old `#ifdef PROMOTE_MODE' was `return mode', so a
+     base that defines no PROMOTE_MODE takes exactly that path.  */
+  if (!mt_has_promote_mode ())
+    return mode;
+
   code = TREE_CODE (type);
   unsignedp = *punsignedp;
 
@@ -933,8 +939,13 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     case REAL_TYPE:      case OFFSET_TYPE:     case FIXED_POINT_TYPE:
     case BITINT_TYPE:
       /* Values of these types always have scalar mode.  */
+      /* `smode' and not `mode': `aarch64.h:58' measures the mode with
+	 `GET_MODE_SIZE (MODE) < 4', which is `unsigned short' for a
+	 `scalar_mode' and `poly_uint16' for a `machine_mode'.  Every
+	 PROMOTE_MODE in the tree is written against the narrow type because
+	 this narrowing is the only place upstream ever expands it.  */
       smode = as_a <scalar_mode> (mode);
-      PROMOTE_MODE (smode, unsignedp, type);
+      mt_promote_mode (&smode, &unsignedp, type);
       *punsignedp = unsignedp;
       return smode;
 
@@ -955,9 +966,6 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     default:
       return mode;
     }
-#else
-  return mode;
-#endif
 }
 
 

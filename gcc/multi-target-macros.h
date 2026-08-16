@@ -396,6 +396,25 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define LONG_TYPE_SIZE (targetm_cdata.long_type_size)
 #undef PARM_BOUNDARY
 #define PARM_BOUNDARY (targetm_cdata.parm_boundary)
+#undef FUNCTION_BOUNDARY
+#define FUNCTION_BOUNDARY (targetm_cdata.function_boundary)
+/* ASM_OUTPUT_ALIGN.  A statement macro rather than a value, so it goes to
+   `target-asm-ops.h''s per-base table rather than to `targetm_cdata'; see
+   that header for why the operand's MEANING and not just its spelling varies
+   between back ends.  Reached at a settled point -- every definition of it is
+   in the back end's own header chain (`riscv.h', `i386/att.h', `elfos.h'),
+   never in `insn-config.h' -- so a redirect here is the last word, which is
+   `LOAD_EXTEND_OP''s argument above.  Swept: all ~30 uses outside `config/'
+   are statements, none is in a `#if'.
+
+   DECLARED HERE RATHER THAN BY INCLUDING `target-asm-ops.h'.  That header
+   also carries `gcc_taop_output_align', whose body is `ASM_OUTPUT_ALIGN' --
+   the macro this block is in the middle of replacing -- so pulling it in at
+   this point would make the definition depend on whether it arrived before or
+   after the redirect.  One extern declaration has no such ordering.  */
+extern void mt_asm_output_align (FILE *, int);
+#undef ASM_OUTPUT_ALIGN
+#define ASM_OUTPUT_ALIGN(STREAM, LOG) (mt_asm_output_align ((STREAM), (LOG)))
 #undef ATTRIBUTE_ALIGNED_VALUE
 #define ATTRIBUTE_ALIGNED_VALUE (targetm_cdata.attribute_aligned_value)
 #undef MALLOC_ABI_ALIGNMENT
@@ -551,6 +570,82 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef LOAD_EXTEND_OP
 #define LOAD_EXTEND_OP(MODE) \
   ((enum rtx_code) mt_load_extend_op ((int) (MODE)))
+
+/* THE EIGHT AUTO-INCREMENT FORMS.  These get `#undef'/`#define' pairs for
+   `LOAD_EXTEND_OP''s reason and not the `HAVE_<pattern>' paragraph's: they do
+   NOT come from `insn-config.h'.  They come from the back end's own `<cpu>.h'
+   -- `riscv.h:1313', `aarch64.h', `arm.h', `rs6000.h' and 21 more -- with
+   `rtl.h''s `#ifndef ... 0' as the fallback, so they are reached at a settled
+   point and a redirect here is the last word.  `rtl.h''s fallbacks then never
+   fire in a shared TU, because the names are already defined when it is read;
+   in every exempt TU above they fire exactly as upstream intends.
+
+   WHY A REDIRECT AND NOT REWRITTEN CALL SITES.  There are 34 of them, and
+   `rtl.h:3062-3090' spells four of the eight again inside
+   `USE_LOAD_POST_INCREMENT' and its five siblings -- macros in a header every
+   translation unit shares.  That is the same argument `LOAD_EXTEND_OP' makes
+   two paragraphs up: the use site is in the header that has to stop needing
+   `tm.h'.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING, as this file's other
+   blocks record.  Outside `config/' the eight appear only in ordinary
+   run-time expressions -- `if' conditions and `?:' in `auto-inc-dec.cc', a
+   `gcc_assert' in `expr.cc', `if' conditions in `cse.cc'.  There is no `#if'
+   on any of them and no array bound, no case label and no static initialiser;
+   `rtl.h:2998's `#if defined (...)' disjunction is inside the exempt arm, so
+   it is never reached with these definitions in scope.  */
+#undef HAVE_PRE_INCREMENT
+#define HAVE_PRE_INCREMENT	 (mt_have_autoinc (MT_AUTOINC_PRE_INC))
+#undef HAVE_PRE_DECREMENT
+#define HAVE_PRE_DECREMENT	 (mt_have_autoinc (MT_AUTOINC_PRE_DEC))
+#undef HAVE_POST_INCREMENT
+#define HAVE_POST_INCREMENT	 (mt_have_autoinc (MT_AUTOINC_POST_INC))
+#undef HAVE_POST_DECREMENT
+#define HAVE_POST_DECREMENT	 (mt_have_autoinc (MT_AUTOINC_POST_DEC))
+#undef HAVE_PRE_MODIFY_DISP
+#define HAVE_PRE_MODIFY_DISP	 (mt_have_autoinc (MT_AUTOINC_PRE_MODIFY_DISP))
+#undef HAVE_POST_MODIFY_DISP
+#define HAVE_POST_MODIFY_DISP	 (mt_have_autoinc (MT_AUTOINC_POST_MODIFY_DISP))
+#undef HAVE_PRE_MODIFY_REG
+#define HAVE_PRE_MODIFY_REG	 (mt_have_autoinc (MT_AUTOINC_PRE_MODIFY_REG))
+#undef HAVE_POST_MODIFY_REG
+#define HAVE_POST_MODIFY_REG	 (mt_have_autoinc (MT_AUTOINC_POST_MODIFY_REG))
+
+/* AND THE EIGHT `USE_*' MACROS WITH THEM, WHICH IS NOT OPTIONAL.  They live in
+   `rtl.h:3060-3090' as `#ifndef' fallbacks that expand to the eight above, so
+   redirecting only the `HAVE_*' half leaves seven back ends' explicit answers
+   overridden by the `HAVE_*' one.  aarch64 defines all eight to a literal `0'
+   while having five of the addressing modes, so while `HAVE_POST_INCREMENT'
+   was stuck at 0 the fallback accidentally agreed with it; correcting the
+   `HAVE_*' half alone starts telling `tree-ssa-loop-ivopts.cc' that aarch64
+   wants post-increment addressing, which aarch64 has said in its own header
+   that it does not.  Measured before this went in: aarch64's `copy' loop
+   acquired `ldr w3, [x1], 4' / `str w3, [x0, 4]!' where stock aarch64 emits
+   indexed addressing.  The two halves go together or neither does.  */
+#undef USE_LOAD_POST_INCREMENT
+#define USE_LOAD_POST_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_POST_INC, (int) (M)))
+#undef USE_LOAD_POST_DECREMENT
+#define USE_LOAD_POST_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_POST_DEC, (int) (M)))
+#undef USE_LOAD_PRE_INCREMENT
+#define USE_LOAD_PRE_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_PRE_INC, (int) (M)))
+#undef USE_LOAD_PRE_DECREMENT
+#define USE_LOAD_PRE_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_PRE_DEC, (int) (M)))
+#undef USE_STORE_POST_INCREMENT
+#define USE_STORE_POST_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_POST_INC, (int) (M)))
+#undef USE_STORE_POST_DECREMENT
+#define USE_STORE_POST_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_POST_DEC, (int) (M)))
+#undef USE_STORE_PRE_INCREMENT
+#define USE_STORE_PRE_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_PRE_INC, (int) (M)))
+#undef USE_STORE_PRE_DECREMENT
+#define USE_STORE_PRE_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_PRE_DEC, (int) (M)))
 
 #undef STACK_BOUNDARY
 #define STACK_BOUNDARY (mt_stack_boundary ())

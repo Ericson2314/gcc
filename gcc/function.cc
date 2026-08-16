@@ -977,9 +977,10 @@ assign_temp (tree type_or_decl, int memory_required,
 {
   tree type, decl;
   machine_mode mode;
-#ifdef PROMOTE_MODE
+  /* Was `#ifdef PROMOTE_MODE'; the macro is per back end and this file is
+     shared, so the test moved to `mt_has_promote_mode ()' at the use site
+     below.  See target-frame.h.  */
   int unsignedp;
-#endif
 
   if (DECL_P (type_or_decl))
     decl = type_or_decl, type = TREE_TYPE (decl);
@@ -987,9 +988,7 @@ assign_temp (tree type_or_decl, int memory_required,
     decl = NULL, type = type_or_decl;
 
   mode = TYPE_MODE (type);
-#ifdef PROMOTE_MODE
   unsignedp = TYPE_UNSIGNED (type);
-#endif
 
   /* Allocating temporaries of TREE_ADDRESSABLE type must be done in the front
      end.  See also create_tmp_var for the gimplification-time check.  */
@@ -1027,10 +1026,8 @@ assign_temp (tree type_or_decl, int memory_required,
       return tmp;
     }
 
-#ifdef PROMOTE_MODE
-  if (! dont_promote)
+  if (mt_has_promote_mode () && ! dont_promote)
     mode = promote_mode (type, mode, &unsignedp);
-#endif
 
   return gen_reg_rtx (mode);
 }
