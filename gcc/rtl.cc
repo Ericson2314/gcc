@@ -35,6 +35,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #endif
 #include "rtl.h"
+
+/* TRIPWIRE.  The comment above says the compiler half does not need `tm.h',
+   and that was measured against `hard-reg-set.h' alone.  `rtl.h' ALSO keys
+   CASE_CONST_UNIQUE / CASE_CONST_ANY / CASE_CONST_SCALAR_INT on
+   `TARGET_SUPPORTS_WIDE_INT', which arrives only through `tm.h'; undefined,
+   `#if' read it as 0, and `rtx_equal_p' -- defined in THIS file -- reported
+   two different `const_poly_int's equal, with no diagnostic anywhere.
+   `rtl.h' now supplies the shared answer; this refuses to build if that ever
+   stops happening, because the failure mode is silent wrong code.  */
+#if !defined (GENERATOR_FILE) && !TARGET_SUPPORTS_WIDE_INT
+#error "rtl.cc: TARGET_SUPPORTS_WIDE_INT is 0 or undefined here, so \
+CASE_CONST_UNIQUE omits CONST_POLY_INT and rtx_equal_p compares two \
+const_poly_ints by CONST_POLY_INT's EMPTY rtl format, i.e. equal."
+#endif
+
 #ifdef GENERATOR_FILE
 # include "errors.h"
 #else

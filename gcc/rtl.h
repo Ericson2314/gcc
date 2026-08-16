@@ -779,6 +779,42 @@ struct GTY(()) rtvec_def {
 /* Predicate yielding nonzero iff X is an rtx for a memory location.  */
 #define MEM_P(X) (GET_CODE (X) == MEM)
 
+/* MULTI-TARGET: the three CASE_CONST_* families below describe the SHARED rtx
+   vocabulary -- every back end linked into this compiler allocates, compares,
+   hashes and prints the same `rtx' objects -- so two translation units may not
+   disagree about them.  `TARGET_SUPPORTS_WIDE_INT' is a per-base macro
+   (12 of 47 back ends define it, `defaults.h:1389' gives the rest 0), and it
+   reaches a TU only through `tm.h'.  A shared TU that does not read `tm.h'
+   therefore evaluates `#if TARGET_SUPPORTS_WIDE_INT' on an UNDEFINED name,
+   which is silently FALSE -- PRINCIPLES 4's named trap, with no diagnostic.
+
+   Measured at `cad1a29fbdc', 47 bases: 260 objects that include `rtl.h' also
+   read `tm.h' and see 1; ELEVEN hand-written ones do not -- `rtl', `print-rtl',
+   `rtlhash', `read-rtl', `real', `rtl-error', `lists', `rtx-vector-builder',
+   `print-tree', `function-tests', `gcc-rich-location'.  `rtx_equal_p' lives in
+   `rtl.cc', so it was compiled with a CASE_CONST_UNIQUE that OMITS
+   CONST_POLY_INT; CONST_POLY_INT's rtl format is the empty string, so the
+   generic operand loop compared no operands and returned true:
+
+     rtx_equal_p ((const_poly_int:DI [8, 8]), (const_poly_int:DI [48, 8])) = 1
+
+   which made `try_split's infinite-loop guard discard every split of
+   aarch64's `*add<mode>3_poly_1' and ICE in `final.cc' with
+   "could not split insn".
+
+   The value below is NOT a fallback to the primary's answer: it is the answer
+   260 of those 271 shared objects already compute, and the question it settles
+   -- how the shared rtx vocabulary is spelled -- has no per-base answer.  It
+   does not reach any per-base TU, where `tm.h' has already answered.  The
+   RESIDUAL is stated rather than hidden: a per-base TU of one of the 35 back
+   ends that define nothing still sees 0 here while shared code sees 1, so
+   `CASE_CONST_ANY' still means two things in one binary.  Converting
+   `TARGET_SUPPORTS_WIDE_INT' to a union setting is the real fix and is a
+   separate task.  */
+#if !defined (GENERATOR_FILE) && !defined (TARGET_SUPPORTS_WIDE_INT)
+#define TARGET_SUPPORTS_WIDE_INT 1
+#endif
+
 #if TARGET_SUPPORTS_WIDE_INT
 
 /* Match CONST_*s that can represent compile-time constant integers.  */

@@ -1,5 +1,48 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## THE WHOLE ACLE CLUSTER IS CLOSED AT `06179fbe3df` (`sme/acle-asm` AT PARITY)
+>
+> ```
+> directory              BEFORE (this task's own    NOW           STOCK
+>                         baseline, reproducing
+>                         the previous board)
+> sve/acle               77962 / 4034              79976 /   6   79980 / 0
+> sme/acle-asm            3982 /  176               4070 /   0    4070 / 0
+> ```
+>
+> **`sme/acle-asm` is at exact parity with stock**, and `sve/acle` — the
+> largest remaining entry — goes **4,034 -> 6**. One cause, not two:
+>
+> | cause | fixed in | what it was worth |
+> |---|---|---|
+> | `TARGET_SUPPORTS_WIDE_INT` UNDEFINED in `rtl.cc`, so `rtx_equal_p` reported two different `const_poly_int`s EQUAL | `06179fbe3df` | all 4,024 `sve/acle` asm FAILs, both `sve/acle` general ICEs, all 176 `sme/acle-asm` |
+>
+> `rtl.h` keys `CASE_CONST_UNIQUE` on a `tm.h` macro; `rtl.cc` does not include
+> `tm.h`, and `#if` on an undefined name is silently FALSE. `CONST_POLY_INT`'s
+> rtl format is the EMPTY string, so `rtx_equal_p` compared no operands and
+> returned true. `try_split`'s infinite-loop guard then discarded **every**
+> split of aarch64's `*add<mode>3_poly_1` — the split ran, produced correct
+> code, and the code was thrown away — and the insn ICEd in `final.cc:2846`
+> with "could not split insn".
+>
+> **The brief's `lane %wd out of range` lead was a red herring, measured:**
+> all 232 testsuite files that expect that diagnostic are in
+> `advsimd-intrinsics` (173), `aarch64/simd` (50) and `arm/simd` (9), and
+> **zero** are in `sve/acle`. They are `dg-error`s, i.e. the message appears in
+> `gcc.log` on tests that PASS. Counting a diagnostic string in a log cannot
+> distinguish an expected error from an unexpected one.
+>
+> **`-O0 -g` was never the condition either**: `-g` is irrelevant (same file,
+> `-O0` alone ICEs identically), and `deref_2.c` ICEs at `-O2`. The
+> `sme` exp's torture list simply has one unoptimised entry, spelled
+> `-std=c90 -O0 -g`.
+>
+> Residual: `nosve_4.c`/`nosve_5.c`, 6 lines, a distinct undiagnosed segfault
+> present identically on both builds. Full detail, with the six refuted
+> suspects and one control that could not have fired, in
+> `AA1E1DB1AEAD2BFFB-RTX-EQUAL-P.md`.
+
+
 > ## SUPERSEDED FOR ALL FOUR TARGETS BY `AB1900D5279BA137F-BOARD.md` (`cad1a29fbdc`, 47 bases)
 >
 > **Every multi-target row and every debt figure below is stale.** One build,
@@ -40,6 +83,7 @@
 > directories. Full ranked residual, per target, with stock's column beside
 > every row, in `AB1900D5279BA137F-BOARD.md` section 3.
 
+||||||| cad1a29fbdc
 > ## THE SME/SME2 ACLE CLUSTER IS CLOSED AT `b2fc4c0b9f8` (SME2 at PARITY)
 >
 > ```

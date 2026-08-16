@@ -22,6 +22,25 @@ task**. If you are about to write `t<NNN>-conf.sh`, the answer is already here.
 | classify a `.sum`'s FAILs: COMPILE vs BODIES vs SCAN | `a5764a65f9eec0063-kinds.sh` |
 | both-sided codegen, all four targets, two build dirs | `a5764a65f9eec0063-bothsided.sh` |
 | is a `-g` md5 difference real or just the path? | `a5764a65f9eec0063-gcheck.sh` |
+| **run one `.exp`, PRESERVE its artefacts, TOOLS/OUT from the environment** | `aa1e1db1aead2bffb-score.sh` |
+
+`aa1e1db1aead2bffb-score.sh` is `a5764a65f9eec0063-score.sh` with the two lines
+that forced the copy taken out: that script hardcodes
+`/tmp/tools-a5764a65f9eec0063/bin` and `/tmp/w-a5764a65f9eec0063/scores`, i.e.
+**another worktree's cross assembler**, which is GUARD 3c's own failure mode
+wearing a harness's clothes. Here `TOOLS` and `OUT` come from the environment
+and `$TOOLS/<triple>-as` is asserted executable before anything runs, so a
+missing cross assembler fails by name instead of silently falling back to the
+host `as`.
+
+**AND A LONG RUN MUST BE DETACHED (`setsid nohup`), NOT A HARNESS BACKGROUND
+TASK.** Measured, twice, in one task: the agent harness culls background
+commands, and it killed two `mtcheck` runs mid-`.exp` after ~40 minutes each.
+The damage is not only the lost time — a culled `mtcheck` leaves a **stale
+`check-<triple>.rc` beside a PARTIAL `gcc.sum`**, which is exactly the shape
+PRINCIPLES warns about: the stamp says a run finished and the file no longer
+belongs to it. `fixboard.sh`/`baseboard.sh` therefore `rm -f` the stamp before
+relaunching, so a copy cannot be authorised by the previous run's rc.
 
 ## TWO TRAPS THESE FOUR EXIST FOR, BOTH HIT IN ONE SESSION
 

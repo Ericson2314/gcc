@@ -567,6 +567,45 @@ different things. Instances found so far:
 | guard hiding a *declaration* | `rs6000_gnu_attr`; `<ldfcn.h>` in collect2 |
 | **the union's answer leaking** | `HAVE_V8HFmode` — "exists somewhere" ≠ "exists here" |
 | **a MAKE variable with one authority** | `PASSES_EXTRA` — fed only by `-include $(tmake_file)`, which is the legacy single `${target}`'s fragments, so `pass-instances.def` held i386's three target passes and **not one** from the other seven configured back ends |
+| **a SHARED header keyed on a per-base macro, in a TU that never reads `tm.h`** | `TARGET_SUPPORTS_WIDE_INT` — `rtl.h`'s `CASE_CONST_UNIQUE` reads it, `rtl.cc` includes no `tm.h`, so `#if` on an *undefined* name read 0 while 260 other shared objects read i386's 1; `CONST_POLY_INT` dropped out of the switch, its rtl format is the **empty string**, and `rtx_equal_p` therefore compared **no operands** and returned true |
+
+**THE `TARGET_SUPPORTS_WIDE_INT` INSTANCE IS THE `#if` TRAP AND THE
+"ONE NAME, SEVERAL AUTHORITIES" BUG AT THE SAME TIME, AND IT WAS INVISIBLE TO
+EVERY EXISTING ARM.** §4 already records that `#if FOO` on an undefined `FOO`
+silently evaluates false; this is that trap in a **shared** header, where the
+consequence is not "a file changed behaviour" but "two translation units in one
+binary disagree about what an `rtx` *is*". Measured (`06179fbe3df`, 47 bases):
+
+```
+rtx_equal_p ((const_poly_int:DI [8, 8]), (const_poly_int:DI [48, 8])) = 1
+```
+
+`try_split`'s infinite-loop guard then discarded **every** split of aarch64's
+`*add<mode>3_poly_1` — the split RAN and produced correct code, which was
+thrown away — and the insn ICEd in `final.cc:2846`. Worth **4,024 + 176**
+results in two directories where stock fails zero.
+
+Three transferable pieces:
+
+- **The leak can be DOWNSTREAM of the thing it breaks.** Six suspects were
+  eliminated first — the wrong base's `split_insns`, a `split5` gate reading
+  `targetm.stack_regs ()`, `epilogue_completed`, the split predicate,
+  `reg_overlap_mentioned_p`, an empty sequence — and each elimination was
+  correct. The defect was in a *shared consumer of the split's output*. When
+  every part of a mechanism measures right and the mechanism still fails, stop
+  testing the mechanism and read what happens to its result.
+- **A per-base macro that a shared HEADER reads is a different population from
+  one a shared TU reads**, and `git grep` scores neither. Score it from the
+  build's own `.deps`: *which objects include the header AND reach `tm.h`*.
+  Here 260 do and **11 do not** — `rtl`, `print-rtl`, `rtlhash`, `read-rtl`,
+  `real`, `rtl-error`, `lists`, `rtx-vector-builder`, `print-tree`,
+  `function-tests`, `gcc-rich-location`, i.e. comparison, hashing and dumping
+  of `rtx`.
+- **A comment recording a measured removal is evidence about what was
+  measured, not about what was safe.** `rtl.cc`'s comment reasons carefully and
+  correctly about `hard-reg-set.h`'s register widths, and `rtl.h` was never in
+  scope. Same family as the `sweep.sh` citation: the comment reads as though
+  the question had been asked.
 
 **THE `PASSES_EXTRA` INSTANCE IS WORTH READING BECAUSE IT WAS IN A CHANNEL
 NOTHING HAD LISTED, AND IT SHOWED BOTH HALVES AT ONCE.** Leaked PRESENCE:
