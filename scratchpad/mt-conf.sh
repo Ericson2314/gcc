@@ -18,6 +18,18 @@
 # usage: SRC=<srcdir> WANT_ANCHOR=<n> mt-conf.sh <builddir> <comma-separated-triples>
 #   MT_CONFIGURE_FLAGS   extra flags appended to configure
 #   MT_HDR               --with-native-system-header-dir (has a default)
+#   MT_LANGUAGES         --enable-languages value; DEFAULT `c,lto'
+#
+# MT_LANGUAGES EXISTS BECAUSE `c,lto' WAS HARDCODED HERE AND THAT IS WHY THE
+# C++ FRONT END HAD NEVER BEEN BUILT MULTI-TARGET.  Every board on this branch
+# runs through this script, so one hardcoded list decided, silently, that no
+# cc1plus result would ever be measured -- and `MT_CXX_OBJS_<base>' was empty
+# for 32 of 48 back ends for as long as that was true (491713a900a).  A build
+# that never enabled a language and a language that passes everything produce
+# the same empty failure list, so ASSERT the front end binary exists before
+# quoting any figure about it.  Passing a second `--enable-languages' through
+# MT_CONFIGURE_FLAGS would also work (the last one wins) and is exactly the
+# silent-override shape this branch keeps paying for; hence a named knob.
 set -eu
 MT_LIB_DIR=$(cd "$(dirname "$0")" && pwd)
 . "$MT_LIB_DIR/mt-lib.sh"
@@ -47,7 +59,7 @@ mt_shell "cd $D && $SRC/configure \
   --with-native-system-header-dir=$HDR \
   CC=gcc CFLAGS='-O2 -g0 -Wno-error=format-security' \
   CXX=g++ CXXFLAGS='-O2 -g0 -Wno-error=format-security' \
-  --enable-languages=c,lto ${MT_CONFIGURE_FLAGS:-}" > "$D/conf.out" 2> "$D/conf.err"
+  --enable-languages=${MT_LANGUAGES:-c,lto} ${MT_CONFIGURE_FLAGS:-}" > "$D/conf.out" 2> "$D/conf.err"
 rc=$?
 set -e
 echo "$rc" > "$D/conf.rc"

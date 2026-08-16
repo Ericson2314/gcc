@@ -8,7 +8,7 @@
 #
 #   * no `.rc' stamp        -> the run never finished; REFUSE, do not score a
 #                              truncated .sum as a smaller number.
-#   * no `=== gcc Summary' -> runtest died partway; a .sum without its summary
+#   * no `=== <tool> Summary' -> runtest died partway; a .sum without its summary
 #                              is non-empty, greps clean, and is not a result.
 #   * zero tests scored     -> non-vacuity.  An all-empty read is
 #                              indistinguishable from "everything unsupported",
@@ -21,6 +21,18 @@
 # silently UNRESOLVED here for months without moving a number.
 set -u
 B=${1:?build dir}; shift
+
+# WHICH TOOL'S BOARD.  `gcc' (default) or `g++'; mtcheck.sh passes MT_CHECK_TOOL
+# through.  The artefact names differ in two places -- the directory under
+# testsuite.<triple>/ and the `=== <tool> Summary' line -- and BOTH have to
+# move together, because a `gcc.sum' path with a `g++ Summary' grep refuses
+# every run and a `g++.sum' path with a `gcc Summary' grep refuses every run.
+# Failing that way is the correct direction; scoring the C run's artefacts
+# while believing they are the C++ run's is not, and that is what a partial
+# change here would do.
+SUM_=${MT_CHECK_TOOL:-gcc}
+case "$SUM_" in gcc|g++) ;; *) echo "FATAL: MT_CHECK_TOOL=$SUM_"; exit 9 ;; esac
+SUMDIR=$SUM_
 
 # KILLED IS ITS OWN VERDICT AND IS NOT A TEST RESULT AT ALL.
 #
@@ -52,13 +64,13 @@ for T in "$@"; do
   # $TSD/gcc/gcc.sum.  A `find -name gcc.sum | head -1' therefore picks an
   # ARBITRARY SLOT -- one 128th of the suite -- and prints it as the board.
   # It did: a 13/6/3 slot was reported as a full aarch64 run.  Name the file.
-  SUM="$TSD/gcc/gcc.sum"
+  SUM="$TSD/$SUMDIR/$SUM_.sum"
   if [ ! -f "$SUM" ]; then
     printf '%-30s %s\n' "$T" "REFUSED: no merged $SUM"
     continue
   fi
-  if ! grep -q '=== gcc Summary' "$SUM"; then
-    printf '%-30s %s\n' "$T" "REFUSED: $SUM has no '=== gcc Summary' -- truncated run"
+  if ! grep -q "=== $SUM_ Summary" "$SUM"; then
+    printf '%-30s %s\n' "$T" "REFUSED: $SUM has no '=== $SUM_ Summary' -- truncated run"
     continue
   fi
   p=$(grep -c '^PASS: '        "$SUM" || true)
@@ -128,7 +140,7 @@ echo
 echo "== KILLED (compiler killed, NOT a test result -- machine contamination)"
 KILLPAT='internal compiler error: Killed|terminated by signal 9|out of memory|virtual memory exhausted'
 for T in "$@"; do
-  LOG="$B/gcc/testsuite.$T/gcc/gcc.log"
+  LOG="$B/gcc/testsuite.$T/$SUMDIR/$SUM_.log"
   if [ ! -f "$LOG" ]; then
     printf '  %-28s %s\n' "$T" "no log"
     continue
@@ -145,7 +157,7 @@ echo "  (a run taken above ~25 is PROVISIONAL -- say so wherever the board is qu
 echo
 echo "== top FAIL causes per target (first 12, by test file)"
 for T in "$@"; do
-  SUM="$B/gcc/testsuite.$T/gcc/gcc.sum"
+  SUM="$B/gcc/testsuite.$T/$SUMDIR/$SUM_.sum"
   [ -f "$SUM" ] || continue
   echo "-- $T"
   grep '^FAIL: ' "$SUM" | awk '{print $2}' | sort | uniq -c | sort -rn | head -12
