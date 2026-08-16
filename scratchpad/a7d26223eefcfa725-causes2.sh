@@ -17,6 +17,29 @@
 # a human and invisible to a text-keyed ranking; the fix is to fold the quoted
 # back-end name out before keying.
 #
+# CORRECTION 1b -- AND `back end' WAS NOT THE ONLY TARGET-VARYING FIELD.
+# Added after `a98009045f7229938-foldcheck.sh' swept the whole population of
+# self-naming diagnostics instead of the one that had been noticed.  29 `%qs'
+# refusals live in the selector sources; 28 spell `back end %qs' and correction
+# 1 folds those.  The twenty-ninth masks and is not `back end'-shaped at all:
+#
+#     target 'avr-unknown-elf' names back end 'avr', which was not built into
+#
+# The FIRST field is a target TRIPLE, one per configured target, so folding
+# the back-end name collapses nothing and 47 targets key as 47 causes -- the
+# DFA masking exactly, in a message an instrument keyed on `back end' cannot
+# see.  Both fields are now folded.
+#
+# WHAT MUST NOT BE FOLDED, since the temptation is to fold harder.  Three
+# messages carry a second `%qs' holding a MACRO name (`records that it defines
+# no %qs yet supplies ...') and one holds a SYMBOL name (`%qs was used before
+# a target was selected').  Those are DEFECT-varying, not target-varying: two
+# back ends failing on different macros are two causes, and folding them would
+# hide a second defect behind a first -- the mirror of the bug this correction
+# fixes.  The rule is: fold every field that varies with the TARGET, no field
+# that varies with the DEFECT.  Run `a98009045f7229938-foldcheck.sh' after
+# adding any diagnostic; the population grows with every good message.
+#
 # CORRECTION 2 -- `s/[0-9][0-9]*/N/g' MANGLES BACK-END NAMES.  Digit-squashing
 # is right for line numbers and wrong for identifiers: `xstormy16' becomes
 # `xstormyN', `rl78' -> `rlN', `h8300' -> `hN'.  So even after correction 1 the
@@ -59,7 +82,7 @@ for f in "$OUT"/gcc-*.log; do
   # exactly one per test RESULT, which is the quantity a board means by
   # "results".
   sed -n 's/^FAIL:.*(internal compiler error: \(.*\)/\1/p' "$f" \
-    | sed "s/back end '[^']*'/back end 'BE'/g" \
+    | sed "s/back end '[^']*'/back end 'BE'/g; s/target '[^']*'/target 'T'/g" \
     | sed 's/\r$//; s/)$//; s/[0-9][0-9]*/N/g; s/  */ /g; s/ *$//' \
     | sort > "$OUT/.ice-$be"
   sort -u "$OUT/.ice-$be" | while IFS= read -r c; do
