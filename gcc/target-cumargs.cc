@@ -314,6 +314,21 @@ mt_base_declare_function_size (FILE *file ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* ASM_OUTPUT_FUNCTION_PREFIX, asked of THIS base -- `varasm.cc:2192'.  s390 is
+   the only definer and i386 is not, so in shared code the `#ifdef' was false
+   for all 47 bases and s390's `.machine push' / `.machinemode zarch' never
+   appeared.  See target-frame.h, including why the leak census cannot see
+   this macro at all.  */
+
+static void
+mt_base_declare_function_prefix (FILE *file ATTRIBUTE_UNUSED,
+				 const char *name ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_FUNCTION_PREFIX
+  ASM_OUTPUT_FUNCTION_PREFIX (file, name);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1838,7 +1853,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_epilogue_uses,
   mt_base_declare_function_name,
   mt_base_declare_cold_function_name,
-  mt_base_declare_function_size
+  mt_base_declare_function_size,
+  mt_base_declare_function_prefix
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what

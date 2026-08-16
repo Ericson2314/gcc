@@ -1695,6 +1695,36 @@ struct target_frame_desc
      itself a complete action (do nothing), so there is nothing for shared code
      to branch on and the call site is unconditional.  */
   void (*declare_function_size) (FILE *file, const char *name, tree decl);
+
+  /* ASM_OUTPUT_FUNCTION_PREFIX -- THE OPENING HALF OF THE BRACKET ABOVE, AND
+     A MACRO THE LEAK CENSUS CANNOT SEE.
+
+     `varasm.cc:2192' is the only shared consumer, an `#ifdef' with no `#else'.
+     s390 is the ONLY back end that defines the macro and i386 does not, so the
+     condition was false for all 47 bases and the body never ran anywhere: a
+     leaked ABSENCE, the half of this defect class that produces no diagnostic
+     of any kind.  s390 stopped emitting
+
+	 .machinemode push / .machine push
+	 .machinemode zarch / .machine "z900"
+
+     around any function carrying `#pragma GCC target' or `target(...)'.  That
+     is board item #4, recorded there as "the whole of that target's residual".
+
+     WHY THE CENSUS MISSES IT, which is worth more than the macro.  The census
+     population is `doc/tm.texi's own `@defmac' list, chosen so the census
+     "cannot be accused of having chosen its own population" -- a real
+     property, and the reason its 296 is quotable.  ASM_OUTPUT_FUNCTION_PREFIX
+     is not documented in tm.texi at all.  So the authority that makes the
+     census trustworthy is exactly what makes it blind here, and no amount of
+     re-running it would ever have produced this row.  An undocumented target
+     macro is a THIRD population beside LEAK-PRIMARY and DEAD-DEFAULT.
+
+     Both s390 functions guard on `DECL_FUNCTION_SPECIFIC_TARGET', so push and
+     pop are balanced by construction -- which is also why converting only
+     `declare_function_size' would have been a half-fix rather than a partial
+     improvement.  */
+  void (*declare_function_prefix) (FILE *file, const char *name);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1743,6 +1773,11 @@ extern void mt_declare_cold_function_name (FILE *, const char *, tree);
    varasm.cc.  See the descriptor field for what the leaked answer costs on
    riscv and s390.  */
 extern void mt_declare_function_size (FILE *, const char *, tree);
+
+/* `ASM_OUTPUT_FUNCTION_PREFIX', the opening half.  s390's only, undocumented
+   in tm.texi, and therefore invisible to the leak census.  See the descriptor
+   field.  */
+extern void mt_declare_function_prefix (FILE *, const char *);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

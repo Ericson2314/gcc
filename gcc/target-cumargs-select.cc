@@ -203,6 +203,16 @@ mt_declare_function_size (FILE *file, const char *name, tree decl)
   mt_frame ()->declare_function_size (file, name, decl);
 }
 
+/* `ASM_OUTPUT_FUNCTION_PREFIX'; `varasm.cc:2192'.  The opening half of the
+   pair -- s390's `.machine push', which no base emitted because i386 defines
+   no such macro and the `#ifdef' was therefore false for everyone.  */
+
+void
+mt_declare_function_prefix (FILE *file, const char *name)
+{
+  mt_frame ()->declare_function_prefix (file, name);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here

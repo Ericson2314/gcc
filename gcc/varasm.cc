@@ -2189,9 +2189,30 @@ assemble_start_function (tree decl, const char *fnname)
 #endif
     }
 
-#ifdef ASM_OUTPUT_FUNCTION_PREFIX
-  ASM_OUTPUT_FUNCTION_PREFIX (asm_out_file, fnname);
-#endif
+  /* THE OPENING HALF OF THE BRACKET `mt_declare_function_size' CLOSES, AND
+     THE ONE THE CENSUS CANNOT SEE.
+
+     s390 is the ONLY definer of ASM_OUTPUT_FUNCTION_PREFIX, and i386 is not,
+     so this `#ifdef' was FALSE for all 47 back ends and the macro's body never
+     ran on any of them.  A leaked ABSENCE: nothing is wrong in any file,
+     nothing fails to link, and s390 simply stops emitting
+
+	 .machinemode push / .machine push / .machinemode zarch / .machine "z900"
+
+     around every function carrying `#pragma GCC target' or the target
+     attribute.  That is board item #4 -- "s390x's missing `.machinemode
+     zarch' / `.machine "z900"', the whole of that target's residual".
+
+     `ASM_OUTPUT_FUNCTION_PREFIX' IS NOT DOCUMENTED IN `doc/tm.texi', so the
+     leak census -- whose population is deliberately tm.texi's own `@defmac'
+     list, exactly so it cannot be accused of choosing its own -- is blind to
+     it by construction.  The property that makes that census trustworthy is
+     also what hides this macro from it.
+
+     Converting only the closing half would have been the half-fix: both s390
+     functions guard on `DECL_FUNCTION_SPECIFIC_TARGET', so they are balanced
+     by construction and fixing the pop alone leaves the push still missing.  */
+  mt_declare_function_prefix (asm_out_file, fnname);
 
   if (!DECL_IGNORED_P (decl))
     (*debug_hooks->begin_function) (decl);
