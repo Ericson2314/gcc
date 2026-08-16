@@ -1,0 +1,51 @@
+BACKEND      TRIPLE                       CROSS-AS  SPECS    VERDICT
+aarch64      aarch64-unknown-linux-gnu    yes       yes      READY  [AArch64; 2's complement, little endian]
+alpha        alpha-unknown-linux-gnu      yes       yes      READY  [Alpha; 2's complement, little endian]  VIA alpha-linux-gnu
+gcn          amdgcn-unknown-amdhsa        no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+arc          arc-unknown-elf32            yes       yes      READY  [ARCv2; 2's complement, little endian]  VIA arc-none-elf
+arm          arm-unknown-eabi             yes       yes      READY  [ARM; 2's complement, little endian]  VIA arm-none-eabi
+avr          avr-unknown-elf              yes       yes      READY  [Atmel AVR 8-bit microcontroller; 2's complement, little endian]  VIA avr-elf
+bfin         bfin-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+bpf          bpf-unknown-none             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+cris         cris-axis-elf                no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+csky         csky-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+epiphany     epiphany-unknown-elf         no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+fr30         fr30-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+frv          frv-unknown-elf              no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+ft32         ft32-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+h8300        h8300-unknown-elf            no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+pa           hppa64-unknown-linux-gnu     no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+ia64         ia64-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+iq2000       iq2000-unknown-elf           no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+lm32         lm32-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+m32r         m32r-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+m68k         m68k-unknown-elf             yes       yes      READY  [MC68000; 2's complement, big endian]  VIA m68k-elf
+mcore        mcore-unknown-elf            no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+microblaze   microblaze-xilinx-elf        yes       yes      READY  [Xilinx MicroBlaze; 2's complement, big endian]  VIA microblaze-elf
+mips         mips64-unknown-elf           yes       yes      READY  [MIPS R3000; 2's complement, big endian]  VIA mips64-elf
+mmix         mmix-knuth-mmixware          yes       yes      READY  [Donald Knuth's educational 64-bit processor; 2's complement, big endian]
+mn10300      mn10300-unknown-elf          no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+moxie        moxie-unknown-elf            no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+msp430       msp430-unknown-elf           yes       yes      READY  [Texas Instruments msp430 microcontroller; 2's complement, little endian]  VIA msp430-elf
+nds32        nds32be-unknown-elf          no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+nvptx        nvptx-unknown-none           no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+or1k         or1k-unknown-elf             yes       yes      READY  [OpenRISC 1000; 2's complement, big endian]  VIA or1k-elf
+pdp11        pdp11-dec-aout               no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+rs6000       powerpc64-unknown-linux-gnu  no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+pru          pru-unknown-elf              no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+riscv        riscv64-unknown-linux-gnu    yes       yes      READY  [RISC-V; 2's complement, little endian]
+rl78         rl78-unknown-elf             no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+rx           rx-unknown-elf               yes       yes      READY  [Renesas RX; 2's complement, little endian]  VIA rx-elf
+s390         s390x-ibm-linux-gnu          yes       yes      READY  [IBM S/390; 2's complement, big endian]  VIA s390x-linux-gnu
+sh           sh-unknown-elf               yes       yes      READY  [Renesas / SuperH SH; 2's complement, big endian]  VIA sh4-elf
+sparc        sparc64-unknown-linux-gnu    yes       yes      READY  [Sparc v9; 2's complement, big endian]  VIA sparc64-linux
+c6x          tic6x-unknown-elf            no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+v850         v850e1-unknown-elf           no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+vax          vax-dec-linux-gnu            no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+visium       visium-unknown-elf           no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+i386         x86_64-pc-linux-gnu          yes       yes      READY  [Advanced Micro Devices X86-64; 2's complement, little endian]
+xstormy16    xstormy16-unknown-elf        no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+xtensa       xtensa-unknown-elf           no        --       NO-CROSS-AS: nixpkgs lib.systems cannot describe this triple
+
+READY=17 NO-CROSS-AS=30 NO-SPECS=0  (of 47)
+READY is 'a run can be ATTEMPTED', never 'the back end works'.
