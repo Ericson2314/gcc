@@ -30,37 +30,54 @@ W=$(cd "$(dirname "$0")/.." && pwd)
 # `grep -c' scores 0 -- in the direction that looks clean.
 command -v nm > /dev/null || { echo "FATAL: no nm on PATH; run under eb-shell.sh"; exit 9; }
 
-# The three target-independent readers, measured by -eight.sh, plus the two
-# that reach the eight through rtl.h's USE_{LOAD,STORE}_* wrappers.
-WANT="auto-inc-dec.o expr.o cse.o tree-ssa-loop-ivopts.o"
+# WHICH SYMBOL EACH OBJECT SHOULD CALL, AND THEY ARE NOT ALL THE SAME ONE.
+#
+# The first version asked for `mt_have_autoinc' in all four and reported
+# `FAIL tree-ssa-loop-ivopts.o -- got rtl.h's fallback'.  It had not: ivopts
+# does not spell the eight `HAVE_*' names at all, it spells the eight `USE_*'
+# wrappers, and once those were redirected too it calls `mt_use_autoinc'.  The
+# object was correct and the guard was asserting the shape of a half-finished
+# change -- a false RED from the guard written to prevent a false green.
+#
+# So the expectation is per object, taken from what each file actually spells
+# (-eight.sh counts the HAVE_* reads; USE_* reads are separate):
+#   auto-inc-dec.cc  HAVE_* only
+#   cse.cc           HAVE_* only
+#   expr.cc          BOTH -- gcc_assert (HAVE_POST_INCREMENT) and the
+#                    USE_{LOAD,STORE}_* pair at expr.cc:1299-1303
+#   ivopts           USE_* only
+WANT="auto-inc-dec.o:mt_have_autoinc cse.o:mt_have_autoinc
+      expr.o:mt_have_autoinc expr.o:mt_use_autoinc
+      tree-ssa-loop-ivopts.o:mt_use_autoinc"
 # Objects that read none of the eight: the negative control.
 NOT="tree-vect-generic.o gimple-fold.o"
 
 rc=0
-echo "-- ARM 1: every reader must CALL mt_have_autoinc"
-for o in $WANT; do
+echo "-- ARM 1: every reader must CALL the selector it actually spells"
+for pair in $WANT; do
+  o=${pair%%:*}; sym=${pair##*:}
   p=$B/gcc/$o
   if [ ! -f "$p" ]; then echo "   FATAL: $o not built"; rc=9; continue; fi
-  if nm -u "$p" 2>/dev/null | grep -q 'mt_have_autoinc'; then
-    echo "   ok   $o"
+  if nm -u "$p" 2>/dev/null | grep -q "$sym"; then
+    echo "   ok   $o -> $sym"
   else
-    echo "   FAIL $o -- reads the eight but does not call mt_have_autoinc,"
-    echo "        so it got rtl.h's '#define HAVE_PRE_INCREMENT 0' fallback"
+    echo "   FAIL $o does not call $sym, so it got rtl.h's"
+    echo "        '#define HAVE_PRE_INCREMENT 0' / USE_* fallback"
     rc=1
   fi
 done
 
-echo "-- ARM 2 (non-vacuity): a non-reader must NOT call it"
+echo "-- ARM 2 (non-vacuity): a non-reader must NOT call either"
 seen=0
 for o in $NOT; do
   p=$B/gcc/$o
   [ -f "$p" ] || continue
   seen=$((seen+1))
-  if nm -u "$p" 2>/dev/null | grep -q 'mt_have_autoinc'; then
-    echo "   FAIL $o -- calls it, so ARM 1 proves nothing about placement"
+  if nm -u "$p" 2>/dev/null | grep -qE 'mt_have_autoinc|mt_use_autoinc'; then
+    echo "   FAIL $o -- calls one, so ARM 1 proves nothing about placement"
     rc=1
   else
-    echo "   ok   $o does not call it"
+    echo "   ok   $o calls neither"
   fi
 done
 [ "$seen" -gt 0 ] || { echo "   FATAL: no control object present; ARM 1 is unfalsified"; rc=9; }
