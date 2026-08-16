@@ -52,17 +52,44 @@ awk '
      if (g != "" && n == g) print n;
      next }
   /^#[ \t]*endif/ { g = "" }
-' "$S/gcc/defaults.h" | sort -u > /tmp/df-guarded-$$
+' "$S/gcc/defaults.h" | sort -u | grep -vx GCC_DEFAULTS_H > /tmp/df-guarded-$$
+# `GCC_DEFAULTS_H' IS THE FILE'S OWN INCLUDE GUARD, not a target macro, and it
+# matches the pattern perfectly (`#ifndef X' / `#define X').  It is also the
+# name step 2 pre-defines, so it scored DEAD-LEAK -- the instrument reporting
+# its own `-D' back to itself.  Harmless, one row, and excluded because a
+# queue with a known-bogus entry in it invites the reader to discount the rest.
 NG=$(grep -c . /tmp/df-guarded-$$)
 echo "== defaults.h guards $NG names with a matching #ifndef/#define pair"
 [ "$NG" -gt 20 ] || { echo "FATAL: only $NG -- the awk is not matching; refusing to score"; exit 9; }
 
 # 2. what the PRIMARY's chain actually defines, from the compiler.
+#
+# `-DGCC_DEFAULTS_H' IS LOAD-BEARING AND THE FIRST DRAFT DID NOT HAVE IT.
+# `mkconfig.sh' appends `#include "defaults.h"' to the END of `tm.h', so a
+# plain `cpp -dM -include tm.h' reports the macro set AFTER defaults.h has
+# run -- in which every guarded name is defined BY CONSTRUCTION, because
+# defaults.h just defined the ones nobody else had.  The first run scored
+# `LIVE 0' of 215, i.e. "every fallback is pre-empted", which is not a
+# measurement of anything: it is the instrument reading its own subject's
+# output.  Pre-defining defaults.h's own include guard makes its body a no-op
+# and leaves exactly the back-end chain's definitions, which is the question.
+#
+# The tell was the number: `LIVE 0' is too clean.  A result with no exceptions
+# at all, on a population of 215 assembled by different people over thirty
+# years, is likelier to be an instrument artefact than a fact -- and it was.
 ( cd "$B/gcc" && echo '' | cpp -dM -I. -I"$S/gcc" -I"$S/gcc/../include" \
-    -DIN_GCC -include tm.h - ) 2> /tmp/df-cpp-err-$$ \
+    -DIN_GCC -DGCC_DEFAULTS_H -include tm.h - ) 2> /tmp/df-cpp-err-$$ \
   | sed -n 's/^#define \([A-Za-z_][A-Za-z_0-9]*\).*/\1/p' | sort -u > /tmp/df-primary-$$
 NP=$(grep -c . /tmp/df-primary-$$)
-echo "== the primary's tm.h chain defines $NP names"
+echo "== the primary's tm.h chain defines $NP names (defaults.h body suppressed)"
+# THE CONTROL FOR THAT SUPPRESSION.  If `GCC_DEFAULTS_H' stopped being
+# defaults.h's guard name, the `-D' would silently do nothing and we would be
+# back to reading defaults.h's own output with no diagnostic.  So require a
+# name defaults.h defines and NO back-end header does to be ABSENT here.
+grep -qx 'DWARF_CIE_DATA_ALIGNMENT' /tmp/df-primary-$$ && {
+  echo "FATAL: DWARF_CIE_DATA_ALIGNMENT is present, so defaults.h still ran;"
+  echo "       -DGCC_DEFAULTS_H is no longer suppressing it."; exit 9; }
+echo "== control: defaults.h's own DWARF_CIE_DATA_ALIGNMENT is absent, as it must be"
 # NON-VACUITY, AND IT IS THE WHOLE POINT.  A `cpp' that failed writes an empty
 # set, every name scores LIVE, and the report reads "nothing is leaking" --
 # the null-result-as-a-pass shape.  Refuse instead.
