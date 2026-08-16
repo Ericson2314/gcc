@@ -26,17 +26,16 @@ avr-unknown-elf mips64-unknown-elf or1k-unknown-elf"
 for t in $SIX; do
   [ -x "$T/$t-as" ] || { echo "FATAL: no $T/$t-as"; exit 9; }
 done
-# One `as' directory per target, because `-B<dir>/' makes the driver look for a
-# bare `as' and the tools are named `<triple>-as'.
-for t in $SIX; do
-  mkdir -p "$OUT/tools/$t"
-  for tool in as ld ar ranlib objcopy objdump readelf nm; do
-    [ -e "$T/$t-$tool" ] && ln -sf "$T/$t-$tool" "$OUT/tools/$t/$tool"
-  done
-done
+# MT_TOOLS_<triple> is the directory holding `<triple>-as', NOT a directory of
+# bare-named links: mtcheck.sh builds the bare-name link dir ITSELF and refuses
+# with `no <dir>/<triple>-as to link' otherwise.  The first draft here made the
+# links up front and passed that directory, which produced six instant rc=9s
+# and six `FAIL rows=0' lines -- a clean-looking zero on every back end, from a
+# harness that never ran a test.  The per-target counts below are therefore
+# only meaningful beside the rc, which is why both are printed.
 for t in $SIX; do
   v=MT_TOOLS_$(printf '%s' "$t" | tr - _)
-  eval "export $v=$OUT/tools/$t"
+  eval "export $v=$T"
 done
 export MT_COMPILE_ONLY=1
 export MT_RUNTESTFLAGS="${MT_RUNTESTFLAGS:-compile.exp}"
@@ -56,3 +55,10 @@ for t in $SIX; do
   echo "    mtcheck rc=$rc   log lines naming the site=$n   FAIL rows=$r"
 done
 echo "artefacts under $OUT/<triple>.sum / .log"
+# NON-VACUITY.  Six targets that all produced no .sum is the shape of a guard
+# refusing before any test ran, and it is indistinguishable from six perfect
+# scores if only the site counts are read.  Refuse to return 0 on it.
+k=0
+for t in $SIX; do [ -s "$OUT/$t.sum" ] && k=$((k+1)); done
+echo "targets with a non-empty .sum: $k of 6"
+[ "$k" = 6 ] || { echo "FATAL: fewer than six .sum files -- this is NOT a score"; exit 9; }
