@@ -376,6 +376,18 @@ mt_function_mode (void)
   return mt_frame ()->function_mode ();
 }
 
+/* `STACK_SAVEAREA_MODE'.  Uncached for the same reason as `FUNCTION_MODE' just
+   above, and here the reason is not hypothetical: the value this replaces was
+   i386's `(TARGET_64BIT ? TImode : DImode)', which is option state, and it was
+   MEASURED reading two different values within one build depending on what had
+   been selected.  A mode read once at selection time would freeze exactly the
+   quantity whose variability is the defect.  */
+machine_mode
+mt_stack_savearea_mode (int level)
+{
+  return mt_frame ()->stack_savearea_mode (level);
+}
+
 /* THE DWARF REGISTER-NUMBERING FAMILY.  Uncached, through `mt_frame ()', for
    the same reason as `Pmode' just above: i386's `DEBUGGER_REGNO' reads
    `TARGET_64BIT', which is option state and can move within one run of the

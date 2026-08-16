@@ -616,6 +616,42 @@ mt_base_function_mode (void)
   return (machine_mode) FUNCTION_MODE;
 }
 
+/* `STACK_SAVEAREA_MODE (LEVEL)', read in THIS base's translation unit.  See
+   target-frame.h for the six-back-end `extract_insn, at recog.cc:2892' wall
+   this answers, for the two insn dumps, and for the measurement showing that
+   the four back ends which do NOT ICE carry the same wrong answer silently.
+
+   NO `#ifdef' AND NO EXISTENCE PREDICATE, and that is the same argument
+   `mt_base_reversible_cc_mode' below makes.  Seven back ends define the macro
+   (rs6000, s390, ia64, i386, nvptx, sparc, aarch64); the other forty get
+   `defaults.h:1494's `Pmode' -- read HERE, in a translation unit whose `tm.h'
+   is `BASE_HEADER (tm.h)', where `Pmode' is still the real macro and so is
+   that back end's OWN word mode.  That is the supply-side floor PRINCIPLES
+   2a permits: it is upstream's own documented answer for a back end that says
+   nothing, and no base ever reads another's value through it.  The consumer-
+   side floor -- `defaults.h's `#ifndef' evaluated in shared code, where
+   i386.h:2011 has already won -- is the banned one, and is the bug.
+
+   THE PARAMETER STAYS AN `int' AND IS NOT CAST BACK, which was checked rather
+   than assumed.  `enum save_level' is declared in `explow.h:90', which this
+   translation unit does not include and which `target-frame.h' is upstream of.
+   Every one of the seven definitions uses the argument ONLY in `==' tests
+   against the enumerators -- i386, sparc and rs6000 on `SAVE_NONLOCAL',
+   rs6000 and nvptx also on `SAVE_FUNCTION', ia64, s390 and aarch64 on
+   `SAVE_NONLOCAL' -- and an `int'/enumerator comparison is exact.  No back end
+   switches on it or indexes anything with it, so there is no range to check
+   and an unknown level falls to that back end's own trailing `Pmode'.
+
+   `(void) level' because the forty back ends that define nothing take
+   `defaults.h:1494's `Pmode', which discards the argument; the same reason
+   `mt_base_reversible_cc_mode' below discards its own.  */
+static machine_mode
+mt_base_stack_savearea_mode (int level)
+{
+  (void) level;
+  return (machine_mode) STACK_SAVEAREA_MODE (level);
+}
+
 /* THE DWARF REGISTER-NUMBERING FAMILY, evaluated in THIS base's translation
    unit.  See target-frame.h for the gdb reading that diagnosed this, for the
    half of the brief's diagnosis that measured FALSE, and for why all three
@@ -1782,6 +1818,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_initial_elimination_offset,
   mt_base_pmode,
   mt_base_function_mode,
+  mt_base_stack_savearea_mode,
   mt_base_debugger_regno,
   mt_base_dwarf_frame_regnum,
   mt_base_dwarf_frame_registers,

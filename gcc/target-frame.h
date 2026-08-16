@@ -703,6 +703,56 @@ struct target_frame_desc
      fails by name rather than answering QImode.  */
   machine_mode (*function_mode) (void);
 
+  /* `STACK_SAVEAREA_MODE (LEVEL)' -- the mode of the object `emit_stack_save'
+     writes and `emit_stack_restore' reads.  MACRO-LEAK class (c1), and the
+     THIRD instance of the dead-`#ifndef' shape after `REGMODE_NATURAL_SIZE'
+     and `EPILOGUE_USES': `defaults.h:1493' guards it with `#ifndef' and
+     `config/i386/i386.h:2011' has already defined the name in every shared
+     translation unit, so the fallback can never be taken.
+
+     WHAT MADE THIS ONE SURVIVE IS A COMMENT.  `multi-target-macros.h:768'
+     states that "`STACK_SAVEAREA_MODE' above expands to `Pmode' for a base
+     that defines no such macro, and is defined EARLIER in this file".  There
+     was no `#undef' and no `#define' for it anywhere in that file; the
+     sentence is about `defaults.h's fallback, which is dead.  PRINCIPLES: a
+     written invariant is not a checked one, and a comment reasoning carefully
+     about a macro reads as evidence the question was asked.
+
+     THE LEAKED VALUE IS OPTION STATE, WHICH IS WHY IT IS NOT EVEN CONSTANT.
+     i386's body is `(TARGET_64BIT ? TImode : DImode)' for `SAVE_NONLOCAL', and
+     `TARGET_64BIT' is `global_options.x_ix86_isa_flags' -- the class `nm -uC'
+     is structurally blind to.  Measured over ten selected targets, shared code
+     read exactly two values, `TImode' and `DImode', and NEITHER group got its
+     own answer:
+
+       alpha arc arm avr mips64 or1k   TImode  -- own answer Pmode (HI/SI/DI)
+       x86_64 aarch64 riscv64 s390x    DImode  -- own answers TI, CDI, DI, OI
+
+     `TImode' for avr is the arm that settles whose macro it is: `defaults.h's
+     `Pmode' is `HImode' there and could not produce it, while `{TImode,
+     DImode}' is exactly the range of i386's expression.  So the value is
+     i386's, read at a moment that varies with what has been selected.
+
+     THE SIX-BACK-END `extract_insn' WALL IS THIS.  `builtins.cc:1203' builds
+     `gen_rtx_MEM (STACK_SAVEAREA_MODE (SAVE_NONLOCAL), ...)' and
+     `explow.cc:1256' does `emit_insn (gen_move_insn (stack_pointer_rtx, sa))',
+     giving a 16-byte load into a Pmode stack pointer that no `.md' declares:
+
+       arm    (set (reg/f:SI 13 sp)        (mem:TI (reg/f:SI 688) [0 S16 A64]))
+       avr    (set (reg/f:HI 32 __SP_L__)  (mem:TI ...              [0 S16 A8]))
+
+     The four that do not ICE are NOT proven fine and are the reason this is a
+     `machine_mode' read rather than a floor: they carry the same wrong answer
+     and merely happen to own a move of that width.  aarch64 loads 8 bytes
+     where its own `STACK_SAVEAREA_MODE' asks for `CDImode''s 16.
+
+     Takes the level as `int' rather than `enum save_level' because this header
+     is upstream of `explow.h'; the per-base thunk casts it back in the base's
+     own translation unit.  No `#if' site: all seven shared spellings
+     (builtins.cc:889, :996, :1203, :1275, explow.cc:1161, tree-nested.cc:792)
+     are ordinary run-time expressions, swept before landing.  */
+  machine_mode (*stack_savearea_mode) (int level);
+
   /* `DEBUGGER_REGNO (N)' -- gcc register number to debugger/DWARF register
      number.  MACRO-LEAK.md class (c1).  THIS IS THE `BOUND BY ONE, INDEXED BY
      ANOTHER' DISGUISE, the sixth time it has appeared on this branch
@@ -1794,6 +1844,11 @@ extern unsigned int mt_biggest_alignment (void);
 /* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
    for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */
 extern machine_mode mt_function_mode (void);
+
+/* `STACK_SAVEAREA_MODE (LEVEL)', redirected in `multi-target-macros.h'.  See
+   the field comment above for the two insn dumps and for why the four back
+   ends that do not ICE are carrying the same wrong answer silently.  */
+extern machine_mode mt_stack_savearea_mode (int level);
 
 /* THE DWARF REGISTER-NUMBERING FAMILY.  See the three field comments for the
    measurement, for why `DWARF_FRAME_REGNUM' is not derived from

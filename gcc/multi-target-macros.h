@@ -765,12 +765,39 @@ extern void mt_asm_output_align (FILE *, int);
    and all 648 shared use sites want it as a run-time expression.  The sweep
    that establishes that is recorded at `mt_pmode''s declaration.
 
-   `STACK_SAVEAREA_MODE' above expands to `Pmode' for a base that defines no
-   such macro, and is defined EARLIER in this file, so it picks this up by
-   ordinary macro expansion -- the redirect being last is what makes that
-   work rather than a coincidence.  */
+   THIS PARAGRAPH USED TO SAY `STACK_SAVEAREA_MODE' WAS HANDLED HERE, AND IT
+   WAS NEVER TRUE.  It read: "`STACK_SAVEAREA_MODE' above expands to `Pmode'
+   for a base that defines no such macro, and is defined EARLIER in this file,
+   so it picks this up by ordinary macro expansion".  There was no `#undef' and
+   no `#define' for that name anywhere in this file.  The sentence describes
+   `defaults.h:1493's `#ifndef' fallback, which is DEAD in every shared
+   translation unit because `config/i386/i386.h:2011' defines the name first --
+   the `REGMODE_NATURAL_SIZE' / `EPILOGUE_USES' trap, third instance.
+
+   It is kept here rather than quietly deleted because it is the reason the
+   defect survived two boards: a comment reasoning correctly about a fallback
+   reads as evidence that someone checked whether the fallback runs.  It cost
+   71 FAIL rows over six back ends.  The real redirect is below.  */
 #undef Pmode
 #define Pmode (mt_pmode ())
+
+/* `STACK_SAVEAREA_MODE (LEVEL)' -- the mode of the object `emit_stack_save'
+   writes and `emit_stack_restore' reads.  See `target-frame.h' for the two
+   insn dumps, for the ten-target measurement showing that shared code read
+   only `TImode' and `DImode' and that NEITHER group got its own answer, and
+   for why `TImode' on avr is the arm that proves the value is i386's rather
+   than `defaults.h's.
+
+   IT MUST FOLLOW THE `Pmode' REDIRECT ABOVE, for the reason the paragraph
+   there gives about `FUNCTION_MODE': forty back ends take `defaults.h's
+   `Pmode' fallback, and the per-base thunk expands it in the base's own
+   translation unit where `Pmode' is still the real macro.
+
+   `#undef' FIRST.  As with `FUNCTION_MODE', the absence of a live fallback in
+   this file is not the same question as "not yet defined": i386's has already
+   been read by this point in every shared TU, which is the entire bug.  */
+#undef STACK_SAVEAREA_MODE
+#define STACK_SAVEAREA_MODE(LEVEL) (mt_stack_savearea_mode ((int) (LEVEL)))
 
 /* `FUNCTION_MODE' -- the mode of the MEM a call jumps through.  QImode for
    i386, `Pmode' for aarch64, and the diagnosed cause of the `extract_insn,
