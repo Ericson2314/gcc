@@ -20,7 +20,11 @@ while ! grep -q 'POST-BUILD-DONE' /tmp/post-a95.log 2>/dev/null; do
   fi
   sleep 20
 done
-echo "POST build done rc=$(cat "$POST/gcc/all-gcc.rc")"
+# mt-build.sh writes the stamp at the BUILD DIR ROOT, not under gcc/.  The
+# first draft read "$POST/gcc/all-gcc.rc" and printed an EMPTY rc, which is the
+# `cmd | grep -c' shape: a missing file and a rc=0 both print nothing useful.
+[ -r "$POST/all-gcc.rc" ] || { echo "FATAL: no all-gcc.rc stamp"; exit 9; }
+echo "POST build done rc=$(cat "$POST/all-gcc.rc")"
 echo "  error: count $(grep -c 'error:' "$POST/all-gcc.err")"
 ls -la "$POST/gcc/cc1"
 

@@ -123,6 +123,75 @@ macro. That is the supply-side floor PRINCIPLES §2a permits — upstream's own
 answer for a back end that says nothing — and no base reads another's value
 through it. The banned consumer-side floor is precisely the bug.
 
+## 3a. WHY EXACTLY THOSE SIX — the causal story closed
+
+`explow.cc:1235` picks `gen_restore_stack_nonlocal` when the back end defines
+one and falls back to `gen_move_insn` otherwise. **Only the fallback puts the
+save-area mode directly against the stack pointer's**, so only a back end
+without the expander can ICE. Measured against the `.md` files:
+
+```
+HAVE restore_stack_nonlocal   aarch64 i386 ia64 riscv rs6000 s390 sparc
+the six that ICEd             alpha arc arm avr mips or1k
+```
+
+Exactly disjoint, and the four controls are four of the seven that have it.
+**The leak reached all 47; the six without the expander are the ones it could
+not reach silently.**
+
+## 3b. RESULT — POST vs PRE, both built cold from immutable snapshots
+
+```
+make all-gcc      rc=0 (stamp at the build-dir ROOT, not gcc/)   `error:' 0
+cc1               links, 231,057,176 bytes
+x86_64 -O2 big.c  12369 bytes / md5 378fc33c1e70    == recorded, UNMOVED
+specs-config      232 lines / 224 non-blank, 10 targets, md5s ALL DISTINCT
+one-line census   OK=9 ICE=0 OTHER=1                 == PRE, UNMOVED
+anchor            52                                  == PRE, UNMOVED
+```
+
+**Targeted by-name arm, 14 tests x 5 optimisation levels, 75 pairs:**
+
+```
+recog.cc:2892     PRE 71  ->  POST 2
+new ICEs at that site: 0
+```
+
+The save-area mode, per back end, now its **own** answer:
+
+```
+alpha  TI -> DI     arc TI -> SI     arm TI -> SI
+avr    TI -> HI     mips64 TI -> SI  or1k TI -> SI
+```
+
+and the ten POST modes are **3 distinct values, not 1** — the non-vacuity arm
+that would have caught a redirect merely swapping i386's answer for one other
+shared answer.
+
+**A DEFECT CAN HIDE BEHIND A DEFECT, and it does here.** Nine of the 69 fixed
+rows do not become PASS; they get further and land on a *different*,
+already-recorded cause:
+
+```
+avr    pr21728.c     -O2 -Os -O3   back end 'avr' has no pipeline automaton
+mips64 20050122-2.c  -O1 -O2 -Os -O3   Segmentation fault
+```
+
+Both are the A7EE board's own separate findings (its hand-off items 3 and 4).
+**The site is fixed; those tests still fail.** Reporting "69 rows fixed" as
+"69 tests pass" would be the error PRINCIPLES records as reading a falling
+total without reading what the new failures say.
+
+**The control side is weaker than it looks and is stated as such.** All four
+controls emit **byte-identical** assembly PRE vs POST on `pr21728.c`. That is
+no regression; it is **not** evidence their save-area mode is now correct,
+because each adjusts the address inside its own `restore_stack_nonlocal`
+expander, so the incoming mode is largely inert there — which is also why they
+never ICEd. `-bothsided.sh`'s `MISMATCH (wanted CDI/OI/TI)` rows for those
+four are an artefact of that script and are **not** findings; it reads the
+expander's output, where the save-area mode is not present. That script is
+left unmodified with the limitation written into its header.
+
 ## 4. THE RESIDUAL, NOT FOLDED IN
 
 `avr string-large-1.c`, 2 of 71 rows, is a **different** cause:
