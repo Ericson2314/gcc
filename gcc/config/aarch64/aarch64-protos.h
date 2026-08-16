@@ -490,14 +490,48 @@ struct cpu_branch_cost
   int br_mispredict_factor;  /* Scale factor for cost of misprediction on branches.  */
 };
 
-/* Control approximate alternatives to certain FP operators.  */
-#define AARCH64_APPROX_MODE(MODE) \
-  ((MIN_MODE_FLOAT <= (MODE) && (MODE) <= MAX_MODE_FLOAT) \
-   ? ((uint64_t) 1 << ((MODE) - MIN_MODE_FLOAT)) \
-   : (MIN_MODE_VECTOR_FLOAT <= (MODE) && (MODE) <= MAX_MODE_VECTOR_FLOAT) \
-     ? ((uint64_t) 1 << ((MODE) - MIN_MODE_VECTOR_FLOAT \
-			 + MAX_MODE_FLOAT - MIN_MODE_FLOAT + 1)) \
-     : (0))
+/* Control approximate alternatives to certain FP operators.
+
+   ONE BIT PER MODE, OVER AARCH64'S OWN MODES -- NOT OVER THE NUMBERING.
+   Upstream this reads `1 << (MODE - MIN_MODE_FLOAT)', and upstream that is a
+   dense index into aarch64's five float and fifty-five vector-float modes: a
+   shift of at most 59, which is what makes a `uint64_t' the right width.
+
+   Under this branch's shared mode numbering `MIN_MODE_FLOAT' ..
+   `MAX_MODE_FLOAT' spans EVERY configured back end's float modes, so the same
+   expression shifted by up to 219 -- undefined behaviour, and a shift count
+   that is a property of the base set rather than of aarch64.  It has been
+   masked only by luck: every in-tree `cpu_approx_modes' value is
+   AARCH64_APPROX_NONE or AARCH64_APPROX_ALL, so 0 and ~0 give the right answer
+   whatever the shift does.  A tuning value with an interesting bit pattern
+   would have made it wrong code with no diagnostic.
+
+   `mode_class_index' / `class_num_modes' are the selected back end's own dense
+   position and count (machmode.h), so the bit numbering is once again
+   aarch64's and is bit-for-bit what a single-target aarch64 compiler computes.
+   The class test replaces the range test deliberately: a range in the shared
+   numbering is not the question being asked, and `GET_MODE_CLASS' already
+   answers MODE_RANDOM for a mode aarch64 does not have.  */
+
+inline uint64_t
+aarch64_approx_mode_bit (machine_mode mode)
+{
+  unsigned int bit;
+
+  if (GET_MODE_CLASS (mode) == MODE_FLOAT)
+    bit = GET_MODE_CLASS_INDEX (mode);
+  else if (GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT)
+    bit = GET_MODE_CLASS_INDEX (mode) + GET_CLASS_NUM_MODES (MODE_FLOAT);
+  else
+    return 0;
+
+  /* Loud rather than undefined if aarch64 ever grows past 64 FP modes: the
+     mask is a `uint64_t' and there would be nowhere to put the bit.  */
+  gcc_checking_assert (bit < 64);
+  return (uint64_t) 1 << bit;
+}
+
+#define AARCH64_APPROX_MODE(MODE) aarch64_approx_mode_bit (MODE)
 #define AARCH64_APPROX_NONE ((uint64_t) 0)
 #define AARCH64_APPROX_ALL (~(uint64_t) 0)
 

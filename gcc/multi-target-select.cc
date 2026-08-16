@@ -237,6 +237,7 @@ tree ms_va_list_type_node;
   F (mode_name, NS) F (mode_class, NS) F (mode_ibit, NS)		\
   F (mode_fbit, NS) F (mode_complex, NS) F (mode_base_align, NS)	\
   F (mode_mask_array, NS) F (class_narrowest_mode, NS)			\
+  F (mode_class_index, NS) F (class_num_modes, NS)			\
   F (int_n_data, NS) F (real_format_for_mode, NS)
 
 /* NS is threaded through because a macro parameter of MT_BACKEND is NOT

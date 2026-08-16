@@ -1070,6 +1070,32 @@ extern GCC_TARGET_TABLE (const unsigned short, class_narrowest_mode,
 #define GET_CLASS_NARROWEST_MODE(CLASS) \
   ((machine_mode) class_narrowest_mode[CLASS])
 
+/* MODE'S DENSE 0-BASED POSITION AMONG THE SELECTED BACK END'S OWN MODES OF
+   MODE'S CLASS, and the number of the selected back end's own modes in a
+   class.
+
+   `MODE - MIN_MODE_<CLASS>' is NOT that number here, and the difference is the
+   union-bound-as-SIZE versus as-PREDICATE distinction again.  `MIN_MODE_FLOAT'
+   and `MAX_MODE_FLOAT' are the shared numbering's -- they have to be, the enum
+   is the vocabulary every back end shares -- so their difference counts EVERY
+   configured back end's float modes.  A back end wanting one bit per mode of a
+   class wants its own count, which is what these two answer.  Measured at
+   forty-seven bases: 10 float and 210 vector-float modes in the numbering
+   against aarch64's own 5 and 55.
+
+   `GET_CLASS_NARROWEST_MODE' just above is the same split for the same reason:
+   the numbering is shared, the answer is per base.  A hole -- a mode this back
+   end does not define -- reports 0xffff, because it is a mode of no class here
+   and must not be handed back a usable index.  See genmodes.cc.  */
+
+extern GCC_TARGET_TABLE (const unsigned short, mode_class_index,
+		       NUM_MACHINE_MODES);
+#define GET_MODE_CLASS_INDEX(MODE) ((unsigned int) mode_class_index[MODE])
+
+extern GCC_TARGET_TABLE (const unsigned short, class_num_modes,
+		       MAX_MODE_CLASS);
+#define GET_CLASS_NUM_MODES(CLASS) ((unsigned int) class_num_modes[CLASS])
+
 /* The narrowest full integer mode available on the target.  */
 
 #define NARROWEST_INT_MODE \
