@@ -1699,13 +1699,70 @@ answer is still wrong is worse than the failure.**
 
 ## 5. Environment traps, each paid for in hours
 
-- **DEVSHELL.md is mandatory.** `nm`/`make` are not on PATH outside the
-  nix-shell; a reduced shell writes `#define rlim_t long` into `auto-host.h`,
-  which looks exactly like someone else's source bug.
+- **THE FULL BUILD SHELL is mandatory.** `nm`/`make` are not on PATH outside
+  the nix-shell; a reduced shell writes `#define rlim_t long` into
+  `auto-host.h`, which looks exactly like someone else's source bug.
+
+  **THIS RULE CITED `DEVSHELL.md` FOR MONTHS AND THAT FILE HAS NEVER EXISTED
+  IN THE HISTORY OF THIS BRANCH.** Measured with
+  `git log --all --diff-filter=AD -- '*DEVSHELL*'`: **no commit ever added
+  it.** It is cited here and by ten `t<NNN>-*.sh` scripts, and
+  `eb-shell.sh`'s first line still reads *"Full build shell per DEVSHELL.md"*.
+  **A rule pointing at an unreadable file is worse than no rule, because it
+  reads as satisfied** — every agent who met this line assumed the detail was
+  written down somewhere and moved on.
+
+  Nothing here is reconstructed from guesses. The mechanism survives in
+  `eb-shell.sh` (the `-p` set, `NIX_HARDENING_ENABLE`, the pinned
+  `cache.nixos.org` substituter) and the `rlim_t` assertion survives inline in
+  `t106-build.sh:57`, `t133-reconf-gcc.sh:31` and others. **Use `eb-shell.sh`;
+  it is the authority, and it always was.** What is genuinely lost is whatever
+  else that document said, and that is stated rather than invented.
+
+  **AND `mt-cite-check.sh` PASSES ON THIS.** It exists because
+  `gcc/Makefile.in` cited a `sweep.sh` under the scratchpad directory which did
+  not exist — the same defect. (Spelled without its prefix deliberately: the
+  checker cannot tell a **quotation** of a bad citation from a citation, so
+  writing that path here in full makes the check fail on this very paragraph.
+  Measured, by making it fail.) It greps
+  `scratchpad/[A-Za-z0-9_...]*`, and this rule wrote
+  `DEVSHELL.md` **bare, with no `scratchpad/` prefix**, so the checker never
+  saw it. One filename spelling outside the pattern and the instrument reports
+  a clean green on the very defect it was written to catch. **A citation
+  checker keyed on a path prefix cannot see a citation that omits the prefix**;
+  cite files by their `scratchpad/` path so the checker can refuse them.
 - **Worktrees are created at bare-repo HEAD `7208eca60d0`**, 39,111 commits
-  behind. It presents as *"stale line numbers"*, not *"wrong tree"*. Check:
-  `git merge-base --is-ancestor HEAD multi-target`, or grep `MULTI_TARGET` in
-  `gcc/Makefile.in` — **empty means wrong tree**.
+  behind. It presents as *"stale line numbers"*, not *"wrong tree"*.
+
+  **THE ANCHOR DOES NOT LOCALISE YOU, AND THIS FILE USED TO IMPLY IT DID.**
+  Grepping `MULTI_TARGET` in `gcc/Makefile.in` distinguishes the bare-repo HEAD
+  (**0**) from a real tree, and nothing more: the value has been 23, 27, 28, 30,
+  37, 39, 45, 47, 49, 52 at different tips, so **several trees give a plausible
+  number** and a *wrong-but-plausible* one is the dangerous case. Measured
+  live: an agent reset off the stale HEAD, landed on `2b20283b6b1` — a genuine
+  ancestor 19 commits back — read anchor **47**, and had a report half-written
+  saying *"the brief's 52 is stale, the tree says 47"*. Both numbers were
+  correct readings of different commits; the brief was right.
+
+  **The tell was not the number, it was what was MISSING.** At that ancestor,
+  `INSTRUMENTS.md`, both boards, `mt-lib.sh`, `mtcheck.sh` and half the harness
+  are absent — which reads as *"the brief cites files that were never
+  committed"* rather than *"you are 19 commits back"*, and is indistinguishable
+  from the `DEVSHELL.md` case two bullets up, which is real. So the two
+  failure modes point at the same evidence and the same evidence does not
+  separate them.
+
+  **Check, in this order, and do not stop at the first:**
+  ```sh
+  git merge-base --is-ancestor HEAD multi-target   # ancestor, not tip => STALE
+  git rev-parse HEAD; git rev-parse multi-target   # must be EQUAL
+  ls scratchpad/INSTRUMENTS.md                     # a RECENT file must exist
+  ```
+  `--is-ancestor` returns **true** on a stale ancestor, so it alone says
+  nothing; it is the *equality* that localises. And before concluding a brief
+  cites files nobody committed, run `git log --all -- <that path>` — a file
+  present in history but absent from your checkout means **you are on the wrong
+  commit**, not that the brief is wrong.
 - **The git index is SHARED.** `git commit` commits whatever is staged, including
   another agent's files. `git diff --cached` immediately before every commit.
 - **EVERY `t<NNN>-build.sh` ON THIS BRANCH HAS THE SAME WRONG TEST, AND IT

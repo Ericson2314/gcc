@@ -65,6 +65,69 @@ is immune. Same shape as the aarch64 `-S` bar being filename-sensitive via
 its input path AND its build dir**; `a5764a65f9eec0063-gcheck.sh` settles it by
 compiling one constant absolute path with both compilers.
 | a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
+| **a real cross `as` for an ARBITRARY triple** | `a7ee6ca7c923e4a58-astry.sh` |
+
+## GETTING A CROSS ASSEMBLER: THE TWO ATTRIBUTES, AND THE RECORDED CLAIM THAT IS ABOUT THE WRONG THING
+
+`taa-tools.sh` reads `pkgsCross.<attr>`, a **hand-curated** attribute set with
+an entry per nixpkgs-supported system. `TAA-BOARD.md` §4b concluded from it
+that *"nixpkgs has no binutils for visium or xtensa (0 of 27,157 attributes)"*
+and used that to justify the host-`as` fallback, which makes every
+assembler-dependent verdict for those targets UNTRUSTED.
+
+**That is a statement about the ATTRIBUTE SET, not about binutils.** An
+arbitrary triple can be requested directly:
+
+```nix
+with import <nixpkgs> { crossSystem = { config = "alpha-linux-gnu"; }; };
+buildPackages.binutils-unwrapped
+```
+
+which yields a real `alpha-linux-gnu-as` 2.46 (built from source, ~67s) for a
+target with **no `pkgsCross` attribute at all**. Two details, both measured,
+both of which turn a non-finding into a "finding" if you get them wrong:
+
+- **`binutils-unwrapped`, NEVER `binutils`.** The *wrapped* cross binutils
+  depends on the target libc, so `or1k-elf` fails **inside newlib** — and that
+  gets recorded as *"no cross assembler for or1k"* when the assembler builds
+  perfectly. A libc is not needed to assemble, and the compile-only /
+  `scan-assembler` axis needs no libc by construction. The next agent will
+  reach for the obvious attribute; this is why not to.
+- **PIN THE SUBSTITUTER.** The ambient nix config lists caches on
+  `obsidian.webhop.org` that are unreachable here, retried 5x at a 15s timeout
+  **per derivation**. The first sweep spent ~15 minutes on ONE target
+  compiling nothing, which reads as *"cross binutils are expensive to build"*
+  and is entirely network dead time. Pass
+  `--substituters https://cache.nixos.org/ --option connect-timeout 5`, as
+  `taa-specs.sh` and `eb-shell.sh` already do.
+
+**THE ROUTE HAS ITS OWN LIMIT, AND IT IS NOT BINUTILS EITHER.** `crossSystem`
+goes through `lib.systems.parse`, whose CPU table is narrower than binutils'
+target list, so `visium`, `xtensa`, `arc`, `arm-eabi`, `cris`, `csky`,
+`epiphany`, `fr30`, `frv`, `ft32`, `h8300`, `lm32`, `m32r`, `mcore` and others
+fail to **evaluate** with `error: Unknown CPU type: <cpu>`.
+
+So there are **three** verdicts and they must not be collapsed — each names a
+different missing artefact, and only the third is a statement about the target:
+
+| verdict | what is actually missing |
+|---|---|
+| `EVAL-FAIL` | **nixpkgs cannot describe the triple.** Says nothing about binutils; GNU `as` may well support the target. |
+| `BUILD-FAIL` | nixpkgs describes it; binutils does not build or substitute for it. |
+| `OK` | `<prefix>-as --version` **executed**. |
+
+`OK` asserts the binary *runs*, not that a path exists: a dangling symlink or a
+wrong-arch binary is exactly the shape that falls back to the host `as` three
+layers away, which is `taa-tools.sh`'s own recorded naming trap and the defect
+GUARD 3c exists for (~10,000 results per target).
+
+**And note what an assembler is and is not needed FOR.** Per the user's ruling
+recorded in `TAA-BOARD.md` §3, a `scan-assembler` test needs no libgcc, no
+linker, no execution and **no assembler** — it compiles to `.s` and greps the
+text. The assembler is required for `target-specs` to probe `<triple>-as` and
+emit a `specs-config`, and for GUARD 3c. So "no cross `as`" bounds how far a
+target's specs can be TRUSTED; it does not by itself mean the target cannot be
+scored on the compile-only axis.
 
 ## THE EXAMPLE IN THIS FILE WAS WRONG IN TWO WAYS AND BOTH COST BUILDS
 
