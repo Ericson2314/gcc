@@ -396,6 +396,41 @@ struct target_frame_desc
   bool has_data_abi_alignment;
   unsigned int (*data_abi_alignment) (tree type, unsigned int align);
 
+  /* PROMOTE_MODE (MODE, UNSIGNEDP, TYPE) -- how a narrow integer is widened
+     when it is held in a register.
+
+     THE TWO DEFINITIONS DISAGREE ABOUT EXACTLY SImode, WHICH IS THE ONE THAT
+     MATTERS ON A 64-BIT TARGET.  `riscv.h:298' promotes any integer narrower
+     than a word to `word_mode' and, for SImode specifically, forces
+     `UNSIGNEDP = 0' -- that is the "SImode values are kept sign-extended in
+     registers" invariant the whole back end is written against.
+     `i386.h:1991' promotes only HImode and QImode, only under
+     `TARGET_PROMOTE_HI_REGS' / `TARGET_PROMOTE_QI_REGS', and says nothing
+     about SImode at all.
+
+     Read at `explow.cc:937' (inside `promote_mode') and `function.cc:980,
+     990, 1030', all four under `#ifdef PROMOTE_MODE'.  The shared `tm.h' is
+     i386's, so every base got i386's rule and riscv64's sign-extension
+     invariant did not exist as far as the middle end was concerned.  Measured
+     symptom (`gcc.target/riscv/zbb-sext.c'): stock emits `sext.b a0,a0' and
+     `sext.h a0,a0'; multi-target emitted NEITHER, i.e. it returned a value it
+     had not sign-extended.  That is wrong code, not slower code.
+
+     A `has_' FLAG AND NOT A NULL CHECK, and not an identity thunk either.
+     16 of the 47 bases define no `PROMOTE_MODE', and for those the four use
+     sites must compile OUT exactly as upstream's `#ifdef' does -- promoting
+     nothing is not the same as promoting to the same mode, because
+     `function.cc:1030' also consults `unsignedp' afterwards.  So the flag is
+     load-bearing and the guards become `if (mt_has_promote_mode ())'.
+
+     `machine_mode *' and `tree', NOT the `int' boundary `target-insn.h' uses.
+     That header is reached before `coretypes.h' and this one is not -- the
+     fields above already take `tree' and `machine_mode' (line 88, 94, 395),
+     and line 593 records why.  Both are passed by pointer because the macro
+     ASSIGNS to both of its first two arguments.  */
+  bool has_promote_mode;
+  void (*promote_mode) (machine_mode *mode, int *unsignedp, const_tree type);
+
   /* ------------------------------------------------------------------
      THE STACK-ALIGNMENT CLOSURE -- FOUR NAMES, AND THE ONE THAT ACTUALLY
      STOPS `big.c' IS NOT THE ONE THE SYMBOL NAMES.
@@ -1629,6 +1664,16 @@ extern bool mt_function_arg_regno_p (int);
    run-time expression with no `#ifdef' around it, so a call-valued redirect in
    `multi-target-macros.h' is legal.  */
 extern bool mt_epilogue_uses (int);
+
+/* `PROMOTE_MODE'.  Spelled at the call site rather than redirected, for the
+   `ASM_DECLARE_FUNCTION_NAME' reason below: all four sites are `#ifdef'
+   pairs, and a redirect would leave the GUARD answered by the primary (i386
+   defines the macro, so the guard is true for everybody) while the BODY was
+   answered by the selected base -- so the 16 bases that define no
+   `PROMOTE_MODE' would silently start promoting.  `mt_has_promote_mode ()'
+   is the guard and `mt_promote_mode' the body.  */
+extern bool mt_has_promote_mode (void);
+extern void mt_promote_mode (machine_mode *, int *, const_tree);
 
 /* `ASM_DECLARE_FUNCTION_NAME' / `ASM_OUTPUT_FUNCTION_LABEL'.  Spelled at the
    call site rather than redirected, because the site is an `#ifdef' pair and

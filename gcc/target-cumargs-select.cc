@@ -911,6 +911,36 @@ mt_data_abi_alignment (tree type, unsigned int align)
   return f->data_abi_alignment (type, align);
 }
 
+/* PROMOTE_MODE; see target-frame.h.  The flag/pointer pair is cross-checked
+   the same way the two alignment pairs above are: a base claiming `has_' with
+   a null thunk, or the reverse, is a supply-side bug and must not be resolved
+   by quietly preferring one of the two.  */
+bool
+mt_has_promote_mode (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  mt_check_align_pair (f, f->has_promote_mode, f->promote_mode != NULL,
+		       "PROMOTE_MODE");
+  return f->has_promote_mode;
+}
+
+void
+mt_promote_mode (machine_mode *mode, int *unsignedp, const_tree type)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  /* Callers guard with mt_has_promote_mode (), exactly as upstream's four
+     sites guard with `#ifdef PROMOTE_MODE'.  Reaching here without it would
+     mean a base that promotes nothing had been asked to promote, so it is a
+     refusal and not a silent no-op: "this base does not define the macro" and
+     "this base's macro left the mode alone" are different facts and only the
+     second is a promotion decision.  */
+  if (!mt_has_promote_mode ())
+    internal_error ("PROMOTE_MODE asked of a back end that does not define it");
+  f->promote_mode (mode, unsignedp, type);
+}
+
 /* ------------------------------------------------------------------------
    THE INSN-PATTERN EXISTENCE ANSWERS; see target-insn.h.
 

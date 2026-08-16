@@ -895,11 +895,13 @@ machine_mode
 promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
 	      int *punsignedp ATTRIBUTE_UNUSED)
 {
-#ifdef PROMOTE_MODE
+  /* Was `#ifdef PROMOTE_MODE'.  The macro is per back end and this file is
+     shared, so the test is `mt_has_promote_mode ()' at the point of use; see
+     target-frame.h.  The declarations become unconditional because the
+     condition is no longer a preprocessor one.  */
   enum tree_code code;
   int unsignedp;
   scalar_mode smode;
-#endif
 
   /* For libcalls this is invoked without TYPE from the backends
      TARGET_PROMOTE_FUNCTION_MODE hooks.  Don't do anything in that
@@ -910,7 +912,11 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
   /* FIXME: this is the same logic that was there until GCC 4.4, but we
      probably want to test POINTERS_EXTEND_UNSIGNED even if PROMOTE_MODE
      is not defined.  The affected targets are S390, SPARC.  */
-#ifdef PROMOTE_MODE
+  /* The `#else' arm of the old `#ifdef PROMOTE_MODE' was `return mode', so a
+     base that defines no PROMOTE_MODE takes exactly that path.  */
+  if (!mt_has_promote_mode ())
+    return mode;
+
   code = TREE_CODE (type);
   unsignedp = *punsignedp;
 
@@ -934,7 +940,15 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     case BITINT_TYPE:
       /* Values of these types always have scalar mode.  */
       smode = as_a <scalar_mode> (mode);
-      PROMOTE_MODE (smode, unsignedp, type);
+      {
+	/* The thunk takes `machine_mode *' because the macro assigns to it;
+	   every in-tree PROMOTE_MODE widens to another scalar (word_mode or
+	   SImode), so narrowing back is safe and `as_a' asserts it rather
+	   than assuming it.  */
+	machine_mode pmode = smode;
+	mt_promote_mode (&pmode, &unsignedp, type);
+	smode = as_a <scalar_mode> (pmode);
+      }
       *punsignedp = unsignedp;
       return smode;
 
@@ -955,9 +969,6 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     default:
       return mode;
     }
-#else
-  return mode;
-#endif
 }
 
 

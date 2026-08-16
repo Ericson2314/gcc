@@ -420,6 +420,34 @@ mt_base_data_abi_alignment (tree type, unsigned int align)
 # define MT_BASE_DATA_ABI_ALIGNMENT NULL
 #endif
 
+/* PROMOTE_MODE, asked of THIS base; see target-frame.h for the measurement.
+
+   The macro ASSIGNS to its first two arguments, so the thunk takes pointers
+   and copies through local lvalues: `riscv.h:298' expands to a bare `if'
+   whose body is `(UNSIGNEDP) = 0; (MODE) = word_mode;', and handing it `*mode'
+   directly would work but reads as if the macro were a function.  The locals
+   also keep the expansion's own `if' from binding to anything outside it --
+   riscv's definition is an `if' with NO `else' and no `do { } while (0)'
+   wrapper, which is exactly the shape that swallows a following `else'.  */
+#ifdef PROMOTE_MODE
+static void
+mt_base_promote_mode (machine_mode *mode, int *unsignedp, const_tree type)
+{
+  machine_mode m = *mode;
+  int u = *unsignedp;
+  {
+    PROMOTE_MODE (m, u, type);
+  }
+  *mode = m;
+  *unsignedp = u;
+}
+# define MT_BASE_HAS_PROMOTE_MODE true
+# define MT_BASE_PROMOTE_MODE mt_base_promote_mode
+#else
+# define MT_BASE_HAS_PROMOTE_MODE false
+# define MT_BASE_PROMOTE_MODE NULL
+#endif
+
 /* THE STACK-ALIGNMENT CLOSURE, asked of THIS base; see target-frame.h for why
    all four move together and for why the one the `nm' output names is not the
    one that stops `big.c'.
@@ -1741,6 +1769,8 @@ static const struct target_frame_desc mt_base_frame = {
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,
   MT_BASE_DATA_ABI_ALIGNMENT,
+  MT_BASE_HAS_PROMOTE_MODE,
+  MT_BASE_PROMOTE_MODE,
   mt_base_incoming_stack_boundary,
   mt_base_max_stack_alignment,
   mt_base_max_supported_stack_alignment,
