@@ -178,6 +178,47 @@ along with GCC; see the file COPYING3.  If not see
    than into this table.  Until then the observable is unchanged, because the
    pass gate and not the flag is now the authority.
 
+   `DELAY_SLOTS' IS THE SAME DEFECT IN THE SAME GENERATED HEADER AND IS NOT
+   FIXED HERE.  Stated rather than left to be rediscovered: it is the second
+   macro `genattr-common' writes into `insn-attr-common-<base>.h', it is the
+   primary's in shared code for exactly the reason `INSN_SCHEDULING' was, and
+   the one-line census at `-O2' surfaced it for free while measuring this.
+
+   Measured, cold 47-base build:
+
+       insn-attr-common.h        DELAY_SLOTS 0     (== i386's)
+       insn-attr-common-sparc.h  DELAY_SLOTS 1
+       insn-attr-common-arc.h    DELAY_SLOTS 1
+       12 of 47 back ends say 1 -- arc cris fr30 h8300 iq2000 microblaze mips
+       or1k pa sh sparc visium -- and all twelve are answered by i386's 0.
+
+   Observable on `int f (int x) { return x + 1; }' at `-O2', arc, in the same
+   census run that found the eleven:
+
+       cc1: warning: this target machine does not have delayed branches
+
+   -- `toplev.cc:1433', `if (!DELAY_SLOTS && flag_delayed_branch)', reading
+   i386's 0 for a back end that has them.  The warning is the visible half.
+   The consequential half is `reorg.cc:3838' and `:3878': `-fdelayed-branch'
+   is gated on the same 0, so **delay-slot filling has never run for any of
+   the twelve on this branch**, and `function.cc:6766' asserts
+   `gcc_assert (!DELAY_SLOTS)' -- an assertion that holds only because the
+   answer is wrong.
+
+   NOTE THE SHAPE, BECAUSE IT IS NOT THE `#ifdef' SHAPE.  `DELAY_SLOTS' is
+   already a 0/1 VALUE and its consumers already spell `if (DELAY_SLOTS)'
+   rather than `#ifdef' -- upstream did that conversion years ago.  So "the
+   consumers are runtime `if's" is NOT evidence a macro is per-base here; the
+   value reaching them is still one header's.  An audit looking for `#ifdef'
+   would score this file clean.
+
+   DELIBERATELY LEFT.  The fix is mechanical -- another member on
+   `target_automata_desc', read in `target-cumargs.cc' where the macro is
+   still that base's own, exactly as `has_dfa' is -- but turning it on starts
+   running `reorg' on twelve back ends for the first time, which is a
+   behaviour change of a different size from switching a gate OFF, and
+   belongs in its own change with its own both-sided measurement.
+
    THE `void *' BOUNDARY IS DELIBERATE.  `state_t' is a typedef in the
    generated `insn-attr.h', and this header is read by translation units that
    do not include it.  It is `void *' in every back end's copy -- genattr
