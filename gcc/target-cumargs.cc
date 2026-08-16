@@ -88,6 +88,14 @@ along with GCC; see the file COPYING3.  If not see
    expansion now happens in the translation unit where the macro is that
    base's own, so that base's headers have to be satisfiable here.  */
 #include "output.h"
+/* `explow.h' is here for `enum save_level' ALONE, and it is required rather
+   than tidy: `mt_base_stack_savearea_mode' expands the base's OWN
+   `STACK_SAVEAREA_MODE', and seven back ends spell `SAVE_NONLOCAL' /
+   `SAVE_FUNCTION' in that body.  Without it the build fails, per back end, at
+   `config/aarch64/aarch64.h:1470: error: SAVE_NONLOCAL was not declared in
+   this scope'.  Note it did NOT fail for i386: that base's object was already
+   up to date, so the first draft looked like it built.  */
+#include "explow.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
@@ -633,8 +641,11 @@ mt_base_function_mode (void)
    i386.h:2011 has already won -- is the banned one, and is the bug.
 
    THE PARAMETER STAYS AN `int' AND IS NOT CAST BACK, which was checked rather
-   than assumed.  `enum save_level' is declared in `explow.h:90', which this
-   translation unit does not include and which `target-frame.h' is upstream of.
+   than assumed.  `enum save_level' is declared in `explow.h:90', and
+   `target-frame.h' -- which carries the slot -- is upstream of it, so the
+   descriptor cannot name the enum.  This TU includes `explow.h' anyway,
+   because the BASE's macro body spells the enumerators; the two facts are
+   independent and only the first is about the signature.
    Every one of the seven definitions uses the argument ONLY in `==' tests
    against the enumerators -- i386, sparc and rs6000 on `SAVE_NONLOCAL',
    rs6000 and nvptx also on `SAVE_FUNCTION', ia64, s390 and aarch64 on
