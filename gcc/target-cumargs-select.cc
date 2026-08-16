@@ -956,6 +956,18 @@ mt_auto_inc_dec (void)
   return mt_insn ()->auto_inc_dec;
 }
 
+/* The eight individual forms behind that disjunction.  `auto_inc_dec' says
+   the base HAS auto-increment addressing; `auto-inc-dec.cc' then asks WHICH,
+   34 times across three target-independent files, and until this existed
+   every one of those reads was the primary's absence.  A base with
+   `auto_inc_dec' true and all eight false is a pass that runs and does
+   nothing, which is what riscv64 measured.  */
+bool
+mt_have_autoinc (int form)
+{
+  return mt_insn ()->have_autoinc (form);
+}
+
 /* LOAD_EXTEND_OP (MODE).  `int' in and `int' out because target-insn.h is
    reached before coretypes.h; `rtl.h''s use site casts back to
    `enum rtx_code'.  */

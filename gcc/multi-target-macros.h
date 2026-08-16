@@ -552,6 +552,46 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define LOAD_EXTEND_OP(MODE) \
   ((enum rtx_code) mt_load_extend_op ((int) (MODE)))
 
+/* THE EIGHT AUTO-INCREMENT FORMS.  These get `#undef'/`#define' pairs for
+   `LOAD_EXTEND_OP''s reason and not the `HAVE_<pattern>' paragraph's: they do
+   NOT come from `insn-config.h'.  They come from the back end's own `<cpu>.h'
+   -- `riscv.h:1313', `aarch64.h', `arm.h', `rs6000.h' and 21 more -- with
+   `rtl.h''s `#ifndef ... 0' as the fallback, so they are reached at a settled
+   point and a redirect here is the last word.  `rtl.h''s fallbacks then never
+   fire in a shared TU, because the names are already defined when it is read;
+   in every exempt TU above they fire exactly as upstream intends.
+
+   WHY A REDIRECT AND NOT REWRITTEN CALL SITES.  There are 34 of them, and
+   `rtl.h:3062-3090' spells four of the eight again inside
+   `USE_LOAD_POST_INCREMENT' and its five siblings -- macros in a header every
+   translation unit shares.  That is the same argument `LOAD_EXTEND_OP' makes
+   two paragraphs up: the use site is in the header that has to stop needing
+   `tm.h'.
+
+   SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING, as this file's other
+   blocks record.  Outside `config/' the eight appear only in ordinary
+   run-time expressions -- `if' conditions and `?:' in `auto-inc-dec.cc', a
+   `gcc_assert' in `expr.cc', `if' conditions in `cse.cc'.  There is no `#if'
+   on any of them and no array bound, no case label and no static initialiser;
+   `rtl.h:2998's `#if defined (...)' disjunction is inside the exempt arm, so
+   it is never reached with these definitions in scope.  */
+#undef HAVE_PRE_INCREMENT
+#define HAVE_PRE_INCREMENT	 (mt_have_autoinc (MT_AUTOINC_PRE_INC))
+#undef HAVE_PRE_DECREMENT
+#define HAVE_PRE_DECREMENT	 (mt_have_autoinc (MT_AUTOINC_PRE_DEC))
+#undef HAVE_POST_INCREMENT
+#define HAVE_POST_INCREMENT	 (mt_have_autoinc (MT_AUTOINC_POST_INC))
+#undef HAVE_POST_DECREMENT
+#define HAVE_POST_DECREMENT	 (mt_have_autoinc (MT_AUTOINC_POST_DEC))
+#undef HAVE_PRE_MODIFY_DISP
+#define HAVE_PRE_MODIFY_DISP	 (mt_have_autoinc (MT_AUTOINC_PRE_MODIFY_DISP))
+#undef HAVE_POST_MODIFY_DISP
+#define HAVE_POST_MODIFY_DISP	 (mt_have_autoinc (MT_AUTOINC_POST_MODIFY_DISP))
+#undef HAVE_PRE_MODIFY_REG
+#define HAVE_PRE_MODIFY_REG	 (mt_have_autoinc (MT_AUTOINC_PRE_MODIFY_REG))
+#undef HAVE_POST_MODIFY_REG
+#define HAVE_POST_MODIFY_REG	 (mt_have_autoinc (MT_AUTOINC_POST_MODIFY_REG))
+
 #undef STACK_BOUNDARY
 #define STACK_BOUNDARY (mt_stack_boundary ())
 #undef PREFERRED_STACK_BOUNDARY

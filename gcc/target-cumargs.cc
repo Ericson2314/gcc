@@ -1139,6 +1139,40 @@ mt_base_load_extend_op (int mode)
   return (int) LOAD_EXTEND_OP ((machine_mode) mode);
 }
 
+/* The eight individual auto-increment forms, in THIS base's preprocessor
+   context; see target-insn.h.
+
+   A FUNCTION AND NOT EIGHT BOOLS IN THE INITIALISER BELOW, and the reason is
+   not style: `riscv.h:1313' defines `HAVE_POST_MODIFY_DISP' as
+   `TARGET_XTHEADMEMIDX', which reads option state.  As a field of a
+   `static const struct' that is not a constant expression and does not
+   compile; evaluated here, per call, it is that back end's own answer for the
+   options actually in force.  Ten of the 25 back ends that define any of the
+   eight define at least one of them in terms of a `TARGET_' macro.
+
+   No `#ifdef' and no fallback of its own, exactly as `mt_base_load_extend_op'
+   above: for a back end that defines the macro this is that back end's
+   expression, and for one that does not it is `rtl.h''s own `0' -- read HERE,
+   where "this back end says nothing" is the answer, rather than in shared code
+   where the PRIMARY saying nothing would answer for everyone.  That difference
+   is the entire defect this file exists to close.  */
+static bool
+mt_base_have_autoinc (int form)
+{
+  switch (form)
+    {
+    case MT_AUTOINC_PRE_INC:		return HAVE_PRE_INCREMENT != 0;
+    case MT_AUTOINC_PRE_DEC:		return HAVE_PRE_DECREMENT != 0;
+    case MT_AUTOINC_POST_INC:		return HAVE_POST_INCREMENT != 0;
+    case MT_AUTOINC_POST_DEC:		return HAVE_POST_DECREMENT != 0;
+    case MT_AUTOINC_PRE_MODIFY_DISP:	return HAVE_PRE_MODIFY_DISP != 0;
+    case MT_AUTOINC_POST_MODIFY_DISP:	return HAVE_POST_MODIFY_DISP != 0;
+    case MT_AUTOINC_PRE_MODIFY_REG:	return HAVE_PRE_MODIFY_REG != 0;
+    case MT_AUTOINC_POST_MODIFY_REG:	return HAVE_POST_MODIFY_REG != 0;
+    default:				return false;
+    }
+}
+
 static const struct target_insn_desc mt_base_insn = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
   HAVE_lo_sum != 0,
@@ -1155,6 +1189,7 @@ static const struct target_insn_desc mt_base_insn = {
      `mt_base_load_extend_op' above: the answer is computed where the base's
      headers are the ones in scope.  */
   AUTO_INC_DEC != 0,
+  mt_base_have_autoinc,
   mt_base_load_extend_op
 };
 
