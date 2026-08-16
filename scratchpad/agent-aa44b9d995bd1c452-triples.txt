@@ -1,0 +1,18 @@
+# The 11 targets the one-line census scored, in the CANONICAL spelling
+# MT_TARGET_SUBDIRS uses -- config.sub renames most of them, and the specs
+# rule, the per-target directory and the tools prefix all use the canonical
+# form.  Asking for `avr-elf' here yields a tools symlink no rule looks for.
+#
+# 3 LOUD (segfault in avr-fuse-add) + 8 that compiled without complaint and
+# are the ones this task exists to settle.
+microblaze-xilinx-elf
+rx-unknown-elf
+sh-unknown-elf
+aarch64-unknown-linux-gnu
+arm-unknown-eabi
+avr-unknown-elf
+mips64-unknown-elf
+or1k-unknown-elf
+riscv64-unknown-linux-gnu
+s390x-ibm-linux-gnu
+x86_64-pc-linux-gnu
