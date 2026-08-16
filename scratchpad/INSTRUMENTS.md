@@ -128,6 +128,11 @@ text. The assembler is required for `target-specs` to probe `<triple>-as` and
 emit a `specs-config`, and for GUARD 3c. So "no cross `as`" bounds how far a
 target's specs can be TRUSTED; it does not by itself mean the target cannot be
 scored on the compile-only axis.
+| **which target macros leak from the primary's chain** | `agent-a018835bbcfad2e28-leakcensus.sh` |
+| DESCRIPTOR macros still spelled raw in shared code | `agent-a4568de8f522450d3-descaudit.sh` |
+| target macros `tm.texi` does not document at all | `agent-a4568de8f522450d3-undoc.sh` |
+| **does `target-cumargs.cc` compile for all 47 bases?** | `agent-a4568de8f522450d3-syncheck.sh` |
+| does the `.option`/`.machine` bracket balance, both-sided | `agent-a4568de8f522450d3-bracket.sh` |
 | **does `cc1` shift out of range in `AARCH64_APPROX_MODE`?** | `a51a0e8b2b458063b-ubshift.sh` |
 | the max `AARCH64_APPROX_MODE` shift, from `insn-modes.h` alone | `a51a0e8b2b458063b-shiftscan.sh` |
 | aarch64 + x86_64 FP codegen on the inputs that reach that site | `a51a0e8b2b458063b-bothsided.sh` |
@@ -248,6 +253,93 @@ from the next worktree, so the next agent copied it under a new number.
 no edit per worktree, no number to collide on. If you find yourself editing one
 line of an `mt-*.sh` to make it run, that line is a bug in `mt-lib.sh`; fix it
 there rather than making the seventh copy.
+
+## THREE WAYS A SCAN LIES, ALL THREE COMMITTED IN ONE SESSION BY ONE AGENT
+
+These are here rather than only in a board because each is a shape the next
+person writing a `grep`-based instrument will reproduce, and two of them were
+committed by the agent who had just diagnosed the third.
+
+**1. A SYNTAX CHECKER REPORTED 22 OF 22 BASES `ok` WHILE COMPILING NOTHING.**
+`agent-a4568de8f522450d3-syncheck.sh`'s first run swept 22 back ends clean and
+then failed its own control:
+
+```
+  aarch64      ok      (x22)
+  bases checked ok=22 fail=0
+  FATAL: the negative control did NOT fire; every 'ok' above is void
+       g++: command not found
+```
+
+It was run outside the nix dev shell. Every compile died with `command not
+found`, produced no `error:` line, and the "no errors" test scored it a pass.
+PRINCIPLES already says *"a missing tool looks exactly like a zero result"*
+and *"anything shaped `cmd | grep -c` needs `cmd` to have demonstrably run"* —
+this is that, in a harness written an hour after reading both sentences.
+
+The arm that caught it appends a deliberately undeclared identifier to the
+file under test and **requires the compiler to name it**. Copy that arm. Note
+what it is not: "did the command exit 0" would have passed (the loop's exit
+status is the grep's), and "is the error file non-empty" would have passed too
+(`command not found` is text). Only *demanding a specific diagnostic* works.
+Re-run inside `eb-shell.sh`, it found a real missing include on the 20th base.
+
+**2. AN UNANCHORED `grep` MATCHED THE COMMENT EXPLAINING THE FIX — A FALSE
+RED.** A snapshot guard asserted a converted tree has no raw `#ifdef
+ADJUST_INSN_LENGTH` left:
+
+```sh
+grep -q '#ifdef ADJUST_INSN_LENGTH' "$S/gcc/final.cc" && FATAL   # WRONG
+```
+
+The conversion's own comment at `final.cc:404` reads *"This was `#ifdef
+ADJUST_INSN_LENGTH`, i.e. ..."*, so the guard refused a **correct** snapshot.
+Anchor to line start:
+
+```sh
+grep -qE '^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+ADJUST_INSN_LENGTH' ...
+```
+
+This is *mention versus use*, and the same agent had diagnosed it two commits
+earlier in the census's DESCRIPTOR bucket (item 3). **A false RED costs what a
+false green costs**: the remedy it invites is reverting a correct change. It
+cost nothing here only because it fired before `configure`.
+
+**3. MENTION-VERSUS-USE AT SCALE: A CENSUS BUCKET BUILT ON IT.**
+`-leakcensus.sh` scores a macro CONVERTED if its name appears anywhere in a
+`target-*.h` header. `agent-a4568de8f522450d3-descaudit.sh` measures the cost:
+**35 of 94 are still spelled raw in shared code**, i.e. still leaking.
+`ASM_OUTPUT_MAX_SKIP_ALIGN` is DESCRIPTOR on the strength of **one sentence**
+in `target-caps.h:314` while `varasm.cc:2173,2181,2182,2184` and
+`final.cc:2432,2436,2438` spell it raw.
+
+That audit needed two fixes before its own number meant anything, both left
+recorded in it rather than quietly corrected:
+
+- a first-character comment test (`^\s*(/\*|\*|//)`) scored multi-line `/* */`
+  prose as code — this branch's conversion notes are exactly that shape. **73
+  of 94.** Comments are now removed by a state machine.
+- `target-*.cc` was counted as "shared", but it is compiled ONCE PER BASE with
+  `BASE_HEADER (tm.h)`, so `#ifdef PROMOTE_MODE` in it is the conversion
+  *working*. **73 -> 35.**
+
+**And the general rule the three share: a scan needs a NEGATIVE control, not
+just a positive one.** A scan that flags everything has a perfect positive arm
+and is worthless. `-descaudit.sh` carries four — `ASM_DECLARE_FUNCTION_NAME`,
+`ASM_OUTPUT_FUNCTION_LABEL`, `PROMOTE_MODE`, `REG_ALLOC_ORDER`, all known
+converted — and exits 9 if any is flagged. All four *were* flagged before the
+population fix and none after; without them, `73 of 94` would have been
+reported as a finding.
+
+**A CONTROL ANCHORED ON A CONVERSION TARGET HAS AN EXPIRY DATE.**
+`-undoc.sh`'s non-vacuity arm was anchored on `ASM_OUTPUT_FUNCTION_PREFIX` —
+the macro the script was written to demonstrate — and went quiet within the
+hour when that macro was converted. It printed *"NOT a pass, treat the total
+as unverified"* rather than a green, which is the wanted behaviour, but this
+is the `macro-probe-run.sh` shape PRINCIPLES records dying unnoticed for a
+day. Re-anchored on `ADDR_VEC_ALIGN` **because it is not being converted**,
+with an instruction to move rather than delete it. **Never anchor a control on
+something your own task is about to change.**
 
 ## Adding to the set
 
