@@ -65,6 +65,25 @@ is immune. Same shape as the aarch64 `-S` bar being filename-sensitive via
 its input path AND its build dir**; `a5764a65f9eec0063-gcheck.sh` settles it by
 compiling one constant absolute path with both compilers.
 | a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
+| **does `cc1` shift out of range in `AARCH64_APPROX_MODE`?** | `a51a0e8b2b458063b-ubshift.sh` |
+| the max `AARCH64_APPROX_MODE` shift, from `insn-modes.h` alone | `a51a0e8b2b458063b-shiftscan.sh` |
+| aarch64 + x86_64 FP codegen on the inputs that reach that site | `a51a0e8b2b458063b-bothsided.sh` |
+| an immutable snapshot **named for its sha as well as the worktree** | `a51a0e8b2b458063b-snap.sh` |
+
+`a51a0e8b2b458063b-ubshift.sh` is the cheap shape for "is there UB in ONE
+translation unit": rebuild that object with `-fsanitize=shift`, relink `cc1`,
+run. A whole sanitized 47-base build costs hours and answers a wider question.
+Its ARM 1 is the part to copy — it refuses to score until it has seen
+`__ubsan_handle_shift_out_of_bounds` as an undefined reference in the rebuilt
+object, because **"UBSan reported nothing" and "UBSan was never enabled here"
+are the same empty log.**
+
+`a51a0e8b2b458063b-snap.sh` puts the sha in the snapshot path, and the reason
+is a near-miss worth knowing: overwriting a snapshot path that an
+already-configured build dir points at breaks nothing loudly, because a build
+dir re-reads its srcdir long after configure — `mt-bars.sh` takes `big.c` from
+it, and rebuilding one object recompiles *that tree's* source. The next arm
+would have measured the other commit and said so with a green.
 
 ## THE EXAMPLE IN THIS FILE WAS WRONG IN TWO WAYS AND BOTH COST BUILDS
 
