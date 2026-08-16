@@ -611,6 +611,42 @@ extern void mt_asm_output_align (FILE *, int);
 #undef HAVE_POST_MODIFY_REG
 #define HAVE_POST_MODIFY_REG	 (mt_have_autoinc (MT_AUTOINC_POST_MODIFY_REG))
 
+/* AND THE EIGHT `USE_*' MACROS WITH THEM, WHICH IS NOT OPTIONAL.  They live in
+   `rtl.h:3060-3090' as `#ifndef' fallbacks that expand to the eight above, so
+   redirecting only the `HAVE_*' half leaves seven back ends' explicit answers
+   overridden by the `HAVE_*' one.  aarch64 defines all eight to a literal `0'
+   while having five of the addressing modes, so while `HAVE_POST_INCREMENT'
+   was stuck at 0 the fallback accidentally agreed with it; correcting the
+   `HAVE_*' half alone starts telling `tree-ssa-loop-ivopts.cc' that aarch64
+   wants post-increment addressing, which aarch64 has said in its own header
+   that it does not.  Measured before this went in: aarch64's `copy' loop
+   acquired `ldr w3, [x1], 4' / `str w3, [x0, 4]!' where stock aarch64 emits
+   indexed addressing.  The two halves go together or neither does.  */
+#undef USE_LOAD_POST_INCREMENT
+#define USE_LOAD_POST_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_POST_INC, (int) (M)))
+#undef USE_LOAD_POST_DECREMENT
+#define USE_LOAD_POST_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_POST_DEC, (int) (M)))
+#undef USE_LOAD_PRE_INCREMENT
+#define USE_LOAD_PRE_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_PRE_INC, (int) (M)))
+#undef USE_LOAD_PRE_DECREMENT
+#define USE_LOAD_PRE_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_LOAD_PRE_DEC, (int) (M)))
+#undef USE_STORE_POST_INCREMENT
+#define USE_STORE_POST_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_POST_INC, (int) (M)))
+#undef USE_STORE_POST_DECREMENT
+#define USE_STORE_POST_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_POST_DEC, (int) (M)))
+#undef USE_STORE_PRE_INCREMENT
+#define USE_STORE_PRE_INCREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_PRE_INC, (int) (M)))
+#undef USE_STORE_PRE_DECREMENT
+#define USE_STORE_PRE_DECREMENT(M) \
+  (mt_use_autoinc (MT_USEINC_STORE_PRE_DEC, (int) (M)))
+
 #undef STACK_BOUNDARY
 #define STACK_BOUNDARY (mt_stack_boundary ())
 #undef PREFERRED_STACK_BOUNDARY

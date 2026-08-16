@@ -84,6 +84,38 @@ enum mt_autoinc_form
   MT_AUTOINC_NFORMS
 };
 
+/* The eight `USE_{LOAD,STORE}_{PRE,POST}_{INC,DEC}REMENT (MODE)' macros, which
+   are a DIFFERENT question from the eight above and must not be folded into
+   them.  `HAVE_POST_INCREMENT' asks whether the machine CAN post-increment;
+   these ask whether it is WORTH doing for a given mode, and `rtl.h:3062' makes
+   the second default to the first only for back ends that say nothing.
+
+   FOUND BY THE FIX TO THE EIGHT ABOVE MAKING IT MATTER.  `aarch64.h:1408-1414'
+   defines all eight of these to a literal `0' -- aarch64 has the addressing
+   modes and deliberately tells `tree-ssa-loop-ivopts.cc' not to prefer them.
+   Shared code read i386's absence, so it took `rtl.h''s fallback, which is
+   `HAVE_POST_INCREMENT' -- and while that was stuck at 0 the fallback
+   ACCIDENTALLY produced aarch64's real answer.  Correcting the eight above
+   turned it into 1 and started overriding a back end's explicit `0'.
+
+   That is the trap PRINCIPLES records from the other direction: "a leak
+   serving the primary's real value would have produced the right mode by luck
+   and hidden this indefinitely".  Here the luck ran the other way, and the
+   only reason it surfaced is that the both-sided instrument compared against
+   STOCK rather than against the previous multi-target output.  */
+enum mt_useinc_form
+{
+  MT_USEINC_LOAD_POST_INC,
+  MT_USEINC_LOAD_POST_DEC,
+  MT_USEINC_LOAD_PRE_INC,
+  MT_USEINC_LOAD_PRE_DEC,
+  MT_USEINC_STORE_POST_INC,
+  MT_USEINC_STORE_POST_DEC,
+  MT_USEINC_STORE_PRE_INC,
+  MT_USEINC_STORE_PRE_DEC,
+  MT_USEINC_NFORMS
+};
+
 /* One back end's answers.  MOSTLY plain booleans rather than function
    pointers, unlike target-frame.h: those entries are settled by the back
    end's machine description before any option is decoded, they cannot vary
@@ -183,6 +215,10 @@ struct target_insn_desc
      enum of GCC's own exists yet.  The argument is one of `MT_AUTOINC_*'.  */
   bool (*have_autoinc) (int form);
 
+  /* The `USE_*' preference question; see `enum mt_useinc_form'.  Takes a mode
+     as well as a form, so a call and not a table however it is typed.  */
+  bool (*use_autoinc) (int form, int mode);
+
   /* LOAD_EXTEND_OP (MODE) -- `rtl.h:4762', inside `load_extend_op', which is
      an inline function in a header the whole compiler shares.
 
@@ -215,5 +251,6 @@ extern bool mt_have_rotatert (void);
 extern bool mt_auto_inc_dec (void);
 extern int mt_load_extend_op (int mode);
 extern bool mt_have_autoinc (int form);
+extern bool mt_use_autoinc (int form, int mode);
 
 #endif /* GCC_TARGET_INSN_H */

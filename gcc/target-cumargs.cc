@@ -1173,6 +1173,29 @@ mt_base_have_autoinc (int form)
     }
 }
 
+/* The eight `USE_*' preference macros, in THIS base's context; see
+   target-insn.h for why they are a separate question from the eight above and
+   for how the omission was found.  `int mode' at the boundary, cast back here,
+   for `mt_base_load_extend_op''s reason.  */
+static bool
+mt_base_use_autoinc (int form, int mode)
+{
+  machine_mode m = (machine_mode) mode;
+
+  switch (form)
+    {
+    case MT_USEINC_LOAD_POST_INC:   return USE_LOAD_POST_INCREMENT (m) != 0;
+    case MT_USEINC_LOAD_POST_DEC:   return USE_LOAD_POST_DECREMENT (m) != 0;
+    case MT_USEINC_LOAD_PRE_INC:    return USE_LOAD_PRE_INCREMENT (m) != 0;
+    case MT_USEINC_LOAD_PRE_DEC:    return USE_LOAD_PRE_DECREMENT (m) != 0;
+    case MT_USEINC_STORE_POST_INC:  return USE_STORE_POST_INCREMENT (m) != 0;
+    case MT_USEINC_STORE_POST_DEC:  return USE_STORE_POST_DECREMENT (m) != 0;
+    case MT_USEINC_STORE_PRE_INC:   return USE_STORE_PRE_INCREMENT (m) != 0;
+    case MT_USEINC_STORE_PRE_DEC:   return USE_STORE_PRE_DECREMENT (m) != 0;
+    default:			    return false;
+    }
+}
+
 static const struct target_insn_desc mt_base_insn = {
   MT_STR (MULTI_TARGET_TARGETM_BASE),
   HAVE_lo_sum != 0,
@@ -1190,6 +1213,7 @@ static const struct target_insn_desc mt_base_insn = {
      headers are the ones in scope.  */
   AUTO_INC_DEC != 0,
   mt_base_have_autoinc,
+  mt_base_use_autoinc,
   mt_base_load_extend_op
 };
 

@@ -968,6 +968,17 @@ mt_have_autoinc (int form)
   return mt_insn ()->have_autoinc (form);
 }
 
+/* The `USE_*' preference question, which is not the `HAVE_*' one: seven back
+   ends answer it differently from the addressing modes they possess, and
+   aarch64 answers it with a literal 0 for all eight while having five of the
+   modes.  Read 28 times outside `config/', nearly all in
+   `tree-ssa-loop-ivopts.cc'.  */
+bool
+mt_use_autoinc (int form, int mode)
+{
+  return mt_insn ()->use_autoinc (form, mode);
+}
+
 /* LOAD_EXTEND_OP (MODE).  `int' in and `int' out because target-insn.h is
    reached before coretypes.h; `rtl.h''s use site casts back to
    `enum rtx_code'.  */
