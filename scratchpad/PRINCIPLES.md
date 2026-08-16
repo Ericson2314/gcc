@@ -1484,6 +1484,10 @@ the anchor AND `git diff --quiet` in the harness, and let the srcdir be
 something nobody can write. A build whose sources can change under it measures
 nothing, and it will not tell you that.
 
+**`specs-config` WAS 230 lines when this was written; it is 232 since #163, and
+the md5s quoted below are environment-sensitive and are NOT bars — see the
+correction near line 978. What follows is kept as history, not as a check.**
+
 **`specs-config` IS 230 lines — and the story of this paragraph is the
 lesson.** An agent reported 222, measured on three targets with distinct md5s,
 and called 230 a stale coordinator figure. That was plausible (the coordinator
