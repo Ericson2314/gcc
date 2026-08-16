@@ -398,6 +398,26 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define PARM_BOUNDARY (targetm_cdata.parm_boundary)
 #undef FUNCTION_BOUNDARY
 #define FUNCTION_BOUNDARY (targetm_cdata.function_boundary)
+/* `TARGET_PTRMEMFUNC_VBIT_LOCATION'.  See the field comment in
+   target-cdata.h: this is the layout of every pointer to member function, it
+   was the primary's for all 47 back ends, and it is the one macro in this
+   block whose leak is an ABI break rather than a code-quality one.
+
+   NOT `#if'-BREAKING.  Swept over all of `gcc/' outside `config/': the eleven
+   spellings (cp/typeck.cc x7, ipa-prop.cc, builtins.cc, function.h, and
+   defaults.h's own supply-side `#ifndef') are ordinary run-time expressions,
+   two `switch' conditions among them and both with `default: gcc_unreachable
+   ()'.  No `#if', no case label, no array bound, no static initialiser.
+
+   The slot is an `int' and this redirect does not cast it back to
+   `enum ptrmemfunc_vbit_where_t'.  That enum is declared in `tree-core.h',
+   which this header is nowhere near -- `multi-target-macros.h' arrives
+   through `tm.h', long before any tree header -- and a cast naming it would
+   bind the redirect to an include order it cannot see.  Every use site
+   compares against the enumerators or switches with a default, so the
+   integral form means exactly what the enumerator form did.  */
+#undef TARGET_PTRMEMFUNC_VBIT_LOCATION
+#define TARGET_PTRMEMFUNC_VBIT_LOCATION (targetm_cdata.ptrmemfunc_vbit_location)
 /* ASM_OUTPUT_ALIGN.  A statement macro rather than a value, so it goes to
    `target-asm-ops.h''s per-base table rather than to `targetm_cdata'; see
    that header for why the operand's MEANING and not just its spelling varies

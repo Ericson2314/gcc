@@ -52,6 +52,22 @@ along with GCC; see the file COPYING3.  If not see
    introduce an enum in a parameter list.  */
 #include "memmodel.h"
 #include BASE_HEADER (tm_p.h)
+/* `TARGET_PTRMEMFUNC_VBIT_LOCATION' expands to a bare `ptrmemfunc_vbit_in_pfn'
+   / `ptrmemfunc_vbit_in_delta' enumerator, and `enum ptrmemfunc_vbit_where_t'
+   is declared here.  Nothing else in this file needs a tree header.
+
+   READ THE `DWARF_FRAME_RETURN_COLUMN' NOTE IN target-cdata.h BEFORE COPYING
+   THIS.  There the build failure was `current_function_decl was not declared
+   in this scope' and the one-line include fix was a TRAP -- it silenced a
+   scope error over a macro that genuinely reads per-function state, and gave
+   epiphany the wrong DWARF column in every interrupt handler.  This include
+   is the other case, and the difference is checkable rather than asserted:
+   `tree-core.h' supplies a TYPE, not state.  All six definitions of the macro
+   are bare enumerators and the 41-back-end fallback is a comparison of two
+   alignment constants, so there is nothing here for `cfun' being null to make
+   wrong.  An include that makes an error go away is safe exactly when you can
+   say what the macro reads; say it, or do not add the include.  */
+#include "tree-core.h"
 #include "target-cdata.h"
 
 #ifndef MULTI_TARGET_TARGETM_BASE

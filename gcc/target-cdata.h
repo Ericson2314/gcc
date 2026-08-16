@@ -217,10 +217,53 @@ along with GCC; see the file COPYING3.  If not see
      read by `defaults.h:1024' (TARGET_PTRMEMFUNC_VBIT_LOCATION),
      `defaults.h:1191' (TRAMPOLINE_ALIGNMENT), `function.h:638'
      (MINIMUM_METHOD_BOUNDARY), `stor-layout.cc', `tree.cc', `tree-nested.cc'
-     and `c-common.cc' -- so the leak reaches the ABI of pointers to member
-     functions, not only the assembler text.  Swept first: none of the eleven
-     is a `#if', an array bound or a static initialiser.  */		\
+     and `c-common.cc'.  Swept first: none of the eleven is a `#if', an array
+     bound or a static initialiser.
+
+     THE `defaults.h:1024' ENTRY IN THAT LIST USED TO CARRY THE CLAIM THAT
+     "the leak reaches the ABI of pointers to member functions".  THE
+     REASONING IS RIGHT AND THE FALLBACK IS NEVER TAKEN, SO THE CONCLUSION IS
+     FALSE.  `i386.h:832' defines `TARGET_PTRMEMFUNC_VBIT_LOCATION' outright,
+     so `defaults.h:1022's `#ifndef' is dead in every shared TU -- the
+     `REGMODE_NATURAL_SIZE' / `EPILOGUE_USES' trap again.  Converting
+     `FUNCTION_BOUNDARY' therefore did NOTHING for pointers to member
+     functions, and the sentence read as though the question had been asked.
+     The ptrmemfunc ABI needed its own field, which is the one below.  */	\
   NUM (unsigned short, function_boundary,	FUNCTION_BOUNDARY)	\
+  /* TARGET_PTRMEMFUNC_VBIT_LOCATION -- where C++ puts the bit that says a
+     pointer to member function names a VIRTUAL member.  ABI-visible: it
+     decides the layout of every `void (C::*)()' object.
+
+     Six back ends spell it (`i386.h:832' and `arc.h:1541'
+     `ptrmemfunc_vbit_in_pfn'; `aarch64.h:125', `arm.h:675', `mips.h:2441',
+     `loongarch.h:637' `ptrmemfunc_vbit_in_delta'), and the other 41 take
+     `defaults.h:1023's `FUNCTION_BOUNDARY'-derived answer -- which THIS file
+     is compiled per base to evaluate, so each of the 41 gets its own.
+
+     Measured before the fix with the built `cc1plus' at `-O2', both-sided,
+     with a NON-VIRTUAL control that must be identical under either
+     convention so the comparison isolates the vbit
+     (`scratchpad/agent-a260445cf27ba480a-ptrmem.{cc,sh}'): x86_64 emitted
+     `.quad 1 / .quad 0' and aarch64 the IDENTICAL `.xword 1 / .xword 0',
+     while aarch64's own header asks for the opposite convention.  rc=0, no
+     diagnostic, and assembly a real cross assembler accepts.
+
+     `cp/cp-tree.h:24' is one of the four shared headers carrying `tm.h' and
+     39 of 42 `cp/*.o' open it, so all 47 back ends were answered by the
+     primary.  `builtins.cc:262', `ipa-prop.cc:3103' and
+     `function.h:637' (MINIMUM_METHOD_BOUNDARY) read it too, so the leak was
+     never confined to the C++ front end.
+
+     INVARIANT AND REFRESH-POINT-EVALUABLE, on this header's own terms: every
+     one of the six definitions is a bare enumerator, and `defaults.h's
+     fallback is a comparison of two alignment constants.  No option state,
+     no `cfun', no back-end function call.  The slot is `int' rather than the
+     enum: the enum lives in `tree-core.h', the use sites all compare against
+     its enumerators or `switch' with a `default: gcc_unreachable ()', and an
+     `int' keeps the redirect in the plain `(targetm_cdata.<field>)' form the
+     completeness matcher requires.  */				\
+  NUM (int,	     ptrmemfunc_vbit_location,				\
+					TARGET_PTRMEMFUNC_VBIT_LOCATION) \
   NUM (unsigned short, attribute_aligned_value,	ATTRIBUTE_ALIGNED_VALUE) \
   NUM (unsigned short, malloc_abi_alignment,	MALLOC_ABI_ALIGNMENT)	\
   NUM (unsigned short, trampoline_size,		TRAMPOLINE_SIZE)	\
