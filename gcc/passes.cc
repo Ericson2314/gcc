@@ -196,19 +196,54 @@ pass_gate_p (opt_pass *pass, function *fun)
    forwarder for instance 1 and `clone ()' for instances 2..N, so EVERY back
    end pass its own passes.def inserts more than once lost its owner, while
    the first instance kept it.  Three exist across the 47 configured back
-   ends, and all three were live leaks:
+   ends:
 
      avr      avr_pass_fuse_add   (before peephole2, after cprop_hardreg)
      i386     pass_stv            (after late_combine, before cse2)
      aarch64  pass_ldp_fusion     (before early_remat, before peephole2)
 
-   avr's is the one that crashed: its `execute ()' writes
-   `func->machine->n_avr_fuse_add_executed' BEFORE testing anything, and
-   `struct machine_function' is declared separately by every back end, so
-   instance 2 wrote through microblaze's, rx's and sh's `machine_function' at
-   avr's offset.  Past the allocation it segfaults; inside it, it silently
-   corrupts whatever member sits there, which is why eight back ends compiled
-   the same input "cleanly" and were NOT thereby shown unaffected.
+   ONLY ONE OF THE THREE ACTUALLY ACTED, and the reason is worth stating
+   because it is what let this survive.  Measured with `-fdump-passes' on a
+   47-back-end build, compiling for x86_64 and for mips64:
+
+     rtl-stv1/stv2        OFF   gate reads TARGET_STV && TARGET_SSE2, i386
+                                option state a foreign base leaves 0
+     rtl-ldp_fusion1/2    OFF   gate reads flag_aarch64_late_ldp_fusion
+     rtl-avr-fuse-add1    OFF   instance 1, correctly gated by its owner
+     rtl-avr-fuse-add2    ON    <- the unowned clone, running for both
+
+   So `pass_stv' and `pass_ldp_fusion' were kept out of trouble by their own
+   gates, exactly as the leaked-PRESENCE half of `b349257c0a2' describes.  Do
+   NOT read `flag_aarch64_late_ldp_fusion' being `Init (1)' in aarch64.opt as
+   meaning that pass ran everywhere -- that inference was made while writing
+   this and the dump refuted it.  The control that makes those OFF readings
+   non-vacuous: compiling for aarch64, ldp_fusion1 and ldp_fusion2 both read
+   ON.
+
+   `avr_pass_fuse_add' is the one that acted, because it has NO gate at all
+   and, worse, its `execute ()' writes
+
+     func->machine->n_avr_fuse_add_executed += 1;
+
+   BEFORE testing `optimize && avropt_fuse_add', so the guard cannot protect
+   anything.  `struct machine_function' is declared separately by every back
+   end, so the unowned instance wrote through another back end's struct at
+   avr's offset.  Past the allocation it segfaults -- microblaze, rx and sh
+   all died on `int f(int x){return x+1;}' with no `-O' and no header.  INSIDE
+   the allocation it lands silently on whatever member sits there, which is
+   why eight back ends compiled that input without complaint and were NOT
+   thereby shown unaffected.  Measured, mips64:
+
+     avr `int n_avr_fuse_add_executed' is at offset 36 of avr's struct;
+     mips' `frame.var_size' (HOST_WIDE_INT) occupies bytes 32..39, so offset
+     36 is its HIGH half on a 64-bit little-endian host, and `+= 1' there adds
+     2^32:
+
+       .frame $fp,8,$31   # vars= 4294967296     <- before this fix
+       .frame $fp,8,$31   # vars= 0              <- after
+
+   i.e. wrong code, at -O0 and at -O2, on a back end the one-line census
+   scored OK.  "Compiled cleanly" and "unaffected" are not the same claim.
 
    Fixed here rather than in the three passes, because a gate added to
    avr_pass_fuse_add would leave the other two, and would leave the next back
