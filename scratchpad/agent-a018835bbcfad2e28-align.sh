@@ -44,16 +44,38 @@ for s in stock mt; do
 done
 
 echo
-echo "-- ARMS (each must hold, or this script is not measuring what it says):"
+echo "-- VERDICT.  The goal state is mt == stock; the two signatures below are"
+echo "   the DIAGNOSIS printed when it is not, not the thing being asserted."
+echo
+# THE ARM IS EQUALITY, NOT THE BUG SIGNATURE.  Written the other way round
+# first -- "mt must be `.align<SPACE>256'" -- which is a fine reproducer and a
+# terrible regression test: once the leak was closed the script printed two
+# FAILs and rc=1 for a compiler that had become byte-identical to stock.  A
+# script whose pass condition is the defect reports the fix as a failure.
 rc=0
-grep -qP '\.align\t8$'  "$O/align-3.stock.s" || { echo "   FAIL stock is not '.align<TAB>8'"; rc=1; }
-grep -q  '\.align 256$' "$O/align-3.mt.s"    || { echo "   FAIL mt is not '.align<SPACE>256'"; rc=1; }
-# 1 << 8 == 256: the arithmetic that identifies att.h rather than riscv.h
-[ "$((1 << 8))" = 256 ] || { echo "   FAIL the 1<<LOG identity"; rc=1; }
-# the SECOND leak: stock aligns `main', mt does not
+# stock is the control and must look like riscv either way; if this moves, the
+# control moved and nothing below means anything.
+grep -qP '\.align\t8$' "$O/align-3.stock.s" \
+  || { echo "   FATAL: stock is not '.align<TAB>8' -- the control is wrong"; exit 9; }
+
 a=$(grep -c '\.align' "$O/align-3.stock.s"); b=$(grep -c '\.align' "$O/align-3.mt.s")
 echo "   .align directives: stock $a, mt $b"
-[ "$a" -gt "$b" ] || { echo "   FAIL expected stock to emit MORE .align than mt"; rc=1; }
-[ "$rc" = 0 ] && echo "   all arms hold"
+
+if cmp -s "$O/align-3.stock.s" "$O/align-3.mt.s"; then
+  echo "   FIXED: multi-target output is byte-identical to stock."
+else
+  rc=1
+  echo "   NOT FIXED.  Which of the two leaks is present:"
+  if grep -q '\.align 256$' "$O/align-3.mt.s"; then
+    echo "     ASM_OUTPUT_ALIGN  -- '.align<SPACE>256' is i386/att.h's"
+    echo "                          '\\t.align %d' with 1 << LOG (1<<8 = $((1 << 8)))"
+  fi
+  if [ "$a" -gt "$b" ]; then
+    echo "     FUNCTION_BOUNDARY -- mt emits $((a - b)) fewer .align than stock;"
+    echo "                          i386.h:823 is 8 BITS, so varasm.cc:2155"
+    echo "                          computes floor_log2 (1) = 0 and emits none"
+  fi
+  diff -u "$O/align-3.stock.s" "$O/align-3.mt.s" | sed -n '1,20p' | sed 's/^/     /'
+fi
 echo "ALIGN rc=$rc"
 exit $rc

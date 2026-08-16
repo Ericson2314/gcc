@@ -49,9 +49,21 @@ for T in "$@"; do
     sh scratchpad/mtcheck.sh "$B" "$T" >> "$L/check-$T.log" 2>&1
   echo "check $T rc=$?" >> "$L/drive2.log"
   # preserve the artefacts before the next target overwrites gcc.sum/gcc.log
+  # THE SUM IS UNDER $B/gcc/, NOT $B/.  Written as $B/testsuite.$T/... at
+  # first, which does not exist: `mtcheck.sh' sets TESTSUITEDIR relative to the
+  # gcc build subdirectory, so the merged sum is
+  # $B/gcc/testsuite.<triple>/gcc/gcc.sum.  The `[ -f ]' guard meant the copy
+  # silently did nothing and the run still stamped its `.rc', i.e. a finished
+  # run with no artefact preserved -- the absent-artefact shape again.  The
+  # guard is now a REFUSAL that names the path it looked for.
   if [ -f "$B/check-$T.rc" ]; then
-    S=$B/testsuite.$T/gcc/gcc.sum
-    [ -f "$S" ] && cp "$S" "$L/$T.sum"
+    S=$B/gcc/testsuite.$T/gcc/gcc.sum
+    if [ -f "$S" ]; then
+      cp "$S" "$L/$T.sum"
+      cp "$B/gcc/testsuite.$T/gcc/gcc.log" "$L/$T.log" 2>/dev/null || true
+    else
+      echo "FATAL: run stamped rc but no sum at $S" >> "$L/drive2.log"
+    fi
     cp "$B/check-$T.rc" "$L/$T.rc"
   fi
 done
