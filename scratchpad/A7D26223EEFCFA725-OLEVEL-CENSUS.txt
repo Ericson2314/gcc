@@ -1,0 +1,50 @@
+TARGET                         -O0                    -O1                    -O2
+aarch64-unknown-linux-gnu      ok                     ok                     ok
+alpha-unknown-linux-gnu        ok                     ok                     ok
+arc-unknown-elf32              ICE:OTHER              ICE:OTHER              ICE:OTHER
+arm-unknown-eabi               ok                     ok                     ok
+avr-unknown-elf                ok                     ok                     ICE:back end 'avr' has n
+bfin-unknown-elf               ok                     ok                     ok
+bpf-unknown-none               ok                     ok                     ok
+tic6x-unknown-elf              ICE:Segmentation fault ICE:Segmentation fault ICE:Segmentation fault
+cris-axis-elf                  ok                     ok                     ICE:back end 'cris' has 
+csky-unknown-elf               ok                     ok                     ok
+epiphany-unknown-elf           ok                     ok                     ok
+fr30-unknown-elf               ICE:in default_legitimat ICE:in default_legitimat ICE:in default_legitimat
+frv-unknown-elf                ok                     ok                     ok
+ft32-unknown-elf               ok                     ok                     ICE:back end 'ft32' has 
+h8300-unknown-elf              ok                     ok                     ICE:back end 'h8300' has
+x86_64-pc-linux-gnu            ok                     ok                     ok
+ia64-unknown-elf               ok                     ok                     ok
+iq2000-unknown-elf             ok                     ok                     ok
+lm32-unknown-elf               ok                     ok                     ok
+m32r-unknown-elf               ok                     ok                     ok
+m68k-unknown-elf               ICE:unrecognized argumen ICE:unrecognized argumen ICE:unrecognized argumen
+mcore-unknown-elf              ok                     ok                     ok
+microblaze-xilinx-elf          ok                     ok                     ok
+mips64-unknown-elf             ok                     ok                     ok
+mmix-knuth-mmixware            ICE:back end 'mmix' has  ICE:back end 'mmix' has  ICE:back end 'mmix' has 
+mn10300-unknown-elf            ok                     ok                     ok
+moxie-unknown-elf              ok                     ok                     ICE:back end 'moxie' has
+msp430-unknown-elf             ICE:in msp430_function_s ICE:in msp430_function_s ICE:back end 'msp430' ha
+nds32be-unknown-elf            ok                     ok                     ok
+or1k-unknown-elf               ok                     ok                     ok
+hppa64-unknown-linux-gnu       ok                     ok                     ok
+pdp11-dec-aout                 ok                     ok                     ICE:back end 'pdp11' has
+powerpc64-unknown-linux-gnu    ok                     ok                     ok
+pru-unknown-elf                ICE:in pru_hard_regno_mo ICE:in pru_hard_regno_mo ICE:in pru_hard_regno_mo
+riscv64-unknown-linux-gnu      ok                     ok                     ok
+rl78-unknown-elf               ok                     ok                     ICE:back end 'rl78' has 
+rx-unknown-elf                 ok                     ok                     ok
+s390x-ibm-linux-gnu            ok                     ok                     ok
+sh-unknown-elf                 ok                     ok                     ok
+sparc64-unknown-linux-gnu      ok                     ICE:'only_leaf_regs_used ICE:'only_leaf_regs_used
+v850e1-unknown-elf             ok                     ok                     ok
+vax-dec-linux-gnu              ok                     ok                     ICE:back end 'vax' has n
+visium-unknown-elf             ok                     ok                     ok
+xstormy16-unknown-elf          ok                     ok                     ICE:back end 'xstormy16'
+xtensa-unknown-elf             ok                     ok                     ok
+
+of 45 targets with a specs-config:  -O0 ok=38   -O1 ok=37   -O2 ok=28
+A target ok at -O0 and dead at -O1/-O2 is INVISIBLE to the existing
+single-level precondition, and gcc.target is mostly compiled at -O2.

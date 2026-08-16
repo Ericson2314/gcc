@@ -1,0 +1,48 @@
+# BACKEND TRIPLE VERDICT PASS FAIL LOAD15 KILLED NOTE
+aarch64      aarch64-unknown-linux-gnu      SCORED               4297    537  18.53      1 
+alpha        alpha-unknown-linux-gnu        SCORED               2153     30  20.57      1 
+arc          arc-unknown-elf32              SCORED                211    153  21.97      1 
+arm          arm-unknown-eabi               SCORED               1215     92  24.27      1 
+avr          avr-unknown-elf                SCORED                 17    125  26.18      1 PROVISIONAL(load>25)
+bfin         bfin-unknown-elf               SCORED                 80      1  26.30      1 PROVISIONAL(load>25)
+bpf          bpf-unknown-none               SCORED                579      5  26.09      1 PROVISIONAL(load>25)
+c6x          tic6x-unknown-elf              DIED-FIRST-INPUT        -      -  26.09      - rc=1 during RTL pass: final /tmp/w-a7d26223eefcfa725/one-c6x.c: In function 'mt_one': /tmp/w-a7
+cris         cris-axis-elf                  SCORED                  3    174  25.97      1 PROVISIONAL(load>25)
+csky         csky-unknown-elf               SCORED                 41      3  25.78      1 PROVISIONAL(load>25)
+epiphany     epiphany-unknown-elf           SCORED                 19      5  25.69      1 PROVISIONAL(load>25)
+fr30         fr30-unknown-elf               NO-EXP                  -      -  25.69      - upstream has no gcc.target/fr30
+frv          frv-unknown-elf                SCORED                154      0  25.52      1 PROVISIONAL(load>25)
+ft32         ft32-unknown-elf               NO-EXP                  -      -  25.52      - upstream has no gcc.target/ft32
+gcn          amdgcn-unknown-amdhsa          NO-CROSS-AS             -      -  25.52      - no GNU as in the concept
+h8300        h8300-unknown-elf              SCORED                  6     24  25.41      1 PROVISIONAL(load>25)
+i386         x86_64-pc-linux-gnu            SCORED              26323     74  22.78      1 
+ia64         ia64-unknown-elf               SCORED                124      9  22.56      1 
+iq2000       iq2000-unknown-elf             NO-EXP                  -      -  22.56      - upstream has no gcc.target/iq2000
+lm32         lm32-unknown-elf               NO-EXP                  -      -  22.56      - upstream has no gcc.target/lm32
+m32r         m32r-unknown-elf               NO-EXP                  -      -  22.56      - upstream has no gcc.target/m32r
+m68k         m68k-unknown-elf               DIED-FIRST-INPUT        -      -  22.56      - rc=1 xgcc: error: unrecognized argument in option '-mcpu=m68020' xgcc: note: valid arguments to
+mcore        mcore-unknown-elf              NO-EXP                  -      -  22.56      - upstream has no gcc.target/mcore
+microblaze   microblaze-xilinx-elf          SCORED                321    101  22.41      1 
+mips         mips64-unknown-elf             SCORED              16478   1746  22.30      1 
+mmix         mmix-knuth-mmixware            NO-EXP                  -      -  22.30      - upstream has no gcc.target/mmix
+mn10300      mn10300-unknown-elf            NO-EXP                  -      -  22.30      - upstream has no gcc.target/mn10300
+moxie        moxie-unknown-elf              NO-EXP                  -      -  22.30      - upstream has no gcc.target/moxie
+msp430       msp430-unknown-elf             DIED-FIRST-INPUT        -      -  22.30      - rc=1 during RTL pass: final /tmp/w-a7d26223eefcfa725/one-msp430.c: In function 'mt_one': /tmp/w
+nds32        nds32be-unknown-elf            SCORED                 15      0  22.44      1 
+nvptx        nvptx-unknown-none             NO-CROSS-AS             -      -  22.44      - no GNU as in the concept
+or1k         or1k-unknown-elf               SCORED                 46      0  22.50      1 
+pa           hppa64-unknown-linux-gnu       NO-SUM                  -      -  22.50      - crc=9 FATAL[hppa64-unknown-linux-gnu]: the target's own assembler rejected the compiler's output
+pdp11        pdp11-dec-aout                 NO-SUM                  -      -  24.52      - crc=9 FATAL[pdp11-dec-aout]: pdp11-dec-aout-readelf named no machine
+rs6000       powerpc64-unknown-linux-gnu    NO-SUM                  -      -  26.66      - crc=9 FATAL[powerpc64-unknown-linux-gnu]: the target's own assembler rejected the compiler's out
+pru          pru-unknown-elf                DIED-FIRST-INPUT        -      -  27.04      - rc=1 /tmp/w-a7d26223eefcfa725/one-pru.c: internal compiler error: in pru_hard_regno_mode_ok, at
+riscv        riscv64-unknown-linux-gnu      SCORED              41714    560  31.27      1 PROVISIONAL(load>25)
+rl78         rl78-unknown-elf               SCORED                  8     30  30.98      1 PROVISIONAL(load>25)
+rx           rx-unknown-elf                 SCORED                192     21  31.36      1 PROVISIONAL(load>25)
+s390         s390x-ibm-linux-gnu            SCORED               1875    164  32.37      1 PROVISIONAL(load>25)
+sh           sh-unknown-elf                 SCORED                386     58  32.94      1 PROVISIONAL(load>25)
+sparc        sparc64-unknown-linux-gnu      NO-SUM                  -      -  32.94      - crc=9 FATAL[sparc64-unknown-linux-gnu]: the target's own assembler rejected the compiler's outpu
+v850         v850e1-unknown-elf             SCORED                  1      0  34.37      1 PROVISIONAL(load>25)
+vax          vax-dec-linux-gnu              SCORED                974   2225  35.83      1 PROVISIONAL(load>25)
+visium       visium-unknown-elf             SCORED                 28      2  36.33      1 PROVISIONAL(load>25)
+xstormy16    xstormy16-unknown-elf          SCORED                  6    440  36.57      1 PROVISIONAL(load>25)
+xtensa       xtensa-unknown-elf             SCORED                 50      4  36.42      1 PROVISIONAL(load>25)
