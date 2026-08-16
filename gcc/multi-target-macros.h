@@ -396,6 +396,25 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #define LONG_TYPE_SIZE (targetm_cdata.long_type_size)
 #undef PARM_BOUNDARY
 #define PARM_BOUNDARY (targetm_cdata.parm_boundary)
+#undef FUNCTION_BOUNDARY
+#define FUNCTION_BOUNDARY (targetm_cdata.function_boundary)
+/* ASM_OUTPUT_ALIGN.  A statement macro rather than a value, so it goes to
+   `target-asm-ops.h''s per-base table rather than to `targetm_cdata'; see
+   that header for why the operand's MEANING and not just its spelling varies
+   between back ends.  Reached at a settled point -- every definition of it is
+   in the back end's own header chain (`riscv.h', `i386/att.h', `elfos.h'),
+   never in `insn-config.h' -- so a redirect here is the last word, which is
+   `LOAD_EXTEND_OP''s argument above.  Swept: all ~30 uses outside `config/'
+   are statements, none is in a `#if'.
+
+   DECLARED HERE RATHER THAN BY INCLUDING `target-asm-ops.h'.  That header
+   also carries `gcc_taop_output_align', whose body is `ASM_OUTPUT_ALIGN' --
+   the macro this block is in the middle of replacing -- so pulling it in at
+   this point would make the definition depend on whether it arrived before or
+   after the redirect.  One extern declaration has no such ordering.  */
+extern void mt_asm_output_align (FILE *, int);
+#undef ASM_OUTPUT_ALIGN
+#define ASM_OUTPUT_ALIGN(STREAM, LOG) (mt_asm_output_align ((STREAM), (LOG)))
 #undef ATTRIBUTE_ALIGNED_VALUE
 #define ATTRIBUTE_ALIGNED_VALUE (targetm_cdata.attribute_aligned_value)
 #undef MALLOC_ABI_ALIGNMENT

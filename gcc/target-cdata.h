@@ -208,6 +208,19 @@ along with GCC; see the file COPYING3.  If not see
   NUM (unsigned short, bits_per_word,		BITS_PER_WORD)		\
   NUM (unsigned short, long_type_size,		LONG_TYPE_SIZE)		\
   NUM (unsigned short, parm_boundary,		PARM_BOUNDARY)		\
+  /* FUNCTION_BOUNDARY, in BITS.  `i386.h:823' is a bare `8' -- one byte --
+     and riscv's is 16 or 32 depending on `TARGET_RVC', so shared code reading
+     the primary's answer computes `floor_log2 (8 / BITS_PER_UNIT)' = 0 at
+     `varasm.cc:2155' and emits NO function alignment directive at all, for
+     every base.  Measured on riscv64: 22 `.align 1' present in stock output
+     and 0 here (scratchpad/agent-a018835bbcfad2e28-align.sh).  It is also
+     read by `defaults.h:1024' (TARGET_PTRMEMFUNC_VBIT_LOCATION),
+     `defaults.h:1191' (TRAMPOLINE_ALIGNMENT), `function.h:638'
+     (MINIMUM_METHOD_BOUNDARY), `stor-layout.cc', `tree.cc', `tree-nested.cc'
+     and `c-common.cc' -- so the leak reaches the ABI of pointers to member
+     functions, not only the assembler text.  Swept first: none of the eleven
+     is a `#if', an array bound or a static initialiser.  */		\
+  NUM (unsigned short, function_boundary,	FUNCTION_BOUNDARY)	\
   NUM (unsigned short, attribute_aligned_value,	ATTRIBUTE_ALIGNED_VALUE) \
   NUM (unsigned short, malloc_abi_alignment,	MALLOC_ABI_ALIGNMENT)	\
   NUM (unsigned short, trampoline_size,		TRAMPOLINE_SIZE)	\

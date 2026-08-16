@@ -91,3 +91,26 @@ init_targetm_asm_ops (void)
   targetm.asm_out.dtors_section_asm_op = ops->dtors_section_asm_op;
   targetm.asm_out.init_section_asm_op = ops->init_section_asm_op;
 }
+
+/* ASM_OUTPUT_ALIGN for the base in force.
+
+   NOT copied into `targetm.asm_out' above, because the macro has no `targetm'
+   counterpart to be copied into; `multi-target-macros.h' redirects the macro
+   straight here instead.
+
+   THE NULL CHECK IS NOT DEFENSIVE PADDING.  `targetm_asm_ops' is initialised
+   to `&TARGETM_ASM_OPS_SYMBOL' -- the PRIMARY's table -- so that a
+   `multi_target_select' which never ran leaves this function quietly emitting
+   i386's directive, which is the exact defect being removed and would be
+   indistinguishable from success.  A null `output_align' is the one shape
+   that can be detected from here, and it fails by name.  */
+
+void
+mt_asm_output_align (FILE *stream, int log)
+{
+  if (targetm_asm_ops == NULL || targetm_asm_ops->output_align == NULL)
+    internal_error ("no back end has been selected, so the %<.align%> "
+		    "directive spelling is unknown; a target must be chosen "
+		    "with %<-ftarget-config=%> before assembly is emitted");
+  targetm_asm_ops->output_align (stream, log);
+}
