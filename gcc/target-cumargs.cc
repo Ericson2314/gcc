@@ -391,10 +391,23 @@ mt_base_adjust_insn_length (rtx_insn *insn ATTRIBUTE_UNUSED,
 
    The `#else' calls the very function `final.cc' used to define privately,
    now non-static, rather than restating its body: one authority for the
-   fallback, so it cannot drift from the generic answer it is meant to be.  */
+   fallback, so it cannot drift from the generic answer it is meant to be.
+
+   ATTRIBUTE_UNUSED ON `table' BECAUSE 10 OF THE 12 DEFINERS IGNORE IT, AND
+   THE COUNT IS EVIDENCE WORTH RECORDING RATHER THAN JUST NOISE TO SILENCE.
+   Before this attribute the 47-base build gained exactly **10** `unused
+   parameter 'table'` warnings, one per base whose ADDR_VEC_ALIGN is a
+   constant or ignores its argument -- aarch64 0, vax 0, csky 0, sh 2, pa 2,
+   nds32 2, xstormy16 1, ia64 `(CASE_VECTOR_MODE == SImode ? 2 : 3)', and
+   nvptx / c6x `(JUMP_TABLES_IN_TEXT_SECTION ? 5 : 2)'.  The two that DO read
+   the table are arm and arc.  10 + 2 = the 12 definers, so the warning count
+   enumerated exactly the population this conversion was aimed at, and nothing
+   else -- a cheap confirmation that it reached the right back ends and only
+   them.  Stated here because once the attribute silences it that evidence is
+   no longer reproducible from a build log.  */
 
 static int
-mt_base_addr_vec_align (rtx_jump_table_data *table)
+mt_base_addr_vec_align (rtx_jump_table_data *table ATTRIBUTE_UNUSED)
 {
 #ifdef ADDR_VEC_ALIGN
   return ADDR_VEC_ALIGN (table);

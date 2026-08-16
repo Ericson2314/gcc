@@ -42,8 +42,8 @@ export WANT_ANCHOR=$A
 export MT_MAKEFLAGS=${MT_MAKEFLAGS:--j6}
 LIST=$(grep -v '^#' "$W/scratchpad/backends-47.txt" | grep -v '^$' | paste -sd,)
 
-sha=25707bfcad1
-tag=post4
+sha=71f44e05666
+tag=post5
 S=/tmp/snap-$ID-$sha
 D=/tmp/b-${ID#agent-}-$tag
 
@@ -54,6 +54,10 @@ echo "anchor=$A jobs=$MT_MAKEFLAGS bases=$(echo "$LIST" | tr ',' '\n' | wc -l)"
 grep -q mt_declare_function_size   "$S/gcc/varasm.cc" || { echo "FATAL: snapshot lacks the POP half";  exit 9; }
 grep -q mt_declare_function_prefix "$S/gcc/varasm.cc" || { echo "FATAL: snapshot lacks the PUSH half"; exit 9; }
 grep -q mt_adjust_insn_length      "$S/gcc/final.cc"  || { echo "FATAL: snapshot lacks ADJUST_INSN_LENGTH"; exit 9; }
+grep -q mt_addr_vec_align          "$S/gcc/final.cc"  || { echo "FATAL: snapshot lacks ADDR_VEC_ALIGN"; exit 9; }
+# The generic fallback must be EXPORTED, not still static -- the per-base thunk
+# calls it, and a snapshot with the call but not the export links nowhere.
+grep -q 'final_addr_vec_align' "$S/gcc/output.h" || { echo "FATAL: final_addr_vec_align not declared in output.h"; exit 9; }
 # ANCHORED AT LINE START, AND THE UNANCHORED VERSION WAS A FALSE RED.  It was
 # `grep -q "#ifdef ADJUST_INSN_LENGTH"', which matched the string inside the
 # CONVERSION'S OWN COMMENT at final.cc:404 ("This was `#ifdef
