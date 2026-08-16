@@ -2816,7 +2816,27 @@ function emit_c_target_objs(	nb, bases, i, b, n, parts, j, obj, src, own,
     printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n\n", b;
     c_target_objs_list = c_target_objs_list " $(MT_C_OBJS_" b ")";
 
-    cxxlist = "";
+    # UNCONDITIONAL, AND THE CONDITIONAL VERSION WAS A MECHANISM THAT NEVER RAN
+    # FOR MOST BACK ENDS.
+    #
+    # This used to start empty and be filled in by the loop below, so a base
+    # naming NOTHING in `cxx_target_objs' got `MT_CXX_OBJS_<b> =' -- and with
+    # it no `target-c-ops-<b>.o' in the cc1plus link, while
+    # `target-c-ops-select.o' (shared, C-family, in both links) still names
+    # `targetm_c_ops_<b>'.  Measured on a 47-back-end build with
+    # `--enable-languages=c,c++,objc,obj-c++': cc1plus and cc1objplus failed
+    # with `undefined reference to targetm_c_ops_<cpu>' for riscv, rx, c6x,
+    # vax, visium, xstormy16, xtensa and others -- every base with no
+    # `cxx_target_objs' of its own.  cc1 linked cleanly, which is why 47 back
+    # ends have been reported as linking: the boards build `c,lto'.
+    #
+    # The comment above already said "the list is `$(MT_C_OBJS_<cpu>)' by
+    # reference: anything the C side adds follows automatically" -- true, but
+    # the assignment sat inside a loop whose trip count is the number of
+    # `cxx_target_objs' entries, so for most bases it was never reached.  The
+    # loop below is still needed for `cxx_moved_objs' bookkeeping and for the
+    # refusal, and it no longer decides whether the list exists.
+    cxxlist = " $(MT_C_OBJS_" b ")";
     n = split(mtc_cxxobjs[b], parts, " ");
     for (j = 1; j <= n; j++) {
       obj = parts[j];
@@ -2838,7 +2858,6 @@ function emit_c_target_objs(	nb, bases, i, b, n, parts, j, obj, src, own,
 	       " gen-multi-target-md.awk a rule for it)\n\n", b, parts[j];
 	continue;
       }
-      cxxlist = " $(MT_C_OBJS_" b ")";
       # Taken OUT of @cxx_target_objs@ by gcc/Makefile.in for the same reason
       # as the C side.
       if (index(" " cxx_moved_objs " ", " " parts[j] " ") == 0)
