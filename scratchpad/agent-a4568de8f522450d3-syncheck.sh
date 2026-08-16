@@ -34,6 +34,15 @@ BASES=${BASES:-aarch64 epiphany s390 riscv i386 arm rs6000 mips avr sh nvptx alp
 n=$(grep -n '/gcc/target-cumargs\.cc[[:space:]]*$' "$LOG" | head -1 | cut -d: -f1)
 [ -n "$n" ] || { echo "FATAL: no target-cumargs.cc compile in $LOG"; exit 9; }
 CMD=$(sed -n "$((n-1))p" "$LOG" | sed 's/[[:space:]]*\\$//')
+# REPOINT THE SNAPSHOT'S `-I' AT $SRC.  Without this the harness compiles the
+# WORKING TREE's target-cumargs.cc against the SNAPSHOT's headers -- new code,
+# old `target-frame.h' -- so a table initialiser naming a field that exists
+# only in the working tree scores CLEAN instead of "too many initializers".
+# Measured: this file reported 47 of 47 `ok' in exactly that state.
+SNAP=$(printf '%s\n' "$CMD" | tr ' ' '\n' | sed -n 's|^-I\(/tmp/snap-[^/]*\)/gcc$|\1|p' | head -1)
+[ -n "$SNAP" ] || { echo "FATAL: no -I<snapshot>/gcc in the compile line"; exit 9; }
+echo "repointing $SNAP -> $SRC"
+CMD=$(printf '%s\n' "$CMD" | sed "s#$SNAP#$SRC#g")
 case "$CMD" in *target-cumargs-*.o*) ;; *) echo "FATAL: line $((n-1)) is not the compile"; exit 9 ;; esac
 OLDBASE=$(printf '%s\n' "$CMD" | grep -o 'MULTI_TARGET_TARGETM_BASE=[A-Za-z0-9_]*' | cut -d= -f2)
 [ -n "$OLDBASE" ] || { echo "FATAL: no MULTI_TARGET_TARGETM_BASE in the command"; exit 9; }

@@ -482,8 +482,19 @@ get_attr_min_length (rtx_insn *insn)
 #define JUMP_ALIGN(LABEL) align_jumps
 #endif
 
-#ifndef ADDR_VEC_ALIGN
-static int
+/* The generic jump-table alignment, for a back end that defines no
+   ADDR_VEC_ALIGN of its own.
+
+   IT USED TO BE `static' INSIDE `#ifndef ADDR_VEC_ALIGN', WITH A `#define'
+   POINTING THE MACRO AT IT -- AND THAT `#ifndef' WAS TAKEN FOR ALL 47 BASES,
+   because i386 defines no ADDR_VEC_ALIGN.  So every back end got this
+   function and the 12 that define the macro never got their own answer.  It
+   is now non-static, declared in output.h, and called from the per-base thunk
+   so that a base defining nothing still gets THIS answer -- the supply-side
+   fallback PRINCIPLES permits, reached in that base's own translation unit,
+   and the same text rather than a restatement of it.  See target-frame.h.  */
+
+int
 final_addr_vec_align (rtx_jump_table_data *addr_vec)
 {
   int align = GET_MODE_SIZE (addr_vec->get_data_mode ());
@@ -493,9 +504,6 @@ final_addr_vec_align (rtx_jump_table_data *addr_vec)
   return exact_log2 (align);
 
 }
-
-#define ADDR_VEC_ALIGN(ADDR_VEC) final_addr_vec_align (ADDR_VEC)
-#endif
 
 #ifndef INSN_LENGTH_ALIGNMENT
 #define INSN_LENGTH_ALIGNMENT(INSN) length_unit_log
@@ -891,7 +899,7 @@ shorten_branches (rtx_insn *first)
 	       || readonly_data_section == text_section)
 	      && table)
 	    {
-	      align_flags alignment = align_flags (ADDR_VEC_ALIGN (table));
+	      align_flags alignment = align_flags (mt_addr_vec_align (table));
 	      max_alignment = align_flags::max (max_alignment, alignment);
 	    }
 	  LABEL_TO_ALIGNMENT (label) = max_alignment;
@@ -1150,7 +1158,7 @@ shorten_branches (rtx_insn *first)
 		  rtx_jump_table_data *table = jump_table_for_label (label);
 		  if (table)
 		    {
-		      int newlog = ADDR_VEC_ALIGN (table);
+		      int newlog = mt_addr_vec_align (table);
 		      if (newlog != log)
 			{
 			  log = newlog;
@@ -2476,11 +2484,14 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 				 (current_function_decl,
 				  jumptable_relocatable ()));
 
-#ifdef ADDR_VEC_ALIGN
-	      log_align = ADDR_VEC_ALIGN (table);
-#else
-	      log_align = exact_log2 (BIGGEST_ALIGNMENT / BITS_PER_UNIT);
-#endif
+	      /* This was `#ifdef ADDR_VEC_ALIGN' with an `#else' -- and the
+		 `#else' was DEAD, because the `#ifndef' block near the top of
+		 this file defined the macro whenever a back end had not, so
+		 the `#ifdef' was true for every base.  Removing it loses
+		 nothing: a base defining no macro now reaches
+		 `final_addr_vec_align' through the thunk, which is the arm
+		 that was actually running.  */
+	      log_align = mt_addr_vec_align (table);
 	      ASM_OUTPUT_ALIGN (file, log_align);
 	    }
 	  else

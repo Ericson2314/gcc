@@ -384,6 +384,25 @@ mt_base_adjust_insn_length (rtx_insn *insn ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* ADDR_VEC_ALIGN, asked of THIS base.  Three sites in `final.cc'; the leak was
+   behind an `#ifndef' rather than an `#ifdef', so all 47 bases took the
+   generic `final_addr_vec_align' and the 12 definers -- aarch64 and vax want
+   0, i.e. NO alignment -- never got their own.  See target-frame.h.
+
+   The `#else' calls the very function `final.cc' used to define privately,
+   now non-static, rather than restating its body: one authority for the
+   fallback, so it cannot drift from the generic answer it is meant to be.  */
+
+static int
+mt_base_addr_vec_align (rtx_jump_table_data *table)
+{
+#ifdef ADDR_VEC_ALIGN
+  return ADDR_VEC_ALIGN (table);
+#else
+  return final_addr_vec_align (table);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1910,7 +1929,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_cold_function_name,
   mt_base_declare_function_size,
   mt_base_declare_function_prefix,
-  mt_base_adjust_insn_length
+  mt_base_adjust_insn_length,
+  mt_base_addr_vec_align
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what

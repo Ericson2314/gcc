@@ -1756,6 +1756,52 @@ struct target_frame_desc
      population has a blind spot -- so the scan has now produced a second
      member of its own class, which is the argument for keeping it.  */
   void (*adjust_insn_length) (rtx_insn *insn, int *length);
+
+  /* ADDR_VEC_ALIGN -- JUMP-TABLE ALIGNMENT, AND THE `.align' LEAK ONE MACRO
+     OVER.
+
+     Three consumers, all in `final.cc' (:894, :1153, :2480), and the leak
+     hides behind a `#ifndef' rather than an `#ifdef', which is why it reads
+     as harmless.  `final.cc:485' says
+
+	 #ifndef ADDR_VEC_ALIGN
+	 static int final_addr_vec_align (...) { ... }
+	 #define ADDR_VEC_ALIGN(ADDR_VEC) final_addr_vec_align (ADDR_VEC)
+	 #endif
+
+     and i386 defines no ADDR_VEC_ALIGN, so that block was taken for ALL 47
+     BASES.  Every back end got the generic `GET_MODE_SIZE' computation and
+     the **12 that define the macro never got their own answer**:
+
+	 aarch64  0        vax    0        csky  0
+	 sh 2     pa 2     nds32 2         xstormy16 1
+	 ia64     (SImode ? 2 : 3)         arm, arc  computed
+	 nvptx / c6x        (JUMP_TABLES_IN_TEXT_SECTION ? 5 : 2)
+
+     aarch64 and vax ask for **0** -- no alignment at all -- and were given
+     `exact_log2 (GET_MODE_SIZE (mode))` instead, so every jump table on those
+     targets is over-aligned. That is the same family as the `.align 256`
+     defect the previous board fixed, where i386's `ASM_OUTPUT_ALIGN` reached
+     riscv and aarch64 was found over-aligning arrays by 4096x. This is the
+     jump-table half of it.
+
+     NOTE THE `#ifdef` AT `final.cc:2479` WAS DEAD. It had an `#else` giving
+     `exact_log2 (BIGGEST_ALIGNMENT / BITS_PER_UNIT)`, and that arm could
+     never be taken, because the `#ifndef` above had already defined the name
+     for exactly the bases that would have wanted it. Two fallbacks, one of
+     them unreachable, disagreeing about the answer.
+
+     THE FALLBACK IS SUPPLY-SIDE AND STAYS. `final_addr_vec_align` is now
+     non-static (declared in `output.h`) and the thunk calls it for a base
+     defining no macro. That is upstream's own answer for such a back end,
+     reached in that base's own translation unit -- the kind PRINCIPLES
+     permits -- and it is the SAME function rather than a restatement, so it
+     cannot drift.
+
+     Not in `doc/tm.texi`: the third member of the undocumented population,
+     and the one `-undoc.sh`'s control is now anchored on. Re-anchor that
+     control before relying on it again.  */
+  int (*addr_vec_align) (rtx_jump_table_data *table);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1816,6 +1862,11 @@ extern void mt_declare_function_prefix (FILE *, const char *);
    thunk with an empty body, which is the same nothing the dead `#ifdef' did --
    the difference being that the 13 bases which DO define it now get theirs.  */
 extern void mt_adjust_insn_length (rtx_insn *, int *);
+
+/* `ADDR_VEC_ALIGN'; `final.cc' :894, :1153, :2480.  Jump-table alignment.
+   aarch64 and vax ask for 0 and were given the generic computation; see the
+   descriptor field.  */
+extern int mt_addr_vec_align (rtx_jump_table_data *);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is
