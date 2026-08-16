@@ -57,6 +57,28 @@ of it. Both are invisible today because every in-tree `cpu_approx_modes` value
 is `AARCH64_APPROX_NONE` (0) or `AARCH64_APPROX_ALL` (~0) — 9 and 3
 occurrences respectively across `config/aarch64/tuning_models/`.
 
+## THE UB, MEASURED IN A RUNNING `cc1` (PRE)
+
+`a51a0e8b2b458063b-ubshift.sh /tmp/b-a51a0e8b2b458063b-pre pre`, 47 bases,
+snapshot `6bbccf3795c`, anchor 52, `mt-aarch64/aarch64.o` rebuilt with
+`-fsanitize=shift` and `cc1` relinked:
+
+```
+__ubsan_handle_shift_out_of_bounds undefined refs in the object: 1   <- ARM 1
+'shift exponent' reports:                                        9   <- ARM 2
+
+aarch64.cc:17316:11  runtime error: shift exponent 136 is too large for
+                     64-bit type 'long unsigned int'      (aarch64_emit_approx_div)
+aarch64.cc:17140:11  ... 136 ...                          (use_rsqrt_p)
+aarch64.cc:17205:5   ... 136 ...                          (aarch64_emit_approx_sqrt)
+```
+
+**All three call sites, and 136 is `VNx4SFmode`** — the value predicted from
+the generated header before any sanitized build existed. ARM 1 is what makes a
+clean ARM 2 mean anything: "UBSan reported nothing" and "UBSan was never
+enabled on that TU" are the same empty log, so the script refuses to score
+until it has seen the handler as an undefined reference in the rebuilt object.
+
 ## THE SHAPE ELSEWHERE — SWEPT, ONE INSTANCE
 
 `grep` for `- MIN_MODE_` over the tree finds ten other sites. Every one of them
