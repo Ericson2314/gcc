@@ -22,6 +22,26 @@
 # assembler, but if a run ever depends on the distinction, say so.
 #
 # The verdict vocabulary is pass 1's, unchanged, plus the spelling that worked.
+#
+# A CANDIDATE MUST NEVER BE A DIFFERENT TARGET WEARING THE SAME BACK END'S
+# NAME, AND THIS LIST BROKE THAT RULE.  `powerpc64-linux-gnu' used to offer
+# `powerpc64le-unknown-linux-gnu' as its second spelling.  That is not a
+# respelling, it is the OTHER ENDIANNESS -- so a run that fell through to it
+# installed a LITTLE-endian `as' under a BIG-endian name, which is this
+# project's root bug (one name, several authorities, no diagnostic) inside the
+# tooling that exists to prevent it.  The recorded rs6000 recovery failure was
+# this line.
+#
+# The real cause was never `lib.systems' at all.  `powerpc64-unknown-linux-gnu'
+# fails with
+#     error: The "gnu" ABI is ambiguous on big-endian 64-bit PowerPC.
+#            Use "gnuabielfv2" or "gnuabielfv1" instead.
+# which is a DIFFERENT error from `Unknown CPU type', and pass 1 collapsed both
+# into one `EVAL-FAIL' verdict.  `powerpc64-unknown-linux-gnuabielfv2'
+# evaluates, builds, and gives ELF64 / big endian / PowerPC64 -- verified with
+# `agent-acda89931a903ec27-asverify.sh'.  Collapsing two distinct errors into
+# one verdict is what hid the largest testsuite directory in the tree for a
+# whole sweep.
 set -u
 NP="${NP:-$HOME/src/nixos-configuration/dep/nixpkgs}"
 OUT=${1:?output dir}
@@ -34,7 +54,7 @@ mkdir -p "$OUT/log2"
 CAND="
 arc-elf32:arc-none-elf arc-elf
 arm-eabi:arm-none-eabi armv7a-none-eabi armv7l-unknown-linux-gnueabihf
-powerpc64-linux-gnu:powerpc64-unknown-linux-gnu powerpc64le-unknown-linux-gnu
+powerpc64-linux-gnu:powerpc64-unknown-linux-gnuabielfv2 powerpc64-unknown-linux-gnuabielfv1
 sh-elf:sh4-elf sh4-unknown-linux-gnu
 mips64-elf:mips64-unknown-linux-gnuabi64 mips64el-unknown-linux-gnuabi64
 sparc64-linux:sparc64-unknown-linux-gnu
