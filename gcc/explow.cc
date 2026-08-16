@@ -939,16 +939,13 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     case REAL_TYPE:      case OFFSET_TYPE:     case FIXED_POINT_TYPE:
     case BITINT_TYPE:
       /* Values of these types always have scalar mode.  */
+      /* `smode' and not `mode': `aarch64.h:58' measures the mode with
+	 `GET_MODE_SIZE (MODE) < 4', which is `unsigned short' for a
+	 `scalar_mode' and `poly_uint16' for a `machine_mode'.  Every
+	 PROMOTE_MODE in the tree is written against the narrow type because
+	 this narrowing is the only place upstream ever expands it.  */
       smode = as_a <scalar_mode> (mode);
-      {
-	/* The thunk takes `machine_mode *' because the macro assigns to it;
-	   every in-tree PROMOTE_MODE widens to another scalar (word_mode or
-	   SImode), so narrowing back is safe and `as_a' asserts it rather
-	   than assuming it.  */
-	machine_mode pmode = smode;
-	mt_promote_mode (&pmode, &unsignedp, type);
-	smode = as_a <scalar_mode> (pmode);
-      }
+      mt_promote_mode (&smode, &unsignedp, type);
       *punsignedp = unsignedp;
       return smode;
 

@@ -423,13 +423,22 @@ struct target_frame_desc
      `function.cc:1030' also consults `unsignedp' afterwards.  So the flag is
      load-bearing and the guards become `if (mt_has_promote_mode ())'.
 
-     `machine_mode *' and `tree', NOT the `int' boundary `target-insn.h' uses.
-     That header is reached before `coretypes.h' and this one is not -- the
-     fields above already take `tree' and `machine_mode' (line 88, 94, 395),
-     and line 593 records why.  Both are passed by pointer because the macro
-     ASSIGNS to both of its first two arguments.  */
+     `scalar_mode *' AND NOT `machine_mode *', WHICH THE BUILD DECIDED RATHER
+     THAN TASTE.  `aarch64.h:58' spells `GET_MODE_SIZE (MODE) < 4', and
+     `GET_MODE_SIZE' returns a plain `unsigned short' for a `scalar_mode' and
+     a `poly_uint16' for a `machine_mode' -- so with the wider type it does
+     not compile at all ("no match for `operator<' ... poly_uint16 and int").
+     The macro is written against the one type upstream ever expands it with:
+     `explow.cc' narrows to `smode' with `as_a <scalar_mode>' BEFORE the
+     expansion. Widening the boundary type here silently changed what the
+     macro means to every back end that measures a mode.
+
+     Passed by pointer because the macro ASSIGNS to both of its first two
+     arguments.  `tree' and `scalar_mode' are both available: this header is
+     reached after `coretypes.h', unlike `target-insn.h', and the fields above
+     already take `tree' and `machine_mode' (lines 88, 94, 395).  */
   bool has_promote_mode;
-  void (*promote_mode) (machine_mode *mode, int *unsignedp, const_tree type);
+  void (*promote_mode) (scalar_mode *mode, int *unsignedp, const_tree type);
 
   /* ------------------------------------------------------------------
      THE STACK-ALIGNMENT CLOSURE -- FOUR NAMES, AND THE ONE THAT ACTUALLY
@@ -1673,7 +1682,7 @@ extern bool mt_epilogue_uses (int);
    `PROMOTE_MODE' would silently start promoting.  `mt_has_promote_mode ()'
    is the guard and `mt_promote_mode' the body.  */
 extern bool mt_has_promote_mode (void);
-extern void mt_promote_mode (machine_mode *, int *, const_tree);
+extern void mt_promote_mode (scalar_mode *, int *, const_tree);
 
 /* `ASM_DECLARE_FUNCTION_NAME' / `ASM_OUTPUT_FUNCTION_LABEL'.  Spelled at the
    call site rather than redirected, because the site is an `#ifdef' pair and

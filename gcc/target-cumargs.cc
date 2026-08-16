@@ -431,9 +431,9 @@ mt_base_data_abi_alignment (tree type, unsigned int align)
    wrapper, which is exactly the shape that swallows a following `else'.  */
 #ifdef PROMOTE_MODE
 static void
-mt_base_promote_mode (machine_mode *mode, int *unsignedp, const_tree type)
+mt_base_promote_mode (scalar_mode *mode, int *unsignedp, const_tree type)
 {
-  machine_mode m = *mode;
+  scalar_mode m = *mode;
   int u = *unsignedp;
   {
     PROMOTE_MODE (m, u, type);

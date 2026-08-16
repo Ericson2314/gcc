@@ -926,7 +926,7 @@ mt_has_promote_mode (void)
 }
 
 void
-mt_promote_mode (machine_mode *mode, int *unsignedp, const_tree type)
+mt_promote_mode (scalar_mode *mode, int *unsignedp, const_tree type)
 {
   const struct target_frame_desc *f = mt_frame ();
 
