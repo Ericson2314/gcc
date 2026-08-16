@@ -133,8 +133,13 @@ target    base PASS/FAIL     fix2 PASS/FAIL    DEBT base -> fix2   by-name
 x86_64    159267/20882       161826/16843       2,971 ->   412     +2559 / -0
 aarch64   338728/26294       338215/27352       3,675 -> 4,180     +271 / -776
 riscv64   267535/18493       267551/18477       2,169 -> 2,153       +16 / -0
-s390x     see board doc      (run pending at time of writing)
+s390x     124307/22437       124307/22437       4,714 -> 4,714       +0 / -0
 ```
+
+s390x is **byte-for-byte unmoved**: identical columns, and by name 0 progress
+and 0 regressions. It is the negative control for this change and it did what a
+control should — s390x's own `FIRST_PSEUDO_REGISTER` walk reaches no site that
+either fix touches.
 
 **The 776 aarch64 regressions are ALL `gcc.target/aarch64`, and every one of
 them is the board's item #1 — not a new defect.** Named reproducer, compiled
