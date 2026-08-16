@@ -1,0 +1,32 @@
+control: host as -> 64 LSB 62  (EM_X86_64=62, control FIRES)
+
+TRIPLE                         CLS  END  MACH   VERDICT
+bfin-unknown-elf               32   LSB  106    OK
+bpf-unknown-none               64   LSB  247    OK
+cris-axis-elf                  32   LSB  76     OK
+csky-unknown-elf               32   LSB  252    OK
+epiphany-unknown-elf           32   LSB  4643   OK
+fr30-unknown-elf               32   MSB  84     OK
+frv-unknown-elf                32   MSB  21569  OK
+ft32-unknown-elf               32   LSB  222    OK
+h8300-unknown-elf              32   MSB  46     OK
+hppa64-unknown-linux-gnu       64   MSB  15     OK
+ia64-unknown-elf               64   LSB  50     OK
+iq2000-unknown-elf             32   MSB  65210  OK
+lm32-unknown-elf               32   MSB  138    OK
+m32r-unknown-elf               32   MSB  88     OK
+mcore-unknown-elf              32   LSB  39     OK
+mn10300-unknown-elf            32   LSB  89     OK
+moxie-unknown-elf              32   MSB  223    OK
+nds32be-unknown-elf            32   MSB  167    OK
+pdp11-dec-aout                 NOTELF             NOT-ELF-UNVERIFIED
+pru-unknown-elf                32   LSB  144    OK
+rl78-unknown-elf               32   LSB  197    OK
+tic6x-unknown-elf              32   LSB  140    OK
+v850e1-unknown-elf             32   LSB  36     OK
+vax-dec-linux-gnu              32   LSB  75     OK
+visium-unknown-elf             32   MSB  221    OK
+xstormy16-unknown-elf          32   LSB  44357  OK
+xtensa-unknown-elf             32   MSB  94     OK
+
+OK=26 FAIL=0
