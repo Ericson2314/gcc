@@ -4265,7 +4265,43 @@ PUT_MODE (rtx x, machine_mode mode)
    the proper value, which is normally {frame,arg,stack}_pointer_rtx plus
    a constant.  */
 
-#define FIRST_VIRTUAL_REGISTER	(FIRST_PSEUDO_REGISTER)
+/* THE UNION'S BOUND, NOT THIS TRANSLATION UNIT'S `FIRST_PSEUDO_REGISTER'.
+
+   The virtual register numbers are part of ONE regno numbering, shared
+   between target-independent code and every back end's own translation unit:
+   `emit-rtl.cc' creates `virtual_incoming_args_rtx' and friends at these
+   numbers and starts pseudos at `LAST_VIRTUAL_REGISTER + 1', while 22 back
+   ends spell `VIRTUAL_STACK_VARS_REGNUM' or fabricate a raw REG at
+   `LAST_VIRTUAL_REGISTER + n'.  `FIRST_PSEUDO_REGISTER' is NOT one number
+   here -- multi-target-macros.h redirects it to the union's width for a
+   shared TU (677 at 47 bases) and deliberately leaves a back end's own TU
+   with its own (i386: 92), because `config/i386/i386.h' declares arrays with
+   the unqualified name before defaults.h is reached.  So spelling the virtual
+   numbering with it gives the numbering TWO AUTHORITIES: this branch's own
+   root bug, one name meaning different things on either side of a call.
+
+   WHAT THAT COST, MEASURED at 47 bases.  `config/i386/i386-expand.cc:27096'
+   (`ix86_vectorize_vec_perm_const', reached from the GIMPLE `vect' pass)
+   builds `gen_raw_REG (mode, LAST_VIRTUAL_REGISTER + 1)' = regno 98 in i386's
+   context, and hands it to the SHARED `recog.cc:1598', where the same name is
+   683.  98 is below the shared `FIRST_PSEUDO_REGISTER', so `general_operand'
+   classified it as a HARD register and `in_hard_reg_set_p' asserted on a
+   register i386 does not have: 1,756 ICE FAILs at `regs.h:312', bounding
+   2,480 of x86_64's 2,971-result debt against stock.  The band is
+   [base's own bound, union bound), so it WIDENS with every back end added --
+   92..127 at four bases, 92..676 at 47.
+
+   `riscv.cc:3486' and `:9405' are the same defect with the opposite symptom:
+   `REGNO (x) == VIRTUAL_STACK_VARS_REGNUM' compares a real 678 against
+   riscv's 66 and is simply never true -- a leaked ABSENCE, silent.
+
+   This is a LAYOUT/NUMBERING use of the union bound, not a classifier, so
+   `MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER' is the right one of the two
+   names; `HARD_REGISTER_NUM_P' (the classifier) is unaffected and stays as
+   it is.  Under GENERATOR_FILE the union macro IS `FIRST_PSEUDO_REGISTER'
+   (hard-reg-set.h:59), so generators are unchanged by construction.  */
+
+#define FIRST_VIRTUAL_REGISTER	(MULTI_TARGET_UNION_FIRST_PSEUDO_REGISTER)
 
 /* This points to the first word of the incoming arguments passed on the stack,
    either by the caller or by the callee when pretending it was passed by the
