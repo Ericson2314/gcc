@@ -401,9 +401,11 @@ get_attr_length_1 (rtx_insn *insn, int (*fallback_fn) (rtx_insn *))
 	break;
       }
 
-#ifdef ADJUST_INSN_LENGTH
-  ADJUST_INSN_LENGTH (insn, length);
-#endif
+  /* If needed, do any adjustment.  This was `#ifdef ADJUST_INSN_LENGTH', i.e.
+     a fact about whichever base compiled final.cc -- and i386 defines no such
+     macro, so it was false for all 47 bases and none of the 13 back ends that
+     DO define it ever had its lengths adjusted.  See target-frame.h.  */
+  mt_adjust_insn_length (insn, &length);
   return length;
 }
 
@@ -1107,12 +1109,13 @@ shorten_branches (rtx_insn *first)
 	  varying_length[uid] = insn_variable_length_p (insn);
 	}
 
-      /* If needed, do any adjustment.  */
-#ifdef ADJUST_INSN_LENGTH
-      ADJUST_INSN_LENGTH (insn, insn_lengths[uid]);
+      /* If needed, do any adjustment.  The `negative insn length' check is now
+	 unconditional: it was inside the `#ifdef' because only an adjustment
+	 can make a generated length negative, and that remains true -- a base
+	 whose thunk body is empty cannot trip it.  */
+      mt_adjust_insn_length (insn, &insn_lengths[uid]);
       if (insn_lengths[uid] < 0)
 	fatal_insn ("negative insn length", insn);
-#endif
     }
 
   /* Now loop over all the insns finding varying length insns.  For each,
@@ -1128,9 +1131,7 @@ shorten_branches (rtx_insn *first)
 	   insn = NEXT_INSN (insn))
 	{
 	  int new_length;
-#ifdef ADJUST_INSN_LENGTH
 	  int tmp_length;
-#endif
 	  int length_align;
 
 	  uid = INSN_UID (insn);
@@ -1365,12 +1366,12 @@ shorten_branches (rtx_insn *first)
 	      insn_current_address += new_length;
 	    }
 
-#ifdef ADJUST_INSN_LENGTH
-	  /* If needed, do any adjustment.  */
+	  /* If needed, do any adjustment.  For a base defining no
+	     ADJUST_INSN_LENGTH the thunk body is empty, so the delta is 0 and
+	     this is exactly what the dead `#ifdef' did.  */
 	  tmp_length = new_length;
-	  ADJUST_INSN_LENGTH (insn, new_length);
+	  mt_adjust_insn_length (insn, &new_length);
 	  insn_current_address += (new_length - tmp_length);
-#endif
 
 	  if (new_length != insn_lengths[uid]
 	      && (!increasing || new_length > insn_lengths[uid]))

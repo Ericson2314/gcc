@@ -1725,6 +1725,37 @@ struct target_frame_desc
      `declare_function_size' would have been a half-fix rather than a partial
      improvement.  */
   void (*declare_function_prefix) (FILE *file, const char *name);
+
+  /* ADJUST_INSN_LENGTH -- A DEAD `#ifdef' IN BRANCH SHORTENING, AND THE SECOND
+     UNDOCUMENTED MACRO FOUND BY THE SAME SCAN.
+
+     Four sites in `final.cc' (:404, :1111, :1131, :1368), every one an
+     `#ifdef'.  i386 defines no ADJUST_INSN_LENGTH, so all four were FALSE for
+     all 47 bases and the adjustment ran for NONE of the 13 back ends that
+     define it: rx, mips, avr, sh, iq2000, msp430, v850, rs6000, arc, arm, pa,
+     nds32 and aarch64.
+
+     WHAT IT IS FOR, and why "merely worse code" is the wrong reading.  The
+     macro's whole purpose is to correct an insn's length AFTER the generated
+     `insn-attrtab' has computed it, and `shorten_branches' uses those lengths
+     to decide whether a branch displacement is in range.  A length that is too
+     SMALL is not a missed optimisation -- it lets the compiler emit a branch
+     it believes reaches and which does not.  For arm, pa, sh, mips and avr
+     this is core branch-shortening correctness.
+
+     aarch64's is narrower and is stated exactly rather than overclaimed:
+     `aarch64.h:1038' adds 4 bytes when `aarch64_madd_needs_nop (insn)', which
+     is the Cortex-A53 erratum 835769 workaround and is gated on
+     `-mfix-cortex-a53-835769'.  So on a default aarch64 compilation this macro
+     is a no-op, and the movement expected on the scored board from THIS back
+     end is small.  It is converted because it is a live wrong-code leak on 13
+     back ends, not because a number is predicted to move.
+
+     Not in `doc/tm.texi'.  Found by `-undoc.sh', the scan written after
+     ASM_OUTPUT_FUNCTION_PREFIX showed that the census's tm.texi-derived
+     population has a blind spot -- so the scan has now produced a second
+     member of its own class, which is the argument for keeping it.  */
+  void (*adjust_insn_length) (rtx_insn *insn, int *length);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1778,6 +1809,13 @@ extern void mt_declare_function_size (FILE *, const char *, tree);
    in tm.texi, and therefore invisible to the leak census.  See the descriptor
    field.  */
 extern void mt_declare_function_prefix (FILE *, const char *);
+
+/* `ADJUST_INSN_LENGTH'; `final.cc' :404, :1111, :1368.  `length' is in/out
+   because every back end's macro assigns to its LENGTH parameter in place.
+   Unconditional at all three call sites: a base defining no such macro gets a
+   thunk with an empty body, which is the same nothing the dead `#ifdef' did --
+   the difference being that the 13 bases which DO define it now get theirs.  */
+extern void mt_adjust_insn_length (rtx_insn *, int *);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

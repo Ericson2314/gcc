@@ -213,6 +213,17 @@ mt_declare_function_prefix (FILE *file, const char *name)
   mt_frame ()->declare_function_prefix (file, name);
 }
 
+/* `ADJUST_INSN_LENGTH'; `final.cc' :404, :1111, :1368.  Through `mt_frame ()'
+   like the rest, so a compilation with no target selected fails by name rather
+   than silently not adjusting -- which is precisely the failure this converts,
+   and would be indistinguishable from it.  */
+
+void
+mt_adjust_insn_length (rtx_insn *insn, int *length)
+{
+  mt_frame ()->adjust_insn_length (insn, length);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here

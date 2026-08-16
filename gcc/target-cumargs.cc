@@ -329,6 +329,27 @@ mt_base_declare_function_prefix (FILE *file ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* ADJUST_INSN_LENGTH, asked of THIS base.  Four `#ifdef' sites in `final.cc'
+   (:404, :1111, :1131, :1368), all answered by whichever base compiled that
+   file.  i386 does not define the macro, so the condition was FALSE for all 47
+   bases and the adjustment ran for NONE of the 13 back ends that define it --
+   rx, mips, avr, sh, iq2000, msp430, v850, rs6000, arc, arm, pa, nds32 and
+   aarch64.
+
+   `*length' rather than a return value so the macro sees an lvalue: every
+   definition assigns to its LENGTH parameter in place (`length += 4',
+   `LENGTH = ...'), which is the interface upstream documents by example
+   rather than in tm.texi -- the macro is not documented there at all.  */
+
+static void
+mt_base_adjust_insn_length (rtx_insn *insn ATTRIBUTE_UNUSED,
+			    int *length ATTRIBUTE_UNUSED)
+{
+#ifdef ADJUST_INSN_LENGTH
+  ADJUST_INSN_LENGTH (insn, *length);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1854,7 +1875,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_function_name,
   mt_base_declare_cold_function_name,
   mt_base_declare_function_size,
-  mt_base_declare_function_prefix
+  mt_base_declare_function_prefix,
+  mt_base_adjust_insn_length
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what
