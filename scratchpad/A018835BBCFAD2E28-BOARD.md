@@ -267,16 +267,38 @@ binutils are expensive to build", which is what makes the next agent point
 
 ## 3. BOTH-SIDED
 
+**The x86_64 suite is byte-for-byte inert across all four fixes.**
+`mt-namediff.sh`, base `3b9f7c8f695` -> tip `d5ad77b33b3`:
+
 ```
-x86_64 suite, auto-inc tree   162171 / 16295   == the board's row EXACTLY
-x86_64 -O2 big.c              12369 / 378fc33c1e70  on every tree built
-x86_64 -O2 -g big.c           normalised md5 fedffc19e2de, unchanged by all
-                              five commits and equal to the board's build dir
-x86_64 al.c -O2               UNMOVED, and == stock
+joined rows   197834
+unchanged     197834      <- every one
+PASS -> NOT PASS   0
+NOT PASS -> PASS   0
+                162171 / 16295 on both, == the board's x86_64 row EXACTLY
+```
+
+```
+x86_64 -O2 big.c      12369 bytes / 378fc33c1e70  on every tree built here
+x86_64 -O2 -g big.c   normalised md5 fedffc19e2de, unchanged by all five
+                      commits and equal to the board's own build dir.  The
+                      RAW md5 differs, by the build-dir path only -- see
+                      section 4, the instrument for this was calling that a
+                      real change.
+x86_64 al.c -O2       UNMOVED, and == stock
 ```
 
 x86_64 is the right control for all four causes because it is the base whose
-answers were leaking: it must not move, and it did not.
+answers were leaking, and for `PROMOTE_MODE` it is the sharpest one available:
+i386 DEFINES that macro, so the change routes x86_64 through a new selector to
+reach its own answer. Zero movement in 197,834 results says the routing is
+transparent.
+
+**aarch64 and s390x have no suite run here, and I do not claim they are
+unmoved** -- 2a changes both by construction. What is shown for them is
+byte-level: aarch64's `sum` loop moved TO stock's post-increment form, its
+`copy` loop moved back to stock's indexed form once `USE_*` landed, and both
+targets' alignment directives became equal to stock's.
 
 ## 4. TWO INSTRUMENTS THAT WERE LYING, BOTH FIXED HERE
 
