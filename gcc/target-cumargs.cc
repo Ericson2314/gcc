@@ -289,6 +289,31 @@ mt_base_declare_cold_function_name (FILE *file, const char *name,
 #endif
 }
 
+/* ASM_DECLARE_FUNCTION_SIZE, asked of THIS base.  `varasm.cc:2254's whole
+   `#ifdef' block, section switch included, relocated unchanged -- see
+   target-frame.h for why the switch may not be split away from the macro
+   call, and for what the leaked `elfos.h' answer costs riscv (an unbalanced
+   `.option push', because the matching `ASM_DECLARE_FUNCTION_NAME' three
+   lines above it in riscv.h IS converted) and s390 (`.machine pop').
+
+   `decl' is read by the section switch as well as by the macro, so it is not
+   ATTRIBUTE_UNUSED even for a base defining nothing -- but the whole body is
+   then empty, so it is marked and the attribute is harmless where it is
+   used.  */
+
+static void
+mt_base_declare_function_size (FILE *file ATTRIBUTE_UNUSED,
+			       const char *name ATTRIBUTE_UNUSED,
+			       tree decl ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_DECLARE_FUNCTION_SIZE
+  /* We could have switched section in the middle of the function.  */
+  if (crtl->has_bb_partition)
+    switch_to_section (function_section (decl));
+  ASM_DECLARE_FUNCTION_SIZE (file, name, decl);
+#endif
+}
+
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
    predicate is a different animal from the six value thunks above.
 
@@ -1812,7 +1837,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_incoming_return_addr_rtx,
   mt_base_epilogue_uses,
   mt_base_declare_function_name,
-  mt_base_declare_cold_function_name
+  mt_base_declare_cold_function_name,
+  mt_base_declare_function_size
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what

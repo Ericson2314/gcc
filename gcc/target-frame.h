@@ -1651,6 +1651,50 @@ struct target_frame_desc
      a number moved.  Stated plainly so nobody later reads its zero as
      evidence the conversion was unnecessary.  */
   void (*declare_cold_function_name) (FILE *file, const char *name, tree decl);
+
+  /* ASM_DECLARE_FUNCTION_SIZE -- THE CLOSING HALF OF `declare_function_name'
+     ABOVE, AND IT WAS LEFT BEHIND WHEN THAT ONE WAS CONVERTED.
+
+     `varasm.cc:2254' (`assemble_end_function') is the only shared consumer and
+     it is an `#ifdef' with no `#else'.  i386 defines no
+     ASM_DECLARE_FUNCTION_SIZE of its own, so the value every base got was
+     `elfos.h:397's generic `.size' directive -- which is the RIGHT answer for
+     most of the 15 definers and the WRONG one for the two that matter here,
+     because for them the macro is not about `.size' at all.
+
+     WHAT IT COSTS: AN UNBALANCED `.option push'.  `riscv.h:1164' points the
+     macro at `riscv_declare_function_size', whose job is to emit
+
+	 .option pop
+
+     closing the `.option push' / `.option arch, <isa>' that
+     `riscv_declare_function_name' emits for any function carrying
+     `#pragma GCC target', `__attribute__((target(...)))' or `norelax'.
+     `ASM_DECLARE_FUNCTION_NAME' is CONVERTED (three lines above it in
+     riscv.h), so on this branch the push is emitted and the pop never is: the
+     per-function ISA override leaks forward into every subsequent function in
+     the translation unit.  The two halves of one bracket answered by two
+     different back ends.
+
+     `s390.h:913' is the same shape -- `s390_asm_declare_function_size' emits
+     `.machine pop' / `.machinemode pop' against the prefix hook's push -- and
+     alpha, arm, ia64, microblaze, nvptx, c6x, epiphany and rs6000/linux64 all
+     override the macro for their own reasons.
+
+     THE SECTION SWITCH MOVES WITH IT, DELIBERATELY.  Upstream guards
+
+	 if (crtl->has_bb_partition)
+	   switch_to_section (function_section (decl));
+
+     inside the SAME `#ifdef', so a base defining no ASM_DECLARE_FUNCTION_SIZE
+     does not switch back either.  Splitting the two would give bases a
+     combination upstream never produces, so the whole block is what the thunk
+     evaluates.
+
+     NO EXISTENCE FIELD, for `declare_function_name's reason: the absence is
+     itself a complete action (do nothing), so there is nothing for shared code
+     to branch on and the call site is unconditional.  */
+  void (*declare_function_size) (FILE *file, const char *name, tree decl);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1692,6 +1736,13 @@ extern void mt_promote_mode (scalar_mode *, int *, const_tree);
    call.  */
 extern void mt_declare_function_name (FILE *, const char *, tree);
 extern void mt_declare_cold_function_name (FILE *, const char *, tree);
+
+/* `ASM_DECLARE_FUNCTION_SIZE', the closing half of the pair above.  Spelled at
+   the call site for the same reason: `varasm.cc:2254's block is an `#ifdef'
+   and a redirect would leave the GUARD answered by whichever base compiled
+   varasm.cc.  See the descriptor field for what the leaked answer costs on
+   riscv and s390.  */
+extern void mt_declare_function_size (FILE *, const char *, tree);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

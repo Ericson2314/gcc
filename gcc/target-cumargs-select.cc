@@ -192,6 +192,17 @@ mt_declare_cold_function_name (FILE *file, const char *name, tree decl)
   mt_frame ()->declare_cold_function_name (file, name, decl);
 }
 
+/* `ASM_DECLARE_FUNCTION_SIZE'; `varasm.cc:2254'.  The closing half of
+   `mt_declare_function_name' -- on this branch the opening half was converted
+   and this one was not, so riscv emitted `.option push' without its `.option
+   pop'.  See target-frame.h.  */
+
+void
+mt_declare_function_size (FILE *file, const char *name, tree decl)
+{
+  mt_frame ()->declare_function_size (file, name, decl);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here
