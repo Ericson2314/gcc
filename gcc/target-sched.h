@@ -91,8 +91,25 @@ struct target_sched_desc
   /* `insn_<base>::init_sched_attrs', or NULL for a back end whose `.md' has
      no `define_insn_reservation' at all -- `genattr' emits neither the
      pointers nor the initialiser for such a back end, and NULL here is that
-     generator's own answer rather than a value invented here.  One in-tree
-     back end is in that position; the other forty-seven have a DFA.  */
+     generator's own answer rather than a value invented here.
+
+     "ONE IN-TREE BACK END IS IN THAT POSITION; THE OTHER FORTY-SEVEN HAVE A
+     DFA" IS WHAT THIS COMMENT SAID, AND IT IS FALSE BY AN ORDER OF
+     MAGNITUDE.  Measured from the generated headers themselves in a cold
+     47-base build -- `#define INSN_SCHEDULING' in each
+     `insn-attr-common-<base>.h', which IS `genattr-common''s answer, rather
+     than a `grep' over `config/<be>/' which asks a different question
+     (`a98009045f7229938-dfacensus.sh'):
+
+	 HAS an automaton   34
+	 NO automaton       13   avr cris fr30 ft32 h8300 mmix moxie msp430
+				 nvptx pdp11 rl78 vax xstormy16
+
+     The figure matters because it is the population every `#ifdef
+     INSN_SCHEDULING' in shared code was answering for with the primary's
+     yes.  Eleven of those thirteen ICEd on `int f (int x) { return x + 1; }'
+     at `-O2'; see target-automata.h.  Note also that the arithmetic in the
+     old sentence never closed -- 1 + 47 = 48 in a 47-back-end tree.  */
   void (*init_attrs) (void);
 };
 

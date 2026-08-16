@@ -3822,7 +3822,13 @@ public:
   bool gate (function *) final override
     {
 #ifdef INSN_SCHEDULING
-      return flag_live_range_shrinkage;
+      /* AND THE SELECTED BASE'S OWN -- see target-automata.h.  The `#ifdef'
+	 is the UNION's presence: it says some configured back end has an
+	 automaton, which is why the scheduler is compiled in at all.  It is
+	 not this base's answer, and reading it as one sent eleven back ends
+	 into `mt_automata ()' on a one-line function at `-O2'.  First in the
+	 `&&' so a base with no automaton never runs anything downstream.  */
+      return mt_has_insn_scheduling () && flag_live_range_shrinkage;
 #else
       return 0;
 #endif
@@ -3878,7 +3884,11 @@ bool
 pass_sched::gate (function *)
 {
 #ifdef INSN_SCHEDULING
-  return optimize > 0 && flag_schedule_insns && dbg_cnt (sched_func);
+  /* AND THE SELECTED BASE'S OWN; see the note in
+     `pass_live_range_shrinkage::gate'.  BEFORE `dbg_cnt' deliberately: a base
+     that cannot schedule must not consume a debug-counter tick either.  */
+  return (mt_has_insn_scheduling ()
+	  && optimize > 0 && flag_schedule_insns && dbg_cnt (sched_func));
 #else
   return 0;
 #endif
@@ -3927,8 +3937,14 @@ bool
 pass_sched2::gate (function *)
 {
 #ifdef INSN_SCHEDULING
-  return optimize > 0 && flag_schedule_insns_after_reload
-    && !targetm.delay_sched2 && dbg_cnt (sched2_func);
+  /* AND THE SELECTED BASE'S OWN; see `pass_live_range_shrinkage::gate'.
+     THIS IS THE GATE THE ELEVEN ACTUALLY DIED IN: `-fschedule-insns2' is on
+     at `-O2' for every base (`opts.cc' cannot ask, see target-automata.h), so
+     `int f (int x) { return x + 1; }' reached `schedule_insns' and then
+     `mt_automata ()'.  */
+  return (mt_has_insn_scheduling ()
+	  && optimize > 0 && flag_schedule_insns_after_reload
+	  && !targetm.delay_sched2 && dbg_cnt (sched2_func));
 #else
   return 0;
 #endif
@@ -3979,7 +3995,9 @@ pass_sched_fusion::gate (function *)
 #ifdef INSN_SCHEDULING
   /* Scheduling fusion relies on peephole2 to do real fusion work,
      so only enable it if peephole2 is in effect.  */
-  return (optimize > 0 && flag_peephole2
+  /* AND THE SELECTED BASE'S OWN; see `pass_live_range_shrinkage::gate'.  */
+  return (mt_has_insn_scheduling ()
+    && optimize > 0 && flag_peephole2
     && flag_schedule_fusion && targetm.sched.fusion_priority != NULL);
 #else
   return 0;

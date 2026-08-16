@@ -117,6 +117,67 @@ along with GCC; see the file COPYING3.  If not see
    a refusal and not a fix.  Converting `INSN_SCHEDULING' itself is a
    separate task.
 
+   THAT RESIDUAL WAS THE LARGEST SINGLE ICE CAUSE ON THIS BRANCH AND IS NOW
+   CLOSED FOR THE GATES.  It was not a corner: `int f (int x) { return x + 1;
+   }' at `-O2', no header and no libc, ICEd on ELEVEN of the 47 configured
+   back ends -- avr, cris, ft32, h8300, mmix, moxie, msp430, pdp11, rl78, vax,
+   xstormy16.  1,449 results by volume and the widest cause by breadth, on
+   both orderings of the 28-back-end board at once.
+
+   TWO THINGS ABOUT HOW IT STAYED HIDDEN, BOTH MORE TRANSFERABLE THAN THE FIX.
+
+   It was recorded as avr's alone, TWICE, because the diagnostic NAMES THE
+   BACK END.  A cause-ranking keyed on diagnostic text therefore scores one
+   shared defect as N distinct causes of one back end each, and it can never
+   rise in a breadth ranking however wide it is.  The property that makes a
+   message useful to a human is the property that hides it from the
+   instrument; `a7d26223eefcfa725-causes2.sh' folds the quoted name out before
+   keying, and `a98009045f7229938-foldcheck.sh' asserts that fold still covers
+   every self-naming diagnostic in the tree.
+
+   And it was invisible at the level everything was probed at.  Over the 45
+   targets with a specs-config, a one-line function gives `-O0' ok = 38,
+   `-O1' ok = 37, `-O2' ok = 28: ten back ends compile it at `-O0' and ICE at
+   `-O2'.  Scheduling is an `-O2' pass, so `-O0' is the LEAST representative
+   single level available, and every precondition that probed only there
+   reproduced the exact blindness it was written to remove.
+
+   WHAT IS CONVERTED AND WHAT IS NOT.  The run-time GATES now ask
+   `mt_has_insn_scheduling ()': the four pass gates in `sched-rgn.cc',
+   `pass_sms::gate', the two split-pass gates in `recog.cc', and the
+   paradoxical-SUBREG family (`recog.cc' `general_operand', `expr.cc'
+   `force_operand', `combine.cc' x2) -- which are converted TOGETHER because
+   they must agree: recog rejects what expr must not create and combine must
+   not split towards.
+
+   The FILE-SCOPE `#ifdef INSN_SCHEDULING' in `haifa-sched.cc',
+   `sched-deps.cc', `sched-ebb.cc', `sched-rgn.cc', `modulo-sched.cc',
+   `ddg.cc', `sel-sched*.cc' and `sched-int.h' are deliberately NOT converted
+   and are not a leak: they decide whether the scheduler is COMPILED IN, and
+   in a build containing any back end with a DFA it must be, for that back
+   end.  They are the union's presence, which is correct; what was wrong was
+   using the union's presence as the selected base's answer.
+
+   `opts.cc' IS NOT CONVERTED, AND THE REASON IS A LINK BOUNDARY RATHER THAN
+   AN OVERSIGHT.  Its two `#ifdef INSN_SCHEDULING' entries in
+   `default_options_table' put `-fschedule-insns2' (and `-fschedule-insns' for
+   speed) on at `-O2'.  `opts.o' is in `libcommon-target.a', which the DRIVER
+   links; `targetm_automata' is in `libbackend.a', which it does not.  A call
+   to `mt_has_insn_scheduling ()' there does not link -- the same boundary
+   that put `$(MT_OPTIONS_TABLES_OBJS)' in `libcommon-target.a', recorded in
+   `gcc/Makefile.in'.
+
+   `toplev.cc:1428''s `#ifndef INSN_SCHEDULING' warning is NOT converted FOR
+   THE SAME REASON, and this is the half-fix trap in the concrete: it warns
+   `instruction scheduling not supported on this target machine' when the flag
+   is set.  Converting it while `opts.cc' still sets the flag at `-O2' would
+   emit that warning on EVERY `-O2' compile for the eleven back ends -- a new
+   diagnostic on every test, from a change whose purpose was to remove one.
+   The two are a matched pair and must move together, into `targetm_common'
+   (which IS selected before `decode_options', at `toplev.cc:2407') rather
+   than into this table.  Until then the observable is unchanged, because the
+   pass gate and not the flag is now the authority.
+
    THE `void *' BOUNDARY IS DELIBERATE.  `state_t' is a typedef in the
    generated `insn-attr.h', and this header is read by translation units that
    do not include it.  It is `void *' in every back end's copy -- genattr
@@ -199,6 +260,12 @@ struct target_automata_desc
    primary's, for the reason `target-regs.h' argues at length: a default here
    is exactly the bug being removed.  */
 extern const struct target_automata_desc *targetm_automata;
+
+/* The run-time form of `#ifdef INSN_SCHEDULING', for the SELECTED base.  A
+   query, so it answers `false' for a base with no automaton rather than
+   refusing it; it still refuses when no base is selected at all.  Every
+   shared gate that used to read the primary's `#ifdef' calls this.  */
+extern bool mt_has_insn_scheduling (void);
 
 extern int mt_state_size (void);
 extern int mt_max_insn_queue_index (void);

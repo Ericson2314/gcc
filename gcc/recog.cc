@@ -4644,7 +4644,13 @@ static bool
 enable_split_before_sched2 (void)
 {
 #ifdef INSN_SCHEDULING
-  return optimize > 0 && flag_schedule_insns_after_reload;
+  /* AND THE SELECTED BASE'S OWN; see target-automata.h.  This one is not a
+     crash but a wasted pass in the wrong direction: `split3' exists to split
+     insns BEFORE `sched2', and on a base with no automaton `sched2' does not
+     run, so upstream that base answers `false' here.  It must answer the same
+     thing as `pass_sched2::gate', and now does -- both read the base.  */
+  return (mt_has_insn_scheduling ()
+	  && optimize > 0 && flag_schedule_insns_after_reload);
 #else
   return false;
 #endif
@@ -4744,11 +4750,14 @@ pass_split_before_regstack::gate (function *)
      split until final which doesn't allow splitting
      if HAVE_ATTR_length.  Selective scheduling can result in
      further instructions that need splitting.  */
-#ifdef INSN_SCHEDULING
-  return !enable_split_before_sched2 () || flag_selective_scheduling2;
-#else
-  return !enable_split_before_sched2 ();
-#endif
+  /* AND THE SELECTED BASE'S OWN; see target-automata.h.  The `#ifdef' here
+     decided whether `flag_selective_scheduling2' is consulted at all, and a
+     base with no automaton must not consult it -- selective scheduling is
+     the same scheduler.  Written as one runtime expression rather than two
+     arms so the two cannot drift; `enable_split_before_sched2 ()' already
+     reads the base.  */
+  return (!enable_split_before_sched2 ()
+	  || (mt_has_insn_scheduling () && flag_selective_scheduling2));
 }
 
 } // anon namespace

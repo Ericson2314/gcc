@@ -3347,7 +3347,15 @@ public:
   /* opt_pass methods: */
   bool gate (function *) final override
 {
-  return (optimize > 0 && flag_modulo_sched);
+  /* AND THE SELECTED BASE'S OWN; see target-automata.h.  Upstream this gate
+     needs no `INSN_SCHEDULING' test because `pass_sms::execute' below is
+     `#ifdef'-ed to nothing on a target without one.  Here that `#ifdef' is
+     the UNION's presence, so `execute' is compiled in and `sms_schedule'
+     would drive the selected base through `mt_automata ()'.  Reached only
+     with an explicit `-fmodulo-sched' -- so not one of the eleven `-O2'
+     ICEs, and one line away from being the twelfth.  */
+  return (mt_has_insn_scheduling ()
+	  && optimize > 0 && flag_modulo_sched);
 }
 
   unsigned int execute (function *) final override;

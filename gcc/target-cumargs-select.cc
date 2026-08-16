@@ -1416,14 +1416,46 @@ mt_assembler_dialect (void)
    memcpyed 116 bytes into the 4-byte buffer.  Six ASAN runs of six.  */
 const struct target_automata_desc *targetm_automata;
 
+/* Whether the SELECTED base has a pipeline automaton at all -- the run-time
+   form of `#ifdef INSN_SCHEDULING', and the thing that turns the refusal
+   below from the only outcome into the last resort.
+
+   This is a QUERY and not an assertion, so it must answer for a base with no
+   automaton rather than refuse it; that is the entire point.  It still
+   refuses when NO base is selected, because "which back end" is then unknown
+   and a `false' there would be an invented answer of exactly the kind
+   PRINCIPLES section 4 bans -- and, being the quiet direction, would silently
+   disable scheduling for every base rather than say so.
+
+   Its callers are the shared gates that used to read the primary's
+   `#ifdef' -- the four scheduling pass gates in `sched-rgn.cc', `pass_sms',
+   the two split-pass gates in `recog.cc', and the paradoxical-SUBREG family
+   in `recog.cc'/`expr.cc'/`combine.cc'.  See target-automata.h.  */
+bool
+mt_has_insn_scheduling (void)
+{
+  if (targetm_automata == NULL)
+    internal_error ("no back end has been selected, so it is not known "
+		    "whether this target has a pipeline automaton; a target "
+		    "must be chosen with %<-ftarget-config=%> before "
+		    "instructions are scheduled");
+  return targetm_automata->has_dfa;
+}
+
 /* NULL until a base is selected, like every other table here, and a base
    with no automaton is refused BY NAME rather than answered.
 
-   That refusal is the honest state of a residual this change does not close:
-   shared scheduling code is wrapped in `#ifdef INSN_SCHEDULING', which is the
-   PRIMARY's macro, so a base with no `define_insn_reservation' beside a
-   primary that has one still reaches here.  Upstream that combination cannot
-   arise.  Failing by name is the loud direction; see target-automata.h.  */
+   THAT REFUSAL IS NOW THE BACKSTOP AND NOT THE FRONT DOOR.  It used to be
+   reachable on the ORDINARY path: shared scheduling code was wrapped in
+   `#ifdef INSN_SCHEDULING', the primary's macro, so `int f (int x) { return
+   x + 1; }' at `-O2' reached here through `pass_sched2' on eleven of the 47
+   configured back ends -- avr, cris, ft32, h8300, mmix, moxie, msp430,
+   pdp11, rl78, vax and xstormy16.  Those gates now ask
+   `mt_has_insn_scheduling ()' above.
+
+   What survives is a genuine backstop: a shared caller that reaches a DFA
+   entry point WITHOUT having consulted that query is a bug in the caller, and
+   this says so by name rather than calling through a null pointer.  */
 static const struct target_automata_desc *
 mt_automata (void)
 {
