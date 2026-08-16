@@ -134,7 +134,42 @@ Look how much rests on it, every item a recorded honest negative:
   3** definers, but they **agree on this pair**.
 - `RELOAD_ELIMINABLE_REGS`, `HONOR_REG_ALLOC_ORDER` — no in-tree back end
   defines them, so no arm can be both-sided.
-- The DFA-absent case — both configured bases have reservations.
+- ~~The DFA-absent case — both configured bases have reservations.~~
+  **SETTLED, AND IT IS THE BEST ARGUMENT ON THIS LIST.** Not by "a third back
+  end would help" but by forty-seven: **13 of the 47 have no
+  `define_insn_reservation` at all** — avr cris fr30 ft32 h8300 mmix moxie
+  msp430 nvptx pdp11 rl78 vax xstormy16 — measured from each
+  `insn-attr-common-<base>.h`, i.e. from `genattr-common`'s own answer
+  (`scratchpad/a98009045f7229938-dfacensus.sh`). Shared code read the
+  **primary's** `#ifdef INSN_SCHEDULING`, so **eleven** of them ICEd on
+  `int f (int x) { return x + 1; }` at `-O2` — no header, no libc — with
+  *"back end 'X' has no pipeline automaton"*. Widest cause by breadth **and**
+  largest by volume (1,449 results) on the 28-back-end board, the only time
+  those two orderings have agreed. Fixed by `mt_has_insn_scheduling ()`.
+
+  Three things to carry, none of them about the DFA:
+
+  - **The item was written as a limit of the INSTRUMENT and read as a limit of
+    the WORLD.** "Both configured bases have reservations" is true and is a
+    fact about i386 + aarch64. It sat on this list while the defect it names
+    was live on eleven back ends and was the largest single ICE cause in the
+    tree. *A "cannot tell" entry is a debt, and it accrues interest silently.*
+  - **A self-describing diagnostic is invisible to a text-keyed ranking.** The
+    message names the back end, so one shared defect keys as N causes of one
+    back end each and can never rise in a breadth ordering. It was recorded as
+    **avr's alone, twice**. The property that makes a message useful to a
+    human is the property that hides it from the instrument. Fold every field
+    that varies with the **target**, no field that varies with the **defect**;
+    `scratchpad/a98009045f7229938-foldcheck.sh` asserts the fold still covers
+    the population, and found a second escapee (`target %qs names back end
+    %qs`) that is not `back end`-shaped at all.
+  - **`-O0` is the least representative level available.** Over the 45 targets
+    with a `specs-config`, a one-line function gives `-O0` ok = 38, `-O1` = 37,
+    **`-O2` = 28**; ten back ends compile it at `-O0` and ICE at `-O2`.
+    Scheduling is an `-O2` pass, so every precondition that probed at `-O0` —
+    including the one written *because* a back end dying on its first input is
+    invisible to a `.sum` ranking — reproduced the exact blindness it existed
+    to remove, one optimisation level down.
 
 Every one is the same sentence: **two back ends cannot tell.** So "unmeasurable
 with this pair" is not a permanent verdict, it is a **request for a third back
