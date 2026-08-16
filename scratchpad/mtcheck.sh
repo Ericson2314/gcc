@@ -12,6 +12,20 @@
 # usage: mtcheck.sh <builddir> <triple> [<triple> ...]
 #   MT_RUNTESTFLAGS  extra runtest flags (e.g. "dg.exp=pr*" to take a subset)
 #   MT_COMPILE_ONLY  non-empty => downgrade dg-do run/link/assemble to compile
+#   MT_CHECK_TOOL    `gcc' (default) or `g++'
+#
+# MT_CHECK_TOOL EXISTS BECAUSE `check-gcc' WAS HARDCODED HERE, AND THAT IS HALF
+# THE REASON NO C++ RESULT HAS EVER BEEN MEASURED ON THIS BRANCH (the other
+# half was `--enable-languages=c,lto' hardcoded in mt-conf.sh).  A whole front
+# end was outside the harness with nothing saying so.
+#
+# THE ASSERTION THAT MAKES A C++ FIGURE MEAN ANYTHING IS BELOW, AND IT IS THE
+# POINT: a language that was never enabled and a language that passes
+# everything produce THE SAME EMPTY FAILURE LIST.  So `cc1plus' and `xg++' are
+# required to EXIST before the run, and `g++.sum' is required to exist after
+# it.  `g++-dg.exp' load_lib's `gcc-dg.exp', which load_lib's
+# `multi-target.exp', so GUARD 4's banner arm fires for g++ unchanged -- that
+# was checked, not assumed.
 #
 # WHAT IS SINGULAR IN THE STOCK HARNESS, which is what this script works around:
 #
@@ -55,6 +69,21 @@ n=$(mt_assert_anchor "$SRC") || exit 9
 kind=$(mt_assert_src_frozen "$SRC") || exit 9
 [ -x "$B/gcc/xgcc" ] || { echo "FATAL: no $B/gcc/xgcc"; exit 9; }
 [ -x "$B/gcc/cc1" ]  || { echo "FATAL: no $B/gcc/cc1"; exit 9; }
+
+# The tool under test, and the four things that are a function of it.
+TOOL=${MT_CHECK_TOOL:-gcc}
+case "$TOOL" in
+  gcc) DRIVER=xgcc; UTVAR=GCC_UNDER_TEST; SUMDIR=gcc; SUM=gcc ;;
+  g++) DRIVER=xg++; UTVAR=GXX_UNDER_TEST; SUMDIR=g++; SUM=g++
+       # THE NULL-RESULT ARM.  Without these two lines a build configured
+       # `c,lto' runs `make check-g++', which has no rule, prints nothing, and
+       # produces an EMPTY failure list -- indistinguishable from a front end
+       # that passes everything.  Refuse by name instead.
+       [ -x "$B/gcc/cc1plus" ] || { echo "FATAL: no $B/gcc/cc1plus -- the C++ front end was never built, and an unbuilt language and a passing language give the same empty failure list"; exit 9; }
+       [ -x "$B/gcc/xg++" ]    || { echo "FATAL: no $B/gcc/xg++"; exit 9; } ;;
+  *) echo "FATAL: MT_CHECK_TOOL=$TOOL is not gcc or g++"; exit 9 ;;
+esac
+echo "== tool: $TOOL  (driver $DRIVER, $UTVAR, $SUM.sum)"
 
 VER=$(cat "$SRC/gcc/BASE-VER")
 [ -n "$VER" ] || { echo "FATAL: empty BASE-VER"; exit 9; }
@@ -305,16 +334,16 @@ for T in "$@"; do
       MT_TARGET_CONFIG=$CFG \
       MT_COMPILE_ONLY='${MT_COMPILE_ONLY:-}' \
       export MT_TARGET_NAME MT_TARGET_CONFIG MT_COMPILE_ONLY; \
-      make ${MT_MAKEFLAGS:-} check-gcc \
+      make ${MT_MAKEFLAGS:-} check-$TOOL \
         TEST_TARGET=$T \
         TESTSUITEDIR=$TSD \
-        RUNTESTFLAGS=\"GCC_UNDER_TEST='$B/gcc/xgcc ${ASDIR:+-B$ASDIR/ }-B$B/gcc/ -ftarget-config=$CFG' $RTF\"" \
+        RUNTESTFLAGS=\"$UTVAR='$B/gcc/$DRIVER ${ASDIR:+-B$ASDIR/ }-B$B/gcc/ -ftarget-config=$CFG' $RTF\"" \
   ) > "$B/check-$T.out" 2> "$B/check-$T.err"
   rc=$?
   # Stamp the exit, and let the scorer refuse a run with no stamp: a log being
   # written looks exactly like a log that finished (PRINCIPLES 4).
   echo "$rc" > "$B/check-$T.rc"
-  echo "-- make check-gcc rc=$rc"
+  echo "-- make check-$TOOL rc=$rc"
 
   # POST-CONDITION -- read the triple back out of the site.exp the run actually
   # used.  This is the arm that catches note 2 above, and it is deliberately a
@@ -348,7 +377,7 @@ for T in "$@"; do
   # `mechanism-present-but-never-invoked' shape survives the whole harness.
   # The MERGED log, by exact path -- see mtscore.sh: under -j the slot dirs
   # each hold their own gcc.log and `head -1' picks one of 128 at random.
-  LOG="$B/gcc/$TSD/gcc/gcc.log"
+  LOG="$B/gcc/$TSD/$SUMDIR/$SUM.log"
   if [ -z "$LOG" ] || ! grep -q "MULTI-TARGET RUN: target = $T" "$LOG"; then
     echo "FATAL[$T]: gcc.log carries no 'MULTI-TARGET RUN: target = $T' banner."
     echo "  multi-target.exp did not see MT_TARGET_NAME, so it was INERT:"
@@ -367,4 +396,4 @@ echo
 # discard it.
 SCORER=${MT_SCORER:-$S/mtscore.sh}
 [ -f "$SCORER" ] || { echo "FATAL: no scorer at $SCORER (set MT_SCORER)"; exit 9; }
-sh "$SCORER" "$B" "$@"
+MT_CHECK_TOOL=$TOOL sh "$SCORER" "$B" "$@"
