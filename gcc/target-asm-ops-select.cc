@@ -21,6 +21,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+/* For internal_error in mt_asm_output_align below.  */
+#include "diagnostic-core.h"
 #include "target-asm-ops.h"
 
 /* Declares every configured back end's table and defines
