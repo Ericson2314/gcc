@@ -123,7 +123,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     extra_gcc_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
-    use_gcc_tgmath=
+    use_gcc_tgmath= use_gcc_stdint=
     TM_MULTILIB_CONFIG=
     . ${srcdir}/config.gcc 2> ${gcc_mt_err} > /dev/null || exit 1
     # config.gcc leaves these unset for most targets; the primary target gets
@@ -245,6 +245,39 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # configure appends ginclude/tgmath.h to extra_headers_list on the PRIMARY
     # target use_gcc_tgmath.  Recorded so it is asked per back end.
     echo "use_gcc_tgmath ${use_gcc_tgmath}"
+    # Which stdint.h this target gets: wrap, provide or none.  NO BACKTICK AND
+    # NO APOSTROPHE ANYWHERE IN THIS COMMENT, for the reason c_target_objs and
+    # extra_headers above both state: this block is inside a command
+    # substitution.  Adding this record reproduced that failure on the first
+    # try -- a backtick here closes the substitution early.  It was LOUD only
+    # by luck, because the count happened to be odd; an even number of them
+    # truncates the stanza silently and configure still exits 0.
+    #
+    # The exact sibling of use_gcc_tgmath above: config.gcc data reaching the
+    # build through a single @use_gcc_stdint@ substitution from the ONE legacy
+    # target pass (gcc/configure.ac AC_SUBST, gcc/Makefile.in USE_GCC_STDINT),
+    # consumed by stmp-int-hdrs to decide which file is copied to
+    # include/stdint.h.  One file, one answer, for every target served.
+    #
+    # IT IS A PROPERTY OF THE TRIPLE, NOT OF THE BACK END, AND THAT IS WHY IT
+    # IS RECORDED HERE RATHER THAN KEYED ON cpu_type LIKE extra_headers.
+    # Measured over every triple in contrib/config-list.mk by sourcing
+    # config.gcc once each, exactly as this loop does
+    # (scratchpad/t190-stdint-census.sh): 188 triples, 166 wrap / 12 provide /
+    # 10 none, and TEN BACK ENDS DISAGREE WITH THEMSELVES -- alpha, i386, mips,
+    # rs6000 and sparc three ways, arm, ia64, pa, s390 and sh two ways.  So the
+    # per-back-end include-<cpu_type>/ directory that #189 built for
+    # extra_headers CANNOT express this: alpha-linux-gnu wants wrap and
+    # alpha-dec-vms wants provide while both are the alpha back end.
+    #
+    # NOT A targ_caps CAPABILITY EITHER, by the hook-vs-capability test: two
+    # installations of the same compiler serving the same triple cannot differ
+    # here, because the answer is config.gcc source data and nothing probes it.
+    # That also means it is invariant between a probed run and a pinned one, so
+    # it needs no pinning mode -- unlike everything in specs-config this cannot
+    # vary with the machine, and a stdint.h that did would make every test
+    # asserting fixed preprocessor output a statement about the box.
+    echo "use_gcc_stdint ${use_gcc_stdint}"
     echo "out_file ${out_file}"
     echo "md_file ${md_file}"
     # The back-end sources gengtype must scan for GTY markers.  gengtype makes
@@ -527,7 +560,8 @@ gcc_mt_keys=" target cpu_type option_defaults decimal_float decimal_bid_format
  common_out_file common_out_symbol tm_file tm_p_file tmake_file
  tmake_file_present extra_objs extra_gcc_objs c_target_objs cxx_target_objs
  extra_options
- extra_headers use_gcc_tgmath out_file md_file target_gtfiles extra_modes
+ extra_headers use_gcc_tgmath use_gcc_stdint out_file md_file target_gtfiles
+ extra_modes
  tm_defines target_cpu_default tm_include_list tm_generated_headers
  tm_multilib_config "
 # Collapse the newlines in the list above to spaces before matching on
