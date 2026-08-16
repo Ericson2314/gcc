@@ -670,10 +670,19 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    and all 648 shared use sites want it as a run-time expression.  The sweep
    that establishes that is recorded at `mt_pmode''s declaration.
 
-   `STACK_SAVEAREA_MODE' above expands to `Pmode' for a base that defines no
+   AND THE SENTENCE THAT USED TO END THIS COMMENT WAS FALSE IN BOTH HALVES,
+   WHICH IS WHY IT IS QUOTED HERE RATHER THAN QUIETLY DELETED.  It read:
+   "`STACK_SAVEAREA_MODE' above expands to `Pmode' for a base that defines no
    such macro, and is defined EARLIER in this file, so it picks this up by
-   ordinary macro expansion -- the redirect being last is what makes that
-   work rather than a coincidence.  */
+   ordinary macro expansion."  There was no `STACK_SAVEAREA_MODE' anywhere in
+   this file -- the citation named a definition that had never been written,
+   the `sweep.sh' shape PRINCIPLES records, where a comment describing a
+   mechanism reads as evidence the mechanism is there.  And the fallback it
+   appealed to is dead anyway: `defaults.h:1493' guards `Pmode' behind
+   `#ifndef STACK_SAVEAREA_MODE', and `config/i386/i386.h:2011' has already
+   defined that name in every shared translation unit, so no base ever reached
+   it.  The real redirect is below, and it cost 69 of the 71 `extract_insn,
+   recog.cc:2892' rows on the ten-back-end board.  */
 #undef Pmode
 #define Pmode (mt_pmode ())
 
@@ -686,8 +695,13 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    tidiness.  Eight back ends define `FUNCTION_MODE' as `Pmode' outright; the
    per-base thunk expands it in the base's own translation unit where `Pmode'
    is still the real macro, but any shared spelling that reached this
-   definition would want the redirected `Pmode', so the two are ordered the
-   way `STACK_SAVEAREA_MODE' above is ordered against `Pmode'.
+   definition would want the redirected `Pmode', so it must come after it.
+   (This sentence used to cite `STACK_SAVEAREA_MODE' as the precedent for that
+   ordering.  It was citing a definition that did not exist; see the corrected
+   paragraph above.  The ordering requirement stated here is real and is
+   unaffected -- and it now applies to the genuine `STACK_SAVEAREA_MODE'
+   redirect below for the same reason, since thirty-odd back ends define no
+   such macro and reach `defaults.h''s `Pmode'.)
 
    `#undef' FIRST, AND THE FIRST DRAFT DID NOT.  Unlike the names above there
    is no defaults.h fallback for `FUNCTION_MODE' -- only `config/' defines it
@@ -700,6 +714,34 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    question as "not yet defined".  */
 #undef FUNCTION_MODE
 #define FUNCTION_MODE (mt_function_mode ())
+
+/* `STACK_SAVEAREA_MODE (LEVEL)' -- the mode of the slot the stack pointer is
+   saved into for a nonlocal goto, and the diagnosed cause of 69 of the 71
+   `extract_insn, recog.cc:2892' rows on the ten-back-end board.  See
+   target-frame.h for the insn dump and for the `restore_stack_nonlocal'
+   discriminator that splits the ten scored back ends 4/6 with no exceptions.
+
+   IT MUST FOLLOW THE `Pmode' REDIRECT ABOVE, for exactly the reason
+   `FUNCTION_MODE' just above must: `defaults.h:1494' supplies `Pmode' to the
+   thirty-odd back ends that define no `STACK_SAVEAREA_MODE' of their own, and
+   a shared spelling reaching that fallback wants the redirected `Pmode'.  The
+   per-base thunk is unaffected either way, since it is compiled where both
+   names are still the real macros.
+
+   `#undef' FIRST.  `defaults.h' DOES have a fallback for this one, so unlike
+   `FUNCTION_MODE' the name is guaranteed defined by the time we get here --
+   by `config/i386/i386.h:2011' if the primary's chain was read, which in a
+   shared translation unit it always is, and which is the entire bug.
+
+   THE ARGUMENT IS CAST TO `int' HERE rather than passed as its enum.  The
+   three call sites in shared code spell `SAVE_NONLOCAL' / `SAVE_BLOCK' /
+   `SAVE_FUNCTION', which are `enum save_level' from `explow.h:90'; that
+   header cannot be required of every translation unit this file reaches, so
+   the enum is not named in the interface.  `target-cumargs.cc' casts it back
+   before expanding the back end's own macro, which is where the enumerator is
+   in scope and where two back ends' bodies compare against it by name.  */
+#undef STACK_SAVEAREA_MODE
+#define STACK_SAVEAREA_MODE(LEVEL) (mt_stack_savearea_mode ((int) (LEVEL)))
 
 /* ------------------------------------------------------------------------
    THE DWARF REGISTER NUMBERING.  See target-frame.h for the gdb reading --

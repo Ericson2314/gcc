@@ -659,6 +659,86 @@ struct target_frame_desc
      fails by name rather than answering QImode.  */
   machine_mode (*function_mode) (void);
 
+  /* `STACK_SAVEAREA_MODE (LEVEL)' -- the mode of the slot `emit_stack_save'
+     writes the stack pointer into, and `emit_stack_restore' reads it back
+     from.  MACRO-LEAK.md class (b), and the diagnosed cause of the
+     `extract_insn, recog.cc:2892' wall that `TAA-BOARD.md' 4 recorded as
+     T173's headline at 5,103 occurrences and then reported as "does not
+     appear at all -- someone fixed it".  It was never fixed; the only back
+     ends still carrying it had never been scored.
+
+     WHAT THE ICE ACTUALLY WAS, from the insn the compiler printed rather than
+     from the site it stopped at.  For `arm-unknown-eabi' compiling
+     `gcc.c-torture/compile/pr21728.c' -- a `__label__' plus a nested function
+     doing `goto', i.e. a nonlocal goto -- the insn that reached `vregs' was
+
+	 (set (reg/f:SI 13 sp) (mem:TI (reg/f:SI 688) [0  S16 A64]))
+
+     -- note `S16', sixteen bytes.  The DESTINATION is correct: `reg:SI 13' is
+     genuinely arm's stack pointer in arm's own `Pmode'.  Only the MEM's mode
+     is wrong, so this is not a `Pmode' leak; it is a `set' whose two halves
+     have different modes, which is malformed RTL that NO back end's `recog'
+     could match.  The bug is therefore UPSTREAM of `recog', and the ICE site
+     cannot say so -- `builtins.cc:1203' builds that MEM, and `explow.cc:1246'
+     hands it to `gen_move_insn' against `stack_pointer_rtx'.
+
+     WHOSE SIXTEEN BYTES.  `config/i386/i386.h:2011':
+
+	 #define STACK_SAVEAREA_MODE(LEVEL) \
+	   ((LEVEL) == SAVE_NONLOCAL ? (TARGET_64BIT ? TImode : DImode) : Pmode)
+
+     i.e. x86-64's answer, reaching all 47 back ends through the shared
+     `tm.h'.  `defaults.h:1493''s `#ifndef STACK_SAVEAREA_MODE' fallback --
+     which would have given every other base the correct `Pmode' -- IS DEAD,
+     because `i386.h' defines the name first.  That is the `EPILOGUE_USES' and
+     `REGMODE_NATURAL_SIZE' trap in a third place, and PRINCIPLES already
+     states the rule it breaks: an `#ifndef' in a shared TU is never taken if
+     the primary defines the name, so "it has a fallback" is not evidence the
+     fallback runs.
+
+     THE DISCRIMINATOR IS `restore_stack_nonlocal', AND IT SPLITS THE TEN
+     SCORED BACK ENDS 4/6 WITH NO EXCEPTIONS.  `emit_stack_restore' uses
+     `gen_move_insn' UNLESS the back end supplies its own
+     `restore_stack_nonlocal' expander, which takes the mode as given and so
+     absorbs the wrong one.  Exactly seven back ends define that pattern
+     (aarch64, i386, ia64, riscv, rs6000, s390, sparc).  The four scored back
+     ends that PASS -- i386, aarch64, riscv, s390 -- are all in that set; the
+     six that FAIL -- alpha, arc, arm, avr, mips, or1k -- are none of them.
+     So the four passing targets were not unaffected, they were CONCEALED: the
+     leak reached them too and their own expander swallowed it.  A board that
+     scored only those four could never have seen this, which is why it read
+     as fixed for two boards running.
+
+     A CALL AND NOT A `target-cdata' CONSTANT, for the reason `pmode' and
+     `function_mode' above are calls: i386's body reads `TARGET_64BIT', which
+     is `global_options.x_ix86_isa_flags' -- option state that can move within
+     one run of the compiler -- and every base that defines no macro of its
+     own gets `defaults.h''s `Pmode', which is already a run-time call here.
+     A value read once at selection time would be frozen.
+
+     `int' AND NOT `enum save_level' in the signature, deliberately.  The enum
+     is declared in `explow.h:90', which this header must not require: this
+     file is reached from `multi-target-macros.h' by every shared translation
+     unit, hundreds of which have no business seeing `explow.h'.  The three
+     enumerators are handed through as ints and cast back in the base's own
+     thunk, where `explow.h' IS included and the back end's macro can compare
+     against `SAVE_NONLOCAL' by name -- which sparc's and s390's bodies do.
+
+     `machine_mode' AND NOT `scalar_int_mode', unlike `pmode'.  aarch64's
+     answer is `E_CDImode' and s390's is an integer mode 256 bits wide; the
+     complex one is not a scalar int at all, so narrowing the type here would
+     make a legal per-base answer unrepresentable.  The four consumers
+     (`explow.cc', `builtins.cc' x4, `tree-nested.cc') all take a
+     `machine_mode', and `tree-nested.cc:792' narrows it itself with an
+     explicit `as_a <fixed_size_mode>'.
+
+     SWEPT FOR CONSTANT-EXPRESSION CONTEXTS BEFORE LANDING.  Outside `config/'
+     there are seven use sites -- explow.cc:1153, builtins.cc:889, :996,
+     :1203, :1275, tree-nested.cc:792 and the comment at explow.cc:1263 -- and
+     every one is an ordinary run-time argument.  No `#if', no `#ifdef', no
+     case label, no array bound, no static initialiser.  */
+  machine_mode (*stack_savearea_mode) (int level);
+
   /* `DEBUGGER_REGNO (N)' -- gcc register number to debugger/DWARF register
      number.  MACRO-LEAK.md class (c1).  THIS IS THE `BOUND BY ONE, INDEXED BY
      ANOTHER' DISGUISE, the sixth time it has appeared on this branch
@@ -1740,6 +1820,14 @@ extern unsigned int mt_biggest_alignment (void);
 /* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
    for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */
 extern machine_mode mt_function_mode (void);
+
+/* `STACK_SAVEAREA_MODE (LEVEL)', redirected in `multi-target-macros.h'.  LEVEL
+   is an `enum save_level' (explow.h:90) passed as an int; see the field
+   comment above for why the enum is not named in this header, for the insn
+   dump that diagnosed the `recog.cc:2892' wall, and for the
+   `restore_stack_nonlocal' discriminator that explains why four scored back
+   ends looked unaffected while carrying the same leak.  */
+extern machine_mode mt_stack_savearea_mode (int level);
 
 /* THE DWARF REGISTER-NUMBERING FAMILY.  See the three field comments for the
    measurement, for why `DWARF_FRAME_REGNUM' is not derived from

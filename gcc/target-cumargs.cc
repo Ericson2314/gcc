@@ -88,6 +88,13 @@ along with GCC; see the file COPYING3.  If not see
    expansion now happens in the translation unit where the macro is that
    base's own, so that base's headers have to be satisfiable here.  */
 #include "output.h"
+/* For `enum save_level' and its three enumerators.  `STACK_SAVEAREA_MODE' is
+   passed an `int' across the shared interface -- target-frame.h says why that
+   header must not require `explow.h' -- and `mt_base_stack_savearea_mode'
+   casts it back, which means the enum has to be in scope HERE.  It also has
+   to be in scope for the macro BODIES: sparc.h:565, s390.h:328 and
+   i386.h:2011 each test `(LEVEL) == SAVE_NONLOCAL' by name.  */
+#include "explow.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
@@ -586,6 +593,33 @@ static machine_mode
 mt_base_function_mode (void)
 {
   return (machine_mode) FUNCTION_MODE;
+}
+
+/* `STACK_SAVEAREA_MODE (LEVEL)', read in THIS base's translation unit.
+   Compiled once against i386's tm.h, every back end's nonlocal-goto save slot
+   was x86-64's `TImode' -- sixteen bytes -- and `emit_stack_restore' then
+   built `(set (reg:SI sp) (mem:TI ...))', a `set' with mismatched modes that
+   no back end's `recog' can match.  See target-frame.h for the insn, for why
+   `defaults.h''s `#ifndef' fallback is dead, and for the
+   `restore_stack_nonlocal' discriminator.
+
+   THE CAST BACK TO `enum save_level' IS WHAT THIS THUNK EXISTS FOR, as much
+   as the macro expansion is.  Two back ends' bodies compare the argument
+   against `SAVE_NONLOCAL' by name -- sparc.h:565 and s390.h:328, and i386's
+   own does too -- so the enumerator has to be in scope, which is why this
+   file includes `explow.h'.  The shared interface cannot pass the enum
+   (target-frame.h says why), so the conversion has to happen on exactly one
+   side and this is the side that can afford the header.
+
+   No assertion on the result, and nothing to assert.  aarch64 answers
+   `E_CDImode', s390 a 256-bit integer mode, ia64 likewise, sparc `TImode',
+   and the thirty-odd back ends defining no macro at all get `defaults.h''s
+   `Pmode'.  Every one of those is a legal answer; the only thing that could
+   be wrong is WHOSE it is, which is precisely what compiling here fixes.  */
+static machine_mode
+mt_base_stack_savearea_mode (int level)
+{
+  return (machine_mode) STACK_SAVEAREA_MODE ((enum save_level) level);
 }
 
 /* THE DWARF REGISTER-NUMBERING FAMILY, evaluated in THIS base's translation
@@ -1693,6 +1727,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_initial_elimination_offset,
   mt_base_pmode,
   mt_base_function_mode,
+  mt_base_stack_savearea_mode,
   mt_base_debugger_regno,
   mt_base_dwarf_frame_regnum,
   mt_base_dwarf_frame_registers,

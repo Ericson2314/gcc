@@ -376,6 +376,22 @@ mt_function_mode (void)
   return mt_frame ()->function_mode ();
 }
 
+/* `STACK_SAVEAREA_MODE'.  Uncached for the same two reasons as `Pmode' and
+   `FUNCTION_MODE' just above, and here BOTH of them apply at once: i386's
+   body is `(TARGET_64BIT ? TImode : DImode)', which is option state, and
+   every base defining no macro of its own falls through `defaults.h' to
+   `Pmode', which is itself already a run-time call.  A value read once at
+   selection time would be frozen twice over.
+
+   See target-frame.h for the insn dump, for why `defaults.h''s `#ifndef' is
+   dead, and for the `restore_stack_nonlocal' discriminator that splits the
+   ten scored back ends 4/6 with no exceptions.  */
+machine_mode
+mt_stack_savearea_mode (int level)
+{
+  return mt_frame ()->stack_savearea_mode (level);
+}
+
 /* THE DWARF REGISTER-NUMBERING FAMILY.  Uncached, through `mt_frame ()', for
    the same reason as `Pmode' just above: i386's `DEBUGGER_REGNO' reads
    `TARGET_64BIT', which is option state and can move within one run of the
