@@ -417,6 +417,39 @@ installing, and read at run time.
 compiler — a new binutils, a different sysroot, headers fixed in place — it is
 post-install adaptation, not build configuration.
 
+**AND THE COROLLARY, WHICH IS THE USER'S RULING AND IS STANDING LAW: ambient
+adaptation is right for builds and deployments and WRONG FOR UNIT TESTS.**
+`target-specs` exists to match whatever assembler and linker happen to sit
+beside an installed compiler. That is correct, and it must stay. But a
+`scan-assembler` test asserts *fixed text*, so if the capability set behind it
+is **probed**, the same test on two machines with different binutils gives
+different answers — and a result that varies with the box is not a regression
+test. Today, every `scan-assembler` number this project has quoted is a
+statement about **this machine**.
+
+So a test run must **pin** the configuration: a declared, checked-in capability
+set per target, with the probes not run at all. Consequences, all of which cut
+in our favour:
+
+- **No assembler is needed to score `scan-assembler` tests**, because nothing
+  is being probed. The "17 of 47 scorable" ceiling is an artefact of the
+  harness, not a property of the tests. `powerpc` alone has ~1379
+  `scan-assembler` tests and is currently unscorable.
+- The guard refusing the host `as` **stays exactly as it is**, because a pinned
+  run is a *different mode*, not a fallback inside the probing one. That
+  distinction has to be structural — a conservative-default branch inside the
+  prober would be the same silent-wrong-answer with better manners.
+- A pinned set must come from a **real probe against a real assembler, captured
+  once and committed** — never invented. A file saying `as_tls=0` because
+  nobody asked, sitting beside one saying `as_tls=0` because an assembler
+  answered, is this project's most expensive recurring failure wearing a
+  config file.
+- A pinned run's numbers must be **marked**, so they can never be compared
+  like-for-like with a probed run without someone noticing.
+
+Eventually the same question arrives for binutils itself — a multi-target `as`
+and `ld` — at which point "which assembler" stops being ambient at all.
+
 **HOOK vs CAPABILITY — the other half of that test.** Not every per-target fact
 belongs in `target-specs`. The user's rule: *"hooks can be used for static
 defaults that vary per target."*
