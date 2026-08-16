@@ -88,6 +88,20 @@ along with GCC; see the file COPYING3.  If not see
    expansion now happens in the translation unit where the macro is that
    base's own, so that base's headers have to be satisfiable here.  */
 #include "output.h"
+/* For `lookup_attribute', which `epiphany.h:776's ASM_DECLARE_FUNCTION_SIZE
+   calls to find its `forwarder_section' attribute.  Without it the 47-base
+   build failed BY NAME --
+
+     config/epiphany/epiphany.h:776: error: lookup_attribute was not declared
+     in this scope
+     target-cumargs.cc:313: note: in expansion of macro ASM_DECLARE_FUNCTION_SIZE
+
+   -- which is the same mechanism `crtl', `cfun' and `assemble_function_label_raw'
+   above record, arriving for a fourth macro: the expansion now happens in the
+   translation unit where the macro is that base's own, so that base's headers
+   have to be satisfiable HERE.  One back end of 47 needed it, and the build
+   named the back end, the file, the line and the identifier.  */
+#include "attribs.h"
 #include "target-cumargs.h"
 
 /* NO APOSTROPHE IN EITHER MESSAGE.  An unpaired quote in a #error draws a
