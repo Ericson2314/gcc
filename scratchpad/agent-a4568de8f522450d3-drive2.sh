@@ -42,8 +42,8 @@ export WANT_ANCHOR=$A
 export MT_MAKEFLAGS=${MT_MAKEFLAGS:--j6}
 LIST=$(grep -v '^#' "$W/scratchpad/backends-47.txt" | grep -v '^$' | paste -sd,)
 
-sha=71f44e05666
-tag=post5
+sha=03217479acc
+tag=post6
 S=/tmp/snap-$ID-$sha
 D=/tmp/b-${ID#agent-}-$tag
 
