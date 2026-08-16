@@ -39,8 +39,40 @@ mkdir -p "$O"
 cd "$W/gcc"
 
 # 1. the authority: every documented target macro
-sed -n 's/^@defmac \([A-Z_][A-Z_0-9]*\).*/\1/p;s/^@defmacx \([A-Z_][A-Z_0-9]*\).*/\1/p' \
+# THE CHARACTER CLASS WAS UPPERCASE-ONLY AND IT TRUNCATED THREE NAMES RATHER
+# THAN SKIPPING THEM, WHICH IS THE DANGEROUS DIRECTION.
+#
+# `[A-Z_][A-Z_0-9]*' stops at the first lowercase letter, so it did not decline
+# to match `@defmac Pmode' -- it matched `P'.  Five of tm.texi's @defmac names
+# contain lowercase, and the old pattern turned three of them into short
+# identifiers that are word-matched all over shared code:
+#
+#     @defmac Pmode                    ->  P            (80 "uses" in gcc/*.cc)
+#     @defmac INVOKE__main             ->  INVOKE__
+#     @defmac __builtin_saveregs  etc  ->  __
+#
+# So the census population contained three garbage names AND WAS MISSING
+# `Pmode' -- the macro PRINCIPLES names first among the leaks this whole
+# instrument exists to enumerate ("Pmode, ELIMINABLE_REGS, INIT_EXPANDERS,
+# ACCUMULATE_OUTGOING_ARGS were each a file reading that list and not knowing
+# it"), and the one behind riscv64 emitting 32-bit code in an ELF64 object.
+# A census that cannot see its own headline example.
+#
+# Both halves are the same one-character bug and neither is visible in the
+# total: `P' is spelled everywhere so it always classified into SOME bucket,
+# and the non-vacuity arm asks only that its four named macros be classified.
+sed -n 's/^@defmacx* \([A-Za-z_][A-Za-z_0-9]*\).*/\1/p' \
   doc/tm.texi | sort -u > "$O/macros.all"
+# The three truncations must be GONE and the five real names PRESENT.  Stated
+# as an arm rather than trusted, because the failure is silent in the total.
+for bad in P __ INVOKE__; do
+  grep -qx "$bad" "$O/macros.all" \
+    && { echo "FATAL: truncated name '$bad' still in the macro list"; exit 9; }
+done
+for good in Pmode INVOKE__main __builtin_saveregs; do
+  grep -qx "$good" "$O/macros.all" \
+    || { echo "FATAL: '$good' missing from the macro list"; exit 9; }
+done
 N=$(wc -l < "$O/macros.all")
 [ "$N" -gt 100 ] || { echo "FATAL: only $N macros from tm.texi -- the extraction is wrong"; exit 9; }
 echo "tm.texi documents $N target macros"
