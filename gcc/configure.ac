@@ -1626,6 +1626,43 @@ fi
 gcc_extra_targets=
 case ${enable_backends} in
   no | "")
+    #
+    # THE DEFAULT IS THE TREE'S OWN SHIPPED LIST, AND THAT IS A DESIGN CALL.
+    #
+    # It used to be a hard error -- `--enable-backends=LIST is required' -- on
+    # the reasoning that a default target is a hiding place.  That reasoning is
+    # about a PRIVILEGED target, and this default has none: it is every back
+    # end the tree ships, one representative triple each, so nothing can hide
+    # behind being the chosen one.
+    #
+    # What the error actually forced was every CALLER becoming an authority for
+    # which back ends exist.  Measured in nixpkgs, where the `gcc' derivation
+    # had to read `default-backends' itself and pass it back in as
+    # `--enable-backends=<47 triples>' -- a list in the packaging, and therefore
+    # a store path that depends on it, which is target-dependence returning by
+    # the front door after being removed from the back.  A component that names
+    # nothing cannot drift from the tree it is built out of.
+    #
+    # NOT `all'.  `all' means "every triple in contrib/config-list.mk", 188 of
+    # them, which is a different question -- see the top-level configure.ac
+    # stanza that refuses to map one onto the other.  This file is the answer to
+    # "one representative triple per back end", written down and reviewable,
+    # not computed.
+    #
+    # NO FALLBACK IF IT IS MISSING.  An unreadable list must not quietly become
+    # a one-target build; that is the exact failure this branch exists to
+    # remove, and it is invisible from an exit code.
+    if test ! -f ${srcdir}/default-backends; then
+      AC_MSG_ERROR([gcc/default-backends is missing, and there is no fallback.
+Without it this build would silently serve only ${target}, which is the
+single-target compiler this tree exists to replace.  Restore the file, or name
+the back ends explicitly with --enable-backends=LIST.])
+    fi
+    gcc_extra_targets=`grep -v '^#' ${srcdir}/default-backends | grep . | tr '\012' ' '`
+    if test x"${gcc_extra_targets}" = x; then
+      AC_MSG_ERROR([gcc/default-backends has no entries; an empty list is not an answer])
+    fi
+    AC_MSG_NOTICE([--enable-backends not given: using gcc/default-backends])
     ;;
   all)
     #
