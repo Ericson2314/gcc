@@ -79,6 +79,55 @@ clean ARM 2 mean anything: "UBSan reported nothing" and "UBSan was never
 enabled on that TU" are the same empty log, so the script refuses to score
 until it has seen the handler as an undefined reference in the rebuilt object.
 
+## THE RESULT, BOTH TREES, 47 BASES, COLD, FROM IMMUTABLE SNAPSHOTS
+
+PRE `6bbccf3795c` in `/tmp/b-a51a0e8b2b458063b-pre`, POST `5b269f19557` in
+`/tmp/b-a51a0e8b2b458063b-post`, anchor **52** on both.
+
+```
+                                        PRE                 POST
+make all-gcc                            rc=0                rc=0
+  error: lines                          0                   0
+  stderr lines                          4470                4470
+  cc1 links                             yes                 yes
+UBSan shift reports (SVE reproducer)    9                   0      <- the fix
+  instrumented (ARM 1)                  yes                 yes
+specs-config x86_64   wc -l / md5       232 / cfbc7a65e54e  232 / cfbc7a65e54e
+specs-config aarch64  wc -l / md5       232 / 575aff0c188b  232 / 575aff0c188b
+x86_64 -O2 big.c                        12369 / 378fc33c1e70   IDENTICAL
+x86_64 -O2 -g big.c                     rc=0, real .debug   rc=0, real .debug
+aarch64 -Ofast +sve   fp.c              3648 / 38deaf8b1f9c    IDENTICAL
+aarch64 -Ofast +sve2  fp.c              3393 / 7144b19aaa99    IDENTICAL
+aarch64 -Ofast armv8-a fp.c             4361 / 8dbba2393d8f    IDENTICAL
+x86_64  -Ofast        fp.c              6000 / 314101f646ac    IDENTICAL
+```
+
+The `-g` md5 from `mt-bars.sh` DOES differ (78528 / d5bbd7911e79 vs 78540 /
+b3b71bb6a749) and it is **entirely the build-dir path**. `gcheck.sh`, which
+compiles one constant absolute path with both compilers, gives a diff that is
+exactly two lines — the `DW_AT_producer` string containing
+`/tmp/b-a51a0e8b2b458063b-pre` vs `-post`, and its position in the `.LASF`
+table. No other byte differs.
+
+**The codegen being byte-identical is the predicted result, not a weak one.**
+Every in-tree `cpu_approx_modes` value is 0 or ~0, so the bit the old code
+computed never changed an answer even when the shift was undefined. A codegen
+difference here would have been a finding. Non-vacuity: the aarch64 `+sve`
+output carries 12 `fdiv`/`fsqrt`/`frecpe`/`frsqrte` witnesses, so the site was
+genuinely reached on both sides.
+
+Generated tables, `mt-aarch64/insn-modes-aarch64.cc`, 47 bases:
+
+```
+class_num_modes_tab[MODE_FLOAT]         5     (numbering says 10)
+class_num_modes_tab[MODE_VECTOR_FLOAT]  55    (numbering says 210)
+mode_class_index_tab: HF 0, BF 1, SF 2, DF 3, TF 4;  V4SF 8;  VNx8DF 54
+```
+
+so the maximum shift is 54 + 5 = **59** — exactly a single-target aarch64
+compiler's maximum, and 5/55 are exactly the stock aarch64 counts measured from
+`/tmp/b-stock-*-aarch64`.
+
 ## THE SHAPE ELSEWHERE — SWEPT, ONE INSTANCE
 
 `grep` for `- MIN_MODE_` over the tree finds ten other sites. Every one of them

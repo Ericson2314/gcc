@@ -2230,6 +2230,65 @@ id>`, and re-measure anything that was in flight — a build dir deleted under a
 running `make` gives results untrustworthy in both directions, and a vanished
 object looks exactly like the ICE class you are hunting.
 
+**A FOURTH INSTANCE OF "THE BOUND IS THE UNION'S, THE NUMBERING IS PER BASE",
+AND THIS ONE IS NOT AN ARRAY BOUND AT ALL — IT IS A BIT POSITION (#185).**
+`AARCH64_APPROX_MODE` (`aarch64-protos.h`) is `1 << (MODE - MIN_MODE_FLOAT)`.
+Upstream that is a dense index over aarch64's own **5** float and **55**
+vector-float modes, so the shift is at most 59 and a `uint64_t` is the right
+width. Here `MIN_MODE_FLOAT` .. `MAX_MODE_FLOAT` are the shared numbering's,
+which is **10 and 210** at 47 bases, and the shift reaches **219**. Measured in
+a `cc1` with `mt-aarch64/aarch64.o` rebuilt `-fsanitize=shift`:
+
+```
+aarch64.cc:17140 / :17205 / :17316   shift exponent 136 is too large for
+                                     64-bit type 'long unsigned int'
+```
+
+Four things worth carrying, and the first three are corrections to the brief:
+
+- **The magnitude is a function of base MEMBERSHIP, not base COUNT, and it had
+  already SATURATED.** 2 bases → 76, 3 → 83, 4 → 204, 11 → **219**, 47 →
+  **219**. The eleven-base set already holds both ends of the range (riscv's
+  RVV, aarch64's SVE `VNx8DF`), so thirty-six further back ends moved it by
+  zero. Same shape as the `type_natural_mode` correction above: *"it appears at
+  N and not at N−1" is not evidence that N is the cause.*
+- **The two-base build reproduces it (76 > 63).** "A small build cannot show
+  this" was wrong, and in the direction that costs a day of build time.
+- **The in-range cases were wrong too, silently.** `V4SF` got bit 35 where a
+  single-target aarch64 gives it bit 11. Only the UB is loud; the whole bit
+  assignment was another base set's. So *"is the shift defined"* and *"is the
+  bit the right bit"* are two questions, and fixing the first without the
+  second would have been a half-fix that passes UBSan.
+- **Grep for a mode-ordinal difference used as a SHIFT, separately from one
+  used as an INDEX.** Ten other `- MIN_MODE_` sites exist (`expmed.h`,
+  `real.h`, the `BUILT_IN_COMPLEX_*` range in `tree-core.h`) and every one
+  indexes an array whose bound is *the same union quantity*, so bound and index
+  agree and they are correct. The bit-position one is the outlier because its
+  bound — 64 — comes from nowhere near the mode machinery and so cannot track
+  the numbering.
+
+The fix is the settled split, and it generalises: `genmodes` now emits
+`mode_class_index[]` (this base's dense 0-based position for a mode within its
+class, `0xffff` for a hole) and `class_num_modes[]` (this base's own count per
+class), both on `MT_MODE_TABLES` beside `class_narrowest_mode`, which was
+already the same split for the same reason. **Reach for those two whenever a
+back end wants "which one of MY modes of this class is this".**
+
+Method note, because the null result here has a specific shape: **"UBSan
+reported nothing" and "UBSan was never enabled on that translation unit" are
+the same empty log.** `a51a0e8b2b458063b-ubshift.sh` refuses to score until it
+has seen `__ubsan_handle_shift_out_of_bounds` as an undefined reference in the
+rebuilt object, and exits 9 rather than 0 otherwise. And the reproducer needs
+**SVE**: Advanced SIMD's shifts (20 .. 37) are in range, so a plain `float`
+loop at `-Ofast` reports nothing and looks exactly like a fixed compiler.
+
+And one near-miss worth the line: this task **overwrote the snapshot directory
+its already-configured PRE build dir pointed at**. Nothing failed — a build dir
+re-reads its srcdir long after configure (`mt-bars.sh` takes `big.c` from it;
+rebuilding one object recompiles *its* source), so the next arm would have
+compiled the FIXED header and reported the bug gone, with a green everywhere.
+**Put the sha in the snapshot path**, not just the worktree id.
+
 Say what you measured, what you did not, and what your instrument cannot see.
 **A measured "still cannot be checked, because X" is a useful result; an
 unexamined pass is not.** Distinguish upper bounds from lower bounds explicitly
