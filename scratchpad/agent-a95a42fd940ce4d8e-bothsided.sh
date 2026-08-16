@@ -13,6 +13,20 @@
 # own answer is TImode and shared code was giving it DImode, so a POST run
 # where x86_64 is unchanged would mean the redirect is not reaching it.
 #
+# THIS SCRIPT IS SOUND FOR THE SIX AND UNSOUND FOR THE FOUR.  Read the result
+# with that in hand; it is left unmodified rather than quietly corrected,
+# because zero movement in a blind instrument is evidence about the instrument.
+#
+# It reads the mode of the MEM loaded into the stack pointer.  For a back end
+# with NO `restore_stack_nonlocal' expander that insn IS the save-area MEM --
+# `explow.cc:1235' falls back to `gen_move_insn' -- so the reading is exact,
+# and those are precisely the six.  For the four controls (i386, aarch64,
+# riscv, s390 all define the expander) the insn is the EXPANDER'S OUTPUT and
+# the save-area mode is not visible in it at all.  Their `MISMATCH (wanted
+# CDI/OI/TI)' rows are therefore NOT findings; the column is asking a question
+# this dump does not answer.  `-whichsix.sh' settles the control side as
+# codegen instead.
+#
 # EXPECTED OWN ANSWERS, from the headers, for SAVE_NONLOCAL:
 #   i386     TImode   (TARGET_64BIT ? TImode : DImode), 64-bit here
 #   aarch64  CDImode  aarch64.h:1469
