@@ -971,10 +971,23 @@ snapshot.** `specs-config` MOVED and it is not a regression:
 make all-gcc                MAKERC=0, 0 error:, cc1 links
 cc1 -quiet -nostdinc -O2 -ftarget-config=<cfg> big.c -o x.s
   x86_64                    12369 bytes  md5 378fc33c1e70   (unchanged)
-specs-config  wc -l         232          md5 cfbc7a65e54e   x86_64
-                            232          md5 575aff0c188b   aarch64
-  was 230 / a6c4c68bdf33 before #189
+specs-config  wc -l         232                            x86_64, aarch64
+  was 230 before #189
 ```
+
+**THE `specs-config` md5 IS NOT A BAR. DO NOT QUOTE IT AS ONE.** It is a
+function of **the probing toolchain's paths** — the build dir and the tools dir
+land inside the file — so two correct builds of the same tree give different
+md5s, and an agent checking against a recorded one **scores a correct build as
+a failed bar**. Measured: `ce3e57e29397` and `cfbc7a65e54e` are both correct,
+from different build dirs. **The line count is the stable part**; if you want a
+content check, normalise the paths out first, and say in the same breath which
+build dir and tools dir produced it.
+
+This entry previously listed `cfbc7a65e54e` / `575aff0c188b` as bars, and every
+brief that copied them has been handing agents a check that fires on success.
+The same is true of `mt-bars.sh`'s `-g` md5, for the same reason in a different
+place: the build dir lands in `DW_AT_producer`.
 
 The two extra lines are the per-back-end include directory each target's spec
 now names. **Every brief written before `7375c86aa4c` quotes 230 /
