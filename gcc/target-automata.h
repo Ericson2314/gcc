@@ -241,6 +241,29 @@ struct target_automata_desc
   /* The cpu_type this describes, for diagnostics.  */
   const char *name;
 
+  /* `DELAY_SLOTS' -- whether this back end's `.md' contains a `define_delay',
+     read WHERE IT IS STILL THIS BASE'S OWN MACRO out of its own
+     `insn-attr-common-<base>.h'.  See the long comment at the top of this
+     file for the measurement; the short form is that the shared
+     `insn-attr-common.h' says 0 because it is i386's, and twelve back ends --
+     arc, cris, fr30, h8300, iq2000, microblaze, mips, or1k, pa, sh, sparc,
+     visium -- were answered by that 0.
+
+     NOTE THE SHAPE.  This is NOT the `#ifdef' shape: upstream converted
+     `DELAY_SLOTS' to a 0/1 VALUE years ago and every consumer already spells
+     `if (DELAY_SLOTS)'.  So every `#ifdef'-keyed sweep this project has run
+     scored the file clean while the value reaching those `if's was one
+     header's.  A macro's consumers being runtime `if's is not evidence the
+     macro is per-base here.
+
+     A `bool' field and not a thunk, unlike everything below it: `DELAY_SLOTS'
+     is an integer literal in the generated header, so it is a constant
+     expression here and the table stays statically initialised.  It is also
+     OUTSIDE the `#ifdef INSN_SCHEDULING' arm of the initialiser, because the
+     two are independent -- fr30, h8300, iq2000, microblaze, or1k and visium
+     have delay slots and no automaton at all.  */
+  bool delay_slots;
+
   /* Whether this back end has an automaton at all, i.e. whether its `.md'
      contains a `define_insn_reservation'.  This is `#ifdef INSN_SCHEDULING'
      read WHERE IT IS STILL THIS BASE'S OWN MACRO, which is the only place it
@@ -307,6 +330,17 @@ extern const struct target_automata_desc *targetm_automata;
    refusing it; it still refuses when no base is selected at all.  Every
    shared gate that used to read the primary's `#ifdef' calls this.  */
 extern bool mt_has_insn_scheduling (void);
+
+/* The run-time form of `DELAY_SLOTS', for the SELECTED base.  A query like
+   `mt_has_insn_scheduling ()' -- it answers `false' for a base with no
+   `define_delay' rather than refusing it, and still refuses when no base is
+   selected at all.  Every shared consumer that used to read the primary's
+   macro calls this: `cfgrtl.cc:493', `final.cc:1067', `function.cc:6766',
+   `reorg.cc:3838' and `:3878'.
+
+   `opts.cc:623' and `toplev.cc:1433' are NOT converted and that is a link
+   boundary, not an oversight -- see the top of this file.  */
+extern bool mt_delay_slots (void);
 
 extern int mt_state_size (void);
 extern int mt_max_insn_queue_index (void);

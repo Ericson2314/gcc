@@ -1430,7 +1430,19 @@ process_options ()
     warning_at (UNKNOWN_LOCATION, 0,
 		"instruction scheduling not supported on this target machine");
 #endif
-  if (!DELAY_SLOTS && flag_delayed_branch)
+  /* Asked of the SELECTED base rather than of the primary.  This one moves
+     ALONE, and the reason is worth stating because the `INSN_SCHEDULING'
+     warning ten lines up may NOT: the two run in opposite directions.
+     `opts.cc' turns `-fschedule-insns2' ON at `-O2' for everybody (i386 has
+     an automaton), so converting that warning without `opts.cc' would emit a
+     new diagnostic on every `-O2' compile for the back ends with no DFA.
+     `opts.cc:623's `#if DELAY_SLOTS' is compiled OUT for everybody (i386's 0),
+     so `flag_delayed_branch' is never set by default and this warning can
+     only fire when a user asks for `-fdelayed-branch' explicitly.  Converting
+     it therefore makes it fire STRICTLY LESS -- it stops telling arc, mips,
+     sparc and nine others that they have no delayed branches when they do.
+     No new diagnostic anywhere; measured on the one-line census.  */
+  if (!mt_delay_slots () && flag_delayed_branch)
     warning_at (UNKNOWN_LOCATION, 0,
 		"this target machine does not have delayed branches");
 

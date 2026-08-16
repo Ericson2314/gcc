@@ -1891,16 +1891,17 @@ bool
 memory_address_addr_space_p (machine_mode mode ATTRIBUTE_UNUSED, rtx addr,
 			     addr_space_t as, code_helper ch ATTRIBUTE_UNUSED)
 {
-#ifdef GO_IF_LEGITIMATE_ADDRESS
-  gcc_assert (ADDR_SPACE_GENERIC_P (as));
-  GO_IF_LEGITIMATE_ADDRESS (mode, addr, win);
-  return false;
-
- win:
-  return true;
-#else
+  /* NON-strict: this site is `memory_address_p', and upstream reaches it from
+     translation units that do not define REG_OK_STRICT.  The `#ifdef' this
+     replaces was the PRIMARY's -- i386 defines no GO_IF_LEGITIMATE_ADDRESS,
+     so it was false for all 47 bases.  See target-frame.h.  */
+  bool win;
+  if (mt_go_if_legitimate_address (mode, addr, false, &win))
+    {
+      gcc_assert (ADDR_SPACE_GENERIC_P (as));
+      return win;
+    }
   return targetm.addr_space.legitimate_address_p (mode, addr, 0, as, ch);
-#endif
 }
 
 /* Return true if OP is a valid memory reference with mode MODE,

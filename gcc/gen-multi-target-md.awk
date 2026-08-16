@@ -2184,11 +2184,36 @@ function emit_base_objects(	i, n, parts, objs, src, obj, poly, gen,
   printf "  $(srcdir)/target-modeswitch.h $(srcdir)/target-sched.h \\\n";
   printf "  $(srcdir)/target-asmfprintf.h $(srcdir)/target-automata.h \\\n";
   printf "  $(srcdir)/target-ccmode.h \\\n";
+  # target-legitaddr.h is where the name of the STRICT GO_IF_LEGITIMATE_ADDRESS
+  # thunk is derived from MULTI_TARGET_TARGETM_BASE.  Named explicitly for the
+  # reason the block above gives for target-frame.h: make does not follow
+  # includes, and on a fresh tree a change to it would not rebuild this object.
+  printf "  $(srcdir)/target-legitaddr.h \\\n";
   printf "  multi-target-reg-widths.h\n";
   printf "\t$(COMPILE) -DTARGETM_CUMARGS_SYMBOL=targetm_cumargs_%s \\\n", cpu;
   printf "\t  $(srcdir)/target-cumargs.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
   objs = objs " target-cumargs-" cpu ".o";
+
+  # This back end's STRICT GO_IF_LEGITIMATE_ADDRESS, and it is a separate
+  # object for a reason no other member of this loop has: `REG_OK_STRICT'
+  # selects between two whole macro bodies when the HEADER CHAIN IS READ, not
+  # when the macro is used, so one translation unit can hold only one of them.
+  # target-cumargs-<cpu>.o above is compiled without REG_OK_STRICT and supplies
+  # the non-strict half; this file `#define's it ahead of every include and
+  # supplies the strict half.  See target-legitaddr-strict.cc.
+  #
+  # It gets -DMT_BASE and -DMULTI_TARGET_TARGETM_BASE from the
+  # MULTI_TARGET_OBJS_<cpu> assignments below, exactly as its sibling does --
+  # which is why it must be appended to `objs' and not merely to a link list.
+  printf "target-legitaddr-strict-%s.o: $(srcdir)/target-legitaddr-strict.cc \\\n", cpu;
+  printf "  %s-inc/s-inc \\\n", cpu;
+  printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/multi-target-base.h \\\n";
+  printf "  $(RTL_H) $(TREE_H) $(TM_P_H) $(TARGET_H) \\\n";
+  printf "  $(srcdir)/target-legitaddr.h\n";
+  printf "\t$(COMPILE) $(srcdir)/target-legitaddr-strict.cc\n";
+  printf "\t$(POSTCOMPILE)\n\n";
+  objs = objs " target-legitaddr-strict-" cpu ".o";
 
   # This back end's REGISTER STACK; see target-regstack.h.  Not a table of
   # values like the four above but a whole pass body, compiled per base

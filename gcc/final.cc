@@ -1064,7 +1064,9 @@ shorten_branches (rtx_insn *first)
 	{
 	  int i;
 	  int const_delay_slots;
-	  if (DELAY_SLOTS)
+	  /* The PRIMARY's `DELAY_SLOTS' -- i386's 0 -- for all 47 bases; see
+	     target-automata.h.  */
+	  if (mt_delay_slots ())
 	    const_delay_slots = const_num_delay_slots (body_seq->insn (0));
 	  else
 	    const_delay_slots = 0;
@@ -2663,9 +2665,13 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	    this_is_asm_operands = insn;
 	    expanded = expand_location (loc);
 
-#ifdef FINAL_PRESCAN_INSN
-	    FINAL_PRESCAN_INSN (insn, ops, insn_noperands);
-#endif
+	    /* Some target machines need to prescan each insn before it is
+	       output.  This was `#ifdef FINAL_PRESCAN_INSN', i.e. a fact
+	       about whichever base compiled final.cc -- and i386 defines no
+	       such macro, so it was false for all 47 bases and none of the
+	       fourteen back ends that DO define it ever had its prescan run.
+	       See target-frame.h.  */
+	    mt_final_prescan_insn (insn, ops, insn_noperands);
 
 	    /* Output the insn using them.  */
 	    if (string[0])
@@ -2796,11 +2802,12 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	  fatal_insn_not_found (insn);
 
 	/* Some target machines need to prescan each insn before
-	   it is output.  */
+	   it is output.  Unconditional: the `#ifdef' that used to guard this
+	   was the primary's, and for arm this call is the entry point of the
+	   conditional-execution state machine.  See target-frame.h.  */
 
-#ifdef FINAL_PRESCAN_INSN
-	FINAL_PRESCAN_INSN (insn, recog_data.operand, recog_data.n_operands);
-#endif
+	mt_final_prescan_insn (insn, recog_data.operand,
+			       recog_data.n_operands);
 
 	if (targetm.have_conditional_execution ()
 	    && GET_CODE (PATTERN (insn)) == COND_EXEC)

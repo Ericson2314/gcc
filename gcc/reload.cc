@@ -2164,17 +2164,18 @@ bool
 strict_memory_address_addr_space_p (machine_mode mode ATTRIBUTE_UNUSED,
 				    rtx addr, addr_space_t as, code_helper)
 {
-#ifdef GO_IF_LEGITIMATE_ADDRESS
-  gcc_assert (ADDR_SPACE_GENERIC_P (as));
-  GO_IF_LEGITIMATE_ADDRESS (mode, addr, win);
-  return false;
-
- win:
-  return true;
-#else
+  /* STRICT -- this file is the one that spells `#define REG_OK_STRICT' above
+     its includes, and that `#define' is now consumed by
+     `target-legitaddr-strict.cc' instead, in a translation unit where the
+     header chain is the SELECTED base's.  See target-frame.h.  */
+  bool win;
+  if (mt_go_if_legitimate_address (mode, addr, true, &win))
+    {
+      gcc_assert (ADDR_SPACE_GENERIC_P (as));
+      return win;
+    }
   return targetm.addr_space.legitimate_address_p (mode, addr, 1, as,
 						  ERROR_MARK);
-#endif
 }
 
 /* Like rtx_equal_p except that it allows a REG and a SUBREG to match
