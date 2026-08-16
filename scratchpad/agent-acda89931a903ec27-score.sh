@@ -61,8 +61,16 @@ for row in $MAP; do
     continue
   fi
   if [ ! -f "$CFG" ]; then
+    # NAME THE MISSING ARTEFACT.  "no specs-config" is three different
+    # findings and collapsing them makes the table worse than useless.  The
+    # known one is m68k: `OPTION_DEFAULT_SPECS' spells its value `-%(VALUE)',
+    # the only back end of 22 that does (20 use `-mcpu=%(VALUE)'), and
+    # target-specs cannot express it.  That is a ONE-back-end blocker and is
+    # recorded as such -- inflating it into a family would be the opposite of
+    # the ranking this board exists to produce.
+    why=$(grep -m1 -i "$T.*\(cannot\|error\|unsupported\)" "$B/specs.err" 2>/dev/null | cut -c1-80)
     printf '%-12s %-30s %-18s %6s %6s %6s %6s %s\n' \
-      "$be" "$T" NO-SPECS - - "$L15" - "target-specs produced nothing" >> "$ROWS"
+      "$be" "$T" NO-SPECS - - "$L15" - "${why:-target-specs produced nothing}" >> "$ROWS"
     continue
   fi
 

@@ -14,6 +14,12 @@ SNAP=/tmp/snap-$ID-$SHA
 D=/tmp/b-acda89931a903ec27
 HERE=$(cd "$(dirname "$0")" && pwd)
 
-SRC=$SNAP WANT_ANCHOR=52 sh "$HERE/mt-conf.sh" "$D" "$(cat /tmp/trlist-$ID.txt)"
+# WANT_ANCHOR is required by mt-build.sh as well as mt-conf.sh -- it is
+# EXPORTED, not passed to one command.  Setting it only on the mt-conf line
+# left mt-build failing instantly with `set WANT_ANCHOR', which again looks
+# exactly like a slow build from outside.  Second time this run; both were
+# guards firing correctly on a driver that had not fed them.
+export WANT_ANCHOR=52
+SRC=$SNAP sh "$HERE/mt-conf.sh" "$D" "$(cat /tmp/trlist-$ID.txt)"
 sh "$HERE/mt-build.sh" "$D" all-gcc all-gcc
 echo "DRIVE-DONE rc=$?"

@@ -15,13 +15,16 @@ while true; do
     echo "BUILD-FINISHED rc=$(cat "$B/all-gcc.rc") cc1=$cc1 load=$(cut -d' ' -f1 /proc/loadavg)"
     break
   fi
-  alive=$(pgrep -cf 'acda89931a903ec27-drive' 2>/dev/null || true)
+  alive=$(pgrep -cf 'mt-build.sh' 2>/dev/null || true)
   [ -n "$alive" ] || alive=0
   if [ "$alive" -eq 0 ]; then
-    echo "DRIVE-GONE without stamp; tail: $(tail -1 /tmp/drive-agent-acda89931a903ec27.log)"
+    echo "BUILD-GONE without stamp; tail: $(tail -1 "$B/all-gcc.err" 2>/dev/null)"
     break
   fi
-  n=$(find "$B/gcc" -name '*.o' 2>/dev/null | wc -l)
+  # count objects across the WHOLE build dir: `all-gcc' spends its first
+  # stretch in libiberty/libcpp/lto-plugin, so `$B/gcc/*.o' reads 0 for a
+  # long time and that zero is not a stall.
+  n=$(find "$B" -name '*.o' 2>/dev/null | wc -l)
   g=$(ls "$GAS" 2>/dev/null | grep -c -- '-as$')
   if [ -f "$B/conf.rc" ]; then
     echo "building conf=$(cat "$B/conf.rc") objs=$n gas=$g load=$(cut -d' ' -f1 /proc/loadavg) avail=$(free -g | awk '/Mem:/{print $7}')G"
