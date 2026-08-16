@@ -76,18 +76,44 @@ while read -r m; do
     [ -f "$h" ] || continue
     grep -qE "^[[:space:]]*#[[:space:]]*define[[:space:]]+$m\b" "$h" && { p=yes; break; }
   done
-  # ALREADY CONVERTED?  multi-target-macros.h is this branch's own record of
-  # which target macros it has moved to run time; a macro named there is
-  # handled and must not be counted as a leak.  Subtracting it is what keeps
-  # this an honest census rather than a scary number.
+  # ALREADY CONVERTED?  AND THERE IS NOT ONE AUTHORITY FOR THAT, WHICH IS THE
+  # BRANCH'S OWN ROOT PATTERN BITING THIS SCRIPT.
+  #
+  # The first version subtracted only `multi-target-macros.h', on the reasoning
+  # that it is "this branch's own record of which target macros it has moved to
+  # run time".  It is one of several.  `REG_ALLOC_ORDER' (38 back ends) and
+  # `ADJUST_REG_ALLOC_ORDER' were both reported as LEAK-PRIMARY here and both
+  # are fully converted -- in `target-regs.h', which owns the register
+  # vocabulary and says so in its header.  A macro converted through a
+  # `target-*.h' descriptor never appears in `multi-target-macros.h' at all,
+  # because its call sites were REWRITTEN rather than redirected; that is a
+  # documented and deliberate choice for exactly the macros whose use sites are
+  # `#ifdef' pairs.
+  #
+  # So the conversion record is spread over every `target-*.h', and a census
+  # keyed on one of them inflates its own headline.  One name, several
+  # authorities, no diagnostic -- the pattern this project keeps re-finding,
+  # here in an instrument written to find it.
+  # Two buckets, with different confidence, kept apart rather than merged:
+  #
+  #   REDIRECT    an `#undef X' / `#define X ...' pair in multi-target-macros.h.
+  #               Unambiguous.
+  #   DESCRIPTOR  the name appears in one of the `target-*.h' conversion
+  #               headers.  Weaker -- those headers also DISCUSS macros they
+  #               have not converted -- so it is reported separately and the
+  #               leak count is given both with and without it.
   if grep -qE "^#[[:space:]]*(undef|define)[[:space:]]+$m\b" multi-target-macros.h 2>/dev/null; then
-    printf 'CONVERTED\t%s\t%s\t%s\n' "$d" "$u" "$m" >> "$O/report.conv"
+    printf 'REDIRECT\t%s\t%s\t%s\n' "$d" "$u" "$m" >> "$O/report.conv"
+    continue
+  fi
+  if grep -qw "$m" target-*.h 2>/dev/null; then
+    printf 'DESCRIPTOR\t%s\t%s\t%s\n' "$d" "$u" "$m" >> "$O/report.conv"
     continue
   fi
   if [ "$p" = yes ]; then k=LEAK-PRIMARY; else k=DEAD-DEFAULT; fi
   printf '%s\t%s\t%s\t%s\n' "$k" "$d" "$u" "$m" >> "$O/report"
 done < "$O/macros.all"
-echo "already converted by multi-target-macros.h: $(wc -l < "$O/report.conv" 2>/dev/null || echo 0)"
+echo "already handled: REDIRECT $(grep -c '^REDIRECT' "$O/report.conv" 2>/dev/null || echo 0), DESCRIPTOR $(grep -c '^DESCRIPTOR' "$O/report.conv" 2>/dev/null || echo 0)"
 
 echo
 echo "== macros documented by tm.texi, SPELLED by target-independent code,"
@@ -98,8 +124,19 @@ echo "TOTAL leaking macros: $(wc -l < "$O/report")"
 echo "  LEAK-PRIMARY (x86's answer served to all): $(grep -c '^LEAK-PRIMARY' "$O/report")"
 echo "  DEAD-DEFAULT (fallback served to all):     $(grep -c '^DEAD-DEFAULT' "$O/report")"
 echo
-echo "NON-VACUITY: the two macros proven by measurement must appear above."
-for m in ASM_OUTPUT_ALIGN HAVE_POST_MODIFY_DISP; do
-  if grep -qw "$m" "$O/report"; then echo "  ok: $m present -- $(grep -w "$m" "$O/report")"
-  else echo "  FATAL: $m ABSENT from the census, which is therefore not measuring what it claims"; fi
+# NON-VACUITY.  The arm used to be "these two must appear as LEAKS", which was
+# true when written and became false the moment they were converted -- the
+# script then printed FATAL about a tree that had been FIXED.  That is the same
+# defect-as-pass-condition shape `-align.sh' had, in the instrument written to
+# audit it.
+#
+# The invariant that does not expire is that the PIPELINE SEES them: each named
+# macro must be classified into SOME bucket.  A macro that falls out of both is
+# one the extraction, the use-scan or the back-end scan dropped, which is the
+# failure this arm exists to catch.
+echo "NON-VACUITY: each proven macro must be CLASSIFIED, as leak or as handled."
+for m in ASM_OUTPUT_ALIGN HAVE_POST_MODIFY_DISP PROMOTE_MODE REG_ALLOC_ORDER; do
+  r=$(grep -w "$m" "$O/report" "$O/report.conv" 2>/dev/null | head -1)
+  if [ -n "$r" ]; then echo "  ok: $m -- $r"
+  else echo "  FATAL: $m is in NEITHER bucket; the census dropped it"; fi
 done

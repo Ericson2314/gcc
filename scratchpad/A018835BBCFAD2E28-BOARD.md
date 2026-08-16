@@ -59,20 +59,41 @@ includes exactly one back end's header chain, and it is i386's:
 
 So every target macro spelled in shared code has ONE value for all 47 bases.
 `-leakcensus.sh` sizes it from `tm.texi`'s own `@defmac` list -- so the
-population is GCC's statement of what a target macro is, not mine -- and
-subtracts the 69 that `multi-target-macros.h` records as already converted:
+population is GCC's statement of what a target macro is, not mine:
 
 ```
-408 documented target macros are still read by target-independent code
-    from the primary's chain
-      229  LEAK-PRIMARY   i386 defines it; every other base gets x86's answer
-      248  DEAD-DEFAULT   i386 does not, so the `#ifndef' fallback is live
+543 documented target macros
+ -87  REDIRECT     an #undef/#define pair in multi-target-macros.h
+ -94  DESCRIPTOR   named in a target-*.h conversion header
+====
+296 still read by target-independent code from the primary's chain
+      119  LEAK-PRIMARY   i386 defines it; every other base gets x86's answer
+      177  DEAD-DEFAULT   i386 does not, so the `#ifndef' fallback is live
                           for the back ends that do
 ```
 
-UPPER bound, and labelled one: a macro may be spelled only where the context
-is already per-base. Both instances proven by measurement are asserted by name
-at the end of the run, so a census that stopped measuring cannot report clean.
+**THE FIRST VERSION OF THIS SAID 408, AND IT WAS WRONG.** It subtracted only
+`multi-target-macros.h`, on the reasoning that this is "the branch's own record
+of which macros it has moved to run time". It is one of several. Both
+`REG_ALLOC_ORDER` (38 back ends) and `ADJUST_REG_ALLOC_ORDER` were reported as
+LEAK-PRIMARY and both are fully converted, in `target-regs.h` -- a macro
+converted through a `target-*.h` descriptor never appears in
+`multi-target-macros.h` at all, because its call sites were REWRITTEN rather
+than redirected, which is a deliberate choice for exactly the macros whose use
+sites are `#ifdef` pairs. **One name, several authorities, no diagnostic** --
+this project's own root pattern, found inside the instrument written to audit
+it. Caught only because a residual (`pr56096.c`, below) pointed at register
+allocation and the census claimed a macro was leaking that demonstrably was
+not.
+
+Still an UPPER bound, and DESCRIPTOR is the weaker of the two subtractions
+(those headers also discuss macros they have not converted), so it is reported
+separately rather than merged.
+
+The non-vacuity arm asserts that four named macros are CLASSIFIED into some
+bucket, not that they are leaks. It used to assert they were leaks, which was
+true when written and became FATAL the moment they were fixed -- the same
+defect-as-pass-condition shape as section 4, in the audit script itself.
 
 **DEAD-DEFAULT is the harder half to find.** Nothing is undefined, nothing
 fails to link, no value is out of range. The pass runs, the dump is produced,
