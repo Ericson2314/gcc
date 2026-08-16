@@ -984,12 +984,14 @@ ncrtn.o%s"
 #define INCLUDE_DEFAULTS_MUSL_CROSS
 #endif
 
-#ifdef TOOL_INCLUDE_DIR
+/* The exact sibling of config/linux.h's entry of the same name, with the same
+   defect and the same fix; see the comment there.  TOOL_INCLUDE_DIR has no
+   definition anywhere in the tree, so this `#ifdef' was silently always-false
+   and the BINUTILS directory dropped out with no diagnostic.  The value lives
+   in targ_caps.tool_include_dir (target-caps.h:886), already read by the
+   generic arm at cppdefault.cc:277; an empty one is compacted out.  */
 #define INCLUDE_DEFAULTS_MUSL_TOOL			\
-    { TOOL_INCLUDE_DIR, "BINUTILS", 0, 1, 0, 0},
-#else
-#define INCLUDE_DEFAULTS_MUSL_TOOL
-#endif
+    { targ_caps.tool_include_dir, "BINUTILS", 0, 1, 0, 0},
 
 #ifdef NATIVE_SYSTEM_HEADER_DIR
 #define INCLUDE_DEFAULTS_MUSL_NATIVE			\

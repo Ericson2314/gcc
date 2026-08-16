@@ -150,12 +150,31 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define INCLUDE_DEFAULTS_MUSL_CROSS
 #endif
 
-#ifdef TOOL_INCLUDE_DIR
+/* TOOL_INCLUDE_DIR HAS NO DEFINITION ANYWHERE IN THIS TREE, so the `#ifdef'
+   that used to guard this entry was silently always-false and the BINUTILS
+   directory dropped out of INCLUDE_DEFAULTS with no diagnostic -- while the
+   CROSS_INCLUDE_DIR entry immediately above it, under the identical pattern,
+   survived (gcc/Makefile.in:5742 -DCROSS_INCLUDE_DIR).  That is the
+   probe-removal silent-default trap: the macro was retired in favour of the
+   per-target capability but these two consumers were not moved with it.
+
+   The answer already exists.  targ_caps.tool_include_dir is declared
+   (target-caps.h:886), defaulted to "" (target-caps.cc:311), read from the
+   per-target config file (target-caps.cc:385) and consumed by the generic
+   arm of this same table (cppdefault.cc:277).  So this is a MISSING
+   CONSUMER, not a missing value.
+
+   NOT DELETED, deliberately.  Dropping the entry would make musl-linux and
+   rs6000/sysv4 the only targets in the tree that cannot be given a binutils
+   include directory -- a new defect wearing the clothes of a cleanup.
+
+   Unconditional, like the LOCAL_INCLUDE_DIR entries: "" is a valid
+   capability value meaning "this target has no such directory", and the
+   compaction pass at the end of cpp_include_defaults_table () removes an
+   empty entry.  That pass sits outside the `#ifdef INCLUDE_DEFAULTS' fork,
+   so it serves this arm too.  */
 #define INCLUDE_DEFAULTS_MUSL_TOOL			\
-    { TOOL_INCLUDE_DIR, "BINUTILS", 0, 1, 0, 0},
-#else
-#define INCLUDE_DEFAULTS_MUSL_TOOL
-#endif
+    { targ_caps.tool_include_dir, "BINUTILS", 0, 1, 0, 0},
 
 #ifdef NATIVE_SYSTEM_HEADER_DIR
 #define INCLUDE_DEFAULTS_MUSL_NATIVE			\
