@@ -247,10 +247,34 @@ for t in "$@"; do
 
   # The target-independent files.  auto-host.h reaches libgcc through
   # tconfig.h and is gcc's HOST configuration -- a fact about the machine gcc
-  # RUNS on, handed to a library for another machine.  That inversion is real
-  # and is recorded as such; it is installed here because it is what libgcc
-  # opens TODAY, and removing it is a separate measured change, not something
-  # to do silently by omitting a file and seeing what breaks.
+  # RUNS on, handed to a library for another machine.
+  #
+  # ARM C: THAT INVERSION IS LIVE, NOT VESTIGIAL, AND IT IS CONFINED.  Measured
+  # by building libgcc twice against ONE prefix, differing only in whether
+  # auto-host.h has its 1217 lines or an empty include guard -- not by deleting
+  # it, which would only prove that tconfig.h includes it (197 of 452 TUs do,
+  # more than open any other generated header):
+  #
+  #     libgcc.a       BYTE-IDENTICAL, 442380 bytes both ways
+  #     libgcov.a      differs: _gcov_info_to_gcda.o
+  #     libgcc_eh.a    differs: unwind-dw2.o, unwind-dw2-fde-dip.o
+  #
+  # So the core library does not consume a single one of the 209 macros, and two
+  # archives do.  `unwind-dw2.o' loses 584 bytes of .text and 96 of .eh_frame
+  # with the content gone -- real code, not debug info, and the symbol lists are
+  # identical, so it is conditionals inside function bodies rather than whole
+  # functions.  aarch64's unwinder is compiled against x86_64's configure
+  # answers.
+  #
+  # For libgcov the consumers are named: `HAVE_SYS_MMAN_H' (libgcov-driver.c,
+  # libgcov.h) and `HOST_HAS_F_SETLKW' (libgcov.h).  For the unwinder the path
+  # is indirect and is NOT yet isolated -- none of the 209 appears literally in
+  # unwind-dw2.c or the headers it includes, so something reaches them through
+  # a chain not yet traced.  Stated as unfinished rather than guessed.
+  #
+  # It is installed here because it is what libgcc opens TODAY, and removing it
+  # is a separate measured change -- now with a number attached to what would
+  # break.
   for f in tconfig.h auto-host.h version.h; do
     test -f "$builddir/$f" || fail "$t: $builddir/$f is absent"
     cp "$builddir/$f" "$d/$f.tmp" && mv "$d/$f.tmp" "$d/$f"
