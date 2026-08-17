@@ -108,6 +108,76 @@ diagnostic — so converting `defaults.h` alone would leave `function.cc`'s four
 uses still reading 0. Both must go together, and a fix that moves the s390x
 number by zero has refuted its own story.
 
+### `EH_RETURN_HANDLER_RTX` — `__builtin_eh_return` is BROKEN on two of the four scored targets
+
+The sharpest of the three, because it has a **loud** half that can be measured
+in one command and a **silent** half of the `EPILOGUE_USES` kind.
+
+```
+NAME                    SHARED  aarch64                       i386  riscv  s390
+EH_RETURN_HANDLER_RTX   NULL    gen_rtx_REG (Pmode, R6_REGNUM) NULL  NULL   gen_rtx_MEM (Pmode, …)
+                                (aarch64.h:875)                             (s390.h)
+```
+
+`defaults.h:1432` floors it to `NULL`; i386 is silent, so the floor fires and
+every shared consumer sees `NULL`.
+
+**Measured, both-sided, with the board's own `cc1`** (`/tmp/ehrun-a992.sh`, on
+`void f (long o, void *h) { __builtin_eh_return (o, h); }`):
+
+```
+aarch64-unknown-linux-gnu    rc=1  error: '__builtin_eh_return' not supported on this target
+s390x-ibm-linux-gnu          rc=1  error: '__builtin_eh_return' not supported on this target
+x86_64-pc-linux-gnu          rc=0
+riscv64-unknown-linux-gnu    rc=0
+```
+
+Upstream all four support it. The two that fail are exactly the two whose own
+header defines a non-`NULL` handler RTX.
+
+The path is `except.cc:2320`:
+
+```c
+  if (targetm.have_eh_return ())
+    emit_insn (targetm.gen_eh_return (crtl->eh.ehr_handler));
+  else
+    {
+      if (rtx handler = EH_RETURN_HANDLER_RTX)      /* NULL, from the floor */
+	emit_move_insn (handler, crtl->eh.ehr_handler);
+      else
+	error ("%<__builtin_eh_return%> not supported on this target");
+    }
+```
+
+**And the two failures are ONE defect, not two — which took checking, because
+s390 *does* have an `eh_return` pattern.** `s390.md:11103` conditions it on
+`TARGET_TPF`, false for `s390x-linux`, so `have_eh_return ()` is correctly
+false and s390 falls through to the same floor. aarch64 has no `eh_return`
+pattern at all (`grep -c 'define_expand "eh_return"' aarch64.md` = **0**).
+x86_64 passes because i386's pattern is unconditional — i.e. the primary takes
+a path that never reads the macro, which is why this survived.
+
+**The silent half is `df-scan.cc:3738`**, and it is `EPILOGUE_USES` again in a
+new place:
+
+```c
+  if ((!targetm.have_epilogue () || ! epilogue_completed)
+      && crtl->calls_eh_return)
+    {
+      rtx tmp = EH_RETURN_HANDLER_RTX;
+      if (tmp && REG_P (tmp))
+	df_mark_reg (tmp, exit_block_uses);
+    }
+```
+
+With `NULL`, aarch64's `R6_REGNUM` is never added to the exit block's use set,
+so dataflow may conclude the instruction writing the handler is dead. That is
+precisely the mechanism by which `EPILOGUE_USES` emptied SME functions to a
+bare `ret` — same file, same set, adjacent lines. It cannot be observed today
+because the loud half stops compilation first; **fixing the loud half without
+the silent one would convert a diagnostic into wrong code**, which is the
+half-fix shape §4 warns about.
+
 ## What this hands over
 
 The 90-row `FLOOR-FIRES` list is a ranked queue with a cheap per-row
