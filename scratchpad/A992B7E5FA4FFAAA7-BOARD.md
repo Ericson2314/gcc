@@ -224,5 +224,61 @@ underlying question — a capability that selects `SWITCHABLE_TARGET`, i.e. one
 that cannot be a runtime read — is a design question of the kind §2b says to
 report rather than resolve by whichever choice builds.
 
-Provenance, guards, the board, the debt and the ranked residual follow as they
+## 1. THE BOARD — rows as they land
+
+### x86_64-pc-linux-gnu — LANDED, `.rc` = 0, DEBT **67**, PREDICTION CONFIRMED
+
+```
+TARGET                    PASS    FAIL   XPASS   XFAIL   UNSUP   UNRES  ERRLIN
+x86_64-pc-linux-gnu     162164   16295       3    1556    4451   13365      44
+KILLED 0
+```
+
+```
+                 multi-target        stock           DEBT      WAS
+x86_64      PASS 162164 FAIL 16295   163816 / 16223    67       67
+```
+
+**The debt is 67 — the recorded figure, to the unit.** Guards: `.rc` stamp 0,
+12/12 `site.exp` attribution, `multi-target.exp` banner present in the merged
+log, `specs-config` 232/224, GUARD 3c reports *Advanced Micro Devices X86-64*,
+mt-specsread 4 arms, KILLED 0.
+
+**And the null is shown in the strong form, which is the whole point of §0's
+advance prediction.** Against the `d5ad77b33b3` baseline
+(`mt-namediff.sh`, keyed on `(name, occurrence)`):
+
+```
+joined rows: 197,827        unchanged: 197,827
+REAL REGRESSIONS (PASS -> NOT PASS, by name):   0
+REAL PROGRESS    (NOT PASS -> PASS, by name):   0
+```
+
+Every one of 197,827 shared rows is unchanged. **That is not what a run which
+silently did not happen produces** — that produces a cardinality of zero, and
+it is what the first launch of this board produced before GUARD 4 refused it
+(§0b). The two are now distinguishable by evidence rather than by assertion.
+
+The column deltas that look like movement are not:
+
+```
+PASS -7      FAIL +0      UNRESOLVED +6      ERROR +26 -> 44  (+18)
+```
+
+`mt-namediff.sh`'s cardinality arm attributes all of it: three pseudo-"test
+files" (`tcl`, `testcase`, `xgcc:` — fragments of `ERROR:` lines, not test
+files) produced **+24 results**, and the script says so itself:
+
+> *24 of the new run's results come from tests that produced FEWER results
+> before. Any column delta smaller than this is inside the noise this effect
+> creates, in EITHER direction.*
+
+−7 and +18 are both inside 24. `ERRLIN` is the raw `^ERROR:` count and **scales
+with `-j`** (this board `-j12` → 44; the last `-j16` → 56), which the previous
+board already recorded. So the x86_64 row is unchanged in substance and the
+only thing that moved is a harness artefact whose own instrument named it.
+
+### aarch64, riscv64, s390x — running
+
+Provenance, the remaining rows, the debt and the ranked residual follow as they
 land.
