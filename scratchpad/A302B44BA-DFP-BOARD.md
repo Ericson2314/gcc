@@ -437,3 +437,59 @@ have named a commit chosen by a broken probe.
 this row's subject.  So the `decimal_float` fix moves x86_64's debt by **0**,
 which is the prediction's claim; the prediction is refuted on the *figure* and
 correct on the *cause*.  Both halves are reported.
+
+10. THE STOCK CONTROL FOR `3241754cf12` — THE DEFECT IS OURS, NOT INHERITED
+-----------------------------------------------------------------------------
+
+"The bisect names this commit on the branch" is **not** the claim "this commit
+is a regression".  `ira.cc` has already been made per-base by this branch in
+several places — #123 (i386's `ELIMINABLE_REGS` reaching every back end) and
+#205 (`init_reg_class_start_regs` compiled to an empty body) — so a
+branch-specific interaction was entirely plausible, and it is the difference
+between *fix our bug* and *inherit upstream's behaviour change*.  §9 could not
+distinguish them.  This section does.
+
+**THE ASKED-FOR CONTROL WAS "STOCK AT `3241754cf12` AND AT ITS PARENT", AND
+THAT TURNS OUT NOT TO BE TWO TREES.**  Measured before building anything:
+
+```
+git merge-base <rev> c31b7a09eea   ==  c31b7a09eea   for ALL of
+    e1f0cad1c2c, 3241754cf12^, 3241754cf12, 7b39423abba
+git log -1 --format=%p 3241754cf12 ==  f1c3095db2c   (ONE parent, not a merge)
+author                              =  John Ericson (branch-authored)
+```
+
+The upstream content is **byte-identical either side of the boundary**.  There
+is no stock boundary to cross, so "stock regressed across it too" is not a
+possibility the evidence leaves open — and building two identical stock trees
+to compare them would have been a check that could not fail.
+
+**ANCESTRY ARGUMENTS HAVE BEEN WRONG ON THIS BRANCH BEFORE, so that is not left
+as the whole answer.**  The positive half asks the stock control the question
+directly (`a302b44ba-stockctl.sh`), with the ICE **compiled** rather than read
+out of a `.sum`:
+
+```
+STOCK CONTROL: /tmp/b-stock-agent-302b44ba-x86_64-pc-linux-gnu
+  srcdir /tmp/snap-stock-302b44ba (upstream merge-base c31b7a09eea, anchor 0)
+  full-suite score: PASS 163816  FAIL 16223
+      == A992B7E5FA4FFAAA7-BOARD.md:281's figure for the control behind debt 67
+
+  gcc.target/i386/pr43644.c scan-assembler-times movq 2      PASS
+  gcc.target/i386/pr78671.c (test for excess errors)         PASS
+  gcc.target/i386/zext-sse-2.c check-function-bodies func2   PASS
+
+  stock compiled the ICE case cleanly: 341 lines of asm, no ICE.
+```
+
+The script refuses to score "no ICE" as clean unless the compiler also emitted
+assembly, so "did not ICE" cannot be the same silence as "did not compile".
+
+```
+STOCKCTL: STOCK IS CLEAN ACROSS THE BOUNDARY.
+```
+
+**CONCLUSION: the branch regresses where stock does not.**  `3241754cf12` is
+interacting with THIS BRANCH's per-base `ira.cc` work; the defect is **ours to
+fix**, not an upstream behaviour change to absorb.  §11 says which half of the
+commit does it.
