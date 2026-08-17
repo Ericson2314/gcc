@@ -287,7 +287,10 @@ prohibited-class-mode table failing to prohibit it.
   `setup_prohibited_and_exclude_class_mode_regs` among them),
   `f1c3095db2c` (`asm_fprintf`'s `%R`/`%I`/`%L`) and `24ef2a0c2ff`.
 
-**NOT YET established: which one.**  Reading points hard at `3241754cf12` — it
+**NOW ESTABLISHED BY BISECT — it is `3241754cf12`.  See §9.**  The paragraph
+below is what motivated the bisect and is kept as written, because the reading
+turned out to name the right commit for a reason that does not survive contact
+with §9's hunk-level result: reading points hard at `3241754cf12` — it
 makes `ira_prohibited_class_mode_regs[cl][j]` stay CLEARED for skipped modes,
 and for a *prohibition* table CLEARED is not the inert value its commit message
 claims ("both already mean 'nothing here'"); it is the maximally PERMISSIVE
@@ -381,3 +384,56 @@ breaking LTO.
 Guards: `make check-gcc` rc=0, `site.exp` attributes to s390x-ibm-linux-gnu,
 `multi-target.exp` banner present, GUARD 3c reports **IBM S/390**, and the run
 was taken on a copy proven md5-identical to the original build (§2).
+
+9. THE x86_64 REGRESSION, ATTRIBUTED BY BISECT — `3241754cf12`
+----------------------------------------------------------------
+
+An unattributed delta is not a measurement, so the +3 was bisected rather than
+argued.  `a302b44ba-icebisect.sh`, 150 commits, `e1f0cad1c2c..7b39423abba`:
+
+```
+   e1f0cad1c2c (want NO):  NO         <- endpoints VERIFIED before any search
+   7b39423abba (want YES): YES
+-- [1..150]   mid=75  5d28dd6c071 : NO
+-- [76..150]  mid=113 3241754cf12 : YES
+-- [76..113]  mid=94  23a070127c8 : NO
+-- [95..113]  mid=104 4bfbb8abf87 : BAD   (build failed; EXCLUDED, not scored)
+-- [105..113] mid=109 6905962904b : NO
+-- [110..113] mid=111 01218faa6f2 : NO
+-- [112..113] mid=112 f1c3095db2c : NO
+
+BISECT: FIRST BAD COMMIT = 3241754cf12
+  two more hook-calling ordinal mode walks in `ira.cc', following pru's backtrace
+```
+
+**The answer does not rest on the skipped build.**  Index 112 (`f1c3095db2c`)
+is NO and index 113 (`3241754cf12`) is YES — adjacent, both measured — so the
+first bad commit is 113 regardless of what `4bfbb8abf87` would have said.  That
+is stated because a bisect with a skip in it is exactly where a convergence can
+be an artefact of the skip.
+
+**HOW IT WAS MADE AFFORDABLE, and each step was measured first, not assumed:**
+`pr78671.c` reproduces off the built `xgcc` in about a second, and the ICE
+still fires at **two bases** — so each step is a ~6-minute two-base build
+rather than a 47-base one.  Had it needed the full union the bisect would have
+been unaffordable, which is precisely why the base count was measured before
+the script was written.
+
+**IT DOES NOT USE `git bisect`.**  This runs in the shared main worktree with
+other agents live in it; `git bisect` moves HEAD and rewrites the working tree
+every step.  The search is a plain binary search over `git rev-list`, and every
+tree is materialised with `git archive | tar -x` into /tmp — object database
+only, never HEAD, the index, or a worktree file.
+
+**THE INSTRUMENT REFUSED THREE TIMES BEFORE IT MEASURED ANYTHING**, each time
+for a real reason and each time reporting that the endpoints did not bracket
+the fault rather than bisecting on failed builds: no `specs-config` (it is a
+post-build `mt-specs.sh` pass, not part of `all-gcc`), no `SNAP-SHA` stamp, and
+a writable snapshot.  A bisect that had "converged" through any of those would
+have named a commit chosen by a broken probe.
+
+**WHAT THIS MEANS FOR THE BOARD.**  The x86_64 debt of 70 is
+`67 + 3`, and the 3 belong to `3241754cf12` — an `ira.cc` change unrelated to
+this row's subject.  So the `decimal_float` fix moves x86_64's debt by **0**,
+which is the prediction's claim; the prediction is refuted on the *figure* and
+correct on the *cause*.  Both halves are reported.
