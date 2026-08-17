@@ -31,7 +31,16 @@ B=${1:?build dir}; shift
 # while believing they are the C++ run's is not, and that is what a partial
 # change here would do.
 SUM_=${MT_CHECK_TOOL:-gcc}
-case "$SUM_" in gcc|g++) ;; *) echo "FATAL: MT_CHECK_TOOL=$SUM_"; exit 9 ;; esac
+# THE SAME TWO-VALUE TABLE `mtcheck.sh' HAD, ONE FILE LATER.  `mtcheck.sh' was
+# widened to the ten `lang_checks' tools and this was not, so every new front
+# end ran its whole suite -- guards passed, `.sum' written, GUARD 4's banner
+# present -- and then died here with `FATAL: MT_CHECK_TOOL=objc' AFTER the
+# expensive part.  Fixing one of two files that share a list is a partial fix
+# by construction; the list is the same list.
+case "$SUM_" in
+  gcc|g++|objc|obj-c++|gfortran|go|gdc|gm2|cobol|algol68|rust) ;;
+  *) echo "FATAL: MT_CHECK_TOOL=$SUM_ is not a DejaGnu tool name"; exit 9 ;;
+esac
 SUMDIR=$SUM_
 
 # KILLED IS ITS OWN VERDICT AND IS NOT A TEST RESULT AT ALL.
