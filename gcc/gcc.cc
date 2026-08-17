@@ -9361,7 +9361,29 @@ driver::set_up_specs () const
   machine_suffix = concat (spec_version, accel_dir_suffix, dir_separator_str,
 			   NULL);
   just_machine_suffix = "";
-  just_machine_prefix = "";
+
+  /* The machine-agnostic directories this compiler searches for tools hold one
+     set of tools per target, told apart by a `<triple>-' on the basename --
+     that is how a cross binutils installs, and it is what find_a_program's
+     prefixed pass exists to find.  The prefix is the target IN FORCE, so it
+     cannot be known before the target is resolved; this ran before that and so
+     the value was hardcoded to the empty string, which made the prefixed pass a
+     no-op in every invocation.  The whole mechanism was present and never
+     fired: a cross compile reached `as' and died with `cannot execute as',
+     because only the unprefixed name was ever tried.
+
+     spec_machine is the resolved target and is assigned in driver::main right
+     after selection, which runs before this (see the assignment there); so by
+     the time we get here it is either the target or "".  Every find_a_program
+     call site is downstream of set_up_specs -- the LTO wrapper lookup,
+     -print-prog-name, collect2 and execute() -- so there is no lookup that sees
+     a stale value.
+
+     Empty when no target was selected: then there is nothing to prefix with and
+     the pass correctly degrades to the plain search.  */
+  just_machine_prefix = (spec_machine != NULL && *spec_machine != '\0'
+			 ? concat (spec_machine, "-", NULL)
+			 : "");
 
   /* Compose the built-in specs FIRST, then let the specs file override what it
      names.  This was an if/else: finding a specs file meant init_spec () never
