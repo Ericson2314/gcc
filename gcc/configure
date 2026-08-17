@@ -12158,7 +12158,7 @@ if test x"${gcc_extra_targets}" = x; then
   as_fn_error $? "--enable-backends=LIST is required" "$LINENO" 5
 fi
 
-gcc_manifest_targets="${gcc_extra_targets} ${target}"
+gcc_manifest_targets="${gcc_extra_targets}"
 
 # Everything derived from that list -- the manifest, the per-target make
 # rules, and the two generated registry headers -- is built by

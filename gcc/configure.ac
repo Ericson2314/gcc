@@ -1690,9 +1690,33 @@ if test x"${gcc_extra_targets}" = x; then
   AC_MSG_ERROR([--enable-backends=LIST is required])
 fi
 
-dnl `${target}' IS added to the manifest, and that is not the fallback
-dnl refused above.
-gcc_manifest_targets="${gcc_extra_targets} ${target}"
+dnl `${target}' IS NOT ADDED TO THE MANIFEST.  It used to be, and that made
+dnl the HOST an implicitly configured back end.
+dnl
+dnl `${target}' here is NOT AC_CANONICAL_TARGET -- that macro is gone from this
+dnl file.  It is autoconf's compatibility boilerplate, `target=$target_alias'
+dnl ("There might be people who depend on the old broken behavior"), so it is
+dnl literally the argument of `--target='.  Nobody passes that argument on
+dnl purpose: the top-level Makefile.tpl gives EVERY module
+dnl `--target=[+target_alias+]', and the top-level configure defaults
+dnl `target_alias' to the host when no target is named.  So `--target=<host>'
+dnl arrives at this script on every single build, and appending it here turned
+dnl "the machine I am running on" into "a back end you asked for".
+dnl
+dnl What that cost, measured: a build naming only non-x86 back ends still got
+dnl `i386', and a stray `x86_64-pc-linux-gnu-gcc' driver that was not a
+dnl configured target.  Worse, `--enable-backends=x86_64-unknown-linux-musl'
+dnl was REFUSED BY NAME, because the appended host triple and the requested one
+dnl are the same back end with different target header chains -- so the obvious
+dnl glibc-vs-musl acceptance pair could not be configured at all.
+dnl
+dnl The list is the only authority.  #67: the top level takes targets PLURAL
+dnl and there is no primary; an implicit host target is a primary by another
+dnl name.  `--target' is still load-bearing for everything ELSE in this file
+dnl (config.gcc is sourced with it above, and it sets tm_file, cpu_type,
+dnl extra_objs and the rest for the host-side build), which is why the flag is
+dnl not removed -- only its power to enrol a back end is.
+gcc_manifest_targets="${gcc_extra_targets}"
 
 # Everything derived from that list -- the manifest, the per-target make
 # rules, and the two generated registry headers -- is built by
