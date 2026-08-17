@@ -48,6 +48,7 @@ function reset() {
   # extra_gcc_objs are, so a value surviving into the next record would
   # attribute one triple's objects to the next triple's back end.
   cobjs = ""; xxobjs = "";
+  dobjs = ""; rsobjs = ""; jitobjs = ""; fobjs = "";
   xhdrs = ""; tgmath = "";
 }
 
@@ -925,6 +926,34 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # built for all 45 bases rather than only the MULTI_TARGET_OBJS ones, so it
   # is genuinely a third category and needs its own name.
   printf "\t  -DMULTI_TARGET_SUPPLY_TU=1 \\\n";
+  # -DMT_BASE, ADDED WHEN THE TWO LABEL WRAPPERS ARRIVED, AND IT IS NOT A
+  # DUPLICATE OF -DTM_H_FILE ABOVE.
+  #
+  # Everything this TU held before was a string constant, so `tm-<cpu>.h' via
+  # TM_H_FILE was all it needed.  `gcc_taop_output_labelref' and
+  # `gcc_taop_generate_internal_label' expand whole BODIES out of 37 back-end
+  # headers, and those bodies reach `user_label_prefix', `sprint_ul',
+  # `asm_fprintf', `default_strip_name_encoding' and `targetm', so
+  # `target-asm-ops.cc' now includes `rtl.h', `tree.h', `target.h' and
+  # `output.h'.
+  #
+  # `target.h:57' is `#include MT_HEADER (tm.h)', and `MT_HEADER' degrades to a
+  # BARE `"tm.h"' when MT_BASE is undefined -- i.e. to the build root's shared
+  # copy, which is the PRIMARY's whole header chain under a target-neutral
+  # name.  Measured before this line existed: compiling
+  # `target-asm-ops-alpha.o' produced `ix86_asm_output_labelref was not
+  # declared', `conflicting declaration typedef struct ix86_args
+  # CUMULATIVE_ARGS' and `multiple definition of enum opt_code' -- i386's
+  # headers arriving underneath alpha's, in the object that exists to capture
+  # ALPHA's answers.  It failed loudly here; it is the silent version of this
+  # that the whole branch is about.
+  #
+  # Harmless against TM_H_FILE: `<cpu>-inc/tm.h' includes `tm-<cpu>.h', which
+  # carries `#ifndef GCC_TM_<CPU>_H', so the second arrival is a no-op.
+  # Verified over all 47 bases by scratchpad/a94d141d788a6b54f-taoptry.sh,
+  # which compiles this one file per base in seconds and carries a negative
+  # control that must fire.
+  printf "\t  -DMT_BASE=%s-inc \\\n", cpu;
   printf "\t  $(srcdir)/target-asm-ops.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
     asm_ops_objs = asm_ops_objs " target-asm-ops-" cpu ".o";
@@ -1369,6 +1398,15 @@ function emit_c_ops_registry(	i, n, parts) {
 	  > "/dev/stderr";
     exit 1;
   }
+  # The four remaining languages' MOVED/TARGET_OBJS pairs.  NO non-vacuity
+  # check on these, DELIBERATELY, and the reason is the instructive half of
+  # this change: `fortran_target_objs' is named only by darwin and vms, neither
+  # of which is in the 47-base set, so MT_FORTRAN_TARGET_OBJS is legitimately
+  # EMPTY on every build this branch takes.  An `exit 1' modelled on the C one
+  # would refuse a correct tree; a green from a check that cannot distinguish
+  # "no reachable instance" from "correct" is worth nothing either way, which
+  # is why the emptiness is stated per base above instead.
+  emit_lang_target_objs_lists();
   printf "multi-target-c-ops.h: multi-target.manifest\n";
   printf "\t{ echo '/* Generated from multi-target.manifest; do not edit. */'; \\\n";
   for (i = 1; i <= n; i++)
@@ -1631,6 +1669,15 @@ $1 == "c_target_objs" { cobjs = ""; for (i = 2; i <= NF; i++) cobjs = cobjs $i "
 # Read on the first record for a back end, exactly like `cobjs' above and
 # deliberately not reset per record for the same reason.
 $1 == "cxx_target_objs" { xxobjs = ""; for (i = 2; i <= NF; i++) xxobjs = xxobjs $i " " }
+# The four remaining language lists.  Read exactly like `cobjs'/`xxobjs' above
+# and cleared in flush() for the same reason: they are set by TRIPLE, and the
+# `pa' back end is the worked example -- four separate hpux/linux/openbsd
+# records each append `pa-d.o', while an `hppa*-*-*' record that does not would
+# have decided the answer for the whole back end had the first record won.
+$1 == "d_target_objs" { dobjs = ""; for (i = 2; i <= NF; i++) dobjs = dobjs $i " " }
+$1 == "rust_target_objs" { rsobjs = ""; for (i = 2; i <= NF; i++) rsobjs = rsobjs $i " " }
+$1 == "jit_target_objs" { jitobjs = ""; for (i = 2; i <= NF; i++) jitobjs = jitobjs $i " " }
+$1 == "fortran_target_objs" { fobjs = ""; for (i = 2; i <= NF; i++) fobjs = fobjs $i " " }
 $1 == "extra_gcc_objs" { xgobjs = ""; for (i = 2; i <= NF; i++) xgobjs = xgobjs $i " " }
 $1 == "extra_modes" { xmodes = $2 }
 $1 == "extra_headers" { xhdrs = ""; for (i = 2; i <= NF; i++) xhdrs = xhdrs $i " " }
@@ -2733,6 +2780,26 @@ function accumulate_c_target_objs(	i, n, parts, j, m, fp) {
     if (index(" " mtc_cxxobjs[cpu] " ", " " parts[i] " ") == 0)
       mtc_cxxobjs[cpu] = mtc_cxxobjs[cpu] parts[i] " ";
   }
+  # The four remaining languages, unioned identically.  One array per language
+  # rather than one keyed on a language name, because awk has no nested arrays
+  # and the alternative -- a "lang:cpu" key -- makes the whole thing a string
+  # concatenation whose typos are silent.
+  n = split(dobjs, parts, " ");
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && index(" " mtc_dobjs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_dobjs[cpu] = mtc_dobjs[cpu] parts[i] " ";
+  n = split(rsobjs, parts, " ");
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && index(" " mtc_rsobjs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_rsobjs[cpu] = mtc_rsobjs[cpu] parts[i] " ";
+  n = split(jitobjs, parts, " ");
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && index(" " mtc_jitobjs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_jitobjs[cpu] = mtc_jitobjs[cpu] parts[i] " ";
+  n = split(fobjs, parts, " ");
+  for (i = 1; i <= n; i++)
+    if (parts[i] != "" && index(" " mtc_fobjs[cpu] " ", " " parts[i] " ") == 0)
+      mtc_fobjs[cpu] = mtc_fobjs[cpu] parts[i] " ";
   # The tmake fragments are unioned along with the objects, and for the same
   # reason accumulate_gcc_driver_objs unions them: the rule that says which
   # source builds `ia64-c.o' lives in ia64/t-ia64, which need not be in the
@@ -2915,6 +2982,97 @@ function emit_c_target_objs(	nb, bases, i, b, n, parts, j, obj, src, own,
     }
     printf "MT_CXX_OBJS_%s =%s\n\n", b, cxxlist;
     cxx_target_objs_list = cxx_target_objs_list " $(MT_CXX_OBJS_" b ")";
+
+    # The four remaining lists.  Each is its OWN set of objects, not a second
+    # name for the C list -- see the long note in gen-target-manifest.sh.
+    emit_one_lang_objs(b, frags, mtc_dobjs[b],   "D",       "d_target_objs");
+    emit_one_lang_objs(b, frags, mtc_rsobjs[b],  "RUST",    "rust_target_objs");
+    emit_one_lang_objs(b, frags, mtc_jitobjs[b], "JIT",     "jit_target_objs");
+    emit_one_lang_objs(b, frags, mtc_fobjs[b],   "FORTRAN", "fortran_target_objs");
+  }
+}
+
+# ONE BACK END, ONE LANGUAGE: emit the per-base compile rules for whatever that
+# back end names under `config/<cpu>/' in <key>, and the MT_<TAG>_OBJS_<base>
+# list naming them.
+#
+# The C++ sibling above can be `$(MT_C_OBJS_<base>)' BY REFERENCE because
+# <cpu>-c.cc serves both front ends -- measured SAME 47, DIFF 0.  That is NOT
+# true here and the brief that asked for it was wrong on this point:
+# `d_target_objs' names <cpu>-d.o, built from config/<cpu>/<cpu>-d.cc, a
+# different translation unit defining different symbols (ix86_d_target_versions,
+# not ix86_target_macros).  Writing MT_D_OBJS_<b> = $(MT_C_OBJS_<b>) would put
+# the C-family object into the D link -- where nothing references it -- and
+# would build no <cpu>-d.o for anybody, i.e. it would leave the exact defect it
+# was meant to close while looking converted.  The `by reference' property that
+# matters is kept a different way: this function does not enumerate names, it
+# reads the manifest key, so anything config.gcc adds follows automatically.
+#
+# `$(warning)' and not `$(error)' for an object no fragment claims, scoped to
+# `<cpu>-<lang>.o', for the reasons recorded on the C loop: unscoped it fires on
+# every OS-side object (default-d.o, glibc-c.o, linux-rust.o, darwin-f.o), whose
+# src == "" is their NORMAL state because gcc/Makefile.in builds them from the
+# legacy @<lang>_target_objs@ list.  Those stay shared, and stay a leak, exactly
+# as glibc-c.o does.
+function emit_one_lang_objs(b, frags, objs, tag, key,
+			    n, parts, j, obj, src, list, suffix) {
+  # `jit' and `rust' name <cpu>-jit.o / <cpu>-rust.o; `d' names <cpu>-d.o;
+  # `fortran' names <cpu>-f.o.  Derived from the key so a new language needs no
+  # second table to get out of step with this one.
+  suffix = key;
+  sub(/_target_objs$/, "", suffix);
+  if (suffix == "fortran")
+    suffix = "f";
+  list = "";
+  n = split(objs, parts, " ");
+  for (j = 1; j <= n; j++) {
+    if (parts[j] == "")
+      continue;
+    obj = parts[j];
+    sub(/\.o$/, "", obj);
+    src = frag_source_for(obj, frags);
+    if (src == "" && obj == (b "-" suffix)) {
+      printf "$(warning multi-target: %s lists %s in %s but no tmake fragment" \
+	     " claims a rule for it -- it will NOT be built and anything" \
+	     " referencing its symbols will fail at link time)\n\n", \
+	     b, parts[j], key;
+      continue;
+    }
+    if (src !~ ("^\\$\\(srcdir\\)/config/" b "/"))
+      continue;
+    if (index(" " lang_moved[tag] " ", " " parts[j] " ") == 0)
+      lang_moved[tag] = lang_moved[tag] parts[j] " ";
+    printf "mt-%s/%s.o: %s %s-inc/s-inc s-gtype\n", b, obj, src, b;
+    printf "\t@$(mkinstalldirs) mt-%s/$(DEPDIR)\n", b;
+    printf "\t$(COMPILE)%s $<\n\t$(POSTCOMPILE)\n\n", mtc_poly[b];
+    list = list " mt-" b "/" obj ".o";
+  }
+  # UNCONDITIONAL, for the reason recorded on MT_CXX_OBJS_<b>: an assignment
+  # that only happens when the loop above ran at least once is a mechanism that
+  # never runs for most back ends, and an undefined make variable expands to the
+  # empty string with no diagnostic.  A back end naming nothing here gets an
+  # explicitly EMPTY list, which is a statement rather than a silence.
+  printf "MT_%s_OBJS_%s =%s\n", tag, b, list;
+  if (list != "") {
+    printf "$(MT_%s_OBJS_%s): MULTI_TARGET_BASE_DEF = -DMT_BASE=%s-inc\n", tag, b, b;
+    printf "$(MT_%s_OBJS_%s): MULTI_TARGET_RENAMES = \\\n", tag, b;
+    printf "  $(foreach n,$(MULTI_TARGET_RENAME_NAMES),-D$(n)=$(n)_%s) \\\n", b;
+    printf "  -DMULTI_TARGET_TARGETM_BASE=%s\n", b;
+  }
+  printf "\n";
+  lang_list[tag] = lang_list[tag] " $(MT_" tag "_OBJS_" b ")";
+}
+
+# The four MOVED/TARGET_OBJS pairs gcc/Makefile.in consumes, printed once at the
+# end of emit_c_target_objs' caller.  Kept beside their siblings
+# MT_C_OBJS_MOVED / MT_C_TARGET_OBJS rather than inlined, so that a language
+# added later has one place to go.
+function emit_lang_target_objs_lists(	i, tags, tag) {
+  split("D RUST JIT FORTRAN", tags, " ");
+  for (i = 1; i <= 4; i++) {
+    tag = tags[i];
+    printf "MT_%s_OBJS_MOVED = %s\n", tag, lang_moved[tag];
+    printf "MT_%s_TARGET_OBJS =%s\n\n", tag, lang_list[tag];
   }
 }
 

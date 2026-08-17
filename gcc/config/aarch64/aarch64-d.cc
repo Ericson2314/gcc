@@ -20,6 +20,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+/* THE WITNESS.  This file is compiled once per back end into mt-<base>/ by
+   gen-multi-target-md.awk, and multi-target-base.h refuses to preprocess
+   without -DMT_BASE, naming both the flag and this file.  Without it this file
+   reached the PRIMARY target's tm.h transitively through target.h and compiled
+   cleanly for every base -- which is exactly why d_target_objs was silent
+   where jit_target_objs was loud.  */
+#include "multi-target-base.h"
+#include BASE_HEADER (tm.h)
 #include "tm_d.h"
 #include "d/d-target.h"
 #include "d/d-target-def.h"

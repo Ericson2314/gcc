@@ -120,6 +120,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
     tm_file= tm_p_file= tmake_file=
     extra_objs= extra_options= extra_headers= c_target_objs=
     cxx_target_objs=
+    d_target_objs= rust_target_objs= jit_target_objs= fortran_target_objs=
     extra_gcc_objs=
     out_file= md_file= target_gtfiles=
     common_out_file= target_has_targetm_common= dwarf2= extra_modes=
@@ -198,6 +199,43 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # a C++ object the C side does not build.  Recorded per target here so
     # that identity is data the generator can check rather than a belief.
     echo "cxx_target_objs ${cxx_target_objs}"
+    # THE FOUR REMAINING LANGUAGE LISTS, in the SAME channel and with the SAME
+    # bug as the two above.  gcc/Makefile.in had D_TARGET_OBJS=@d_target_objs@,
+    # JIT_TARGET_OBJS=@jit_target_objs@, FORTRAN_TARGET_OBJS=
+    # @fortran_target_objs@ and RUST_TARGET_OBJS=@rust_target_objs@, each
+    # substituted from the ONE legacy target pass through config.gcc, and each
+    # linked verbatim into d21/jit/f951 by that language Make-lang.in.
+    #
+    # HOW LOUD EACH ONE IS TODAY, and the difference is NOT the mechanism:
+    #
+    #   jit      LOUD.  config/i386/t-i386 builds i386-jit.o with a bare
+    #            $(COMPILE), so it gets no -DMT_BASE, and i386-jit.cc includes
+    #            multi-target-base.h, whose witness fires naming both the flag
+    #            and the file.
+    #   d        SILENT for 4 of its 10 back ends and loud for the rest, on
+    #            exactly that split: aarch64-d.cc, loongarch-d.cc, pa-d.cc and
+    #            riscv-d.cc carried NO multi-target-base.h, so nothing in their
+    #            path could complain.  They are given the witness with this
+    #            change so the two halves fail the same way.
+    #   rust     one back end (i386) and it already carries the witness.
+    #   fortran  CLEAN, and clean BY ACCIDENT: only darwin and vms name
+    #            anything in fortran_target_objs, neither is in the 47-base set,
+    #            so the defect has no reachable instance.  A board green because
+    #            nothing can reach the bug is indistinguishable from one green
+    #            because the code is right, which is why it is converted anyway
+    #            rather than ticked off.
+    #
+    # NOTE THESE ARE *NOT* THE C LIST UNDER ANOTHER NAME, unlike cxx_target_objs.
+    # <cpu>-c.cc serves both the C and the C++ front ends, which is why the C++
+    # list can be $(MT_C_OBJS_<cpu>) by reference.  <cpu>-d.cc, <cpu>-rust.cc
+    # and <cpu>-jit.cc are DIFFERENT SOURCE FILES defining different symbols, so
+    # each needs its own per-base object.  Recorded per target here for the same
+    # reason as the two lines above: so the generator reads data instead of
+    # guessing a naming rule.
+    echo "d_target_objs ${d_target_objs}"
+    echo "rust_target_objs ${rust_target_objs}"
+    echo "jit_target_objs ${jit_target_objs}"
+    echo "fortran_target_objs ${fortran_target_objs}"
     echo "extra_options ${extra_options}"
     # The INTRINSICS HEADERS this back end installs for the user -- arm_neon.h,
     # emmintrin.h, riscv_vector.h and 177 others.  NO BACKTICK AND NO
@@ -574,6 +612,7 @@ rm -f ${gcc_mt_err}
 gcc_mt_keys=" target cpu_type option_defaults decimal_float decimal_bid_format
  common_out_file common_out_symbol tm_file tm_p_file tmake_file
  tmake_file_present extra_objs extra_gcc_objs c_target_objs cxx_target_objs
+ d_target_objs rust_target_objs jit_target_objs fortran_target_objs
  extra_options
  extra_headers use_gcc_tgmath use_gcc_stdint out_file md_file target_gtfiles
  extra_modes

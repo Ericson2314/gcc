@@ -464,6 +464,43 @@ extern void mt_asm_output_skip (FILE *, unsigned HOST_WIDE_INT);
 #undef ASM_OUTPUT_SKIP
 #define ASM_OUTPUT_SKIP(STREAM, NBYTES) \
   (mt_asm_output_skip ((STREAM), (unsigned HOST_WIDE_INT) (NBYTES)))
+/* ASM_OUTPUT_LABELREF.  The exact sibling of ASM_OUTPUT_ALIGN above -- a
+   statement macro, redirected to the per-base table rather than to
+   `targetm_cdata' -- and reached through ONE shared consumer,
+   `assemble_name_raw' (varasm.cc:3011).  `defaults.h:197' floors it and the
+   primary is silent, so the floor was FIRING for all 47 bases; pa dissents
+   (`pa.h:1096' strips the leading `@' pa's own `FUNCTION_NAME_P' puts on
+   function symbols) and hppa64 therefore emitted `.globl @f', which its
+   assembler refuses.  Swept: every use outside `config/' is a statement and
+   none is on a `#if' line, so a redirect here is the last word.
+
+   Declared with an `extern' rather than by including `target-asm-ops.h', for
+   the ordering reason recorded on `mt_asm_output_align': that header's
+   `gcc_taop_output_labelref' has THIS macro as its body.  */
+extern void mt_asm_output_labelref (FILE *, const char *);
+#undef ASM_OUTPUT_LABELREF
+#define ASM_OUTPUT_LABELREF(STREAM, NAME) \
+  (mt_asm_output_labelref ((STREAM), (NAME)))
+/* ASM_GENERATE_INTERNAL_LABEL.  ONE redirect covers 122 shared call sites --
+   `dwarf2out.cc', `except.cc', `varasm.cc', `final.cc', `asan.cc',
+   `coverage.cc' and the rest -- and that breadth is why it is done here
+   rather than site by site.
+
+   NOTE THERE IS NO `defaults.h' FLOOR FOR THIS MACRO AT ALL.  37 headers
+   under `config/' define it and the shared TUs simply got the PRIMARY's,
+   `i386/att.h:86'.  microblaze spells it `$L' where i386 spells `.L', so
+   microblaze's own per-base `ASM_DECLARE_FUNCTION_SIZE' emitted
+   `.size f,$Lfe1-f' against a label shared code had written as `.Lfe1' -- one
+   label, two authorities, and `as' refusing all seven corpus inputs on a back
+   end that compiled 7/7.
+
+   Swept: every use outside `config/' is a statement and none is on a `#if'
+   line, so a redirect here is the last word.  */
+extern void mt_asm_generate_internal_label (char *, const char *,
+					    unsigned long);
+#undef ASM_GENERATE_INTERNAL_LABEL
+#define ASM_GENERATE_INTERNAL_LABEL(BUF, PREFIX, NUM) \
+  (mt_asm_generate_internal_label ((BUF), (PREFIX), (unsigned long) (NUM)))
 #undef ATTRIBUTE_ALIGNED_VALUE
 #define ATTRIBUTE_ALIGNED_VALUE (targetm_cdata.attribute_aligned_value)
 #undef MALLOC_ABI_ALIGNMENT

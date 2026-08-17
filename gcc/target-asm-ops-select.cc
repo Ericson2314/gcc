@@ -132,6 +132,51 @@ mt_asm_output_skip (FILE *stream, unsigned HOST_WIDE_INT nbytes)
   targetm_asm_ops->output_skip (stream, nbytes);
 }
 
+/* ASM_OUTPUT_LABELREF for the base in force.
+
+   THE NULL CHECK CARRIES THE SAME ARGUMENT AS `mt_asm_output_align''s, and
+   here it is sharper.  Before this conversion the single shared consumer,
+   `assemble_name_raw', read `defaults.h:197''s floor for all 47 bases, so
+   every base emitted `user_label_prefix' + NAME.  That is CORRECT for most of
+   them and wrong for pa, which strips a leading `@' its own back end put
+   there -- hppa64 emitted `.globl @f' and its assembler refused all seven
+   corpus inputs while cc1 exited 0 on every one.  A silent fallback here would
+   restore exactly that, so an unselected compiler must say so by name rather
+   than print a plausible label.  */
+
+void
+mt_asm_output_labelref (FILE *stream, const char *name)
+{
+  if (targetm_asm_ops == NULL || targetm_asm_ops->output_labelref == NULL)
+    internal_error ("no back end has been selected, so the spelling of a "
+		    "reference to symbol %qs is unknown; a target must be "
+		    "chosen with %<-ftarget-config=%> before assembly is "
+		    "emitted", name);
+  targetm_asm_ops->output_labelref (stream, name);
+}
+
+/* ASM_GENERATE_INTERNAL_LABEL for the base in force.
+
+   THE FAIL-BY-NAME ARM MATTERS MORE HERE THAN ANYWHERE ELSE IN THIS FILE,
+   because the pre-selection default is the PRIMARY's table and the primary's
+   spelling (`.L...') is ACCEPTED BY EVERY ELF ASSEMBLER.  A silent fallback
+   would therefore produce assembly that assembles, on every target, and is
+   wrong on the 20-odd back ends that spell internal labels differently -- the
+   exact "plausible wrong output" this board is about.  */
+
+void
+mt_asm_generate_internal_label (char *buf, const char *prefix,
+				unsigned long num)
+{
+  if (targetm_asm_ops == NULL
+      || targetm_asm_ops->generate_internal_label == NULL)
+    internal_error ("no back end has been selected, so the spelling of "
+		    "internal label %qs is unknown; a target must be chosen "
+		    "with %<-ftarget-config=%> before assembly is emitted",
+		    prefix);
+  targetm_asm_ops->generate_internal_label (buf, prefix, num);
+}
+
 /* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.
 
    NO fail-by-name arm here, deliberately, and the reason is worth stating
