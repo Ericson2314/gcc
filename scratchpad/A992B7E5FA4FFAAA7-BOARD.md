@@ -1,8 +1,27 @@
 # THE FOUR-TARGET BOARD AT `e1f0cad1c2c`, 47 BASES
 
-Status: **IN PROGRESS.** Sections filled as arms land, per the standing rule
-that a partial board with `.rc`-stamped rows beats a complete one that never
-gets reported.
+**COMPLETE. `BOARD.rc` = 0, all four `.rc` stamps 0, all four sums preserved.**
+
+```
+TARGET      DEBT   WAS   stock PASS/FAIL     multi-target PASS/FAIL   KILLED
+x86_64        67    67   163816 / 16223      162164 / 16295             0
+s390x        206   207   130895 / 15627      128882 / 15776             0
+aarch64      443   513   344463 / 20443      341962 / 20688             0
+riscv64      772   772   270248 / 15904      268925 / 16762            10
+                  ----                                                 ---
+TOTAL      1,488  1,559
+```
+
+**Movement by name — the only column that distinguishes a fix from a
+regression:**
+
+```
+target    baseline       joined rows   unchanged   PROGRESS  REGRESSIONS
+x86_64    d5ad77b33b3      197,827     197,827          0         0
+riscv64   d5ad77b33b3      320,946     320,946          0         0
+aarch64   e3fac057ae4      388,970     388,898         71         1
+s390x     e3fac057ae4      166,546     166,545          1         0
+```
 
 ## 0. THE BRIEF'S CENTRAL EXPECTATION IS REFUTED BEFORE THE RUN, AND IT IS
 ##    MEASURABLE FROM THE BUILD'S OWN GENERATED HEADERS
@@ -510,5 +529,127 @@ and the honest statement is *"that diagnostic did not occur in this run"*. The
 brief's note that riscv64's ~20 are "known non-contaminating, present on both
 sides" is **stale for this board**: the count is 10 and the cause is different.
 
-Provenance, the remaining rows, the debt and the ranked residual follow as they
-land.
+### s390x-ibm-linux-gnu — LANDED, `.rc` = 0, DEBT **206** (was 207)
+
+```
+TARGET                PASS    FAIL   XPASS   XFAIL   UNSUP   UNRES  ERRLIN
+s390x-ibm-linux-gnu 128882   15776       2    1228    7647   13013      46
+KILLED 0
+```
+
+```
+                 multi-target        stock           DEBT      WAS
+s390x       PASS 128882 FAIL 15776   130895 / 15627   206      207
+```
+
+By name against `e3fac057ae4`: **166,546 joined rows, 166,545 unchanged, 1
+`FAIL`→`PASS` (in `gcc.target/s390`), 0 regressions.** Cardinality noise 3.
+
+**AND THIS IS A RESULT, NOT AN ABSENCE OF ONE.** s390x's span is the *same* as
+aarch64's — it also holds the auto-inc, alignment and `PROMOTE_MODE` work that
+no board had scored on this target. aarch64 moved **70**; s390x moved **1**.
+The asymmetry matches the mechanism: `aarch64.h` **defines** `PROMOTE_MODE` and
+gains its own answer, while `s390` defines none and merely stops receiving
+i386's, which for this suite changes almost nothing.
+
+So `A018835BBCFAD2E28-BOARD`'s handover item 6 — *"a suite run for aarch64 and
+s390x on this tip"* — is **discharged for both**, and for s390x the answer is
+"no measurable effect", which is worth as much as the 70.
+
+## 2. THE RANKED RESIDUAL, PER TARGET
+
+Ranked by DEBT with stock's figure beside every row: a directory where both
+sides fail is not a work item; one where stock fails **zero** is.
+
+### x86_64 — 67, unchanged, still 43 of it `_Float16`/HFmode
+
+Unmoved to the unit. `A01E6C604F26604A7-BOARD` characterised it as `part-vect`
+32 / `avx512fp16` 10 / any `hf` 36 — **43 of 67 matched, 24 matched by none** —
+and nothing in this session's span touches it.
+
+### aarch64 — 443, and **256 of it is one macro**
+
+```
+fmv_priority2.c 26 | sve 17 (stock fails 5 of 91,512) | mv-and-mvc3.c 15
+aapcs64 12 (stock itself fails 44) | mv-symbols{7,8,9,10}.c 11 each | ...
+    the mv*/fmv* family, 42 files:  256   <- TARGET_HAS_FMV_TARGET_ATTRIBUTE
+```
+
+### riscv64 — 772, and it is no longer the ICE-shaped residual it was
+
+```
+DIRECTORY                                  DEBT  STOCK_FAIL  STOCK_PASS
+gcc.dg/Wstringop-overread.c                 129           0         148
+gcc.target/riscv/rvv                        100         259      106729
+c-c++-common/Wrestrict.c                     39           0         155
+gcc.target/riscv/zilsd-align-word-4.c        21           0          21
+gcc.dg/Wstringop-overflow-25.c               15           0          52
+gcc.target/riscv/attribute-5.c               14           0          14
+gcc.dg/torture/inline-mem-cpy-cmp-1.c        12           0          21
+gcc.dg/torture/inline-mem-cpy-1.c            10           0          14
+gcc.target/riscv/nozicond-3.c                 8           0          20
+gcc.target/riscv/pr-crossing-jump-1.c         8           0          16
+gcc.target/riscv/{mcpu-1,mcpu-2}.c            7 each      0           7
+```
+
+**`gcc.dg/params` is gone from the head entirely** (239 → 1 → absent) and with
+it the `lra.cc:192` cluster that was this board's #2 item for three boards. The
+head is now **`Wstringop-overread` / `Wrestrict` / `Wstringop-overflow` — 183
+results across three files, stock failing zero** — a *diagnostics* family, a
+different kind of item from anything previously ranked here, and shared with no
+other target. `gcc.target/riscv/rvv`'s 100 sits against **259 stock failures
+and 106,729 stock passes**, i.e. a small residue on a directory both sides find
+hard.
+
+**Two leads for this target come from this session's sweeps and are not in the
+ranking**: `SHORT_IMMEDIATES_SIGN_EXTEND` (riscv 1, shared 0 — a `combine`
+pessimisation, and riscv64's residual is exactly the "compiled and emitted
+different code" shape) and `TARGET_CLONES_ATTR_SEPARATOR` (`'#'` vs `','`).
+Neither is sized; both are in `A992B7E5FA4FFAAA7-FLOORSWEEP.md`.
+
+### s390x — 206
+
+```
+DIRECTORY                                              DEBT  STOCK_FAIL  STOCK_PASS
+gcc.target/s390/vector                                   19           2         540
+gcc.target/s390/isfinite-isinf-isnormal-signbit-1.c      17           0          17
+gcc.target/s390/signbit-3.c                              13           0          13
+gcc.target/s390/isfinite-isinf-isnormal-signbit-{2,3}.c   9 each      0           9
+gcc.target/s390/md                                        8           0         388
+gcc.dg/debug/pr104337.c                                   7           0          10
+gcc.target/s390/risbg-ll-1.c                              7           1          44
+gcc.c-torture/compile/pr104327.c                          6           0           7
+gcc.dg/lto/{20091027-1,20100603-1,-2,-3}                  6 each      0       12-18
+```
+
+Essentially identical to the last board's s390x ranking. The
+signbit/isfinite family (**48 across four files, stock passes all**) remains
+the one coherent, self-contained work item on this target.
+
+**`gcc.dg/lto` is now s390x's alone.** The last board flagged 53 *identically*
+on aarch64, riscv64 and s390x and said "the same count on three targets is not
+three bugs". It is now ~24 on s390x and absent from the other two heads — so
+that observation no longer holds, and whatever it was has largely closed
+without being worked. Recorded because an inherited item that quietly
+disappears is exactly what nobody re-checks.
+
+## 3. WHAT THIS BOARD CANNOT SEE — the most important section
+
+Three of this session's most serious findings are **absent from every number
+above**, and all three were found by compiling four small programs and diffing
+against the stock compiler:
+
+| defect | target | why the board is blind to it |
+|---|---|---|
+| `STACK_POINTER_OFFSET` 0 vs **160** — outgoing stack args land in the callee's register save area | s390x | compile-only; the wrong code assembles cleanly into a correct-machine ELF object |
+| `TRAMPOLINE_SECTION` ignored — the trampoline is emitted into **`.rodata`** | aarch64 | nested functions are rare in the suite, and it assembles |
+| `EH_RETURN_HANDLER_RTX` NULL — `__builtin_eh_return` **errors** | aarch64, s390x | few tests use the builtin |
+
+`s390x`'s measured debt is **206** and its ABI is broken for every function
+taking more than five integer arguments. PRINCIPLES already states the general
+form for riscv64 emitting 32-bit code while passing "assembles, right ELF
+machine"; this is the same lesson arriving three more times in one session.
+
+**So the four numbers above are a LOWER BOUND on what is wrong, and a
+compile-only board is a weak instrument for anything wrong about the ABI.**
+That is the single most useful thing this board says, and it is not a number.
