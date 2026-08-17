@@ -17,6 +17,37 @@ task**. If you are about to write `t<NNN>-conf.sh`, the answer is already here.
 | `MULTI_TARGET_RENAME_NAMES` completeness | `mt-rename-sweep.sh` |
 | the testsuite, once per target | `mtcheck.sh` |
 | score its runs | `mtscore.sh` |
+| an immutable snapshot named for worktree AND sha | `mt-snap.sh` |
+| `sh -n` every committed `.sh`, plus the backtick-landmine census | `mt-shcheck.sh` |
+| **is each language's compiler present AND did it RUN?** | `mt-fe-exec.sh` |
+| per-front-end `tm.h` channel, macro surface, and objects that opened it | `mt-fe-surface.sh` |
+| the same surface as NAMES, filtered to macros with >1 definer | `mt-fe-macros.sh` |
+| **split a `.sum`'s FAILs into harness causes and RESIDUAL** | `mt-attribute.sh` |
+| prefixed binutils for the target that IS the host | `mt-native-tools.sh` |
+
+**`mtcheck.sh` AND `mtscore.sh` SHARE ONE TOOL LIST AND IT MUST BE WIDENED IN
+BOTH.** The list was `gcc g++`; it is now the ten `lang_checks` DejaGnu tool
+names (`gcc g++ objc obj-c++ gfortran go gdc gm2 cobol algol68 rust`). Widening
+only `mtcheck.sh` makes a front end run its entire suite -- guards passing,
+`.sum` written, GUARD 4 banner present -- and then die in the scorer with
+`FATAL: MT_CHECK_TOOL=objc`, after the expensive part.
+
+**AND `<TOOL>_UNDER_TEST` IS NOT DERIVABLE FROM THE TOOL NAME.** Read it out of
+`gcc/testsuite/lib/<tool>.exp`; six of nine plausible guesses are wrong
+(`OBJC_`, `OBJCXX_`, `GOC_`, `RUST_`, `COBOL_`, and `gm2` has none of its own
+and uses `GCC_UNDER_TEST`). A wrong name does not fail: the `.exp` falls back
+to `[find_gcc]`, a bare `xgcc` with no `-ftarget-config=`, and the driver
+refuses **correctly**, once per test -- yielding a full-looking board in which
+every FAIL is the harness. `cobol` with the wrong variable ran **zero tests**
+and `make check-cobol` exited **0**.
+
+**RUN `mt-attribute.sh` BEFORE QUOTING ANY FRONT END'S FAIL TOTAL.** A raw
+total for a language nobody has run is a number about the harness at least as
+much as about the compiler: the six first boards taken in
+`A13057F203EB4821C-FEBOARD.md` total 14,312 FAILs and **12** residual. Its
+NO-RUNTIME arm needs a signature per front end -- `No such file or directory`,
+`cannot find module` (libga68), `import file "x" not found` (libgo),
+`could not open copybook file` (libgcobol) -- and that list is open.
 | every cited `scratchpad/` path exists | `mt-cite-check.sh` |
 | **run one `.exp` and PRESERVE its `.sum`/`.log`** | `a5764a65f9eec0063-score.sh` |
 | classify a `.sum`'s FAILs: COMPILE vs BODIES vs SCAN | `a5764a65f9eec0063-kinds.sh` |

@@ -5358,6 +5358,22 @@ s-gtype: $(EXTRA_GTYPE_DEPS) build/gengtype$(build_exeext) \
                     -r gtype.state
 	$(STAMP) s-gtype
 
+# THIS VARIABLE IS EMPTY EVERYWHERE ABOVE THIS LINE, AND THAT INCLUDES EVERY
+# `Make-lang.in'.  GNU make expands a rule's prerequisite list when the rule is
+# READ, and `@language_hooks@' is read at line 3113 -- two thousand lines
+# before this assignment.  So a language fragment writing `$(generated_files)'
+# among its prerequisites gets NOTHING, in a form that reads as a dependency.
+# All fourteen fragments do it.
+#
+# Upstream that is harmless: `$(ALL_HOST_OBJS) : | $(generated_files)' below
+# supplies the ordering for host objects, and nothing else needed it.  Here
+# `tm.h' -> `defaults.h' -> `multi-target-macros.h' reaches the GENERATED
+# `multi-target-reg-widths.h', so ANY compilation that opens `tm.h' now needs
+# these files -- including language DRIVER objects (`m2/gm2spec.o' is in
+# `GM2_OBJS', not in `ALL_HOST_FRONTEND_OBJS') and language plugins
+# (`plugin/m2rte.so' is not an object at all).  Both raced and lost on a cold
+# `-j8' build.  If you add such a rule, name the generated files you need
+# LITERALLY; a variable that is empty at read time cannot create an edge.
 generated_files = config.h tm.h $(TM_P_H) $(TM_D_H) $(TM_JIT_H) $(TM_H) \
        multilib.h $(simple_generated_h) insn-config.h insn-codes.h specs.h \
        tree-check.h genrtl.h insn-modes.h insn-modes-inline.h \

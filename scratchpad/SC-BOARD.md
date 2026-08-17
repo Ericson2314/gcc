@@ -1,5 +1,40 @@
 # THE STOCK CONTROL — the multi-target board against unmodified GCC
 
+> ## THERE IS A FIFTH CONTROL AND IT IS 32-BIT: `arm`, DEBT **3,288** (`A660907426E03E4E9-ARM-BOARD.md`)
+>
+> ```
+> arm-unknown-linux-gnueabihf     PASS      FAIL   UNSUP    UNRES
+>   multi-target b351eb857d1     130868     18381    8265    12688
+>   stock        c31b7a09eea     148432     15997   10573    12831
+> ```
+>
+> **KILLED 0 on both, load 15.94 / 10.94, neither provisional.**  Built the
+> same way §1 records: `--target=`, real cross binutils 2.46, the target's own
+> glibc headers through `--with-sysroot`, `make all-gcc` only, `MT_COMPILE_ONLY`
+> on both sides, the same two grafted testsuite files.
+>
+> **89% of the debt is `TYPE_OPERAND_FMT`** — `defaults.h:260` builds
+> `ASM_OUTPUT_TYPE_DIRECTIVE` from the primary's `"@%s"`, and on ARM `@` begins
+> a comment.  **`aarch64` asks for `%object` too and its assembler accepts
+> `@object` silently, so the defect is live on a scored target today.**  A
+> defect can be present and ACTIVE on a scored target and still invisible,
+> because that target's tooling does not object — a stronger statement than
+> "invisible where targets agree", and no sample size on the four reaches it.
+>
+> **And `ilp32` reads FALSE on the multi-target arm compiler** for the same
+> reason: `check_effective_target_ilp32` is `check_no_compiler_messages ...
+> object`, so the assembler answers it, not `sizeof (void *)`.  189
+> `object`-mode and 116 `assembly`-mode selectors are affected, and **21,181
+> results the stock run produced are absent from the multi-target run and are
+> NOT in the 3,288.**  Read that debt as a lower bound over the common scope.
+>
+> `sc-check.sh` gained an `arm` arm for S4 and a NEW **guard S4b** (ELF class),
+> which no LP64 row could ever have fired.
+>
+> **The tip did not build when this was started** (`3f75b7f16a3`); a merge had
+> dropped eight `mt_*` accessors while keeping their callers.  Fixed in
+> `b351eb857d1`, 583 insertions / 0 deletions.
+
 > ## THE WHOLE ACLE CLUSTER IS CLOSED AT `06179fbe3df` (`sme/acle-asm` AT PARITY)
 >
 > ```

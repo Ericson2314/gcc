@@ -1,0 +1,35 @@
+== debt tests: 3288   with a parsed diagnostic: 2982
+
+-- CAUSE BUCKETS over the DEBT SET, by distinct test name
+    2922  TYPE_OPERAND_FMT (`@object` where arm needs `%object`)
+       0  FUNCTION_PROFILER (i386 text emitted for arm)
+       0  an x86 INSTRUCTION emitted for arm
+      25  ICE
+       4  float-ABI / -march
+      10   unset:-march unset (harness)
+       0  harness (bare xgcc, no -ftarget-config=)
+       0  Thumb IT-block
+       0  -mcpu/-march feature
+       0  LINK (not reached by the compile-only downgrade)
+
+-- the same debt tests, by their FIRST message, top 20 (nothing folded)
+   2922 Error: unrecognized symbol type ""
+     25 
+     10 xgcc: error: missing argument to 'X'
+      4 ccN: error: 'X': selected architecture lacks an FPU
+      2 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Warray-bounds-N.c:N:N: warning: array subscript -N is outside array bounds of 'X' [-Warray-bounds=]
+      1 ccN: sorry, unimplemented: 'X' and VFP
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.target/arm/prN-N.c:N:N: error: argument of type 'X' not permitted with 'X'
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.target/arm/prN-N-soft.c:N:N: warning: FP registers might be clobbered despite 'X' attribute: compile with 'X' [-Wattributes]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c:N:N: sorry, unimplemented: Thumb-N 'X' VFP ABI
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/utfN-N.c:N:N: warning: conversion from 'X' to 'X' {aka 'X'} changes value from 'X' to 'X' [-Woverflow]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/tree-ssa/prN.c:N:N: warning: 'X' directive writing between N and N bytes into a region of size N [-Wformat-overflow=]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/tree-ssa/builtin-sprintf-warn-N.c:N:N: warning: specified bound N exceeds maximum object size N [-Wformat-truncation=]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/tree-ssa/builtin-sprintf-warn-N.c:N:N: warning: 'X' directive writing between N and N bytes into a region of size between N and N [-Wformat-overflow=]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/builtin-stdc-rotate-N.c:N:N: warning: rotate count is negative [-Wshift-count-negative]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Wtype-limits.c:N:N: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Wtype-limits-Wextra.c:N:N: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Wstringop-overflow-N.c:N:N: warning: 'X' writing N bytes into a region of size N overflows the destination [-Wstringop-overflow=]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Wnonnull-N.c:N:N: warning: 'X' specified size N exceeds maximum object size N [-Wstringop-overflow=]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Wconversion-N.c:N:N: warning: conversion from 'X' to 'X' may change value [-Wconversion]
+      1 /tmp/snap-agent-aNeNeNeN-bNebNdN/gcc/testsuite/gcc.dg/Warray-bounds-N.c:N:N: warning: array subscript N is outside array bounds of 'X' [-Warray-bounds=]

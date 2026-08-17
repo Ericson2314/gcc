@@ -2631,6 +2631,41 @@ defect that cannot be detected at all**:
   * nine front ends never built     => their own `tm.h` readers, their ABIs
   * nineteen back ends never scored => whatever only they would disagree with
 
+**A FIFTH TARGET WAS SCORED AGAINST A STOCK CONTROL AND THE PREDICTION HELD —
+BUT NOT ON THE AXIS THIS LIST NAMES.**  `arm-unknown-linux-gnueabihf`, debt
+**3,288** (`A660907426E03E4E9-ARM-BOARD.md`).  **89% of it is one cause, and it
+is not pointer width**: `TYPE_OPERAND_FMT`.  `defaults.h:260` builds
+`ASM_OUTPUT_TYPE_DIRECTIVE` from the primary's `"@%s"`, and **on ARM `@` begins
+a comment**, so `.type x, @object` has an empty operand and `as` refuses it.
+
+Two corrections to how this section should be read:
+
+**1. The mechanism is stronger than "invisible where targets agree".**
+`aarch64` asks for `%object` too — it is one of the four — and its assembler
+**ACCEPTS** `@object`, as do riscv64's, s390x's and x86_64's.  So the defect is
+**live and active on a scored target right now** and produces no failure.  The
+four did not lack the property; they could not *complain*.  That is a class no
+sample size on those four reaches, and it is wider than any list of
+target-attribute axes.
+
+**2. The axis this list names appears only derivatively, and it appears in the
+HARNESS.**  `check_effective_target_ilp32` is
+`check_no_compiler_messages ilp32 **object** { ... }` — the assembler runs — so
+`ilp32` reads FALSE on the multi-target arm compiler while that compiler's own
+answer (`sizeof (void *) == 4`) is correct and is never consulted.  189
+`object`-mode and 116 `assembly`-mode selectors in `target-supports.exp` are
+answered by the assembler.  **The compiler was right about the 32-bit axis and
+the board could not find that out.**
+
+The transferable lesson is to widen the list rather than tick an entry off it:
+the four also agree about assembler comment characters, `.align` semantics
+(`ASM_OUTPUT_ALIGN` is `1 << LOG` for i386 and the POWER for arm, aarch64 and
+riscv — multi-target emits `.align 4` where arm wants `.align 2`, i.e. 16-byte
+alignment where 4 was asked for, **assembling cleanly with every test still
+passing**) and `.type` operand syntax.  **A new target is worth what it
+DISSENTS about, and the dissents are not enumerable in advance** — which is the
+argument for breadth, not a refinement of it.
+
 And the front-end half is not a smaller version of the same point.  **C++ was
 enabled for the first time and immediately produced the highest-severity defect
 on the branch** — eight back ends emitting an ABI-incompatible pointer to

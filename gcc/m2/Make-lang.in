@@ -107,8 +107,24 @@ ifeq ($(enable_plugin),yes)
 M2RTE_PLUGIN_SO=plugin/m2rte$(soext)
 endif
 
+# `$(generated_files)' IS EMPTY IN EVERY Make-lang.in, AND IT LOOKS LIKE A
+# DEPENDENCY.  GNU make expands a rule's prerequisite list when the rule is
+# READ; `@language_hooks@' is at gcc/Makefile.in:3113 and
+# `generated_files = ...' at :5339, so every `$(generated_files)' written in a
+# language fragment expands to NOTHING.  Upstream survives it because
+# `$(ALL_HOST_OBJS) : | $(generated_files)' (:7259) supplies the ordering for
+# host objects -- but `m2/gm2spec.o' is a DRIVER object (`GM2_OBJS'), not a
+# front-end one, so it is in neither list and had no ordering at all.
+#
+# It only became fatal on this branch: `tm.h' -> `defaults.h:1932' ->
+# `multi-target-macros.h:243' now reaches the GENERATED
+# `multi-target-reg-widths.h', so a compilation that opens `tm.h' before that
+# header exists dies with `No such file or directory' -- under `-j8', on a
+# cold build, nondeterministically.  Naming the two files literally is what
+# actually creates the edge; a variable that is empty at read time cannot.
 m2/gm2spec.o: $(srcdir)/m2/gm2spec.cc $(SYSTEM_H) $(GCC_H) $(CONFIG_H) \
                m2/gm2config.h $(TARGET_H) $(PLUGIN_HEADERS) \
+               tm.h multi-target-reg-widths.h \
                $(generated_files) $(C_TREE_H) insn-attr-common.h
 	(SHLIB_LINK='$(SHLIB_LINK)' \
 	SHLIB_MULTILIB='$(SHLIB_MULTILIB)'; \
@@ -457,8 +473,11 @@ m2.install-plugin: installdirs
 
 override PLUGINCFLAGS := $(filter-out -mdynamic-no-pic,$(PLUGINCFLAGS))
 
+# Same missing edge as `m2/gm2spec.o' above, and this target is not an object
+# at all, so no `ALL_HOST_OBJS' barrier could ever have covered it.
 plugin/m2rte$(soext): $(srcdir)/m2/plugin/m2rte.cc $(GCC_HEADER_DEPENDENCIES_FOR_M2) \
-        insn-attr-common.h insn-flags.h $(generated_files)
+        insn-attr-common.h insn-flags.h tm.h multi-target-reg-widths.h \
+        $(generated_files)
 	-test -d $(@D) || $(mkinstalldirs) $(@D)
 	$(PLUGINCC) $(PLUGINCFLAGS) -fno-rtti -I. -I$(srcdir) $(INCINTL) -I$(srcdir)/m2 -I$(srcdir)/m2/gm2-gcc -I$(srcdir)/../include -I$(srcdir)/../libcpp/include -Wall $(GMPINC) -Wno-literal-suffix -fPIC -c -o plugin/m2rte.o $(srcdir)/m2/plugin/m2rte.cc
 	$(PLUGINCC) $(PLUGINCFLAGS) $(PLUGINLDFLAGS) $(PLUGINLIBS) $(LIBINTL) -fno-rtti plugin/m2rte.o -shared -o $@

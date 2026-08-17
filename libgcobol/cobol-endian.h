@@ -44,6 +44,28 @@
 /* Front-end / compiler build.  This is compiler run time,
    but target endianness. */
 
+/* INCLUDE WHAT YOU USE, AND SAY WHY.  `BYTES_BIG_ENDIAN' is not a
+   preprocessor constant on the multi-target branch: it is
+   `(targetm_cdata.bytes_big_endian)' (multi-target-macros.h), a read of the
+   SELECTED target's data, reached only through `target.h' -> `tm.h' ->
+   `defaults.h'.  Upstream this header could rely on whatever the including
+   `.cc' had already pulled in; here the include that used to supply the name
+   was removed from a shared header, so `cobol/genmath.cc', `cobol/symbols.cc'
+   and `cobol/util.cc' each failed with
+
+     cobol-endian.h:50:10: error: 'BYTES_BIG_ENDIAN' was not declared in this
+       scope; did you mean 'SSO_BIG_ENDIAN'?
+     note: the macro 'BYTES_BIG_ENDIAN' had not yet been defined
+     note: it was later defined here   <- multi-target-macros.h:380
+
+   -- three compilations of the same header, each deciding by INCLUDE ORDER
+   whether the name existed.  Note the shape of the near miss: the compiler
+   offered `SSO_BIG_ENDIAN', a real and entirely unrelated identifier, so the
+   obvious repair is a plausible wrong answer.  Naming the dependency here
+   fixes it once for every includer, present and future, rather than making
+   three `.cc' files carry an ordering rule nothing states.  */
+#include "target.h"
+
 static inline bool
 cobol_target_big_endian()
   {
