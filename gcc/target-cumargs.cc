@@ -88,6 +88,24 @@ along with GCC; see the file COPYING3.  If not see
    expansion now happens in the translation unit where the macro is that
    base's own, so that base's headers have to be satisfiable here.  */
 #include "output.h"
+/* For `lang_hooks'.  `defaults.h:1191's `TRAMPOLINE_ALIGNMENT' floor is
+   `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', and `FUNCTION_ALIGNMENT'
+   (`defaults.h:1182') reads `lang_hooks.custom_function_descriptors'.  46 of
+   the 47 back ends take that floor, so without this the build fails BY NAME:
+   `defaults.h:1183: lang_hooks was not declared in this scope'.
+
+   AN INCLUDE THAT MAKES A SCOPE ERROR GO AWAY IS SAFE EXACTLY WHEN YOU CAN
+   SAY WHAT THE MACRO READS, and `target-cdata.h' records the case where it is
+   NOT -- `DWARF_FRAME_RETURN_COLUMN', where the identical one-line fix would
+   have silenced a scope error over a macro reading per-FUNCTION state and
+   given epiphany the wrong DWARF column in every interrupt handler.  This is
+   the other case, and the difference is checkable: `lang_hooks' is a global
+   the front end fills in once, `custom_function_descriptors' is a property of
+   the LANGUAGE, and `mt_base_trampoline_alignment' is a CALL evaluated at each
+   use site rather than a value cached at selection time -- so it reads exactly
+   what `varasm.cc' and `builtins.cc' read, at the same moment they read it.
+   Nothing here is frozen and nothing is per-function.  */
+#include "langhooks.h"
 /* `explow.h' is here for `enum save_level' ALONE, and it is required rather
    than tidy: `mt_base_stack_savearea_mode' expands the base's OWN
    `STACK_SAVEAREA_MODE', and seven back ends spell `SAVE_NONLOCAL' /
@@ -876,6 +894,25 @@ mt_base_biggest_alignment (void)
   return (unsigned int) BIGGEST_ALIGNMENT;
 }
 
+/* `TARGET_VTABLE_ENTRY_ALIGN', read in THIS base's translation unit.  Three
+   back ends define it -- ia64 64, avr 8, msp430 16 -- and for the other 44
+   this expands `defaults.h:972's `TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE'
+   against THIS base's `POINTER_SIZE', which is the answer a single-target
+   build of that back end gives.
+
+   NOTE WHAT THIS FUNCTION IS NOT.  For the 44 it is not a frozen number: in
+   a supply-side TU `POINTER_SIZE' is still the real macro, but the value is
+   read on every CALL through `targetm_frame', not once at selection time, so
+   i386's `(TARGET_64BIT ? 64 : 32)' and aarch64's `(TARGET_ILP32 ? 32 : 64)'
+   keep moving with the option state exactly as they do for `mt_pointer_size'
+   itself.  That is the whole reason this is a `target_frame_desc' call and
+   not a `TARGET_CDATA_FIELDS' slot; see target-frame.h.  */
+static unsigned int
+mt_base_vtable_entry_align (void)
+{
+  return (unsigned int) TARGET_VTABLE_ENTRY_ALIGN;
+}
+
 /* `FUNCTION_MODE', read in THIS base's translation unit: QImode for i386,
    `Pmode' -- and so DImode -- for aarch64.  Compiled once against i386's tm.h,
    shared code built every target's call MEM as QImode, and aarch64's own
@@ -1229,6 +1266,101 @@ static poly_int64
 mt_base_stack_dynamic_offset (tree fndecl ATTRIBUTE_UNUSED)
 {
   return STACK_DYNAMIC_OFFSET (fndecl);
+}
+
+/* `STACK_POINTER_OFFSET', evaluated in THIS base's translation unit.  See
+   target-frame.h for the definer set and for why this is a call rather than a
+   cdata slot: four of the twenty definers are not invariant, and pa's reads
+   `crtl->outgoing_args_size'.
+
+   NO `#ifndef' HERE.  `defaults.h:1156' supplies the 0 and this file reads it
+   through this base's own `tm.h', so a back end that does not spell the macro
+   gets upstream's own answer for that back end -- the supply-side floor
+   PRINCIPLES section 2a permits -- and a definer gets its own.  Adding a
+   second floor here would shadow that and be indistinguishable from it.
+
+   microblaze's body is `FIRST_PARM_OFFSET(FNDECL)' with `FNDECL' a free
+   identifier, which is legal only because microblaze's `FIRST_PARM_OFFSET'
+   discards its argument (`(UNITS_PER_WORD)'), so `FNDECL' does not survive
+   expansion.  Recorded because it looks like a compile error waiting to
+   happen and is not -- but it is also the reason this thunk cannot usefully
+   grow an `fndecl' parameter: the macro's own use of the name is
+   accidental.  */
+static poly_int64
+mt_base_stack_pointer_offset (void)
+{
+  return STACK_POINTER_OFFSET;
+}
+
+/* `EH_RETURN_HANDLER_RTX', built in THIS base's translation unit.  See
+   target-frame.h: with `defaults.h:1432's NULL reaching shared code,
+   `__builtin_eh_return' errored out on aarch64 and s390x, and `df-scan.cc'
+   silently left their handler register out of the exit block's use set.
+
+   No `#ifndef' here either: `defaults.h' supplies the NULL through this
+   base's own `tm.h', which is upstream's own answer for a back end that does
+   not define the macro, and NULL is a value both consumers test for.  */
+static rtx
+mt_base_eh_return_handler_rtx (void)
+{
+  return EH_RETURN_HANDLER_RTX;
+}
+
+/* `EH_RETURN_STACKADJ_RTX' -- an EXISTENCE question, so a pair, and one where
+   the primary DEFINES the name, so shared code's `#ifdef' was true for all 47
+   and the value was i386's `CX_REG', register 2 -- which on riscv is `sp'.
+   See target-frame.h for the measured diff.
+
+   No `#else' value: a back end that does not define the macro has no stack
+   adjustment register, and inventing one is the floor PRINCIPLES forbids.  */
+#ifdef EH_RETURN_STACKADJ_RTX
+static rtx
+mt_base_eh_return_stackadj_rtx (void)
+{
+  return EH_RETURN_STACKADJ_RTX;
+}
+# define MT_BASE_HAS_EH_RETURN_STACKADJ_RTX true
+# define MT_BASE_EH_RETURN_STACKADJ_RTX mt_base_eh_return_stackadj_rtx
+#else
+# define MT_BASE_HAS_EH_RETURN_STACKADJ_RTX false
+# define MT_BASE_EH_RETURN_STACKADJ_RTX NULL
+#endif
+
+/* `TRAMPOLINE_SECTION' -- an EXISTENCE question, so a pair, exactly as
+   `INIT_EXPANDERS' above.  aarch64 is the only back end in the tree that
+   defines it, and `varasm.cc:3065's shared `#ifdef' was answered by i386 for
+   all 47, so the trampoline was emitted into whatever section happened to be
+   current -- `.rodata', which is not executable.
+
+   There is deliberately no `#else' supplying `text_section'.  It would be
+   right for aarch64 and is an invented answer for the other 46, whose
+   trampolines upstream really do land in the current section; that is the
+   `#ifndef' floor PRINCIPLES forbids, and it would silently change 46 back
+   ends to fix one.  */
+#ifdef TRAMPOLINE_SECTION
+static section *
+mt_base_trampoline_section (void)
+{
+  return TRAMPOLINE_SECTION;
+}
+# define MT_BASE_HAS_TRAMPOLINE_SECTION true
+# define MT_BASE_TRAMPOLINE_SECTION mt_base_trampoline_section
+#else
+# define MT_BASE_HAS_TRAMPOLINE_SECTION false
+# define MT_BASE_TRAMPOLINE_SECTION NULL
+#endif
+
+/* `TRAMPOLINE_ALIGNMENT', in bits, asked of THIS base.  A definer yields its
+   own value (aarch64 64); a non-definer yields `defaults.h:1191's
+   `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)' computed against ITS OWN
+   `FUNCTION_BOUNDARY' -- the answer a single-target build of that back end
+   gives, which is the supply-side floor section 2a permits.  In shared code
+   that same expression was i386's, and aarch64's trampolines came out
+   `.align 2' against stock's `.align 3'.  */
+static unsigned int
+mt_base_trampoline_alignment (void)
+{
+  return (unsigned int) TRAMPOLINE_ALIGNMENT;
 }
 
 /* `PUSH_ARGS_REVERSED', read in THIS base's translation unit.  See
@@ -2087,6 +2219,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_units_per_word,
   mt_base_pointer_size,
   mt_base_biggest_alignment,
+  mt_base_vtable_entry_align,
   MT_BASE_HAS_DATA_ALIGNMENT,
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,
@@ -2122,6 +2255,13 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_default_incoming_frame_sp_offset,
   mt_base_accumulate_outgoing_args,
   mt_base_stack_dynamic_offset,
+  mt_base_stack_pointer_offset,
+  mt_base_eh_return_handler_rtx,
+  MT_BASE_HAS_EH_RETURN_STACKADJ_RTX,
+  MT_BASE_EH_RETURN_STACKADJ_RTX,
+  MT_BASE_HAS_TRAMPOLINE_SECTION,
+  MT_BASE_TRAMPOLINE_SECTION,
+  mt_base_trampoline_alignment,
   mt_base_push_args_reversed,
   mt_base_incoming_reg_parm_stack_space,
   mt_base_has_reg_parm_stack_space,

@@ -465,6 +465,16 @@ mt_biggest_alignment (void)
   return mt_frame ()->biggest_alignment ();
 }
 
+/* `TARGET_VTABLE_ENTRY_ALIGN'.  Uncached for the same reason as the three
+   above: for the 44 back ends that define nothing it IS `POINTER_SIZE', so
+   caching it would freeze exactly the value `mt_pointer_size' is deliberately
+   not freezing.  */
+unsigned int
+mt_vtable_entry_align (void)
+{
+  return mt_frame ()->vtable_entry_align ();
+}
+
 /* `FUNCTION_MODE'.  Uncached for the same reason as `Pmode' just above: eight
    back ends define it AS `Pmode', which is option-dependent on i386 and on
    arm, so a value read once at selection time would be frozen.  */
@@ -661,6 +671,111 @@ poly_int64
 mt_stack_dynamic_offset (tree fndecl)
 {
   return mt_frame ()->stack_dynamic_offset (fndecl);
+}
+
+/* `STACK_POINTER_OFFSET'.  Uncached, and not merely out of caution: pa's body
+   is `-(crtl->outgoing_args_size + 48)', which is per-function state and has
+   no value at selection time at all, and epiphany's is an option variable.
+   Sixteen of the twenty definers would survive caching and four would be
+   silently frozen, which is the trade `target-cdata.h' already refuses by
+   name for `TARGET_VTABLE_ENTRY_ALIGN'.  */
+poly_int64
+mt_stack_pointer_offset (void)
+{
+  return mt_frame ()->stack_pointer_offset ();
+}
+
+/* `EH_RETURN_HANDLER_RTX'.  Uncached necessarily: the bodies BUILD RTL, and
+   three back ends reach a back-end function to do it.  */
+rtx
+mt_eh_return_handler_rtx (void)
+{
+  return mt_frame ()->eh_return_handler_rtx ();
+}
+
+/* `EH_RETURN_STACKADJ_RTX'.  The `(has_X, payload)' pair is cross-checked
+   against itself, as `mt_init_expanders' is: an inconsistent pair is an object
+   built against a different `target-frame.h', and its only other symptom here
+   would be the stack adjustment landing in whichever register the primary
+   happens to name -- which is the defect this field exists to remove.  */
+bool
+mt_has_eh_return_stackadj_rtx (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->has_eh_return_stackadj_rtx != (f->eh_return_stackadj_rtx != NULL))
+    internal_error ("back end %qs disagrees with itself about whether it "
+		    "defines %<EH_RETURN_STACKADJ_RTX%>; its objects and "
+		    "%<target-frame.h%> are from different builds", f->name);
+
+  return f->has_eh_return_stackadj_rtx;
+}
+
+rtx
+mt_eh_return_stackadj_rtx (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->eh_return_stackadj_rtx == NULL)
+    internal_error ("back end %qs defines no %<EH_RETURN_STACKADJ_RTX%>, but "
+		    "one was asked for without testing for it first", f->name);
+
+  return f->eh_return_stackadj_rtx ();
+}
+
+/* `TRAMPOLINE_SECTION'.  The `(has_X, payload)' pair is cross-checked against
+   itself rather than merely dereferenced, for `mt_init_expanders'' reason:
+   46 of the 47 back ends genuinely define nothing, so a null pointer alone
+   cannot be an error -- but a null pointer the base did NOT claim, or a claim
+   with nothing behind it, is an object built against a different
+   `target-frame.h', whose only other symptom is a trampoline emitted into
+   whichever section happened to be current.  That is the defect this field
+   exists to remove, so it must not also be its failure mode.  */
+bool
+mt_has_trampoline_section (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->has_trampoline_section != (f->trampoline_section != NULL))
+    {
+      if (f->has_trampoline_section)
+	internal_error ("back end %qs records that it defines "
+			"%<TRAMPOLINE_SECTION%> but supplies no function for "
+			"it; its objects and %<target-frame.h%> are from "
+			"different builds", f->name);
+      else
+	internal_error ("back end %qs records that it defines no "
+			"%<TRAMPOLINE_SECTION%> yet supplies a function for "
+			"it; its objects and %<target-frame.h%> are from "
+			"different builds", f->name);
+    }
+
+  return f->has_trampoline_section;
+}
+
+/* The payload.  Callers must have asked `mt_has_trampoline_section ()' first;
+   asking for a section a base does not have is a bug in the caller, not a
+   case to paper over with the current section.  */
+section *
+mt_trampoline_section (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->trampoline_section == NULL)
+    internal_error ("back end %qs defines no %<TRAMPOLINE_SECTION%>, but one "
+		    "was asked for without testing for it first", f->name);
+
+  return f->trampoline_section ();
+}
+
+/* `TRAMPOLINE_ALIGNMENT'.  Uncached: for the 46 back ends that define nothing
+   it IS `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', and riscv's
+   `FUNCTION_BOUNDARY' moves with `TARGET_RVC', so caching would freeze
+   exactly what the supply-side expansion is there to keep live.  */
+unsigned int
+mt_trampoline_alignment (void)
+{
+  return mt_frame ()->trampoline_alignment ();
 }
 
 /* `PUSH_ARGS_REVERSED'.  Uncached, and here that is not merely conservative:
