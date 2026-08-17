@@ -2678,3 +2678,58 @@ been scored is worth more than another pass over one that has, even when the
 scored one has a larger residual — because the unscored one can refute
 assumptions and the scored one can only refine a number.  Prefer breadth until
 every back end and every front end has produced at least one result.
+
+---
+
+## THE PACKAGING SHAPE, CONFIRMED BY THE USER: THE COMPILER SHIPS BACK ENDS, THE WRAPPER SHIPS TARGETS
+
+Stated to the user and confirmed verbatim ("yes that's exactly correct"), so this
+is settled and not a proposal:
+
+> **`gcc-unwrapped` ships back ends, `cc-wrapper` ships targets.**  So
+> `target-specs` and `fixincludes` are per-target derivations feeding the
+> wrapper, and **libgcc is just another consumer of a composed target.**
+
+The chain:
+
+```
+gcc-unwrapped   ONE derivation, all 47 back ends, NO target, one store path
+  |
+target-specs    per target -- probes the REAL as/ld, writes specs-config
+fixincludes     per target -- fixes THAT target's system headers
+  |
+cc-wrapper      per target -- COMPOSES the target from gcc-unwrapped
+                + specs-config + fixed headers + binutils + libc/sysroot
+  |
+libgcc          one machine's library: --host=<that machine>, NO --target
+  |
+libstdcxx, libgfortran, ...     same shape
+```
+
+**What this settles, each of which was an open question until now:**
+
+  * **A target is not something the compiler HAS; it is something COMPOSED.**
+    The wrapper's store path *is* that target's identity.  This is LLVM's
+    shape, and it is why one `gcc-unwrapped` serves everybody.
+  * **Per-target data belongs with the per-target thing** -- the wrapper --
+    which is why `target-specs` and `fixincludes` must be their own
+    derivations.  A component cannot consume what is buried inside the
+    compiler's own build.
+  * **`libgcc` is not special.**  It is a consumer, one machine's library,
+    `--host=<that machine>` and no `--target` at all.  Every `*_FOR_TARGET`
+    export in its expression describes a machine it does not have.
+  * **The store-path arithmetic is LLVM's**: one big compiler, N small
+    wrappers -- not N compilers.
+
+**And the corollary that makes the env-var dance deletable rather than
+tidiable**: the three-machine `build`/`host`/`target` vocabulary is the DISTRO
+layer's, and **nix is already the outer build system**.  GCC's top level exists
+to instantiate a tree per target and drive them in dependency order, which is
+what a package set does.  Running it from inside nixpkgs is a distro inside a
+distro, and every `touch stamp-h`, `noconfigdirs` subtraction and `cd` into a
+sibling's tree is one layer telling the other "no, I've got this".  **Skip the
+top level, run only the component's own build system, and there is nothing left
+to shift.**
+
+Do not weaken GCC's top level -- it must keep working for `./configure && make`,
+where it legitimately IS the distro.  Stop *using* it here.
