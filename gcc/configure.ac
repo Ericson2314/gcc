@@ -1627,42 +1627,37 @@ gcc_extra_targets=
 case ${enable_backends} in
   no | "")
     #
-    # THE DEFAULT IS THE TREE'S OWN SHIPPED LIST, AND THAT IS A DESIGN CALL.
+    # NO DEFAULT LIST, AND NO SHIPPED FILE TO READ ONE FROM.
     #
-    # It used to be a hard error -- `--enable-backends=LIST is required' -- on
-    # the reasoning that a default target is a hiding place.  That reasoning is
-    # about a PRIVILEGED target, and this default has none: it is every back
-    # end the tree ships, one representative triple each, so nothing can hide
-    # behind being the chosen one.
+    # There used to be a `gcc/default-backends' here -- 47 triples, one per
+    # back end -- read by this arm.  It was DEAD CODE and had been since the
+    # top level learned to derive the list: top-level configure.ac ERRORS if
+    # `--enable-targets' is empty and then UNCONDITIONALLY derives
+    # `gcc_backends_arg="--enable-backends=<list>"', which Makefile.def passes
+    # to this script on every build.  So `enable_backends' is never `no' or
+    # empty in a tree configured through the top level, and the file was never
+    # read; a real configure's gcc/config.log carries the derived
+    # `--enable-backends=...' and ZERO occurrences of the notice this arm used
+    # to print.
     #
-    # What the error actually forced was every CALLER becoming an authority for
-    # which back ends exist.  Measured in nixpkgs, where the `gcc' derivation
-    # had to read `default-backends' itself and pass it back in as
-    # `--enable-backends=<47 triples>' -- a list in the packaging, and therefore
-    # a store path that depends on it, which is target-dependence returning by
-    # the front door after being removed from the back.  A component that names
-    # nothing cannot drift from the tree it is built out of.
+    # It was also the purest instance of the sampling rule: a FINITE SAMPLE of
+    # an infinite space (47 arbitrary triples, each carrying an arbitrary OS)
+    # sitting BELOW the top level, inside `gcc/', where a target triple must
+    # not appear at all.  The sample belongs to whoever is playing distro --
+    # GCC's own top level, or nixpkgs -- and it stops there.  The 47-triple
+    # list survives as harness input at `scratchpad/backends-47.txt', which is
+    # the distro layer, not the tree.
     #
-    # NOT `all'.  `all' means "every triple in contrib/config-list.mk", 188 of
-    # them, which is a different question -- see the top-level configure.ac
-    # stanza that refuses to map one onto the other.  This file is the answer to
-    # "one representative triple per back end", written down and reviewable,
-    # not computed.
-    #
-    # NO FALLBACK IF IT IS MISSING.  An unreadable list must not quietly become
-    # a one-target build; that is the exact failure this branch exists to
-    # remove, and it is invisible from an exit code.
-    if test ! -f ${srcdir}/default-backends; then
-      AC_MSG_ERROR([gcc/default-backends is missing, and there is no fallback.
-Without it this build would silently serve only ${target}, which is the
-single-target compiler this tree exists to replace.  Restore the file, or name
-the back ends explicitly with --enable-backends=LIST.])
-    fi
-    gcc_extra_targets=`grep -v '^#' ${srcdir}/default-backends | grep . | tr '\012' ' '`
-    if test x"${gcc_extra_targets}" = x; then
-      AC_MSG_ERROR([gcc/default-backends has no entries; an empty list is not an answer])
-    fi
-    AC_MSG_NOTICE([--enable-backends not given: using gcc/default-backends])
+    # This arm is kept, and kept FATAL, only so that a caller who reaches
+    # gcc/configure directly is told by name rather than getting a silent
+    # single-target build.  The `--enable-backends=LIST is required' check
+    # below would catch it too; this says which knob to turn.
+    AC_MSG_ERROR([--enable-backends=LIST is required, and there is no default.
+
+This tree has no primary target, so an absent list cannot mean "the usual
+one" -- it would mean a single-target compiler, which is what this tree
+exists to replace.  Name the back ends explicitly, or configure from the top
+level, where --enable-targets=LIST derives this flag for you.])
     ;;
   all)
     #
@@ -1747,14 +1742,35 @@ dnl reaches `pass-instances.def' in a build with no i386 back end.  Both are the
 dnl same unfinished business -- the build tree still has ONE target of its own
 dnl -- and neither is fixed here.  What IS fixed is the silence: fail at
 dnl configure time, by name, with the fix in the message.
-gcc_mt_target_configured=no
-for gcc_mt in ${gcc_manifest_targets}; do
-  test x"${gcc_mt}" = x"${target}" && gcc_mt_target_configured=yes
-done
-if test x"${target}" != x && test x"${gcc_mt_target_configured}" = xno; then
+dnl
+dnl THE TEST IS ON THE config.gcc ANSWER, NOT ON THE TRIPLE STRING.
+dnl
+dnl gen-target-manifest.sh computes `gcc_mt_target_equiv': the configured
+dnl target whose config.gcc answer is byte-identical to `${target}'s, or
+dnl `${target}' itself when it is in the list verbatim, or empty when no
+dnl configured back end answers the same way.  See the long comment there for
+dnl why equality-of-answer rather than string equality, and for why the vendor
+dnl field cannot simply be ignored instead.
+dnl
+dnl WHAT THIS UNBLOCKS, measured: a tree whose `--target' defaults to
+dnl `x86_64-pc-linux-gnu' (config.guess's spelling) configured against
+dnl `--enable-targets=x86_64-unknown-linux-gnu,...' (nixpkgs' spelling).  The
+dnl two triples are the same arm of config.gcc and produce identical answers,
+dnl and the old string test refused the pair outright, so `gcc-unwrapped' could
+dnl not configure at all.  Hardcoding one spelling was rejected: the driver's
+dnl own name, `specs-config's directory and `gcc-composed's per-target
+dnl directory all resolve by the CALLER's spelling, so a hardcode moves the
+dnl failure to `target-specs' -- `no cpu_type for x86_64-unknown-linux-gnu',
+dnl AFTER a green gcc build.
+dnl
+dnl IT IS NOT A LICENCE TO ACCEPT ANYTHING.  A triple that is genuinely not a
+dnl configured back end has no matching answer, `gcc_mt_target_equiv' is empty,
+dnl and the refusal below fires with the same message it always did.
+if test x"${target}" != x && test x"${gcc_mt_target_equiv}" = x; then
   AC_MSG_ERROR([${target} is this build tree's own target (--target, which the
 top-level Makefile passes to every module) but it is not one of the configured
-back ends:
+back ends, and no configured back end produces the same config.gcc answer for
+it:
 
     ${gcc_manifest_targets}
 
@@ -3424,7 +3440,20 @@ AC_DEFINE_UNQUOTED(DIAGNOSTICS_URLS_DEFAULT, $DIAGNOSTICS_URLS_DEFAULT,
 #
 #
 # The triple the target libraries in THIS BUILD TREE are being built for.
-build_target_triple=${target}
+#
+# THE CONFIGURED SPELLING, NOT `${target}'s.  `BUILD_DRIVER_NAME =
+# $(build_target_triple)-gcc' must name a driver that MULTI_TARGET_DRIVERS
+# actually builds, and that list is `$(enabled_targets)' -- the configured
+# spellings.  When `--target=x86_64-pc-linux-gnu' is accepted against a list
+# naming `x86_64-unknown-linux-gnu' (same config.gcc answer, different
+# spelling), taking `${target}' here would ask `make' for an
+# `x86_64-pc-linux-gnu-gcc' that has no rule, which is precisely the
+# 4000-lines-in failure the check above exists to prevent.
+#
+# `gcc_mt_target_equiv' is `${target}' verbatim whenever `${target}' is in the
+# list, so this is a no-op for every build that already worked.  It cannot be
+# empty here: the check above is fatal when it is.
+build_target_triple=${gcc_mt_target_equiv}
 AC_SUBST(build_target_triple)
 
 # Generate gcc-driver-name.h containing GCC_DRIVER_NAME for the benefit

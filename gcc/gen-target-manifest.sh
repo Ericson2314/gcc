@@ -119,7 +119,55 @@ for gcc_mt in ${gcc_manifest_targets}; do
 done
 gcc_manifest_targets=${gcc_mt_canon}
 
-for gcc_mt in ${gcc_manifest_targets}; do
+# THE BUILD TREE'S OWN TARGET, MATCHED BY ITS config.gcc ANSWER RATHER THAN BY
+# ITS SPELLING.
+#
+# `${target}' -- the argument of `--target', which the top-level Makefile hands
+# every module -- has to name a CONFIGURED back end, because
+# `build_target_triple' is derived from it and `$(build_target_triple)-gcc' is
+# a hard prerequisite of `start.encap' (see configure.ac).  That requirement is
+# real.  What was wrong was testing it by TRIPLE STRING EQUALITY.
+#
+# Measured: `x86_64-pc-linux-gnu' and `x86_64-unknown-linux-gnu' produce
+# BYTE-IDENTICAL config.gcc answers -- same arm, same tm_file chain, same
+# everything this manifest records.  They are the same back end configured the
+# same way, spelled two ways.  Comparing strings therefore REFUSED a target
+# behaviourally indistinguishable from one already in the list, which is the
+# infinite input space leaking into a finite behaviour decision: the finite
+# thing is the config.gcc ARM, not the triple.
+#
+# That is not a licence to ignore the vendor field in general.  config.gcc has
+# arms that DO match on it -- `aarch64*-wrs-vxworks*', `alpha*-dec-*vms*',
+# `rs6000-ibm-aix7.1.*', `mips*-img-linux*', `mmix-knuth-mmixware' and more --
+# so `x86_64-wrs-vxworks7' is emphatically not `x86_64-pc-linux-gnu'.  The test
+# below is EQUALITY OF THE WHOLE ANSWER, which decides both cases correctly
+# without anyone having to know which fields a given arm reads.
+#
+# gcc_mt_target_equiv comes out as the CONFIGURED spelling -- the one the list
+# named, and therefore the one MULTI_TARGET_DRIVERS actually builds a driver
+# for.  configure.ac assigns build_target_triple from it, not from ${target};
+# assigning ${target}'s own spelling would name a driver with no rule and fail
+# 4000 lines into `make' instead, which is the bug this whole check exists to
+# turn into a configure-time diagnostic.  Empty means genuinely not configured,
+# and configure.ac then refuses BY NAME.
+gcc_mt_target_equiv=
+gcc_mt_own_probe=
+if test x"${target}" != x; then
+  gcc_mt_own_probe=${target}
+  for gcc_mt in ${gcc_manifest_targets}; do
+    if test x"${gcc_mt}" = x"${target}"; then
+      gcc_mt_own_probe=
+      gcc_mt_target_equiv=${target}
+    fi
+  done
+fi
+gcc_mt_own_data=
+
+# ${gcc_mt_own_probe} runs FIRST when it runs at all, so that every configured
+# target below can be compared against it as it is computed.  Its stanza is
+# captured and NOT appended to the manifest: it is not a configured back end,
+# it is the question being asked.
+for gcc_mt in ${gcc_mt_own_probe} ${gcc_manifest_targets}; do
   # The with_* group no longer needs clearing here:
   gcc_mt_data=`
     target=${gcc_mt}
@@ -382,11 +430,39 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # The multilib set is NOT a config.gcc variable:
     echo "tm_multilib_config ${TM_MULTILIB_CONFIG}"
   ` || {
+    # THE OWN-TARGET PROBE IS NOT FATAL HERE.  ${target} is whatever
+    # `--target' happened to carry; if config.gcc cannot answer for it at all
+    # then it is certainly not one of the configured back ends, and the right
+    # diagnostic is configure.ac's by-name refusal, which says what the
+    # configured list IS.  Dying here with `config.gcc failed for <triple>'
+    # would name the same problem worse.  For a CONFIGURED target a config.gcc
+    # failure is still fatal, exactly as before.
+    if test x"${gcc_mt}" = x"${gcc_mt_own_probe}" \
+       && test x"${gcc_mt_own_probe}" != x; then
+      gcc_mt_own_data=
+      continue
+    fi
     # Read the message here, not in the diagnostic's argument:
     gcc_mt_msg=`tr '\n' ' ' < ${gcc_mt_err}`
     gcc_mt_fatal="config.gcc failed for ${gcc_mt}: ${gcc_mt_msg}"
     return 1
   }
+
+  # The `target ...' line is the SPELLING, and the spelling is the one thing
+  # being compared away; every other line is the answer.  Dropping it by
+  # position is safe because it is the first thing the stanza echoes.
+  if test x"${gcc_mt}" = x"${gcc_mt_own_probe}" \
+     && test x"${gcc_mt_own_probe}" != x; then
+    gcc_mt_own_data=`echo "${gcc_mt_data}" | sed -e '/^target /d'`
+    continue
+  fi
+  if test x"${gcc_mt_own_data}" != x && test x"${gcc_mt_target_equiv}" = x; then
+    gcc_mt_this_data=`echo "${gcc_mt_data}" | sed -e '/^target /d'`
+    if test x"${gcc_mt_this_data}" = x"${gcc_mt_own_data}"; then
+      gcc_mt_target_equiv=${gcc_mt}
+    fi
+  fi
+
   echo "${gcc_mt_data}" >> ${gcc_target_manifest}
   echo "" >> ${gcc_target_manifest}
 
