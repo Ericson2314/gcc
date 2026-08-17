@@ -224,6 +224,61 @@ underlying question — a capability that selects `SWITCHABLE_TARGET`, i.e. one
 that cannot be a runtime read — is a design question of the kind §2b says to
 report rather than resolve by whichever choice builds.
 
+## PROVENANCE — quote this with any row
+
+```
+srcdir      /tmp/snap-agent-a992b7e5fa4ffaaa7
+            git archive of e1f0cad1c2c, read-only, SNAP-SHA stamped
+anchor      grep -c MULTI_TARGET gcc/Makefile.in = 52  (measured on this tree,
+            not copied from the brief; UNCHANGED from the last two boards)
+build       /tmp/b-a992b7e5fa4ffaaa7
+            --enable-targets = the 47 triples of scratchpad/backends-47.txt
+            make all-gcc rc=0;  `error:' 0;  multiple definition 0;
+            undefined reference 0;  Killed 0;  cc1 links (231,133,040 bytes)
+bars        x86_64 -O2 big.c   12369 bytes / md5 378fc33c1e70  == THE RECORDED BAR
+              in=/tmp/snap-agent-a992b7e5fa4ffaaa7/scratchpad/big.c
+            x86_64 -O2 -g big.c  rc=0, 78520 bytes, md5 d1e4d264c34e,
+              debug sections present (non-vacuity arm OK)
+              -- PATH-SENSITIVE, never quotable bare.  78520 bytes is identical
+                 to the last two boards; only the md5 moved, because the build
+                 dir lands in DW_AT_producer.
+            specs-config, all four:  wc -l 232 / grep -c . 224
+              -- THE LINE COUNT IS THE BAR.  The md5s are a function of the
+                 probing toolchain's paths and are NOT quoted as one, per the
+                 correction in PRINCIPLES near line 1016.  (They did in fact
+                 reproduce the recorded values, the nix store paths still being
+                 live; that is an observation, not a check that was applied.)
+mode        MT_COMPILE_ONLY=1, make -j12, all-gcc only, no target libgcc
+tools       real cross binutils + each target's own glibc headers (taa-tools.sh)
+memcap      ulimit -v 8 GB on the shell launching runtest, read back and
+            refused if it did not take
+guards      sweep (arm 0e + arm 0f + SWEEP PASSES) once; then per target:
+            specs-config exists, cc1 NAMES THE TARGET BACK, non-vacuity of
+            -ftarget-config=, mt-specsread 4 arms (incl. its ARM3 negative
+            control), GUARD 3c the target's OWN assembler, 12/12 site.exp
+            attribution, multi-target.exp banner in the MERGED log, `.rc' stamp
+rename      mt-rename-sweep.sh: 0 base-vs-base and 0 base-vs-shared strong-symbol
+            collisions, run in the dev shell so `nm' exists
+stock       all four controls re-read at scoring time and reproducing their
+            recorded figures EXACTLY (163816/16223, 344463/20443, 270248/15904,
+            130895/15627) -- verified, not quoted
+artefacts   preserved per run in /tmp/board-agent-a992b7e5fa4ffaaa7/
+```
+
+**GUARD 3c reports the target's own assembler on all four** — `Advanced Micro
+Devices X86-64`, `AArch64`, `RISC-V`, `IBM S/390`.
+
+### LOAD — sampled for the whole run, not read once at the end
+
+`loadsamples.txt`, every 5 minutes. The fifteen-minute column is the one the
+~25 threshold applies to, and its maximum over the run is **24.21** (21:55).
+So on the standing rule these rows are **NOT provisional** — but the peak was
+close, it was during the x86_64 arm, and it is stated rather than rounded away.
+KILLED is the contamination signal and it is 0 on x86_64.
+
+The previous board had to decide this from a single reading taken hours after
+the arms that mattered; that is why the sampler was added here.
+
 ## 1. THE BOARD — rows as they land
 
 ### x86_64-pc-linux-gnu — LANDED, `.rc` = 0, DEBT **67**, PREDICTION CONFIRMED
