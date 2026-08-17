@@ -2552,7 +2552,7 @@ for ts_od in ${spec_option_defaults}; do
     i386:cpu | i386:tune)
             ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
     m68k:cpu)
-                                                                      ts_tmpl="%{!m68020-40:%{!m68020-60:%{!mcpu=*:%{!march=*:-${ts_value}}}}}" ;;
+                                                                                                            ts_tmpl="%{!m68020-40:%{!m68020-60:%{!mcpu=*:%{!march=*:-${ts_value}}}}}" ;;
     mips:arch)
                         ts_tmpl= ;;
     *:arch)
@@ -2586,7 +2586,7 @@ for ts_od in ${spec_option_defaults}; do
     *:tls)
                   ts_tmpl="%{!mtls-dialect=*:-mtls-dialect=${ts_value}}" ;;
     riscv:isa_spec)
-      ts_tmpl="%{!misa-spec=*:-misa-spec=${ts_value}}" ;;
+                                                                                                                        ts_tmpl="%{!misa-spec=*:-misa-spec=${ts_value}}" ;;
     *:schedule)
       ts_tmpl="%{!mschedule=*:-mschedule=${ts_value}}" ;;
   esac
@@ -3107,6 +3107,26 @@ ts_asm_ok () {
   # $1 is the assembly text; assemble it and report yes/no.
   echo "$1" > conftest.s
   if "$gcc_cv_as" $ts_as_flags -o conftest.o conftest.s > /dev/null 2>&1; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
+ts_asm_ok_f () {
+  # $1 is extra assembler flags, $2 the assembly text; yes/no as above.
+  #
+  # THIS EXISTS BECAUSE TS_AS_CHECK CANNOT TAKE ITS PROGRAM FROM A VARIABLE.
+  # That macro writes the program with a QUOTED heredoc (<<'TS_ASEOF'), which is
+  # deliberate -- the x86 programs contain $0 and (%esp) and must not be
+  # expanded -- but it means TS_AS_CHECK([...], [var], [], [$ts_foo]) assembles
+  # the seven literal characters "$ts_foo" and answers no on EVERY target,
+  # silently.  Four probes were written that way and all four were vacuous: the
+  # powerpc mfcrf, power10-htm and rel16 checks, and the Solaris "#exclude"
+  # spelling of the section-exclude flag.  A probe whose program varies per
+  # target goes through here instead.
+  echo "$2" > conftest.s
+  if "$gcc_cv_as" $ts_as_flags $1 -o conftest.o conftest.s > /dev/null 2>&1; then
     echo yes
   else
     echo no
@@ -3952,20 +3972,11 @@ else
                                  ts_exclude_s='	.section foo1, #exclude' ;;
   esac
   if test x"$ts_exclude_s" != x; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section exclude flag, Solaris spelling" >&5
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for section exclude flag, Solaris spelling" >&5
 $as_echo_n "checking assembler for section exclude flag, Solaris spelling... " >&6; }
-gcc_cv_as_section_exclude_hash=no
-if test x"$gcc_cv_as" != x; then
-  cat > conftest.s <<'TS_ASEOF'
-$ts_exclude_s
-	.byte 0,0,0,0
-TS_ASEOF
-  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
-    gcc_cv_as_section_exclude_hash=yes
-  fi
-  rm -f conftest.o conftest.s
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_section_exclude_hash" >&5
+    gcc_cv_as_section_exclude_hash=`ts_asm_ok_f "" "$ts_exclude_s
+	.byte 0,0,0,0"`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_section_exclude_hash" >&5
 $as_echo "$gcc_cv_as_section_exclude_hash" >&6; }
     gcc_cv_as_section_exclude=$gcc_cv_as_section_exclude_hash
   fi
@@ -4227,19 +4238,10 @@ $as_echo "$as_me: WARNING: $gcc_cv_as does not support \".machine\"; powerpc-dar
 	.text
 	mfcr 3,128' ;;
     esac
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for mfcr field support" >&5
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for mfcr field support" >&5
 $as_echo_n "checking assembler for mfcr field support... " >&6; }
-gcc_cv_as_powerpc_mfcrf=no
-if test x"$gcc_cv_as" != x; then
-  cat > conftest.s <<'TS_ASEOF'
-$ts_ppc_s
-TS_ASEOF
-  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
-    gcc_cv_as_powerpc_mfcrf=yes
-  fi
-  rm -f conftest.o conftest.s
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_mfcrf" >&5
+    gcc_cv_as_powerpc_mfcrf=`ts_asm_ok_f "" "$ts_ppc_s"`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_mfcrf" >&5
 $as_echo "$gcc_cv_as_powerpc_mfcrf" >&6; }
 
     case ${target} in
@@ -4254,17 +4256,8 @@ $as_echo "$gcc_cv_as_powerpc_mfcrf" >&6; }
     esac
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for htm support on Power10" >&5
 $as_echo_n "checking assembler for htm support on Power10... " >&6; }
-gcc_cv_as_power10_htm=no
-if test x"$gcc_cv_as" != x; then
-  cat > conftest.s <<'TS_ASEOF'
-$ts_ppc_s
-TS_ASEOF
-  if "$gcc_cv_as"  -o conftest.o conftest.s > /dev/null 2>&1; then
-    gcc_cv_as_power10_htm=yes
-  fi
-  rm -f conftest.o conftest.s
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_power10_htm" >&5
+    gcc_cv_as_power10_htm=`ts_asm_ok_f "" "$ts_ppc_s"`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_power10_htm" >&5
 $as_echo "$gcc_cv_as_power10_htm" >&6; }
 
     case ${target} in
@@ -4280,17 +4273,8 @@ LCF0:
     esac
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for rel16 relocs" >&5
 $as_echo_n "checking assembler for rel16 relocs... " >&6; }
-gcc_cv_as_powerpc_rel16=no
-if test x"$gcc_cv_as" != x; then
-  cat > conftest.s <<'TS_ASEOF'
-$ts_ppc_s
-TS_ASEOF
-  if "$gcc_cv_as" -a32 -o conftest.o conftest.s > /dev/null 2>&1; then
-    gcc_cv_as_powerpc_rel16=yes
-  fi
-  rm -f conftest.o conftest.s
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_rel16" >&5
+    gcc_cv_as_powerpc_rel16=`ts_asm_ok_f "-a32" "$ts_ppc_s"`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_powerpc_rel16" >&5
 $as_echo "$gcc_cv_as_powerpc_rel16" >&6; }
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for prologue entry point marker support" >&5
@@ -4851,9 +4835,93 @@ case ${target} in
 esac
 
 ts_as_tls=yes
-ts_as_dtprel_reloc=yes
 case ${target} in
-  *-*-lynxos*) ts_as_tls=no; ts_as_dtprel_reloc=no ;;
+  *-*-lynxos*) ts_as_tls=no ;;
+esac
+
+ts_dtprel_pre='	.section	.tdata,"awT",%progbits
+tsdtp:	.word	1
+	.section	.debug_info,"",%progbits
+'
+ts_dtprel_reloc_line=
+ts_dtprel_plain_line=
+case ${target} in
+  aarch64*-*-*)
+    ts_dtprel_reloc_line='	.xword	%dtprel(tsdtp)'
+    ts_dtprel_plain_line='	.xword	tsdtp' ;;
+  arm*-*-*)
+    ts_dtprel_reloc_line='	.word	tsdtp(tlsldo)'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+  frv-*-*)
+    ts_dtprel_reloc_line='	.picptr	tlsmoff(tsdtp)'
+    ts_dtprel_plain_line='	.picptr	tsdtp' ;;
+  i?86-*-mingw* | x86_64-*-mingw* | i?86-*-cygwin* | x86_64-*-cygwin*)
+        ts_dtprel_reloc_line='	.long	tsdtp@secrel32'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  i?86-*-* | x86_64-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@dtpoff'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  ia64-*-*)
+    ts_dtprel_reloc_line='	data8.ua	@dtprel(tsdtp)'
+    ts_dtprel_plain_line='	data8.ua	tsdtp' ;;
+  loongarch*-*-*)
+    ts_dtprel_reloc_line='	.dtpreldword	tsdtp'
+    ts_dtprel_plain_line='	.dword	tsdtp' ;;
+  m68k-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@TLSLDO+0x8000'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  mips*-*-*)
+    ts_dtprel_reloc_line='	.dtprelword	tsdtp+0x8000'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+  powerpc*-*-* | rs6000-*-* | powerpcle*-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@dtprel+0x8000'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  s390x-*-*)
+    ts_dtprel_reloc_line='	.quad	tsdtp@DTPOFF'
+    ts_dtprel_plain_line='	.quad	tsdtp' ;;
+  s390-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@DTPOFF'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  sparc64*-*-* | sparcv9*-*-* | sparc*-*-*64*)
+    ts_dtprel_reloc_line='	.xword	%r_tls_dtpoff64(tsdtp)'
+    ts_dtprel_plain_line='	.xword	tsdtp' ;;
+  sparc*-*-*)
+    ts_dtprel_reloc_line='	.word	%r_tls_dtpoff32(tsdtp)'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+esac
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for DTPREL relocation" >&5
+$as_echo_n "checking assembler for DTPREL relocation... " >&6; }
+if test x"$ts_dtprel_reloc_line" = x; then
+  ts_as_dtprel_reloc=no
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no (this target has no TARGET_ASM_OUTPUT_DWARF_DTPREL; not asked)" >&5
+$as_echo "no (this target has no TARGET_ASM_OUTPUT_DWARF_DTPREL; not asked)" >&6; }
+elif test x"$gcc_cv_as" = x; then
+      ts_as_dtprel_reloc=yes
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes (assumed; no assembler to ask)" >&5
+$as_echo "yes (assumed; no assembler to ask)" >&6; }
+else
+  ts_dtprel_ctl=`ts_asm_ok "$ts_dtprel_pre$ts_dtprel_plain_line"`
+  if test x"$ts_dtprel_ctl" != xyes; then
+    ts_as_dtprel_reloc=yes
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes (assumed)" >&5
+$as_echo "yes (assumed)" >&6; }
+                { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $target: the DTPREL probe\047s plain-symbol control did not
+assemble, so this assembler was never asked the dtprel question, and the value
+recorded is upstream\047s unconditional yes.  A no here would have been a wrong
+answer arrived at for the wrong reason." >&5
+$as_echo "$as_me: WARNING: $target: the DTPREL probe\047s plain-symbol control did not
+assemble, so this assembler was never asked the dtprel question, and the value
+recorded is upstream\047s unconditional yes.  A no here would have been a wrong
+answer arrived at for the wrong reason." >&2;}
+  else
+    ts_as_dtprel_reloc=`ts_asm_ok "$ts_dtprel_pre$ts_dtprel_reloc_line"`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ts_as_dtprel_reloc" >&5
+$as_echo "$ts_as_dtprel_reloc" >&6; }
+  fi
+fi
+case ${target} in
+  *-*-lynxos*) ts_as_dtprel_reloc=no ;;
 esac
 
 case ${target} in

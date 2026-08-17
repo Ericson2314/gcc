@@ -464,6 +464,31 @@ target_have_tls_p ()
   return targetm.have_tls && targ_caps.as_tls;
 }
 
+/* Can a DWARF dtprel relocation actually be EMITTED for this target?  Two
+   questions, and both have to be yes:
+
+     1. does the back end know how to spell one -- i.e. does it supply
+	TARGET_ASM_OUTPUT_DWARF_DTPREL at all;
+     2. can the assembler in front of us parse what that hook would write.
+
+   CALL THIS, NOT a bare `targetm.asm_out.output_dwarf_dtprel' test.  dwarf2out
+   asked only (1), which was correct while the assembler's answer was a
+   compile-time constant baked into the same binary as the hook table.  It is
+   not one any more, and the two can now disagree: aarch64 supplies the hook and
+   emits `.xword %dtprel(...)', which aarch64 gas 2.46 REJECTS -- so a bare
+   read of the hook produces an assembly file that does not assemble, under -g
+   only, which no compile-only test reaches.
+
+   The right behaviour when (2) is no is to take the SAME path as a target with
+   no hook: emit no location for the thread-local variable.  Debug info that
+   omits one variable's location is a documented, ordinary outcome; a source
+   file that cannot be assembled is not.  */
+inline bool
+target_dwarf_dtprel_p ()
+{
+  return targetm.asm_out.output_dwarf_dtprel != NULL && targ_caps.as_dtprel_reloc;
+}
+
 /* Return an estimate of the runtime value of X, for use in things
    like cost calculations or profiling frequencies.  Note that this
    function should never be used in situations where the actual

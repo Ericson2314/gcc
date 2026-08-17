@@ -2143,7 +2143,7 @@ output_loc_operands (dw_loc_descr_ref loc, int for_eh_or_skip)
     case DW_OP_const4u:
       if (loc->dw_loc_dtprel)
 	{
-	  gcc_assert (targetm.asm_out.output_dwarf_dtprel);
+	  gcc_assert (target_dwarf_dtprel_p ());
 	  targetm.asm_out.output_dwarf_dtprel (asm_out_file, 4,
 					       val1->v.val_addr);
 	  fputc ('\n', asm_out_file);
@@ -2156,7 +2156,7 @@ output_loc_operands (dw_loc_descr_ref loc, int for_eh_or_skip)
     case DW_OP_const8u:
       if (loc->dw_loc_dtprel)
 	{
-	  gcc_assert (targetm.asm_out.output_dwarf_dtprel);
+	  gcc_assert (target_dwarf_dtprel_p ());
 	  targetm.asm_out.output_dwarf_dtprel (asm_out_file, 8,
 					       val1->v.val_addr);
 	  fputc ('\n', asm_out_file);
@@ -2351,7 +2351,7 @@ output_loc_operands (dw_loc_descr_ref loc, int for_eh_or_skip)
     case DW_OP_addr:
       if (loc->dw_loc_dtprel)
 	{
-	  if (targetm.asm_out.output_dwarf_dtprel)
+	  if (target_dwarf_dtprel_p ())
 	    {
 	      targetm.asm_out.output_dwarf_dtprel (asm_out_file,
 						   DWARF2_ADDR_SIZE,
@@ -16616,8 +16616,12 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	{
 	  dw_loc_descr_ref temp;
 
-	  /* If this is not defined, we have no way to emit the data.  */
-	  if (!target_have_tls_p () || !targetm.asm_out.output_dwarf_dtprel)
+	  /* If this is not defined, we have no way to emit the data.
+	     target_dwarf_dtprel_p () and not a bare hook test: the assembler
+	     may reject the relocation the hook would write, and that has to
+	     stop us HERE, before a dtprel loc descriptor exists, not at the
+	     point of emission where the only remaining move is to fail.  */
+	  if (!target_have_tls_p () || !target_dwarf_dtprel_p ())
 	    break;
 
           temp = new_addr_loc_descr (rtl, dtprel_true);
@@ -19212,8 +19216,9 @@ loc_list_from_tree_1 (tree loc, int want_address,
 	  if (target_have_tls_p ())
 	    {
 	      /* If this is not defined, we have no way to emit the
-		 data.  */
-	      if (!targetm.asm_out.output_dwarf_dtprel)
+		 data.  See target_dwarf_dtprel_p (): "not defined" now
+		 includes "the assembler cannot parse it".  */
+	      if (!target_dwarf_dtprel_p ())
 		return 0;
 
 	       /* The way DW_OP_GNU_push_tls_address is specified, we
@@ -30476,7 +30481,7 @@ output_addr_table_entry (addr_table_entry **slot, unsigned int *cur_index)
                                  "0x%x", entry->index);
         break;
       case ate_kind_rtx_dtprel:
-        gcc_assert (targetm.asm_out.output_dwarf_dtprel);
+        gcc_assert (target_dwarf_dtprel_p ());
         targetm.asm_out.output_dwarf_dtprel (asm_out_file,
                                              DWARF2_ADDR_SIZE,
                                              entry->addr.rtl);

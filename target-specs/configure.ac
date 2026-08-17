@@ -1523,6 +1523,26 @@ ts_asm_ok () {
   fi
 }
 
+ts_asm_ok_f () {
+  # $1 is extra assembler flags, $2 the assembly text; yes/no as above.
+  #
+  # THIS EXISTS BECAUSE TS_AS_CHECK CANNOT TAKE ITS PROGRAM FROM A VARIABLE.
+  # That macro writes the program with a QUOTED heredoc (<<'TS_ASEOF'), which is
+  # deliberate -- the x86 programs contain $0 and (%esp) and must not be
+  # expanded -- but it means TS_AS_CHECK([...], [var], [], [$ts_foo]) assembles
+  # the seven literal characters "$ts_foo" and answers no on EVERY target,
+  # silently.  Four probes were written that way and all four were vacuous: the
+  # powerpc mfcrf, power10-htm and rel16 checks, and the Solaris "#exclude"
+  # spelling of the section-exclude flag.  A probe whose program varies per
+  # target goes through here instead.
+  echo "$2" > conftest.s
+  if "$gcc_cv_as" $ts_as_flags $1 -o conftest.o conftest.s > /dev/null 2>&1; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
 ts_as_flags=
 
 dnl .cfi_startproc and friends.  gcc/configure.ac decided this with a
@@ -2325,9 +2345,11 @@ else
                                  ts_exclude_s='	.section foo1, #exclude' ;;
   esac
   if test x"$ts_exclude_s" != x; then
-    TS_AS_CHECK([section exclude flag, Solaris spelling], [gcc_cv_as_section_exclude_hash], [],
-[$ts_exclude_s
-	.byte 0,0,0,0])
+    dnl VIA ts_asm_ok_f: the program is in a variable; see its note.
+    AC_MSG_CHECKING([assembler for section exclude flag, Solaris spelling])
+    gcc_cv_as_section_exclude_hash=`ts_asm_ok_f "" "$ts_exclude_s
+	.byte 0,0,0,0"`
+    AC_MSG_RESULT([$gcc_cv_as_section_exclude_hash])
     gcc_cv_as_section_exclude=$gcc_cv_as_section_exclude_hash
   fi
 fi
@@ -2362,6 +2384,19 @@ dnl remedy was --traditional-format, which gcc/configure.ac recorded as
 dnl USE_AS_TRADITIONAL_FORMAT.  Distinguishing "good" from "buggy" needs the
 dnl assembled bytes read back, so with no objdump the answer is "good", which
 dnl is what every assembler released this century actually is.
+dnl
+dnl THE VALUE IS A CONSTANT `no' FOR EVERY TARGET, AND THAT IS THE CLAIM, not an
+dnl omission.  It is the third of the three constants in this file (the others
+dnl are ts_as_tls and, until it was probed, ts_as_dtprel_reloc) and the only one
+dnl whose constancy is a statement about TIME rather than about machines: the
+dnl bug is gas 2.11.0 and older, released 2001, and no binutils this tree can be
+dnl built against is within two decades of that.  `no' is therefore correct for
+dnl every target rather than merely unmeasured for every target -- and the
+dnl distinction matters, because those two produce the same byte in the file.
+dnl If a probe is ever wanted, note that its non-vacuity control is the hard
+dnl part: the byte transcripts below are per-layout, and a control-free probe
+dnl would answer "buggy" for every target whose .eh_frame merely looks
+dnl different, which turns section merging off everywhere.
 AC_MSG_CHECKING([assembler for buggy .eh_frame optimization])
 gcc_cv_as_eh_frame_traditional=no
 if test x"$gcc_cv_objdump" != x; then
@@ -2471,7 +2506,13 @@ case ${target} in
 	.text
 	mfcr 3,128' ;;
     esac
-    TS_AS_CHECK([mfcr field support], [gcc_cv_as_powerpc_mfcrf], [], [$ts_ppc_s])
+    dnl VIA ts_asm_ok_f, NOT TS_AS_CHECK: the program is in a variable.  See the
+    dnl note on ts_asm_ok_f -- this probe, the two below it and the Solaris
+    dnl exclude probe were all answering no for every powerpc/Solaris target
+    dnl because TS_AS_CHECK assembled the literal text "$ts_ppc_s".
+    AC_MSG_CHECKING([assembler for mfcr field support])
+    gcc_cv_as_powerpc_mfcrf=`ts_asm_ok_f "" "$ts_ppc_s"`
+    AC_MSG_RESULT([$gcc_cv_as_powerpc_mfcrf])
 
     case ${target} in
       *-*-aix*)    ts_ppc_s='	.machine "pwr10"
@@ -2483,7 +2524,9 @@ case ${target} in
 	.text
 	tend. 0' ;;
     esac
-    TS_AS_CHECK([htm support on Power10], [gcc_cv_as_power10_htm], [], [$ts_ppc_s])
+    AC_MSG_CHECKING([assembler for htm support on Power10])
+    gcc_cv_as_power10_htm=`ts_asm_ok_f "" "$ts_ppc_s"`
+    AC_MSG_RESULT([$gcc_cv_as_power10_htm])
 
     case ${target} in
       *-*-aix*)    ts_ppc_s='	.csect .text@<:@PR@:>@
@@ -2496,7 +2539,9 @@ LCF0:
 .LCF0:
 	addis 11,30,_GLOBAL_OFFSET_TABLE_-.LCF0@ha' ;;
     esac
-    TS_AS_CHECK([rel16 relocs], [gcc_cv_as_powerpc_rel16], [-a32], [$ts_ppc_s])
+    AC_MSG_CHECKING([assembler for rel16 relocs])
+    gcc_cv_as_powerpc_rel16=`ts_asm_ok_f "-a32" "$ts_ppc_s"`
+    AC_MSG_RESULT([$gcc_cv_as_powerpc_rel16])
 
     TS_AS_CHECK([prologue entry point marker support],
       [gcc_cv_as_powerpc_entry_markers], [-a64 $fw_as_opt],
@@ -2852,16 +2897,125 @@ dnl back end serves both lynx and everything else, so a per-back-end answer
 dnl cannot express it.  Same shape as vms_debug above.  Those two headers no
 dnl longer touch the macro; this case is where their answer lives now.
 dnl
-dnl A REAL PROBE IS STILL OWED and is deliberately not written here: upstream's
-dnl was a `case $target' over about twenty per-architecture asm snippets
-dnl (`.tbss'/@tlsgd/@tprel spellings differ per machine), and guessing at those
-dnl would produce a probe that fails for the wrong reason -- reported as "this
-dnl assembler has no TLS" -- which is worse than the honest default.  The key
-dnl exists and is read, so adding the snippets later changes nothing else.
+dnl `ts_as_tls' ITSELF IS STILL A CONSTANT, and that is a stated position, not
+dnl an omission: upstream's TLS probe was a `case $target' over about twenty
+dnl per-architecture snippets (`.tbss'/@tlsgd/@tprel spellings differ per
+dnl machine), a wrong one of which reports "this assembler has no TLS" and
+dnl moves that back end onto emutls -- a bigger change than the one it would be
+dnl correcting.  `ts_as_dtprel_reloc' is NO LONGER a constant; see below.
 ts_as_tls=yes
-ts_as_dtprel_reloc=yes
 case ${target} in
-  *-*-lynxos*) ts_as_tls=no; ts_as_dtprel_reloc=no ;;
+  *-*-lynxos*) ts_as_tls=no ;;
+esac
+
+dnl --- The DTPREL relocation.  PROBED, per target, with a NON-VACUITY CONTROL.
+dnl
+dnl THIS WAS `ts_as_dtprel_reloc=yes' FOR EVERY TARGET, and it was WRONG for at
+dnl least one real one: aarch64 gas 2.46 rejects `%dtprel(', which is exactly
+dnl what `aarch64_output_dwarf_dtprel' emits, so libgcc's heap-trampoline.c did
+dnl not ASSEMBLE under -g.  That is the inverse of the silent-default failure --
+dnl a WRONG PRESENT answer in the one file whose whole job is recording what a
+dnl SPECIFIC assembler can do -- and it only bites under -g with TLS, so no
+dnl compile-only test could reach it.
+dnl
+dnl THE PROGRAM IS DERIVED FROM THE BACK END THAT WOULD EMIT IT, not guessed.
+dnl Exactly eleven back ends define TARGET_ASM_OUTPUT_DWARF_DTPREL (aarch64,
+dnl arm, frv, i386, ia64, loongarch, m68k, mips, rs6000, s390, sparc); the arms
+dnl below are their `*_output_dwarf_dtprel' bodies, spelt for the size DWARF
+dnl asks for on that machine.  A target with no such hook cannot reach the key:
+dnl dwarf2out only calls the hook when the target supplies one, and the only
+dnl reader of `targ_caps.as_dtprel_reloc' is inside one of those eleven.  So an
+dnl unlisted target gets `no' and nothing observes it -- that is recorded here
+dnl rather than left implicit, because "no" arrived at by not asking and "no"
+dnl arrived at by asking are the same byte in the file.
+dnl
+dnl NON-VACUITY IS THE POINT OF THE SECOND PROBE.  An assembler that rejects the
+dnl whole fragment -- wrong section syntax for its object format, say -- would
+dnl otherwise report "no dtprel" for a reason that has nothing to do with
+dnl dtprel, replacing a wrong `yes' with a wrong `no'.  The control is the SAME
+dnl file with the relocation replaced by a plain symbol reference, so it must
+dnl assemble.  If it does not, the probe HAS NO ANSWER, and the recorded value
+dnl is upstream's `yes' plus a warning naming the target -- never a silent `no'.
+ts_dtprel_pre='	.section	.tdata,"awT",%progbits
+tsdtp:	.word	1
+	.section	.debug_info,"",%progbits
+'
+ts_dtprel_reloc_line=
+ts_dtprel_plain_line=
+case ${target} in
+  aarch64*-*-*)
+    ts_dtprel_reloc_line='	.xword	%dtprel(tsdtp)'
+    ts_dtprel_plain_line='	.xword	tsdtp' ;;
+  arm*-*-*)
+    ts_dtprel_reloc_line='	.word	tsdtp(tlsldo)'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+  frv-*-*)
+    ts_dtprel_reloc_line='	.picptr	tlsmoff(tsdtp)'
+    ts_dtprel_plain_line='	.picptr	tsdtp' ;;
+  i?86-*-mingw* | x86_64-*-mingw* | i?86-*-cygwin* | x86_64-*-cygwin*)
+    dnl TARGET_WIN32_TLS spells it @secrel32; see i386_output_dwarf_dtprel.
+    ts_dtprel_reloc_line='	.long	tsdtp@secrel32'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  i?86-*-* | x86_64-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@dtpoff'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  ia64-*-*)
+    ts_dtprel_reloc_line='	data8.ua	@dtprel(tsdtp)'
+    ts_dtprel_plain_line='	data8.ua	tsdtp' ;;
+  loongarch*-*-*)
+    ts_dtprel_reloc_line='	.dtpreldword	tsdtp'
+    ts_dtprel_plain_line='	.dword	tsdtp' ;;
+  m68k-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@TLSLDO+0x8000'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  mips*-*-*)
+    ts_dtprel_reloc_line='	.dtprelword	tsdtp+0x8000'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+  powerpc*-*-* | rs6000-*-* | powerpcle*-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@dtprel+0x8000'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  s390x-*-*)
+    ts_dtprel_reloc_line='	.quad	tsdtp@DTPOFF'
+    ts_dtprel_plain_line='	.quad	tsdtp' ;;
+  s390-*-*)
+    ts_dtprel_reloc_line='	.long	tsdtp@DTPOFF'
+    ts_dtprel_plain_line='	.long	tsdtp' ;;
+  sparc64*-*-* | sparcv9*-*-* | sparc*-*-*64*)
+    ts_dtprel_reloc_line='	.xword	%r_tls_dtpoff64(tsdtp)'
+    ts_dtprel_plain_line='	.xword	tsdtp' ;;
+  sparc*-*-*)
+    ts_dtprel_reloc_line='	.word	%r_tls_dtpoff32(tsdtp)'
+    ts_dtprel_plain_line='	.word	tsdtp' ;;
+esac
+
+AC_MSG_CHECKING([assembler for DTPREL relocation])
+if test x"$ts_dtprel_reloc_line" = x; then
+  ts_as_dtprel_reloc=no
+  AC_MSG_RESULT([no (this target has no TARGET_ASM_OUTPUT_DWARF_DTPREL; not asked)])
+elif test x"$gcc_cv_as" = x; then
+  dnl No assembler at all is a MISSING ANSWER, not a `no'.  Same rule as the
+  dnl failing control below: keep upstream's value and say so.
+  ts_as_dtprel_reloc=yes
+  AC_MSG_RESULT([yes (assumed; no assembler to ask)])
+else
+  ts_dtprel_ctl=`ts_asm_ok "$ts_dtprel_pre$ts_dtprel_plain_line"`
+  if test x"$ts_dtprel_ctl" != xyes; then
+    ts_as_dtprel_reloc=yes
+    AC_MSG_RESULT([yes (assumed)])
+    dnl NO BACKTICKS AND NO APOSTROPHES IN THIS TEXT: AC_MSG_WARN emits it
+    dnl inside a double-quoted shell string, so a backtick opens a command
+    dnl substitution.  Use \047 for an apostrophe, as the emitter block does.
+    AC_MSG_WARN([$target: the DTPREL probe\047s plain-symbol control did not
+assemble, so this assembler was never asked the dtprel question, and the value
+recorded is upstream\047s unconditional yes.  A no here would have been a wrong
+answer arrived at for the wrong reason.])
+  else
+    ts_as_dtprel_reloc=`ts_asm_ok "$ts_dtprel_pre$ts_dtprel_reloc_line"`
+    AC_MSG_RESULT([$ts_as_dtprel_reloc])
+  fi
+fi
+case ${target} in
+  *-*-lynxos*) ts_as_dtprel_reloc=no ;;
 esac
 
 dnl --- Toolchain-vendor requirements that used to abort gcc/configure.
