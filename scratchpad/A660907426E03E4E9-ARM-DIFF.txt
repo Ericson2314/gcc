@@ -1,0 +1,989 @@
+====================================================================
+== arm-unknown-linux-gnueabihf  b351eb857d1 vs stock c31b7a09eea
+==   multi-target: /tmp/b-a660907426e03e4e9/gcc/testsuite.arm-unknown-linux-gnueabihf/gcc/gcc.sum   (171445 results)
+==   stock:        /tmp/b-stock-agent-a660907426e03e4e9-arm/gcc/testsuite.arm-unknown-linux-gnueabihf/gcc/gcc.sum   (189156 results)
+====================================================================
+
+-- TOTALS (no floor subtracted anywhere)
+VERDICT      MULTI-TARGET      STOCK      DELTA
+PASS             130868     148432     -17564
+FAIL              18381      15997      +2384
+XPASS                 4          8         -4
+XFAIL              1199       1307       -108
+UNSUPPORTED        8265      10573      -2308
+UNRESOLVED        12688      12831       -143
+ERROR                40          8        +32
+
+-- THE TRANSITION MATRIX over tests present on BOTH sides
+   (rows = stock verdict, cols = multi-target verdict)
+   joined rows: 167975
+  130772  stock PASS         -> mt PASS
+   15030  stock FAIL         -> mt FAIL
+   12386  stock UNRESOLVED   -> mt UNRESOLVED
+    5280  stock UNSUPPORTED  -> mt UNSUPPORTED
+    3224  stock PASS         -> mt FAIL
+    1199  stock XFAIL        -> mt XFAIL
+      62  stock PASS         -> mt UNRESOLVED
+      10  stock XFAIL        -> mt FAIL
+       7  stock UNSUPPORTED  -> mt UNRESOLVED
+       2  stock XPASS        -> mt XPASS
+       2  stock PASS         -> mt XPASS
+       1  stock FAIL         -> mt PASS
+
+-- REGRESSIONS: stock PASS -> multi-target NOT PASS.  THIS IS THE DEBT.
+   count: 3288
+   by multi-target verdict:
+    3224  -> FAIL
+      62  -> UNRESOLVED
+       2  -> XPASS
+   by test directory (top 25):
+   2897 gcc.c-torture/compile
+    138 gcc.dg/compat
+    125 gcc.target/arm
+     60 gcc.dg/lto
+     14 gcc.c-torture/unsorted
+     10 gcc.dg/tree-ssa
+      8 gcc.dg/torture
+      8 c-c++-common/torture
+      3 gcc.c-torture/execute
+      1 outputs-25
+      1 outputs-24
+      1 outputs-23
+      1 outputs-22
+      1 gcc.dg/utf16-4.c
+      1 gcc.dg/tm
+      1 gcc.dg/pr104992.c
+      1 gcc.dg/builtins-9.c
+      1 gcc.dg/builtin-stdc-rotate-2.c
+      1 gcc.dg/autopar
+      1 gcc.dg/Wunused-var-3.c
+      1 gcc.dg/Wtype-limits.c
+      1 gcc.dg/Wtype-limits-Wextra.c
+      1 gcc.dg/Wstringop-overflow-62.c
+      1 gcc.dg/Wnonnull-4.c
+      1 gcc.dg/Wconversion-5.c
+   20 named regressions (the work queue, verbatim):
+     FAIL        c-c++-common/Wrestrict.c  -Wc++-compat  (test for excess errors)
+     FAIL        c-c++-common/builtin-bswapg-3.c  -Wc++-compat  (test for excess errors)
+     FAIL        c-c++-common/builtin-shuffle-1.c  -Wc++-compat  (test for excess errors)
+     FAIL        c-c++-common/pr57793.c  -Wc++-compat  (test for excess errors)
+     FAIL        c-c++-common/scal-to-vec1.c  -Wc++-compat  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v16qi.c   -O0  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v16qi.c   -O1  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v2di.c   -O0  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v2di.c   -O1  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v4si.c   -O0  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v4si.c   -O1  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v8hi.c   -O0  (test for excess errors)
+     FAIL        c-c++-common/torture/vshuf-v8hi.c   -O1  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000120-1.c   -O0  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000120-1.c   -O1  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000120-1.c   -O2  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000120-1.c   -O3 -g  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000120-1.c   -Os  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000127-1.c   -O0  (test for excess errors)
+     FAIL        gcc.c-torture/compile/20000127-1.c   -O1  (test for excess errors)
+
+-- FIXED BY NOTHING: multi-target PASS where stock does NOT pass
+   (not a claim of improvement -- read it as a check that the two runs
+    are not one run compared with itself)
+1
+
+-- FAILING ON BOTH SIDES: upstream's own behaviour, NOT this project's debt
+15030
+
+-- PER TEST DIRECTORY: FAIL counts, both sides
+DIRECTORY                            FAIL_MT   FAIL_ST    FAIL_D     PASS_MT   PASS_ST    PASS_D
+gcc.c-torture/compile                   2909         0      2909       11643     15014     -3371
+gcc.dg/compat                            139        58        81          33       174      -141
+gcc.dg/lto                               523       460        63         915       977       -62
+gcc.target/arm                            73        12        61       17095     18774     -1679
+gcc.dg/visibility-d.c                     30         0        30          31        61       -30
+c-c++-common/torture                      16         0        16        2481      2496       -15
+gcc.dg/torture                           105        89        16       14275     15946     -1671
+gcc.c-torture/unsorted                    14         0        14        1426      1436       -10
+gcc.dg/tree-ssa                           18         5        13        7004      8854     -1850
+gcc.dg/Wtype-limits-Wextra.c               5         0         5          18        23        -5
+gcc.dg/Wtype-limits.c                      5         0         5          18        23        -5
+gcc.dg/Warray-bounds-32.c                  3         0         3          31        33        -2
+gcc.dg/Warray-bounds-52.c                  3         0         3          23        25        -2
+gcc.dg/Warray-bounds-53.c                  3         0         3          23        25        -2
+gcc.dg/Wstringop-overflow-62.c             2         0         2          43        46        -3
+gcc.dg/autopar                             2         0         2         120       121        -1
+gcc.dg/tm                                  2         0         2         190       191        -1
+gcc.dg/utf-array.c                         2         0         2          18        18         0
+c-c++-common/Wrestrict.c                   1         0         1         150       155        -5
+gcc.dg/Wnonnull-4.c                        1         0         1          42        44        -2
+gcc.dg/builtin-stdc-rotate-2.c             1         0         1          44        53        -9
+outputs-23                                 3         2         1           7         9        -2
+outputs-24                                 3         2         1           9        11        -2
+outputs-25                                 3         2         1          10        12        -2
+./main-file-warnings.h                     0         0         0          24        24         0
+c-c++-common/Waddress-3.c                  0         0         0          56        56         0
+c-c++-common/Waddress-4.c                  0         0         0          44        44         0
+c-c++-common/Waddress-5.c                  0         0         0           0        35       -35
+c-c++-common/Waddress-of-packed-member-1.c         0         0         0          51        51         0
+c-c++-common/Waddress-of-packed-member-2.c         0         0         0          32        32         0
+c-c++-common/Warray-bounds-10.c            0         0         0          19        19         0
+c-c++-common/Warray-bounds-2.c             0         0         0          24        24         0
+c-c++-common/Warray-bounds-3.c             0         0         0          42        42         0
+c-c++-common/Warray-bounds-7.c             0         0         0          61        61         0
+c-c++-common/Warray-bounds-9.c             0         0         0          35        35         0
+c-c++-common/Warray-bounds.c               0         0         0          91        91         0
+c-c++-common/Wattributes-2.c               0         0         0          10        10         0
+c-c++-common/Wattributes.c                 0         0         0          90        90         0
+c-c++-common/Wbidi-chars-14.c              0         0         0          11        11         0
+c-c++-common/Wbidi-chars-15.c              0         0         0          15        15         0
+c-c++-common/Wbidi-chars-16.c              0         0         0          11        11         0
+c-c++-common/Wbidi-chars-17.c              0         0         0          13        13         0
+c-c++-common/Wbidi-chars-24.c              0         0         0          10        10         0
+c-c++-common/Wbidi-chars-25.c              0         0         0          10        10         0
+c-c++-common/Wbidi-chars-4.c               0         0         0          78        78         0
+c-c++-common/Wbidi-chars-5.c               0         0         0          78        78         0
+c-c++-common/Wbidi-chars-6.c               0         0         0          59        59         0
+c-c++-common/Wbidi-chars-9.c               0         0         0          12        12         0
+c-c++-common/Wbool-compare-1.c             0         0         0          61        61         0
+c-c++-common/Wbool-compare-2.c             0         0         0          29        29         0
+c-c++-common/Wbool-operation-1.c           0         0         0          13        13         0
+c-c++-common/Wcast-qual-1.c                0         0         0          31        31         0
+c-c++-common/Wconstant-logical-operand-1.c         0         0         0          33        33         0
+c-c++-common/Wconstant-logical-operand-2.c         0         0         0          33        33         0
+c-c++-common/Wconversion-pr40752.c         0         0         0          16        16         0
+c-c++-common/Wconversion-pr40752a.c         0         0         0          32        30         2
+c-c++-common/Wdangling-pointer-2.c         0         0         0          22        22         0
+c-c++-common/Wdangling-pointer.c           0         0         0          21        21         0
+c-c++-common/Wduplicated-branches-1.c         0         0         0          19        19         0
+c-c++-common/Wduplicated-branches-9.c         0         0         0          10        10         0
+c-c++-common/Wduplicated-cond-1.c          0         0         0          37        37         0
+c-c++-common/Wfloat-conversion.c           0         0         0           0        21       -21
+c-c++-common/Wformat-pr104148.c            0         0         0          23        23         0
+c-c++-common/Wimplicit-fallthrough-2.c         0         0         0          11        11         0
+c-c++-common/Wimplicit-fallthrough-23.c         0         0         0          37        37         0
+c-c++-common/Wimplicit-fallthrough-3.c         0         0         0          19        19         0
+c-c++-common/Wimplicit-fallthrough-39.c         0         0         0          11        11         0
+c-c++-common/Wimplicit-fallthrough-4.c         0         0         0          17        17         0
+c-c++-common/Wimplicit-fallthrough-7.c         0         0         0          10        10         0
+c-c++-common/Wint-in-bool-context.c         0         0         0          10        10         0
+c-c++-common/Winvalid-memory-model.c         0         0         0          32        32         0
+c-c++-common/Wlogical-op-1.c               0         0         0          37        37         0
+c-c++-common/Wmemset-transposed-args1.c         0         0         0          10        10         0
+c-c++-common/Wmisleading-indentation-3.c         0         0         0          15        15         0
+c-c++-common/Wmisleading-indentation-5.c         0         0         0          13        13         0
+c-c++-common/Wmisleading-indentation.c         0         0         0         102       102         0
+c-c++-common/Wmultistatement-macros-10.c         0         0         0          12        12         0
+c-c++-common/Wmultistatement-macros-13.c         0         0         0          31        31         0
+c-c++-common/Wmultistatement-macros-8.c         0         0         0          12        12         0
+c-c++-common/Wmultistatement-macros-9.c         0         0         0          12        12         0
+c-c++-common/Wno-attributes-1.c            0         0         0          10        10         0
+c-c++-common/Wno-attributes-2.c            0         0         0          10        10         0
+c-c++-common/Wpointer-compare-1.c          0         0         0          21        21         0
+c-c++-common/Wshift-overflow-1.c           0         0         0           0        23       -23
+c-c++-common/Wshift-overflow-3.c           0         0         0           0        23       -23
+c-c++-common/Wshift-overflow-7.c           0         0         0           0        33       -33
+c-c++-common/Wsizeof-pointer-memaccess1.c         0         0         0          28        28         0
+c-c++-common/Wsizeof-pointer-memaccess2.c         0         0         0         125       125         0
+c-c++-common/Wsizeof-pointer-memaccess3.c         0         0         0          13        13         0
+c-c++-common/Wstringop-overflow-2-novec.c         0         0         0          27        27         0
+c-c++-common/Wstringop-overflow-2.c         0         0         0          61        61         0
+c-c++-common/Wstringop-overflow.c          0         0         0          18        18         0
+c-c++-common/Wstringop-truncation-4.c         0         0         0          25        25         0
+c-c++-common/Wstringop-truncation.c         0         0         0          70        70         0
+c-c++-common/Wswitch-unreachable-1.c         0         0         0          10        10         0
+c-c++-common/Wtautological-compare-1.c         0         0         0          16        16         0
+c-c++-common/Wtautological-compare-5.c         0         0         0          33        33         0
+c-c++-common/Wunused-parm-1.c              0         0         0          14        14         0
+c-c++-common/Wunused-parm-2.c              0         0         0          14        14         0
+c-c++-common/Wunused-parm-3.c              0         0         0          14        14         0
+c-c++-common/Wunused-value-1.c             0         0         0          16        16         0
+c-c++-common/Wunused-var-1.c               0         0         0          11        11         0
+c-c++-common/Wunused-var-19.c              0         0         0          14        14         0
+c-c++-common/Wunused-var-20.c              0         0         0          14        14         0
+c-c++-common/Wunused-var-21.c              0         0         0          14        14         0
+c-c++-common/Wunused-var-7.c               0         0         0          10        10         0
+c-c++-common/Wuse-after-free-2.c           0         0         0          16        16         0
+c-c++-common/Wuse-after-free-5.c           0         0         0          16        16         0
+c-c++-common/Wuse-after-free-6.c           0         0         0          16        16         0
+c-c++-common/Wuse-after-free-7.c           0         0         0          20        20         0
+c-c++-common/Wuse-after-free.c             0         0         0          16        16         0
+c-c++-common/analyzer                      2         2         0        3017      3027       -10
+c-c++-common/array-5.c                     0         0         0          17        17         0
+c-c++-common/attr-fallthrough-1.c          0         0         0          10        10         0
+c-c++-common/attr-fallthrough-2.c          0         0         0          13        13         0
+c-c++-common/attr-nonstring-11.c           0         0         0          57        57         0
+c-c++-common/attr-nonstring-14.c           0         0         0          40        40         0
+c-c++-common/attr-nonstring-16.c           0         0         0          16        16         0
+c-c++-common/attr-nonstring-3.c            0         0         0          58        58         0
+c-c++-common/attr-nonstring-6.c            0         0         0          40        40         0
+c-c++-common/attr-nonstring-8.c            0         0         0          16        16         0
+c-c++-common/attr-reproducible-1.c         0         0         0          15        15         0
+c-c++-common/attr-reproducible-2.c         0         0         0          15        15         0
+c-c++-common/attr-unsequenced-1.c          0         0         0          17        17         0
+c-c++-common/attr-unsequenced-2.c          0         0         0          17        17         0
+c-c++-common/attr-warn-unused-result.c         0         0         0          54        54         0
+c-c++-common/attributes-1.c                0         0         0          11        11         0
+c-c++-common/attributes-3.c                0         0         0          15        15         0
+c-c++-common/builtin-arith-overflow-1.c         0         0         0         100       100         0
+c-c++-common/builtin-bitreverseg-2.c         0         0         0          16        15         1
+c-c++-common/builtin-bswapg-2.c            0         0         0          16        15         1
+c-c++-common/builtin-has-attribute.c         0         0         0          19        19         0
+c-c++-common/builtin-offsetof-2.c          0         0         0          32        32         0
+c-c++-common/conflict-markers-6.c          0         0         0          10        10         0
+c-c++-common/cpp                           0         0         0        1201      1201         0
+c-c++-common/diagnostic-format-sarif-file-1.c         0         0         0          36        36         0
+c-c++-common/diagnostic-format-sarif-file-2.c         0         0         0          12        12         0
+c-c++-common/diagnostic-format-sarif-file-3.c         0         0         0          13        13         0
+c-c++-common/diagnostic-format-sarif-file-bad-utf8-pr109098-3.c         0         0         0          43        43         0
+c-c++-common/diagnostic-format-sarif-file-no-results.c         0         0         0          19        19         0
+c-c++-common/goacc                         0         0         0        2604      2604         0
+c-c++-common/goacc-gomp                    0         0         0         156       156         0
+c-c++-common/gomp                          4         4         0        5015      5020        -5
+c-c++-common/indirection-fixits.c          0         0         0          43        43         0
+c-c++-common/initpri2.c                    0         0         0          11        11         0
+c-c++-common/missing-symbol.c              0         0         0          13        13         0
+c-c++-common/musttail23.c                  0         0         0          15        15         0
+c-c++-common/musttail30.c                  0         0         0          12        12         0
+c-c++-common/musttail31.c                  0         0         0          12        12         0
+c-c++-common/musttail5.c                   0         0         0          10        10         0
+c-c++-common/pr111309-2.c                  0         0         0          74        74         0
+c-c++-common/pr111309-3.c                  0         0         0          25        25         0
+c-c++-common/pr49706.c                     0         0         0          49        49         0
+c-c++-common/pr57371-1.c                   0         0         0          54        54         0
+c-c++-common/pr57371-4.c                   0         0         0          13        13         0
+c-c++-common/pr57371-5.c                   0         0         0          13        13         0
+c-c++-common/pr57371-6.c                   0         0         0          33        33         0
+c-c++-common/pr57371-7.c                   0         0         0          31        31         0
+c-c++-common/pr60439.c                     0         0         0          19        19         0
+c-c++-common/pr62199.c                     0         0         0          13        13         0
+c-c++-common/pr65120.c                     0         0         0          11        11         0
+c-c++-common/pr66322.c                     0         0         0          10        10         0
+c-c++-common/pr68107.c                     0         0         0          19        19         0
+c-c++-common/pr71574.c                     0         0         0          10        10         0
+c-c++-common/pr95378.c                     0         0         0          24        24         0
+c-c++-common/pragma-diag-16.c              0         0         0          21        21         0
+c-c++-common/raw-string-14.c               0         0         0          17        17         0
+c-c++-common/raw-string-16.c               0         0         0          15        15         0
+c-c++-common/raw-string-3.c                0         0         0          16        16         0
+c-c++-common/raw-string-4.c                0         0         0          11        11         0
+c-c++-common/raw-string-5.c                0         0         0          17        17         0
+c-c++-common/raw-string-directive-1.c         0         0         0          15        15         0
+c-c++-common/simulate-thread               0         0         0          12        12         0
+c-c++-common/sizeof-array-argument.c         0         0         0          10        10         0
+c-c++-common/spellcheck-reserved.c         0         0         0          10        10         0
+c-c++-common/strub-parms1.c                0         0         0          12        12         0
+c-c++-common/strub-parms3.c                0         0         0          12        12         0
+c-c++-common/tm                            0         0         0          76        76         0
+c-c++-common/toplevel-asm-2.c              0         0         0          14        14         0
+c-c++-common/toplevel-asm-5.c              0         0         0          14        14         0
+c-c++-common/vector-compare-4.c            0         0         0          13        13         0
+c-c++-common/warn-ommitted-condop.c         0         0         0          23        23         0
+compiler                                   0         0         0         171       171         0
+gcc.dg/20011021-1.c                        0         0         0          11        11         0
+gcc.dg/20041213-1.c                        0         0         0          21        21         0
+gcc.dg/Waddress-3.c                        0         0         0          15        15         0
+gcc.dg/Walloc-size-4.c                     0         0         0          11        11         0
+gcc.dg/Walloc-size-larger-than-18.c         0         0         0          26        26         0
+gcc.dg/Walways-true-1.c                    0         0         0          13        13         0
+gcc.dg/Warray-bounds-11.c                  0         0         0          10        10         0
+gcc.dg/Warray-bounds-22.c                  0         0         0          15        15         0
+gcc.dg/Warray-bounds-29.c                  0         0         0          23        23         0
+gcc.dg/Warray-bounds-30.c                  0         0         0          65        65         0
+gcc.dg/Warray-bounds-31.c                  0         0         0          65        65         0
+gcc.dg/Warray-bounds-39.c                  0         0         0          24        24         0
+gcc.dg/Warray-bounds-45.c                  0         0         0          39        39         0
+gcc.dg/Warray-bounds-46.c                  0         0         0          57        57         0
+gcc.dg/Warray-bounds-47.c                  0         0         0         228       228         0
+gcc.dg/Warray-bounds-48-novec.c            0         0         0          39        39         0
+gcc.dg/Warray-bounds-48.c                  0         0         0          41        41         0
+gcc.dg/Warray-bounds-49.c                  0         0         0          11        11         0
+gcc.dg/Warray-bounds-51.c                  0         0         0          10        10         0
+gcc.dg/Warray-bounds-56.c                  0         0         0          11        11         0
+gcc.dg/Warray-bounds-58.c                  0         0         0          14        14         0
+gcc.dg/Warray-bounds-61.c                  0         0         0          30        30         0
+gcc.dg/Warray-bounds-62.c                  0         0         0          30        30         0
+gcc.dg/Warray-bounds-65.c                  0         0         0          59        59         0
+gcc.dg/Warray-bounds-66.c                  0         0         0          41        41         0
+gcc.dg/Warray-bounds-68.c                  0         0         0          10        10         0
+gcc.dg/Warray-bounds-76.c                  0         0         0          10        10         0
+gcc.dg/Warray-bounds-77.c                  0         0         0          51        51         0
+gcc.dg/Warray-bounds-78.c                  0         0         0          33        33         0
+gcc.dg/Warray-bounds-79.c                  0         0         0          19        19         0
+gcc.dg/Warray-bounds-80.c                  0         0         0          18        18         0
+gcc.dg/Warray-bounds-81.c                  0         0         0          42        42         0
+gcc.dg/Warray-bounds-82.c                  0         0         0          29        29         0
+gcc.dg/Warray-bounds-83.c                  0         0         0          25        25         0
+gcc.dg/Warray-bounds-84.c                  0         0         0          13        13         0
+gcc.dg/Warray-bounds-90.c                  0         0         0          29        29         0
+gcc.dg/Warray-bounds-91.c                  0         0         0          21        21         0
+gcc.dg/Warray-bounds-92.c                  0         0         0          13        13         0
+gcc.dg/Warray-bounds.c                     0         0         0          23        23         0
+gcc.dg/Warray-parameter-4.c                0         0         0          28        28         0
+gcc.dg/Warray-parameter-8.c                0         0         0          16        16         0
+gcc.dg/Warray-parameter-9.c                0         0         0          12        12         0
+gcc.dg/Warray-parameter.c                  0         0         0          48        48         0
+gcc.dg/Wattributes-5.c                     0         0         0          11        11         0
+gcc.dg/Wattributes-6.c                     0         0         0          90        90         0
+gcc.dg/Wattributes-7.c                     0         0         0          10        10         0
+gcc.dg/Wbad-function-cast-1.c              0         0         0          11        11         0
+gcc.dg/Wbuiltin-declaration-mismatch-13.c         0         0         0          10        10         0
+gcc.dg/Wbuiltin-declaration-mismatch-15.c         0         0         0          13        13         0
+gcc.dg/Wbuiltin-declaration-mismatch-3.c         0         0         0          17        17         0
+gcc.dg/Wbuiltin-declaration-mismatch-4.c         0         0         0          25        25         0
+gcc.dg/Wc90-c99-compat-1.c                 0         0         0          19        19         0
+gcc.dg/Wc90-c99-compat-2.c                 0         0         0          19        19         0
+gcc.dg/Wc90-c99-compat-3.c                 0         0         0          19        19         0
+gcc.dg/Wc90-c99-compat-8.c                 0         0         0          19        19         0
+gcc.dg/Wc99-c11-compat-1.c                 0         0         0          10        10         0
+gcc.dg/Wc99-c11-compat-2.c                 0         0         0          10        10         0
+gcc.dg/Wc99-c11-compat-3.c                 0         0         0          10        10         0
+gcc.dg/Wc99-c11-compat-6.c                 0         0         0          10        10         0
+gcc.dg/Wc99-c11-compat-7.c                 0         0         0          10        10         0
+gcc.dg/Wcalloc-transposed-args-1.c         0         0         0          15        15         0
+gcc.dg/Wconversion-complex-c99.c           0         0         0           0        34       -34
+gcc.dg/Wconversion-complex-gnu.c           0         0         0           0        34       -34
+gcc.dg/Wconversion-integer-no-sign.c         0         0         0          11        11         0
+gcc.dg/Wconversion-integer.c               0         0         0          47        47         0
+gcc.dg/Wconversion-real-integer.c          0         0         0           0        35       -35
+gcc.dg/Wcxx-compat-10.c                    0         0         0          17        17         0
+gcc.dg/Wcxx-compat-13.c                    0         0         0          23        23         0
+gcc.dg/Wcxx-compat-19.c                    0         0         0          11        11         0
+gcc.dg/Wcxx-compat-2.c                     0         0         0          35        35         0
+gcc.dg/Wcxx-compat-4.c                     0         0         0          11        11         0
+gcc.dg/Wcxx-compat-6.c                     0         0         0          26        26         0
+gcc.dg/Wcxx-compat-7.c                     0         0         0          11        11         0
+gcc.dg/Wcxx-compat-8.c                     0         0         0          18        18         0
+gcc.dg/Wdangling-pointer.c                 0         0         0          10        10         0
+gcc.dg/Wdesignated-init.c                  0         0         0          21        21         0
+gcc.dg/Wdouble-promotion.c                 0         0         0          34        34         0
+gcc.dg/Wduplicate-decl-specifier.c         0         0         0          10        10         0
+gcc.dg/Wenum-int-mismatch-1.c              0         0         0          25        25         0
+gcc.dg/Wenum-int-mismatch-2.c              0         0         0          25        25         0
+gcc.dg/Wenum-int-mismatch-3.c              0         0         0          25        25         0
+gcc.dg/Wframe-address.c                    0         0         0          17        17         0
+gcc.dg/Wfree-nonheap-object-2.c            0         0         0          23        23         0
+gcc.dg/Wfree-nonheap-object-5.c            0         0         0          10        10         0
+gcc.dg/Wfree-nonheap-object-6.c            0         0         0          10        10         0
+gcc.dg/Wfree-nonheap-object.c              0         0         0          22        22         0
+gcc.dg/Winfinite-recursion-2.c             0         0         0          24        24         0
+gcc.dg/Winfinite-recursion.c               0         0         0          22        22         0
+gcc.dg/Wjump-misses-init-1.c               0         0         0          13        13         0
+gcc.dg/Wkeyword-macro-1.c                  0         0         0          60        60         0
+gcc.dg/Wkeyword-macro-3.c                  0         0         0          60        60         0
+gcc.dg/Wkeyword-macro-5.c                  0         0         0          45        45         0
+gcc.dg/Wkeyword-macro-7.c                  0         0         0          45        45         0
+gcc.dg/Wkeyword-macro-9.c                  0         0         0          13        13         0
+gcc.dg/Wlogical-op-1.c                     0         0         0          19        19         0
+gcc.dg/Wmismatched-dealloc-3.c             0         0         0          10        10         0
+gcc.dg/Wmismatched-dealloc.c               0         0         0          42        42         0
+gcc.dg/Wmissing-attributes.c               0         0         0          12        12         0
+gcc.dg/Wmissing-braces-fixits.c            0         0         0          35        35         0
+gcc.dg/Wno-pointer-sign.c                  0         0         0          11        11         0
+gcc.dg/Wnonnull-2.c                        0         0         0          11        11         0
+gcc.dg/Wnonnull-3.c                        0         0         0          11        11         0
+gcc.dg/Wnonnull-5.c                        0         0         0          11        11         0
+gcc.dg/Wnonnull-6.c                        0         0         0          11        11         0
+gcc.dg/Wparentheses-11.c                   0         0         0          62        62         0
+gcc.dg/Wparentheses-12.c                   0         0         0          10        10         0
+gcc.dg/Wparentheses-2.c                    0         0         0          37        37         0
+gcc.dg/Wparentheses-3.c                    0         0         0          13        13         0
+gcc.dg/Wparentheses-4.c                    0         0         0          25        25         0
+gcc.dg/Wparentheses-6.c                    0         0         0          37        37         0
+gcc.dg/Wparentheses-7.c                    0         0         0          37        37         0
+gcc.dg/Wparentheses-8.c                    0         0         0          31        31         0
+gcc.dg/Wredundant-decls-2.c                0         0         0          11        11         0
+gcc.dg/Wrestrict-11.c                      0         0         0          20        20         0
+gcc.dg/Wrestrict-14.c                      0         0         0          47        47         0
+gcc.dg/Wrestrict-16.c                      0         0         0          13        13         0
+gcc.dg/Wrestrict-23.c                      0         0         0          17        17         0
+gcc.dg/Wrestrict-26.c                      0         0         0          21        21         0
+gcc.dg/Wrestrict-7.c                       0         0         0          20        20         0
+gcc.dg/Wrestrict-8.c                       0         0         0          29        29         0
+gcc.dg/Wreturn-local-addr-2.c              0         0         0          31        31         0
+gcc.dg/Wreturn-local-addr-3.c              0         0         0          60        60         0
+gcc.dg/Wreturn-local-addr-4.c              0         0         0          64        64         0
+gcc.dg/Wreturn-local-addr-6.c              0         0         0          39        39         0
+gcc.dg/Wreturn-local-addr-8.c              0         0         0          15        15         0
+gcc.dg/Wreturn-nested-2.c                  0         0         0          11        11         0
+gcc.dg/Wshadow-1.c                         0         0         0          10        10         0
+gcc.dg/Wshadow-3.c                         0         0         0          11        11         0
+gcc.dg/Wshadow-compatible-local-1.c         0         0         0          11        11         0
+gcc.dg/Wshadow-local-2.c                   0         0         0          14        14         0
+gcc.dg/Wsign-compare-1.c                   0         0         0          17        17         0
+gcc.dg/Wsign-conversion.c                  0         0         0          37        37         0
+gcc.dg/Wsizeof-pointer-memaccess1.c         0         0         0         120       120         0
+gcc.dg/Wstring-compare-2.c                 0         0         0          20        20         0
+gcc.dg/Wstring-compare-3.c                 0         0         0          15        15         0
+gcc.dg/Wstring-compare.c                   0         0         0          45        45         0
+gcc.dg/Wstringop-overflow-11.c             0         0         0          71        71         0
+gcc.dg/Wstringop-overflow-12.c             0         0         0          20        20         0
+gcc.dg/Wstringop-overflow-18.c             0         0         0          97        97         0
+gcc.dg/Wstringop-overflow-22.c             0         0         0          74        74         0
+gcc.dg/Wstringop-overflow-23.c             0         0         0          18        18         0
+gcc.dg/Wstringop-overflow-24.c             0         0         0          27        27         0
+gcc.dg/Wstringop-overflow-25.c             0         0         0          52        52         0
+gcc.dg/Wstringop-overflow-27.c             0         0         0          21        21         0
+gcc.dg/Wstringop-overflow-28.c             0         0         0          27        27         0
+gcc.dg/Wstringop-overflow-29.c             0         0         0          11        11         0
+gcc.dg/Wstringop-overflow-34.c             0         0         0          10        10         0
+gcc.dg/Wstringop-overflow-37.c             0         0         0          47        47         0
+gcc.dg/Wstringop-overflow-39.c             0         0         0          11        11         0
+gcc.dg/Wstringop-overflow-40.c             0         0         0          33        33         0
+gcc.dg/Wstringop-overflow-41.c             0         0         0          14        14         0
+gcc.dg/Wstringop-overflow-42.c             0         0         0          11        11         0
+gcc.dg/Wstringop-overflow-43.c             0         0         0          14        14         0
+gcc.dg/Wstringop-overflow-45.c             0         0         0          22        22         0
+gcc.dg/Wstringop-overflow-46.c             0         0         0          10        10         0
+gcc.dg/Wstringop-overflow-50.c             0         0         0          13        13         0
+gcc.dg/Wstringop-overflow-54.c             0         0         0          13        13         0
+gcc.dg/Wstringop-overflow-56.c             0         0         0          11        11         0
+gcc.dg/Wstringop-overflow-58.c             0         0         0          32        32         0
+gcc.dg/Wstringop-overflow-59.c             0         0         0          32        32         0
+gcc.dg/Wstringop-overflow-66.c             0         0         0          14        14         0
+gcc.dg/Wstringop-overflow-68.c             0         0         0          33        33         0
+gcc.dg/Wstringop-overflow-69.c             0         0         0          25        25         0
+gcc.dg/Wstringop-overflow-75.c             0         0         0          17        17         0
+gcc.dg/Wstringop-overflow-76.c             0         0         0          17        17         0
+gcc.dg/Wstringop-overflow-77.c             0         0         0         109       109         0
+gcc.dg/Wstringop-overflow-78.c             0         0         0         109       109         0
+gcc.dg/Wstringop-overflow-79.c             0         0         0          19        19         0
+gcc.dg/Wstringop-overflow-8.c              0         0         0          11        11         0
+gcc.dg/Wstringop-overflow-80.c             0         0         0          19        19         0
+gcc.dg/Wstringop-overflow-85.c             0         0         0          13        13         0
+gcc.dg/Wstringop-overflow-87.c             0         0         0          21        21         0
+gcc.dg/Wstringop-overflow-88.c             0         0         0          97        97         0
+gcc.dg/Wstringop-overflow.c                0         0         0          24        24         0
+gcc.dg/Wstringop-overread-2.c              0         0         0          16        16         0
+gcc.dg/Wstringop-overread-3.c              0         0         0          25        25         0
+gcc.dg/Wstringop-overread-5.c              0         0         0          15        15         0
+gcc.dg/Wstringop-overread-6.c              0         0         0          69        69         0
+gcc.dg/Wstringop-overread.c                0         0         0         148       148         0
+gcc.dg/Wstringop-truncation-8.c            0         0         0          11        11         0
+gcc.dg/Wstringop-truncation.c              0         0         0          12        12         0
+gcc.dg/Wswitch-enum-error.c                0         0         0          10        10         0
+gcc.dg/Wswitch-error.c                     0         0         0          10        10         0
+gcc.dg/Wtraditional-conversion-2.c         0         0         0          23        23         0
+gcc.dg/Wtrampolines-3.c                    0         0         0          11        11         0
+gcc.dg/Wtype-limits-no.c                   0         0         0          23        23         0
+gcc.dg/Wunterminated-string-initialization-2.c         0         0         0          21        21         0
+gcc.dg/Wuse-after-free-2.c                 0         0         0          11        11         0
+gcc.dg/Wvla-parameter-10.c                 0         0         0          23        23         0
+gcc.dg/Wvla-parameter-11.c                 0         0         0          23        23         0
+gcc.dg/Wvla-parameter-12.c                 0         0         0          10        10         0
+gcc.dg/Wvla-parameter-2.c                  0         0         0          26        26         0
+gcc.dg/Wvla-parameter-3.c                  0         0         0          27        27         0
+gcc.dg/Wvla-parameter.c                    0         0         0          56        56         0
+gcc.dg/Wzero-as-null-pointer-constant.c         0         0         0          23        23         0
+gcc.dg/Wzero-length-array-bounds-2-novec.c         0         0         0          11        11         0
+gcc.dg/Wzero-length-array-bounds-2.c         0         0         0          33        33         0
+gcc.dg/Wzero-length-array-bounds.c         0         0         0          31        31         0
+gcc.dg/addr_builtin-1.c                    0         0         0          39        39         0
+gcc.dg/alias-16.c                          0         0         0          18        18         0
+gcc.dg/anon-struct-11.c                    0         0         0          19        19         0
+gcc.dg/anon-struct-11a.c                   0         0         0          19        19         0
+gcc.dg/anon-struct-13.c                    0         0         0          11        11         0
+gcc.dg/anon-struct-13a.c                   0         0         0          11        11         0
+gcc.dg/array-10.c                          0         0         0          24        24         0
+gcc.dg/array-15.c                          0         0         0          25        25         0
+gcc.dg/array-8.c                           0         0         0          10        10         0
+gcc.dg/array-quals-1.c                     0         0         0          22        22         0
+gcc.dg/asm-hard-reg-error-1.c              0         0         0          21        21         0
+gcc.dg/asm-qual-2.c                        0         0         0          19        19         0
+gcc.dg/asm-wide-1.c                        0         0         0          13        13         0
+gcc.dg/assign-warn-1.c                     0         0         0          82        82         0
+gcc.dg/assign-warn-2.c                     0         0         0          82        82         0
+gcc.dg/assign-warn-4.c                     0         0         0          11        11         0
+gcc.dg/atomic-fetch-bool.c                 0         0         0          25        25         0
+gcc.dg/atomic-invalid-2.c                  0         0         0          14        14         0
+gcc.dg/atomic-invalid.c                    0         0         0          14        14         0
+gcc.dg/attr-access-2.c                     0         0         0          13        13         0
+gcc.dg/attr-access-read-only.c             0         0         0          20        20         0
+gcc.dg/attr-access-read-write-2.c          0         0         0          16        16         0
+gcc.dg/attr-access-read-write.c            0         0         0          21        21         0
+gcc.dg/attr-access-write-only.c            0         0         0          21        21         0
+gcc.dg/attr-access.c                       0         0         0          13        13         0
+gcc.dg/attr-alloc_align-4.c                0         0         0          13        13         0
+gcc.dg/attr-alloc_size-11.c                0         0         0          17        17         0
+gcc.dg/attr-alloc_size-12.c                0         0         0          19        19         0
+gcc.dg/attr-alloc_size-13.c                0         0         0          11        11         0
+gcc.dg/attr-alloc_size-3.c                 0         0         0           0        57       -57
+gcc.dg/attr-alloc_size-4.c                 0         0         0          25        25         0
+gcc.dg/attr-alloc_size-5.c                 0         0         0          65        65         0
+gcc.dg/attr-alloc_size-6.c                 0         0         0          13        13         0
+gcc.dg/attr-alloc_size-7.c                 0         0         0          19        19         0
+gcc.dg/attr-assume-2.c                     0         0         0          27        27         0
+gcc.dg/attr-assume-3.c                     0         0         0          16        16         0
+gcc.dg/attr-assume_aligned-4.c             0         0         0          11        11         0
+gcc.dg/attr-callback.c                     4         4         0          14        14         0
+gcc.dg/attr-copy-2.c                       0         0         0          21        21         0
+gcc.dg/attr-externally-visible-1.c         0         0         0          13        13         0
+gcc.dg/attr-externally-visible-2.c         0         0         0          10        10         0
+gcc.dg/attr-invalid.c                      0         0         0          25        25         0
+gcc.dg/attr-malloc.c                       0         0         0          16        16         0
+gcc.dg/attr-noinline.c                     0         0         0          25        25         0
+gcc.dg/attr-noipa.c                        0         0         0          13        13         0
+gcc.dg/attr-nonstring-2.c                  0         0         0          16        16         0
+gcc.dg/attr-nonstring-3.c                  0         0         0          33        33         0
+gcc.dg/attr-nonstring-4.c                  0         0         0          12        12         0
+gcc.dg/attr-nonstring.c                    0         0         0          17        17         0
+gcc.dg/attr-unavailable-1.c                0         0         0          24        24         0
+gcc.dg/attr-unavailable-4.c                0         0         0          24        24         0
+gcc.dg/auto-init-uninit-37.c               0         0         0          34        34         0
+gcc.dg/auto-type-2.c                       0         0         0          20        20         0
+gcc.dg/bad-pragma-locations.c              0         0         0          23        23         0
+gcc.dg/bitfld-1.c                          0         0         0          13        13         0
+gcc.dg/bitint-36.c                         0         0         0           0        23       -23
+gcc.dg/builtin-protos-1.c                  0         0         0          43        43         0
+gcc.dg/builtin-redefine.c                  0         0         0          15        15         0
+gcc.dg/builtin-stdc-bit-2.c                0         0         0         141       141         0
+gcc.dg/builtin-stdc-bit-3.c                0         0         0          15        15         0
+gcc.dg/builtin-stringop-chk-1.c            0         0         0          25        25         0
+gcc.dg/builtin-stringop-chk-4.c            0         0         0          68        68         0
+gcc.dg/builtin-stringop-chk-5.c            0         0         0          28        28         0
+gcc.dg/builtin-stringop-chk-8.c            0         0         0          23        23         0
+gcc.dg/builtin-stringop-chk-9.c            0         0         0          11        11         0
+gcc.dg/builtin-tgmath-err-1.c              0         0         0          33        33         0
+gcc.dg/builtins-68.c                       0         0         0          31        31         0
+gcc.dg/builtins-error.c                    0         0         0          45        45         0
+gcc.dg/builtins-nonnull.c                  0         0         0          74        74         0
+gcc.dg/c11-align-3.c                       0         0         0          29        29         0
+gcc.dg/c11-align-5.c                       0         0         0          15        15         0
+gcc.dg/c11-atomic-1.c                      0         0         0          14        14         0
+gcc.dg/c11-atomic-3.c                      0         0         0          89        89         0
+gcc.dg/c11-empty-init-1.c                  0         0         0          15        15         0
+gcc.dg/c11-empty-init-2.c                  0         0         0          15        15         0
+gcc.dg/c11-empty-init-3.c                  0         0         0          15        15         0
+gcc.dg/c11-pointer-float-1.c               0         0         0          13        13         0
+gcc.dg/c11-static-assert-3.c               0         0         0          10        10         0
+gcc.dg/c11-thread-local-2.c                0         0         0          22        22         0
+gcc.dg/c11-typedef-1.c                     0         0         0          25        25         0
+gcc.dg/c11-typeof-3.c                      0         0         0          23        23         0
+gcc.dg/c11-unproto-1.c                     0         0         0          14        14         0
+gcc.dg/c11-unproto-2.c                     0         0         0          13        13         0
+gcc.dg/c23-attr-deprecated-1.c             0         0         0          14        14         0
+gcc.dg/c23-attr-deprecated-2.c             0         0         0          11        11         0
+gcc.dg/c23-attr-fallthrough-2.c            0         0         0          17        17         0
+gcc.dg/c23-attr-nodiscard-1.c              0         0         0          26        26         0
+gcc.dg/c23-attr-nodiscard-2.c              0         0         0          19        19         0
+gcc.dg/c23-attr-noreturn-2.c               0         0         0          30        30         0
+gcc.dg/c23-attr-reproducible-1.c           0         0         0          15        15         0
+gcc.dg/c23-attr-reproducible-2.c           0         0         0          16        16         0
+gcc.dg/c23-attr-syntax-2.c                 0         0         0          36        36         0
+gcc.dg/c23-attr-syntax-3.c                 0         0         0          15        15         0
+gcc.dg/c23-attr-syntax-5.c                 0         0         0          35        35         0
+gcc.dg/c23-attr-syntax-6.c                 0         0         0          47        47         0
+gcc.dg/c23-attr-syntax-7.c                 0         0         0          41        41         0
+gcc.dg/c23-attr-unsequenced-1.c            0         0         0          17        17         0
+gcc.dg/c23-attr-unsequenced-2.c            0         0         0          16        16         0
+gcc.dg/c23-auto-3.c                        0         0         0          36        36         0
+gcc.dg/c23-bool-errors-3.c                 0         0         0          11        11         0
+gcc.dg/c23-builtins-1.c                    0         0         0          30        30         0
+gcc.dg/c23-complit-5.c                     0         0         0          21        21         0
+gcc.dg/c23-concat-1.c                      0         0         0          25        25         0
+gcc.dg/c23-constexpr-3.c                   0         0         0         176       176         0
+gcc.dg/c23-constexpr-9.c                   0         0         0           0        28       -28
+gcc.dg/c23-digit-separators-2.c            0         0         0          15        15         0
+gcc.dg/c23-empty-init-3.c                  0         0         0          15        15         0
+gcc.dg/c23-enum-7.c                        0         0         0          43        43         0
+gcc.dg/c23-imaginary-constants-1.c         0         0         0          13        13         0
+gcc.dg/c23-imaginary-constants-2.c         0         0         0          13        13         0
+gcc.dg/c23-incomplete-1.c                  0         0         0          11        11         0
+gcc.dg/c23-mismatching-fn-ptr.c            0         0         0          17        17         0
+gcc.dg/c23-named-loops-1.c                 0         0         0          31        31         0
+gcc.dg/c23-nullptr-3.c                     0         0         0          31        31         0
+gcc.dg/c23-qual-4.c                        0         0         0          35        35         0
+gcc.dg/c23-qual-5.c                        0         0         0          34        34         0
+gcc.dg/c23-qual-6.c                        0         0         0          64        64         0
+gcc.dg/c23-register-array-1.c              0         0         0          15        15         0
+gcc.dg/c23-register-array-2.c              0         0         0          15        15         0
+gcc.dg/c23-register-array-3.c              0         0         0          15        15         0
+gcc.dg/c23-static-assert-5.c               0         0         0          25        25         0
+gcc.dg/c23-static-assert-6.c               0         0         0          25        25         0
+gcc.dg/c23-static-assert-7.c               0         0         0          25        25         0
+gcc.dg/c23-stdarg-10.c                     0         0         0          12        12         0
+gcc.dg/c23-switch-1.c                      0         0         0          30        30         0
+gcc.dg/c23-tag-1.c                         0         0         0          10        10         0
+gcc.dg/c23-tag-enum-1.c                    0         0         0          10        10         0
+gcc.dg/c23-thread-local-2.c                0         0         0          16        16         0
+gcc.dg/c23-unproto-1.c                     0         0         0          10        10         0
+gcc.dg/c2y-array-negative-1.c              0         0         0          12        12         0
+gcc.dg/c2y-if-decls-1.c                    0         0         0          38        38         0
+gcc.dg/c2y-if-decls-10.c                   0         0         0          25        25         0
+gcc.dg/c2y-if-decls-2.c                    0         0         0          23        23         0
+gcc.dg/c2y-if-decls-3.c                    0         0         0          26        26         0
+gcc.dg/c2y-if-decls-4.c                    0         0         0          25        25         0
+gcc.dg/c2y-if-decls-7.c                    0         0         0          12        12         0
+gcc.dg/c2y-if-decls-9.c                    0         0         0          23        23         0
+gcc.dg/c2y-imaginary-constants-11.c         0         0         0          13        13         0
+gcc.dg/c2y-imaginary-constants-12.c         0         0         0          13        13         0
+gcc.dg/c2y-imaginary-constants-2.c         0         0         0          13        13         0
+gcc.dg/c2y-incomplete-3.c                  0         0         0          15        15         0
+gcc.dg/c2y-init-1.c                        0         0         0          24        24         0
+gcc.dg/c2y-init-3.c                        0         0         0          33        33         0
+gcc.dg/c2y-named-loops-1.c                 0         0         0          31        31         0
+gcc.dg/c2y-named-loops-2.c                 0         0         0          10        10         0
+gcc.dg/c2y-pointer-1.c                     0         0         0          26        26         0
+gcc.dg/c2y-register-array-3.c              0         0         0          15        15         0
+gcc.dg/c2y-static-assert-3.c               0         0         0          25        25         0
+gcc.dg/c2y-static-assert-4.c               0         0         0          31        31         0
+gcc.dg/c2y-switch-1.c                      0         0         0          17        17         0
+gcc.dg/c2y-switch-2.c                      0         0         0          30        30         0
+gcc.dg/c2y-void-parm-1.c                   0         0         0         125       125         0
+gcc.dg/c90-array-lval-3.c                  0         0         0          19        19         0
+gcc.dg/c90-arraydecl-1.c                   0         0         0          13        13         0
+gcc.dg/c90-const-expr-6.c                  0         0         0          11        11         0
+gcc.dg/c90-const-expr-7.c                  0         0         0          17        17         0
+gcc.dg/c90-const-expr-8.c                  0         0         0          17        17         0
+gcc.dg/c90-typespec-1.c                    0         0         0         459       459         0
+gcc.dg/c99-array-nonobj-1.c                0         0         0          13        13         0
+gcc.dg/c99-arraydecl-1.c                   0         0         0          23        23         0
+gcc.dg/c99-complit-2.c                     0         0         0          33        33         0
+gcc.dg/c99-const-expr-11.c                 0         0         0          11        11         0
+gcc.dg/c99-const-expr-6.c                  0         0         0          12        12         0
+gcc.dg/c99-const-expr-7.c                  0         0         0          22        22         0
+gcc.dg/c99-const-expr-8.c                  0         0         0          17        17         0
+gcc.dg/c99-flex-array-3.c                  0         0         0          31        31         0
+gcc.dg/c99-flex-array-7.c                  0         0         0          11        11         0
+gcc.dg/c99-flex-array-typedef-3.c          0         0         0          16        16         0
+gcc.dg/c99-flex-array-typedef-7.c          0         0         0          11        11         0
+gcc.dg/c99-fordecl-2.c                     0         0         0          13        13         0
+gcc.dg/c99-hexfloat-3.c                    0         0         0          11        11         0
+gcc.dg/c99-init-2.c                        0         0         0          13        13         0
+gcc.dg/c99-tag-1.c                         0         0         0          51        51         0
+gcc.dg/c99-tag-3.c                         0         0         0          12        12         0
+gcc.dg/c99-typespec-1.c                    0         0         0        1056      1056         0
+gcc.dg/c99-vla-jump-1.c                    0         0         0         180       180         0
+gcc.dg/c99-vla-jump-2.c                    0         0         0         180       180         0
+gcc.dg/c99-vla-jump-3.c                    0         0         0         180       180         0
+gcc.dg/c99-vla-jump-4.c                    0         0         0         180       180         0
+gcc.dg/cast-1.c                            0         0         0          18        18         0
+gcc.dg/cast-2.c                            0         0         0          21        21         0
+gcc.dg/cast-3.c                            0         0         0          21        21         0
+gcc.dg/cast-function-1.c                   0         0         0          13        13         0
+gcc.dg/cleanup-1.c                         0         0         0          15        15         0
+gcc.dg/compare2.c                          0         0         0          25        25         0
+gcc.dg/compare3.c                          0         0         0          37        37         0
+gcc.dg/conv-2.c                            0         0         0          13        13         0
+gcc.dg/counted-by-anonymous.c              0         0         0          24        24         0
+gcc.dg/countof-compile.c                   0         0         0          20        20         0
+gcc.dg/cpp                                 0         0         0        5208      5209        -1
+gcc.dg/debug                              10        10         0        1924      1943       -19
+gcc.dg/decl-9.c                            0         0         0          13        13         0
+gcc.dg/declspec-1.c                        0         0         0          11        11         0
+gcc.dg/declspec-10.c                       0         0         0          23        23         0
+gcc.dg/declspec-11.c                       0         0         0          23        23         0
+gcc.dg/declspec-13.c                       0         0         0          75        75         0
+gcc.dg/declspec-18.c                       0         0         0          37        37         0
+gcc.dg/declspec-4.c                        0         0         0          23        23         0
+gcc.dg/declspec-5.c                        0         0         0          26        26         0
+gcc.dg/declspec-6.c                        0         0         0          26        26         0
+gcc.dg/declspec-8.c                        0         0         0          10        10         0
+gcc.dg/declspec-9.c                        0         0         0          18        18         0
+gcc.dg/deprecated-4.c                      0         0         0          24        24         0
+gcc.dg/deprecated.c                        0         0         0          24        24         0
+gcc.dg/dg-test-1.c                         0         0         0          11        11         0
+gcc.dg/diag-aka-4.c                        0         0         0          41        41         0
+gcc.dg/diag-aka-5a.c                       0         0         0          59        59         0
+gcc.dg/diag-aka-5b.c                       0         0         0          59        59         0
+gcc.dg/diagnostic-range-bad-return-2.c         0         0         0          12        12         0
+gcc.dg/diagnostic-range-bad-return.c         0         0         0          12        12         0
+gcc.dg/diagnostic-token-ranges.c           0         0         0          27        27         0
+gcc.dg/diagnostic-types-1.c                0         0         0          26        26         0
+gcc.dg/diagnostic-types-2.c                0         0         0          11        11         0
+gcc.dg/enum-incomplete-1.c                 0         0         0          62        62         0
+gcc.dg/enum-redef-1.c                      0         0         0          14        14         0
+gcc.dg/fixed-point                         0         0         0           0      1051     -1051
+gcc.dg/float-range-3.c                     0         0         0          13        13         0
+gcc.dg/float-range-5.c                     0         0         0          13        13         0
+gcc.dg/fltconst-1.c                        0         0         0          10        10         0
+gcc.dg/format                              0         0         0        4342      4346        -4
+gcc.dg/free-1.c                            0         0         0          10        10         0
+gcc.dg/free-2.c                            0         0         0          10        10         0
+gcc.dg/func-args-1.c                       0         0         0          22        22         0
+gcc.dg/func-ptr-conv-1.c                   0         0         0          23        23         0
+gcc.dg/func-ptr-conv-2.c                   0         0         0          23        23         0
+gcc.dg/gnu11-empty-init-warn-1.c           0         0         0          10        10         0
+gcc.dg/gnu11-typeof-4.c                    0         0         0          21        21         0
+gcc.dg/gnu23-attrs-1.c                     0         0         0          10        10         0
+gcc.dg/gnu23-switch-1.c                    0         0         0          30        30         0
+gcc.dg/gnu23-switch-2.c                    0         0         0          17        17         0
+gcc.dg/gnu23-tag-3.c                       0         0         0          12        12         0
+gcc.dg/gnu2y-named-loops-3.c               0         0         0          26        26         0
+gcc.dg/gnu89-const-expr-1.c                0         0         0          23        23         0
+gcc.dg/gnu90-const-expr-1.c                0         0         0          23        23         0
+gcc.dg/gnu99-const-expr-1.c                0         0         0          20        20         0
+gcc.dg/gnu99-named-loops-1.c               0         0         0          42        42         0
+gcc.dg/gnu99-named-loops-2.c               0         0         0          10        10         0
+gcc.dg/gnu99-named-loops-3.c               0         0         0          26        26         0
+gcc.dg/goacc                               0         0         0          60        60         0
+gcc.dg/gomp                                0         0         0        1691      1691         0
+gcc.dg/hardbool-err.c                      0         0         0          10        10         0
+gcc.dg/init-bad-1.c                        0         0         0          26        26         0
+gcc.dg/init-bad-2.c                        0         0         0          16        16         0
+gcc.dg/init-bad-3.c                        0         0         0          16        16         0
+gcc.dg/init-excess-1.c                     0         0         0          35        35         0
+gcc.dg/init-string-1.c                     0         0         0          21        21         0
+gcc.dg/inline-13.c                         0         0         0          11        11         0
+gcc.dg/inline-20.c                         0         0         0          11        11         0
+gcc.dg/ipa                                 0         0         0         744       756       -12
+gcc.dg/long-long-typespec-1.c              0         0         0         731       731         0
+gcc.dg/lvalue-2.c                          0         0         0          27        27         0
+gcc.dg/lvalue-9.c                          0         0         0          26        26         0
+gcc.dg/maxof-compile.c                     0         0         0          31        31         0
+gcc.dg/misc-column.c                       0         0         0          11        11         0
+gcc.dg/missing-header-fixit-5.c            0         0         0          10        10         0
+gcc.dg/missing-header-fixit-5a.c           0         0         0          10        10         0
+gcc.dg/missing-symbol-2.c                  0         0         0          13        13         0
+gcc.dg/noncompile                          0         0         0        2214      2214         0
+gcc.dg/nonnull-1.c                         0         0         0          11        11         0
+gcc.dg/nonnull-10.c                        0         0         0          46        46         0
+gcc.dg/nonnull-12.c                        0         0         0          11        11         0
+gcc.dg/nonnull-13.c                        0         0         0          46        46         0
+gcc.dg/nonnull-3.c                         0         0         0          66        66         0
+gcc.dg/nonnull-4.c                         0         0         0          28        28         0
+gcc.dg/nonnull-8.c                         0         0         0          11        11         0
+gcc.dg/nonnull-9.c                         0         0         0          23        23         0
+gcc.dg/noreturn-1.c                        0         0         0          10        10         0
+gcc.dg/old-style-then-proto-1.c            0         0         0          23        23         0
+gcc.dg/overflow-warn-1.c                   0         0         0          27        27         0
+gcc.dg/overflow-warn-2.c                   0         0         0          41        41         0
+gcc.dg/overflow-warn-3.c                   0         0         0          35        35         0
+gcc.dg/overflow-warn-4.c                   0         0         0          35        35         0
+gcc.dg/overflow-warn-8.c                   0         0         0          12        12         0
+gcc.dg/param-type-mismatch-2.c             0         0         0          37        37         0
+gcc.dg/param-type-mismatch.c               0         0         0          37        37         0
+gcc.dg/params                              0         0         0         243       243         0
+gcc.dg/parm-mismatch-1.c                   0         0         0          13        13         0
+gcc.dg/pch                                 0         0         0         936       936         0
+gcc.dg/pedwarn-init.c                      0         0         0          12        12         0
+gcc.dg/permerror-default.c                 0         0         0          31        31         0
+gcc.dg/permerror-fpermissive.c             0         0         0          31        31         0
+gcc.dg/permerror-gnu89-nopermissive.c         0         0         0          30        30         0
+gcc.dg/permerror-gnu89-pedantic.c          0         0         0          30        30         0
+gcc.dg/permerror-gnu89.c                   0         0         0          30        30         0
+gcc.dg/permerror-noerror.c                 0         0         0          31        31         0
+gcc.dg/permerror-pedantic.c                0         0         0          31        31         0
+gcc.dg/permerror-system.c                  0         0         0          31        31         0
+gcc.dg/plugin                              0         0         0         929       929         0
+gcc.dg/pointer-arith-2.c                   0         0         0          29        29         0
+gcc.dg/pointer-arith-3.c                   0         0         0          29        29         0
+gcc.dg/pointer-arith-4.c                   0         0         0          29        29         0
+gcc.dg/pointer-array-atomic-2.c            0         0         0          29        29         0
+gcc.dg/pointer-array-atomic.c              0         0         0          29        29         0
+gcc.dg/pointer-array-quals-1.c             0         0         0          35        35         0
+gcc.dg/pointer-array-quals-2.c             0         0         0          53        53         0
+gcc.dg/pointer-counted-by.c                0         0         0          11        11         0
+gcc.dg/pr100501-1.c                        0         0         0          15        15         0
+gcc.dg/pr109412.c                          0         0         0          13        13         0
+gcc.dg/pr114540.c                          0         0         0          17        17         0
+gcc.dg/pr119001-2.c                        0         0         0          10        10         0
+gcc.dg/pr119350-1.c                        0         0         0          10        10         0
+gcc.dg/pr119350-2.c                        0         0         0          10        10         0
+gcc.dg/pr120380.c                          0         0         0          10        10         0
+gcc.dg/pr16302.c                           0         0         0          37        37         0
+gcc.dg/pr17188-1.c                         0         0         0          11        11         0
+gcc.dg/pr25801.c                           0         0         0          29        29         0
+gcc.dg/pr33826.c                           0         0         0          15        15         0
+gcc.dg/pr35635.c                           0         0         0          35        35         0
+gcc.dg/pr35691-5.c                         0         0         0          14        14         0
+gcc.dg/pr37561.c                           0         0         0          13        13         0
+gcc.dg/pr37772.c                           0         0         0          12        12         0
+gcc.dg/pr48552-1.c                         0         0         0          15        15         0
+gcc.dg/pr48552-2.c                         0         0         0          15        15         0
+gcc.dg/pr53265.c                           0         0         0           0        20       -20
+gcc.dg/pr56724-1.c                         0         0         0          13        13         0
+gcc.dg/pr56980.c                           0         0         0          13        13         0
+gcc.dg/pr59717.c                           0         0         0         227       227         0
+gcc.dg/pr59871.c                           0         0         0          13        13         0
+gcc.dg/pr59940.c                           0         0         0          11        11         0
+gcc.dg/pr59963-2.c                         0         0         0          17        17         0
+gcc.dg/pr61096-1.c                         0         0         0          29        29         0
+gcc.dg/pr61861.c                           0         0         0          24        24         0
+gcc.dg/pr66066-1.c                         0         0         0          21        21         0
+gcc.dg/pr66066-2.c                         0         0         0          31        31         0
+gcc.dg/pr66066-3.c                         0         0         0          31        31         0
+gcc.dg/pr67088.c                           0         0         0          10        10         0
+gcc.dg/pr68090.c                           0         0         0          11        11         0
+gcc.dg/pr69554-1.c                         0         0         0          28        28         0
+gcc.dg/pr70859.c                           0         0         0          35        35         0
+gcc.dg/pr82112.c                           0         0         0          11        11         0
+gcc.dg/pr90010.c                           0         0         0          11        11         0
+gcc.dg/pr96377-1.c                         0         0         0          13        13         0
+gcc.dg/pr97882.c                           0         0         0          54        54         0
+gcc.dg/pr97932.c                           0         0         0          17        17         0
+gcc.dg/pragma-diag-6.c                     0         0         0          10        10         0
+gcc.dg/pragma-message.c                    0         0         0          25        25         0
+gcc.dg/qual-component-1.c                  0         0         0          69        69         0
+gcc.dg/qual-return-1.c                     0         0         0          13        13         0
+gcc.dg/raw-string-1.c                      0         0         0          11        11         0
+gcc.dg/redecl-1.c                          0         0         0          29        29         0
+gcc.dg/redecl-2.c                          0         0         0          17        17         0
+gcc.dg/redecl-3.c                          0         0         0         112       112         0
+gcc.dg/rtl                                 0         0         0          19        19         0
+gcc.dg/sancov                              0         0         0         360       360         0
+gcc.dg/sarif-output                        0         0         0          16        16         0
+gcc.dg/sequence-pt-1.c                     0         0         0          58        58         0
+gcc.dg/sequence-pt-2.c                     0         0         0          15        15         0
+gcc.dg/sequence-pt-pr17880.c               0         0         0          30        30         0
+gcc.dg/simd-1.c                            0         0         0          11        11         0
+gcc.dg/simd-1b.c                           0         0         0          10        10         0
+gcc.dg/simd-2.c                            0         0         0          10        10         0
+gcc.dg/simulate-thread                     0         0         0          30        30         0
+gcc.dg/sinatan-2.c                         0         0         0          10        10         0
+gcc.dg/sinatan-3.c                         0         0         0          10        10         0
+gcc.dg/sinhatanh-1.c                       0         0         0          10        10         0
+gcc.dg/sinhatanh-2.c                       0         0         0          10        10         0
+gcc.dg/sinhatanh-3.c                       0         0         0          10        10         0
+gcc.dg/sinhovercosh-1.c                    0         0         0          10        10         0
+gcc.dg/spellcheck-fields-3.c               0         0         0          13        13         0
+gcc.dg/spellcheck-identifiers-1a.c         0         0         0          23        23         0
+gcc.dg/spellcheck-identifiers.c            0         0         0          23        23         0
+gcc.dg/spellcheck-inttypes.c               0         0         0          53        53         0
+gcc.dg/spellcheck-stdint.c                 0         0         0          45        45         0
+gcc.dg/spellcheck-stdlib.c                 0         0         0          36        36         0
+gcc.dg/spellcheck-typenames.c              0         0         0          24        24         0
+gcc.dg/sso                                 0         0         0           0       270      -270
+gcc.dg/sso-2.c                             0         0         0          11        11         0
+gcc.dg/sso-3.c                             0         0         0          11        11         0
+gcc.dg/stdckdint-2.c                       0         0         0          49        49         0
+gcc.dg/stmt-expr-label-1.c                 0         0         0         214       214         0
+gcc.dg/strlenopt-11.c                      0         0         0          10        10         0
+gcc.dg/strlenopt-13.c                      0         0         0          11        11         0
+gcc.dg/strlenopt-14gf.c                    0         0         0          13        13         0
+gcc.dg/strlenopt-1f.c                      0         0         0          11        11         0
+gcc.dg/strlenopt-2f.c                      0         0         0          11        11         0
+gcc.dg/strlenopt-3.c                       0         0         0          10        10         0
+gcc.dg/strlenopt-4gf.c                     0         0         0          11        11         0
+gcc.dg/strlenopt-7.c                       0         0         0          10        10         0
+gcc.dg/strlenopt-78.c                      0         0         0          33        33         0
+gcc.dg/strlenopt-89.c                      0         0         0          11        11         0
+gcc.dg/strlenopt-90.c                      0         0         0          11        11         0
+gcc.dg/switch-5.c                          0         0         0          23        23         0
+gcc.dg/sync-fetch-bool.c                   0         0         0          25        25         0
+gcc.dg/sync-fetch.c                        0         0         0          19        19         0
+gcc.dg/tanhbysinh.c                        0         0         0          10        10         0
+gcc.dg/tls                                 0         0         0          85        85         0
+gcc.dg/too-few-arguments.c                 0         0         0          11        11         0
+gcc.dg/too-many-arguments.c                0         0         0          25        25         0
+gcc.dg/transparent-union-1.c               0         0         0          12        12         0
+gcc.dg/transparent-union-1a.c              0         0         0          12        12         0
+gcc.dg/transparent-union-3.c               0         0         0          11        11         0
+gcc.dg/typespec-1.c                        0         0         0         831       831         0
+gcc.dg/uninit-32.c                         0         0         0          15        15         0
+gcc.dg/uninit-33.c                         0         0         0          12        12         0
+gcc.dg/uninit-37.c                         0         0         0          34        34         0
+gcc.dg/uninit-38.c                         0         0         0           0        21       -21
+gcc.dg/uninit-40.c                         0         0         0          11        11         0
+gcc.dg/uninit-pr101300.c                   0         0         0          10        10         0
+gcc.dg/uninit-pr95136.c                    0         0         0          17        17         0
+gcc.dg/uninit-pr98578.c                    0         0         0          34        34         0
+gcc.dg/utf-array-short-wchar.c             0         0         0          18        18         0
+gcc.dg/utf8-2.c                            0         0         0          10        10         0
+gcc.dg/variable-sized-type-flex-array.c         0         0         0          17        17         0
+gcc.dg/vect                                0         0         0           0      1886     -1886
+gcc.dg/vla-6.c                             0         0         0          12        12         0
+gcc.dg/vshift-6.c                          0         0         0          13        13         0
+gcc.dg/vshift-7.c                          0         0         0          13        13         0
+gcc.dg/warn-abs-1.c                        0         0         0          17        17         0
+gcc.dg/warn-sprintf-no-nul-2.c             0         0         0          16        16         0
+gcc.dg/warn-sprintf-no-nul-3.c             0         0         0          10        10         0
+gcc.dg/warn-sprintf-no-nul.c               0         0         0          16        16         0
+gcc.dg/warn-stpcpy-no-nul.c                0         0         0          75        75         0
+gcc.dg/warn-strcpy-no-nul.c                0         0         0          87        87         0
+gcc.dg/warn-strlen-no-nul.c                0         0         0         101       101         0
+gcc.dg/warn-strnlen-no-nul-2.c             0         0         0          15        15         0
+gcc.dg/warn-strnlen-no-nul.c               0         0         0          97        97         0
+gcc.dg/weak                                0         0         0           0        91       -91
+gcc.dg/wtr-conversion-1.c                  0         0         0          13        13         0
+gcc.dg/wtr-func-def-1.c                    0         0         0          16        16         0
+gcc.misc-tests/gcov-19.c                 940       940         0           1         1         0
+gcc.misc-tests/gcov-22.c                  35        35         0           1         1         0
+gcc.misc-tests/gcov-29.c                  14        14         0           1         1         0
+gcc.misc-tests/gcov-4.c                   66        66         0           1         1         0
+gcc.misc-tests/gcov-4b.c                  25        25         0           1         1         0
+gcc.misc-tests/gcov-6.c                   10        10         0           1         1         0
+gcc.misc-tests/gcov-7.c                   19        19         0           1         1         0
+largefile.c                                0         0         0          12        12         0
+outputs-122                                0         0         0          10        10         0
+outputs-124                                0         0         0          12        12         0
+outputs-132                                2         2         0          11        11         0
+outputs-135                                2         2         0          11        11         0
+outputs-144                                2         2         0          11        11         0
+outputs-281                                0         0         0          11        11         0
+outputs-283                                7         7         0           3         3         0
+outputs-285                                7         7         0           3         3         0
+outputs-287                                7         7         0           3         3         0
+outputs-296                                7         7         0           3         3         0
+outputs-298                                7         7         0           3         3         0
+outputs-300                                7         7         0           3         3         0
+outputs-302                                7         7         0           3         3         0
+outputs-304                                7         7         0           3         3         0
+outputs-306                                7         7         0           3         3         0
+outputs-308                                7         7         0           3         3         0
+outputs-310                                7         7         0           3         3         0
+outputs-312                                7         7         0           3         3         0
+outputs-314                                7         7         0           3         3         0
+outputs-316                                7         7         0           3         3         0
+outputs-318                                7         7         0           3         3         0
+outputs-320                                7         7         0           3         3         0
+outputs-322                                7         7         0           3         3         0
+outputs-324                                7         7         0           3         3         0
+outputs-326                                7         7         0           3         3         0
+outputs-328                                7         7         0           3         3         0
+outputs-330                                7         7         0           3         3         0
+outputs-332                                7         7         0           3         3         0
+outputs-334                                7         7         0           3         3         0
+outputs-336                                7         7         0           3         3         0
+outputs-337                               15        15         0           5         5         0
+outputs-338                               16        16         0           9         9         0
+outputs-339                               15        15         0           5         5         0
+outputs-340                               16        16         0           9         9         0
+outputs-341                               15        15         0           5         5         0
+outputs-342                               16        16         0           9         9         0
+outputs-343                               15        15         0           5         5         0
+outputs-344                               16        16         0           9         9         0
+outputs-345                               15        15         0           5         5         0
+outputs-346                               16        16         0           9         9         0
+outputs-347                               15        15         0           5         5         0
+outputs-348                               16        16         0           9         9         0
+outputs-357                                0         0         0          11        11         0
+outputs-368                                7         7         0           3         3         0
+gcc.dg/analyzer                          164       176       -12        3720      3779       -59
+gcc.target/aarch64                         0       408      -408           3      3615     -3612
+gcc.c-torture/execute                  12299     12736      -437         521       567       -46
+
+-- ONLY-IN rows (a test name+occurrence one side produced and the other
+   did not).  Large numbers here mean the two runs did not attempt the
+   same work, and the totals above must be read with that in mind.
+   only multi-target: 3470
+   only stock:        21181
+   top 15 only-in-stock names:
+   6263 gcc.target/aarch64
+   4973 gcc.dg/vect
+   1847 gcc.dg/tree-ssa
+   1691 gcc.dg/torture
+   1586 gcc.target/arm
+   1051 gcc.dg/fixed-point
+    929 gcc.c-torture/execute
+    479 gcc.c-torture/compile
+    270 gcc.dg/sso
+     91 gcc.dg/weak
+     72 gcc.dg/analyzer
+     60 gcc.dg/visibility-d.c
+     60 gcc.dg/compat
+     57 gcc.dg/attr-alloc_size-3.c
+     35 gcc.dg/Wconversion-real-integer.c
+   top 15 only-in-multi-target names:
+   1392 gcc.dg/torture
+    496 gcc.c-torture/execute
+    290 gcc.c-torture/compile
+    208 gcc.target/arm
+    141 gcc.dg/tree-ssa
+    113 gcc.dg/compat
+     60 gcc.dg/visibility-d.c
+     40 gcc.dg/weak
+     25 gcc.dg/lto
+     20 tcl
+     15 c-c++-common/torture
+     14 gcc.dg/analyzer
+     10 xgcc:
+     10 testcase
+     10 gcc.dg/nofixed-point-2.c
