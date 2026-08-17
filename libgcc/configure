@@ -618,6 +618,7 @@ GREP
 long_double_type_size
 double_type_size
 INHIBIT_LIBC_CFLAGS
+gcc_gen_incdir
 libgcc_standalone
 gcc_target_incdir
 CPP
@@ -4442,6 +4443,72 @@ install-target-headers." "$LINENO" 5
   fi
 fi
 
+
+
+if test "$libgcc_standalone" = yes || test -n "$libgcc_sibling"; then
+  libgcc_gccdir=$srcdir/../gcc
+  if test ! -f "$libgcc_gccdir/config.gcc"; then
+    as_fn_error $? "no $libgcc_gccdir/config.gcc.
+tconfig.h is generated here from config.gcc's \`xm_file' for $host, because that
+entry is target-selected and gcc's single copy is the wrong one for every target
+but its own.  Without config.gcc there is nothing to derive it from." "$LINENO" 5
+  fi
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking tconfig.h for $host" >&5
+$as_echo_n "checking tconfig.h for $host... " >&6; }
+  libgcc_xm=`
+    target=$host
+    xm_file= xm_defines= cpu_type= tm_file= tm_p_file= tmake_file=
+    extra_objs= extra_options= extra_headers= c_target_objs= cxx_target_objs=
+    d_target_objs= rust_target_objs= jit_target_objs= fortran_target_objs=
+    extra_gcc_objs= out_file= md_file= target_gtfiles= common_out_file=
+    target_has_targetm_common= dwarf2= extra_modes= tm_defines=
+    target_cpu_default= use_gcc_tgmath= use_gcc_stdint= TM_MULTILIB_CONFIG=
+    . "$libgcc_gccdir/config.gcc" >/dev/null 2>&1 || exit 1
+        for libgcc_f in auto-host.h ansidecl.h $xm_file; do
+      case $libgcc_f in
+        ansidecl.h | auto-host.h ) echo "H $libgcc_f" ;;
+        * ) echo "H config/$libgcc_f" ;;
+      esac
+    done
+    echo "D $xm_defines"
+  ` || as_fn_error $? "config.gcc does not support $host, so tconfig.h cannot be derived for it" "$LINENO" 5
+  libgcc_tc_hdrs=`echo "$libgcc_xm" | sed -n 's/^H //p' | tr '\n' ' '`
+  libgcc_tc_defs=`echo "$libgcc_xm" | sed -n 's/^D //p'`
+        case $libgcc_tc_hdrs in
+    *auto-host.h*ansidecl.h* ) ;;
+    * ) as_fn_error $? "derived tconfig.h header list is \`$libgcc_tc_hdrs', which
+does not contain the two entries gcc/configure.ac:2041 prepends
+unconditionally.  config.gcc was not sourced." "$LINENO" 5 ;;
+  esac
+  TARGET_CPU_DEFAULT="" HEADERS="$libgcc_tc_hdrs" \
+    DEFINES="USED_FOR_TARGET $libgcc_tc_defs" \
+    $SHELL "$libgcc_gccdir/mkconfig.sh" tconfig.h \
+    || as_fn_error $? "mkconfig.sh failed to write tconfig.h" "$LINENO" 5
+  rm -f cs-tconfig.h
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: generated from \`$libgcc_tc_hdrs'" >&5
+$as_echo "generated from \`$libgcc_tc_hdrs'" >&6; }
+fi
+
+if test -n "$libgcc_sibling"; then
+    gcc_gen_incdir=$gcc_target_incdir
+else
+  gcc_gen_incdir=$gcc_target_incdir/../../gen-headers
+  if test ! -f "$gcc_gen_incdir/auto-host.h"; then
+    as_fn_error $? "$gcc_gen_incdir/auto-host.h does not exist.
+The compiler named $gcc_target_incdir as its per-target header directory, so
+gen-headers/ should be two levels above it.  It holds the generated headers that
+are gcc's and target-agnostic -- auto-host.h and version.h -- which
+\`make install' in gcc/ puts there.  Without it tconfig.h cannot be preprocessed
+and every _gcov_* object fails on version.h." "$LINENO" 5
+  fi
+  if test ! -f "$gcc_gen_incdir/version.h"; then
+    as_fn_error $? "$gcc_gen_incdir/version.h does not exist.
+It is reached from gcc/gcov-io.h:240 via libgcc/libgcov.h:191 and is opened by
+every _gcov_* object.  Removing it was measured wrong once (#268 arm A) and it
+is checked by name here so that the failure is not 28 identical
+\`version.h: No such file' errors from a -I list nobody reads." "$LINENO" 5
+  fi
+fi
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a C library is available for $host" >&5

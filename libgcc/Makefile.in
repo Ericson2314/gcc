@@ -35,6 +35,7 @@ gcc_objdir = $(MULTIBUILDTOP)../../$(host_subdir)/gcc
 # only the include path can be satisfied from an installation, so only the
 # include path moves.
 gcc_target_incdir = @gcc_target_incdir@
+gcc_gen_incdir = @gcc_gen_incdir@
 libgcc_standalone = @libgcc_standalone@
 
 srcdir = @srcdir@
@@ -320,7 +321,7 @@ LIB2ADD_ST =
 # subdirectory rather than in the source directory.
 # -I$(@D) and -I$(srcdir)/$(@D) cause the subdirectory of the file
 # currently being compiled, in both source trees, to be examined as well.
-INCLUDES = -I. -I$(@D) -I$(gcc_target_incdir) \
+INCLUDES = -I. -I$(@D) -I$(gcc_target_incdir) -I$(gcc_gen_incdir) \
 	   -I$(srcdir) -I$(srcdir)/$(@D) -I$(srcdir)/../gcc \
 	   -I$(srcdir)/../include $(DECNUMINC)
 
