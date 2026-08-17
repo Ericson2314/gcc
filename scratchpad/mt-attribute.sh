@@ -69,6 +69,18 @@ awk '
   /^FAIL: / {
     if (buf ~ /no target selected/)              k = "NO-TARGET";
     else if (buf ~ /No such file or directory/)  k = "NO-RUNTIME";
+    # AN ARTEFACT OF COMPILE-ONLY MODE ITSELF.  MT_COMPILE_ONLY downgrades
+    # dg-do run/link to -S; a test with dg-additional-sources then hands the
+    # driver several files AND a -o, which it refuses by name.  Nothing about
+    # the compiler is measured.  One such refusal in
+    # gfortran.dg/bind-c-contiguous-1 produced 1014 FAIL lines, and three such
+    # files were 3042 of a 3988 "residual" -- the amplification PRINCIPLES
+    # warns that raw counts mislead on.
+    # (No apostrophes in this block: it lives inside a single-quoted awk
+    # program, and a GNU-style `word" quotation would end the string.  That is
+    # the same class as the syntax error this task found in
+    # gen-target-manifest.sh, met again while writing the tool that reports it.)
+    else if (buf ~ /cannot specify .-o. with/)   k = "COMPILE-ONLY";
     else                                         k = "RESIDUAL";
     line = $0; sub(/^FAIL: /, "", line);
     print k "\t" line; next;
@@ -84,7 +96,7 @@ NA=$(wc -l < "$W/attr")
 echo "  attributed from the log: $NA (the .sum has $NF)"
 [ "$NA" = "$NF" ] || echo "  NOTE: the two differ -- a .log and .sum from different runs, or"
 [ "$NA" = "$NF" ] || echo "        parallel slot logs; report both rather than picking one"
-for k in NO-TARGET NO-RUNTIME RESIDUAL; do
+for k in NO-TARGET NO-RUNTIME COMPILE-ONLY RESIDUAL; do
   n=$(awk -F'\t' -v k="$k" '$1 == k' "$W/attr" | wc -l)
   case $k in
     RESIDUAL) printf '    %-12s %s   <- the only column that is a claim about the compiler\n' "$k" "$n" ;;
