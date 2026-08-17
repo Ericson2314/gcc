@@ -376,10 +376,37 @@ for T in "$@"; do
     # "no complaint" would be another way to see nothing.
     got=$("$B/gcc/xgcc" -B"$ASDIR/" -B"$B/gcc/" -ftarget-config="$CFG" \
             -print-prog-name=as)
+    # EITHER NAME IN $ASDIR IS CORRECT, AND WHICH ONE IS NOT THIS GUARD'S
+    # BUSINESS.  Until 3ff8b3f835c ("driver: set `just_machine_prefix' from the
+    # resolved target") the driver returned `$ASDIR/as'; since it landed the
+    # driver finds `$ASDIR/$T-as' FIRST, because it now has a machine prefix to
+    # search for.  This case arm still named only the unprefixed spelling, so
+    # `mtcheck.sh' has refused EVERY target at the tip since that commit --
+    # which is after the i686 row, the last row taken, so nothing had run it.
+    #
+    # The guard is kept and its QUESTION is kept: what must be true is that the
+    # driver resolved to a file IN $ASDIR (not `$B/gcc/as', the shim around the
+    # host assembler, which is the whole point of GUARD 3c above).  What must
+    # NOT be asserted is which of the two names it picked -- `mtcheck.sh' itself
+    # links both, to the same file, forty lines up.
+    #
+    # So: accept either name, and then require that the thing it resolved to is
+    # REALLY the same binary as the target tools dir's own `$T-as', through
+    # `readlink -f'.  That is strictly STRONGER than the old string compare: a
+    # `$ASDIR/as' that had somehow come to point at the host assembler would
+    # have satisfied the old arm and fails this one.
     case "$got" in
-      "$ASDIR/as") ;;
-      *) echo "FATAL[$T]: driver resolves \`as' to $got, not $ASDIR/as"; exit 9 ;;
+      "$ASDIR/as"|"$ASDIR/$T-as") ;;
+      *) echo "FATAL[$T]: driver resolves \`as' to $got, which is not in $ASDIR."
+         echo "  It is most likely $B/gcc/as, the shim around the HOST"
+         echo "  assembler -- see GUARD 3c above for what that costs."; exit 9 ;;
     esac
+    _gotreal=$(readlink -f "$got")
+    _wantreal=$(readlink -f "$TDIR/$T-as")
+    [ -n "$_gotreal" ] && [ "$_gotreal" = "$_wantreal" ] \
+      || { echo "FATAL[$T]: driver's \`as' ($got) really is $_gotreal,"
+           echo "  but $T's own assembler is $_wantreal.  Different binaries."; exit 9; }
+    echo "-- guard: driver's \`as' is $got -> $_gotreal (= $T's own)"
     printf 'int mt_as_probe (int x) { return x + 1; }\n' > "$B/mt-as-$T.c"
     if ! "$B/gcc/xgcc" -B"$ASDIR/" -B"$B/gcc/" -ftarget-config="$CFG" \
            -O1 -w -c -o "$B/mt-as-$T.o" "$B/mt-as-$T.c" 2> "$B/mt-as-$T.err"; then

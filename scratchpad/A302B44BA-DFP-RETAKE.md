@@ -214,19 +214,124 @@ Nothing of theirs was staged, unstaged, stashed or committed by this row.  The
 index was restored to exactly the state it was found in, and this row's commit
 is pathspec-limited to its own files.
 
-8. STATUS OF THE FOUR RE-SCORES
---------------------------------
+8. `dfp.exp` RUNS, AND THE NEGATIVE CONTROL HOLDS — ONE BUILD, ONE RUN
+------------------------------------------------------------------------
 
-The i686 row is settled above and needed no new run.  The three that ARE
-affected — x86_64, aarch64, s390x — need a fresh multi-target build and three
-fresh controls, and those were in progress when this document was committed;
-the machine was carrying another agent's `-j24` build at the same time
-(load average 61) and both of this row's builds were SIGTERMed once at rc=143
-before being restarted detached under `setsid`.  The build and control
-directories, the scorers, and the two new instruments are all in place, so the
-remaining work is the six testsuite runs and the arithmetic.
+Questions 3 and 4 are the same measurement asked on targets with opposite
+manifest answers, so they were taken together: `MT_RUNTESTFLAGS='dfp.exp'`
+against the ONE multi-target build, four targets, same harness, same hour.
 
-**No debt or scope figure for x86_64, aarch64 or s390x is quoted in this
-document, because none has been re-derived yet.**  That is stated plainly here
-rather than left as an absence a reader could mistake for "unchanged": on this
-branch "no output" and "no mechanism" have looked identical four times.
+```
+target                       manifest   gcc.dg/dfp   c-c++-common/dfp   TOTAL
+x86_64-pc-linux-gnu                 1          749                110     859
+aarch64-unknown-linux-gnu           1          749                110     859
+s390x-ibm-linux-gnu                 1          749                110     859
+riscv64-unknown-linux-gnu           0            1                  0       1
+```
+
+All four runs `.rc`-stamped 0.  The `1` on riscv64 is the `Running ...` banner
+and nothing else — its `.sum` contains **zero** results of any verdict, which is
+character for character the shape the pre-fix builds had on every target.
+
+**That is the negative control, and it is the sharpest available.** The same
+compiler, the same `mtcheck.sh` invocation and the same `dfp.exp` produce 859
+results on three targets and 1 on the fourth, decided by the target's own
+manifest line. If the fix had been "turn decimal float on everywhere" — the
+same defect with the sign flipped, and the version that produces a *better*
+looking board — riscv64 would read 859 too. Three orders of magnitude separate
+the two answers.
+
+The config-level arm agrees, and was taken before the suite ran
+(`a302b44ba-specs.sh`, which refuses unless BOTH answers appear in the list):
+
+```
+x86_64-pc-linux-gnu          decimal_float manifest=1 specs-config=1  OK
+aarch64-unknown-linux-gnu    decimal_float manifest=1 specs-config=1  OK
+s390x-ibm-linux-gnu          decimal_float manifest=1 specs-config=1  OK
+riscv64-unknown-linux-gnu    decimal_float manifest=0 specs-config=0  OK
+-- decimal_float: 3 target(s) at 1, 1 at 0; both arms present
+-- all 4 specs-config md5s are distinct
+-- each target's probe resolved gcc_cv_as=<its own>-as
+```
+
+**AND THE 858 RESULTS ARE NOT DEBT — MEASURED, NOT ASSUMED.** The verdicts
+those newly-attempted tests produce are:
+
+```
+target                        PASS   FAIL   UNSUPPORTED
+x86_64-pc-linux-gnu            846      0            12
+aarch64-unknown-linux-gnu      845      0            13
+s390x-ibm-linux-gnu            839      0            19
+```
+
+**Zero FAIL on all three.**  So the recorded debt figures for x86_64 (67),
+aarch64 (443) and s390x (206) are predicted to be UNCHANGED by this fix, and
+the entire understatement is in the SCOPE column — roughly 858 results per
+target that were never attempted, contributing nothing to debt in either
+direction. That is the brief's own thesis, and it is the one part of the brief
+that measured TRUE.
+
+9. `mtcheck.sh` WAS RED AT THE TIP, AND NOT FOR A REASON ANYONE HAD SEEN
+--------------------------------------------------------------------------
+
+Found by running it: `mtcheck.sh` refused **every** target at `7b39423abba`
+before this row fixed it.
+
+```
+FATAL[x86_64-pc-linux-gnu]: driver resolves `as' to
+  /tmp/b-302b44ba-mt/asdir-x86_64-pc-linux-gnu/x86_64-pc-linux-gnu-as,
+  not /tmp/b-302b44ba-mt/asdir-x86_64-pc-linux-gnu/as
+```
+
+GUARD 3c's case arm named only the UNPREFIXED spelling. `3ff8b3f835c`
+("driver: set `just_machine_prefix` from the resolved target") makes the driver
+search for the machine-prefixed name and find it first — and `mtcheck.sh`
+itself links BOTH names, to the same file, forty lines earlier. Confirmed by
+`git merge-base --is-ancestor`: `3ff8b3f835c` is **not** an ancestor of
+`45557c05382`, the i686 row's base, so it landed after the last row taken and
+nothing had run the harness since.
+
+Fixed here in a way that makes the guard STRONGER, not looser: either name in
+`$ASDIR` is accepted, and then `readlink -f` must show the resolved file is
+byte-identically the same binary as the target tools dir's own `$T-as`. A
+`$ASDIR/as` that had come to point at the host assembler would have satisfied
+the old string compare and fails this one.
+
+```
+-- guard: driver's `as' is .../aarch64-unknown-linux-gnu-as
+   -> /nix/store/...-aarch64-unknown-linux-gnu-binutils-2.46/bin/aarch64-unknown-linux-gnu-as
+   (= aarch64-unknown-linux-gnu's own)
+-- guard: assembler is aarch64-unknown-linux-gnu's own, and it produces: AArch64
+```
+
+10. STATUS OF THE FOUR RE-SCORES
+---------------------------------
+
+The i686 row is settled in §2 and needed no new run.  Questions 3 and 4 are
+settled in §8 for all four targets.  What remains is DEBT and SCOPE for the
+three affected targets, which needs the full suite on both sides.
+
+```
+                 multi-target build   stock control    full suite   debt+scope
+x86_64                       rc=0            in flight     running        NOT YET
+aarch64                      rc=0            in flight     running        NOT YET
+s390x                        rc=0            in flight     running        NOT YET
+riscv64          (negative control only -- decimal_float 0, not re-scored)
+```
+
+The multi-target build is up (`all-gcc` rc=0, `error:` 0, multiple-definition 0,
+undefined-reference 0, Killed 0) and its full three-target run is in flight.
+The stock controls had to be built twice: the first attempt was SIGTERMed at
+rc=143 (the machine was carrying another agent's `-j24` build, load average 61)
+and the interrupted directories then failed with host-compiler symptoms —
+`cannot compute sizeof (long long)`, `incompatible implicit declaration of
+built-in function 'free'`, `genchecksum.o` Error 1 — i.e. the reuse of a
+half-configured tree, not a real portability finding.  Reconfigured from
+scratch and rebuilt detached under `setsid`.
+
+**No debt or scope figure for x86_64, aarch64 or s390x is quoted anywhere in
+this document, because none has been re-derived yet.**  Stated plainly rather
+than left as an absence a reader could mistake for "unchanged": on this branch
+"no output" and "no mechanism" have looked identical four times.  The PREDICTION
+from §8 — debt unchanged at 67 / 443 / 206, scope closing by ~858 per target —
+is written down here BEFORE the runs land, so that it can be wrong.
