@@ -21,18 +21,29 @@
 # sibling build directory in an installation, which is what every packaging
 # attempt so far has had to reach around.
 #
-# THE LIST IS MEASURED, NOT GUESSED.  Building libgcc in-tree with the compiler
-# writing `.dep' files and collecting every path under the gcc build directory
-# gives exactly SEVEN generated headers, across 359 translation units:
+# THE LIST IS MEASURED, NOT GUESSED -- AND IT WAS MEASURED WRONG ONCE, SO THE
+# METHOD MATTERS AS MUCH AS THE ANSWER.
 #
-#     tconfig.h  auto-host.h  tm.h  options.h  insn-constants.h
-#     insn-modes.h  version.h
+# It is SIX generated headers:
 #
-# and nothing else.  In particular `tm_p.h' is NOT among them -- it is a
-# compiler-internal header, it was on every guessed list, and installing it
-# would have been a file nothing opens.  `insn-flags.h' is not either: tm.h
-# guards it with `!defined USED_FOR_TARGET', and tconfig.h defines
-# USED_FOR_TARGET.  Both absences are load-bearing; re-measure before adding.
+#     tconfig.h  auto-host.h  tm.h  options.h  insn-constants.h  insn-modes.h
+#
+# It used to say seven, with `version.h', and that was an artefact of HOW the
+# set was collected: by building libgcc in-tree and taking every path under the
+# gcc build directory that appeared in a `.dep' file.  That scopes by SOURCE
+# DIRECTORY, not by what actually links into the library, and `gcc/' compiles a
+# file out of `libgcc/' for its own use -- `libgcc/libgcov-util.c' becomes
+# `libgcov-util.o' in GCOV_TOOL_OBJS (gcc/Makefile.in:5883,5891), part of the
+# HOST tool `gcov-tool'.  That file is the only thing under libgcc/ that
+# includes "version.h", and `libgcc/Makefile.in' never names it, so it is not a
+# libgcc object at all.  (`libgcc/config/gthr-vxworks.h:312' has
+# `#include <version.h>' -- angle brackets, VxWorks' own system header, not
+# gcc's.)
+#
+# `tm_p.h' is NOT among them either -- it is a compiler-internal header, it was
+# on every guessed list, and installing it would have been a file nothing opens.
+# `insn-flags.h' is not either: tm.h guards it with `!defined USED_FOR_TARGET', and
+# tconfig.h defines USED_FOR_TARGET.  Both absences are load-bearing; re-measure before adding.
 #
 # (The other 47 files a libgcc compile opens from the build tree -- `include/'
 # and `include-<cpu>/' -- are the COMPILER's own headers.  They already install
@@ -141,7 +152,7 @@ for t in "$@"; do
   # and is recorded as such; it is installed here because it is what libgcc
   # opens TODAY, and removing it is a separate measured change, not something
   # to do silently by omitting a file and seeing what breaks.
-  for f in tconfig.h auto-host.h version.h; do
+  for f in tconfig.h auto-host.h; do
     test -f "$builddir/$f" || fail "$t: $builddir/$f is absent"
     cp "$builddir/$f" "$d/$f.tmp" && mv "$d/$f.tmp" "$d/$f"
   done

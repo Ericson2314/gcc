@@ -225,10 +225,21 @@ AC_SYS_LARGEFILE
 dnl WHERE THIS LIBRARY'S GENERATED HEADERS COME FROM.
 dnl
 dnl libgcc is ONE MACHINE'S LIBRARY, so it compiles against that machine's
-dnl `tm.h', `options.h', `insn-modes.h' and `insn-constants.h'.  Measured, by
-dnl building it in-tree with `.dep' files on and collecting every path under the
-dnl gcc build directory: exactly seven generated headers, across 359 translation
-dnl units -- those four plus `tconfig.h', `auto-host.h' and `version.h'.
+dnl `tm.h', `options.h', `insn-modes.h' and `insn-constants.h', plus
+dnl `tconfig.h' and `auto-host.h' -- SIX generated headers.
+dnl
+dnl IT SAID SEVEN, AND THE SEVENTH WAS AN ARTEFACT OF THE MEASUREMENT.  The set
+dnl was collected by building libgcc in-tree with `.dep' files on and taking
+dnl every path under the gcc build directory.  That scopes by SOURCE DIRECTORY
+dnl rather than by what links into the library, and `gcc/' compiles a file out
+dnl of `libgcc/' for its own use: `libgcc/libgcov-util.c' becomes
+dnl `libgcov-util.o' in GCOV_TOOL_OBJS (gcc/Makefile.in:5883,5891), part of the
+dnl HOST tool `gcov-tool'.  It is the only file under libgcc/ that includes
+dnl "version.h", and `libgcc/Makefile.in' never names it -- so `version.h' was
+dnl a host tool's dependency counted as the library's.
+dnl
+dnl A standalone build cannot make that mistake: there is no gcc build directory
+dnl to over-collect from, so its `.dep' set is exactly libgcc's own objects.
 dnl
 dnl Makefile.in has had one source for them: `-I$(gcc_objdir)', the SIBLING GCC
 dnl BUILD DIRECTORY.  That is legitimate in an in-tree build and impossible
