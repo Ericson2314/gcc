@@ -69,6 +69,11 @@ extern void final_end_function (void);
 /* Output assembler code for some insns: all or part of a function.  */
 extern void final (rtx_insn *, FILE *, int);
 
+/* The generic ADDR_VEC_ALIGN, exported so the per-base thunk in
+   target-cumargs.cc can supply it to a back end that defines no macro of its
+   own -- one authority for the fallback rather than a restatement of it.  */
+extern int final_addr_vec_align (rtx_jump_table_data *);
+
 /* The final scan for one insn, INSN.  Args are same as in `final', except
    that INSN is the insn being scanned.  Value returned is the next insn to
    be scanned.  */

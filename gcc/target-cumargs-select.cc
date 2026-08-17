@@ -217,6 +217,48 @@ mt_go_if_legitimate_address (machine_mode mode, rtx addr, bool strict,
   return mt_frame ()->go_if_legitimate_address (mode, addr, strict, win);
 }
 
+/* `ASM_DECLARE_FUNCTION_SIZE'; `varasm.cc:2254'.  The closing half of
+   `mt_declare_function_name' -- on this branch the opening half was converted
+   and this one was not, so riscv emitted `.option push' without its `.option
+   pop'.  See target-frame.h.  */
+
+void
+mt_declare_function_size (FILE *file, const char *name, tree decl)
+{
+  mt_frame ()->declare_function_size (file, name, decl);
+}
+
+/* `ASM_OUTPUT_FUNCTION_PREFIX'; `varasm.cc:2192'.  The opening half of the
+   pair -- s390's `.machine push', which no base emitted because i386 defines
+   no such macro and the `#ifdef' was therefore false for everyone.  */
+
+void
+mt_declare_function_prefix (FILE *file, const char *name)
+{
+  mt_frame ()->declare_function_prefix (file, name);
+}
+
+/* `ADJUST_INSN_LENGTH'; `final.cc' :404, :1111, :1368.  Through `mt_frame ()'
+   like the rest, so a compilation with no target selected fails by name rather
+   than silently not adjusting -- which is precisely the failure this converts,
+   and would be indistinguishable from it.  */
+
+void
+mt_adjust_insn_length (rtx_insn *insn, int *length)
+{
+  mt_frame ()->adjust_insn_length (insn, length);
+}
+
+/* `ADDR_VEC_ALIGN'; `final.cc' :894, :1153, :2480.  Jump-table alignment,
+   where aarch64 and vax ask for 0 and every base was given the generic
+   computation instead.  */
+
+int
+mt_addr_vec_align (rtx_jump_table_data *table)
+{
+  return mt_frame ()->addr_vec_align (table);
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here
