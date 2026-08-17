@@ -2084,9 +2084,14 @@ output_alternate_entry_point (FILE *file, rtx_insn *insn)
       targetm.asm_out.globalize_label (file, name);
       gcc_fallthrough ();
     case LABEL_STATIC_ENTRY:
-#ifdef ASM_OUTPUT_TYPE_DIRECTIVE
-      ASM_OUTPUT_TYPE_DIRECTIVE (file, name, "function");
-#endif
+      /* THE `#ifdef ASM_OUTPUT_TYPE_DIRECTIVE' THAT WAS HERE WAS THE PRIMARY'S,
+	 GUARD AND BODY BOTH: the weak/global/static entry label's `.type ...,
+	 "function"' came out with `elfos.h:284's `@' operand for all 47 bases,
+	 which arm's assembler refuses and aarch64's silently accepts.  The
+	 return value is ignored here because upstream's `#ifdef' has no `#else'
+	 -- absence means print nothing, and it still does.  See
+	 target-frame.h.  */
+      mt_output_type_directive (file, name, "function");
       ASM_OUTPUT_LABEL (file, name);
       break;
 

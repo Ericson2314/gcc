@@ -2112,6 +2112,105 @@ struct target_frame_desc
      to branch on and the call site is unconditional.  */
   void (*declare_function_size) (FILE *file, const char *name, tree decl);
 
+  /* ASM_DECLARE_OBJECT_NAME -- THE DATA SIBLING OF `declare_function_name',
+     AND THE SITE THAT EMITS THE `.type' DIRECTIVE FOR EVERY VARIABLE.
+
+     `varasm.cc:2539' (`assemble_variable_contents') and `varasm.cc:517'
+     (`asm_output_aligned_bss'), both an `#ifdef' with an `ASM_OUTPUT_LABEL'
+     `#else'.  `elfos.h:346' supplies the generic ELF version, so -- exactly as
+     for `declare_function_name' -- the `#ifdef' was true for nearly everyone
+     and the question was never existence but WHOSE.
+
+     WHAT THE PRIMARY'S ANSWER COSTS, MEASURED ON arm.  `elfos.h:354' reaches
+     `ASM_OUTPUT_TYPE_DIRECTIVE', which `defaults.h:260' builds out of
+     `TYPE_ASM_OP' and `TYPE_OPERAND_FMT'.  `elfos.h:284' spells the operand
+     format `"@%s"'; `arm/elf.h:74' and `aarch64/aarch64-elf.h:149' spell it
+     `"%%%s"'.  Shared code got the primary's, so every variable came out as
+
+	 .type	x, @object          instead of      .type	x, %object
+
+     and ON ARM `@' BEGINS A COMMENT, so the type operand is empty and the
+     assembler refuses the line by name:
+
+	 Error: unrecognized symbol type ""
+
+     A660907426E03E4E9-ARM-BOARD.md attributes 2,922 of the arm row's 3,288
+     regressions to exactly this, 89% of that board.
+
+     AND THE SHARPER HALF, WHICH IS WHY THIS FIELD EXISTS RATHER THAN AN arm
+     SPECIAL CASE.  `aarch64' asks for `%object' too and `aarch64' has been a
+     SCORED target on this branch from the beginning -- so it has been emitting
+     the wrong `.type' operand on every board ever taken here, and produced no
+     failure, because the aarch64 assembler ACCEPTS `@object'.  So do riscv64's,
+     s390x's and x86_64's; only arm's objects.  The defect was not invisible
+     because the scored targets agreed -- one of them DISSENTED and was
+     silently mis-served.  It was invisible because no tooling complained.
+     PRINCIPLES' "a leaked assumption is invisible from any set of targets that
+     shares it" is the weaker statement; this is the stronger one, and no
+     sample size over those four reaches it.
+
+     NO EXISTENCE FIELD, for `declare_function_name's reason: the `#else' arm
+     (emit a plain label) is itself a complete action.
+
+     `last_assemble_variable_decl' IS ASSIGNED INSIDE THE THUNK, not by the
+     caller, because upstream assigns it BEFORE expanding the macro and only on
+     the arm where the macro exists.  Hoisting it to the shared side would
+     either set it for bases that upstream leaves alone, or set it after a
+     macro body that is entitled to read it.  */
+  void (*declare_object_name) (FILE *file, const char *name, tree decl);
+
+  /* ASM_FINISH_DECLARE_OBJECT -- THE CLOSING HALF OF THE FIELD ABOVE.
+     `passes.cc:376', an `#ifdef' with no `#else'.  `output.h:349' states the
+     pairing outright: "Carry information from ASM_DECLARE_OBJECT_NAME to
+     ASM_FINISH_DECLARE_OBJECT", and the carrier is
+     `last_assemble_variable_decl', which the opening thunk now assigns.
+
+     CONVERTED WITH ITS OPENING HALF AND NOT AFTER IT.  `declare_function_size'
+     records what the other order costs: `declare_function_name' was converted
+     alone and riscv emitted `.option push' with no `.option pop' until a later
+     board found it.  Five back ends define this macro with four distinct
+     bodies -- elfos, openbsd, mcore-elf, mips/elf, microblaze -- and elfos.h
+     is in the primary's chain, so the guard was true for all 47 bases and
+     every one of them ran elfos.h's body.
+
+     NO EXISTENCE FIELD: no `#else', so absence is a complete action.  */
+  void (*finish_declare_object) (FILE *file, tree decl, int top_level,
+				 int at_end);
+
+  /* ASM_OUTPUT_TYPE_DIRECTIVE, read DIRECTLY by shared code at two sites that
+     do not go through `declare_object_name': `final.cc:2087' (the `.type ...,
+     "function"' for a weak/global/static ENTRY label) and `varasm.cc:6647'
+     (the ifunc resolver's `.type ..., IFUNC_ASM_TYPE').
+
+     Same leak, same cost, different bracket -- and it is the "sweep the
+     family, do not meet it one wall at a time" rule from
+     `declare_cold_function_name' applied before rather than after the second
+     wall was hit.  Converting only `declare_object_name' would have left every
+     ifunc resolver and every weak entry label on arm still spelling `@'.
+
+     THIS ONE DOES NEED AN EXISTENCE ANSWER, unlike its neighbours, and it is
+     carried in the RETURN VALUE rather than a separate field.  `varasm.cc:6647'
+     is not an `#ifdef'/`#else' pair over two actions; it is
+
+	 #if defined (ASM_OUTPUT_TYPE_DIRECTIVE)
+	   if (targetm.has_ifunc_p ()) ASM_OUTPUT_TYPE_DIRECTIVE (...); else
+	 #endif
+	   error_at (..., "%qs is not supported on this target", "ifunc");
+
+     -- so a base with no such macro must reach the ERROR, and "nothing was
+     emitted" has to be distinguishable at the call site.  A `void' thunk would
+     turn that into a silently missing directive with a successful compile,
+     which is the null-result-reads-as-success shape this file exists to
+     refuse.  Returns true iff the base defines the macro and the directive was
+     written.
+
+     `IFUNC_ASM_TYPE' is deliberately NOT converted with it: `defaults.h:120'
+     is its only definition in the whole tree, no back end overrides it, so
+     there is no second answer for the primary to leak.  Checked rather than
+     assumed, because `TYPE_OPERAND_FMT' looked equally settled.  */
+  bool (*output_type_directive) (FILE *file, const char *name,
+				 const char *type);
+
   /* ASM_OUTPUT_FUNCTION_PREFIX -- THE OPENING HALF OF THE BRACKET ABOVE, AND
      A MACRO THE LEAK CENSUS CANNOT SEE.
 
@@ -2397,6 +2496,22 @@ extern void mt_declare_cold_function_name (FILE *, const char *, tree);
    varasm.cc.  See the descriptor field for what the leaked answer costs on
    riscv and s390.  */
 extern void mt_declare_function_size (FILE *, const char *, tree);
+
+/* `ASM_DECLARE_OBJECT_NAME' / `ASM_OUTPUT_LABEL', the data sibling.  Spelled
+   at the call site for the same reason as the two above.  See the descriptor
+   field for what the primary's `"@%s"' costs on arm -- and for the fact that
+   aarch64, a SCORED target, has been carrying the same wrong operand silently
+   because its assembler does not object.  */
+extern void mt_declare_object_name (FILE *, const char *, tree);
+
+/* `ASM_FINISH_DECLARE_OBJECT', the closing half; `passes.cc:376'.  */
+extern void mt_finish_declare_object (FILE *, tree, int, int);
+
+/* `ASM_OUTPUT_TYPE_DIRECTIVE', for the two shared sites that read it directly.
+   Returns false when the selected base defines no such macro and NOTHING was
+   emitted, which `varasm.cc:6647' must turn into its `ifunc is not supported'
+   error rather than into a silently absent directive.  */
+extern bool mt_output_type_directive (FILE *, const char *, const char *);
 
 /* `ASM_OUTPUT_FUNCTION_PREFIX', the opening half.  s390's only, undocumented
    in tm.texi, and therefore invisible to the leak census.  See the descriptor

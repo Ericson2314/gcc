@@ -458,6 +458,62 @@ mt_base_declare_function_size (FILE *file ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* ASM_DECLARE_OBJECT_NAME, asked of THIS base.  `varasm.cc:2539' and
+   `varasm.cc:517', the same `#ifdef'/`#else' pair both spelled, with the
+   `last_assemble_variable_decl' assignment kept where upstream has it --
+   BEFORE the macro body and only on the arm that has one.
+
+   In shared code both arms were the primary's, and the body reaches
+   `defaults.h:260's ASM_OUTPUT_TYPE_DIRECTIVE, i.e. `elfos.h:284's
+   `TYPE_OPERAND_FMT "@%s"'.  arm and aarch64 both spell it `"%%%s"'.  On arm
+   `@' opens a comment and `as' rejects the empty type operand; on aarch64 the
+   assembler accepts the wrong operand without a word.  See target-frame.h.  */
+
+static void
+mt_base_declare_object_name (FILE *file, const char *name,
+			     tree decl ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_DECLARE_OBJECT_NAME
+  last_assemble_variable_decl = decl;
+  ASM_DECLARE_OBJECT_NAME (file, name, decl);
+#else
+  /* Standard thing is just output label for the object.  */
+  ASM_OUTPUT_LABEL (file, name);
+#endif
+}
+
+/* ASM_FINISH_DECLARE_OBJECT, asked of THIS base -- `passes.cc:376', the
+   CLOSING half of the bracket `mt_base_declare_object_name' opens.  An
+   `#ifdef' with no `#else', so absence is "do nothing" and stays so.  */
+
+static void
+mt_base_finish_declare_object (FILE *file ATTRIBUTE_UNUSED,
+			       tree decl ATTRIBUTE_UNUSED,
+			       int top_level ATTRIBUTE_UNUSED,
+			       int at_end ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_FINISH_DECLARE_OBJECT
+  ASM_FINISH_DECLARE_OBJECT (file, decl, top_level, at_end);
+#endif
+}
+
+/* ASM_OUTPUT_TYPE_DIRECTIVE, asked of THIS base -- `final.cc:2087' and
+   `varasm.cc:6647'.  The return value carries the `#if defined' that
+   `varasm.cc:6647' can not do without; see target-frame.h.  */
+
+static bool
+mt_base_output_type_directive (FILE *file ATTRIBUTE_UNUSED,
+			       const char *name ATTRIBUTE_UNUSED,
+			       const char *type ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_TYPE_DIRECTIVE
+  ASM_OUTPUT_TYPE_DIRECTIVE (file, name, type);
+  return true;
+#else
+  return false;
+#endif
+}
+
 /* ASM_OUTPUT_FUNCTION_PREFIX, asked of THIS base -- `varasm.cc:2192'.  s390 is
    the only definer and i386 is not, so in shared code the `#ifdef' was false
    for all 47 bases and s390's `.machine push' / `.machinemode zarch' never
@@ -2279,6 +2335,9 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_final_prescan_insn,
   mt_base_go_if_legitimate_address,
   mt_base_declare_function_size,
+  mt_base_declare_object_name,
+  mt_base_finish_declare_object,
+  mt_base_output_type_directive,
   mt_base_declare_function_prefix,
   mt_base_adjust_insn_length,
   mt_base_addr_vec_align,

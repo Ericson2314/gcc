@@ -373,13 +373,21 @@ rest_of_decl_compilation (tree decl,
 	    varpool_node::finalize_decl (decl);
 	}
 
-#ifdef ASM_FINISH_DECLARE_OBJECT
+      /* THE `#ifdef ASM_FINISH_DECLARE_OBJECT' THAT WAS HERE WAS THE
+	 PRIMARY'S, GUARD AND BODY BOTH -- and it is the CLOSING HALF of the
+	 bracket `varasm.cc:2539's `ASM_DECLARE_OBJECT_NAME' opens; `output.h:349'
+	 says so in as many words ("Carry information from ASM_DECLARE_OBJECT_NAME
+	 to ASM_FINISH_DECLARE_OBJECT").  Converting only the opening half is the
+	 `declare_function_name'-without-`declare_function_size' mistake, which
+	 cost riscv a `.option push' with no `.option pop'; so it is converted
+	 here rather than left for the next board to find.  Five back ends define
+	 the macro with four distinct bodies (elfos, openbsd, mcore, mips/elf,
+	 microblaze) and elfos.h is the primary's, so all 47 bases were running
+	 elfos.h's.  The `last_assemble_variable_decl' test stays on the shared
+	 side: it is a fact about this compilation, not about the target, and the
+	 thunk is what makes the ASSIGNMENT above per-base.  */
       if (decl == last_assemble_variable_decl)
-	{
-	  ASM_FINISH_DECLARE_OBJECT (asm_out_file, decl,
-				     top_level, at_end);
-	}
-#endif
+	mt_finish_declare_object (asm_out_file, decl, top_level, at_end);
 
       /* Now that we have activated any function-specific attributes
 	 that might affect function decl, particularly align, relayout it.  */

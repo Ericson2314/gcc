@@ -514,13 +514,12 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 {
   switch_to_section (bss_section);
   ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
-#ifdef ASM_DECLARE_OBJECT_NAME
-  last_assemble_variable_decl = decl;
-  ASM_DECLARE_OBJECT_NAME (file, name, decl);
-#else
-  /* Standard thing is just output label for the object.  */
-  ASM_OUTPUT_LABEL (file, name);
-#endif /* ASM_DECLARE_OBJECT_NAME */
+  /* THE `#ifdef ASM_DECLARE_OBJECT_NAME' PAIR THAT WAS HERE WAS ANSWERED BY
+     THE PRIMARY, IN BOTH ARMS -- `declare_function_name's defect, one bracket
+     over, on the DATA side.  The body reaches `elfos.h:284's
+     `TYPE_OPERAND_FMT "@%s"', and arm and aarch64 both ask for `"%%%s"'.  See
+     target-frame.h.  */
+  mt_declare_object_name (file, name, decl);
   ASM_OUTPUT_SKIP (file, size ? size : 1);
 }
 
@@ -2535,14 +2534,16 @@ static void
 assemble_variable_contents (tree decl, const char *name,
 			    bool dont_output_data, bool merge_strings)
 {
-  /* Do any machine/system dependent processing of the object.  */
-#ifdef ASM_DECLARE_OBJECT_NAME
-  last_assemble_variable_decl = decl;
-  ASM_DECLARE_OBJECT_NAME (asm_out_file, name, decl);
-#else
-  /* Standard thing is just output label for the object.  */
-  ASM_OUTPUT_LABEL (asm_out_file, name);
-#endif /* ASM_DECLARE_OBJECT_NAME */
+  /* Do any machine/system dependent processing of the object.
+
+     THE `#ifdef ASM_DECLARE_OBJECT_NAME' PAIR THAT WAS HERE WAS ANSWERED BY
+     THE PRIMARY, IN BOTH ARMS.  This is the site that emits `.type x, @object'
+     for every variable in the program, and `@' begins a COMMENT on arm, so the
+     type operand arrived empty and `as' refused the line -- 2,922 of the arm
+     row's 3,288 regressions.  aarch64 asks for `%object' too and has been
+     mis-served silently on every board this branch has taken, because its
+     assembler accepts `@object' without a word.  See target-frame.h.  */
+  mt_declare_object_name (asm_out_file, name, decl);
 
   if (!dont_output_data)
     {
@@ -6644,13 +6645,17 @@ do_assemble_alias (tree decl, tree target)
   if (TREE_CODE (decl) == FUNCTION_DECL
       && cgraph_node::get (decl)->ifunc_resolver)
     {
-#if defined (ASM_OUTPUT_TYPE_DIRECTIVE)
-      if (targetm.has_ifunc_p ())
-	ASM_OUTPUT_TYPE_DIRECTIVE
-	  (asm_out_file, IDENTIFIER_POINTER (id),
-	   IFUNC_ASM_TYPE);
-      else
-#endif
+      /* THE `#if defined (ASM_OUTPUT_TYPE_DIRECTIVE)' THAT WAS HERE ASKED THE
+	 PRIMARY WHETHER THE SELECTED BASE HAS THE MACRO, AND THEN EXPANDED THE
+	 PRIMARY'S BODY.  The existence answer moves into the per-base thunk and
+	 comes back as the return value, so a base with no such macro still
+	 reaches the error below instead of quietly emitting nothing.
+	 `IFUNC_ASM_TYPE' stays as it is: `defaults.h:120' is its only
+	 definition in the tree, so there is no second answer to leak -- checked
+	 rather than assumed.  See target-frame.h.  */
+      if (!(targetm.has_ifunc_p ()
+	    && mt_output_type_directive (asm_out_file, IDENTIFIER_POINTER (id),
+					 IFUNC_ASM_TYPE)))
 	error_at (DECL_SOURCE_LOCATION (decl),
 		  "%qs is not supported on this target", "ifunc");
     }
