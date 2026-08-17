@@ -367,6 +367,9 @@ Driver Alias(print-multi-directory)
 -print-multi-lib
 Driver Alias(print-multi-lib)
 
+-print-target-header-dir
+Driver Alias(print-target-header-dir)
+
 -print-multi-os-directory
 Driver Alias(print-multi-os-directory)
 
@@ -3931,6 +3934,9 @@ Driver
 
 print-multi-directory
 Driver Var(print_multi_directory)
+
+print-target-header-dir
+Driver Var(print_target_header_dir)
 
 print-multi-lib
 Driver Var(print_multi_lib)

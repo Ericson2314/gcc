@@ -4509,6 +4509,7 @@ driver_handle_option (struct gcc_options *opts,
     case OPT_print_prog_name_:
     case OPT_print_multi_lib:
     case OPT_print_multi_directory:
+    case OPT_print_target_header_dir:
     case OPT_print_sysroot:
     case OPT_print_multi_os_directory:
     case OPT_print_multiarch:
@@ -9776,6 +9777,51 @@ driver::maybe_print_and_exit () const
 	printf (".\n");
       else
 	printf ("%s\n", multilib_dir);
+      return (0);
+    }
+
+  /* Where this installation keeps the GENERATED headers for the target this
+     driver serves: $(libdir)/gcc/$(version)/<target>/include.
+
+     WHY THE DRIVER ANSWERS THIS AND NOT A CONFIGURE OPTION.  libgcc is one
+     machine's library and has to compile against that machine's `tm.h',
+     `options.h', `insn-modes.h' and `insn-constants.h'.  In an in-tree build it
+     gets them from `-I$(gcc_objdir)' -- the sibling gcc BUILD directory -- and
+     that is exactly what every packaging attempt has had to reach around,
+     because an installed compiler has no sibling build directory.  Asking a
+     packager to name the directory instead just moves the wrong answer: it is a
+     path INSIDE the compiler's own installation, derived from the same
+     make_relative_prefix arithmetic `find_target_config' already does, and the
+     only program that can do that arithmetic correctly is this one.
+
+     DERIVED FROM `found_target_config', not composed again, for the same reason
+     the per-target spec file above is: two derivations of one directory can
+     disagree, and this one would disagree silently -- a wrong include directory
+     does not fail, it serves ANOTHER target's `tm.h', which is the defect this
+     whole layout exists to remove.
+
+     PRINTS NOTHING AND FAILS when no configuration was found.  An empty line on
+     stdout with status 0 would read to a configure script as "the directory is
+     the current one".  There is no target here whose headers these could be, so
+     say so by name and exit non-zero; libgcc's configure tests the status.  */
+  if (print_target_header_dir)
+    {
+      if (found_target_config == NULL)
+	{
+	  fatal_error (input_location,
+		       "no per-target configuration was found, so this "
+		       "installation has no generated headers for %qs; "
+		       "looked at:%s",
+		       targ_caps_target_name ? targ_caps_target_name
+					     : spec_machine,
+		       target_config_tried ? target_config_tried : " nothing");
+	}
+      const char *slash = strrchr (found_target_config, '/');
+      gcc_assert (slash != NULL);
+      char *dir = xstrndup (found_target_config,
+			    slash - found_target_config);
+      printf ("%s/include\n", dir);
+      free (dir);
       return (0);
     }
 

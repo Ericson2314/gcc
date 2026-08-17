@@ -6462,6 +6462,28 @@ ifeq ($(enable_plugin),yes)
 install: install-plugin
 endif
 
+install: install-target-headers
+
+# Where the per-target generated headers go, and it is the SAME directory the
+# driver already finds `specs-config' in -- $(libdir)/gcc/$(version)/<target>,
+# the top level's $(MT_INSTALL_CONFIGDIR).  Spelled from $(libdir) and
+# $(version) here rather than from $(libsubdir), because $(libsubdir) carries
+# $(accel_dir_suffix) and the driver's search does not: find_target_config maps
+# $(bindir) -> $(libdir)/gcc and then appends <version>/<target>.  Using
+# $(libsubdir) would put the headers one directory from where a compiler with
+# an accelerator suffix looks, which is a correct file nobody opens.
+MT_INSTALL_HEADERDIR = $(libdir)/gcc/$(version)
+#
+# NOT GUARDED BY A `test -d': the script fails by name when a header is absent.
+# An install that quietly skipped the headers would leave an installation whose
+# libgcc cannot be built, reporting success -- and the failure would surface in
+# another component, as a missing `tm.h', naming nothing that led to it.
+install-target-headers: installdirs multi-target.manifest
+	$(SHELL) $(srcdir)/install-target-headers.sh \
+	  $(objdir) multi-target.manifest \
+	  $(DESTDIR)$(MT_INSTALL_HEADERDIR) $(MT_INSTALL_HEADERDIR) \
+	  $(enabled_targets)
+
 ifeq ($(enable_libgdiagnostics),yes)
 install: install-libgdiagnostics
 endif

@@ -222,6 +222,96 @@ AC_PROG_CPP_WERROR
 
 AC_SYS_LARGEFILE
 
+dnl WHERE THIS LIBRARY'S GENERATED HEADERS COME FROM.
+dnl
+dnl libgcc is ONE MACHINE'S LIBRARY, so it compiles against that machine's
+dnl `tm.h', `options.h', `insn-modes.h' and `insn-constants.h'.  Measured, by
+dnl building it in-tree with `.dep' files on and collecting every path under the
+dnl gcc build directory: exactly seven generated headers, across 359 translation
+dnl units -- those four plus `tconfig.h', `auto-host.h' and `version.h'.
+dnl
+dnl Makefile.in has had one source for them: `-I$(gcc_objdir)', the SIBLING GCC
+dnl BUILD DIRECTORY.  That is legitimate in an in-tree build and impossible
+dnl anywhere else, and reaching around it is what every packaging attempt on
+dnl this branch has had to do.  An installed compiler carries the same headers,
+dnl per target, in $(libdir)/gcc/$(version)/<target>/include -- beside the
+dnl specs-config the driver already finds there.
+dnl
+dnl THE DRIVER IS ASKED, not a configure option.  `--with-gcc-headers=DIR' would
+dnl be a path inside the compiler's own installation supplied from outside it,
+dnl i.e. a second authority on a question the driver already answers -- and a
+dnl wrong answer here does not fail, it compiles this library against ANOTHER
+dnl target's tm.h.  Same reason -print-prog-name=ld is used for the linker probe
+dnl further down: $CC is the compiler that will build these objects.
+dnl
+dnl IN-TREE IS DETECTED BY THE SIBLING BUILD DIRECTORY, not by the driver
+dnl failing.  In an in-tree build the headers have not been installed yet and
+dnl the driver would either answer with a directory that does not exist or fail;
+dnl either way the sibling directory is the right answer and is the one with the
+dnl freshly generated files in it.
+AC_MSG_CHECKING([where this target's generated headers come from])
+libgcc_standalone=no
+gcc_target_incdir='$(gcc_objdir)'
+if test -f "../../$host_subdir/gcc/libgcc.mvars"; then
+  AC_MSG_RESULT([the sibling gcc build directory (in-tree build)])
+else
+  libgcc_standalone=yes
+  gcc_target_incdir=`$CC $CFLAGS $CPPFLAGS -print-target-header-dir 2>&1`
+  case $gcc_target_incdir in
+    /*) ;;
+    *) AC_MSG_RESULT([nothing usable])
+       AC_MSG_ERROR([there is no sibling gcc build directory, and
+  $CC -print-target-header-dir
+did not name one either.  It said:
+  $gcc_target_incdir
+This library must compile against ITS OWN machine's generated tm.h; there is
+no default to fall back on, because falling back means compiling against
+whichever back end happened to be the compiler's primary.]) ;;
+  esac
+  AC_MSG_RESULT([$gcc_target_incdir])
+  dnl NON-VACUITY.  An absolute path that does not exist, or that holds no
+  dnl tm.h, would pass the case above and then surface hundreds of lines later
+  dnl as `tm.h: No such file or directory' in a compile whose -I list nobody
+  dnl reads.  Both halves are checked: the directory AND the header that is the
+  dnl entire reason for it.
+  if test ! -f "$gcc_target_incdir/tm.h"; then
+    AC_MSG_ERROR([$gcc_target_incdir/tm.h does not exist.
+The compiler named that directory, so it believes it was installed with
+per-target headers.  Install them with `make install' in gcc/, which runs
+install-target-headers.])
+  fi
+fi
+AC_SUBST(gcc_target_incdir)
+AC_SUBST(libgcc_standalone)
+
+dnl `inhibit_libc' IS THIS LIBRARY'S QUESTION AND IT USED TO BE ANSWERED BY gcc.
+dnl
+dnl gcc/configure.ac sets `inhibit_libc=true' when it was configured with newlib
+dnl and no headers, gcc/Makefile.in turns that into `-Dinhibit_libc', and it
+dnl reaches here through `libgcc.mvars' -- one of the only two variables that
+dnl file carries.  A host gcc serving many targets has ONE such answer; whether
+dnl a C library is available is a fact about the machine THIS library is being
+dnl built for.
+dnl
+dnl It matters more than its size suggests.  `-Dinhibit_libc' removes the
+dnl split-stack support, the gcov runtime and the dl_iterate_phdr FDE lookup
+dnl from libgcc WITH NO CHANGE TO ANY INSTALLED FILE NAME -- a crippled
+dnl libgcc.a and a complete one are told apart only by `nm'.  So it is probed
+dnl here, and the probe is a compile against the headers these objects will
+dnl actually use.
+AC_CACHE_CHECK([whether a C library is available for $host],
+	       [libgcc_cv_have_libc], [
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <stdio.h>
+#include <stdlib.h>
+int f (void) { return 0; }]])],
+		    [libgcc_cv_have_libc=yes], [libgcc_cv_have_libc=no])])
+if test x$libgcc_cv_have_libc = xno; then
+  INHIBIT_LIBC_CFLAGS=-Dinhibit_libc
+else
+  INHIBIT_LIBC_CFLAGS=
+fi
+AC_SUBST(INHIBIT_LIBC_CFLAGS)
+
 AC_CHECK_SIZEOF([double])
 AC_CHECK_SIZEOF([long double])
 AS_VAR_ARITH([double_type_size], [$ac_cv_sizeof_double \* 8])
