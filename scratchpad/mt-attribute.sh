@@ -68,7 +68,25 @@ awk '
   /^(Executing on host:|spawn )/ { if ($0 ~ /^Executing on host:/) buf = $0; next }
   /^FAIL: / {
     if (buf ~ /no target selected/)              k = "NO-TARGET";
+    # NO-RUNTIME HAS A SIGNATURE PER FRONT END, AND ONE PATTERN IS NOT ENOUGH.
+    # A multi-target build has no target libraries at all, and each front end
+    # reports that absence in its own words:
+    #   C / C++ / Fortran    fatal error: <hdr>: No such file or directory
+    #   Algol 68             prelude: error: cannot find module STANDARD
+    # The second is emitted by a681 itself (a68-parser-extract.cc:233), not by
+    # the preprocessor, so it matches nothing file-shaped.  Scoring it RESIDUAL
+    # attributed all 5367 of the algol68 board to the compiler, when libga68 is
+    # a target module (Makefile.def:221) that this build never had.
     else if (buf ~ /No such file or directory/)  k = "NO-RUNTIME";
+    else if (buf ~ /cannot find module/)         k = "NO-RUNTIME";
+    #   Go                   error: import file "fmt" not found      (libgo)
+    # Third signature, third front end, and each was found only by reading a
+    # residual that looked like a compiler defect.  The list is open: when a
+    # new front end is boarded, read its residual before quoting it.
+    else if (buf ~ /import file .* not found/)   k = "NO-RUNTIME";
+    #   COBOL   error: could not open copybook file for "cbltypes.cpy"
+    #           -- the copybooks ship with libgcobol, also a target module.
+    else if (buf ~ /could not open copybook file/) k = "NO-RUNTIME";
     # AN ARTEFACT OF COMPILE-ONLY MODE ITSELF.  MT_COMPILE_ONLY downgrades
     # dg-do run/link to -S; a test with dg-additional-sources then hands the
     # driver several files AND a -o, which it refuses by name.  Nothing about
