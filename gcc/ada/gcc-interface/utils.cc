@@ -145,18 +145,19 @@ static const struct attribute_spec::exclusions attr_noinline_exclusions[] =
   { NULL, false, false, false },
 };
 
-static const struct attribute_spec::exclusions attr_target_exclusions[] =
+/* Not `const', and the `target_clones' entry is a placeholder patched by
+   `mt_fixup_fmv_exclusions ()' -- see the note in `c-family/c-attribs.cc'.  */
+static struct attribute_spec::exclusions attr_target_exclusions[] =
 {
-  { "target_clones", TARGET_HAS_FMV_TARGET_ATTRIBUTE,
-    TARGET_HAS_FMV_TARGET_ATTRIBUTE, TARGET_HAS_FMV_TARGET_ATTRIBUTE },
+  { "target_clones", false, false, false },
   { NULL, false, false, false },
 };
 
-static const struct attribute_spec::exclusions attr_target_clones_exclusions[] =
+/* Not `const', and the `target' entry patched at run time -- see above.  */
+static struct attribute_spec::exclusions attr_target_clones_exclusions[] =
 {
   { "always_inline", true, true, true },
-  { "target", TARGET_HAS_FMV_TARGET_ATTRIBUTE, TARGET_HAS_FMV_TARGET_ATTRIBUTE,
-    TARGET_HAS_FMV_TARGET_ATTRIBUTE },
+  { "target", false, false, false },
   { NULL, false, false, false },
 };
 

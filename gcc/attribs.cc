@@ -313,6 +313,68 @@ free_attr_data ()
   ignored_attributes_table.release ();
 }
 
+/* MULTI-TARGET.  Whether the `target' and `target_clones' attributes are
+   mutually exclusive is a PER-CONFIGURATION fact -- it is
+   `TARGET_HAS_FMV_TARGET_ATTRIBUTE', which aarch64, riscv and loongarch
+   define as 0 and every other back end leaves to `defaults.h''s floor of 1.
+
+   Upstream spells the macro directly in the initialisers of four front ends'
+   `attribute_spec::exclusions' tables (c-family, d, jit, ada).  Here the
+   macro is a run-time load from `targetm_cdata', so those initialisers cannot
+   name it; the tables carry `false' and this function writes the selected
+   base's real answer into them before anything registers or reads them.
+
+   THE INITIALISER IS `false' AND THAT DIRECTION IS DELIBERATE.  If this
+   function ever failed to run, `false' loses a diagnostic -- a `dg-error'
+   test fails loudly -- whereas `true' would silently reject valid aarch64
+   code.  A one-bit field has no room for a poison, so the fallback is chosen
+   to fail in the direction that a test can see.  It is not left to trust
+   either: the check below refuses a table that names both attributes and
+   yet offered nothing to patch.  */
+
+static void
+mt_fixup_fmv_exclusions (void)
+{
+  bool saw_target = false, saw_target_clones = false;
+  unsigned patched = 0;
+
+  for (auto scoped_array : attribute_tables)
+    for (auto scoped_attributes : scoped_array)
+      for (const attribute_spec &spec : scoped_attributes->attributes)
+	{
+	  const bool is_target = strcmp (spec.name, "target") == 0;
+	  const bool is_clones = strcmp (spec.name, "target_clones") == 0;
+
+	  saw_target |= is_target;
+	  saw_target_clones |= is_clones;
+
+	  if ((!is_target && !is_clones) || spec.exclude == NULL)
+	    continue;
+
+	  const char *const other = is_target ? "target_clones" : "target";
+	  /* `const_cast' is safe exactly because the four tables above were
+	     changed from `static const' to `static'; a table still declared
+	     const would land in .rodata and this would fault rather than
+	     answer.  */
+	  for (attribute_spec::exclusions *e
+		 = const_cast<attribute_spec::exclusions *> (spec.exclude);
+	       e->name != NULL; e++)
+	    if (strcmp (e->name, other) == 0)
+	      {
+		e->function = e->variable = e->type
+		  = TARGET_HAS_FMV_TARGET_ATTRIBUTE;
+		patched++;
+	      }
+	}
+
+  if (saw_target && saw_target_clones && patched == 0)
+    internal_error ("this front end declares both %qs and %qs and yet no "
+		    "mutual-exclusion entry naming the other could be "
+		    "patched with this target%'s "
+		    "%<TARGET_HAS_FMV_TARGET_ATTRIBUTE%>",
+		    "target", "target_clones");
+}
+
 /* Initialize attribute tables, and make some sanity checks if checking is
    enabled.  */
 
@@ -324,6 +386,11 @@ init_attributes (void)
 
   attribute_tables[0] = lang_hooks.attribute_table;
   attribute_tables[1] = targetm.attribute_table;
+
+  /* Before `check_attribute_tables', which asserts that exclusions are
+     symmetric: both directions are written here from one value, so the
+     assertion is checking the patched tables rather than racing them.  */
+  mt_fixup_fmv_exclusions ();
 
   if (flag_checking)
     check_attribute_tables ();
@@ -1133,7 +1200,11 @@ sorted_attr_string (tree arglist)
   char *attr = NULL;
   unsigned int argnum = 1;
   unsigned int i;
-  static const char separator_str[] = { TARGET_CLONES_ATTR_SEPARATOR, 0 };
+  /* NOT `static': `TARGET_CLONES_ATTR_SEPARATOR' is per-configuration data
+     now (target-cdata.h), so it is a run-time load and cannot initialise an
+     object with static storage duration.  The array is only ever read inside
+     this function, through `strtok' below.  */
+  const char separator_str[] = { TARGET_CLONES_ATTR_SEPARATOR, 0 };
 
   for (arg = arglist; arg; arg = TREE_CHAIN (arg))
     {

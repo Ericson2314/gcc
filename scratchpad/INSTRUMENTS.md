@@ -78,6 +78,15 @@ until now **three of them had no sweep** and were found by accident.
 | floor-fires | `#ifndef` floor, primary **silent**, so the floor runs and the *dissenters* read it (`TARGET_HAS_FMV_TARGET_ATTRIBUTE`, `STACK_POINTER_OFFSET`) | same |
 | leaked absence | bare `#ifdef` in a **shared** TU on a name the primary does not define, so the guarded code runs for **nobody** (`FINAL_PRESCAN_INSN`, `TRAMPOLINE_SECTION`) | `agent-a992b7e5fa4ffaaa7-absencesweep.sh` |
 | generated header | the name lives only in a **generated per-base header** and the build root's shared copy is the primary's (`DELAY_SLOTS`, `HAVE_conditional_execution`, `insn-modes.h`, `options.h`) | `agent-a992b7e5fa4ffaaa7-genhdrsweep.sh` |
+| **guard-true-for-all** | **bare `#ifdef` in shared code on a name the PRIMARY DEFINES, so the guard is true for everyone and the VALUE inside is the primary's** (`EH_RETURN_STACKADJ_RTX` — i386's `CX_REG` is 2, which on riscv is `sp`) | **nothing yet** |
+
+**The fifth row has NO `defaults.h` floor anywhere in its story**, so
+`floorsweep.sh` cannot see it, and it is not the leaked-absence row either:
+`absencesweep.sh` looks for names the primary is SILENT about, and here the
+primary is the definer. It leaks presence and value at once — the guarded code
+also runs for the back ends that define nothing. Enumerable in the same way as
+the others: *a bare `#ifdef <NAME>` in a shared TU where `<NAME>` is `#define`d
+by i386 **and** by some other back end with a different body.*
 
 **The per-row discriminator is `agent-a992b7e5fa4ffaaa7-floorread.sh`** — the
 both-sided header read, shared `tm.h` against each `<base>-inc/tm.h`. **It MUST

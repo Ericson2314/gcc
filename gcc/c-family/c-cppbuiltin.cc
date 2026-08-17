@@ -1631,9 +1631,12 @@ c_cpp_builtins (cpp_reader *pfile)
       builtin_define_with_int_value ("__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__",
 				     DWARF_CIE_DATA_ALIGNMENT);
 
-#ifdef EH_RETURN_STACKADJ_RTX
-      cpp_define (pfile, "__LIBGCC_EH_RETURN_STACKADJ_RTX__");
-#endif
+      /* WAS `#ifdef EH_RETURN_STACKADJ_RTX'.  This EXPORTS the existence
+	 answer to libgcc, and it was the primary's -- i386 defines the macro,
+	 so every target's libgcc was told it has a stack-adjust register
+	 whether or not its back end supplies one.  Ask the selected base.  */
+      if (mt_has_eh_return_stackadj_rtx ())
+	cpp_define (pfile, "__LIBGCC_EH_RETURN_STACKADJ_RTX__");
 #ifdef JMP_BUF_SIZE
       builtin_define_with_int_value ("__LIBGCC_JMP_BUF_SIZE__",
 				     JMP_BUF_SIZE);

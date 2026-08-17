@@ -496,6 +496,31 @@ extern void mt_asm_output_align (FILE *, int);
    `STORE_FLAG_VALUE' above this redirect stands alone.  */
 #undef WORD_REGISTER_OPERATIONS
 #define WORD_REGISTER_OPERATIONS (targetm_cdata.word_register_operations)
+/* THE FUNCTION-MULTIVERSIONING PAIR.  See the field comment in
+   target-cdata.h: this is the `#ifndef' floor in the polarity where the
+   PRIMARY IS SILENT, so `defaults.h''s fallback really does fire and the
+   dissenters (aarch64, riscv, loongarch) get the floor's answer instead of
+   their own.
+
+   SWEPT BEFORE REDIRECTING, because a cdata slot is a run-time load and these
+   two are the first cdata macros with STATIC-INITIALISER consumers.  Over all
+   of `gcc/' outside `config/': no `#if', no `#ifdef', no case label, no array
+   bound.  Six static initialisers, all now converted -- four
+   `attribute_spec::exclusions' tables (c-family, d, jit, ada) patched at
+   `init_attributes ()' time by `mt_fixup_fmv_exclusions ()', and two
+   `static const char separator_str[]' arrays turned into ordinary locals.
+   Everything else (multiple_target.cc x12, attribs.cc x5, tree.cc x4 -- two
+   of them `gcc_assert's -- c-decl.cc x4, cp/ x6, c-attribs.cc x2,
+   c-pretty-print.cc x2) is an ordinary run-time expression.
+
+   The two `gcc_assert (!TARGET_HAS_FMV_TARGET_ATTRIBUTE)'s in tree.cc hold
+   today only because the macro is the floor's 1 in a shared TU; asked of the
+   SELECTED base they become real checks.  That is the point, and it is why
+   they are named here rather than assumed harmless.  */
+#undef TARGET_HAS_FMV_TARGET_ATTRIBUTE
+#define TARGET_HAS_FMV_TARGET_ATTRIBUTE (targetm_cdata.has_fmv_target_attribute)
+#undef TARGET_CLONES_ATTR_SEPARATOR
+#define TARGET_CLONES_ATTR_SEPARATOR (targetm_cdata.clones_attr_separator)
 /* `DWARF_FRAME_RETURN_COLUMN' WAS REDIRECTED HERE AND IS NOW A CALL, with the
    rest of the DWARF register family below.  epiphany's reads
    `current_function_decl', which is null when `target-cdata.cc' runs.  */
@@ -1558,6 +1583,94 @@ extern void mt_asm_output_align (FILE *, int);
    fallback.  */
 #undef TARGET_VTABLE_ENTRY_ALIGN
 #define TARGET_VTABLE_ENTRY_ALIGN (mt_vtable_entry_align ())
+
+/* `STACK_POINTER_OFFSET' -- where a target's outgoing stack arguments begin,
+   relative to the stack pointer.  `defaults.h:1156' floors it at 0, i386 does
+   not define it so the floor FIRES, and twenty back ends dissent; on s390x
+   that put every stack argument 160 bytes low, inside the callee's register
+   save area, with every other instruction identical to genuine stock.  See
+   target-frame.h for the definer set and for why this is a call.
+
+   `#undef' first, deliberately: `defaults.h' has already defined the name by
+   the time this header is reached (it is included from `defaults.h''s own
+   foot), so a bare `#define' would only warn -- and PRINCIPLES records a
+   `FUNCTION_MODE' redirect whose ONLY signal was 495 warnings.
+
+   SWEPT: five shared spellings, all ordinary run-time expressions
+   (`function.cc:1964', `:2725', `:4198', `rtlanal.cc:489', `calls.cc:4576').
+   No `#if', no array bound, no static initialiser.  `function.cc:1396's local
+   `#ifndef' floor is deleted with this change: it is dead only because this
+   redirect defines the name first, which is the `REGMODE_NATURAL_SIZE' trap
+   read backwards, and a shadowing floor left beside a redirect is how the
+   next include reordering silently reinstates the 0.  */
+#undef STACK_POINTER_OFFSET
+#define STACK_POINTER_OFFSET (mt_stack_pointer_offset ())
+
+/* `EH_RETURN_HANDLER_RTX' -- `defaults.h:1432' floors it at NULL and i386 is
+   silent, so the floor fires and `__builtin_eh_return' ERRORS OUT on aarch64
+   and s390x, which are exactly the two back ends whose own header defines a
+   non-NULL handler.  x86_64 is unaffected because i386's `eh_return' pattern
+   is unconditional, i.e. the primary never reads the macro.  See
+   target-frame.h, including the SILENT half in `df-scan.cc' that must move
+   with the loud one or a diagnostic becomes wrong code.  */
+#undef EH_RETURN_HANDLER_RTX
+#define EH_RETURN_HANDLER_RTX (mt_eh_return_handler_rtx ())
+
+/* `TRAMPOLINE_ALIGNMENT' -- `defaults.h:1190' floors it at
+   `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', i386's in shared code, so
+   aarch64's trampolines came out `.align 2' where it asks for 64 and stock
+   emits `.align 3'.  See target-frame.h.
+
+   `TRAMPOLINE_SECTION' IS DELIBERATELY NOT REDIRECTED HERE.  Its only shared
+   use is `#ifdef TRAMPOLINE_SECTION' in `varasm.cc' -- an EXISTENCE question,
+   which a redirect turns into an unconditional yes for all 47.  That site
+   calls `mt_has_trampoline_section ()' directly instead, and the name stays
+   unspellable in shared code so a future shared use fails by name.  Same
+   treatment, same reason, as `#ifdef INIT_EXPANDERS'.  */
+#undef TRAMPOLINE_ALIGNMENT
+#define TRAMPOLINE_ALIGNMENT (mt_trampoline_alignment ())
+
+/* `EH_RETURN_STACKADJ_RTX' AND `TRAMPOLINE_SECTION' ARE `#undef'd WITH NO
+   REPLACEMENT, AND THAT IS THE POINT.
+
+   Both are asked by shared code with `#ifdef' -- an EXISTENCE question, which
+   a redirect turns into an unconditional yes for all 47.  Their consumers call
+   `mt_has_*' / `mt_*' instead, so the names must become UNSPELLABLE here:
+   any shared site I failed to convert then fails to compile NAMING THE MACRO,
+   rather than quietly continuing to read the primary's answer.  A redirect
+   would have made a missed site silent, which is how `EH_RETURN_STACKADJ_RTX'
+   came to write riscv64's stack adjustment into `sp' in the first place.
+
+   `EH_RETURN_STACKADJ_RTX' is the sharper of the two because THE PRIMARY
+   DEFINES IT (`i386.h:2187', `gen_rtx_REG (Pmode, CX_REG)', register 2), so
+   there is no `defaults.h' floor anywhere in the story and no floor sweep
+   could have found it: the `#ifdef' is simply true for everybody, with i386's
+   register inside.  See target-frame.h.
+
+   AND `MULTI_TARGET_MD_TU' IS THE ONE EXEMPTION, WHICH THE BUILD FOUND RATHER
+   THAN A REVIEW.  `insn-emit-*.cc' is generated from every configured back
+   end's `.md' and compiled ONCE, so `i386.md:21873's `gen_eh_return' body --
+   `rtx sa = EH_RETURN_STACKADJ_RTX' -- is BACK-END code sitting in a shared
+   object's file name.  `#undef'ing there does not catch a missed conversion,
+   it breaks a build that was correct: `EH_RETURN_STACKADJ_RTX was not declared
+   in this scope, did you mean EH_RETURN_HANDLER_RTX'.  Those objects carry
+   `-DMULTI_TARGET_MD_TU' (gcc/Makefile.in) and keep the names spellable.
+
+   THEY THEN GET THE PRIMARY'S ANSWER, and that is a pre-existing structural
+   ceiling rather than something this change introduces -- the same one
+   `Makefile.in' records for `only_leaf_regs_used' and `immed_double_const'.
+   For `EH_RETURN_STACKADJ_RTX' specifically the exposure is small: only i386
+   and s390 have an `eh_return' expander at all, i386's body is i386's own and
+   therefore right, and s390's is `TARGET_TPF'-only.  Stated, not waved past.
+
+   Note the flag is NOT an entry on the exempt `#if' at the top of this file:
+   that branch takes a TU out of the conversion ENTIRELY, which for these
+   objects would revert every redirect at once.  This suppresses two `#undef's
+   and nothing else.  */
+#ifndef MULTI_TARGET_MD_TU
+#undef EH_RETURN_STACKADJ_RTX
+#undef TRAMPOLINE_SECTION
+#endif
 #endif
 
 #endif /* ! GCC_MULTI_TARGET_MACROS_H */

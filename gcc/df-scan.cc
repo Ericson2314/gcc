@@ -3712,15 +3712,19 @@ df_get_exit_block_use_set (bitmap exit_block_uses)
   if (reload_completed && crtl->calls_eh_return)
     IOR_REG_SET_HRS (exit_block_uses, eh_return_data_regs);
 
-#ifdef EH_RETURN_STACKADJ_RTX
-  if ((!targetm.have_epilogue () || ! epilogue_completed)
+  /* WAS `#ifdef EH_RETURN_STACKADJ_RTX'.  The primary defines the name, so
+     this ran for all 47 back ends and marked i386's `CX_REG' -- register 2 --
+     as live out of every `__builtin_eh_return' function, whatever that
+     register means on the target.  The `EPILOGUE_USES' family, one macro
+     along; see target-frame.h.  */
+  if (mt_has_eh_return_stackadj_rtx ()
+      && (!targetm.have_epilogue () || ! epilogue_completed)
       && crtl->calls_eh_return)
     {
-      rtx tmp = EH_RETURN_STACKADJ_RTX;
+      rtx tmp = mt_eh_return_stackadj_rtx ();
       if (tmp && REG_P (tmp))
 	df_mark_reg (tmp, exit_block_uses);
     }
-#endif
 
 #ifdef EH_RETURN_TAKEN_RTX
   if ((!targetm.have_epilogue () || ! epilogue_completed)

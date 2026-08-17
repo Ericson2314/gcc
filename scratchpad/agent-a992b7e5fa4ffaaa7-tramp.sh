@@ -48,7 +48,50 @@ for f in /tmp/tr-st.s /tmp/tr-mt.s; do
   printf '   %-14s %s\n' "$tag" "$(grep -B1 '^\.LTRAMP0:' "$f" | head -1)"
 done
 
-echo
-echo "EXPECTED WHILE THE LEAKS ARE OPEN:"
-echo "  STOCK         (no .section -- .text)      .align 3"
-echo "  MULTI-TARGET  .section .rodata            .align 2"
+
+# VERDICT.  This script used to end by PRINTING the expected broken values and
+# leaving the reader to compare them by eye, which is a paragraph rather than a
+# check: it exits 0 whether the leak is open or closed, so a harness calling it
+# cannot tell.  It now compares the two sides and says which.
+#
+# For reference, what it looked like while the leaks were open:
+#   STOCK         (no .section -- .text)      .align 3
+#   MULTI-TARGET  .section .rodata            .align 2
+sec_of () { awk '/LTRAMP/{print s; exit} /^\t\.section|^\t\.text/{s=$0}' "$1"; }
+aln_of () { grep -B1 '^\.LTRAMP0:' "$1" | head -1; }
+rc=0; named=0
+[ "$(sec_of /tmp/tr-st.s)" = "$(sec_of /tmp/tr-mt.s)" ] \
+  && echo "PASS: TRAMPOLINE_SECTION matches genuine stock" \
+  || { echo "FAIL: TRAMPOLINE_SECTION differs from stock"; rc=1; named=1; }
+[ "$(aln_of /tmp/tr-st.s)" = "$(aln_of /tmp/tr-mt.s)" ] \
+  && echo "PASS: TRAMPOLINE_ALIGNMENT matches genuine stock" \
+  || { echo "FAIL: TRAMPOLINE_ALIGNMENT differs from stock"; rc=1; named=1; }
+
+# And the whole body, so a third divergence on this construct cannot hide
+# behind the two arms that were written for the two known ones.
+grep -v '^[[:space:]]*\.file\|^[[:space:]]*\.ident' /tmp/tr-st.s > /tmp/tr-st.body
+grep -v '^[[:space:]]*\.file\|^[[:space:]]*\.ident' /tmp/tr-mt.s > /tmp/tr-mt.body
+n=$(grep -c . /tmp/tr-st.body)
+[ "$n" -ge 10 ] || { echo "FATAL: stock body is $n lines -- the arm read nothing"; exit 9; }
+if diff -u /tmp/tr-st.body /tmp/tr-mt.body > /tmp/tr.diff; then
+  echo
+  echo "WHOLE FILE IDENTICAL to genuine stock over $n lines."
+else
+  echo
+  echo "-- residual whole-file diff vs stock ($n lines on the stock side):"
+  sed -n '1,30p' /tmp/tr.diff
+  rc=1
+  if [ "$named" = 0 ]; then
+    echo
+    echo "READ THE EXIT CODE CAREFULLY.  Both NAMED arms PASS -- the two leaks"
+    echo "this reproducer was written for are closed.  The nonzero rc is the"
+    echo "WIDER arm, added afterwards so a third divergence on this construct"
+    echo "cannot hide behind two arms written for two known ones.  As of"
+    echo "95d90a64818 it shows a spurious '.p2align 3'"
+    echo "(ASM_OUTPUT_MAX_SKIP_ALIGN -- 7 definers incl. i386, so the shared"
+    echo "#ifdef is true for everyone; A992B7E5FA4FFAAA7-TRAMPOLINE.md item 3,"
+    echo "still open) and a 16-byte frame-size difference.  Neither is what"
+    echo "this script's two arms measure."
+  fi
+fi
+exit "$rc"

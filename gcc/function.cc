@@ -1390,12 +1390,21 @@ static poly_int64 dynamic_offset;
 static poly_int64 out_arg_offset;
 static poly_int64 cfa_offset;
 
-/* In most machines, the stack pointer register is equivalent to the bottom
-   of the stack.  */
+/* `STACK_POINTER_OFFSET' USED TO BE FLOORED HERE with the comment "in most
+   machines, the stack pointer register is equivalent to the bottom of the
+   stack", and that floor was a SECOND authority for the name in a shared TU.
 
-#ifndef STACK_POINTER_OFFSET
-#define STACK_POINTER_OFFSET	0
-#endif
+   It is dead today only because `multi-target-macros.h' -- reached from
+   `defaults.h''s foot, i.e. through `tm.h' -- defines the name before this
+   line.  "It is dead" is exactly what was believed about `defaults.h''s
+   `#ifndef EPILOGUE_USES' and `regs.h''s `#ifndef REGMODE_NATURAL_SIZE', in
+   the other direction, so a shadowing floor is deleted rather than left
+   sitting beside the redirect where the next include reordering would
+   silently reinstate the primary's 0 for all 47 back ends.
+
+   The real per-base answer comes from `mt_stack_pointer_offset ()'; the
+   supply-side default for a back end that does not spell the macro is
+   `defaults.h:1156's own 0, evaluated against that base's `tm.h'.  */
 
 /* `INCOMING_REG_PARM_STACK_SPACE' USED TO BE DERIVED HERE from
    `REG_PARM_STACK_SPACE', and the derivation was the primary's: i386 defines
