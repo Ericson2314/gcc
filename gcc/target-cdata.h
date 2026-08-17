@@ -249,7 +249,8 @@ along with GCC; see the file COPYING3.  If not see
      diagnostic, and assembly a real cross assembler accepts.
 
      `cp/cp-tree.h:24' is one of the four shared headers carrying `tm.h' and
-     39 of 42 `cp/*.o' open it, so all 47 back ends were answered by the
+     39 of 42 objects under `cp/' open it, so all 47 back ends were
+     answered by the
      primary.  `builtins.cc:262', `ipa-prop.cc:3103' and
      `function.h:637' (MINIMUM_METHOD_BOUNDARY) read it too, so the leak was
      never confined to the C++ front end.
