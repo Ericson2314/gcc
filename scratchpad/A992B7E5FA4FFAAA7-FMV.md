@@ -66,9 +66,24 @@ loongarch/loongarch.h:1297  #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
 ```
 
 **Three definers, all dissenting, and two of them are on this board.**
-loongarch is not in the 47. So the affected set is **aarch64 and riscv64**, and
-riscv64's residual should be re-read for an FMV component that was never
-attributed — its `gcc.target/riscv` 384 has not been broken down by family.
+loongarch is not in the 47. So the affected set is **aarch64 and riscv64**.
+
+**And the riscv64 half is small — measured, not assumed.** My first draft of
+this line said riscv64's residual "should be re-read for an FMV component",
+which invited someone to go looking for hundreds of results. The test
+population bounds it:
+
+```
+gcc.target/aarch64  files matching ^(mv|fmv)                49
+gcc.target/riscv    files matching target.version|mv-|fmv    3
+```
+
+So the FMV leak is worth ~256 results on aarch64 and **at most a handful on
+riscv64**. riscv64's real exposure in this family is the sibling macro
+`TARGET_CLONES_ATTR_SEPARATOR` (`','` shared, `'#'` riscv), which changes how
+every `target_clones` list is *parsed* rather than how many tests exist —
+still small, and still worth fixing in the same change so the target does not
+move from one wrong answer to another.
 The both-sided probe below shows `riscv` reading **0** too, which is how the
 correction was caught: the header read disagreed with the grep, and the header
 read is the one that says what the compiler does.
