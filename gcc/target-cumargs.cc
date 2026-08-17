@@ -1097,6 +1097,26 @@ mt_base_eh_return_handler_rtx (void)
   return EH_RETURN_HANDLER_RTX;
 }
 
+/* `EH_RETURN_STACKADJ_RTX' -- an EXISTENCE question, so a pair, and one where
+   the primary DEFINES the name, so shared code's `#ifdef' was true for all 47
+   and the value was i386's `CX_REG', register 2 -- which on riscv is `sp'.
+   See target-frame.h for the measured diff.
+
+   No `#else' value: a back end that does not define the macro has no stack
+   adjustment register, and inventing one is the floor PRINCIPLES forbids.  */
+#ifdef EH_RETURN_STACKADJ_RTX
+static rtx
+mt_base_eh_return_stackadj_rtx (void)
+{
+  return EH_RETURN_STACKADJ_RTX;
+}
+# define MT_BASE_HAS_EH_RETURN_STACKADJ_RTX true
+# define MT_BASE_EH_RETURN_STACKADJ_RTX mt_base_eh_return_stackadj_rtx
+#else
+# define MT_BASE_HAS_EH_RETURN_STACKADJ_RTX false
+# define MT_BASE_EH_RETURN_STACKADJ_RTX NULL
+#endif
+
 /* `TRAMPOLINE_SECTION' -- an EXISTENCE question, so a pair, exactly as
    `INIT_EXPANDERS' above.  aarch64 is the only back end in the tree that
    defines it, and `varasm.cc:3065's shared `#ifdef' was answered by i386 for
@@ -2028,6 +2048,8 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_stack_dynamic_offset,
   mt_base_stack_pointer_offset,
   mt_base_eh_return_handler_rtx,
+  MT_BASE_HAS_EH_RETURN_STACKADJ_RTX,
+  MT_BASE_EH_RETURN_STACKADJ_RTX,
   MT_BASE_HAS_TRAMPOLINE_SECTION,
   MT_BASE_TRAMPOLINE_SECTION,
   mt_base_trampoline_alignment,

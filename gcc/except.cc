@@ -2258,15 +2258,20 @@ expand_builtin_eh_return (tree stackadj_tree ATTRIBUTE_UNUSED,
 {
   rtx tmp;
 
-#ifdef EH_RETURN_STACKADJ_RTX
-  tmp = expand_expr (stackadj_tree, crtl->eh.ehr_stackadj,
-		     VOIDmode, EXPAND_NORMAL);
-  tmp = convert_memory_address (Pmode, tmp);
-  if (!crtl->eh.ehr_stackadj)
-    crtl->eh.ehr_stackadj = copy_addr_to_reg (tmp);
-  else if (tmp != crtl->eh.ehr_stackadj)
-    emit_move_insn (crtl->eh.ehr_stackadj, tmp);
-#endif
+  /* WAS `#ifdef EH_RETURN_STACKADJ_RTX', ANSWERED BY THE PRIMARY FOR ALL 47.
+     i386 defines the macro, so the guard was true for every target -- and the
+     REGISTER inside it was i386's `CX_REG', which is 2, which on riscv is
+     `sp'.  Asked of the selected base; see target-frame.h.  */
+  if (mt_has_eh_return_stackadj_rtx ())
+    {
+      tmp = expand_expr (stackadj_tree, crtl->eh.ehr_stackadj,
+			 VOIDmode, EXPAND_NORMAL);
+      tmp = convert_memory_address (Pmode, tmp);
+      if (!crtl->eh.ehr_stackadj)
+	crtl->eh.ehr_stackadj = copy_addr_to_reg (tmp);
+      else if (tmp != crtl->eh.ehr_stackadj)
+	emit_move_insn (crtl->eh.ehr_stackadj, tmp);
+    }
 
   tmp = expand_expr (handler_tree, crtl->eh.ehr_handler,
 		     VOIDmode, EXPAND_NORMAL);
@@ -2295,9 +2300,8 @@ expand_eh_return (void)
 
   crtl->calls_eh_return = 1;
 
-#ifdef EH_RETURN_STACKADJ_RTX
-  emit_move_insn (EH_RETURN_STACKADJ_RTX, const0_rtx);
-#endif
+  if (mt_has_eh_return_stackadj_rtx ())
+    emit_move_insn (mt_eh_return_stackadj_rtx (), const0_rtx);
 
 #ifdef EH_RETURN_TAKEN_RTX
   emit_move_insn (EH_RETURN_TAKEN_RTX, const0_rtx);
@@ -2309,9 +2313,8 @@ expand_eh_return (void)
   emit_label (crtl->eh.ehr_label);
   clobber_return_register ();
 
-#ifdef EH_RETURN_STACKADJ_RTX
-  emit_move_insn (EH_RETURN_STACKADJ_RTX, crtl->eh.ehr_stackadj);
-#endif
+  if (mt_has_eh_return_stackadj_rtx ())
+    emit_move_insn (mt_eh_return_stackadj_rtx (), crtl->eh.ehr_stackadj);
 
 #ifdef EH_RETURN_TAKEN_RTX
   emit_move_insn (EH_RETURN_TAKEN_RTX, const1_rtx);
@@ -2335,7 +2338,13 @@ expand_eh_return (void)
   emit_label (around_label);
 
 #ifdef EH_RETURN_TAKEN_RTX
-  for (rtx tmp : { EH_RETURN_STACKADJ_RTX, EH_RETURN_HANDLER_RTX })
+  /* `EH_RETURN_STACKADJ_RTX' is no longer spellable in shared code; ask the
+     selected base.  (This whole block is under `#ifdef EH_RETURN_TAKEN_RTX',
+     which no configured back end defines, so it is dead today -- converted
+     anyway so it is not a latent build break the day one does.)  */
+  for (rtx tmp : { mt_has_eh_return_stackadj_rtx ()
+		     ? mt_eh_return_stackadj_rtx () : NULL_RTX,
+		   EH_RETURN_HANDLER_RTX })
     if (tmp && REG_P (tmp))
       emit_clobber (tmp);
   emit_label (eh_done_label);

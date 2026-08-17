@@ -1445,6 +1445,60 @@ struct target_frame_desc
   rtx (*eh_return_handler_rtx) (void);
 
   /* ------------------------------------------------------------------
+     `EH_RETURN_STACKADJ_RTX' -- THE REGISTER `__builtin_eh_return' LEAVES THE
+     STACK ADJUSTMENT IN.  SILENT WRONG CODE ON riscv64, AND IT IS THE REASON
+     `EH_RETURN_HANDLER_RTX' COULD NOT BE FIXED ALONE.
+
+     FOUND BY REPAIRING AN INSTRUMENT, not by looking for it.  The committed
+     `agent-a992b7e5fa4ffaaa7-ehreturn.sh' printed multi-target's exit status
+     and nothing else; given a control against genuine stock it reported
+
+	 riscv64-unknown-linux-gnu    rc=0  DIFFERS from stock
+
+     on a target the earlier note had recorded as passing, because rc=0 was all
+     it could see.  The diff:
+
+	 STOCK                        MULTI-TARGET
+	   sd    a1,40(sp)              mv    sp,a0        <- register 2
+	   ...                          ...
+	   mv    a4,a0                  (a4 never written)
+	   add   sp,sp,a4               add   sp,sp,a4     <- a4 is garbage
+
+     Unlike everything else in this block THIS IS NOT A `defaults.h' FLOOR --
+     there is no floor.  It is a bare `#ifdef' on a name **the primary
+     defines**, so the guard is true for all 47 and the VALUE is i386's:
+     `i386.h:2187' is `gen_rtx_REG (Pmode, CX_REG)', and `CX_REG' is 2.
+     Register 2 on riscv is `sp'.  So `except.cc:2313's
+     `emit_move_insn (EH_RETURN_STACKADJ_RTX, crtl->eh.ehr_stackadj)' wrote the
+     stack adjustment into **the stack pointer**, while riscv's own epilogue
+     (`riscv.cc:10806', compiled per base and therefore correct) still reads
+     `a4' -- `GP_ARG_FIRST + 4' -- which nothing ever sets.
+
+     Around 35 back ends define the macro and every one of them was answered by
+     `CX_REG`; the back ends that define nothing had the guarded code run for
+     them anyway.  Leaked value and leaked presence at once.
+
+     THIS HAD TO LAND WITH `EH_RETURN_HANDLER_RTX', not after it.  On aarch64
+     and s390x the handler leak stops compilation with a diagnostic, which
+     MASKS this one; fixing the handler alone would have let those two targets
+     through to the same wrong `mv' -- **a diagnostic converted into wrong
+     code on two further targets**, which is the exact half-fix shape the
+     handler's own entry warns about, arriving from the other side.
+
+     A `has_' PAIR, because what shared code asks is `#ifdef' in four places
+     (`except.cc:2261', `:2298', `:2312', `df-scan.cc:3715') plus
+     `c-family/c-cppbuiltin.cc:1634', which turns the answer into
+     `__LIBGCC_EH_RETURN_STACKADJ_RTX__' -- i.e. the existence answer is
+     exported to libgcc, so getting it from the primary is wrong twice over.
+
+     THE NAME IS `#undef'd IN SHARED CODE and not redirected.  That is what
+     makes this change self-verifying: any shared spelling I failed to convert
+     is a compile error naming the macro, rather than a site quietly still
+     reading i386's register.  */
+  bool has_eh_return_stackadj_rtx;
+  rtx (*eh_return_stackadj_rtx) (void);
+
+  /* ------------------------------------------------------------------
      THE TRAMPOLINE PAIR -- AND ONE OF THEM PUTS EXECUTABLE CODE IN `.rodata'.
 
      Measured against genuine stock aarch64 on
@@ -2278,6 +2332,12 @@ extern poly_int64 mt_stack_pointer_offset (void);
 /* `EH_RETURN_HANDLER_RTX', for shared code.  Redirected in
    `multi-target-macros.h': all three consumers spell the name.  */
 extern rtx mt_eh_return_handler_rtx (void);
+
+/* `EH_RETURN_STACKADJ_RTX', for shared code.  NOT redirected: the name is
+   `#undef'd in `multi-target-macros.h' so that a shared spelling fails BY
+   NAME, and every consumer asks these two instead.  */
+extern bool mt_has_eh_return_stackadj_rtx (void);
+extern rtx mt_eh_return_stackadj_rtx (void);
 
 /* The trampoline pair, for shared code.  `TRAMPOLINE_ALIGNMENT' is redirected
    in `multi-target-macros.h' because its five consumers spell the name;

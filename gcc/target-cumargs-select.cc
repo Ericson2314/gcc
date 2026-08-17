@@ -620,6 +620,36 @@ mt_eh_return_handler_rtx (void)
   return mt_frame ()->eh_return_handler_rtx ();
 }
 
+/* `EH_RETURN_STACKADJ_RTX'.  The `(has_X, payload)' pair is cross-checked
+   against itself, as `mt_init_expanders' is: an inconsistent pair is an object
+   built against a different `target-frame.h', and its only other symptom here
+   would be the stack adjustment landing in whichever register the primary
+   happens to name -- which is the defect this field exists to remove.  */
+bool
+mt_has_eh_return_stackadj_rtx (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->has_eh_return_stackadj_rtx != (f->eh_return_stackadj_rtx != NULL))
+    internal_error ("back end %qs disagrees with itself about whether it "
+		    "defines %<EH_RETURN_STACKADJ_RTX%>; its objects and "
+		    "%<target-frame.h%> are from different builds", f->name);
+
+  return f->has_eh_return_stackadj_rtx;
+}
+
+rtx
+mt_eh_return_stackadj_rtx (void)
+{
+  const struct target_frame_desc *f = mt_frame ();
+
+  if (f->eh_return_stackadj_rtx == NULL)
+    internal_error ("back end %qs defines no %<EH_RETURN_STACKADJ_RTX%>, but "
+		    "one was asked for without testing for it first", f->name);
+
+  return f->eh_return_stackadj_rtx ();
+}
+
 /* `TRAMPOLINE_SECTION'.  The `(has_X, payload)' pair is cross-checked against
    itself rather than merely dereferenced, for `mt_init_expanders'' reason:
    46 of the 47 back ends genuinely define nothing, so a null pointer alone

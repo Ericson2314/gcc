@@ -1629,6 +1629,25 @@ extern void mt_asm_output_align (FILE *, int);
    treatment, same reason, as `#ifdef INIT_EXPANDERS'.  */
 #undef TRAMPOLINE_ALIGNMENT
 #define TRAMPOLINE_ALIGNMENT (mt_trampoline_alignment ())
+
+/* `EH_RETURN_STACKADJ_RTX' AND `TRAMPOLINE_SECTION' ARE `#undef'd WITH NO
+   REPLACEMENT, AND THAT IS THE POINT.
+
+   Both are asked by shared code with `#ifdef' -- an EXISTENCE question, which
+   a redirect turns into an unconditional yes for all 47.  Their consumers call
+   `mt_has_*' / `mt_*' instead, so the names must become UNSPELLABLE here:
+   any shared site I failed to convert then fails to compile NAMING THE MACRO,
+   rather than quietly continuing to read the primary's answer.  A redirect
+   would have made a missed site silent, which is how `EH_RETURN_STACKADJ_RTX'
+   came to write riscv64's stack adjustment into `sp' in the first place.
+
+   `EH_RETURN_STACKADJ_RTX' is the sharper of the two because THE PRIMARY
+   DEFINES IT (`i386.h:2187', `gen_rtx_REG (Pmode, CX_REG)', register 2), so
+   there is no `defaults.h' floor anywhere in the story and no floor sweep
+   could have found it: the `#ifdef' is simply true for everybody, with i386's
+   register inside.  See target-frame.h.  */
+#undef EH_RETURN_STACKADJ_RTX
+#undef TRAMPOLINE_SECTION
 #endif
 
 #endif /* ! GCC_MULTI_TARGET_MACROS_H */
