@@ -70,15 +70,23 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 # End of variables for you to override.
 
 # The target that we're configured for.
+#
+# `$(target)' has exactly ONE use, at the `full-stamp' rule below:
+# `mkfixinc.sh $(target)', which decides whether this target needs header
+# fixing at all.  Everything else that used to be per-target here is now an
+# ARGUMENT to mkheaders rather than a substitution.
+#
+# `target_noncanonical' is GONE, with ACX_NONCANONICAL_TARGET in configure.ac.
+# It was substituted here and READ BY NOTHING -- its only other mention was the
+# comment below saying not to use it.
 target = @target@
-target_noncanonical:=@target_noncanonical@
 
 # The version of GCC in this tree
 gcc_version := $(shell @get_gcc_base_ver@ $(srcdir)/../gcc/BASE-VER)
 
 # Directory in which the compiler finds libraries etc.
 #
-# NO $(target_noncanonical) HERE -- it must match gcc/Makefile.in's
+# NO TRIPLE IN THIS PATH -- it must match gcc/Makefile.in's
 # `libsubdir = $(libdir)/gcc/$(version)' exactly.  It did not: this file put
 # install-tools/ under .../gcc/<triple>/<ver>/ while gcc/'s `install-mkheaders'
 # put fixinc_list, gsyslimits.h and the per-multilib limits.h under

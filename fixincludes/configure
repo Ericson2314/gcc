@@ -626,7 +626,6 @@ MAINT
 LD_PICFLAG
 PICFLAG
 TARGET
-target_noncanonical
 WERROR
 WARN_PEDANTIC
 WARN_CFLAGS
@@ -4863,24 +4862,19 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-# Determine the noncanonical target name, for directory use.
- case ${build_alias} in
-  "") build_noncanonical=${build} ;;
-  *) build_noncanonical=${build_alias} ;;
-esac
-
- case ${host_alias} in
-  "") host_noncanonical=${build_noncanonical} ;;
-  *) host_noncanonical=${host_alias} ;;
-esac
-
- case ${target_alias} in
-  "") target_noncanonical=${host_noncanonical} ;;
-  *) target_noncanonical=${target_alias} ;;
-esac
-
-
-
+# NO ACX_NONCANONICAL_TARGET.  It was here to "determine the noncanonical
+# target name, for directory use", and there is no such directory any more:
+# `libsubdir' below is `$(libdir)/gcc/$(gcc_version)' with no triple in it,
+# because one compiler serves every back end.  The target reappears one level
+# DOWN, in what `mkheaders' writes -- `$(libsubdir)/<target>/include-fixed' --
+# and mkheaders takes the target as an ARGUMENT, not as an @target@
+# substitution (see mkheaders.in).
+#
+# The macro was still expanded and `target_noncanonical' still substituted
+# into Makefile.in, where NOTHING READ IT: the only other mention was a comment
+# saying not to use it.  A configure-time answer to a question this component
+# no longer asks is exactly the kind of remnant that later reads as evidence
+# the component has a target.  It has a --host and no target.
 
 # Specify the local prefix
 local_prefix=
