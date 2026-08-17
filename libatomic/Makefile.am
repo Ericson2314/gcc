@@ -181,7 +181,23 @@ all-multi: $(libatomic_la_LIBADD)
 # from $gcc_objdir seems to fix the issue.
 
 gcc_objdir = `pwd`/$(MULTIBUILDTOP)../../gcc/
+# GUARDED, NOT DELETED: an in-tree build still needs this copy, and a standalone
+# build cannot make it.  `$(gcc_objdir)' is `../../gcc/' relative to this build
+# directory; standalone there is no such tree, and the copy fails with
+#
+#     install: cannot create regular file '<build>/../../gcc/libatomic.so.1.2.0'
+#
+# AFTER libatomic.so and libatomic_convenience.a have both linked successfully
+# -- so the library is complete and the build fails on a step that exists only
+# to help a compiler being built alongside.  configure.ac decides which case
+# this is; see the note there for how, and for why libatomic is the only other
+# target library that needs this (7 gcc_objdir references here, 0 in libgomp,
+# libssp, libquadmath, libstdc++-v3, libgfortran, libsanitizer, libbacktrace).
+if LIBAT_STANDALONE
+all-local:
+else
 all-local: stmp-libatomic
+endif
 stmp-libatomic: libatomic.la
 	$(LIBTOOL) --mode=install $(INSTALL_DATA) libatomic.la $(gcc_objdir)$(MULTISUBDIR)/
 if LIBAT_BUILD_ASNEEDED_SOLINK

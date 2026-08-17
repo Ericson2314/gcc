@@ -324,6 +324,47 @@ else
   multilib_arg=
 fi
 
+
+dnl IS THERE A SIBLING gcc BUILD DIRECTORY?  `all-local: stmp-libatomic' copies
+dnl the built library into `$(gcc_objdir)' -- `../../gcc/' relative to this
+dnl build -- so that an in-tree compiler being built alongside can link against
+dnl it before anything is installed.  A standalone build has no such tree, and
+dnl the copy fails with
+dnl
+dnl     install: cannot create regular file '<build>/../../gcc/libatomic.so.1.2.0'
+dnl
+dnl AFTER the library has been built and linked successfully.  Measured on two
+dnl independent arms -- aarch64-unknown-linux-gnu and aarch64-unknown-linux-musl
+dnl -- which reached the identical line, so it is neither libc- nor
+dnl target-specific.
+dnl
+dnl This is the same question libgcc/configure.ac asks, and the answer is used
+dnl the same way: to GUARD the outbound write rather than to delete it, because
+dnl an in-tree build still needs it.  The search climbs for the same reason
+dnl libgcc's does -- a multilib sub-configure is one level deeper, so a single
+dnl `../../' test gets it wrong in the direction that hurts, silently deciding
+dnl a 32-bit multilib is standalone when the top-level build is not.
+dnl
+dnl libatomic is the ONLY other target library with this shape.  Measured across
+dnl the tree: gcc_objdir references are libatomic 7, and libgomp, libssp,
+dnl libquadmath, libstdc++-v3, libgfortran, libsanitizer and libbacktrace 0.
+AC_MSG_CHECKING([for a sibling gcc build directory])
+libat_standalone=no
+libat_sibling=
+for libat_up in . .. ../.. ../../..; do
+  if test -d "$libat_up/../../$host_subdir/gcc"; then
+    libat_sibling=$libat_up/../../$host_subdir/gcc
+    break
+  fi
+done
+if test -n "$libat_sibling"; then
+  AC_MSG_RESULT([$libat_sibling (in-tree build)])
+else
+  libat_standalone=yes
+  AC_MSG_RESULT([none; this is a standalone build])
+fi
+AC_SUBST(libat_standalone)
+AM_CONDITIONAL(LIBAT_STANDALONE, [test x$libat_standalone = xyes])
 AC_CONFIG_FILES(Makefile testsuite/Makefile)
 AC_CONFIG_FILES(testsuite/libatomic-site-extra.exp)
 AC_OUTPUT
