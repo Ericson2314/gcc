@@ -2406,16 +2406,28 @@ install-gdb: $(INSTALL_GDB_TK)
 # why `.attribute arch' comes out as the empty string.  One missing input, both
 # symptoms.
 #
-# So these two are read from the manifest and passed automatically, BEFORE the
-# pass-through, which therefore still overrides them.  This does not re-enumerate
-# target-specs' options in the sense the paragraph above forbids: the objection
-# there was to a fixed list SILENTLY TRUNCATING what a user supplied, and these
-# are supplied by nobody.
+# THAT WAS FIRST FIXED BY READING THE MANIFEST HERE, AND THAT FIX HAS BEEN
+# WITHDRAWN IN FAVOUR OF THE RIGHT ONE.  This rule used to awk `option_defaults'
+# and `cpu_type' (and three more keys) out of gcc/multi-target.manifest and pass
+# them as `--with-' options.  It worked, and it made the probe runnable only for
+# a triple that was named in `--enable-targets' when gcc was configured -- for
+# the one script whose entire job is to answer for an ARBITRARY triple.
 #
-# THE MANIFEST IS REQUIRED, NOT OPTIONAL.  Passing an empty --with-option-defaults
-# when the file cannot be read would be indistinguishable from a target that
-# genuinely has no defaults -- which is exactly the state that produced the bug,
-# so it fails by name instead.
+# target-specs/configure now sources gcc/config.gcc itself, so it computes
+# `option_defaults' and `cpu_type' -- and `decimal_float', `decimal_bid_format'
+# and the t-slibgcc answer -- for the canonicalised triple it was given, from
+# gcc's SOURCES rather than from a record of one build's target list.  This
+# makefile therefore enumerates NONE of target-specs' options again, which is
+# what the paragraph above asks for; the riscv64 measurement stands and the
+# value that fixes it now arrives without anything here knowing its name.
+#
+# THE "EMPTY IS INDISTINGUISHABLE FROM NONE" HAZARD IS NOT GONE, IT IS UNREACHABLE.
+# An empty --with-option-defaults for a target that genuinely has no defaults
+# (aarch64-*-linux-musl is one) reads exactly like a target whose data could not
+# be found -- which is the state that produced the riscv64 bug.  What removes it
+# is that there is no longer a channel that can be absent: config.gcc either
+# answers or target-specs/configure stops by name.  See the note on
+# `mt_target_specs_rules' below for the diagnostics that moved there.
 #
 # WRITING THE FILE IS NOT THE FIX; WRITING IT WHERE THE DRIVER LOOKS IS.  Both
 # are `rc=0' from the producer's side, and getting the directory wrong leaves a
@@ -2512,7 +2524,6 @@ configure-target-specs-$(1):
 	fi; \
 	mt_dest="$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)"; \
 	mt_src=; \
-
 	for f in gcc/specs-src-$(1) gcc/mlib-specs-$(1); do \
 	  test -f "$$$$r/$$$$f" && mt_src="$$$$mt_src $$$$r/$$$$f"; \
 	done; \
