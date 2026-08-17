@@ -133,12 +133,42 @@ case "$T:$mach" in
   s390x*:*S/390*|s390x*:*IBM*) ;;
   riscv64*:*RISC-V*) ;;
   x86_64*:*X86-64*|x86_64*:*x86-64*) ;;
+  # arm: the first 32-bit row.  `Machine: ARM' is what arm-*-readelf prints;
+  # the host x86 gas would say `Advanced Micro Devices X86-64', so this arm
+  # discriminates in the direction the guard exists for.  Note that unlike the
+  # four LP64 rows the ELF CLASS also differs, and that is checked below --
+  # a control whose objects came out ELF64 would not be an arm control at all.
+  arm*:*ARM*) ;;
   *) echo "FATAL[$T]: the control assembled to machine '$mach' -- wrong target."
      echo "  (ORIGINAL_AS_FOR_TARGET pointing at the host assembler produces"
      echo "   exactly this, and it is silent until something looks.)"
      exit 9 ;;
 esac
 echo "-- guard S4: assembled object reports Machine: $mach"
+
+# ---- S4b: THE ELF CLASS.  ADDED WITH THE FIRST 32-BIT ROW, AND IT COULD NOT
+# ---- HAVE FIRED BEFORE IT.
+#
+# Every target this control had ever been run for -- aarch64, s390x, riscv64,
+# x86_64 -- is LP64 and emits ELF64.  So "the object is ELF64" was true on
+# every row, was never asserted, and an ELF64 object from a target that must
+# emit ELF32 would have passed S4 unremarked as long as the Machine field was
+# right.  That is PRINCIPLES' own shape: an axis on which every scored target
+# agrees is an axis nothing is measuring.  The expected class is DERIVED from
+# the triple and the DEFAULT ARM IS A REFUSAL, so a triple nobody has thought
+# about stops here rather than being scored against a guess.
+class=$("$TOOLS/$T-readelf" -h "$B/as-probe-$T.o" | sed -n 's/^ *Class: *//p')
+case "$T" in
+  arm*|i?86-*)                              want=ELF32 ;;
+  aarch64*|s390x*|riscv64*|x86_64*|alpha*)  want=ELF64 ;;
+  *) echo "FATAL[$T]: no expected ELF class for this triple.  Add an arm."
+     echo "  REFUSING: 'cannot tell' must not read as 'fine'."; exit 9 ;;
+esac
+[ "$class" = "$want" ] || {
+  echo "FATAL[$T]: the control emitted $class, expected $want."
+  echo "  The Machine field can be right while the word size is not."
+  exit 9; }
+echo "-- guard S4b: ELF class is $class, as $T requires"
 
 TSD="testsuite.$T"
 rm -f "$B/gcc/site.exp"
