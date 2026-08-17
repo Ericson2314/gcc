@@ -35,6 +35,28 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 #include TM_H_FILE
 
+/* THIS BASE'S OWN `tm_p.h', i.e. its `<cpu>-protos.h'.  Several back ends
+   spell a directive as a CALL rather than a string -- mmix's
+   `DATA_SECTION_ASM_OP' is `mmix_data_section_asm_op ()' and its
+   `ASM_OUTPUT_ALIGN' is `mmix_asm_output_align (...)' -- and those functions
+   are declared in `<cpu>-protos.h', which `tm.h' does not include.  Without
+   this the base fails to compile BY NAME:
+
+     config/mmix/mmix.h:588: error: 'mmix_data_section_asm_op' was not
+                                    declared in this scope
+
+   Same series as `target-cumargs.cc''s `BASE_HEADER (tm_p.h)' and its
+   epiphany/`attribs.h', `attribs.h'/`stringpool.h' and msp430/`recog.h'
+   includes: the macro is expanded in a translation unit where it is THAT
+   base's own, so that base's headers must be satisfiable here.
+
+   `#ifdef' rather than unconditional only because the single-target build
+   compiles this file without the per-base -D; there `tm_p.h' comes in through
+   the ordinary chain.  */
+#ifdef TM_P_H_FILE
+#include TM_P_H_FILE
+#endif
+
 #include "target-asm-ops.h"
 
 /* defaults.h, at the end of every tm header, carries each target macro into

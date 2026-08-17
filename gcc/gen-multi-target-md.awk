@@ -909,9 +909,13 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # manifest loop now deduplicates the per-back-end headers on cpu_type, so all
   # 48 have tm-<base>.h, options-<base>.h and insn-constants-<base>.h.
   {
-  printf "target-asm-ops-%s.o: $(srcdir)/target-asm-ops.cc tm-%s.h \\\n", cpu, cpu;
+  printf "target-asm-ops-%s.o: $(srcdir)/target-asm-ops.cc tm-%s.h tm_p-%s.h \\\n", cpu, cpu, cpu;
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-asm-ops.h\n";
   printf "\t$(COMPILE) -DTM_H_FILE='\"tm-%s.h\"' \\\n", cpu;
+  # This base's own <cpu>-protos.h.  Needed by any back end whose directive is
+  # a CALL rather than a string -- mmix's DATA_SECTION_ASM_OP and
+  # ASM_OUTPUT_ALIGN both are.  See the note in target-asm-ops.cc.
+  printf "\t  -DTM_P_H_FILE='\"tm_p-%s.h\"' \\\n", cpu;
   printf "\t  -DTARGETM_ASM_OPS_SYMBOL=targetm_asm_ops_%s \\\n", cpu;
   # This TU is on the SUPPLY side of defaults.h's (c-DATA) redirection: it is
   # compiled against one base's tm.h in order to capture that base's own macro
