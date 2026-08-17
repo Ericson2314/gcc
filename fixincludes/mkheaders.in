@@ -31,14 +31,19 @@
 # TARGET_MACHINE against each hack's `mach' glob at RUN time, and 137 of its
 # 252 hacks carry one.  The tool needed no change; only its caller did.
 #
-# Consequently THE TARGET IS AN ARGUMENT, not an @target@ substitution.  It has
+# Consequently THE TARGET IS AN ARGUMENT, not a configure substitution.  It has
 # to be: this script is installed once, under a directory with no target in its
 # path, and the top-level build (which does know the targets, being the
 # dispatcher) will invoke it once per configured target from that one copy.
 # `--headers' likewise: it was `SYSTEM_HEADER_DIR' baked into mkheaders.conf at
 # gcc-build time, i.e. one target's system headers written down as everyone's.
 #
-# @target@ is deliberately NOT read here.  Do not put it back.
+# The target is deliberately NOT a configure substitution here.  Do not make it
+# one.  (This comment cannot spell that macro literally: config.status generates
+# this file, and would substitute it -- which is how the previous wording came
+# out reading "# <the configured triple> is deliberately NOT read here", a
+# comment that had been silently rewritten into nonsense by the very mechanism
+# it was warning against.)
 
 version=@gcc_version@
 
@@ -62,18 +67,17 @@ One of:
                     consults so it does not rename one of them).
   --macro-list=FILE a macro_list built earlier.
 
-Directories -- THE CALLER DEFINES THESE.  The defaults reproduce the historic
-layout and are the only place gcc's install layout is written down here:
-  --itoolsdir=DIR      where fixincl, fixinc.sh and mkinstalldirs live.
-                       Default: <libexecdir>/gcc/<version>/install-tools
-  --itoolsdatadir=DIR  where fixinc_list, gsyslimits.h and the per-multilib
-                       limits.h live, installed by gcc's \`install-mkheaders'.
-                       Default: <libdir>/gcc/<version>/install-tools
-  --incdir=DIR         THE OUTPUT: where this target's fixed headers go.
-                       Default: <libdir>/gcc/<version>/TRIPLE/include-fixed
-
-  --prefix=DIR         relocates all three defaults above together.  This was
-                       the first positional argument.
+Directories -- THE CALLER DEFINES THESE.  There are no defaults: a default
+would re-encode gcc's install layout here, which is exactly what this script
+must not hold an opinion about.
+  --itoolsdatadir=DIR  REQUIRED.  Where fixinc_list, gsyslimits.h and the
+                       per-multilib limits.h live, installed by gcc's
+                       \`install-mkheaders'.
+  --incdir=DIR         REQUIRED.  THE OUTPUT: where this target's fixed
+                       headers go.  Give each target its own.
+  --itoolsdir=DIR      where fixincl and fixinc.sh live.  Defaults to this
+                       script's own directory, which is where they are
+                       installed, so it is normally unnecessary.
 
 Options:
   --isysroot=DIR    prepended to --headers when reading.
@@ -95,9 +99,6 @@ isysroot=
 itoolsdir=
 itoolsdatadir=
 incdir=
-# NOT EMPTY, unlike the rest: @exec_prefix@ below substitutes to the literal
-# `${prefix}', so this variable is read even though nothing here spells it.
-prefix=@prefix@
 
 while [ $# -gt 0 ] ; do
     case $1 in
@@ -108,7 +109,6 @@ while [ $# -gt 0 ] ; do
 	--macro-list=*)  macro_list_in=`expr "x$1" : 'x--macro-list=\(.*\)'` ;;
 	--other-dirs=*)  other_dirs=`expr "x$1" : 'x--other-dirs=\(.*\)'` ;;
 	--isysroot=*)    isysroot=`expr "x$1" : 'x--isysroot=\(.*\)'` ;;
-	--prefix=*)      prefix=`expr "x$1" : 'x--prefix=\(.*\)'` ;;
 	--itoolsdir=*)   itoolsdir=`expr "x$1" : 'x--itoolsdir=\(.*\)'` ;;
 	--itoolsdatadir=*)
 	                 itoolsdatadir=`expr "x$1" : 'x--itoolsdatadir=\(.*\)'` ;;
@@ -151,47 +151,70 @@ if [ -z "$sysheaders" ] ; then
     exit 1
 fi
 
-# NO POSITIONAL ARGUMENTS.  This script used to take `[prefix [isysroot]]'; both
-# are options now (--prefix=, --isysroot=) and a bare argument is an error.
-#
-# `prefix' IS LOAD-BEARING, in a way that greps of this file cannot see.  Nothing
-# below mentions $prefix.  But @exec_prefix@ substitutes to the LITERAL TEXT
-# `${prefix}' and @libdir@ to `${exec_prefix}/lib', so `exec_prefix=@exec_prefix@'
-# expands the shell variable `prefix' at assignment time.  The reference does not
-# exist in this file -- it appears only after config.status runs.  So the
-# positional relocated itoolsdir, itoolsdatadir and incdir together, and
-# `prefix' must keep a default or all three resolve under `/'.
+# NO POSITIONAL ARGUMENTS.  This script used to take `[prefix [isysroot]]';
+# isysroot is --isysroot= now and prefix is gone entirely, see below.
 if [ $# -gt 0 ] ; then
     echo "$me: unexpected argument \`$1'." >&2
-    echo "  This script takes options only.  What used to be the positional" >&2
-    echo "  \`prefix' is now --prefix=DIR, and the second positional is" >&2
-    echo "  --isysroot=DIR.  To place the directories individually, use" >&2
-    echo "  --itoolsdir=, --itoolsdatadir= and --incdir=, which override" >&2
-    echo "  --prefix." >&2
+    echo "  This script takes options only.  The positional \`prefix' is gone:" >&2
+    echo "  say where things are with --itoolsdatadir= and where output goes" >&2
+    echo "  with --incdir=.  The second positional is now --isysroot=DIR." >&2
     exit 1
 fi
 
-# THE DIRECTORIES, WHICH THE CALLER DEFINES.  Each default below reproduces the
-# historic layout, and together they are the only place gcc's install layout is
-# written down in this file.  Deriving them here from @libdir@ meant this script
-# had to know, and agree with, a layout owned by another component; when the two
-# disagreed, mkheaders looked for its data where nothing had written any.
+# THE DIRECTORIES, WHICH THE CALLER DEFINES -- WITH NO DEFAULTS.
 #
-# NO TARGET COMPONENT in itoolsdir/itoolsdatadir: one compiler serves every back
-# end, so the tools and their data are installed once.
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-libexecdir=@libexecdir@
+# There was a `prefix' here, and the prefix/exec_prefix/libdir/libexecdir
+# configure substitutions with it, purely to compute defaults for the three
+# directories below.  All of it is gone, and that removes a trap rather than
+# merely documenting one: nothing in this file ever mentioned $prefix, yet it
+# was load-bearing, because the exec_prefix substitution expands to the LITERAL
+# TEXT `${prefix}' and the libdir one to `${exec_prefix}/lib'.  The reference
+# existed only after config.status ran, so no grep of this file could see it.
+# With those substitutions gone there is nothing left to be silently
+# load-bearing.  (This comment spells none of them with at-signs for the same
+# reason -- config.status would substitute them here too.)
+#
+# No defaults, for the same reason `target' and `sysheaders' have none: a
+# default here re-encodes gcc's install layout, and a layout this script merely
+# COPIES from another component is one it can silently disagree with.  It did
+# once -- gcc's `install-mkheaders' wrote fixinc_list to a directory this script
+# did not read -- and each half succeeded with exit 0.  Every missing answer is
+# a hard error naming itself.
 
-test -n "$itoolsdir"     || itoolsdir=${libexecdir}/gcc/${version}/install-tools
-test -n "$itoolsdatadir" || itoolsdatadir=${libdir}/gcc/${version}/install-tools
+# `itoolsdir' IS NOT ASKED FOR: this script is installed INTO it, next to
+# fixincl and fixinc.sh, so it can find itself.  That is correct wherever it is
+# installed, including a store path, and it cannot disagree with reality the way
+# a configure-time answer could.  --itoolsdir= overrides it for odd layouts.
+if [ -z "$itoolsdir" ] ; then
+    itoolsdir=`dirname "$0"`
+    case ${itoolsdir} in
+	/*) ;;
+	*)  itoolsdir=`cd "${itoolsdir}" && pwd` ;;
+    esac
+fi
+
+if [ -z "$itoolsdatadir" ] ; then
+    echo "$me: no --itoolsdatadir=DIR." >&2
+    echo "  That is where gcc's \`install-mkheaders' put fixinc_list," >&2
+    echo "  gsyslimits.h and the per-multilib limits.h.  It is a different" >&2
+    echo "  tree from --itoolsdir, so it cannot be derived from this script's" >&2
+    echo "  own location, and it is not guessed: guessing it wrong means" >&2
+    echo "  reading a multilib list that was written for another layout." >&2
+    exit 1
+fi
+
 # THE PER-TARGET OUTPUT DIRECTORY, and the one thing this script exists to
-# write.  Its default has to carry ${target}: it is
-# $(libdir)/gcc/$(version)/<target>/, the per-target directory this branch puts
-# every per-target fact in.  Running mkheaders again for the same target
-# REPLACES that target's fixed headers and touches no other target's -- which is
-# why a caller supplying --incdir must give each target its own.
-test -n "$incdir" || incdir=${libdir}/gcc/${version}/${target}/include-fixed
+# write.  Running mkheaders again for the same target REPLACES that target's
+# fixed headers and touches no other target's -- so a caller must give each
+# target its own, which is precisely why there is no default to get wrong.
+if [ -z "$incdir" ] ; then
+    echo "$me: no --incdir=DIR for $target." >&2
+    echo "  This is where $target's fixed headers go.  There is no default:" >&2
+    echo "  one compiler serves every back end, so a path computed here would" >&2
+    echo "  have to carry the target itself, and two targets sharing it would" >&2
+    echo "  overwrite each other in turn with no diagnostic." >&2
+    exit 1
+fi
 mkinstalldirs="${itoolsdir}/mkinstalldirs"
 
 if [ ! -f ${itoolsdatadir}/fixinc_list ] ; then
@@ -204,7 +227,7 @@ if [ ! -f ${itoolsdatadir}/fixinc_list ] ; then
 fi
 
 # `incdir' IS ABOUT TO BE EMPTIED, and it is now caller-supplied, so check it
-# before trusting it to `rm -rf'.  When it was always @libdir@/gcc/<ver>/<target>
+# before trusting it to `rm -rf'.  When it was always <libdir>/gcc/<ver>/<target>
 # it could not name a short path; an option can.  Require an absolute path at
 # least three components deep -- enough to exclude `/', `/usr' and `/usr/lib'.
 case ${incdir} in
