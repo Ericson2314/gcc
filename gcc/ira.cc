@@ -649,6 +649,17 @@ setup_class_subset_and_memory_move_costs (void)
       if (cl != (int) NO_REGS)
 	for (mode = 0; mode < MAX_MACHINE_MODE; mode++)
 	  {
+	    /* ...AND THE MODE AXIS, for the same reason one line up.  `mode'
+	       is an ordinal in the SHARED numbering and both
+	       `targetm.memory_move_cost' and `targetm.hard_regno_mode_ok'
+	       below are BACK-END hooks; a hole is a mode some other configured
+	       back end defines and this one does not, and the back end has no
+	       answer -- `pru_hard_regno_mode_ok' (pru.cc:547) says so with an
+	       assert.  The rows keep their SHRT_MAX from the loop above, which
+	       is what this function already uses for "no".  See MODE_IS_HOLE_P
+	       (machmode.h).  */
+	    if (MODE_IS_HOLE_P (mode))
+	      continue;
 	    ira_max_memory_move_cost[mode][cl][0]
 	      = ira_memory_move_cost[mode][cl][0]
 	      = memory_move_cost ((machine_mode) mode,
@@ -1815,6 +1826,13 @@ setup_prohibited_mode_move_regs (void)
   for (i = 0; i < NUM_MACHINE_MODES; i++)
     {
       SET_HARD_REG_SET (ira_prohibited_mode_move_regs[i]);
+      /* AND THE MODE AXIS: `i' is a shared-numbering ordinal passed to
+	 `targetm.hard_regno_mode_ok' below, so a mode this base does not have
+	 must not be asked about.  The set stays all-prohibited, which is what
+	 "this base has no such mode" means and is what the loop leaves for a
+	 mode no register accepts anyway.  See MODE_IS_HOLE_P.  */
+      if (MODE_IS_HOLE_P (i))
+	continue;
       /* MT_FIRST_PSEUDO_REGISTER: a back-end hook asked about a register
 	 number.  The set keeps the union layout; a register this base does
 	 not have stays PROHIBITED, which is what its absence means.  */

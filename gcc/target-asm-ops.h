@@ -118,6 +118,40 @@ struct target_asm_ops
      defined the macro has always got, so converting the guard cannot change
      any other base's output.  */
   bool use_select_section_for_functions;
+
+  /* ------------------------------------------------------------------
+     `asm_fprintf''s THREE PREFIX ESCAPES -- `%R', `%I' and `%L'.  LEAKED
+     ABSENCE, and it produced ASSEMBLY THE TARGET'S OWN ASSEMBLER REJECTS.
+
+     `final.cc:4086-4102' answered each with a bare `#ifdef' in a SHARED
+     translation unit.  The primary defines none of the three, so all three
+     emitted NOTHING for all 47 bases, and every back end that spells `%I' in
+     a pattern lost its immediate marker.  Measured on m68k, which had just
+     been unblocked and could be assembled for the first time -- 1 of 7 corpus
+     inputs assembled, and every failure was this:
+
+       Error: operands mismatch -- statement `moveq 7,%d0' ignored
+       Error: operands mismatch -- statement `addq.l 1,%d0' ignored
+       Error: operands mismatch -- statement `subq.l 4,%sp' ignored
+
+     `moveq #7,%d0' is the instruction; `moveq 7,%d0' is not an m68k
+     instruction at all.  `m68k.h:684' defines `IMMEDIATE_PREFIX "#"' and
+     `m68k.cc:5094' turns the `#' operand letter into `asm_fprintf ("%I")'.
+
+     Definers, none of them the primary: IMMEDIATE_PREFIX 8 (epiphany, fr30,
+     frv, ia64, m32r, m68k, visium, xstormy16), REGISTER_PREFIX 16,
+     LOCAL_LABEL_PREFIX 51.
+
+     `const char *' with NULL meaning "this back end defines none", which is
+     exactly what the `#ifdef' meant: absence prints nothing.  So a back end
+     that defines nothing is unaffected, and only the definers move.
+
+     `USER_LABEL_PREFIX' is deliberately NOT here: `final.cc' already reads it
+     through the runtime variable `user_label_prefix', which is the same fix
+     one layer up and was made long ago.  */
+  const char *register_prefix;
+  const char *immediate_prefix;
+  const char *local_label_prefix;
 };
 
 /* Wrap each target macro in a function of the right shape.  Defined
@@ -262,6 +296,24 @@ gcc_taop_output_align (FILE *stream, int log)
 #define TARGET_ASM_USE_SELECT_SECTION_FOR_FUNCTIONS false
 #endif
 
+/* The three prefix escapes.  NULL where the back end defines nothing, which
+   is what the `#ifdef' in final.cc meant.  */
+#ifdef REGISTER_PREFIX
+#define TARGET_ASM_REGISTER_PREFIX REGISTER_PREFIX
+#else
+#define TARGET_ASM_REGISTER_PREFIX NULL
+#endif
+#ifdef IMMEDIATE_PREFIX
+#define TARGET_ASM_IMMEDIATE_PREFIX IMMEDIATE_PREFIX
+#else
+#define TARGET_ASM_IMMEDIATE_PREFIX NULL
+#endif
+#ifdef LOCAL_LABEL_PREFIX
+#define TARGET_ASM_LOCAL_LABEL_PREFIX LOCAL_LABEL_PREFIX
+#else
+#define TARGET_ASM_LOCAL_LABEL_PREFIX NULL
+#endif
+
 /* One entry per configured back end, so a table can be found by name.  */
 struct target_asm_ops_entry
 {
@@ -293,5 +345,12 @@ extern void mt_asm_output_align (FILE *stream, int log);
    `mt_asm_output_align', not copied into `targetm.asm_out': the macro has no
    `targetm' counterpart upstream.  */
 extern bool mt_use_select_section_for_functions (void);
+
+/* `asm_fprintf''s `%R', `%I' and `%L', for the base in force.  NULL means the
+   back end defines no such prefix and nothing is printed -- the `#ifdef'
+   semantics these replace.  */
+extern const char *mt_register_prefix (void);
+extern const char *mt_immediate_prefix (void);
+extern const char *mt_local_label_prefix (void);
 
 #endif /* GCC_TARGET_ASM_OPS_H */

@@ -135,3 +135,31 @@ mt_use_select_section_for_functions (void)
   return targetm_asm_ops != NULL
 	 && targetm_asm_ops->use_select_section_for_functions;
 }
+
+/* `asm_fprintf''s three prefix escapes for the base in force.
+
+   NULL is a REAL ANSWER here, not a failure: it is what a back end defining
+   no such prefix means, and `final.cc' prints nothing for it -- the exact
+   semantics of the `#ifdef' these replace.  That is also why there is no
+   fail-by-name arm: "no base selected" and "this base has no prefix" both
+   have to be spelled NULL, and the pre-selection default is the primary's
+   table, whose three entries are NULL.  So an unselected compiler behaves
+   exactly as every base did before this change, and only the definers move.  */
+
+const char *
+mt_register_prefix (void)
+{
+  return targetm_asm_ops == NULL ? NULL : targetm_asm_ops->register_prefix;
+}
+
+const char *
+mt_immediate_prefix (void)
+{
+  return targetm_asm_ops == NULL ? NULL : targetm_asm_ops->immediate_prefix;
+}
+
+const char *
+mt_local_label_prefix (void)
+{
+  return targetm_asm_ops == NULL ? NULL : targetm_asm_ops->local_label_prefix;
+}

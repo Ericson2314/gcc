@@ -90,6 +90,9 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "dwarf2out.h"
 #include "target-asmfprintf.h"
+/* For mt_register_prefix / mt_immediate_prefix / mt_local_label_prefix, the
+   three `asm_fprintf' escapes that used to be `#ifdef's here.  */
+#include "target-asm-ops.h"
 
 /* Most ports don't need to define CC_STATUS_INIT.
    So define a null default for it to save conditionalization later.  */
@@ -4084,22 +4087,31 @@ asm_fprintf (FILE *file, const char *p, ...)
 #endif
 	    break;
 
+	  /* THESE THREE WERE `#ifdef's IN A SHARED TU AND THE PRIMARY DEFINES
+	     NONE OF THEM, so all three printed NOTHING for all 47 bases --
+	     INSTRUMENTS.md's "leaked absence", and here it produced assembly
+	     the target's own assembler REJECTS.  m68k, on the first corpus it
+	     was ever able to assemble, got 1 of 7 and every failure was
+
+	       Error: operands mismatch -- statement `moveq 7,%d0' ignored
+
+	     because `m68k.h:684's IMMEDIATE_PREFIX "#" never reached `%I'.
+	     NULL from these accessors keeps the old meaning exactly: the back
+	     end defines no such prefix, so nothing is printed.  See
+	     target-asm-ops.h.  */
 	  case 'R':
-#ifdef REGISTER_PREFIX
-	    fprintf (file, "%s", REGISTER_PREFIX);
-#endif
+	    if (const char *pfx = mt_register_prefix ())
+	      fprintf (file, "%s", pfx);
 	    break;
 
 	  case 'I':
-#ifdef IMMEDIATE_PREFIX
-	    fprintf (file, "%s", IMMEDIATE_PREFIX);
-#endif
+	    if (const char *pfx = mt_immediate_prefix ())
+	      fprintf (file, "%s", pfx);
 	    break;
 
 	  case 'L':
-#ifdef LOCAL_LABEL_PREFIX
-	    fprintf (file, "%s", LOCAL_LABEL_PREFIX);
-#endif
+	    if (const char *pfx = mt_local_label_prefix ())
+	      fprintf (file, "%s", pfx);
 	    break;
 
 	  case 'U':
