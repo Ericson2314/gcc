@@ -2898,3 +2898,41 @@ uncountably many spellings.
 
 That is the whole argument in one command.  Anything that needs "the list of
 targets" is asking a question with no answer.
+
+### Enumeration is for SAMPLING, never for runtime logic
+
+The operative form of the rule, and the test to apply to any target list you
+find:
+
+    Is this list choosing WHAT TO BUILD, or deciding WHAT THE COMPILER DOES?
+
+A target list has exactly one legitimate use: **sampling** — "which target
+libraries do I want built?"  That is a distro's or a user's choice, finite by
+fiat rather than by nature (I want *these* N), and it drives multibuild and
+nothing else.  `--enable-targets` is that list, it lives at the top level, and
+its whole job is to say which per-target things get instantiated.
+
+Every other use is wrong.  A target list must never reach runtime logic, never
+be compiled in, never key a generated file, never decide a branch the compiler
+takes.  Because the space is infinite subsets of infinite spaces, any list used
+as logic is a sample standing in for a region — and the sample is arbitrary.
+
+The mechanical consequences, all measured on this branch:
+
+  * the compiler build depends only on `--enable-backends`;
+    **same `--enable-backends` => byte-identical compiler, whatever
+    `--enable-targets` said**;
+  * `tm_defines` (`DEFAULT_LIBC`, `TARGET_HAS_IFUNC`) are per-target facts, so
+    they belong in the runtime config, not compiled into `<cpu>-common.o` —
+    this branch has already moved 92 such facts, so the channel exists and this
+    is residue;
+  * `tm-<triple>.h` generated at gcc build time is a list used as logic, in file
+    form;
+  * `gcc/default-backends` was the same thing one layer up, and was deleted
+    rather than curated;
+  * a per-target directory in gcc's *install* is a list used as logic, made
+    persistent.
+
+And the reason the distinction is safe to lean on: sampling is honest about
+being arbitrary.  Nobody is misled when a distro says "build me these five."
+Logic keyed on the same list silently claims the five are exhaustive.
