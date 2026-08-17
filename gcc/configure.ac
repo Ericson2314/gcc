@@ -1728,6 +1728,48 @@ if gcc_gen_target_manifest; then :; else
   AC_MSG_ERROR([--enable-backends: ${gcc_mt_fatal}])
 fi
 
+dnl THE REMAINING COUPLING, NAMED RATHER THAN LEFT TO `make'.
+dnl
+dnl Taking `${target}' out of the manifest above does NOT make `--target'
+dnl irrelevant to the build: `build_target_triple=${target}' further down is
+dnl the triple THIS BUILD TREE's target libraries are built for, and
+dnl `BUILD_DRIVER_NAME = $(build_target_triple)-gcc' is a HARD PREREQUISITE of
+dnl `start.encap'.  That driver is produced by MULTI_TARGET_DRIVERS, which is
+dnl `$(enabled_targets)' -- so if `${target}' is not one of the configured back
+dnl ends there is no rule to build it, and `make' says
+dnl
+dnl     No rule to make target 'x86_64-pc-linux-gnu-gcc', needed by 'start.encap'
+dnl
+dnl 4000 lines into a build, naming a triple the user never typed.  The primary
+dnl config.gcc sourced above also still feeds `tmake_file', `c_target_objs' and
+dnl friends from `${target}', which is how `config/i386/i386-passes.def'
+dnl reaches `pass-instances.def' in a build with no i386 back end.  Both are the
+dnl same unfinished business -- the build tree still has ONE target of its own
+dnl -- and neither is fixed here.  What IS fixed is the silence: fail at
+dnl configure time, by name, with the fix in the message.
+gcc_mt_target_configured=no
+for gcc_mt in ${gcc_manifest_targets}; do
+  test x"${gcc_mt}" = x"${target}" && gcc_mt_target_configured=yes
+done
+if test x"${target}" != x && test x"${gcc_mt_target_configured}" = xno; then
+  AC_MSG_ERROR([${target} is this build tree's own target (--target, which the
+top-level Makefile passes to every module) but it is not one of the configured
+back ends:
+
+    ${gcc_manifest_targets}
+
+The build tree builds target libraries for ${target} and needs a
+${target}-gcc driver for them; that driver is only built for a configured
+target, so the build would die in `make' with
+
+    No rule to make target `${target}-gcc', needed by `start.encap'
+
+Include ${target} in the list -- at the top level that is
+--enable-targets -- or configure the tree for the target you actually
+want.  The build tree having a target of its own at all is the defect behind
+this message; until it is gone, the two must agree.])
+fi
+
 AC_SUBST(gcc_manifest_targets)
 AC_SUBST(gcc_all_common_objects)
 AC_SUBST(gcc_all_common_symbols)
