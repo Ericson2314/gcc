@@ -298,3 +298,86 @@ attribution**, because on this branch a plausible mechanism that was never run
 is precisely the failure mode being guarded against.  A bisect is running
 (`a302b44ba-icebuild.sh`); `pr78671` answers in one second per step, so only
 the build is expensive.
+
+8. THE BOARD — s390x, REFUTED IN THE OTHER DIRECTION, AND THE PREDICTION'S
+   PREMISE IS WHAT BREAKS
+---------------------------------------------------------------------------
+
+```
+s390x-ibm-linux-gnu     stock control: PASS 130895 / FAIL 15627 (both runs)
+
+                        BEFORE (e1f0cad1c2c)      AFTER (7b39423abba)
+multi-target PASS/FAIL  128882 / 15776            130465 / 15744
+DEBT                    206                       134         <- PREDICTED 206
+SCOPE  results in mt    166,594                   167,787
+       results in stock 168,040                   168,040
+       only in STOCK    1,998                     340
+       only in MT       552                       87
+```
+
+**Debt was predicted UNCHANGED at 206.  It is 134 — it FELL by 72.**  So the
+prediction is refuted on this target too, in the opposite direction from
+x86_64.  A board that reported only "206 -> 134, an improvement" would be
+hiding the more interesting fact, which is that **the prediction's REASONING
+was wrong, not just its number.**
+
+Movement by name: **74 debt items gone, 2 new.**
+
+**THE 74, ATTRIBUTED.**  Of the 74 that went away, **60 are in test files that
+use `_Decimal`** — `gcc.target/s390/dfp-1.c`, `dfp-conv1.c`,
+`dfp_to_bfp_rounding.c`, `pfpo.c`, the six `vector/long-double-{from,to}-
+decimal{32,64,128}.c`, `signbit-2/3.c` and
+`isfinite-isinf-isnormal-signbit-1/2.c`.  **That is `9ee972c229d`, the
+`decimal_float` fix, and it is removing DEBT — which the prediction says it
+cannot do.**
+
+**WHY THE PREDICTION WAS WRONG, AND IT IS A GATING FACT, NOT AN ARITHMETIC
+SLIP.**  The prediction generalised from `dfp.exp` to all decimal-float tests.
+`gcc.dg/dfp/dfp.exp:23` is
+
+```tcl
+if { ![check_effective_target_dfp] } {
+```
+
+and it `return`s — **the whole `.exp` bails out**, so its 859 results are never
+attempted and land wholly in SCOPE, contributing nothing to debt in either
+direction.  That is exactly what §6 measures and it is true.
+
+But the target-specific decimal tests are **NOT GATED**.  `gcc.target/s390/
+dfp-1.c`, `dfp-conv1.c` and `vector/long-double-from-decimal64.c` carry **no**
+`dg-require-effective-target dfp` (measured: 0 each), and they run from
+`s390.exp`, which does not bail.  So they were **attempted, and they FAILED**
+with an excess error — they were sitting in the DEBT column all along, not in
+scope.  The prediction reasoned from the gated suite to the ungated tests and
+that step does not hold.
+
+**AND THE SAME MEASUREMENT EXPLAINS WHY x86_64 DID NOT MOVE THIS WAY.**  Of
+x86_64's 67 before-debt items, the number whose test file uses `_Decimal` is
+**0**.  There was nothing on that target for the fix to take out of debt.  The
+asymmetry is not noise; it is which back end has ungated decimal tests in its
+own directory.
+
+The remaining **14** of the 74 are not decimal at all —
+`atomic-align-1.c` (4 `.align` scans), `isfinite-isinf-isnormal-signbit-3.c`
+(9) and `pr79890.c` (1).  Those are `.align`/codegen scans and belong to the
+assembler-output work in the same range (`3d1ca4b936b`, `46335722ef7` and
+neighbours); they are **not** attributed to a single commit here, and are
+listed as unattributed rather than folded into the dfp count.
+
+**THE 2 NEW ARE NOT REGRESSIONS, AND THEY WERE CHECKED RATHER THAN ASSUMED.**
+
+```
+gcc.dg/lto/pr52634 ... link, -flto -r -flto-partition=1to1   before-MT: (absent)  now FAIL  stock PASS
+gcc.dg/torture/pr67619.c -O3 -g (test for excess errors)     before-MT: (absent)  now FAIL  stock PASS
+```
+
+Both are **absent from the before run entirely** — no verdict of any kind.
+They were never attempted before and are attempted now, so they are SCOPE
+converting into DEBT, not `PASS -> FAIL`.  This is the same class as the ten
+previously-UNSUPPORTED tests the standing rule was written for, and it is why
+the rule exists: counted as regressions they would have read as the fix
+breaking LTO.
+
+Guards: `make check-gcc` rc=0, `site.exp` attributes to s390x-ibm-linux-gnu,
+`multi-target.exp` banner present, GUARD 3c reports **IBM S/390**, and the run
+was taken on a copy proven md5-identical to the original build (§2).
