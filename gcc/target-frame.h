@@ -1971,14 +1971,38 @@ struct target_frame_desc
      the reason "i386's answer happens to be right for LP64 targets" is not a
      safe reading.  `LPREFIX' is i386's label prefix on top of that.
 
-     WHY THE SCORED BOARD MAY NOT MOVE, SAID IN ADVANCE.  x86_64, aarch64,
-     riscv64 and s390x are all LP64 and all spell `.L`, so all four currently
-     emit `.quad .L<n>` and all four are CORRECT BY LUCK -- measured, twelve
-     entries each, `-jtelt.sh`.  The targets this is wrong for are the 32-bit
-     and 16-bit ones (mips o32, avr, msp430, m68k, arm, xtensa, ...) and none
-     of them is on the four-target board.  Converted because it is a live
-     wrong-code leak on 37 back ends, not because a number is predicted to
-     move; the same statement `adjust_insn_length' above had to make.
+     I PREDICTED THE SCORED BOARD WOULD NOT MOVE AND THAT WAS WRONG, IN THE
+     DIRECTION THAT MATTERS.  The prediction was: x86_64, aarch64, riscv64 and
+     s390x are all LP64 and all spell `.L', i386's emitter writes
+     `.quad .L<n>' for exactly that combination, so all four are correct by
+     luck and must be byte-identical.  Measured, TWO OF THE FOUR CHANGED.
+
+     The reasoning failed because it was about the POINTER width.  A jump
+     table may be RELATIVE, and then the entry width is not the pointer width
+     at all -- it is whatever that back end's own `casesi' pattern LOADS:
+
+	 aarch64  ldr  w1, [x1, w0, uxtw #2]     4-byte entry, index scaled
+		  add  x1, x0, w1, sxtw #2      and the ENTRY is scaled too
+	 riscv64  slli a0,a0,2 ; lw a5,0(a0)     4-byte entry
+
+     `aarch64-elf.h:72' emits `.word (%LL%d - %LLrtx%d) / 4' and `riscv.h:1102'
+     `.word %sL%d'.  Both were replaced by `.quad'.  So on every aarch64 and
+     riscv64 switch compiled into a jump table, entry `i' was read from bytes
+     [4i, 4i+4) of a table written with an 8-byte stride -- the low half of
+     entry i/2 -- and on aarch64 the value was additionally UNSCALED where the
+     `add' scales by 4.  The branch target was garbage.
+
+     Measured at the object level with a real cross assembler: aarch64's
+     `.rodata' goes 96 -> 48 bytes for a twelve-entry table, i.e. it was
+     exactly twice the size its own code indexed.  BOTH SIDES ASSEMBLE rc=0
+     into a well-formed AArch64 object, which is why nothing before this saw
+     it.  s390x and x86_64 are byte-identical and genuinely do use 8-byte
+     entries; they are the control.
+
+     The 32- and 16-bit targets (mips o32, avr, msp430, m68k, arm, xtensa) are
+     wrong for the width reason too, and none of them is on the four-target
+     board -- so that part of the prediction stands and is simply not the
+     whole of it.
 
      NO `has_' FLAG, AND THE `#else' IS `gcc_unreachable ()' RATHER THAN A
      FALLBACK.  That is not a floor being declined for tidiness: it is exactly
