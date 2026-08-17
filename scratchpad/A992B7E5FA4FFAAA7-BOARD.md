@@ -626,12 +626,35 @@ Essentially identical to the last board's s390x ranking. The
 signbit/isfinite family (**48 across four files, stock passes all**) remains
 the one coherent, self-contained work item on this target.
 
-**`gcc.dg/lto` is now s390x's alone.** The last board flagged 53 *identically*
-on aarch64, riscv64 and s390x and said "the same count on three targets is not
-three bugs". It is now ~24 on s390x and absent from the other two heads — so
-that observation no longer holds, and whatever it was has largely closed
-without being worked. Recorded because an inherited item that quietly
-disappears is exactly what nobody re-checks.
+### `gcc.dg/lto` — STILL 53 ON THREE TARGETS, AND MY FIRST READING OF IT WAS WRONG
+
+I wrote, from the depth-3 rankings, that *"`gcc.dg/lto` is now s390x's alone …
+absent from the other two heads … whatever it was has largely closed"*. **That
+is false.** Measured at depth 2 (`/tmp/ltocheck-a992.sh`):
+
+```
+aarch64-unknown-linux-gnu    gcc.dg/lto debt 53
+riscv64-unknown-linux-gnu    gcc.dg/lto debt 53
+s390x-ibm-linux-gnu          gcc.dg/lto debt 53
+x86_64-pc-linux-gnu          gcc.dg/lto debt  0
+```
+
+**Unchanged from the last board, to the unit, on all four.** The previous
+board's observation stands exactly as written: *"the same count on three
+targets is not three bugs"*, and x86_64's zero is still the clue.
+
+The error is worth recording because it is a *reading* error with a clean
+mechanism, not a measurement error. At **depth 3** the directory splits into
+`gcc.dg/lto/20091027-1`, `/20100603-1`, `/20100603-2` … each worth ~6, so no
+single row shows anything like 53 and the family is invisible in a top-14
+listing. At **depth 2** it is one row of 53. `mt-debt-rank.sh`'s header says
+the depth is a parameter *"for that reason"* — I used the depth tuned for
+aarch64's `gcc.target/aarch64/*` subdirectories and read a different question's
+answer off it.
+
+Generalises to: **a ranking is an answer at one granularity, and "absent from
+the head" is not "absent".** Re-run at the depth the family actually lives at
+before saying something has gone.
 
 ## 3. WHAT THIS BOARD CANNOT SEE — the most important section
 
