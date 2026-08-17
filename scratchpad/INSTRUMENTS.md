@@ -96,6 +96,31 @@ is immune. Same shape as the aarch64 `-S` bar being filename-sensitive via
 its input path AND its build dir**; `a5764a65f9eec0063-gcheck.sh` settles it by
 compiling one constant absolute path with both compilers.
 | a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
+| **what each of the 47 bases EXPANDS a macro to, not who spells it** | `a9364e5cd42e818ad-typefmt.sh` |
+| both-sided `.s` diff + each target's OWN `as`, five targets | `a9364e5cd42e818ad-tdprobe.sh` |
+| the 4 cross assemblers EXECUTED, `Machine:` read back | `a9364e5cd42e818ad-tools.sh` |
+| `taa-specs.sh` + arm: 5 targets, 5 DISTINCT md5s asserted | `a9364e5cd42e818ad-specs5.sh` |
+| does an effective-target probe measure what it NAMES? | `a9364e5cd42e818ad-etprobe2.sh` |
+| **the SCOPE columns — results one run produced and the other did not** | `a9364e5cd42e818ad-scope.sh` |
+
+**QUOTE `-scope.sh` BESIDE EVERY DEBT FIGURE; THE DEBT ALONE MISREADS IN BOTH
+DIRECTIONS.**  A run whose effective-target selectors are broken does not
+ATTEMPT the tests they gate, so those tests contribute no per-assertion names
+and cannot appear in the debt at all — the arm board's 3,288 sat beside 21,181
+results the stock run produced and it did not.  Fix the selector and the same
+tests start running: `bfloat16_simd_1_1.c` went from one `UNSUPPORTED` line to
+two PASSes and one FAIL.  **Against the debt column alone, a test moving from
+"never attempted" to "attempted, mostly passing" is indistinguishable from a
+regression.**  In the arm re-score, debt 3288 -> 191 came with 10 "new" debt
+names, every one of them of that kind, while the scope gap fell 21181 -> 874.
+
+**`-typefmt.sh` EXISTS BECAUSE THE DEFINER-COUNT IS THE WRONG COUNT, THREE TIMES
+NOW.**  It preprocesses each base's own `tm-<base>.h` and EXPANDS the macro,
+which is the only reading that answers "what would this back end have said
+standing alone".  On `TYPE_OPERAND_FMT` a `grep` of `config/` named 7 files; the
+expansion named **4 distinct answers over 47 bases**, including a dissenter
+nobody had listed (sparc, `#object`) and three bases with no directive at all
+(mmix, nvptx, pdp11) that shared code had been FABRICATING one for.
 
 ## THE FOUR LEAK CLASSES AND THEIR SWEEPS — read this before hunting a leak by hand
 
@@ -110,6 +135,26 @@ until now **three of them had no sweep** and were found by accident.
 | leaked absence | bare `#ifdef` in a **shared** TU on a name the primary does not define, so the guarded code runs for **nobody** (`FINAL_PRESCAN_INSN`, `TRAMPOLINE_SECTION`) | `agent-a992b7e5fa4ffaaa7-absencesweep.sh` |
 | generated header | the name lives only in a **generated per-base header** and the build root's shared copy is the primary's (`DELAY_SLOTS`, `HAVE_conditional_execution`, `insn-modes.h`, `options.h`) | `agent-a992b7e5fa4ffaaa7-genhdrsweep.sh` |
 | **guard-true-for-all** | **bare `#ifdef` in shared code on a name the PRIMARY DEFINES, so the guard is true for everyone and the VALUE inside is the primary's** (`EH_RETURN_STACKADJ_RTX` — i386's `CX_REG` is 2, which on riscv is `sp`) | **nothing yet** |
+
+| **converted-macro, leaked CALLER** | **the macro IS converted and the redirect works — but a PER-BASE TU expands it inside a function the primary's macro names, so shared code calls that function and gets the primary's answer anyway** (`ASM_OUTPUT_ALIGN`, correct everywhere except inside `x86_output_aligned_bss`) | **nothing yet** |
+
+**THE SIXTH ROW IS INVISIBLE TO EVERY SWEEP ABOVE, BECAUSE THE MACRO IS
+CONVERTED.**  `ASM_OUTPUT_ALIGN` was converted in `7247d7aea83` and arm's
+`.data` path emits `.align 2` correctly.  But `i386/gnu-user.h:87` defines
+`ASM_OUTPUT_ALIGNED_BSS` as `x86_output_aligned_bss` — a function in `i386.cc`
+— and `varasm.cc`'s `emit_bss` called it for all 47 bases.  Inside `i386.cc`
+the redirect does not apply and `ASM_OUTPUT_ALIGN` is genuinely i386's, so
+arm's `.bss` came out `.align 4` while its `.data` came out `.align 2`, in the
+same file.  A sweep asking "is this macro converted?" answers yes.  A sweep
+asking "does the primary define this name?" is looking at the wrong name: the
+leaked name is `ASM_OUTPUT_ALIGNED_BSS`, whose VALUE is a function symbol.
+
+The generalisation, and it is what a sweep would have to look for: **a
+shared-code `#ifdef`/`#if defined` on a macro whose expansion is a CALL to a
+back-end function.**  `nm -uC` on the shared object names it — the same reading
+that caught `ix86_asm_output_function_label` — so the sweep is
+"symbols in shared `.o`s that belong to exactly one back end", not a macro
+census at all.  `A9364E5CD42E818AD-TYPEFMT.md` 4.
 
 **The fifth row has NO `defaults.h` floor anywhere in its story**, so
 `floorsweep.sh` cannot see it, and it is not the leaked-absence row either:

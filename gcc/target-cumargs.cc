@@ -458,6 +458,228 @@ mt_base_declare_function_size (FILE *file ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* ASM_DECLARE_OBJECT_NAME, asked of THIS base.  `varasm.cc:2539' and
+   `varasm.cc:517', the same `#ifdef'/`#else' pair both spelled, with the
+   `last_assemble_variable_decl' assignment kept where upstream has it --
+   BEFORE the macro body and only on the arm that has one.
+
+   In shared code both arms were the primary's, and the body reaches
+   `defaults.h:260's ASM_OUTPUT_TYPE_DIRECTIVE, i.e. `elfos.h:284's
+   `TYPE_OPERAND_FMT "@%s"'.  arm and aarch64 both spell it `"%%%s"'.  On arm
+   `@' opens a comment and `as' rejects the empty type operand; on aarch64 the
+   assembler accepts the wrong operand without a word.  See target-frame.h.  */
+
+static void
+mt_base_declare_object_name (FILE *file, const char *name,
+			     tree decl ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_DECLARE_OBJECT_NAME
+  last_assemble_variable_decl = decl;
+  ASM_DECLARE_OBJECT_NAME (file, name, decl);
+#else
+  /* Standard thing is just output label for the object.  */
+  ASM_OUTPUT_LABEL (file, name);
+#endif
+}
+
+/* THE FOUR `SECTION_NOSWITCH' CALLBACKS' MACRO CHAINS, ASKED OF THIS BASE.
+   `varasm.cc' :2411 (`emit_local'), :2447 (`emit_bss'), :2461 (`emit_common')
+   and :2482 (`emit_tls_common') each dispatch on `#if defined' over macros the
+   PRIMARY supplies, so every arm and every body was i386's for all 47 bases.
+
+   `emit_bss' IS THE WORST OF THE FOUR AND IT IS NOT A DIRECTIVE-SPELLING BUG.
+   `i386/gnu-user.h:87' defines ASM_OUTPUT_ALIGNED_BSS as `x86_output_aligned_bss'
+   -- a FUNCTION IN `i386.cc' -- so every uninitialized global on every one of
+   the 47 back ends was emitted by i386's back end, including
+
+       i386.cc:973   if ((ix86_cmodel == CM_MEDIUM || ... || CM_LARGE_PIC)
+		      && size > (unsigned int) ix86_section_threshold)
+		       switch_to_section (get_named_section (decl, ".lbss", 0));
+
+   i.e. arm's `.bss' placement was decided by i386's code model and i386's
+   `-mlarge-data-threshold'.  Exactly the `ix86_asm_output_function_label'
+   shape that `declare_function_name' records, on the data side.  arm's own
+   answer is the GENERIC `asm_output_aligned_bss', and its ASM_OUTPUT_SKIP is
+   `.space' where i386's is `.zero'.
+
+   ONLY THE MACRO CHAIN MOVES.  The callers keep the target-neutral
+   bookkeeping -- `symtab_node::get (decl)->definition_alignment ()',
+   `get_variable_align', the `sorry' for thread-local COMMON -- so this file
+   needs no new includes and the split is at the macro boundary rather than at
+   an arbitrary one.
+
+   EXISTENCE IS A SEPARATE ANSWER FOR `bss' AND ONLY FOR `bss', because
+   `varasm.cc:7108' creates `bss_noswitch_section' at all only
+   `#if defined ASM_OUTPUT_ALIGNED_BSS'.  30 back ends define the macro and 17
+   do not, and for those 17 the section must not exist -- an in-band "the thunk
+   emitted nothing" cannot say that, since the question is asked once at
+   `init_varasm_once' and not per variable.  */
+
+static bool
+mt_base_has_output_aligned_bss (void)
+{
+#ifdef ASM_OUTPUT_ALIGNED_BSS
+  return true;
+#else
+  return false;
+#endif
+}
+
+static void
+mt_base_output_aligned_bss (FILE *file ATTRIBUTE_UNUSED,
+			    tree decl ATTRIBUTE_UNUSED,
+			    const char *name ATTRIBUTE_UNUSED,
+			    unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+			    unsigned int align ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_ALIGNED_BSS
+  ASM_OUTPUT_ALIGNED_BSS (file, decl, name, size, align);
+#else
+  /* Unreachable: the caller asks `has_output_aligned_bss' first, and a base
+     answering false never gets a `bss_noswitch_section' to route a variable
+     through.  It is a hard stop rather than a no-op because a silently empty
+     `.bss' emission is indistinguishable from a correct one in the output.  */
+  gcc_unreachable ();
+#endif
+}
+
+/* `emit_local's chain.  Returns true when an ALIGNED form was used, which is
+   what the caller's "did the target honour the alignment" test reads.  */
+
+static bool
+mt_base_output_local (FILE *file ATTRIBUTE_UNUSED,
+		      tree decl ATTRIBUTE_UNUSED,
+		      const char *name ATTRIBUTE_UNUSED,
+		      unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+		      unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED,
+		      unsigned int align ATTRIBUTE_UNUSED)
+{
+#if defined ASM_OUTPUT_ALIGNED_DECL_LOCAL
+  ASM_OUTPUT_ALIGNED_DECL_LOCAL (file, decl, name, size, align);
+  return true;
+#elif defined ASM_OUTPUT_ALIGNED_LOCAL
+  /* ASM_OUTPUT_ALIGNED_LOCAL_P is a RUNTIME read of an assembler capability on
+     i386/bsd.h -- `.lcomm' takes an alignment operand only on some
+     assemblers -- so it stays a runtime test here rather than becoming part of
+     the `#if' chain.  It is now this BASE's capability rather than the
+     primary's.  */
+  if (ASM_OUTPUT_ALIGNED_LOCAL_P)
+    {
+      ASM_OUTPUT_ALIGNED_LOCAL (file, name, size, align);
+      return true;
+    }
+# if defined ASM_OUTPUT_LOCAL \
+     && !defined ASM_OUTPUT_ALIGNED_LOCAL_P_IS_CONSTANT_TRUE
+  ASM_OUTPUT_LOCAL (file, name, size, rounded);
+  return false;
+# else
+  /* THIS ARM COMPILES FOR THE FIRST TIME ON THIS BRANCH, AND THAT IS WHY IT
+     NEEDS A GUARD UPSTREAM DOES NOT HAVE.  Upstream compiles `varasm.cc' once,
+     with the primary's macros; i386 takes the ASM_OUTPUT_ALIGNED_DECL_LOCAL
+     arm, so the ALIGNED_LOCAL arm below it is never compiled by anyone and its
+     `ASM_OUTPUT_LOCAL' fallback is never looked up.  Here 31 of the 47 bases
+     take this arm, and several of them define no `ASM_OUTPUT_LOCAL' at all --
+     `aarch64` was the one the build named.
+
+     Reaching this is impossible rather than merely unlikely: where
+     `defaults.h' supplied `ASM_OUTPUT_ALIGNED_LOCAL_P' the test above is the
+     compile-time constant `true', and the only back end that overrides it is
+     `i386/bsd.h:76' -- which also defines `ASM_OUTPUT_LOCAL'.  That is what
+     the `_IS_CONSTANT_TRUE' marker records, per base, in that base's own
+     translation unit.
+
+     THE SECOND CONDITION IS NOT BELT-AND-BRACES; IT IS WHAT bfin NEEDS.
+     `bfin.h:1054's ASM_OUTPUT_LOCAL spells `ASM_SPACE', and `ASM_SPACE' is
+     **defined nowhere in the GCC tree**.  bfin defines the macro, so an
+     `#ifdef ASM_OUTPUT_LOCAL' alone lets it through, and the build stops with
+     `'ASM_SPACE' was not declared in this scope'.  bfin's macro has never been
+     compiled by anything: upstream compiles `varasm.cc' once with the
+     primary's macros, i386 takes the DECL_LOCAL arm, and so this arm is
+     compiled for nobody.  A dormant upstream bug, surfaced by making 47 back
+     ends answer for themselves.  Worth reporting upstream.
+
+     Spelled as a hard stop rather than deleted, because "the target emitted
+     nothing for a local variable" would otherwise be a silent hole in the data
+     section.  */
+  gcc_unreachable ();
+# endif
+#else
+  ASM_OUTPUT_LOCAL (file, name, size, rounded);
+  return false;
+#endif
+}
+
+/* `emit_common's chain.  */
+
+static bool
+mt_base_output_common (FILE *file ATTRIBUTE_UNUSED,
+		       tree decl ATTRIBUTE_UNUSED,
+		       const char *name ATTRIBUTE_UNUSED,
+		       unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+		       unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED,
+		       unsigned int align ATTRIBUTE_UNUSED)
+{
+#if defined ASM_OUTPUT_ALIGNED_DECL_COMMON
+  ASM_OUTPUT_ALIGNED_DECL_COMMON (file, decl, name, size, align);
+  return true;
+#elif defined ASM_OUTPUT_ALIGNED_COMMON
+  ASM_OUTPUT_ALIGNED_COMMON (file, name, size, align);
+  return true;
+#else
+  ASM_OUTPUT_COMMON (file, name, size, rounded);
+  return false;
+#endif
+}
+
+/* `emit_tls_common's chain.  False means this base has no ASM_OUTPUT_TLS_COMMON
+   and the caller must `sorry'; the message is target-neutral and stays there.  */
+
+static bool
+mt_base_output_tls_common (FILE *file ATTRIBUTE_UNUSED,
+			   tree decl ATTRIBUTE_UNUSED,
+			   const char *name ATTRIBUTE_UNUSED,
+			   unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_TLS_COMMON
+  ASM_OUTPUT_TLS_COMMON (file, decl, name, size);
+  return true;
+#else
+  return false;
+#endif
+}
+
+/* ASM_FINISH_DECLARE_OBJECT, asked of THIS base -- `passes.cc:376', the
+   CLOSING half of the bracket `mt_base_declare_object_name' opens.  An
+   `#ifdef' with no `#else', so absence is "do nothing" and stays so.  */
+
+static void
+mt_base_finish_declare_object (FILE *file ATTRIBUTE_UNUSED,
+			       tree decl ATTRIBUTE_UNUSED,
+			       int top_level ATTRIBUTE_UNUSED,
+			       int at_end ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_FINISH_DECLARE_OBJECT
+  ASM_FINISH_DECLARE_OBJECT (file, decl, top_level, at_end);
+#endif
+}
+
+/* ASM_OUTPUT_TYPE_DIRECTIVE, asked of THIS base -- `final.cc:2087' and
+   `varasm.cc:6647'.  The return value carries the `#if defined' that
+   `varasm.cc:6647' can not do without; see target-frame.h.  */
+
+static bool
+mt_base_output_type_directive (FILE *file ATTRIBUTE_UNUSED,
+			       const char *name ATTRIBUTE_UNUSED,
+			       const char *type ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_TYPE_DIRECTIVE
+  ASM_OUTPUT_TYPE_DIRECTIVE (file, name, type);
+  return true;
+#else
+  return false;
+#endif
+}
+
 /* ASM_OUTPUT_FUNCTION_PREFIX, asked of THIS base -- `varasm.cc:2192'.  s390 is
    the only definer and i386 is not, so in shared code the `#ifdef' was false
    for all 47 bases and s390's `.machine push' / `.machinemode zarch' never
@@ -2279,6 +2501,14 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_final_prescan_insn,
   mt_base_go_if_legitimate_address,
   mt_base_declare_function_size,
+  mt_base_declare_object_name,
+  mt_base_finish_declare_object,
+  mt_base_has_output_aligned_bss,
+  mt_base_output_aligned_bss,
+  mt_base_output_local,
+  mt_base_output_common,
+  mt_base_output_tls_common,
+  mt_base_output_type_directive,
   mt_base_declare_function_prefix,
   mt_base_adjust_insn_length,
   mt_base_addr_vec_align,

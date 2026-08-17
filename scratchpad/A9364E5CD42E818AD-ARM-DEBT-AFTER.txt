@@ -1,0 +1,191 @@
+c-c++-common/builtin-shuffle-1.c  -Wc++-compat  (test for excess errors)
+c-c++-common/torture/vshuf-v16qi.c   -O0  (test for excess errors)
+c-c++-common/torture/vshuf-v16qi.c   -O1  (test for excess errors)
+c-c++-common/torture/vshuf-v2di.c   -O0  (test for excess errors)
+c-c++-common/torture/vshuf-v2di.c   -O1  (test for excess errors)
+c-c++-common/torture/vshuf-v4si.c   -O0  (test for excess errors)
+c-c++-common/torture/vshuf-v4si.c   -O1  (test for excess errors)
+c-c++-common/torture/vshuf-v8hi.c   -O0  (test for excess errors)
+c-c++-common/torture/vshuf-v8hi.c   -O1  (test for excess errors)
+gcc.c-torture/execute/ieee/fp-cmp-8f.c   -O2  (test for excess errors)
+gcc.c-torture/execute/ieee/fp-cmp-8f.c   -O3 -g  (test for excess errors)
+gcc.c-torture/execute/ieee/fp-cmp-8f.c   -Os  (test for excess errors)
+gcc.dg/Wunused-var-3.c (test for excess errors)
+gcc.dg/autopar/reduc-6.c (test for excess errors)
+gcc.dg/builtins-9.c (test for excess errors)
+gcc.dg/lto/20081120-1 c_lto_20081120-1_0.o-c_lto_20081120-1_1.o link, -flto -r -nostdlib
+gcc.dg/lto/20081120-2 c_lto_20081120-2_0.o-c_lto_20081120-2_1.o link, -flto -flto-partition=1to1 -r -nostdlib
+gcc.dg/lto/20081204-1 c_lto_20081204-1_0.o-c_lto_20081204-1_1.o link, -flto -flto-partition=1to1 -fPIC -r -nostdlib
+gcc.dg/lto/20081212-1 c_lto_20081212-1_0.o-c_lto_20081212-1_0.o link, -r -nostdlib
+gcc.dg/lto/20081224 c_lto_20081224_0.o-c_lto_20081224_1.o link, -flto -flto-partition=1to1 -r -nostdlib -fPIC
+gcc.dg/lto/20090116 c_lto_20090116_0.o-c_lto_20090116_0.o link, -O1 -flto -flto-partition=1to1 -fPIC
+gcc.dg/lto/20090126-1 c_lto_20090126-1_0.o-c_lto_20090126-1_0.o link, -O0 -flto -flto-partition=1to1
+gcc.dg/lto/20090126-2 c_lto_20090126-2_0.o-c_lto_20090126-2_0.o link, -fPIC -O2 -flto -flto-partition=1to1
+gcc.dg/lto/20090219 c_lto_20090219_0.o-c_lto_20090219_0.o link, -O3 -flto -flto-partition=1to1 -fPIC -r -nostdlib
+gcc.dg/lto/20091013-1 c_lto_20091013-1_0.o-c_lto_20091013-1_2.o link, -fPIC -r -nostdlib -O2 -flto
+gcc.dg/lto/20091013-1 c_lto_20091013-1_0.o-c_lto_20091013-1_2.o link, -fPIC -r -nostdlib -flto
+gcc.dg/lto/20091014-1 c_lto_20091014-1_0.o-c_lto_20091014-1_0.o link, -fPIC -r -nostdlib -flto
+gcc.dg/lto/20091015-1 c_lto_20091015-1_0.o-c_lto_20091015-1_2.o link, -fPIC -r -nostdlib -O2 -flto
+gcc.dg/lto/20091015-1 c_lto_20091015-1_0.o-c_lto_20091015-1_2.o link, -fPIC -r -nostdlib -O2 -flto -flto-partition=1to1
+gcc.dg/lto/20091016-1 c_lto_20091016-1_0.o-c_lto_20091016-1_1.o link, -fPIC -r -nostdlib -O2 -flto
+gcc.dg/lto/20091020-1 c_lto_20091020-1_0.o-c_lto_20091020-1_1.o link, -fPIC -r -nostdlib -flto
+gcc.dg/lto/20091020-2 c_lto_20091020-2_0.o-c_lto_20091020-2_1.o link, -fPIC -r -nostdlib -flto
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O0 -flto 
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O0 -flto -flto-partition=1to1 
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O0 -flto -flto-partition=none 
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O2 -flto
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O2 -flto -flto-partition=1to1 
+gcc.dg/lto/20091027-1 c_lto_20091027-1_0.o-c_lto_20091027-1_1.o link, -O2 -flto -flto-partition=none 
+gcc.dg/lto/20100426 c_lto_20100426_0.o-c_lto_20100426_0.o link, -r -nostdlib -flto -g
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O0 -flto 
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O0 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O0 -flto -flto-partition=none 
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O2 -flto
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O2 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-1 c_lto_20100603-1_0.o-c_lto_20100603-1_0.o link, -O2 -flto -flto-partition=none 
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O0 -flto 
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O0 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O0 -flto -flto-partition=none 
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O2 -flto
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O2 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-2 c_lto_20100603-2_0.o-c_lto_20100603-2_0.o link, -O2 -flto -flto-partition=none 
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O0 -flto 
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O0 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O0 -flto -flto-partition=none 
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O2 -flto
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O2 -flto -flto-partition=1to1 
+gcc.dg/lto/20100603-3 c_lto_20100603-3_0.o-c_lto_20100603-3_0.o link, -O2 -flto -flto-partition=none 
+gcc.dg/lto/20111213-1 c_lto_20111213-1_0.o-c_lto_20111213-1_0.o link,  -flto -g 
+gcc.dg/lto/pr113197 c_lto_pr113197_0.o-c_lto_pr113197_1.o link,  -O -flto -fpie 
+gcc.dg/lto/pr45736 c_lto_pr45736_0.o-c_lto_pr45736_0.o link, -flto -r -O
+gcc.dg/lto/pr54702 c_lto_pr54702_0.o-c_lto_pr54702_1.o link,  -O2 -flto -w 
+gcc.dg/lto/pr59323 c_lto_pr59323_0.o-c_lto_pr59323_0.o link,  -O2 -g -flto 
+gcc.dg/lto/pr59323-2 c_lto_pr59323-2_0.o-c_lto_pr59323-2_0.o link,  -O2 -g -flto 
+gcc.dg/lto/pr60820 c_lto_pr60820_0.o-c_lto_pr60820_1.o link, -flto -r -nostdlib -O2
+gcc.dg/lto/pr81406 c_lto_pr81406_0.o-c_lto_pr81406_0.o link,  -O2 -g -flto 
+gcc.dg/lto/pr83388 c_lto_pr83388_0.o-c_lto_pr83388_0.o link,  -O0 -flto -fsanitize=null 
+gcc.dg/lto/pr83388 c_lto_pr83388_0.o-c_lto_pr83388_0.o link,  -O2 -flto -fsanitize=null 
+gcc.dg/lto/pr85870 c_lto_pr85870_0.o-c_lto_pr85870_1.o link,  -flto -O2 
+gcc.dg/pr104992.c (test for excess errors)
+gcc.dg/tm/pr95569.c (test for excess errors)
+gcc.dg/torture/builtin-complex-1.c   -Os  (test for excess errors)
+gcc.dg/torture/float16-complex.c   -O2  (test for excess errors)
+gcc.dg/torture/float16-complex.c   -O3 -g  (test for excess errors)
+gcc.dg/torture/float16-complex.c   -Os  (test for excess errors)
+gcc.dg/torture/pr77286.c   -O2  (test for excess errors)
+gcc.dg/torture/pr77286.c   -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  (test for excess errors)
+gcc.dg/torture/pr77286.c   -O3 -g  (test for excess errors)
+gcc.dg/torture/pr77286.c   -Os  (test for excess errors)
+gcc.dg/tree-ssa/pr123311-2.c scan-tree-dump-times optimized "__builtin_clz|\\.CLZ" 1
+gcc.dg/tree-ssa/reassoc-33.c scan-tree-dump-times reassoc1 "Optimizing range tests" 3
+gcc.dg/tree-ssa/reassoc-34.c scan-tree-dump-times reassoc1 "Optimizing range tests" 1
+gcc.dg/tree-ssa/reassoc-35.c scan-tree-dump-times reassoc1 "Optimizing range tests" 1
+gcc.dg/tree-ssa/reassoc-36.c scan-tree-dump-times reassoc1 "Optimizing range tests" 1
+gcc.dg/tree-ssa/update-threading.c scan-tree-dump-times optimized "Invalid sum" 0
+gcc.target/arm/addr-modes-int.c scan-assembler ldrb.*#1]!
+gcc.target/arm/addr-modes-int.c scan-assembler ldrb.*], #1
+gcc.target/arm/arm-switchstatement.c check-function-bodies HImode_test
+gcc.target/arm/arm-switchstatement.c check-function-bodies QImode_test
+gcc.target/arm/arm-switchstatement.c check-function-bodies backwards_branch_test
+gcc.target/arm/arm-switchstatement.c scan-assembler .2byte
+gcc.target/arm/arm-switchstatement.c scan-assembler .byte
+gcc.target/arm/attr-unaligned-load-ice.c (test for excess errors)
+gcc.target/arm/bfloat16_scalar_1_2.c check-function-bodies stacktest1
+gcc.target/arm/bfloat16_scalar_2_2.c check-function-bodies stacktest1
+gcc.target/arm/bfloat16_scalar_3_2.c check-function-bodies stacktest1
+gcc.target/arm/bfloat16_simd_1_1.c check-function-bodies stacktest3
+gcc.target/arm/bfloat16_simd_2_1.c check-function-bodies stacktest3
+gcc.target/arm/bfloat16_simd_3_1.c check-function-bodies stacktest3
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c (test for excess errors)
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler-not .arch_extension dsp
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nodsp-flag-hard.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler-not .arch_extension dsp
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nodsp-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler .fpu softvfp
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler-not .arch_extension dsp
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler-not .arch_extension fp
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler-not .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nodsp-nofp-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nofp-flag-hard.c (test for excess errors)
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler .arch_extension mve
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler .fpu softvfp
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler-not .arch_extension fp
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler-not .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nofp-flag-hard.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler .arch_extension mve
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler .fpu softvfp
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler-not .arch_extension fp
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler-not .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nofp-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler .fpu softvfp
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler-not .arch_extension fp
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler-not .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nomve-flag-hard.c (test for excess errors)
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nomve-flag-hard.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler-not .arch_extension mve
+gcc.target/arm/cortex-m55-nomve-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c (test for excess errors)
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler .arch_extension mve
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nomve.fp-flag-hard.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c (test for excess errors)
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler .arch_extension dsp
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler .arch_extension fp
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler .arch_extension fp.dp
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler .arch_extension mve
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler .fpu fpv5-d16
+gcc.target/arm/cortex-m55-nomve.fp-flag-softfp.c scan-assembler-not .arch_extension mve.fp
+gcc.target/arm/lto/pr61123-enum-size c_lto_pr61123-enum-size_0.o-c_lto_pr61123-enum-size_1.o link,  -fno-short-enums -Os -flto 
+gcc.target/arm/neon-vaddwu8.c scan-assembler vaddw.u8
+gcc.target/arm/optional_thumb-1.c (test for excess errors)
+gcc.target/arm/pr37780_1.c scan-assembler-not cmp\t.*0
+gcc.target/arm/pr37780_1.c scan-assembler-times clz\t 6
+gcc.target/arm/pr42505.c scan-assembler-not str[\\t ]*r.,[\\t ]*.sp,
+gcc.target/arm/pr45701-2.c scan-assembler push\t{r3
+gcc.target/arm/pr45701-3.c scan-assembler push\t[^\n]*r8
+gcc.target/arm/pr60650.c (test for excess errors)
+gcc.target/arm/pr7676.c (test for excess errors)
+gcc.target/arm/pr88648-asm-syntax-unified.c scan-assembler-times \\.syntax\\sunified 3
+gcc.target/arm/pr88850.c scan-rtl-dump final "_movsi_vfp"
+gcc.target/arm/pr94743-1-soft.c (test for excess errors)
+gcc.target/arm/pr94743-3.c (test for excess errors)
+gcc.target/arm/pr98931.c scan-assembler-not le\\slr,\\s\\S*
+gcc.target/arm/scd42-1.c (test for excess errors)
+gcc.target/arm/scd42-1.c scan-assembler mov[ \t].*17
+gcc.target/arm/scd42-3.c (test for excess errors)
+gcc.target/arm/scd42-3.c scan-assembler ldr[ \t].*
+outputs-22 exe savetmp namedb-2: extra
+outputs-23 exe savetmp named2-2: extra
+outputs-24 exe savetmp named2-3: extra
+outputs-25 exe savetmp named2-4: extra

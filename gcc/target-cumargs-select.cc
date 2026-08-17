@@ -228,6 +228,81 @@ mt_declare_function_size (FILE *file, const char *name, tree decl)
   mt_frame ()->declare_function_size (file, name, decl);
 }
 
+/* `ASM_DECLARE_OBJECT_NAME'; `varasm.cc:2539' and `varasm.cc:517'.  The data
+   sibling of `mt_declare_function_name', and the site that emits the `.type'
+   directive for every variable.  Through `mt_frame ()' like the rest, so a
+   compilation with no target selected fails by name rather than emitting a
+   bare label that assembles cleanly and loses every symbol's type.  */
+
+void
+mt_declare_object_name (FILE *file, const char *name, tree decl)
+{
+  mt_frame ()->declare_object_name (file, name, decl);
+}
+
+/* `ASM_FINISH_DECLARE_OBJECT'; `passes.cc:376', the closing half of the
+   bracket above.  See target-frame.h for why it lands with its opening half
+   rather than after it.  */
+
+void
+mt_finish_declare_object (FILE *file, tree decl, int top_level, int at_end)
+{
+  mt_frame ()->finish_declare_object (file, decl, top_level, at_end);
+}
+
+/* The four `SECTION_NOSWITCH' callbacks' macro chains.  Through `mt_frame ()'
+   like the rest: with no target selected these must fail BY NAME, because the
+   alternative is emitting a `.bss' or `.comm' block that assembles cleanly and
+   is simply the wrong target's.  See target-frame.h.  */
+
+bool
+mt_has_output_aligned_bss (void)
+{
+  return mt_frame ()->has_output_aligned_bss ();
+}
+
+void
+mt_output_aligned_bss (FILE *file, tree decl, const char *name,
+		       unsigned HOST_WIDE_INT size, unsigned int align)
+{
+  mt_frame ()->output_aligned_bss (file, decl, name, size, align);
+}
+
+bool
+mt_output_local (FILE *file, tree decl, const char *name,
+		 unsigned HOST_WIDE_INT size, unsigned HOST_WIDE_INT rounded,
+		 unsigned int align)
+{
+  return mt_frame ()->output_local (file, decl, name, size, rounded, align);
+}
+
+bool
+mt_output_common (FILE *file, tree decl, const char *name,
+		  unsigned HOST_WIDE_INT size, unsigned HOST_WIDE_INT rounded,
+		  unsigned int align)
+{
+  return mt_frame ()->output_common (file, decl, name, size, rounded, align);
+}
+
+bool
+mt_output_tls_common (FILE *file, tree decl, const char *name,
+		      unsigned HOST_WIDE_INT size)
+{
+  return mt_frame ()->output_tls_common (file, decl, name, size);
+}
+
+/* `ASM_OUTPUT_TYPE_DIRECTIVE'; `final.cc:2087' and `varasm.cc:6647', the two
+   shared sites that read the macro directly rather than through
+   `ASM_DECLARE_OBJECT_NAME'.  False means the selected base defines no such
+   macro and nothing was written; see target-frame.h for why that has to be
+   observable at the call site.  */
+
+bool
+mt_output_type_directive (FILE *file, const char *name, const char *type)
+{
+  return mt_frame ()->output_type_directive (file, name, type);
+}
+
 /* `ASM_OUTPUT_FUNCTION_PREFIX'; `varasm.cc:2192'.  The opening half of the
    pair -- s390's `.machine push', which no base emitted because i386 defines
    no such macro and the `#ifdef' was therefore false for everyone.  */

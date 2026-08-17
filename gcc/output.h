@@ -353,6 +353,17 @@ extern tree last_assemble_variable_decl;
 
 extern bool first_function_block_is_cold;
 
+/* The generic body most back ends' `ASM_OUTPUT_ALIGNED_BSS' expands to --
+   alpha, arm, m68k, sh, sparc, v850, xtensa and others all spell the macro as
+   a call to it.  It was `static' in `varasm.cc' and is declared here because
+   those macros are now expanded in the per-base translation unit
+   (`mt_base_output_aligned_bss', target-cumargs.cc), which cannot reach a
+   `static'.  See target-frame.h for why the chain had to move: i386's spelling
+   of the same macro is `x86_output_aligned_bss', so every back end's
+   uninitialized globals were going through `i386.cc'.  */
+extern void asm_output_aligned_bss (FILE *, tree, const char *,
+				    unsigned HOST_WIDE_INT, int);
+
 /* Decide whether DECL needs to be in a writable section.
    RELOC is the same as for SELECT_SECTION.  */
 extern bool decl_readonly_section (const_tree, int);

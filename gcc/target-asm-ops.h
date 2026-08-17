@@ -94,6 +94,27 @@ struct target_asm_ops
      nothing and looks like correct output.  */
   void (*output_align) (FILE *, int);
 
+  /* ASM_OUTPUT_SKIP (FILE, NBYTES) -- advance the location counter by NBYTES,
+     the sibling of `output_align' and read from the same shared code.  Three
+     uses in `varasm.cc' (:526, :2357, :8980), and one of them is inside
+     `asm_output_aligned_bss', i.e. inside the body most back ends'
+     ASM_OUTPUT_ALIGNED_BSS expands to -- so it is emitted for every
+     uninitialized variable on every target.
+
+     The spellings genuinely differ: `i386/att.h' says `.zero', arm's
+     `aout.h' says `.space', and A660907426E03E4E9-ARM-BOARD.md 8 names it in
+     the same hand-diffed `.s' that produced the `.align' finding.  It happens
+     that ARM's gas also accepts `.zero', which is exactly why this one had to
+     be converted deliberately rather than waiting for a board to object -- the
+     "wrong output that assembles cleanly" class INSTRUMENTS.md records.
+
+     A function pointer and no `#ifdef' wrapper, for `output_align's reasons in
+     both cases: some back ends switch the directive on options, and shared
+     code skips unconditionally, so a base whose chain never defines the macro
+     must fail to compile this file BY NAME rather than silently emit nothing
+     and leave a hole in the data.  */
+  void (*output_skip) (FILE *, unsigned HOST_WIDE_INT);
+
   /* USE_SELECT_SECTION_FOR_FUNCTIONS -- this back end wants
      `function_section_1' (varasm.cc) to route a function with no explicit
      section through TARGET_ASM_SELECT_SECTION rather than through
@@ -244,6 +265,16 @@ gcc_taop_output_align (FILE *stream, int log)
 {
   ASM_OUTPUT_ALIGN (stream, log);
 }
+
+/* ASM_OUTPUT_SKIP's wrapper, on exactly the same terms and under exactly the
+   same five-way test: `multi-target-macros.h' redirects that macro too, so
+   compiling this body in a shared TU would define a wrapper that calls the
+   selector that calls the wrapper.  */
+static inline void
+gcc_taop_output_skip (FILE *stream, unsigned HOST_WIDE_INT nbytes)
+{
+  ASM_OUTPUT_SKIP (stream, nbytes);
+}
 #endif
 
 /* #ifndef so a back end that supplies its own hook still wins.  */
@@ -284,6 +315,9 @@ gcc_taop_output_align (FILE *stream, int log)
     || !defined (__cplusplus)
 #ifndef TARGET_ASM_OUTPUT_ALIGN
 #define TARGET_ASM_OUTPUT_ALIGN gcc_taop_output_align
+#endif
+#ifndef TARGET_ASM_OUTPUT_SKIP
+#define TARGET_ASM_OUTPUT_SKIP gcc_taop_output_skip
 #endif
 #endif
 
@@ -340,6 +374,10 @@ extern void init_targetm_asm_ops (void);
    `targetm' counterpart upstream and inventing one would mean touching
    target.def and 50 back ends to change where a directive is printed.  */
 extern void mt_asm_output_align (FILE *stream, int log);
+
+/* ASM_OUTPUT_SKIP for the base in force; same arrangement, same reason for not
+   being copied into `targetm.asm_out'.  */
+extern void mt_asm_output_skip (FILE *stream, unsigned HOST_WIDE_INT nbytes);
 
 /* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.  Like
    `mt_asm_output_align', not copied into `targetm.asm_out': the macro has no

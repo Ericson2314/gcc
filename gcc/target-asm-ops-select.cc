@@ -117,6 +117,21 @@ mt_asm_output_align (FILE *stream, int log)
   targetm_asm_ops->output_align (stream, log);
 }
 
+/* ASM_OUTPUT_SKIP for the base in force.  Same null check and same reason: the
+   fallback is the PRIMARY's table, so a selection that never ran would emit
+   i386's `.zero' for every target rather than fail.  */
+
+void
+mt_asm_output_skip (FILE *stream, unsigned HOST_WIDE_INT nbytes)
+{
+  if (targetm_asm_ops == NULL || targetm_asm_ops->output_skip == NULL)
+    internal_error ("no back end has been selected, so the directive that "
+		    "reserves uninitialised space is unknown; a target must "
+		    "be chosen with %<-ftarget-config=%> before assembly is "
+		    "emitted");
+  targetm_asm_ops->output_skip (stream, nbytes);
+}
+
 /* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.
 
    NO fail-by-name arm here, deliberately, and the reason is worth stating

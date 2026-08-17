@@ -455,6 +455,15 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 extern void mt_asm_output_align (FILE *, int);
 #undef ASM_OUTPUT_ALIGN
 #define ASM_OUTPUT_ALIGN(STREAM, LOG) (mt_asm_output_align ((STREAM), (LOG)))
+/* ASM_OUTPUT_SKIP, the sibling, on identical terms -- statement macro, three
+   shared uses in `varasm.cc', all statements, none in a `#if'.  Declared here
+   rather than by including `target-asm-ops.h' for the ordering reason above.
+   i386 says `.zero', arm says `.space'; ARM's gas accepts both, so this one
+   would never have been reported by a board.  */
+extern void mt_asm_output_skip (FILE *, unsigned HOST_WIDE_INT);
+#undef ASM_OUTPUT_SKIP
+#define ASM_OUTPUT_SKIP(STREAM, NBYTES) \
+  (mt_asm_output_skip ((STREAM), (unsigned HOST_WIDE_INT) (NBYTES)))
 #undef ATTRIBUTE_ALIGNED_VALUE
 #define ATTRIBUTE_ALIGNED_VALUE (targetm_cdata.attribute_aligned_value)
 #undef MALLOC_ABI_ALIGNMENT
