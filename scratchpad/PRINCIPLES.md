@@ -2485,3 +2485,45 @@ Say what you measured, what you did not, and what your instrument cannot see.
 unexamined pass is not.** Distinguish upper bounds from lower bounds explicitly
 and never quote one as the other. If a number in your brief is stale or
 impossible, say so rather than reporting against it.
+
+---
+
+## PASSING TESTS COME BEFORE SIMPLIFYING, BECAUSE THEY ARE WHAT MAKES "WAS THIS NECESSARY?" FALSIFIABLE
+
+The user's ruling, and the reasoning is the part to keep:
+
+> The main thing now is getting those tests passing for as many back ends and
+> front ends as possible.  **Only then are we able to ask "was this really
+> necessary?"** — because it is hard to falsify a claim that something *wasn't*
+> necessary while we are still failing tests, or worse, haven't bothered to
+> test something.
+
+This branch has accumulated many mechanisms — `targ_caps`, `target-cdata`,
+`target_frame_desc`, the `target-*.h` selectors, `MULTI_TARGET_UNION_*`, the
+`MT_*` runtime forms, `MULTI_TARGET_RENAME_NAMES`, per-base headers,
+`modes-union.list` settings.  Each was justified locally, and cutting the set
+down is a real goal.  **It is not a goal to pursue yet**, and the reason is
+epistemic rather than aesthetic:
+
+**"Mechanism X was unnecessary" is a claim about what breaks without X.  A
+passing test suite is the instrument that can refute it.**  Remove X, rebuild,
+re-run: something fails, or nothing does.  That is an experiment.
+
+**Without passing tests the claim is unfalsifiable in the worst way — it looks
+supported.**  Remove X while a target is still failing 500 tests and it fails
+501, or 500, and neither number tells you anything.  Remove X for a target
+nobody has ever run and the silence reads exactly like success.  **A back end
+with no test results cannot notice the loss of anything**, which is precisely
+the condition nine front ends and nineteen back ends are in today.
+
+Note the asymmetry with everything else in this file.  Elsewhere the danger is
+a check that cannot fire; here the danger is a *simplification* that cannot be
+contradicted.  It is the same defect wearing different clothes: **an
+unfalsifiable claim and a null result are the same object**, and this project
+has spent more time on that one shape than on all its compiler bugs together.
+
+So: **tests first, then the necessity question, then the cuts.**  When the
+survey in the consolidation task is written, every proposed merge must name the
+experiment that would refute it — and that experiment must be runnable on the
+back ends that would be affected, which means those back ends must already be
+scoring.
