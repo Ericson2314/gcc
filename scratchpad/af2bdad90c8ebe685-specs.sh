@@ -69,9 +69,25 @@ a=$(md5sum < "$FI")
 b=$(md5sum < "$B/lib/gcc/$VER/$TQ/specs-config")
 [ "$a" != "$b" ] || { echo "FATAL: i686 and aarch64 specs-config are IDENTICAL -- a probe fell back to the host tools"; exit 9; }
 echo "-- md5s differ"
-BU=$(readlink -f "$TOOLS/bin/$TI-as")
-BUD=$(dirname "$BU")
-grep -q "$BUD" "$FI" \
-  || { echo "FATAL: $FI does not name $BUD -- the i686 probe did not use the i686 binutils";
-       grep -n 'as\b\|_as=' "$FI" | head -10; exit 9; }
-echo "-- the i686 specs-config names the i686 binutils: $BUD"
+# THE DIRECT ARM, AND THE FIRST VERSION OF IT WAS WRONG -- MEASURED.  It
+# grepped the specs-config for the i686 binutils STORE PATH.  There is no
+# store path in the file at all: specs-config records CAPABILITIES
+# (`as_ix86_hle 1'), not tool locations, so the arm failed against a probe
+# that had in fact used the right assembler.
+#
+# Nor do the capabilities discriminate on this row, which is the same weakness
+# the tools script and sc-check.sh guard S4 record: the host assembler is an
+# x86 assembler, so a fallback would report the SAME `as_ix86_*' answers.
+# (Against aarch64 they differ completely -- as_ix86_* 1 vs 0 and
+# as_aarch64_mabi 0 vs 1 -- which is what the md5 arm above is really seeing.)
+#
+# What does discriminate is the probe's own config.log, which records the
+# assembler it resolved BY NAME.  A fallback records a bare `as'.
+CL="$B/$TI/target-specs/config.log"
+[ -f "$CL" ] || { echo "FATAL: no $CL -- the i686 probe left no configure log"; exit 9; }
+sawas=$(sed -n 's/^gcc_cv_as=//p' "$CL" | head -1)
+[ "$sawas" = "$TI-as" ] \
+  || { echo "FATAL: the i686 probe resolved gcc_cv_as='$sawas', not $TI-as"; exit 9; }
+echo "-- the i686 probe resolved gcc_cv_as=$sawas (not a bare \`as')"
+grep -q '^as_ix86_hle 1$' "$FI" \
+  || { echo "FATAL: $FI reports no ix86 assembler capabilities at all"; exit 9; }
