@@ -126,5 +126,56 @@ If the board instead **moves**, the movement is not attributable to any of the
 four causes named in the brief, and this section says so in advance so that a
 post-hoc story cannot be fitted to it.
 
+## 0b. THE BOARD COULD NOT START: `check-gcc` HAD BEEN DEAD IN THE COMMITTED
+##     HARNESS SINCE THE COMMIT THAT FIXED `check-g++`
+
+The first launch aborted at `GUARD 4`. `make check-gcc` returned **rc=0 in
+twenty seconds** beside a **zero-byte `gcc.sum`**, with no
+`MULTI-TARGET RUN: target = ...` banner. One line, in `mtcheck.sh`:
+
+```sh
+DEJAGNU='${DEJAGNU:-}' \
+export MT_TARGET_NAME MT_TARGET_CONFIG MT_COMPILE_ONLY DEJAGNU;
+```
+
+`DEJAGNU` is set only on the **`g++`** arm. On the `gcc` arm nothing sets it,
+so this exported the **empty string** — and DejaGnu tests
+`[info exists env(DEJAGNU)]`, TRUE for an empty value, then sources a file
+named `""`:
+
+```
+ERROR: global config file  not found.      <- the doubled space is the empty name
+```
+
+twelve times (once per parallel job), after which runtest writes a zero-byte
+`gcc.sum`. `make check-gcc` still exits **0**, because the `check-%` recipe is
+wrapped in `-(...)`.
+
+`32dbd04da25` — *"`make check-g++` exited 0 having run nothing, twice, for two
+reasons"* — **introduced for `gcc` the exact failure it fixed for `g++`.** One
+name, two authorities, the authorities being the two values of
+`MT_CHECK_TOOL`.
+
+**The blast radius is bounded and it is zero.** Both prior boards predate the
+breakage (`git merge-base --is-ancestor 32dbd04da25 <sha>` is FALSE for both
+`e3fac057ae4` and `d5ad77b33b3`), so no recorded figure was taken through it.
+No four-target board has been taken since it landed — which is exactly why
+nothing scored it, and why the brief's "landed since, unmeasured" list did not
+know the harness itself was one of the unmeasured things.
+
+Fixed in `5850a790922`: the assignment **and** the `export` are both
+conditional, so an unset `DEJAGNU` stays unset — the state DejaGnu's own
+`info exists` arm is written for. Not a default value; the absence stays an
+absence. Verified in both directions on the real 47-base build:
+
+```
+MT_RUNTESTFLAGS=dg.exp=pr100*.c    62 PASS / 0 FAIL, banner present
+MT_RUNTESTFLAGS=dg.exp=pr9906*     0 results -> "REFUSED: a board of zeroes
+                                    is not a clean sweep"
+```
+
+so the instrument is shown able to report a pass **and** a refusal, rather than
+merely having stopped complaining.
+
 Provenance, guards, the board, the debt and the ranked residual follow as they
 land.
