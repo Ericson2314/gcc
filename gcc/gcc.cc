@@ -4376,6 +4376,40 @@ forward_offload_option (size_t opt_index, const char *arg, bool validated)
     }
 }
 
+/* Normalise the argument of a -B option.
+
+   Catch the case where the user has forgotten to append a directory
+   separator to the path.  Note, they may be using -B to add an executable
+   name prefix, eg "i386-elf-", in order to distinguish between multiple
+   installations of GCC in the same directory.  Hence we must check to see
+   if appending a directory separator actually makes a valid directory name.
+
+   ONE FIXUP, TWO READERS.  driver_handle_option below builds the prefix
+   lists from -B, and find_target_config scans argv for -B itself because it
+   runs before the option handler has been reached (see driver::main).  If
+   the two derived the fixup separately, `-B/dir' and `-B/dir/' would name
+   the same specs-config to one of them and different files to the other, so
+   both call this.  Returns ARG itself when nothing needs adding.  */
+
+static const char *
+b_opt_prefix (const char *arg)
+{
+  size_t len = strlen (arg);
+
+  if (len != 0
+      && !IS_DIR_SEPARATOR (arg[len - 1])
+      && is_directory (arg))
+    {
+      char *tmp = XNEWVEC (char, len + 2);
+      strcpy (tmp, arg);
+      tmp[len] = DIR_SEPARATOR;
+      tmp[++len] = 0;
+      return tmp;
+    }
+
+  return arg;
+}
+
 /* Handle a driver option; arguments and return value as for
    handle_option.  */
 
@@ -4785,24 +4819,7 @@ driver_handle_option (struct gcc_options *opts,
 
     case OPT_B:
       {
-	size_t len = strlen (arg);
-
-	/* Catch the case where the user has forgotten to append a
-	   directory separator to the path.  Note, they may be using
-	   -B to add an executable name prefix, eg "i386-elf-", in
-	   order to distinguish between multiple installations of
-	   GCC in the same directory.  Hence we must check to see
-	   if appending a directory separator actually makes a
-	   valid directory name.  */
-	if (!IS_DIR_SEPARATOR (arg[len - 1])
-	    && is_directory (arg))
-	  {
-	    char *tmp = XNEWVEC (char, len + 2);
-	    strcpy (tmp, arg);
-	    tmp[len] = DIR_SEPARATOR;
-	    tmp[++len] = 0;
-	    arg = tmp;
-	  }
+	arg = b_opt_prefix (arg);
 
 	add_prefix (&exec_prefixes, arg, NULL,
 		    PREFIX_PRIORITY_B_OPT, 0, 0);
@@ -8672,6 +8689,10 @@ static char *target_config_tried = NULL;
    Searched, most specific first, and every directory is the same question
    asked of a different authority: where is this installation's lib/gcc?
 
+     0. every -B DIR on the command line, in the order given -- the user
+	pointing explicitly, which is what -B means everywhere else in this
+	program, and the only route that works for a driver reached through a
+	symlink;
      1. $GCC_EXEC_PREFIX, if the environment names one;
      2. where this binary actually is, mapped bindir -> $(libdir)/gcc/ the way
 	make_relative_prefix does it, so a relocated or unpacked-anywhere
@@ -8688,26 +8709,64 @@ static char *target_config_tried = NULL;
    so it is called only on a path that has already been opened.  */
 
 static const char *
-find_target_config (const char *argv0, const char *target, char **tried)
+find_target_config (int argc, char **argv, const char *target, char **tried)
 {
-  const char *dirs[3];
-  unsigned n = 0;
+  const char *argv0 = argv[0];
+  auto_vec<const char *, 8> dirs;
+
+  /* 0. every -B, scanned straight out of argv.
+
+     -B MEANS THIS EVERYWHERE ELSE IN THIS PROGRAM: look here first.  Without
+     it there is no way to say "use this driver, find your target config
+     here", because route 2 below resolves from where the binary REALLY is --
+     so a driver symlinked into a composed prefix reads the original
+     installation's files, and $GCC_EXEC_PREFIX, the only other override,
+     redirects the search for cc1 as well and so answers with `cannot execute
+     cc1'.  A symlinkJoin of drivers and configs needs exactly this.
+
+     SCANNED HERE, NOT READ FROM exec_prefixes, and that is not a style
+     choice.  This runs from driver::main at a point where set_up_specs --
+     and therefore process_command, and therefore the OPT_B handler that
+     fills exec_prefixes -- has not run yet.  The list is empty at this
+     point, so reading it compiles, runs, finds nothing, and is
+     indistinguishable from "no -B was given".  Same reason, same technique
+     as the -ftarget-config= scan in driver::main.
+
+     Both spellings that the option machinery accepts, `-B DIR' and `-BDIR',
+     and the trailing-separator fixup comes from b_opt_prefix so that
+     `-B/dir' and `-B/dir/' cannot diverge from what the real handler does
+     with them.  */
+  for (int i = 1; i < argc; i++)
+    {
+      const char *b = NULL;
+
+      if (strcmp (argv[i], "-B") == 0)
+	{
+	  if (i + 1 < argc)
+	    b = argv[++i];
+	}
+      else if (startswith (argv[i], "-B"))
+	b = argv[i] + 2;
+
+      if (b != NULL && *b != '\0')
+	dirs.safe_push (b_opt_prefix (b));
+    }
 
   const char *ep = env.get ("GCC_EXEC_PREFIX");
   if (ep != NULL && *ep != '\0')
-    dirs[n++] = ep;
+    dirs.safe_push (ep);
 
   char *rel = make_relative_prefix (argv0, standard_bindir_prefix,
 				    standard_exec_prefix);
   if (rel != NULL)
-    dirs[n++] = rel;
+    dirs.safe_push (rel);
 
-  dirs[n++] = standard_exec_prefix;
+  dirs.safe_push (standard_exec_prefix);
 
   const char *found = NULL;
   char *list = xstrdup ("");
 
-  for (unsigned i = 0; i < n; i++)
+  for (unsigned i = 0; i < dirs.length (); i++)
     {
       /* Skip an authority that answered the same as an earlier one; three
 	 identical lines in a diagnostic look like a bug in the diagnostic.  */
@@ -8892,7 +8951,7 @@ driver::main (int argc, char **argv)
      have been run without one.  */
   if (targ_caps_target_name == NULL)
     {
-      found_target_config = find_target_config (argv[0], selected_target,
+      found_target_config = find_target_config (argc, argv, selected_target,
 						&target_config_tried);
       if (found_target_config != NULL)
 	{
