@@ -2577,27 +2577,26 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	    vlen = XVECLEN (body, GET_CODE (body) == ADDR_DIFF_VEC);
 	    for (idx = 0; idx < vlen; idx++)
 	      {
+		/* These were `#ifdef ASM_OUTPUT_ADDR_VEC_ELT' and
+		   `#ifdef ASM_OUTPUT_ADDR_DIFF_ELT', each with
+		   `gcc_unreachable ()' as its `#else'.  This file is SHARED,
+		   so both were i386's -- `nm -uC final.o' bound
+		   `ix86_output_addr_vec_elt' and `ix86_output_addr_diff_elt'
+		   for all 47 bases, and the 38 back ends that define each,
+		   with 34 and 33 distinct bodies between them, never wrote
+		   one entry of their own jump tables.  The `#else' arms are
+		   not lost: they moved into the per-base thunks, where the
+		   question is about the base being compiled for rather than
+		   about whoever happened to compile this file.  */
 		if (GET_CODE (body) == ADDR_VEC)
-		  {
-#ifdef ASM_OUTPUT_ADDR_VEC_ELT
-		    ASM_OUTPUT_ADDR_VEC_ELT
-		      (file, CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 0, idx), 0)));
-#else
-		    gcc_unreachable ();
-#endif
-		  }
+		  mt_output_addr_vec_elt
+		    (file, CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 0, idx), 0)));
 		else
-		  {
-#ifdef ASM_OUTPUT_ADDR_DIFF_ELT
-		    ASM_OUTPUT_ADDR_DIFF_ELT
-		      (file,
-		       body,
-		       CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 1, idx), 0)),
-		       CODE_LABEL_NUMBER (XEXP (XEXP (body, 0), 0)));
-#else
-		    gcc_unreachable ();
-#endif
-		  }
+		  mt_output_addr_diff_elt
+		    (file,
+		     body,
+		     CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 1, idx), 0)),
+		     CODE_LABEL_NUMBER (XEXP (XEXP (body, 0), 0)));
 	      }
 #ifdef ASM_OUTPUT_CASE_END
 	    ASM_OUTPUT_CASE_END (file,

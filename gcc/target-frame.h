@@ -1923,6 +1923,113 @@ struct target_frame_desc
      and the one `-undoc.sh`'s control is now anchored on. Re-anchor that
      control before relying on it again.  */
   int (*addr_vec_align) (rtx_jump_table_data *table);
+
+  /* ASM_OUTPUT_ADDR_VEC_ELT / ASM_OUTPUT_ADDR_DIFF_ELT -- THE CONTENTS OF
+     EVERY JUMP TABLE, WRITTEN BY i386 FOR ALL 47 BACK ENDS.
+
+     `addr_vec_align' above is the ALIGNMENT of the case vector.  These two are
+     the vector's ENTRIES, they sit in the same `final.cc' block (`:2578' and
+     `:2586'), and they are the larger leak of the two by a wide margin.
+
+     MEASURED AT THE OBJECT LEVEL, WHICH IS WHY THIS IS NOT AN INFERENCE.
+     `nm -uC final.o' in the 47-base build binds
+
+	 U ix86_output_addr_vec_elt(_IO_FILE*, int)
+	 U ix86_output_addr_diff_elt(_IO_FILE*, int, int)
+
+     `final.cc' is SHARED, so both macros are `i386.h:2231' and `:2237' -- and
+     neither symbol is in MULTI_TARGET_RENAME_NAMES, so this is one bare
+     definition in `i386.cc' serving every target's case vectors.
+
+     THE DIVERGENCE IS BY VALUE AND IT IS ENORMOUS.  Measured through each
+     base's REAL tm.h chain (`-eltbodies.sh', `cpp -dM -imacros tm-<base>.h',
+     not a `config/' directory grep):
+
+	 ASM_OUTPUT_ADDR_VEC_ELT    38 definers,  34 DISTINCT bodies
+	 ASM_OUTPUT_ADDR_DIFF_ELT   38 definers,  33 DISTINCT bodies
+
+     Nearly every definer has its own.  A sample of what they were not
+     emitting, and note none of these is a stylistic difference:
+
+	 mips    "\t%s\t%sL%d\n", ptr_mode == DImode ? ".dword" : ".word",
+		 LOCAL_LABEL_PREFIX          -- entry width chosen per ABI
+	 m68k    "\t.long .L%d - 1b\n"        -- PC-relative against a
+					        different anchor entirely
+	 arm     switch (GET_MODE (BODY)) { SImode .long / HImode .word /
+					    QImode .byte }
+	 xtensa  (%LL%d - %LLrtx%d) / 4       -- a SCALED difference
+	 mmix    mmix_asm_output_addr_diff_elt (...)
+
+     WHAT i386 GIVES THEM INSTEAD, and the second defect inside the first.
+     `ix86_output_addr_vec_elt' (`i386.cc:16133') picks `ASM_QUAD` over
+     `ASM_LONG` on `TARGET_LP64`, and `TARGET_LP64` is
+     `global_options.x_ix86_isa_flags`, promoted only by
+     `ix86_option_override` -- which runs only when i386 is SELECTED.  So a
+     non-i386 base does not even get x86_64's answer; it gets i386's
+     UNCONFIGURED default.  That is the `Pmode' shape PRINCIPLES records, the
+     one behind riscv64 emitting 32-bit code into an ELF64 object, and it is
+     the reason "i386's answer happens to be right for LP64 targets" is not a
+     safe reading.  `LPREFIX' is i386's label prefix on top of that.
+
+     WHY THE SCORED BOARD MAY NOT MOVE, SAID IN ADVANCE.  x86_64, aarch64,
+     riscv64 and s390x are all LP64 and all spell `.L`, so all four currently
+     emit `.quad .L<n>` and all four are CORRECT BY LUCK -- measured, twelve
+     entries each, `-jtelt.sh`.  The targets this is wrong for are the 32-bit
+     and 16-bit ones (mips o32, avr, msp430, m68k, arm, xtensa, ...) and none
+     of them is on the four-target board.  Converted because it is a live
+     wrong-code leak on 37 back ends, not because a number is predicted to
+     move; the same statement `adjust_insn_length' above had to make.
+
+     NO `has_' FLAG, AND THE `#else' IS `gcc_unreachable ()' RATHER THAN A
+     FALLBACK.  That is not a floor being declined for tidiness: it is exactly
+     what shared code did.  `final.cc's own `#else' for each of these two was
+     `gcc_unreachable ()', because a back end that emits a case vector must
+     say how.  Nine bases define neither (avr bpf ia64 moxie nvptx or1k
+     xstormy16 and, for the DIFF half, ft32 mcore pdp11); four of those --
+     avr, pa, sparc, xstormy16 -- define the WHOLE-TABLE `ASM_OUTPUT_ADDR_VEC'
+     form instead, which is a separate leak and is NOT converted here (see the
+     hand-over in this branch's board).  Supplying a generic body here would
+     give those nine i386's directive under a new name, which is the
+     `#ifndef' floor in its most disguised form.
+
+     Not in `doc/tm.texi'... except that they ARE: both are documented, so
+     unlike `ADDR_VEC_ALIGN' and `ADJUST_INSN_LENGTH' these two ARE in the
+     leak census's population.  Stated because the last four conversions on
+     this branch all came from the undocumented set and it would be easy to
+     read that as where the remaining value is.  */
+  void (*output_addr_vec_elt) (FILE *file, int value);
+  void (*output_addr_diff_elt) (FILE *file, rtx body, int value, int rel);
+
+  /* Does this base define ASM_OUTPUT_ADDR_DIFF_ELT at all?
+
+     THE CLOSURE, AND IT IS THE GUARD ON THE `gcc_unreachable ()' ABOVE.
+     `tree-switch-conversion.h:537' is a SECOND consumer of that macro and it
+     asks the opposite question:
+
+	 #ifndef ASM_OUTPUT_ADDR_DIFF_ELT
+	   if (flag_pic)
+	     return false;          <- do not build a jump table at all
+	 #endif
+
+     i386 defines the macro, so that `#ifndef' was FALSE for all 47 bases and
+     the nine which define nothing -- avr bpf ft32 mcore moxie nvptx or1k
+     pdp11 xstormy16 -- had PIC jump tables enabled on i386's authority.
+     Before this change they then reached `final.cc' and wrote their entries
+     with `ix86_output_addr_diff_elt'; after it they would reach a
+     `gcc_unreachable ()'.
+
+     Converting only the emitter would therefore have traded a silent wrong
+     answer for an ICE on those nine, which PRINCIPLES names exactly: when a
+     symbol points at your suspect, walk the GUARDS that decided you reached
+     that line and convert the closure.  A loud failure is better than a quiet
+     one and it is still not the fix.
+
+     Note this predicate answers about the DIFF half only, because that is the
+     half the `#ifndef' asks about: a PIC jump table is relative by
+     construction.  A base defining the VEC half and not the DIFF half is a
+     real configuration (ft32, mcore, pdp11) and it is precisely the case
+     upstream's `#ifndef' was written for.  */
+  bool (*has_output_addr_diff_elt) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -1988,6 +2095,17 @@ extern void mt_adjust_insn_length (rtx_insn *, int *);
    aarch64 and vax ask for 0 and were given the generic computation; see the
    descriptor field.  */
 extern int mt_addr_vec_align (rtx_jump_table_data *);
+
+/* `ASM_OUTPUT_ADDR_VEC_ELT' / `ASM_OUTPUT_ADDR_DIFF_ELT'; `final.cc:2578' and
+   `:2586' -- the entries of every case vector, 34 and 33 distinct bodies, all
+   of them i386's until now.  See the descriptor fields.  */
+extern void mt_output_addr_vec_elt (FILE *, int);
+extern void mt_output_addr_diff_elt (FILE *, rtx, int, int);
+
+/* Replaces `#ifndef ASM_OUTPUT_ADDR_DIFF_ELT' at `tree-switch-conversion.h:537',
+   which decided whether PIC jump tables are possible -- on i386's behalf, for
+   all 47 bases.  See the descriptor field.  */
+extern bool mt_has_output_addr_diff_elt (void);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is

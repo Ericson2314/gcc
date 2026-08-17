@@ -28,9 +28,22 @@ SRC=$(cd "$S/.." && pwd)
 D=${1:?build dir}
 [ -d "$D/gcc" ] || { echo "FATAL: $D/gcc missing"; exit 9; }
 
-MACROS=$(sed -n 's/^#ifdef \([A-Z_][A-Z_0-9]*\)$/\1/p' "$SRC/gcc/targhooks.cc" \
-         | grep -v '^HAVE_' | sort -u)
-[ -n "$MACROS" ] || { echo "FATAL: read no #ifdef macros from targhooks.cc"; exit 9; }
+# The default population is `targhooks.cc's own `#ifdef' set, which is what
+# this script was written for.  `MACROS' in the environment overrides it, so
+# any other candidate list -- a leak census row, the jump-table family -- can be
+# scored through the same real-header-chain mechanism instead of a directory
+# grep.  That override is the whole reason this file was extended rather than
+# copied: the defect it exists to avoid (elfos.h being invisible to a `config/'
+# grep) is not specific to targhooks.cc's macros.
+if [ -n "${MACROS:-}" ]; then
+  MACROS=$(echo "$MACROS" | tr ' ,' '\n\n' | grep . | sort -u)
+  echo "population: from the environment, $(echo "$MACROS" | grep -c .) macros"
+else
+  MACROS=$(sed -n 's/^#ifdef \([A-Z_][A-Z_0-9]*\)$/\1/p' "$SRC/gcc/targhooks.cc" \
+           | grep -v '^HAVE_' | sort -u)
+  echo "population: targhooks.cc #ifdefs, $(echo "$MACROS" | grep -c .) macros"
+fi
+[ -n "$MACROS" ] || { echo "FATAL: read no macros for the population"; exit 9; }
 
 # `tm-<base>.h' is not the only `tm-*.h' the build writes: `tm-preds-<base>.h'
 # and `tm-constrs-<base>.h' match the same glob and define none of these

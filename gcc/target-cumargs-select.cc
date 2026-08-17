@@ -259,6 +259,37 @@ mt_addr_vec_align (rtx_jump_table_data *table)
   return mt_frame ()->addr_vec_align (table);
 }
 
+/* `ASM_OUTPUT_ADDR_VEC_ELT' / `ASM_OUTPUT_ADDR_DIFF_ELT'; `final.cc:2578' and
+   `:2586'.  The entries of every case vector -- 34 and 33 distinct bodies over
+   38 definers each, and `nm -uC final.o' bound `ix86_output_addr_vec_elt' and
+   `ix86_output_addr_diff_elt' for all 47 bases before this.  Through
+   `mt_frame ()' like the rest, so a compilation with no target selected fails
+   BY NAME rather than writing a jump table with nobody's directive.  */
+
+void
+mt_output_addr_vec_elt (FILE *file, int value)
+{
+  mt_frame ()->output_addr_vec_elt (file, value);
+}
+
+void
+mt_output_addr_diff_elt (FILE *file, rtx body, int value, int rel)
+{
+  mt_frame ()->output_addr_diff_elt (file, body, value, rel);
+}
+
+/* The closure: whether this base can write a relative case-vector entry at
+   all, which is what `tree-switch-conversion.h' needs before it decides to
+   build a PIC jump table.  Through `mt_frame ()' like the rest -- answering
+   `false' with no target selected would silently disable PIC jump tables
+   everywhere, which compiles and is wrong in the direction nobody looks.  */
+
+bool
+mt_has_output_addr_diff_elt (void)
+{
+  return mt_frame ()->has_output_addr_diff_elt ();
+}
+
 /* The stack-alignment closure; see target-frame.h.  These go through
    `mt_frame ()' like the six above, so a compilation with no target selected
    fails by name instead of reading a null table -- which matters more here

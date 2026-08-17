@@ -130,6 +130,13 @@ along with GCC; see the file COPYING3.  If not see
    first two (epiphany/attribs.h, attribs.h/stringpool.h) cost a build apiece
    before that harness existed.  */
 #include "recog.h"
+/* For `make_decl_rtl', which `tree.h:3178's `DECL_RTL' calls -- reached from
+   `mips.h:3040's ASM_OUTPUT_ADDR_DIFF_ELT, whose TARGET_RTP_PIC arm takes
+   `XEXP (DECL_RTL (current_function_decl), 0)' to make the entry relative to
+   the start of the function.  Fourth in the same series as epiphany/attribs.h,
+   attribs.h/stringpool.h and msp430/recog.h, and found the same cheap way --
+   `-syncheck.sh' over the bases, one run instead of one 47-base build.  */
+#include "varasm.h"
 #include "target-cumargs.h"
 /* For MT_LEGITADDR_STRICT_FN -- the name of the strict GO_IF_LEGITIMATE_ADDRESS
    thunk this base's `target-legitaddr-strict.o' defines.  */
@@ -498,6 +505,63 @@ mt_base_addr_vec_align (rtx_jump_table_data *table ATTRIBUTE_UNUSED)
   return ADDR_VEC_ALIGN (table);
 #else
   return final_addr_vec_align (table);
+#endif
+}
+
+/* ASM_OUTPUT_ADDR_VEC_ELT and ASM_OUTPUT_ADDR_DIFF_ELT, asked of THIS base --
+   the entries of a case vector.  38 back ends define each, with 34 and 33
+   DISTINCT bodies respectively, and `final.cc' being shared meant every one of
+   those bodies was replaced by i386's.  See target-frame.h.
+
+   NO `#else' FALLBACK, DELIBERATELY, AND IT IS NOT A STUB.  `final.cc's own
+   `#else' at each site was `gcc_unreachable ()'.  A back end that emits a case
+   vector must say how one is written; there is no generic answer and inventing
+   one would hand the nine non-definers i386's directive under a different name.
+   `gcc_unreachable ()' here fails in the same place and for the same reason it
+   would have failed upstream, with the difference that it is now a fact about
+   THIS base rather than about i386.
+
+   `body' is unused by the ADDR_VEC half and used by several ADDR_DIFF_ELT
+   bodies (arm, xtensa and pdp11 switch on `GET_MODE (BODY)' to pick the entry
+   width), so it is passed through rather than dropped -- an interface that
+   fits i386's two-argument helper and not the macro's four-argument contract
+   would silently truncate those three back ends to their default arm.  */
+
+static void
+mt_base_output_addr_vec_elt (FILE *file ATTRIBUTE_UNUSED,
+			     int value ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_ADDR_VEC_ELT
+  ASM_OUTPUT_ADDR_VEC_ELT (file, value);
+#else
+  gcc_unreachable ();
+#endif
+}
+
+static void
+mt_base_output_addr_diff_elt (FILE *file ATTRIBUTE_UNUSED,
+			      rtx body ATTRIBUTE_UNUSED,
+			      int value ATTRIBUTE_UNUSED,
+			      int rel ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_ADDR_DIFF_ELT
+  ASM_OUTPUT_ADDR_DIFF_ELT (file, body, value, rel);
+#else
+  gcc_unreachable ();
+#endif
+}
+
+/* The existence half, for `tree-switch-conversion.h's `#ifndef'.  Evaluated
+   HERE, where the `#ifdef' is a fact about MULTI_TARGET_TARGETM_BASE rather
+   than about whichever base compiled a shared file.  */
+
+static bool
+mt_base_has_output_addr_diff_elt (void)
+{
+#ifdef ASM_OUTPUT_ADDR_DIFF_ELT
+  return true;
+#else
+  return false;
 #endif
 }
 
@@ -2077,7 +2141,10 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_function_size,
   mt_base_declare_function_prefix,
   mt_base_adjust_insn_length,
-  mt_base_addr_vec_align
+  mt_base_addr_vec_align,
+  mt_base_output_addr_vec_elt,
+  mt_base_output_addr_diff_elt,
+  mt_base_has_output_addr_diff_elt
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what
