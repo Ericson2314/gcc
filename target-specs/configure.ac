@@ -824,6 +824,25 @@ for ts_od in ${spec_option_defaults}; do
     i386:cpu | i386:tune)
       dnl i386.h: {"cpu"|"tune", "%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=%(VALUE)}}}"}
       ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    m68k:cpu)
+      dnl Transcribed from m68k.h:30-32, which is a THIRD spelling: the value
+      dnl is not the argument of an option, it IS the option, with a dash
+      dnl prepended -- `-%(VALUE)', so `--with-cpu=m68020' means `-m68020'.
+      dnl
+      dnl The generic `*:cpu' arm below produced `-mcpu=m68020', which the m68k
+      dnl driver rejects outright ("unrecognized argument in option
+      dnl '-mcpu=m68020' ... did you mean '68020'?"), so the driver died before
+      dnl emitting any cc1 line and m68k could not be scored at all.  It was
+      dnl the only back end of the 22 defining OPTION_DEFAULT_SPECS to use this
+      dnl form (20 use -mcpu=, 11 -march=, 11 -mtune=, 1 this).
+      dnl
+      dnl Keyed on the back end, like riscv:isa_spec below, rather than made a
+      dnl new generic shape: this table is a TRANSCRIPTION of each back end's
+      dnl own OPTION_DEFAULT_SPECS, and a back end whose spelling is unique
+      dnl gets its own arm for the same reason i386's does.  The design
+      dnl question it does not answer -- that this shell table restates tm.h by
+      dnl hand and cannot be diffed against it -- is stated in the board.
+      ts_tmpl="%{!m68020-40:%{!m68020-60:%{!mcpu=*:%{!march=*:-${ts_value}}}}}" ;;
     mips:arch)
       dnl mips.h guards this with MIPS_ARCH_OPTION_SPEC, which lists every -m
       dnl option that already implies an architecture.  Approximating it here

@@ -619,6 +619,19 @@ init_reg_sets_1 (void)
   for (m = 0; m < (unsigned int) MAX_MACHINE_MODE; m++)
     {
       HARD_REG_SET ok_regs, ok_regs2;
+
+      /* THE ARRAY IS THE UNION'S, THE WALK IS THIS BASE'S -- the same
+	 correction as the register bound below, one axis over.  `m' is an
+	 ordinal in the SHARED mode numbering and is handed to a BACK-END HOOK;
+	 a hole is a mode some other configured back end defines and this one
+	 does not, so the hook has no answer and several back ends say so with
+	 an assert (`pru_hard_regno_mode_ok', pru.cc:547 -- see MODE_IS_HOLE_P
+	 in machmode.h).  Leaving the row zeroed is what "this base has no such
+	 mode" means, and matches how `init_reg_modes_target' leaves the rows
+	 of registers this base does not have.  */
+      if (MODE_IS_HOLE_P (m))
+	continue;
+
       CLEAR_HARD_REG_SET (ok_regs);
       CLEAR_HARD_REG_SET (ok_regs2);
       /* The selected base's own register count, not the union width: this
@@ -694,6 +707,13 @@ init_reg_modes_target (void)
   for (i = 0; i < MT_FIRST_PSEUDO_REGISTER; i++)
     for (j = 0; j < MAX_MACHINE_MODE; j++)
       {
+	/* And the MODE axis of the same rule: `j' is a shared-numbering
+	   ordinal handed to a back-end hook, so a mode this base does not
+	   have must not be asked about.  The row keeps its zero, exactly as
+	   the rows of absent REGISTERS do.  */
+	if (MODE_IS_HOLE_P (j))
+	  continue;
+
 	unsigned char nregs = targetm.hard_regno_nregs (i, (machine_mode) j);
 	this_target_regs->x_hard_regno_nregs[i][j] = nregs;
 	if (nregs > this_target_regs->x_hard_regno_max_nregs)
@@ -859,6 +879,13 @@ choose_hard_reg_mode (unsigned int regno ATTRIBUTE_UNUSED,
   /* Iterate over all of the CCmodes.  */
   for (m = (unsigned int) CCmode; m < (unsigned int) NUM_MACHINE_MODES; ++m)
     {
+      /* The four loops above walk with FOR_EACH_MODE_IN_CLASS, which never
+	 enters a hole.  THIS one reaches modes by ORDINAL, which genmodes.cc
+	 names as the residue case, and it asks a back-end hook -- so it is
+	 the third of the three sites that had to be bounded.  */
+      if (MODE_IS_HOLE_P (m))
+	continue;
+
       mode = (machine_mode) m;
       if (hard_regno_nregs (regno, mode) == nregs
 	  && targetm.hard_regno_mode_ok (regno, mode)

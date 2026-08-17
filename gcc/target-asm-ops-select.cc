@@ -116,3 +116,22 @@ mt_asm_output_align (FILE *stream, int log)
 		    "with %<-ftarget-config=%> before assembly is emitted");
   targetm_asm_ops->output_align (stream, log);
 }
+
+/* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.
+
+   NO fail-by-name arm here, deliberately, and the reason is worth stating
+   rather than leaving as an omission: the answer is a BOOL, so there is no
+   value outside the domain to reserve for "nobody selected a base".  The
+   `output_align' function pointer above can be NULL and say so; `false' here
+   is indistinguishable from the 46 bases whose honest answer is false.  What
+   makes that acceptable is that the pre-selection default, `&TARGETM_ASM_OPS_
+   SYMBOL' (the primary's table), gives false -- which is the answer this
+   guard had for EVERY base before this change, so an unselected compiler
+   behaves exactly as it did, and only a correctly selected msp430 moves.  */
+
+bool
+mt_use_select_section_for_functions (void)
+{
+  return targetm_asm_ops != NULL
+	 && targetm_asm_ops->use_select_section_for_functions;
+}

@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "regs.h"
 #include "target-regs.h"
+#include "target-asm-ops.h"
 #include "emit-rtl.h"
 #include "cgraph.h"
 #include "diagnostic-core.h"
@@ -527,9 +528,14 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 
 #endif /* BSS_SECTION_ASM_OP */
 
-#ifndef USE_SELECT_SECTION_FOR_FUNCTIONS
 /* Return the hot section for function DECL.  Return text_section for
-   null DECLs.  */
+   null DECLs.
+
+   COMPILED UNCONDITIONALLY.  Upstream this sits inside
+   `#ifndef USE_SELECT_SECTION_FOR_FUNCTIONS' only to avoid an unused-function
+   warning on the one back end that defines the macro; here the choice is made
+   at run time (see `function_section_1'), so both arms must exist in the one
+   binary.  */
 
 static section *
 hot_function_section (tree decl)
@@ -541,7 +547,6 @@ hot_function_section (tree decl)
   else
     return text_section;
 }
-#endif
 
 /* Return section for TEXT_SECTION_NAME if DECL or DECL_SECTION_NAME (DECL)
    is NULL.
@@ -672,28 +677,37 @@ function_section_1 (tree decl, bool force_cold)
   if (force_cold)
     freq = NODE_FREQUENCY_UNLIKELY_EXECUTED;
 
-#ifdef USE_SELECT_SECTION_FOR_FUNCTIONS
-  if (decl != NULL_TREE
-      && DECL_SECTION_NAME (decl) != NULL)
+  /* WAS `#ifdef USE_SELECT_SECTION_FOR_FUNCTIONS'.  The macro is defined by
+     exactly one back end (config/msp430/msp430.h:525) and NOT by the primary,
+     so in a shared translation unit the guard was false for all 47 bases and
+     the first arm ran for nobody -- INSTRUMENTS.md's "leaked absence" class.
+     msp430's TARGET_ASM_FUNCTION_SECTION hook asserts DECL_SECTION_NAME is
+     non-null (msp430.cc:2466), an assumption it may make upstream only
+     because this macro diverts the no-section case to select_section, so
+     msp430 ICEd on the first function it was ever handed.  */
+  if (mt_use_select_section_for_functions ())
     {
-      if (targetm.asm_out.function_section)
-	section = targetm.asm_out.function_section (decl, freq,
-						    startup, exit);
-      if (section)
-	return section;
-      return get_named_section (decl, NULL, 0);
+      if (decl != NULL_TREE
+	  && DECL_SECTION_NAME (decl) != NULL)
+	{
+	  if (targetm.asm_out.function_section)
+	    section = targetm.asm_out.function_section (decl, freq,
+							startup, exit);
+	  if (section)
+	    return section;
+	  return get_named_section (decl, NULL, 0);
+	}
+      else
+	return targetm.asm_out.select_section
+		(decl, freq == NODE_FREQUENCY_UNLIKELY_EXECUTED,
+		 symtab_node::get (decl)->definition_alignment ());
     }
-  else
-    return targetm.asm_out.select_section
-	    (decl, freq == NODE_FREQUENCY_UNLIKELY_EXECUTED,
-	     symtab_node::get (decl)->definition_alignment ());
-#else
+
   if (targetm.asm_out.function_section)
     section = targetm.asm_out.function_section (decl, freq, startup, exit);
   if (section)
     return section;
   return hot_function_section (decl);
-#endif
 }
 
 /* Return the section for function DECL.

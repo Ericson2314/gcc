@@ -1096,6 +1096,36 @@ extern GCC_TARGET_TABLE (const unsigned short, class_num_modes,
 		       MAX_MODE_CLASS);
 #define GET_CLASS_NUM_MODES(CLASS) ((unsigned int) class_num_modes[CLASS])
 
+/* TRUE IF MODE IS A HOLE FOR THE SELECTED BACK END -- an ordinal in the shared
+   numbering that some OTHER configured back end defines and this one does not.
+
+   `genmodes.cc' (see the note above `emit_mode_inner') states the reason this
+   is needed and that it was absent: "the property that makes a hole safe
+   everywhere else is that FOR_EACH_MODE* never walks into one, so the question
+   is never asked; the residue is code that reaches a mode by ORDINAL rather
+   than by walking."  `reginfo.cc' has two such ordinal walks, and both hand
+   the foreign ordinal straight to a BACK-END HOOK.
+
+   THE WORKED CASE.  `pru_hard_regno_mode_ok' (config/pru/pru.cc:547) switches
+   on GET_MODE_SIZE and closes with
+
+     default:  gcc_assert (mode == BLKmode || mode == VOIDmode);
+
+   which is true of every mode pru HAS.  Walking the union's ordinals reaches
+   sizes pru never defined -- i386's 64-byte AVX-512 vectors among them -- and
+   pru died on `int f(int x){return x+1;}', contributing no FAIL rows at all.
+   The assert is not pru's bug: it is the same shape as
+   `aarch64_class_max_nregs' asserting on class numbers and
+   `mips_hard_regno_mode_ok_p' being indexed past its end, both recorded in
+   `reginfo.cc'.  The array is the union's; the walk is this base's.
+
+   This reads `mode_class_index' rather than a table of its own because the
+   0xffff hole marker is already emitted there, per base, for exactly this
+   distinction -- and it is more precise than `GET_MODE_CLASS (m) ==
+   MODE_RANDOM', which is also true of VOIDmode and BLKmode, two modes every
+   base really has.  */
+#define MODE_IS_HOLE_P(MODE) (mode_class_index[MODE] == 0xffff)
+
 /* The narrowest full integer mode available on the target.  */
 
 #define NARROWEST_INT_MODE \

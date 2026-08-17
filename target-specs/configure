@@ -2551,6 +2551,8 @@ for ts_od in ${spec_option_defaults}; do
   case ${spec_cpu_type}:${ts_name} in
     i386:cpu | i386:tune)
             ts_tmpl="%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=${ts_value}}}}" ;;
+    m68k:cpu)
+                                                                      ts_tmpl="%{!m68020-40:%{!m68020-60:%{!mcpu=*:%{!march=*:-${ts_value}}}}}" ;;
     mips:arch)
                         ts_tmpl= ;;
     *:arch)

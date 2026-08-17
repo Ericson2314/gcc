@@ -93,6 +93,31 @@ struct target_asm_ops
      compile THIS file, by name, rather than acquire a silent no-op that emits
      nothing and looks like correct output.  */
   void (*output_align) (FILE *, int);
+
+  /* USE_SELECT_SECTION_FOR_FUNCTIONS -- this back end wants
+     `function_section_1' (varasm.cc) to route a function with no explicit
+     section through TARGET_ASM_SELECT_SECTION rather than through
+     `hot_function_section'.
+
+     A BOOL RATHER THAN A `#ifdef', BECAUSE THE `#ifdef' KILLED msp430 ON ITS
+     FIRST INPUT.  Exactly one back end in the tree defines the macro
+     (config/msp430/msp430.h:525) and the primary does not, so the `#ifdef' in
+     shared `varasm.cc' was false for all 47 bases -- the "leaked absence"
+     class in INSTRUMENTS.md, where guarded code runs for NOBODY.  The
+     consequence is not a subtly wrong section: the `#else' arm calls
+     `targetm.asm_out.function_section' unconditionally, and msp430's hook
+     opens with
+
+       gcc_assert (DECL_SECTION_NAME (decl) != NULL);   msp430.cc:2466
+
+     which upstream can rely on precisely BECAUSE the macro sends the
+     no-section case elsewhere.  So msp430 ICEd on `int f(int x){return x+1;}'
+     and contributed no FAIL rows at all.
+
+     Note the direction of the default: false is what a back end that never
+     defined the macro has always got, so converting the guard cannot change
+     any other base's output.  */
+  bool use_select_section_for_functions;
 };
 
 /* Wrap each target macro in a function of the right shape.  Defined
@@ -228,6 +253,15 @@ gcc_taop_output_align (FILE *stream, int log)
 #endif
 #endif
 
+/* No `#ifndef' guard on this one, unlike the hook names above: it is not a
+   target.def hook a back end could already have supplied, it is the tm.h
+   macro itself, read here in the per-base TU.  */
+#ifdef USE_SELECT_SECTION_FOR_FUNCTIONS
+#define TARGET_ASM_USE_SELECT_SECTION_FOR_FUNCTIONS true
+#else
+#define TARGET_ASM_USE_SELECT_SECTION_FOR_FUNCTIONS false
+#endif
+
 /* One entry per configured back end, so a table can be found by name.  */
 struct target_asm_ops_entry
 {
@@ -254,5 +288,10 @@ extern void init_targetm_asm_ops (void);
    `targetm' counterpart upstream and inventing one would mean touching
    target.def and 50 back ends to change where a directive is printed.  */
 extern void mt_asm_output_align (FILE *stream, int log);
+
+/* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.  Like
+   `mt_asm_output_align', not copied into `targetm.asm_out': the macro has no
+   `targetm' counterpart upstream.  */
+extern bool mt_use_select_section_for_functions (void);
 
 #endif /* GCC_TARGET_ASM_OPS_H */
