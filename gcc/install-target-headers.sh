@@ -25,15 +25,21 @@
 # IN OPPOSITE DIRECTIONS, BY THE SAME MISTAKE.  The method matters more than the
 # number, so both errors are recorded rather than just the answer.
 #
-# libgcc opens SEVEN generated headers:
+# libgcc opens NINE generated headers.  THE LIST IS BELOW, under `ARM D' -- it
+# is not restated here, because this count has already been wrong twice and a
+# second copy of it is a second thing to forget to update.  What matters at
+# THIS point in the file is only WHO PRODUCES THEM, which is what this script
+# decides:
 #
-#     tconfig.h  auto-host.h  tm.h  options.h  insn-constants.h  insn-modes.h
-#     version.h
+#     this script, per BASE      options-<base>.h, insn-modes-<base>.h,
+#                                insn-constants-<base>.h and the plain-name shims
+#     this script, ONCE          auto-host.h, version.h  ->  gen-headers/
+#     target-specs, per TRIPLE   tm-<triple>.h and its tm.h shim
+#     libgcc's own configure     tconfig.h
 #
-# THIS SCRIPT INSTALLS SIX OF THEM.  `tm.h' -- and the `tm-<key>.h' it shims --
-# comes from `target-specs/configure' instead, which generates it per target
-# after the build.  The seven are still what libgcc opens; they no longer all
-# come from one producer.  See the note over the copy loop.
+# Four producers, no overlap.  Both properties are checked, and both are
+# needed: disjointness alone would pass a split that DROPPED a header, and
+# completeness alone would pass two producers writing the same path.
 #
 # ERROR 1, OVER-COUNTING.  The original set was collected by building libgcc
 # in-tree with `.dep' files on and taking every path under the gcc BUILD
