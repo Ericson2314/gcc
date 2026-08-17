@@ -78,6 +78,23 @@ predefined_function_abi::initialize (unsigned int id,
   m_full_and_partial_reg_clobbers = full_reg_clobbers;
   for (unsigned int i = 0; i < NUM_MACHINE_MODES; ++i)
     {
+      /* AND THE MODE AXIS OF THE SAME RULE, which the register note above
+	 does not cover.  `i' is an ordinal in the SHARED mode numbering handed
+	 to a BACK-END hook, and a hole -- a mode some other configured back
+	 end defines and this one does not -- has no answer to give.
+	 `pru_hard_regno_mode_ok' (pru.cc:547) says so with an assert, and pru
+	 died HERE on `int f(int x){return x+1;}' after the three ordinal walks
+	 in reginfo.cc had been bounded; this is the fourth site and the one
+	 the backtrace then named.
+
+	 THE THREE WALKS IN `initialize' GET THE GUARD; `caller_save_regs'
+	 BELOW DELIBERATELY DOES NOT.  Its mode walk reads `mode_clobbers'
+	 only and asks no back-end hook anything, so a hole there is answered
+	 out of a table this code owns.  Guarding a loop that cannot be wrong
+	 would suggest the criterion is "walks modes" when it is "asks the
+	 back end".  See MODE_IS_HOLE_P (machmode.h).  */
+      if (MODE_IS_HOLE_P (i))
+	continue;
       machine_mode mode = (machine_mode) i;
       for (unsigned int regno = 0;
 	   regno < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++regno)
@@ -101,8 +118,13 @@ predefined_function_abi::initialize (unsigned int id,
      either invalid or also part-clobbered.  */
   for (unsigned int i = 0; i < NUM_MACHINE_MODES; ++i)
     {
-      machine_mode mode = (machine_mode) i;
+      /* A hole is not asked about; see the first walk.  The row still gets
+	 `m_full_and_partial_reg_clobbers', which is what an unrefined answer
+	 for a mode this base does not have should be.  */
       m_mode_clobbers[i] = m_full_and_partial_reg_clobbers;
+      if (MODE_IS_HOLE_P (i))
+	continue;
+      machine_mode mode = (machine_mode) i;
       for (unsigned int regno = 0;
 	   regno < (unsigned int) MT_FIRST_PSEUDO_REGISTER; ++regno)
 	if (targetm.hard_regno_mode_ok (regno, mode)
@@ -117,6 +139,9 @@ predefined_function_abi::initialize (unsigned int id,
   if (flag_checking)
     for (unsigned int i = 0; i < NUM_MACHINE_MODES; ++i)
       {
+	/* A hole is not asked about; see the first walk.  */
+	if (MODE_IS_HOLE_P (i))
+	  continue;
 	machine_mode mode = (machine_mode) i;
 	const_hard_reg_set all_clobbers = m_full_and_partial_reg_clobbers;
 	for (unsigned int regno = 0;

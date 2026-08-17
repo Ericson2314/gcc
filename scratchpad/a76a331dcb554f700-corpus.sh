@@ -106,6 +106,30 @@ fi
 # of separating CC-OK from AS-OK.
 no_gnu_as="amdgcn nvptx"
 
+# PER-TARGET EXTRA FLAGS -- exactly one target needs any, and it is recorded
+# here rather than left to the caller so the reading cannot be quoted without
+# it.  nvptx's cc1 refuses outright with
+#
+#   cc1: fatal error: '-march=' must be specified
+#
+# because nvptx has no default ISA (upstream one comes from configure, and a
+# multi-target compiler is configured once for everybody).  `-misa=sm_30' is
+# the smallest thing that makes nvptx measurable at all -- and note that
+# `-march=sm_30', which nvptx.opt aliases to it, is REJECTED BY THE DRIVER
+# ("unrecognized command-line option '-march=sm_30'; did you mean
+# '-march-map='"), while nvptx's own `-march-map=' IS recognised.  That is the
+# `m68k -mcpu=m68020' family in the option table rather than the spec file and
+# is recorded, not worked around.
+extra_flags_for () {
+  case "$1" in
+    nvptx-*) echo "-misa=sm_30" ;;
+    *) echo "" ;;
+  esac
+}
+
+READELF=${READELF:-$(ls /tmp/tools8*-a76a331dcb554f700/bin/*-readelf 2>/dev/null | head -1)}
+[ -n "$READELF" ] || echo "NOTE: no readelf found; the MACHINE arm is OFF and AS-OK means only \"as exited 0\""
+
 printf 'corpus census at %s   build=%s   tools=%s\n' "$OPT" "$B" "${TOOLS:-<none>}"
 printf '%-26s %-9s %-9s %s\n' TARGET CC AS NOTE
 nt=0
@@ -114,6 +138,9 @@ for T in $targets; do
   base=$(echo "$T" | sed 's/-.*//')
   nt=$((nt+1))
   ccok=0; ccbad=0; asok=0; asbad=0; note=
+  machines=
+  XF=$(extra_flags_for "$T")
+  [ -z "$XF" ] || note="extra flags: $XF"
   firstfail=
   for f in $C/*.c; do
     n=$(basename "$f" .c)
@@ -126,9 +153,9 @@ for T in $targets; do
       mkdir -p $C/cfg
       printf 'target %s\n' "$T" > "$C/cfg/$T.cfg"
       cfgarg="-ftarget-config=$C/cfg/$T.cfg"
-      note="synthesised target-config (no probed specs-config)"
+      case "$note" in *synthesised*) ;; *) note="${note:+$note; }synthesised target-config (no probed specs-config)" ;; esac
     fi
-    if "$B/gcc/xgcc" -B"$B/gcc/" $cfgarg $OPT -S -o "$C/$T-$n.s" "$f" \
+    if "$B/gcc/xgcc" -B"$B/gcc/" $cfgarg $OPT $XF -S -o "$C/$T-$n.s" "$f" \
          > "$C/$T-$n.cc.err" 2>&1; then
       ccok=$((ccok+1))
     else
@@ -141,6 +168,19 @@ for T in $targets; do
     if [ -z "$AS" ] && [ -n "$TOOLS" ] && [ -x "$TOOLS/$T-as" ]; then
       if "$TOOLS/$T-as" -o "$C/$T-$n.o" "$C/$T-$n.s" > "$C/$T-$n.as.err" 2>&1; then
         asok=$((asok+1))
+        # THE MACHINE ARM.  "as exited 0" is not "an object for THIS machine":
+        # the host `as' also exits 0, which is the whole reason this dir is
+        # asserted by name.  One `readelf' serves every target here (it is
+        # multi-arch), so this is ONE piece of evidence about the ASSEMBLER's
+        # output, not N -- said plainly because a previous board counted 45.
+        if [ -n "$READELF" ]; then
+          mm=$("$READELF" -h "$C/$T-$n.o" 2>/dev/null \
+               | sed -n 's/^ *Machine: *//p' | head -1)
+          case "$machines" in
+            "") machines=$mm ;;
+            *) [ "$machines" = "$mm" ] || machines="$machines / $mm (INCONSISTENT)" ;;
+          esac
+        fi
       else
         asbad=$((asbad+1))
       fi
@@ -156,7 +196,7 @@ for T in $targets; do
        fi ;;
   esac
   printf '%-26s %-9s %-9s %s\n' "$T" "$ccok/$((ccok+ccbad))" "$as_col" \
-    "${firstfail:+first cc1 failure: $firstfail. }$note"
+    "${machines:+[$machines] }${firstfail:+first cc1 failure: $firstfail. }$note"
 done
 echo
 echo "targets=$nt  inputs=7  level=$OPT   (the level is part of the reading)"

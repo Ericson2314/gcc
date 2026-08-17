@@ -875,13 +875,30 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # each macro in a static inline, and a wrapper whose body is a call is a
   # perfectly good constant expression.  So mmix is now REPRESENTABLE.
   #
-  # What excludes it is one step further out: the function that wrapper calls,
-  # `mmix_data_section_asm_op', is defined in config/mmix/mmix.cc, and only
-  # the PRIMARY target's back-end sources are linked -- OBJS carries a
-  # singular $(out_object_file).  target-asm-ops-mmix.o would compile and then
-  # fail to link with an undefined reference whenever mmix is not the primary.
-  # This exclusion therefore ends when the per-back-end compiler objects go
-  # into OBJS, not before, and it is one more consumer of that work.
+  # THE EXCLUSION IS GONE, BECAUSE ITS OWN STATED PRECONDITION HAS BEEN MET.
+  # It said: the function that wrapper calls, `mmix_data_section_asm_op', is
+  # defined in config/mmix/mmix.cc, only the PRIMARY target's back-end sources
+  # are linked, so target-asm-ops-mmix.o would fail to link -- "this exclusion
+  # therefore ends when the per-back-end compiler objects go into OBJS".
+  #
+  # They have.  Measured on a 47-base build at 23a070127c8:
+  #
+  #   nm mt-mmix/mmix.o | grep data_section_asm_op
+  #     0000000000001b50 T _Z24mmix_data_section_asm_opv
+  #   nm gcc/cc1        | grep mmix_data_section
+  #     0000000003ff9cd0 T _Z24mmix_data_section_asm_opv
+  #
+  # WHAT IT COST WHILE IT LASTED, and this is why a condition that has been met
+  # must be re-checked rather than left standing: mmix is the ONLY back end of
+  # the 47 with no entry in `targetm_asm_ops_registry', so
+  # `multi_target_select' refused it outright --
+  #
+  #   cc1: internal compiler error: back end 'mmix' has no assembler-directive
+  #        table; ... such a back end cannot be selected
+  #
+  # -- on EVERY input.  mmix therefore produced no test result of any kind, and
+  # in a `.sum'-based ranking that is indistinguishable from passing.  The
+  # diagnostic was doing its job perfectly and nothing was reading it.
   #
   # Back ends that share default-common.cc are NOT skipped any more.  They used
   # to be, because tm-<base>.h was generated per *common file* base rather than
@@ -891,11 +908,7 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # means only that a back end has no common-hook overrides of its own.  The
   # manifest loop now deduplicates the per-back-end headers on cpu_type, so all
   # 48 have tm-<base>.h, options-<base>.h and insn-constants-<base>.h.
-  if (cpu == "mmix") {
-    printf "# target-asm-ops-mmix.o omitted: DATA_SECTION_ASM_OP calls mmix_data_section_asm_op (),\n";
-    printf "# which is defined in config/mmix/mmix.cc -- not linked unless mmix is the primary.\n\n";
-  }
-  else {
+  {
   printf "target-asm-ops-%s.o: $(srcdir)/target-asm-ops.cc tm-%s.h \\\n", cpu, cpu;
   printf "  $(CONFIG_H) $(SYSTEM_H) $(CORETYPES_H) $(srcdir)/target-asm-ops.h\n";
   printf "\t$(COMPILE) -DTM_H_FILE='\"tm-%s.h\"' \\\n", cpu;
