@@ -216,9 +216,9 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # unlike extra_objs and unlike PASSES_EXTRA.  Measured over all 47 back
     # ends -- 180 headers, 14 back ends, and 18 basenames claimed by more than
     # one back end.  (This cited a census script under scratchpad as the measurement;
-    # `git log --all' has no record of that file, so the SCRIPT was never
+    # 'git log --all' has no record of that file, so the SCRIPT was never
     # committed even though the numbers below are checkable by hand from
-    # config.gcc and are reproduced by `mt-cite-check.sh' being widened.  The
+    # config.gcc and are reproduced by 'mt-cite-check.sh' being widened.  The
     # figures stand; the named instrument does not exist.) --
     #
     #   mmintrin.h        arm i386 rs6000
@@ -369,7 +369,7 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # back-end gt- header a multi-target build produced.  Union it here too.
   gcc_mt_gtf="${gcc_mt_gtf} \$(srcdir)/config/`echo "${gcc_mt_data}" | sed -n 's/^out_file //p'`"
   # ...AND NEITHER IS THE BACK END'S OWN tm.h CHAIN, which is where SIXTEEN of
-  # the thirty-four `struct GTY(()) machine_function' definitions live --
+  # the thirty-four 'struct GTY(()) machine_function' definitions live --
   # aarch64, arm, avr, c6x, epiphany, gcn, i386, ia64, loongarch, mips, mmix,
   # nds32, nvptx, pa, rs6000, s390.  gcc/Makefile.in reaches those through
   # $(tm_file_list), which is the PRIMARY target's chain and nobody else's, so
