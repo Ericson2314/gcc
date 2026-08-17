@@ -52,7 +52,28 @@ defaults.h:1002    #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 1
 aarch64/aarch64.h:1556   #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
 ```
 
-**aarch64 is the only back end in the tree that defines it, and it dissents.**
+**CORRECTION TO MY OWN PARAGRAPH, AND IT IS THE ERROR PRINCIPLES NAMES BY
+NAME.** The line above originally read *"aarch64 is the only back end in the
+tree that defines it"*. That grep was **scoped to `config/i386/` and
+`config/aarch64/`** — *"scope chosen by directory rather than by what the
+compiler reads"*, the `elfos.h` mistake, committed while writing up a leak. Run
+over the whole of `config/`:
+
+```
+aarch64/aarch64.h:1556      #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
+riscv/riscv.h:1349          #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
+loongarch/loongarch.h:1297  #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
+```
+
+**Three definers, all dissenting, and two of them are on this board.**
+loongarch is not in the 47. So the affected set is **aarch64 and riscv64**, and
+riscv64's residual should be re-read for an FMV component that was never
+attributed — its `gcc.target/riscv` 384 has not been broken down by family.
+The both-sided probe below shows `riscv` reading **0** too, which is how the
+correction was caught: the header read disagreed with the grep, and the header
+read is the one that says what the compiler does.
+
+The definers dissent unanimously; the floor is the outlier.
 
 Measured from the build's own headers, `-DIN_GCC`, rc=0 on all three arms
 (the first attempt omitted `-DIN_GCC`, which silently skips the entire back-end
@@ -61,12 +82,13 @@ reduced-environment trap, recorded because the wrong reading is the plausible
 one):
 
 ```
-shared  tm.h            TARGET_HAS_FMV_TARGET_ATTRIBUTE 1   <- what c-decl.cc,
-                                                               multiple_target.cc,
-                                                               attribs.cc, tree.cc read
-aarch64-inc/tm.h        TARGET_HAS_FMV_TARGET_ATTRIBUTE 0   <- aarch64's own answer
-i386-inc/tm.h           TARGET_HAS_FMV_TARGET_ATTRIBUTE 1   <- the control
+NAME                              SHARED  aarch64  i386  riscv  s390
+TARGET_HAS_FMV_TARGET_ATTRIBUTE      1       0       1     0      1
 ```
+
+`SHARED` is what `c-decl.cc`, `multiple_target.cc`, `attribs.cc` and `tree.cc`
+read; `i386` and `s390` agree with it, which is why this is invisible on
+x86_64 and s390x and is the control.
 
 **THE POLARITY IS THE OPPOSITE OF `EPILOGUE_USES` AND `REGMODE_NATURAL_SIZE`,
 AND THAT IS THE TRANSFERABLE PART.** In those cases the primary *defines* the
