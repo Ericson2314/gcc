@@ -139,6 +139,15 @@ case "$T:$mach" in
   # four LP64 rows the ELF CLASS also differs, and that is checked below --
   # a control whose objects came out ELF64 would not be an arm control at all.
   arm*:*ARM*) ;;
+  # i686: the SECOND 32-bit row, and the one this guard is WEAKEST on.  For
+  # every other target a fallback to the host assembler shows up here as
+  # `Advanced Micro Devices X86-64' and the guard fires.  For i686 the host
+  # gas IS an x86 assembler: it accepts the input, and the only thing that
+  # separates the right answer from the wrong one is `Intel 80386' vs
+  # `Advanced Micro Devices X86-64' -- i.e. S4b's ELF class below is doing
+  # most of the work on this row, not S4.  Stated because a reader would
+  # otherwise assume this arm is as strong here as it is on arm.
+  i?86-*:*80386*) ;;
   *) echo "FATAL[$T]: the control assembled to machine '$mach' -- wrong target."
      echo "  (ORIGINAL_AS_FOR_TARGET pointing at the host assembler produces"
      echo "   exactly this, and it is silent until something looks.)"
