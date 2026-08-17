@@ -334,9 +334,41 @@ for T in "$@"; do
   else
     ASDIR="$B/asdir-$T"; rm -rf "$ASDIR"; mkdir -p "$ASDIR"
     for tool in as ld nm ar ranlib objcopy objdump strip readelf; do
-      [ -x "$TDIR/$T-$tool" ] && ln -sf "$TDIR/$T-$tool" "$ASDIR/$tool"
+      [ -x "$TDIR/$T-$tool" ] || continue
+      ln -sf "$TDIR/$T-$tool" "$ASDIR/$tool"
+      # ... AND UNDER THE PREFIXED NAME TOO, WITH $ASDIR ON PATH BELOW.
+      #
+      # The unprefixed link is what `-B$ASDIR/' needs and it is all this
+      # harness used to make.  The TESTSUITE asks a different question:
+      # `find_binutils_prog objdump' returns `<target>-objdump', spawned by
+      # NAME through PATH, and nothing put the target's tools there -- while
+      # `sc-check.sh' (the CONTROL) runs its `make check' with
+      # `PATH=$TOOLS:$PATH'.  So the two sides of the board did not have the
+      # same tools visible, on the side that is supposed to differ only in
+      # the compiler.
+      #
+      # MEASURED on the i686 row, and it is invisible in the debt column by
+      # construction.  `lib/file-format.exp' compiles a TU and objdumps it;
+      # with no `<target>-objdump' the spawn fails, `gcc_target_object_format'
+      # returns `unknown', and `hidden-scan-for' (lib/scanasm.exp:156) falls
+      # through its switch to `return ""'.  An EMPTY regexp then goes into
+      # both the scan and the TEST NAME: the multi-target side wrote
+      #
+      #    FAIL: gcc.dg/visibility-d.c scan-not-hidden
+      #
+      # where the control wrote
+      #
+      #    PASS: gcc.dg/visibility-d.c scan-not-hidden hidden[ \t_]*foo00
+      #
+      # -- 30 FAILs that are the harness, and because the NAMES differ they
+      # do not join, so they land in the only-in columns and NOT in `stock
+      # PASS -> mt not PASS'.  A debt figure alone would have reported this
+      # row cleaner than it was, in exactly the direction that flatters us.
+      ln -sf "$TDIR/$T-$tool" "$ASDIR/$T-$tool"
     done
     [ -x "$ASDIR/as" ] || { echo "FATAL[$T]: no $TDIR/$T-as to link"; exit 9; }
+    [ -x "$ASDIR/$T-objdump" ] \
+      || echo "WARNING[$T]: no $T-objdump; gcc_target_object_format will say \`unknown'"
 
     # NON-VACUITY, and it is the arm SC-BOARD's S4 already prescribes: ask the
     # RUNNING driver, then ASSEMBLE A REAL FUNCTION and require the target's
@@ -480,6 +512,7 @@ for T in "$@"; do
   ( ulimit -v "$CAP" || exit 9
     [ "$(ulimit -v)" = "$CAP" ] || { echo "FATAL: ulimit -v $CAP did not take"; exit 9; }
     cd "$B/gcc" && sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
+      ${ASDIR:+PATH=$ASDIR:\$PATH; export PATH; } \
       $DJSET \
       MT_TARGET_NAME=$T \
       MT_TARGET_CONFIG=$CFG \

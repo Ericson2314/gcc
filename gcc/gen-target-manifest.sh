@@ -89,6 +89,13 @@ gcc_sf_ent=multi-target-spec-functions.ent
 : > ${gcc_sf_ent}
 gcc_target_manifest=multi-target.manifest
 : > ${gcc_target_manifest}
+# One line per back end: cpu_type, the triple that decided tm-<cpu>.h, and the
+# chain it decided it from.  TRUNCATED HERE, not merely appended to: a stale
+# file from an earlier configure in the same build dir would compare this run's
+# triples against another run's answers, which is a false RED that reads
+# exactly like the true one.  See the tm-<cpu>.h collision check below.
+gcc_mt_tmchains=${gcc_common_mk}.tmchains
+: > ${gcc_mt_tmchains}
 gcc_mt_err=conftest.mterr
 
 #
@@ -495,6 +502,61 @@ for gcc_mt in ${gcc_manifest_targets}; do
   # ft32/moxie/rl78 in MT_OPTION_TARGET_BASES, and the options union pass
   # after this loop still counts 48.  Sharing a common-hook file says nothing
   # whatever about a back end's .md, its .opt files or its headers.
+  # *** AND THE FIRST TRIPLE OF A BACK END WINS tm-<cpu>.h, SILENTLY. ***
+  #
+  # The `case' below is a dedup: the SECOND and later triples of one back end
+  # skip it entirely, so `tm-<cpu>.h' -- the header `<cpu>-common.o',
+  # `spec-functions-<cpu>.o' and `target-asm-ops-<cpu>.o' are compiled against
+  # -- is generated from the FIRST triple's `tm_file' chain, `tm_defines' and
+  # `target_cpu_default', and every later triple contributes nothing to it.
+  #
+  # THAT IS INVISIBLE FROM ANY BOARD WITH ONE TRIPLE PER BACK END, WHICH IS
+  # EVERY BOARD THIS BRANCH HAS EVER TAKEN.  The committed 47 has exactly one
+  # triple per back end, so the collision has never had an opportunity to
+  # happen.  MEASURED the first time two did: with
+  # `--enable-targets=aarch64-unknown-linux-gnu,x86_64-pc-linux-gnu,i686-unknown-linux-gnu'
+  # the manifest holds two `cpu_type i386' stanzas with DIFFERENT chains --
+  # i686 has neither `i386/biarch64.h' nor `i386/x86-64.h' nor
+  # `i386/linux64.h' -- and `i686-unknown-linux-gnu' sorts first, so
+  # `tm-i386.h' was built from the 32-bit chain.  Through
+  # `config/i386/i386.h:566' that makes `TARGET_64BIT_DEFAULT' 0 and, with no
+  # `TARGET_BI_ARCH', `TARGET_64BIT' a compile-time constant 0 (i386.h:307) in
+  # the very objects that decide x86_64's default option flags
+  # (`TARGET_DEFAULT_TARGET_FLAGS', `common/config/i386/i386-common.cc:2135').
+  # No diagnostic anywhere: configure succeeded and the build succeeded.
+  #
+  # `extra_options' a few lines up is UNIONED across a back end's triples, and
+  # `gen-multi-target-md.awk' gives every TRIPLE its own `tm-<triple>.h' and
+  # intersects the conditions -- so the tree's other two answers to "several
+  # triples, one back end" are both correct, and this one is neither.  That is
+  # the branch's own root pattern: one name, several authorities, no
+  # diagnostic.
+  #
+  # THE HONEST FIX IS TO MAKE THESE THREE OBJECTS PER TRIPLE, and that is
+  # design work, not a patch: the registry already maps a TARGET to a
+  # `targetm_common' SYMBOL, so the shape exists, but one object per triple
+  # per back end has to be argued and costed.  Until it is done, REFUSE.  A
+  # configuration that cannot be built correctly must not be built silently
+  # wrong -- and refusing is what makes the gap findable by the next person
+  # instead of costing them a board.
+  gcc_mt_tmchain="${gcc_mt_incl}|${gcc_mt_tmdef}|${gcc_mt_tcd}"
+  gcc_mt_seen=`sed -n "s/^${gcc_mt_cpu}	\\([^	]*\\)	//p" ${gcc_mt_tmchains} 2>/dev/null`
+  gcc_mt_seent=`sed -n "s/^${gcc_mt_cpu}	\\([^	]*\\)	.*/\\1/p" ${gcc_mt_tmchains} 2>/dev/null`
+  if test x"${gcc_mt_seen}" = x; then
+    printf '%s\t%s\t%s\n' "${gcc_mt_cpu}" "${gcc_mt}" "${gcc_mt_tmchain}" \
+      >> ${gcc_mt_tmchains}
+  elif test x"${gcc_mt_seen}" != x"${gcc_mt_tmchain}"; then
+    gcc_mt_fatal="${gcc_mt} and ${gcc_mt_seent} are both the \`${gcc_mt_cpu}'\
+ back end, and they DISAGREE about that back end's target header chain,\
+ tm_defines or target_cpu_default.  tm-${gcc_mt_cpu}.h is generated once per\
+ BACK END from whichever of them is seen first (${gcc_mt_seent} here), and it\
+ is what ${gcc_mt_cpu}-common.o, spec-functions-${gcc_mt_cpu}.o and\
+ target-asm-ops-${gcc_mt_cpu}.o are compiled against -- so ${gcc_mt} would be\
+ built against ${gcc_mt_seent}'s ABI defaults with no diagnostic.  Configure\
+ one triple per back end until those objects are made per triple, as\
+ tm-<triple>.h and the condition intersection already are."
+    return 1
+  fi
   case " ${gcc_all_cpu_bases} " in
     *" ${gcc_mt_cpu} "*) ;;
     *) gcc_all_cpu_bases="${gcc_all_cpu_bases} ${gcc_mt_cpu}"
