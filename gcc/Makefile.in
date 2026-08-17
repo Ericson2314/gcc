@@ -2332,17 +2332,57 @@ C_TARGET_OBJS = $(filter-out $(MT_C_OBJS_MOVED),@c_target_objs@) \
 CXX_TARGET_OBJS = $(filter-out $(MT_CXX_OBJS_MOVED),@cxx_target_objs@) \
 		  $(MT_CXX_TARGET_OBJS)
 
+# The four remaining language lists, converted in the same channel and for the
+# same reason as C_TARGET_OBJS and CXX_TARGET_OBJS above.  @d_target_objs@ and
+# its three siblings are the PRIMARY target's lists, substituted from the ONE
+# legacy ${target} pass through config.gcc, and gcc/d/Make-lang.in,
+# gcc/jit/Make-lang.in and gcc/fortran/Make-lang.in link exactly them.
+#
+# HOW LOUD EACH ONE WAS, because that is the finding rather than the counts:
+#
+#   jit      LOUD.  config/i386/t-i386 builds i386-jit.o with a bare
+#            $(COMPILE), so it gets no -DMT_BASE, and i386-jit.cc includes
+#            multi-target-base.h -- whose witness fires naming both the flag
+#            and the file.
+#   d        SILENT for four of its ten back ends, and the mechanism is
+#            identical.  aarch64-d.cc, loongarch-d.cc, pa-d.cc and riscv-d.cc
+#            carried no multi-target-base.h at all, so nothing in their path
+#            could complain; they reached the primary's tm.h transitively
+#            through target.h and compiled cleanly.  They are given the witness
+#            with this change, which is what makes the two halves fail alike.
+#   rust     one back end (i386) and it already carried the witness.
+#   fortran  clean, and clean BY ACCIDENT: only darwin and vms name anything in
+#            fortran_target_objs and neither is in the 47-base set, so the
+#            defect has no reachable instance here.  Converted anyway --
+#            a board green because nothing can reach the bug is not evidence
+#            about the mechanism.
+#
+# NOT `$(MT_C_OBJS_<base>)' BY REFERENCE, unlike CXX_TARGET_OBJS: <cpu>-c.cc
+# serves both the C and C++ front ends, but <cpu>-d.cc, <cpu>-rust.cc and
+# <cpu>-jit.cc are separate translation units defining separate symbols.  The
+# `follows automatically' property is kept in gen-multi-target-md.awk, which
+# reads the manifest key rather than enumerating names.
+#
+# RECURSIVE `=', not `:=', for the reason recorded on C_TARGET_OBJS:
+# multi-target-md.mk is included below this line, so an immediate assignment
+# would filter against an empty MT_<LANG>_OBJS_MOVED and keep both the shared
+# copy and the per-base one.
+
 # Target specific, D specific object file
-D_TARGET_OBJS=@d_target_objs@
+D_TARGET_OBJS = $(filter-out $(MT_D_OBJS_MOVED),@d_target_objs@) \
+		$(MT_D_TARGET_OBJS)
 
 # Target specific, JIT specific object file
-JIT_TARGET_OBJS=@jit_target_objs@
+JIT_TARGET_OBJS = $(filter-out $(MT_JIT_OBJS_MOVED),@jit_target_objs@) \
+		  $(MT_JIT_TARGET_OBJS)
 
 # Target specific, Fortran specific object file
-FORTRAN_TARGET_OBJS=@fortran_target_objs@
+FORTRAN_TARGET_OBJS = $(filter-out $(MT_FORTRAN_OBJS_MOVED),@fortran_target_objs@) \
+		      $(MT_FORTRAN_TARGET_OBJS)
 
 # Target specific, Rust specific object file
-RUST_TARGET_OBJS=@rust_target_objs@
+RUST_TARGET_OBJS = $(filter-out $(MT_RUST_OBJS_MOVED),@rust_target_objs@) \
+		   $(MT_RUST_TARGET_OBJS)
 
 # Object files for gcc many-languages driver.
 #
