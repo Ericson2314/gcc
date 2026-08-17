@@ -87,11 +87,22 @@ BASES="i386 aarch64"
 # forgiving reader is a reader with more ways to return the empty set.
 TAB_MACROS="LIBCALL_VALUE ASM_OUTPUT_EXTERNAL GLOBAL_ASM_OP BASE_REG_CLASS INDEX_REG_CLASS REGNO_OK_FOR_BASE_P REGNO_OK_FOR_INDEX_P ASM_COMMENT_START WCHAR_TYPE SIZE_TYPE PTRDIFF_TYPE BYTES_BIG_ENDIAN WORDS_BIG_ENDIAN FLOAT_WORDS_BIG_ENDIAN REG_WORDS_BIG_ENDIAN STRICT_ALIGNMENT SHIFT_COUNT_TRUNCATED JUMP_TABLES_IN_TEXT_SECTION BITS_PER_WORD LONG_TYPE_SIZE PARM_BOUNDARY ATTRIBUTE_ALIGNED_VALUE MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_CIE_DATA_ALIGNMENT STACK_CHECK_FIXED_FRAME_SIZE STACK_CHECK_MAX_FRAME_SIZE MAX_FIXED_MODE_SIZE DWARF_FRAME_RETURN_COLUMN FIRST_PSEUDO_REGISTER N_REG_CLASSES REGNO_REG_CLASS"
 
-# How many slot lines the plugin writes per base.  Named rather than spelled as
-# a literal, because getting it wrong in the direction of TOO FEW is a silent
-# pass: the length assertion below would accept a dump missing the very arms
-# this run was added to score.
-SLOTS_PER_BASE=37
+# `SLOTS_PER_BASE=37' WAS HERE AND IT IS THE THRESHOLD-CALIBRATED-ON-A-MOVING-
+# NUMBER BUG THAT PRINCIPLES NAMES BY NAME.
+#
+# The plugin drives its NUM slots from `TARGET_CDATA_FIELDS', so the count is a
+# function of a list this project ADDS TO -- and a literal beside it expires
+# every time it does.  Measured: the real figure was 39 before this task and is
+# 42 after `TARGET_PTRMEMFUNC_VBIT_LOCATION' and the two `TARGET_VTABLE_*'
+# fields landed, so the assertion was ALREADY two behind and refused a correct
+# run with "slot dump has 84 lines, expected 74".
+#
+# The fix is not to write 42.  That expires at the next field and is
+# indistinguishable from moving a number to make a check pass, which this
+# project has refused four times.  The property the literal was reaching for
+# is "the dump is not missing arms", and that is stated directly below as an
+# identity over the bases: every base must emit the SAME slot-name set.  A
+# dropped arm changes that set, and no addition can make the check stale.
 
 # Which symbol names count as belonging to which base.
 own_i386='^(ix86_|i386_|x86_)'
@@ -181,7 +192,7 @@ DWARF_CIE_DATA_ALIGNMENT:-8:-8 \
 STACK_CHECK_FIXED_FRAME_SIZE:32:32 \
 STACK_CHECK_MAX_FRAME_SIZE:4088:4088 \
 MAX_FIXED_MODE_SIZE:128:128 \
-DWARF_FRAME_RETURN_COLUMN:16:30"
+FUNCTION_BOUNDARY:8:32"
 
 # The three whose two bases must DISAGREE.  Fifteen of the eighteen agree
 # between i386 and aarch64 in this configuration, and an agreeing slot is
@@ -190,7 +201,29 @@ DWARF_FRAME_RETURN_COLUMN:16:30"
 # choosing nothing.  These three are the only lines that can tell those two
 # worlds apart, so they are asserted separately and by name, before the
 # per-macro verdicts are issued.
-CDATA_NUM_DISCRIM="MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE DWARF_FRAME_RETURN_COLUMN"
+#
+# RE-ANCHORED FROM `DWARF_FRAME_RETURN_COLUMN' TO `FUNCTION_BOUNDARY', AND THE
+# REASON IS THE ONE PRINCIPLES ALREADY RECORDS ABOUT A DIFFERENT CONTROL:
+# **a control anchored on a macro this project is converting is a control with
+# an expiry date.**  `DWARF_FRAME_RETURN_COLUMN' left `TARGET_CDATA_FIELDS' for
+# `target_frame_desc' -- correctly, it is the one cdata macro that reads
+# per-function state (epiphany) -- so the plugin stopped emitting it and this
+# control fired on a HEALTHY tree, taking the whole probe down with it.  That
+# is the control working, and it is the second time this exact shape has been
+# paid for on this branch.
+#
+# `FUNCTION_BOUNDARY' is chosen on the same criteria that re-anchored
+# `macro-probe.sh': it is still a numeric cdata field, its two bases DISAGREE
+# (i386 8, aarch64 32 -- measured over all 47 bases by
+# `scratchpad/agent-ad6a5c1d2539f5e18-vbitcensus.sh'), and it is not 0/1-valued,
+# so a defaulted 0 cannot be mistaken for a correct reading.
+#
+# NOTE FOR WHOEVER READS THIS NEXT: `TAB_MACROS' above still NAMES
+# `DWARF_FRAME_RETURN_COLUMN'.  That is deliberate and is NOT an oversight --
+# `macro-probe.sh' parses that line and carries the identity
+# `NMACRO + |RETIRED n ALL| == |ALL|', so quietly deleting a name there moves a
+# number in another script.  Retiring it is a separate, deliberate act.
+CDATA_NUM_DISCRIM="MALLOC_ABI_ALIGNMENT TRAMPOLINE_SIZE FUNCTION_BOUNDARY"
 
 # Macros whose value is a read of the BASE'S OWN OPTION VARIABLES rather than
 # arithmetic on literals: aarch64's `BYTES_BIG_ENDIAN' is `(TARGET_BIG_END !=
@@ -339,16 +372,49 @@ g++ -fPIC -shared -o "$OUT/tab.so" "$HERE/tab-plugin.cc" $CPPI -std=c++14 -w \
 
 : > "$OUT/tiny.c"
 printf 'int f (int x) { return x + 1; }\n' > "$OUT/tiny.c"
+# THE SECOND STALENESS IN THIS SCRIPT, and it is a different one from the
+# `redirected'/`reg_redirected' repair above.  This used to name
+# `specs-x86_64-pc-linux-gnu-config' RELATIVE to $BUILD/gcc, which is the
+# pre-#163 layout.  `target-specs' now writes
+# `$BUILD/lib/gcc/<ver>/<target>/specs-config', so the flag pointed at a file
+# that does not exist, cc1 selected NO target, and the run died in
+# `init_reg_sets' with "no target configuration was selected".  Located by
+# name and asserted, rather than defaulted -- a missing specs-config must not
+# silently become a compiler with no target, which is the shape that reads as
+# a broken tree.
+TSCFG=$(echo "$BUILD"/lib/gcc/*/x86_64-pc-linux-gnu/specs-config)
+[ -s "$TSCFG" ] || die "no specs-config under $BUILD/lib/gcc/<ver>/x86_64-pc-linux-gnu/ \
+-- run target-specs for this build dir first (scratchpad/a7d26223eefcfa725-runspecs.sh); \
+without it cc1 has no target and this probe measures nothing"
 ( cd "$BUILD/gcc" && TAB_OUT="$OUT/slots.txt" ./cc1 -quiet -nostdinc -O2 \
-    -ftarget-config=specs-x86_64-pc-linux-gnu-config \
+    -ftarget-config="$TSCFG" \
     -fplugin="$OUT/tab.so" "$OUT/tiny.c" -o "$OUT/tiny.s" ) \
   > "$OUT/cc1.out" 2> "$OUT/cc1.err" \
   || { cat "$OUT/cc1.err"; die "cc1 failed with the TAB plugin loaded"; }
 [ -s "$OUT/slots.txt" ] || die "the plugin wrote no slots; TAB_OUT never opened \
 or the callback never fired -- an empty table must not read as a clean run"
-want=$(( $(echo $BASES | wc -w) * SLOTS_PER_BASE ))
-[ "$(wc -l < "$OUT/slots.txt")" = "$want" ] \
-  || die "slot dump has $(wc -l < "$OUT/slots.txt") lines, expected $want"
+# The slot-name set must be IDENTICAL across bases, and every configured base
+# must appear.  This is what the old line-count literal was reaching for, said
+# in a form that cannot expire when a cdata field is added.
+_nb=0; _ref=""
+for _b in $BASES; do
+  _s=$(awk -F'|' -v b="$_b" '$2 == b { print $4 }' "$OUT/slots.txt" | sort | md5sum)
+  [ -n "$_s" ] || die "base $_b emitted NO slots"
+  case $_s in *d41d8cd98f00*) die "base $_b emitted NO slots" ;; esac
+  if [ -z "$_ref" ]; then _ref=$_s
+  elif [ "$_s" != "$_ref" ]; then
+    die "base $_b emits a DIFFERENT slot-name set from the first base -- an arm
+was dropped for one base only, which a line count over the whole file cannot see"
+  fi
+  _nb=$((_nb + 1))
+done
+[ "$_nb" = "$(echo $BASES | wc -w)" ] \
+  || die "only $_nb of $(echo $BASES | wc -w) configured bases appear in the slot dump"
+_per=$(awk -F'|' -v b="$(echo $BASES | cut -d' ' -f1)" '$2 == b' "$OUT/slots.txt" | wc -l)
+[ "$(wc -l < "$OUT/slots.txt")" = "$((_nb * _per))" ] \
+  || die "slot dump is $(wc -l < "$OUT/slots.txt") lines but $_nb bases x $_per slots
+is $((_nb * _per)) -- some line belongs to no configured base"
+echo "slot dump: $_nb bases x $_per slots, identical slot-name sets"
 
 nm -C --defined-only "$BUILD/gcc/cc1" > "$OUT/nm.txt" 2> "$OUT/nm.err" \
   || { cat "$OUT/nm.err"; die "nm failed on cc1"; }
