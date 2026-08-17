@@ -493,3 +493,55 @@ STOCKCTL: STOCK IS CLEAN ACROSS THE BOUNDARY.
 interacting with THIS BRANCH's per-base `ira.cc` work; the defect is **ours to
 fix**, not an upstream behaviour change to absorb.  §11 says which half of the
 commit does it.
+
+11. WHICH HALF OF `3241754cf12` — IT IS HUNK B, AND MY OWN READING WAS WRONG
+------------------------------------------------------------------------------
+
+`3241754cf12` makes two independent "skip modes for which `MODE_IS_HOLE_P`"
+changes.  `a302b44ba-icehunk.sh` reverts exactly one at a time and rebuilds:
+
+```
+control  3241754cf12 unmodified                              ICE: YES
+arm A    setup_reg_class_nregs                    reverted   ICE: YES   <- not it
+arm B    setup_prohibited_and_exclude_class_mode_regs reverted ICE: NO  <- IT
+```
+
+Each arm refuses to run if its `perl` revert matched nothing, so an arm cannot
+re-run the unmodified commit under the name of a revert.
+
+**IT IS HUNK B**, and the defect is the one the commit message states in its own
+words.  That message says the two `HARD_REG_SET`s "stay CLEARED ... both
+already mean 'nothing here'".  For `ira_prohibited_class_mode_regs` **that is
+false**: cleared means NOTHING IS PROHIBITED — the maximally **permissive**
+value, not the inert one.  The inert value for a prohibition table is SET.  So
+`r15` is simply never marked as unable to hold TImode, LRA allocates it, and
+`*movti_internal` cannot be satisfied because TImode needs a two-register pair
+and `r15` is the last general register.
+
+**AND THIS REFUTES MY OWN READING FROM §7, WHICH IS WHY THE HUNK ARM WAS RUN
+RATHER THAN THE READING TRUSTED.**  §7 argued the skip should not fire here at
+all: `MODE_IS_HOLE_P` reads `mode_class_index`, which is emitted **per base**,
+and x86 really has TImode.  But reverting B changes behaviour *only* for modes
+the skip fires on — so the measurement proves the skip **does** fire for a mode
+the x86 arm needs.  The reading was wrong; had it been reported instead of
+tested, this commit would have been cleared of a defect it has.
+
+**THE NARROWED OPEN QUESTION, stated as open.**  `machmode.h:1091` declares
+
+```c
+extern GCC_TARGET_TABLE (const unsigned short, mode_class_index, ...)
+```
+
+— a per-base table selected at run time (`multi-target-select.cc:253`).  So
+`MODE_IS_HOLE_P` answers according to **whichever base is selected when
+`ira_init` runs**, and the measurement says that at `ira_init` time it is not
+answering as x86.  Whether that is because `ira_init` runs before the target is
+selected, or because the walk indexes a per-base table with union ordinals, is
+**not established here** and is the next thing to measure.  Either way the
+repair is in hunk B, and the smallest correct one is not "remove the bound" but
+"choose the inert value correctly": a prohibition table skipped for a hole
+should be left **SET**, not cleared.
+
+Scope note: this is `#241`'s row, not a fix row.  Nothing in `ira.cc` was
+changed on the branch by this task; the reverts existed only inside throwaway
+snapshots under `/tmp/icehunk-302b44ba`.
