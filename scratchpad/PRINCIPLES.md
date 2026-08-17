@@ -2595,3 +2595,51 @@ survey in the consolidation task is written, every proposed merge must name the
 experiment that would refute it — and that experiment must be runnable on the
 back ends that would be affected, which means those back ends must already be
 scoring.
+
+---
+
+## TESTING *ALL* BACK ENDS IS THE POINT, NOT A THOROUGHNESS PREFERENCE
+
+The user's statement of why, and it is the argument for the whole exercise:
+
+> Testing **all** back ends, not just some, is the only way to make sure we
+> catch all the assumptions we might compile in by mistake.  And test all the
+> front ends too.
+
+**A leaked assumption is invisible from any set of targets that shares it.**
+That is not a probabilistic claim about coverage; it is a structural one.  The
+primary's answer reaching everyone can only be *seen* by a target that would
+have answered differently, so a board of targets that agree measures nothing
+about the axis they agree on.
+
+**The worked proof, and it was luck rather than method.** Every target this
+project has ever scored against a stock control — x86_64, aarch64, riscv64,
+s390x — is **LP64**.  `ASM_OUTPUT_ADDR_VEC_ELT` was i386's for all 47 back
+ends, 38 definers with 34 distinct bodies, and it emitted `.quad` where aarch64
+and riscv64 index a **4-byte** table: `.rodata` exactly twice the size the
+code reads, entries unscaled where the `add` scales by 4.  **It was caught only
+because two of those four happen to use RELATIVE jump tables.**  Had all four
+used absolute tables, i386's answer would have looked correct on every scored
+target and the divergence would still be live.
+
+So the coverage gaps are not "less confidence" — they are **specific classes of
+defect that cannot be detected at all**:
+
+  * every scored target LP64        => pointer width, word size, `Pmode`
+  * no 32-bit target                => `INT_TYPE_SIZE` (six back ends ask for
+                                       16; `sizeof(int)` is 4 on all of them)
+  * nine front ends never built     => their own `tm.h` readers, their ABIs
+  * nineteen back ends never scored => whatever only they would disagree with
+
+And the front-end half is not a smaller version of the same point.  **C++ was
+enabled for the first time and immediately produced the highest-severity defect
+on the branch** — eight back ends emitting an ABI-incompatible pointer to
+member function, silently, at rc=0, assembling into correct-machine ELF.
+Nothing was looking, because no instrument compiled C++.  `d/` was then found
+to carry the same vtable defect **before it had ever been built**.
+
+**Corollary for how to choose work.** A new target or front end that has never
+been scored is worth more than another pass over one that has, even when the
+scored one has a larger residual — because the unscored one can refute
+assumptions and the scored one can only refine a number.  Prefer breadth until
+every back end and every front end has produced at least one result.
