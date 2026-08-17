@@ -333,7 +333,58 @@ with `-j`** (this board `-j12` → 44; the last `-j16` → 56), which the previo
 board already recorded. So the x86_64 row is unchanged in substance and the
 only thing that moved is a harness artefact whose own instrument named it.
 
-### aarch64, riscv64, s390x — running
+### aarch64-unknown-linux-gnu — LANDED, `.rc` = 0, DEBT **443** (was 513)
+
+```
+TARGET                      PASS    FAIL   XPASS   XFAIL   UNSUP   UNRES  ERRLIN
+aarch64-unknown-linux-gnu 341962   20688       2    1994    7009   17317      46
+KILLED 0
+```
+
+```
+                 multi-target        stock           DEBT      WAS
+aarch64     PASS 341962 FAIL 20688   344463 / 20443   443      513
+```
+
+Guards: `.rc` 0, 12/12 `site.exp`, banner present, `specs-config` 232/224,
+GUARD 3c reports **AArch64**, KILLED **0** (the previous board's 2
+`virtual memory exhausted` are gone and stayed gone).
+
+**Movement, by name, against `e3fac057ae4`:**
+
+```
+joined rows: 388,970      unchanged: 388,898
+REAL PROGRESS    (NOT PASS -> PASS):  71    all in gcc.target/aarch64
+REAL REGRESSIONS (PASS -> NOT PASS):   1
+```
+
+Cardinality moved by **3 results**, so 71 and 1 are an order of magnitude
+outside the noise this effect creates — the arm that exists because a FAIL
+column once rose +38,303 while 87,963 tests went `UNRESOLVED`→`PASS`.
+
+**THE ONE REGRESSION, NAMED, because a net figure would bury it:**
+
+```
+FAIL  gcc.target/aarch64/ands_3.c
+      scan-assembler ands\t(x|w)[0-9]+,[ \t]*(x|w)[0-9]+,[ \t]*255
+```
+
+A mask-immediate codegen difference. That shape is *consistent with*
+`PROMOTE_MODE` changing whether a sub-word value is promoted before the `and`
+— but that is a hypothesis, not a measurement, and it is labelled as one.
+
+**AND THIS ROW'S MOVEMENT IS NOT ATTRIBUTABLE TO THE BRIEF'S FOUR CAUSES**,
+exactly as §0a predicted in advance. aarch64's only available baseline is
+`e3fac057ae4`, so the span also contains the auto-inc, alignment and
+`PROMOTE_MODE` work — and aarch64 is a `PROMOTE_MODE` definer, while
+`bd6f4dbe3ae` is titled *"the eight `USE_*` macros too, **or aarch64
+regresses**"*. §0 showed the four named causes cannot reach this target except
+through `FINAL_PRESCAN_INSN`, whose aarch64 body is a no-op without
+`-mfix-cortex-a53-835769`. **This board cannot separate the two sets**;
+separating them needs a run at `d5ad77b33b3` for aarch64, which is stated as
+missing rather than papered over.
+
+### riscv64, s390x — running
 
 Provenance, the remaining rows, the debt and the ranked residual follow as they
 land.
