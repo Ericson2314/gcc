@@ -1523,6 +1523,13 @@ setup_reg_class_nregs (void)
 
   for (m = 0; m < MAX_MACHINE_MODE; m++)
     {
+      /* AND THE MODE AXIS, which the class note below does not cover: `m' is
+	 a shared-numbering ordinal passed to `targetm.class_max_nregs', a
+	 BACK-END hook, and several back ends assert on a mode they do not
+	 have.  Rows keep the zero `XCNEW' gave them -- see the note below for
+	 why zero is the inert value here.  See MODE_IS_HOLE_P.  */
+      if (MODE_IS_HOLE_P (m))
+	continue;
       /* Was `N_REG_CLASSES', the UNION width.  This is the loop that ICEd:
 	 with i386 primary it asked `aarch64_class_max_nregs' about classes
 	 20..33 and that back end's `gcc_unreachable ()' fired
@@ -1564,6 +1571,17 @@ setup_prohibited_and_exclude_class_mode_regs (void)
 	  last_hard_regno = -1;
 	  CLEAR_HARD_REG_SET (ira_prohibited_class_mode_regs[cl][j]);
 	  CLEAR_HARD_REG_SET (ira_exclude_class_mode_regs[cl][j]);
+	  /* THE MODE AXIS: `j' is a shared-numbering ordinal passed straight to
+	     `targetm.hard_regno_mode_ok'.  A hole is a mode some other
+	     configured back end defines and this one does not, so the back end
+	     has no answer -- `pru_hard_regno_mode_ok' (pru.cc:547) asserts.
+	     The two sets stay CLEARED and `ira_class_singleton' stays -1, both
+	     of which already mean "nothing here".  See MODE_IS_HOLE_P.  */
+	  if (MODE_IS_HOLE_P (j))
+	    {
+	      ira_class_singleton[cl][j] = -1;
+	      continue;
+	    }
 	  for (k = ira_class_hard_regs_num[cl] - 1; k >= 0; k--)
 	    {
 	      hard_regno = ira_class_hard_regs[cl][k];
