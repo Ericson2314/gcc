@@ -60,8 +60,14 @@ cobol    cobol    cobol1      gcobol    cob
 algol68  algol68  a681        ga68      a68
 rust     rust     crab1       gccrs     rs
 lto      lto      lto1        xgcc      c
-jit      jit      cc1         xgcc      c
+jit      jit      -           -         -
 "
+# `jit' HAS NO COMPILER OF ITS OWN -- its `config-lang.in' has
+# `compilers=""'.  The first version of this table gave it `cc1'/`xgcc' so it
+# could have a row, and it duly reported `RAN' -- a front end scored green by
+# running a DIFFERENT front end's compiler.  That is the null-result-as-a-pass
+# shape with the sign flipped, and it is exactly the kind of row a reader
+# banks.  It is now `n/a' by name.
 
 # The minimal program per language.  Deliberately trivial: this arm asks
 # whether the FRONT END RAN, not whether it is correct.
@@ -89,6 +95,11 @@ echo "$TABLE" | while read -r lang dir bin drv ext; do
   [ -n "${lang:-}" ] || continue
   [ -f "$SRC/gcc/$dir/config-lang.in" ] || { printf '%-9s %s\n' "$lang" "NO config-lang.in -- not a language in this tree"; continue; }
   nlang=$((nlang + 1))
+  if [ "$bin" = - ]; then
+    printf '%-9s %-11s %-9s %-9s %-9s %s\n' "$lang" 'n/a' 'n/a' 'n/a' '-' \
+      "config-lang.in declares compilers=\"\" -- no compiler of its own"
+    continue
+  fi
   if [ -x "$B/gcc/$bin" ]; then bs=ok; else bs="MISSING"; fi
   if [ -x "$B/gcc/$drv" ]; then ds=ok; else ds="MISSING"; fi
   if [ "$bs" != ok ] || [ "$ds" != ok ]; then
