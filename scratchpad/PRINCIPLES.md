@@ -2657,14 +2657,57 @@ answer (`sizeof (void *) == 4`) is correct and is never consulted.  189
 answered by the assembler.  **The compiler was right about the 32-bit axis and
 the board could not find that out.**
 
+**BOTH ARE NOW FIXED, AND HOW THE SECOND ONE WAS FOUND IS THE PART TO KEEP.**
+arm's debt is **3,288 -> 191** and its scope gap **21,181 -> 874**
+(`A9364E5CD42E818AD-TYPEFMT.md`); `ilp32` and `int32plus` read TRUE with the
+`lp64` negative control still firing.  But the `.type` fix ALONE did not restore
+them.  The arm board offered that as a prediction and was careful to label it
+one; it was tested and **it is false**.  `check_effective_target_ilp32`'s body
+is `int dummy[...]` with no initializer, so it goes to `.bss` and never reaches
+the site that had been fixed — and following the refutation is what found
+`emit_bss` routing every back end's uninitialized globals through
+`x86_output_aligned_bss` in `i386.cc`.
+
+**Had the prediction been assumed instead of tested, the task would have closed
+with the larger leak intact and the whole debt attributed to the smaller one.**
+A prediction that would be expensive to be wrong about is worth its measurement
+even when it looks obviously right — and this one looked obviously right.
+
 The transferable lesson is to widen the list rather than tick an entry off it:
-the four also agree about assembler comment characters, `.align` semantics
-(`ASM_OUTPUT_ALIGN` is `1 << LOG` for i386 and the POWER for arm, aarch64 and
-riscv — multi-target emits `.align 4` where arm wants `.align 2`, i.e. 16-byte
-alignment where 4 was asked for, **assembling cleanly with every test still
-passing**) and `.type` operand syntax.  **A new target is worth what it
-DISSENTS about, and the dissents are not enumerable in advance** — which is the
-argument for breadth, not a refinement of it.
+the four also agree about assembler comment characters, `.align` semantics and
+`.type` operand syntax.  **A new target is worth what it DISSENTS about, and
+the dissents are not enumerable in advance** — which is the argument for
+breadth, not a refinement of it.
+
+**THREE CORRECTIONS TO THE `.align` CLAIM THAT USED TO STAND HERE**, all
+measured in `A9364E5CD42E818AD-TYPEFMT.md`, and each is worth more than the
+sentence it replaces.
+
+**1. The `.align 4` was real and its stated cause was wrong.**  This paragraph
+used to attribute it to `ASM_OUTPUT_ALIGN` being unconverted.  That macro was
+already converted, in `7247d7aea83` — an ancestor of the very commit the arm
+board was measured on — and arm's `.data` path already emitted `.align 2`
+correctly there.  The `.align 4` comes from `ASM_OUTPUT_ALIGN` being expanded
+inside `x86_output_aligned_bss`, in `i386.cc`, a per-base translation unit where
+the redirect does not apply and the macro is genuinely i386's.  **A converted
+macro can still be leaked by an unconverted CALLER.**  That is a fifth leak
+shape beside INSTRUMENTS.md's four, and no sweep for unconverted macros can see
+it, because the macro is converted.
+
+**2. "`1 << LOG` for i386 and the POWER for the others" is not the shape of the
+space.**  Expanded per base rather than grepped for, `ASM_OUTPUT_ALIGN` has
+**seven** distinct shapes over 47 back ends: the power (18), `1 << LOG` bytes
+(13), `.balign 1 << LOG` (5), `.p2align LOG` (6), pdp11's `.even` with no
+operand, nvptx's no-op, and mmix's function call — plus rx switching on
+`target_flags`.  A two-class summary of a target-macro's answers should be
+assumed wrong until it has been expanded per base.
+
+**3. The defect it pointed at was bigger than `.align`.**  `i386/gnu-user.h:87`
+defines `ASM_OUTPUT_ALIGNED_BSS` as `x86_output_aligned_bss`, so shared
+`emit_bss` routed **every uninitialized global on all 47 back ends** through
+i386's back end — including `i386.cc:973`'s decision to place a variable in
+`.lbss` based on `ix86_cmodel` and `ix86_section_threshold`.  arm's `.bss`
+placement was being decided by i386's code model.
 
 And the front-end half is not a smaller version of the same point.  **C++ was
 enabled for the first time and immediately produced the highest-severity defect
