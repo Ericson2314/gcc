@@ -418,6 +418,23 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
    integral form means exactly what the enumerator form did.  */
 #undef TARGET_PTRMEMFUNC_VBIT_LOCATION
 #define TARGET_PTRMEMFUNC_VBIT_LOCATION (targetm_cdata.ptrmemfunc_vbit_location)
+/* The vtable pair, the same leak one structure along; see target-cdata.h.
+   `TARGET_VTABLE_ENTRY_ALIGN' is NOT here and that is deliberate -- its
+   default is `POINTER_SIZE', which is already a per-base CALL, so it is
+   already converted for the 44 back ends that define nothing.  The header
+   says what to do about the 3 that do.
+
+   NOT `#if'-BREAKING.  Swept over all of `gcc/': every use is an ordinary
+   run-time expression -- loop bounds in `cp/class.cc', a `vec_safe_grow'
+   length, `ssize_int' arguments in `cp/rtti.cc', `MAX (M, 1)', and
+   `c-cppbuiltin.cc:1646's `builtin_define_with_int_value'.  The only
+   preprocessor occurrences of either name anywhere are `defaults.h:1884' and
+   `:979', which are upstream's own supply-side `#ifndef's and which this
+   follows.  */
+#undef TARGET_VTABLE_USES_DESCRIPTORS
+#define TARGET_VTABLE_USES_DESCRIPTORS (targetm_cdata.vtable_uses_descriptors)
+#undef TARGET_VTABLE_DATA_ENTRY_DISTANCE
+#define TARGET_VTABLE_DATA_ENTRY_DISTANCE (targetm_cdata.vtable_data_entry_distance)
 /* ASM_OUTPUT_ALIGN.  A statement macro rather than a value, so it goes to
    `target-asm-ops.h''s per-base table rather than to `targetm_cdata'; see
    that header for why the operand's MEANING and not just its spelling varies

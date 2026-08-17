@@ -264,6 +264,42 @@ along with GCC; see the file COPYING3.  If not see
      completeness matcher requires.  */				\
   NUM (int,	     ptrmemfunc_vbit_location,				\
 					TARGET_PTRMEMFUNC_VBIT_LOCATION) \
+  /* THE VTABLE PAIR, THE SAME LEAK ONE STRUCTURE ALONG -- and note that they
+     are LEAKED ABSENCES rather than leaked values.  i386 defines neither, so
+     `defaults.h:1884' and `:979' DO fire in a shared TU and give every back
+     end 0 and 1.  For 46 of the 47 that is the right answer; ia64 is the one
+     back end that defines them, and it got 0 and 1 too.
+
+     `TARGET_VTABLE_USES_DESCRIPTORS' 0 vs 2 is a vtable-layout difference,
+     i.e. ABI, and ia64 is the whole population.
+     `TARGET_VTABLE_DATA_ENTRY_DISTANCE' is CORRECT BY LUCK on the
+     configuration measured here: `ia64.h:240' is `(TARGET_ILP32 ? 2 : 1)' and
+     `ilp32.opt' reaches only the hpux configurations, so an `ia64-elf' build
+     takes `ia64.h:85's `#ifndef TARGET_ILP32 / 0' and wants 1, which is what
+     the leak already gave it.  It is listed and converted anyway: correct by
+     luck is what `ARG_POINTER_CFA_OFFSET' and `INCOMING_REG_PARM_STACK_SPACE'
+     were, and PRINCIPLES keeps them on the two-back-ends-cannot-tell list for
+     exactly this reason.
+
+     INVARIANT AND EVALUABLE.  Both bodies are `TARGET_ILP32 ? _ : _', and
+     `ilp32.opt:2' is `Target RejectNegative Mask(ILP32)' with NO `Save', so
+     it cannot move under `__attribute__((target))' -- which is the property
+     `BIGGEST_ALIGNMENT' fails and the reason that macro is a call instead.
+     Neither reads `cfun' nor calls a back-end function.
+
+     They sit inside `defaults.h''s `#ifdef GCC_INSN_FLAGS_H' block
+     (`:1436'..`:1888'), which is satisfied here because `tm.h' pulls in this
+     base's `insn-flags.h' -- the same block `STACK_CHECK_FIXED_FRAME_SIZE'
+     and `STACK_CHECK_MAX_FRAME_SIZE' already come out of.
+
+     `unsigned short' by this header's own type rules: small, bounded and
+     non-negative, promoting to `int' exactly as the current expansion does,
+     which keeps `MAX (M, 1)', `ix /= MAX (M, 1)' and `-3 * M' meaning what
+     they mean today.  */						\
+  NUM (unsigned short, vtable_uses_descriptors,				\
+					TARGET_VTABLE_USES_DESCRIPTORS)	\
+  NUM (unsigned short, vtable_data_entry_distance,			\
+					TARGET_VTABLE_DATA_ENTRY_DISTANCE) \
   NUM (unsigned short, attribute_aligned_value,	ATTRIBUTE_ALIGNED_VALUE) \
   NUM (unsigned short, malloc_abi_alignment,	MALLOC_ABI_ALIGNMENT)	\
   NUM (unsigned short, trampoline_size,		TRAMPOLINE_SIZE)	\
@@ -275,6 +311,36 @@ along with GCC; see the file COPYING3.  If not see
   NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)	\
   NUM (int,	     store_flag_value,		STORE_FLAG_VALUE)	\
   NUM (int,	     word_register_operations,	WORD_REGISTER_OPERATIONS)
+
+/* `TARGET_VTABLE_ENTRY_ALIGN' IS THE THIRD OF THAT FAMILY AND IT MUST NOT
+   COME HERE.  It was measured alongside the two above and it does NOT share
+   their fix, which is worth recording because the family reads homogeneous.
+
+   `defaults.h:972' is `#define TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE', and
+   `POINTER_SIZE' is deliberately a CALL (`target-frame.h', the option-state
+   family) rather than a cached value, because it moves within one
+   compilation.  A macro body is expanded at the USE site, so the 44 back ends
+   that define nothing ALREADY get their own answer today, through that call,
+   and target-frame.h's own closure list names this macro as one of the eleven
+   it converts for free.
+
+   So a slot here would FREEZE a value that is currently correct and dynamic
+   for 44 back ends, in order to fix 3.  That is a regression wearing a fix's
+   clothes, and it is the `BIGGEST_ALIGNMENT' rule applied one macro further
+   out.
+
+   THE RESIDUAL DEFECT IS REAL AND IS THOSE 3.  `ia64.h:236' (64),
+   `avr.h:139' (8) and `msp430.h:205' (16) define the macro, and
+   `defaults.h:971's `#ifndef' is answered by the PRIMARY -- i386, which does
+   not define it -- so their explicit values never reach shared code and all
+   three get `POINTER_SIZE'.  msp430's own comment states the symptom before
+   the fact: "TARGET_VTABLE_ENTRY_ALIGN defaults to POINTER_SIZE, which is 20
+   for TARGET_LARGE", and 20 is not an alignment.  avr wants 8 and gets 16.
+
+   ITS HOME IS `target_frame_desc', beside `POINTER_SIZE' -- a call, so the
+   44 keep the dynamic answer and the 3 get their own.  NOT DONE HERE: it is a
+   different mechanism from this file's, and doing it inside a cdata task is
+   how a "same family" assumption lands the wrong shape.  */
 
 /* `DWARF_FRAME_RETURN_COLUMN' WAS HERE AND IS NOT A CDATA FIELD.
 
