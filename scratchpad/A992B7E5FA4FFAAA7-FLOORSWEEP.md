@@ -178,12 +178,67 @@ because the loud half stops compilation first; **fixing the loud half without
 the silent one would convert a diagnostic into wrong code**, which is the
 half-fix shape §4 warns about.
 
+### `SHORT_IMMEDIATES_SIGN_EXTEND` — riscv64 reads 0 and needs 1, in `combine`
+
+```
+SHARED 0    aarch64 0    i386 0    riscv 1    s390 0
+```
+
+`defaults.h:1393` floors it to 0; only riscv dissents among the four.
+Consumers are all shared and all in the value-range machinery:
+
+```
+combine.cc:1606      combine.cc:10301      rtlanal.cc:4837
+```
+
+— `nonzero_bits` / `num_sign_bit_copies`. Reading 0 where the target sign-
+extends short immediates makes those analyses **over-broad**: correct but
+pessimistic, so combine declines simplifications it could make. **The
+symptom is different-but-valid code, not a diagnostic**, which is precisely
+the shape of riscv64's residual: `A018835BBCFAD2E28-BOARD` records 384 left in
+`gcc.target/riscv`, three quarters `scan-assembler*`, described as *"the
+compiler COMPILED and EMITTED, and emitted different code than stock"*.
+
+This is a **lead, not an attribution.** Nothing here says how many of the 384
+it is worth; sizing it means fixing it and re-running, exactly as
+`mt-debt-attribute.sh`'s header says there is no lower bound available from a
+`.sum`.
+
+### `TARGET_MEM_CONSTRAINT` — s390x's memory constraint letter is `'e'`, shared says `'m'`
+
+```
+SHARED 'm'    aarch64 'm'    i386 'm'    riscv 'm'    s390 'e'
+```
+
+Shared consumers are `reload.cc` and `recog.h`. (`genoutput.cc` and
+`genpreds.cc` also read it, but those are **generators invoked per base** with
+`-A<base>`, so they are likely getting s390's own value — which would make this
+a *disagreement between the generated tables and the shared consumers*, a worse
+shape than a plain leak and one that needs its own check before anything is
+claimed.)
+
+Flagged, not diagnosed. It is on the board's s390x row and it is the kind of
+divergence that would show as constraint-matching differences rather than as a
+diagnostic.
+
 ## What this hands over
 
 The 90-row `FLOOR-FIRES` list is a ranked queue with a cheap per-row
-discriminator (the `-DIN_GCC` both-sided read, `/tmp/fmvcheck-a992.sh`'s
-shape). Ten were checked here; **80 are unread**, and that is stated as an
-upper bound on the remaining work, not as a claim that they are clean.
+discriminator (the `-DIN_GCC` both-sided read). **42 rows were read here and 5
+are live leaks**, every one on a target this board scores:
+
+```
+name                            wrong for      kind
+EH_RETURN_HANDLER_RTX           aarch64 s390x  LOUD (error) + silent df-scan
+STACK_POINTER_OFFSET            s390x          stack layout, 0 vs 160
+TARGET_HAS_FMV_TARGET_ATTRIBUTE aarch64 riscv  256 results on aarch64
+TRAMPOLINE_ALIGNMENT            aarch64 riscv s390x
+SHORT_IMMEDIATES_SIGN_EXTEND    riscv64        combine pessimisation
+TARGET_MEM_CONSTRAINT           s390x          flagged, not diagnosed
+```
+
+**48 rows are unread.** A hit rate of 5 in 42 on the read half is not a
+prediction about the unread half, and is not offered as one.
 
 The 106-row `FLOOR-DEAD` list is the already-understood variant and is not
 re-derived here.
