@@ -9,13 +9,30 @@
 # per-name and CARDINALITY arms of mt-namediff.sh are the authority for every
 # claim of movement here, and the totals are printed only for reconciliation.
 #
-# THE riscv64 BASELINE IS NOT THE SAME BOARD AS THE OTHER THREE, and quoting
-# one number for all four would be wrong.  x86_64/aarch64/s390x were last
-# scored at `e3fac057ae4' (A01E6C604F26604A7-BOARD, debts 67/513/207); riscv64
-# was scored LATER and alone at `d5ad77b33b3' (A018835BBCFAD2E28-BOARD, debt
-# 772, PASS 268932 / FAIL 16762), which supersedes that board's 2,074.  Using
-# the A01E riscv64 sum here would manufacture ~1,300 of movement that is really
-# a fix already measured and reported by someone else.
+# THE FOUR ROWS HAVE THREE DIFFERENT BASELINES, AND THE SPANS ARE NOT EQUAL.
+# Quoting one number for all four would be wrong in both directions.  The
+# commit chain is `e3fac057ae4' -> `d5ad77b33b3' -> HEAD `e1f0cad1c2c'
+# (asserted with merge-base, not assumed), and what was scored where is:
+#
+#   e3fac057ae4  A01E6C604F26604A7-BOARD   all four   debts 67/513/2074/207
+#   d5ad77b33b3  A018835BBCFAD2E28-BOARD   riscv64 (debt 772, supersedes the
+#                2,074) and x86_64 (162171/16295, byte-for-byte INERT), and
+#                **aarch64 and s390x NOT AT ALL** -- that board says so itself
+#                and files it as handover item 6.
+#
+# So `riscv64' and `x86_64' get the TIGHT baseline `d5ad77b33b3', and their
+# span is exactly the brief's four causes.  `aarch64' and `s390x' can only get
+# `e3fac057ae4', and their span therefore ALSO contains the auto-inc,
+# alignment and `PROMOTE_MODE' work -- which is not a detail: `PROMOTE_MODE'
+# alone moved 1,116 results on riscv64, `aarch64.h' is one of its definers,
+# and `bd6f4dbe3ae' is titled *"the eight `USE_*' macros too, or aarch64
+# regresses"*.  **Movement on those two rows is therefore NOT attributable to
+# the brief's four causes**, and this script prints the span with every row so
+# that it cannot be.
+#
+# Using the A01E riscv64 sum here would likewise manufacture ~1,300 of
+# "movement" that is really a fix already measured and reported by someone
+# else.
 #
 # Each baseline is re-read and its summary marker asserted before use: a
 # truncated .sum greps clean and would land its missing rows in the
@@ -29,13 +46,13 @@ S=$(cd "$(dirname "$0")" && pwd)
 P=/tmp/board-agent-a01e6c604f26604a7
 
 set -- \
- "x86_64-pc-linux-gnu|$P/x86_64-pc-linux-gnu.sum|e3fac057ae4" \
- "aarch64-unknown-linux-gnu|$P/aarch64-unknown-linux-gnu.sum|e3fac057ae4" \
- "riscv64-unknown-linux-gnu|/tmp/w-a018835bbcfad2e28/tip-riscv64.sum|d5ad77b33b3" \
- "s390x-ibm-linux-gnu|$P/s390x-ibm-linux-gnu.sum|e3fac057ae4"
+ "x86_64-pc-linux-gnu|/tmp/w-a018835bbcfad2e28/tip-x86_64.sum|d5ad77b33b3 (span = the brief's 4 causes)" \
+ "aarch64-unknown-linux-gnu|$P/aarch64-unknown-linux-gnu.sum|e3fac057ae4 (span ALSO includes auto-inc/align/PROMOTE_MODE -- NEVER SCORED on this target)" \
+ "riscv64-unknown-linux-gnu|/tmp/w-a018835bbcfad2e28/tip-riscv64.sum|d5ad77b33b3 (span = the brief's 4 causes)" \
+ "s390x-ibm-linux-gnu|$P/s390x-ibm-linux-gnu.sum|e3fac057ae4 (span ALSO includes auto-inc/align/PROMOTE_MODE -- NEVER SCORED on this target)"
 
 for spec in "$@"; do
-  T=${spec%%|*}; rest=${spec#*|}; OLD=${rest%%|*}; SHA=${rest##*|}
+  T=${spec%%|*}; rest=${spec#*|}; OLD=${rest%%|*}; SHA=${rest#*|}
   NEW="$L/$T.sum"
   echo
   echo "################################################################"

@@ -60,8 +60,54 @@ void aarch64_final_prescan_insn (rtx_insn *insn)
 `TARGET_FIX_ERR_A53_835769` is off unless `-mfix-cortex-a53-835769` is passed,
 so aarch64's prescan hook is a **no-op on every test this board runs**.
 
-**PREDICTION, RECORDED BEFORE THE RUN: this board should reproduce the
-previous figures, and a null result is the CORRECT result.** That is an
+## 0a. AND THAT PREDICTION IS ONLY TRUE FOR TWO OF THE FOUR ROWS — THE BRIEF'S
+##     "LANDED SINCE, UNMEASURED" LIST IS INCOMPLETE, AND NOT IN A SMALL WAY
+
+Written after §0 and before the run, as a correction to my own paragraph.
+
+The commit chain is `e3fac057ae4` → `d5ad77b33b3` → HEAD `e1f0cad1c2c`
+(`git merge-base --is-ancestor`, both arms, asserted). What was scored where:
+
+| commit | board | what it scored |
+|---|---|---|
+| `e3fac057ae4` | `A01E6C604F26604A7` | all four — 67 / 513 / 2,074 / 207 |
+| `d5ad77b33b3` | `A018835BBCFAD2E28` | riscv64 (**772**, superseding 2,074) and x86_64 (`162171/16295`, byte-for-byte inert) — and **aarch64 and s390x NOT AT ALL** |
+
+Between those two commits landed the auto-inc conversion (`784a5b556d9`,
+`bd6f4dbe3ae`), the alignment leaks (`7247d7aea83`, `4f2f6fcb8c5`) and
+**`PROMOTE_MODE`** (`0f82873ef1a`, `d5ad77b33b3`). None of these is on the
+brief's list, because the brief's list is "since the last *full* board" and
+riscv64 was scored later and alone.
+
+**That set is not inert on aarch64 and s390x, and it is the one that moves
+numbers.** `PROMOTE_MODE` alone took riscv64 1,116 results in one step;
+`aarch64.h` is one of its definers and `s390` is not, so aarch64 changes
+answer and s390x stops receiving i386's. `bd6f4dbe3ae` is titled *"the eight
+`USE_*` macros too, **or aarch64 regresses**"*. The A018 board files this as
+its own handover item 6 — *"a suite run for aarch64 and s390x on this tip [...]
+aarch64 is the one to do first"* — and says plainly that "unmoved" is not a
+claim available for them.
+
+So the honest per-row prediction is:
+
+```
+row       baseline       span                              predicted
+x86_64    d5ad77b33b3    the brief's 4 causes              NULL
+riscv64   d5ad77b33b3    the brief's 4 causes              NULL
+aarch64   e3fac057ae4    4 causes + auto-inc/align/PROMOTE MOVEMENT, unattributable
+                                                           to the brief's four
+s390x     e3fac057ae4    4 causes + auto-inc/align/PROMOTE MOVEMENT, ditto
+```
+
+**Whatever aarch64 and s390x do, it must not be credited to the four causes in
+the brief**, and this section exists so that it cannot be after the fact. If
+those rows move, this board cannot say which of the two sets did it; separating
+them needs a run at `d5ad77b33b3` for those two targets, which is stated as
+missing rather than papered over.
+
+**PREDICTION, RECORDED BEFORE THE RUN, FOR THE `d5ad77b33b3`-BASELINED ROWS
+(x86_64 and riscv64): they should reproduce the previous figures, and a null
+result is the CORRECT result.** That is an
 uncomfortable thing to write down, because a null result is also what a run
 that silently did not happen produces — which is this project's dominant
 failure mode and the reason the acceptance list says a null must be impossible
