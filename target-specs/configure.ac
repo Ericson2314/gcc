@@ -49,6 +49,194 @@ AC_ARG_WITH([target],
   [AS_HELP_STRING([--with-target=TRIPLE], [target these specs describe])],
   [target=$withval], [])
 
+dnl ===================================================================
+dnl WHAT config.gcc SAYS ABOUT THIS TARGET.
+dnl
+dnl Everything below this banner used to arrive as a `--with-' option, awked out
+dnl of `gcc/multi-target.manifest' by the top-level `configure-target-specs-<t>'
+dnl rule.  That manifest is a BUILD-TIME ENUMERATION of `--enable-targets': it
+dnl holds a stanza only for a triple that was named when gcc was configured, so
+dnl this script -- the whole point of which is to answer for an ARBITRARY triple
+dnl after the build -- could only ever be run for one of the triples the build
+dnl already knew about.  That is the sample of an infinite set standing in for
+dnl finite behaviour, and the manifest was the last place it survived.
+dnl
+dnl The set of triples is infinite; the set of ANSWERS is finite, and the
+dnl function from one to the other is `config.gcc'.  So call the function.
+dnl
+dnl SOURCED, NOT RUN AS A CHILD, and in a subshell: config.gcc reads some
+dnl seventy of configure's own `enable_*' and `with_*' variables and configure
+dnl does not export them, so a child process would source it with those unset
+dnl and get a different, silently plausible answer for every target that
+dnl consults one.  The subshell is so that config.gcc's ~40 output variables do
+dnl not land in this script's namespace; what is wanted comes back through
+dnl stdout as `key value' lines.  This is the same shape gcc's own
+dnl `gen-target-manifest.sh' used, and it is now the only copy.
+AC_ARG_WITH([gcc-srcdir],
+  [AS_HELP_STRING([--with-gcc-srcdir=DIR],
+     [gcc source directory holding config.gcc and mkconfig.sh])],
+  [ts_gcc_srcdir=$withval], [ts_gcc_srcdir='$srcdir/../gcc'])
+eval ts_gcc_srcdir=\"$ts_gcc_srcdir\"
+if test ! -f "$ts_gcc_srcdir/config.gcc"; then
+  AC_MSG_ERROR([no $ts_gcc_srcdir/config.gcc.
+This script derives ${target}'s back end, CPU/ABI defaults and decimal-float
+properties by sourcing config.gcc, because those are a function of the triple
+and of gcc's sources and of nothing else.  Without it there is no answer to
+derive and no default that would not be another target's.  Name the directory
+with --with-gcc-srcdir=DIR.])
+fi
+
+dnl CANONICALISE FIRST.  `--with-target' bypasses AC_CANONICAL_TARGET, so the
+dnl value arrives exactly as the caller spelled it -- and config.gcc's arms
+dnl match on the CANONICAL form.  `armv6l-unknown-linux-gnueabihf' happens to be
+dnl canonical already; `arm-linux-gnueabihf' is not, and matching it raw would
+dnl fall off the end of config.gcc's case and report "not supported" for a
+dnl target config.gcc handles perfectly well.
+ts_target_raw=$target
+target=`$SHELL "$ac_aux_dir/config.sub" "$ts_target_raw" 2>/dev/null`
+if test x"$target" = x; then
+  AC_MSG_ERROR([$ac_aux_dir/config.sub does not recognise `$ts_target_raw'])
+fi
+if test x"$target" != x"$ts_target_raw"; then
+  AC_MSG_NOTICE([canonicalised $ts_target_raw to $target])
+fi
+
+AC_MSG_CHECKING([what config.gcc says about $target])
+ts_cg_err=conftest.cgerr
+ts_cg_data=`
+  tm_defines= cpu_type= target_cpu_default=
+  tm_file= tm_p_file= tmake_file=
+  extra_objs= extra_options= extra_headers= c_target_objs=
+  cxx_target_objs= d_target_objs= rust_target_objs= jit_target_objs=
+  fortran_target_objs= extra_gcc_objs=
+  out_file= md_file= target_gtfiles=
+  common_out_file= target_has_targetm_common= dwarf2= extra_modes=
+  use_gcc_tgmath= use_gcc_stdint= TM_MULTILIB_CONFIG=
+  target_option_defaults= target_decimal_float= target_decimal_bid_format=
+  . "$ts_gcc_srcdir/config.gcc" 2> $ts_cg_err > /dev/null || exit 1
+  dnl config.gcc leaves tm_file unset for a target whose back end supplies the
+  dnl default; gcc/configure.ac:1805 fills it in the same way.
+  test x"\${tm_file}" = x && tm_file=\${cpu_type}/\${cpu_type}.h
+  dnl gcc/configure.ac:1818, :1821 and :2035 append these AFTER config.gcc has
+  dnl run, and all three are unconditional-or-config.gcc-decided -- none is
+  dnl probed.  Measured: with them, the tm_include_list derived here is
+  dnl byte-identical to the manifest's for both targets in this tree; without
+  dnl them it differs in exactly this tail.
+  tm_file="\${tm_file} initfini-array.h"
+  test x"\${dwarf2}" = xyes && tm_file="\${tm_file} tm-dwarf2.h"
+  tm_file="\${tm_file} defaults.h"
+  ts_incl="options.h insn-constants.h"
+  for ts_f in \${tm_file}; do
+    case \$ts_f in
+      ./* ) ts_incl="\${ts_incl} \`echo \$ts_f | sed 's|^\./||'\`" ;;
+      defaults.h ) ts_incl="\${ts_incl} \$ts_f" ;;
+      * ) ts_incl="\${ts_incl} config/\$ts_f" ;;
+    esac
+  done
+  dnl gcc/configure.ac:1812 defaults tmake_file the same way.  MEASURED: without
+  dnl this, `pdp11-aout' -- whose config.gcc arm sets no tmake_file at all --
+  dnl came out with an EMPTY fragment list and was rejected as unsupported,
+  dnl although `gcc/config/pdp11/t-pdp11' is right there.
+  test x"\${tmake_file}" = x && tmake_file=\${cpu_type}/t-\${cpu_type}
+  dnl Which tmake fragments actually exist -- t-slibgcc is the one read below.
+  ts_tfp=
+  for ts_f in \${tmake_file}; do
+    test -f "$ts_gcc_srcdir/config/\$ts_f" && ts_tfp="\${ts_tfp} \$ts_f"
+  done
+  echo "cpu_type \${cpu_type}"
+  echo "option_defaults \${target_option_defaults}"
+  echo "decimal_float \${target_decimal_float}"
+  echo "decimal_bid_format \${target_decimal_bid_format}"
+  echo "tmake_file_present \${ts_tfp}"
+  echo "target_cpu_default \${target_cpu_default}"
+  echo "tm_defines \${tm_defines}"
+  echo "tm_include_list \${ts_incl}"
+`
+if test $? -ne 0 || test x"$ts_cg_data" = x; then
+  AC_MSG_RESULT([it refuses])
+  AC_MSG_ERROR([config.gcc does not support the target `$target'.
+It said:
+`sed 's/^/  /' $ts_cg_err`
+config.gcc is the authority on which triples exist; if it has no arm for this
+one, there is no target here to write specs for.  Nothing is guessed, because
+every guess would be some OTHER target's answer wearing this target's name.])
+fi
+rm -f $ts_cg_err
+ts_cg () { echo "$ts_cg_data" | sed -n "s/^$1 //p"; }
+spec_cpu_type=`ts_cg cpu_type`
+spec_option_defaults=`ts_cg option_defaults`
+spec_decimal_float=`ts_cg decimal_float`
+spec_decimal_bid_format=`ts_cg decimal_bid_format`
+ts_tmake_present=`ts_cg tmake_file_present`
+ts_target_cpu_default=`ts_cg target_cpu_default`
+ts_tm_defines=`ts_cg tm_defines`
+ts_tm_include_list=`ts_cg tm_include_list`
+AC_MSG_RESULT([back end $spec_cpu_type])
+
+dnl EVERY STRUCTURAL KEY IS CHECKED BY NAME.  dfbcc97f11c made four of these
+dnl required when they arrived as options; deriving them is not a reason to
+dnl weaken that, it is a reason to keep it -- a config.gcc arm that sets no
+dnl `cpu_type' produces the empty string just as a forgotten `--with-cpu-type'
+dnl did, and the failure downstream is identical: the wrong back end's
+dnl OPTION_DEFAULT_SPECS templates, chosen silently.
+if test x"$spec_cpu_type" = x; then
+  AC_MSG_ERROR([config.gcc set no `cpu_type' for $target.
+Without the back-end name the option-default templates cannot be chosen (i386
+spells `cpu' as -mtune, most others as -mcpu), so this stops rather than
+guessing.])
+fi
+if test ! -d "$ts_gcc_srcdir/config/$spec_cpu_type"; then
+  AC_MSG_ERROR([config.gcc gave $target the back end `$spec_cpu_type', but
+$ts_gcc_srcdir/config/$spec_cpu_type is not a directory.  The back ends are the
+FINITE side of this split and they are `gcc/config/<cpu>/' directories; a name
+that is not one of them means config.gcc and this gcc source tree disagree.])
+fi
+dnl `decimal_float' and `decimal_bid_format': see the long note that used to
+dnl stand over --with-decimal-float.  These two defaulted to 0, nothing passed
+dnl them, and every `specs-config' this project ever wrote said `decimal_float
+dnl 0' -- on x86_64, aarch64, powerpc64 and s390x, whose config.gcc arms all
+dnl say 1.  `targ_caps.decimal_float' is the only thing cc1 reads, so decimal
+dnl float was off for every target on every board and `dfp.exp' ran 1 line
+dnl instead of 749 while contributing zero debt, because an unattempted test is
+dnl not a failure.  There is no safe floor for a fact: 0 is one of the two
+dnl possible answers, chosen by whoever forgot to supply the other.  So an
+dnl empty answer here is fatal, exactly as a missing option was.
+case $spec_decimal_float in
+  0 | 1 ) ;;
+  '' ) AC_MSG_ERROR([config.gcc set no `target_decimal_float' for $target.
+It is a property of the target that is not probed and has no default -- 0
+silently disables decimal float on every target that has it.]) ;;
+  * ) AC_MSG_ERROR([config.gcc set target_decimal_float=`$spec_decimal_float' for $target; it must be `0' or `1']) ;;
+esac
+case $spec_decimal_bid_format in
+  0 | 1 ) ;;
+  '' ) AC_MSG_ERROR([config.gcc set no `target_decimal_bid_format' for $target, and defaulting it picks DPD for a BID target with no diagnostic]) ;;
+  * ) AC_MSG_ERROR([config.gcc set target_decimal_bid_format=`$spec_decimal_bid_format' for $target; it must be `0' or `1']) ;;
+esac
+dnl `tmake_file' is never empty for a supported target -- config.gcc either sets
+dnl it or gcc/configure.ac:1814 defaults it to `<cpu>/t-<cpu>' -- so an empty
+dnl PRESENT list means the fragments config.gcc named are all missing from this
+dnl source tree, which is a wrong --with-gcc-srcdir rather than a target with no
+dnl fragments.  Checking it matters because `t-slibgcc' is read out of it just
+dnl below and its absence is indistinguishable from "this target has a static
+dnl libgcc only".
+if test x"$ts_tmake_present" = x; then
+  AC_MSG_ERROR([none of the tmake fragments config.gcc named for $target exist
+under $ts_gcc_srcdir/config.  An empty list here reads exactly like a target
+with no shared libgcc, which is why it is fatal rather than defaulted.])
+fi
+dnl Whether this target has a SHARED libgcc: 24 of config.gcc's arms put
+dnl `t-slibgcc' in tmake_file, and that fragment sets SHLIB, which used to reach
+dnl the driver as -DENABLE_SHARED_LIBGCC through gcc/Makefile.in's
+dnl DRIVER_DEFINES -- from the PRIMARY target's tmake_file, applied to all of
+dnl them, because gcc.cc is compiled once.
+spec_shared_libgcc=no
+for ts_f in $ts_tmake_present; do
+  test x"$ts_f" = xt-slibgcc && spec_shared_libgcc=yes
+done
+AC_MSG_CHECKING([whether $target has a shared libgcc])
+AC_MSG_RESULT([$spec_shared_libgcc])
+
 dnl Directory holding the target's binutils.  Prepended to PATH for the whole
 dnl probe run.
 dnl
@@ -143,64 +331,6 @@ AC_MSG_RESULT([${gcc_cv_objdump:-not found}])
 AC_MSG_CHECKING([for readelf])
 AC_MSG_RESULT([${gcc_cv_readelf:-not found}])
 
-dnl This target's CPU/ABI defaults.  gcc/configure used to freeze one target's
-dnl answers into configure_default_options[[]] and pair them with that target's
-dnl OPTION_DEFAULT_SPECS templates inside the driver; here they are ordinary
-dnl inputs, so one driver can carry different defaults for every target it
-dnl serves.  gcc/config.gcc infers them from the triple and gcc/configure.ac
-dnl records them in the multi-target manifest as `name=value' pairs.
-AC_ARG_WITH([option-defaults],
-  [AS_HELP_STRING([--with-option-defaults=LIST],
-     [space-separated name=value defaults, as config.gcc infers them])],
-  [spec_option_defaults=$withval], [spec_option_defaults=])
-
-dnl Which back end this target uses.  The templates below are not the same for
-dnl every back end -- i386 spells the `cpu' and `tune' defaults as -mtune, most
-dnl others spell `cpu' as -mcpu -- so the expansion has to know.
-AC_ARG_WITH([cpu-type],
-  [AS_HELP_STRING([--with-cpu-type=NAME], [back end name, e.g. i386, mips])],
-  [spec_cpu_type=$withval], [spec_cpu_type=])
-
-dnl Properties of the target that are decided by the target itself rather than
-dnl probed from a tool: gcc/config.gcc derives them from the triple and
-dnl gcc/configure.ac reports them in the manifest.  They are passed through here
-dnl because the target config file is the one channel cc1 reads.
-dnl NO DEFAULT, DELIBERATELY.  These two used to default to 0, and nothing
-dnl passed them, so every `specs-config' this project ever wrote said
-dnl `decimal_float 0' -- on x86_64, aarch64, powerpc64 and s390x, whose
-dnl config.gcc arms all say 1.  `targ_caps.decimal_float' is the only thing cc1
-dnl reads, so decimal float was off for every target on every board, and
-dnl `dfp.exp' ran 1 line instead of 749 while contributing zero debt, because an
-dnl unattempted test is not a failure.  Fixed in 9ee972c229d by making the
-dnl top-level rule pass them from the manifest.
-dnl
-dnl The default is removed as well, because passing them was only half of it: a
-dnl default of 0 means that the day the top level stops passing them -- a
-dnl renamed manifest key, a hand-run of this script -- the answer silently
-dnl reverts to the wrong one and nothing anywhere says so.  0 is not a safe
-dnl floor for a fact; it is one of the two possible answers, chosen by whoever
-dnl forgot to supply the other.  A tri-state is not available here the way it is
-dnl for `sjlj_exceptions': cc1 reads these as a plain 0/1 capability and has no
-dnl "unstated" behaviour to fall back to, so the only honest handling of
-dnl "nobody said" is to refuse to write the file.
-AC_ARG_WITH([decimal-float],
-  [AS_HELP_STRING([--with-decimal-float=0|1],
-     [target has decimal float support in its libgcc (REQUIRED)])],
-  [spec_decimal_float=$withval], [spec_decimal_float=])
-AC_ARG_WITH([decimal-bid-format],
-  [AS_HELP_STRING([--with-decimal-bid-format=0|1],
-     [target ABI encodes decimal float as BID rather than DPD (REQUIRED)])],
-  [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=])
-case $spec_decimal_float in
-  0 | 1 ) ;;
-  '' ) AC_MSG_ERROR([--with-decimal-float=0|1 is required: it is a property of ${target} that only gcc/config.gcc knows, it is not probed here, and there is no safe default -- 0 silently disables decimal float on every target that has it.  gcc's build records it as the `decimal_float' line for this target in gcc/multi-target.manifest]) ;;
-  * ) AC_MSG_ERROR([--with-decimal-float must be `0' or `1', not `$spec_decimal_float']) ;;
-esac
-case $spec_decimal_bid_format in
-  0 | 1 ) ;;
-  '' ) AC_MSG_ERROR([--with-decimal-bid-format=0|1 is required, for the same reason as --with-decimal-float: it is the `decimal_bid_format' line for this target in gcc/multi-target.manifest, and defaulting it picks DPD for a BID target with no diagnostic]) ;;
-  * ) AC_MSG_ERROR([--with-decimal-bid-format must be `0' or `1', not `$spec_decimal_bid_format']) ;;
-esac
 dnl Whether this build has a libatomic for this target.  Not probed: the
 dnl question is "did the top level build one", and when these probes run it has
 dnl not been installed yet, so asking the linker for -latomic would answer no on
@@ -225,44 +355,6 @@ AC_ARG_WITH([libatomic],
 case $spec_libatomic in
   yes | no ) ;;
   * ) AC_MSG_ERROR([--with-libatomic must be `yes' or `no', not `$spec_libatomic'; any other value takes the same arm as `no' and silently drops -latomic from this target's link line]) ;;
-esac
-dnl Whether this target has a SHARED libgcc.  Not probed, for the same reason as
-dnl libatomic: when these probes run libgcc has not been built, so asking the
-dnl linker for -lgcc_s would answer no on a build that is about to have one.
-dnl
-dnl It is config.gcc data -- 24 of its arms put `t-slibgcc' in tmake_file, and
-dnl that fragment sets SHLIB, which used to reach the driver as
-dnl -DENABLE_SHARED_LIBGCC through gcc/Makefile.in's DRIVER_DEFINES.  The
-dnl tmake_file it reached through was the PRIMARY target's, and gcc.cc is
-dnl compiled once, so one target's answer was applied to all of them silently.
-dnl The manifest records tmake_file_present per target; the top level's
-dnl `configure-target-specs-<t>' rule (Makefile.tpl) reads t-slibgcc out of it
-dnl and passes the answer here, per target.
-dnl
-dnl THAT SENTENCE WAS FALSE UNTIL NOW, and it is worth saying so rather than
-dnl quietly correcting it.  It said `gcc/Makefile.in reads t-slibgcc out of it',
-dnl and gcc/Makefile.in does not run this script at all any more -- composition
-dnl moved to the top-level rule.  So nothing read the key, nothing passed the
-dnl option, the default below applied on every target, and both configured
-dnl targets in this tree (aarch64-*-linux-musl and armv6l-*-linux-gnueabihf) had
-dnl `t-slibgcc' in their manifest while their spec files said `*libgcc_variants:
-dnl -lgcc'.  A comment describing a mechanism is not the mechanism.
-dnl
-dnl `no' is the conservative default and it matches the driver's own built-in
-dnl `*libgcc_variants' -- an unprobed driver, and a target this is not passed
-dnl for, keep exactly the plain -lgcc that a build without ENABLE_SHARED_LIBGCC
-dnl emitted.
-AC_ARG_WITH([shared-libgcc],
-  [AS_HELP_STRING([--with-shared-libgcc=yes|no],
-     [this target has a shared libgcc (config.gcc gave it t-slibgcc)])],
-  [spec_shared_libgcc=$withval], [spec_shared_libgcc=no])
-dnl A value that is neither `yes' nor `no' would fall down the `else' arm below
-dnl and be indistinguishable from a target that really has no shared libgcc --
-dnl the absence of an answer becoming an answer, silently, on that one target.
-dnl The default above is a decision; a misspelt --with-shared-libgcc= is not.
-case $spec_shared_libgcc in
-  yes | no ) ;;
-  * ) AC_MSG_ERROR([--with-shared-libgcc must be `yes' or `no', not `$spec_shared_libgcc'; it says whether ${target} has a shared libgcc, and any other value would silently select the static libgcc specs for that target alone]) ;;
 esac
 dnl The target's GNU C Library version.  gcc/configure used to grep __GLIBC__
 dnl out of the target sysroot's features.h; this step is the right place to ask,

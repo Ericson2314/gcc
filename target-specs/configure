@@ -638,18 +638,14 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_target
+with_gcc_srcdir
 with_tools_dir
 with_as
 with_ld
 with_objdump
 with_readelf
 with_nm
-with_option_defaults
-with_cpu_type
-with_decimal_float
-with_decimal_bid_format
 with_libatomic
-with_shared_libgcc
 with_glibc_version
 with_s390_excess_float_precision
 enable_sjlj_exceptions
@@ -1296,6 +1292,8 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-target=TRIPLE    target these specs describe
+  --with-gcc-srcdir=DIR   gcc source directory holding config.gcc and
+                          mkconfig.sh
   --with-tools-dir=DIR    directory of the target's binutils; prepended to
                           PATH while probing
   --with-as=PATH          assembler to probe (default: TARGET-as, or as if
@@ -1305,20 +1303,7 @@ Optional Packages:
   --with-objdump=PATH     objdump to inspect probe output with
   --with-readelf=PATH     readelf to inspect probe output with
   --with-nm=PATH          nm to inspect probe output with
-  --with-option-defaults=LIST
-                          space-separated name=value defaults, as config.gcc
-                          infers them
-  --with-cpu-type=NAME    back end name, e.g. i386, mips
-  --with-decimal-float=0|1
-                          target has decimal float support in its libgcc
-                          (REQUIRED)
-  --with-decimal-bid-format=0|1
-                          target ABI encodes decimal float as BID rather than
-                          DPD (REQUIRED)
   --with-libatomic=yes|no this build provides a libatomic for the target
-  --with-shared-libgcc=yes|no
-                          this target has a shared libgcc (config.gcc gave it
-                          t-slibgcc)
   --with-glibc-version=M.N
                           target runs glibc version M.N or later
   --with-s390-excess-float-precision=0|1
@@ -1935,6 +1920,135 @@ fi
 
 
 
+# Check whether --with-gcc-srcdir was given.
+if test "${with_gcc_srcdir+set}" = set; then :
+  withval=$with_gcc_srcdir; ts_gcc_srcdir=$withval
+else
+  ts_gcc_srcdir='$srcdir/../gcc'
+fi
+
+eval ts_gcc_srcdir=\"$ts_gcc_srcdir\"
+if test ! -f "$ts_gcc_srcdir/config.gcc"; then
+  as_fn_error $? "no $ts_gcc_srcdir/config.gcc.
+This script derives ${target}'s back end, CPU/ABI defaults and decimal-float
+properties by sourcing config.gcc, because those are a function of the triple
+and of gcc's sources and of nothing else.  Without it there is no answer to
+derive and no default that would not be another target's.  Name the directory
+with --with-gcc-srcdir=DIR." "$LINENO" 5
+fi
+
+ts_target_raw=$target
+target=`$SHELL "$ac_aux_dir/config.sub" "$ts_target_raw" 2>/dev/null`
+if test x"$target" = x; then
+  as_fn_error $? "$ac_aux_dir/config.sub does not recognise \`$ts_target_raw'" "$LINENO" 5
+fi
+if test x"$target" != x"$ts_target_raw"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: canonicalised $ts_target_raw to $target" >&5
+$as_echo "$as_me: canonicalised $ts_target_raw to $target" >&6;}
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking what config.gcc says about $target" >&5
+$as_echo_n "checking what config.gcc says about $target... " >&6; }
+ts_cg_err=conftest.cgerr
+ts_cg_data=`
+  tm_defines= cpu_type= target_cpu_default=
+  tm_file= tm_p_file= tmake_file=
+  extra_objs= extra_options= extra_headers= c_target_objs=
+  cxx_target_objs= d_target_objs= rust_target_objs= jit_target_objs=
+  fortran_target_objs= extra_gcc_objs=
+  out_file= md_file= target_gtfiles=
+  common_out_file= target_has_targetm_common= dwarf2= extra_modes=
+  use_gcc_tgmath= use_gcc_stdint= TM_MULTILIB_CONFIG=
+  target_option_defaults= target_decimal_float= target_decimal_bid_format=
+  . "$ts_gcc_srcdir/config.gcc" 2> $ts_cg_err > /dev/null || exit 1
+      test x"\${tm_file}" = x && tm_file=\${cpu_type}/\${cpu_type}.h
+            tm_file="\${tm_file} initfini-array.h"
+  test x"\${dwarf2}" = xyes && tm_file="\${tm_file} tm-dwarf2.h"
+  tm_file="\${tm_file} defaults.h"
+  ts_incl="options.h insn-constants.h"
+  for ts_f in \${tm_file}; do
+    case \$ts_f in
+      ./* ) ts_incl="\${ts_incl} \`echo \$ts_f | sed 's|^\./||'\`" ;;
+      defaults.h ) ts_incl="\${ts_incl} \$ts_f" ;;
+      * ) ts_incl="\${ts_incl} config/\$ts_f" ;;
+    esac
+  done
+          test x"\${tmake_file}" = x && tmake_file=\${cpu_type}/t-\${cpu_type}
+    ts_tfp=
+  for ts_f in \${tmake_file}; do
+    test -f "$ts_gcc_srcdir/config/\$ts_f" && ts_tfp="\${ts_tfp} \$ts_f"
+  done
+  echo "cpu_type \${cpu_type}"
+  echo "option_defaults \${target_option_defaults}"
+  echo "decimal_float \${target_decimal_float}"
+  echo "decimal_bid_format \${target_decimal_bid_format}"
+  echo "tmake_file_present \${ts_tfp}"
+  echo "target_cpu_default \${target_cpu_default}"
+  echo "tm_defines \${tm_defines}"
+  echo "tm_include_list \${ts_incl}"
+`
+if test $? -ne 0 || test x"$ts_cg_data" = x; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: it refuses" >&5
+$as_echo "it refuses" >&6; }
+  as_fn_error $? "config.gcc does not support the target \`$target'.
+It said:
+\`sed 's/^/  /' $ts_cg_err\`
+config.gcc is the authority on which triples exist; if it has no arm for this
+one, there is no target here to write specs for.  Nothing is guessed, because
+every guess would be some OTHER target's answer wearing this target's name." "$LINENO" 5
+fi
+rm -f $ts_cg_err
+ts_cg () { echo "$ts_cg_data" | sed -n "s/^$1 //p"; }
+spec_cpu_type=`ts_cg cpu_type`
+spec_option_defaults=`ts_cg option_defaults`
+spec_decimal_float=`ts_cg decimal_float`
+spec_decimal_bid_format=`ts_cg decimal_bid_format`
+ts_tmake_present=`ts_cg tmake_file_present`
+ts_target_cpu_default=`ts_cg target_cpu_default`
+ts_tm_defines=`ts_cg tm_defines`
+ts_tm_include_list=`ts_cg tm_include_list`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: back end $spec_cpu_type" >&5
+$as_echo "back end $spec_cpu_type" >&6; }
+
+if test x"$spec_cpu_type" = x; then
+  as_fn_error $? "config.gcc set no \`cpu_type' for $target.
+Without the back-end name the option-default templates cannot be chosen (i386
+spells \`cpu' as -mtune, most others as -mcpu), so this stops rather than
+guessing." "$LINENO" 5
+fi
+if test ! -d "$ts_gcc_srcdir/config/$spec_cpu_type"; then
+  as_fn_error $? "config.gcc gave $target the back end \`$spec_cpu_type', but
+$ts_gcc_srcdir/config/$spec_cpu_type is not a directory.  The back ends are the
+FINITE side of this split and they are \`gcc/config/<cpu>/' directories; a name
+that is not one of them means config.gcc and this gcc source tree disagree." "$LINENO" 5
+fi
+case $spec_decimal_float in
+  0 | 1 ) ;;
+  '' ) as_fn_error $? "config.gcc set no \`target_decimal_float' for $target.
+It is a property of the target that is not probed and has no default -- 0
+silently disables decimal float on every target that has it." "$LINENO" 5 ;;
+  * ) as_fn_error $? "config.gcc set target_decimal_float=\`$spec_decimal_float' for $target; it must be \`0' or \`1'" "$LINENO" 5 ;;
+esac
+case $spec_decimal_bid_format in
+  0 | 1 ) ;;
+  '' ) as_fn_error $? "config.gcc set no \`target_decimal_bid_format' for $target, and defaulting it picks DPD for a BID target with no diagnostic" "$LINENO" 5 ;;
+  * ) as_fn_error $? "config.gcc set target_decimal_bid_format=\`$spec_decimal_bid_format' for $target; it must be \`0' or \`1'" "$LINENO" 5 ;;
+esac
+if test x"$ts_tmake_present" = x; then
+  as_fn_error $? "none of the tmake fragments config.gcc named for $target exist
+under $ts_gcc_srcdir/config.  An empty list here reads exactly like a target
+with no shared libgcc, which is why it is fatal rather than defaulted." "$LINENO" 5
+fi
+spec_shared_libgcc=no
+for ts_f in $ts_tmake_present; do
+  test x"$ts_f" = xt-slibgcc && spec_shared_libgcc=yes
+done
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $target has a shared libgcc" >&5
+$as_echo_n "checking whether $target has a shared libgcc... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $spec_shared_libgcc" >&5
+$as_echo "$spec_shared_libgcc" >&6; }
+
+
 # Check whether --with-tools-dir was given.
 if test "${with_tools_dir+set}" = set; then :
   withval=$with_tools_dir; ts_tools_dir=$withval
@@ -2042,50 +2156,6 @@ $as_echo_n "checking for readelf... " >&6; }
 $as_echo "${gcc_cv_readelf:-not found}" >&6; }
 
 
-# Check whether --with-option-defaults was given.
-if test "${with_option_defaults+set}" = set; then :
-  withval=$with_option_defaults; spec_option_defaults=$withval
-else
-  spec_option_defaults=
-fi
-
-
-
-# Check whether --with-cpu-type was given.
-if test "${with_cpu_type+set}" = set; then :
-  withval=$with_cpu_type; spec_cpu_type=$withval
-else
-  spec_cpu_type=
-fi
-
-
-
-# Check whether --with-decimal-float was given.
-if test "${with_decimal_float+set}" = set; then :
-  withval=$with_decimal_float; spec_decimal_float=$withval
-else
-  spec_decimal_float=
-fi
-
-
-# Check whether --with-decimal-bid-format was given.
-if test "${with_decimal_bid_format+set}" = set; then :
-  withval=$with_decimal_bid_format; spec_decimal_bid_format=$withval
-else
-  spec_decimal_bid_format=
-fi
-
-case $spec_decimal_float in
-  0 | 1 ) ;;
-  '' ) as_fn_error $? "--with-decimal-float=0|1 is required: it is a property of ${target} that only gcc/config.gcc knows, it is not probed here, and there is no safe default -- 0 silently disables decimal float on every target that has it.  gcc's build records it as the \`decimal_float' line for this target in gcc/multi-target.manifest" "$LINENO" 5 ;;
-  * ) as_fn_error $? "--with-decimal-float must be \`0' or \`1', not \`$spec_decimal_float'" "$LINENO" 5 ;;
-esac
-case $spec_decimal_bid_format in
-  0 | 1 ) ;;
-  '' ) as_fn_error $? "--with-decimal-bid-format=0|1 is required, for the same reason as --with-decimal-float: it is the \`decimal_bid_format' line for this target in gcc/multi-target.manifest, and defaulting it picks DPD for a BID target with no diagnostic" "$LINENO" 5 ;;
-  * ) as_fn_error $? "--with-decimal-bid-format must be \`0' or \`1', not \`$spec_decimal_bid_format'" "$LINENO" 5 ;;
-esac
-
 # Check whether --with-libatomic was given.
 if test "${with_libatomic+set}" = set; then :
   withval=$with_libatomic; spec_libatomic=$withval
@@ -2096,18 +2166,6 @@ fi
 case $spec_libatomic in
   yes | no ) ;;
   * ) as_fn_error $? "--with-libatomic must be \`yes' or \`no', not \`$spec_libatomic'; any other value takes the same arm as \`no' and silently drops -latomic from this target's link line" "$LINENO" 5 ;;
-esac
-
-# Check whether --with-shared-libgcc was given.
-if test "${with_shared_libgcc+set}" = set; then :
-  withval=$with_shared_libgcc; spec_shared_libgcc=$withval
-else
-  spec_shared_libgcc=no
-fi
-
-case $spec_shared_libgcc in
-  yes | no ) ;;
-  * ) as_fn_error $? "--with-shared-libgcc must be \`yes' or \`no', not \`$spec_shared_libgcc'; it says whether ${target} has a shared libgcc, and any other value would silently select the static libgcc specs for that target alone" "$LINENO" 5 ;;
 esac
 
 # Check whether --with-glibc-version was given.

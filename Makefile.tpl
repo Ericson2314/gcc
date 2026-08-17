@@ -2448,6 +2448,44 @@ install-gdb: $(INSTALL_GDB_TK)
 #     make all-gcc
 define mt_target_specs_rules
 MT_SPECS_EMITTED += $(1)
+# NOTHING IS AWKED OUT OF gcc/multi-target.manifest HERE ANY MORE.  This rule
+# used to read `cpu_type', `option_defaults', `decimal_float',
+# `decimal_bid_format' and `tmake_file_present' out of it and pass them as five
+# `--with-' options.  target-specs/configure now sources gcc/config.gcc and
+# computes all five itself, for the canonicalised triple, from gcc's SOURCES.
+#
+# WHY THAT WAS A DEFECT AND NOT A CONVENIENCE.  The manifest is a build-time
+# enumeration of `--enable-targets': it holds a stanza only for a triple named
+# when gcc was configured.  So the one script whose entire purpose is to answer
+# for an ARBITRARY triple after the build could be run only for triples the
+# build already knew.  That is the sample of an infinite set standing in for
+# finite behaviour; the finite thing is config.gcc's ARMS, and the way to reach
+# them is to call config.gcc.
+#
+# THE DIAGNOSTICS THAT STOOD HERE HAVE MOVED, THEY ARE NOT DROPPED.  Each was a
+# measured finding, and deleting one while relocating the logic would read as
+# cleanup and BE a regression to silence:
+#
+#   * "a missing manifest writes an empty `*option_defaults' spec, which looks
+#     EXACTLY LIKE a target that has none" -- and aarch64-*-linux-musl really
+#     does have none, so the two are indistinguishable by inspection.  What
+#     removes the ambiguity is not a better message: it is that the CHANNEL can
+#     no longer go missing.  config.gcc either runs and answers, or
+#     target-specs/configure stops with `config.gcc does not support the target'.
+#     There is no path on which "nobody told us" reaches the spec file as "".
+#
+#   * `cpu_type', `decimal_float', `decimal_bid_format' and the shared-libgcc
+#     answer are still REQUIRED and still fail BY NAME -- see the checks under
+#     "WHAT config.gcc SAYS ABOUT THIS TARGET" in target-specs/configure.ac.
+#     dfbcc97f11c made them required when they were options; they are required
+#     as derivations too.  In particular a `decimal_float' that is neither 0 nor
+#     1 is fatal, because 0 is not a floor for a fact -- it is one of the two
+#     answers, chosen by whoever forgot to supply the other, and it disabled
+#     decimal float on every target on every board.
+#
+# The `as'/`ld' diagnostic BELOW is untouched and stays in this rule: it is
+# about the tools this rule found, not about the manifest, and the
+# 95-identical-lines measurement behind it is unaffected.
 .PHONY: configure-target-specs-$(1)
 configure-target-specs-$(1):
 	@r=`$${PWD_COMMAND}`; export r; \
@@ -2473,65 +2511,8 @@ configure-target-specs-$(1):
 	  mt_tools=`dirname "$$$$mt_as"`; \
 	fi; \
 	mt_dest="$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)"; \
-	mt_manifest="$$$$r/gcc/multi-target.manifest"; \
-	test -f "$$$$mt_manifest" || { \
-	  echo "*** target-specs for $(1): no $$$$mt_manifest." >&2; \
-	  echo "*** It carries this target's config.gcc-derived CPU/ABI" >&2; \
-	  echo "*** defaults, and running the probe without them writes an" >&2; \
-	  echo "*** empty \`*option_defaults' spec -- which looks exactly like" >&2; \
-	  echo "*** a target that has none.  Build gcc first." >&2; \
-	  exit 1; }; \
-	mt_od=`$$(AWK) -v t="$(1)" \
-	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
-	   seen && $$$$1 == "option_defaults" { $$$$1 = ""; print; exit }' \
-	  "$$$$mt_manifest"`; \
-	mt_ct=`$$(AWK) -v t="$(1)" \
-	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
-	   seen && $$$$1 == "cpu_type" { print $$$$2; exit }' \
-	  "$$$$mt_manifest"`; \
-	test -n "$$$$mt_ct" || { \
-	  echo "*** target-specs for $(1): $$$$mt_manifest has no \`cpu_type'" >&2; \
-	  echo "*** line for this target.  Without the back-end name the" >&2; \
-	  echo "*** option-default templates cannot be chosen (i386 spells" >&2; \
-	  echo "*** \`cpu' as -mtune, most others as -mcpu), so this stops" >&2; \
-	  echo "*** rather than guessing." >&2; \
-	  exit 1; }; \
-	mt_df=`$$(AWK) -v t="$(1)" \
-	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
-	   seen && $$$$1 == "decimal_float" { print $$$$2; exit }' \
-	  "$$$$mt_manifest"`; \
-	mt_dbf=`$$(AWK) -v t="$(1)" \
-	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
-	   seen && $$$$1 == "decimal_bid_format" { print $$$$2; exit }' \
-	  "$$$$mt_manifest"`; \
-	test -n "$$$$mt_df" && test -n "$$$$mt_dbf" || { \
-	  echo "*** target-specs for $(1): $$$$mt_manifest has no" >&2; \
-	  echo "*** \`decimal_float' or \`decimal_bid_format' line for this" >&2; \
-	  echo "*** target.  These are not probed and have no default --" >&2; \
-	  echo "*** target-specs/configure now REFUSES to run without them," >&2; \
-	  echo "*** because a default of 0 silently disabled decimal float for a" >&2; \
-	  echo "*** target whose config.gcc says it has it -- which is exactly" >&2; \
-	  echo "*** what happened before this was passed at all." >&2; \
-	  exit 1; }; \
-	mt_tfp=`$$(AWK) -v t="$(1)" \
-	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
-	   seen && $$$$1 == "tmake_file_present" { $$$$1 = "PRESENT"; print; exit }' \
-	  "$$$$mt_manifest"`; \
-	test -n "$$$$mt_tfp" || { \
-	  echo "*** target-specs for $(1): $$$$mt_manifest has no" >&2; \
-	  echo "*** \`tmake_file_present' line for this target.  That line is" >&2; \
-	  echo "*** what says whether config.gcc gave $(1) \`t-slibgcc', i.e." >&2; \
-	  echo "*** whether this target has a SHARED libgcc.  A missing line is" >&2; \
-	  echo "*** not \`no': it is a manifest this rule cannot read, and" >&2; \
-	  echo "*** answering \`no' writes \`*libgcc_variants: -lgcc' for a" >&2; \
-	  echo "*** target that does have libgcc_s -- which is exactly what" >&2; \
-	  echo "*** happened on every target until this was passed at all." >&2; \
-	  exit 1; }; \
-	case " $$$$mt_tfp " in \
-	  *" t-slibgcc "* ) mt_slg=yes ;; \
-	  * ) mt_slg=no ;; \
-	esac; \
 	mt_src=; \
+
 	for f in gcc/specs-src-$(1) gcc/mlib-specs-$(1); do \
 	  test -f "$$$$r/$$$$f" && mt_src="$$$$mt_src $$$$r/$$$$f"; \
 	done; \
@@ -2552,11 +2533,6 @@ configure-target-specs-$(1):
 	  --build=$${build_alias} --host=$(1) --with-target=$(1) \
 	  --with-tools-dir="$$$$mt_tools" \
 	  --with-specs-file="$$$$mt_dest/specs" \
-	  --with-cpu-type="$$$$mt_ct" \
-	  --with-option-defaults="$$$$mt_od" \
-	  --with-decimal-float="$$$$mt_df" \
-	  --with-decimal-bid-format="$$$$mt_dbf" \
-	  --with-shared-libgcc="$$$$mt_slg" \
 	  $$$${mt_src:+--with-source-specs="$$$$mt_src"} \
 	  $$(TARGET_SPECS_FLAGS_FOR_$(1)) \
 	  || exit 1; \

@@ -2826,3 +2826,51 @@ finite side — all back ends, all control flow, built once. `target-specs` is
 the infinite side — one arbitrary triple, canonicalised, computed, probed,
 instantiated on demand. The split between the two derivations *is* the
 finite/infinite boundary, and that is the only place it can be.
+
+### The branching narrows infinity to infinity, not to a list
+
+A refinement of the rule above, and the reason no amount of case analysis ever
+produces a target list.
+
+`config.gcc` does have combined arms — "this OS *and* this arch" — and it is
+tempting to read a sufficiently specific one as naming a target. It does not.
+`aarch64*-*-linux*` narrows the space, and what remains is **still infinite**.
+The branching partitions an infinite set into **finitely many infinite
+regions**. The regions are enumerable. Their members never are.
+
+So:
+
+  * key on a REGION — the tuple of branches taken, i.e. the whole `config.gcc`
+    answer — and you have a finite, total classification;
+  * key on a MEMBER — any particular triple, however "representative" — and you
+    have an arbitrary sample standing in for a region, which is the defect.
+
+This is why `tm-<triple>.h` is wrong in KIND and not merely in placement. It is
+keyed on a member. `gcc/default-backends` was the same error one layer up: 47
+members chosen to stand for 47 regions, each dragging in whatever OS its
+representative happened to carry.
+
+And note the corollary, because it is what makes the whole thing tractable:
+comparing WHOLE ANSWERS decides region-equality without anyone having to know
+which fields a given arm reads. Measured: `config.gcc` answers are byte-identical
+across `x86_64-unknown-linux-gnu`, `x86_64-pc-linux-gnu` and
+`x86_64-foobar-linux-gnu`, and across `aarch64-unknown-linux-musl`,
+`aarch64-foo-linux-musl` and `x86_64-alpine-linux-musl` — six spellings, three
+regions. But the vendor field is **not** universally inert: `aarch64*-wrs-vxworks*`,
+`alpha*-dec-*vms*`, `rs6000-ibm-aix7.1.*`, `mips*-img-linux*`,
+`mmix-knuth-mmixware` all match on it. So never strip a field to decide
+equality — compare the answer.
+
+THE STRONGEST FORM OF THE TEST, from the user: the compiler build must depend
+only on `--enable-backends`, **never** on `--enable-targets`. The top level uses
+the target enumeration solely to drive multibuild; it must never reach the
+compiler's own configuration. Mechanically:
+
+    same --enable-backends  =>  BYTE-IDENTICAL compiler,
+                                whatever --enable-targets said.
+
+Configure once naming a glibc triple and once naming a musl triple of the same
+back end; every object, every generated header and `cc1` itself must be
+identical. Any difference is a target fact compiled in where a runtime fact
+belongs — and this branch has already moved 92 such facts into the runtime
+config, so the channel exists and the residue is the work.
