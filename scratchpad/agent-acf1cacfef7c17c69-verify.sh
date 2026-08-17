@@ -34,9 +34,11 @@ echo "================================================================"
 
 rc=0
 run () {  # run <label> <cmd...>
-  echo; echo "---- $1 ----------------------------------------------------"
-  shift
-  if "$@"; then echo "[$1 arm rc=0]"; else echo "[arm rc=$? -- see above]"; rc=1; fi
+  lab=$1; shift
+  echo; echo "---- $lab ----------------------------------------------------"
+  if "$@"; then echo "[$lab: arm rc=0]"; else
+    echo "[$lab: arm rc=$? -- READ IT, do not summarise it]"; rc=1
+  fi
 }
 
 echo; echo "---- BARS -------------------------------------------------------"

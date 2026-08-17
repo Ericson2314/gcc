@@ -227,6 +227,74 @@ code with no replacement**, because both are asked with `#ifdef`. That makes
 the change self-verifying: a missed site is a compile error naming the macro,
 rather than a site quietly still reading i386's answer.
 
+### VERIFIED, against genuine stock, on the final build
+
+`agent-acf1cacfef7c17c69-verify.sh /tmp/b-acf1cacfef7c17c69`, snapshot
+`95d90a64818`, anchor **55**, `make all-gcc` rc=0, 0 `error:`, 0 `multiple
+definition`, 0 `undefined reference`, `cc1` links (231,172,808 bytes):
+
+```
+BARS      x86_64 -O2 big.c   12369 bytes  md5 378fc33c1e70   == THE RECORDED BAR
+          specs-config  all four targets   wc -l 232   grep -c . 224
+
+ITEM 4    aarch64 mv-1.c   foo.default=1  foo._M*=3  foo.resolver=1     PASS
+          x86_64 target_clones  IDENTICAL to genuine stock, 42 lines    PASS
+
+ITEM 1    s390x outgoing-argument stores
+            STOCK  160/168/176/184/192(%r15)
+            MT     160/168/176/184/192(%r15)
+          whole-body diff vs genuine stock: IDENTICAL                   PASS
+          (was 0/8/16/24/32 -- 160 bytes low, in the callee's save area)
+
+ITEM 2    aarch64 trampoline    section  STOCK .text    MT .text        PASS
+                                align    STOCK 3        MT 3
+          (was .section .rodata / .align 2)
+
+ITEM 3    aarch64   rc=1 -> rc=0     (the error is gone)
+          s390x     rc=1 -> rc=0, IDENTICAL to stock over 6 body lines  PASS
+          x86_64    IDENTICAL to stock over 9 body lines (control)      PASS
+          riscv64   no longer clobbers `sp`; still differs -- see below
+```
+
+**Both-sided, per target: 3 changed and correct, 1 byte-identical (x86_64, the
+control), 0 differ on the constructs fixed.** The `-g` md5 moved and is not
+quoted as a bar — it is path-sensitive through `DW_AT_producer`.
+
+### ITEM 3 IS NOT WHOLLY CLOSED, AND THE RESIDUAL IS TWO MORE MACROS
+
+The assigned defect — `__builtin_eh_return` **erroring out** — is fixed and
+verified on both targets, and s390x is now byte-identical to stock. aarch64 and
+riscv64 still differ from stock, and the remaining diffs are **two further
+leaks, each a different macro**, now root-caused:
+
+```
+aarch64, missing vs stock:            riscv64, missing vs stock:
+  mov  w4, 1                            ld  a1,24(sp)
+  ldp  x2, x3, [sp, 16]                 ld  a2,16(sp)
+                                        ld  a3,8(sp)
+```
+
+- **`EH_RETURN_TAKEN_RTX`** — leaked absence. **`aarch64.h:873` is the only
+  definition in the tree** (`gen_rtx_REG (Pmode, R4_REGNUM)`); i386 is silent,
+  so `except.cc:2306`/`:2319`/`:2337` and `df-scan.cc:3724` are `#ifdef`s that
+  are false for all 47. aarch64 therefore emits `cbz x4, .L4` **without ever
+  setting x4**.
+- **`EH_RETURN_DATA_REGNO(N)`** — leaked value, and the `EPILOGUE_USES`
+  mechanism a fourth time. **33 back ends define it**; `defaults.h:457` floors
+  it and i386 defines it, so every target got
+  `((N) <= DX_REG ? (N) : INVALID_REGNUM)` — registers 0 and 1, which on riscv
+  are `zero` and `ra`. `hard-reg-set.h:538`'s `eh_return_data_regs` is
+  therefore not riscv's `a0..a3`, `df-scan` never marks them live out, and DCE
+  deleted their reloads. Ten shared consumers (`except.cc` x5,
+  `ira-lives.cc` x3, `lra-lives.cc`, `bb-reorder.cc`, `builtins.cc`), and it is
+  **parameterised**, so it needs a call taking an `int` rather than the plain
+  thunks used above.
+
+Not attempted here: each is its own change with its own both-sided arm, and
+starting a fifth build cycle on newly-discovered work would have put the four
+assigned items at risk. Handed over with the diff, the definer counts and the
+mechanism rather than as a suspicion.
+
 ### CORRECTION: the trampoline was NOT a W^X failure
 
 `A992B7E5FA4FFAAA7-TRAMPOLINE.md` records item 2 as *"a trampoline is
