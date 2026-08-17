@@ -1106,6 +1106,85 @@ if test x"$option_defaults_unhandled" != x; then
   AC_MSG_WARN([no OPTION_DEFAULT_SPECS template for:${option_defaults_unhandled}])
 fi
 
+dnl ===================================================================
+dnl THIS TARGET'S `tm.h', GENERATED HERE RATHER THAN INSTALLED BY gcc.
+dnl
+dnl libgcc is ONE MACHINE'S LIBRARY and must compile against THAT machine's
+dnl `tm.h'.  gcc's install used to ship one per target, into
+dnl $(libdir)/gcc/$(version)/<target>/include -- a directory named after a
+dnl triple, which exists only for triples that were configured when gcc was
+dnl built, so a target supplied later had none.  That is the installed-artefact
+dnl form of the same defect the manifest was: a finite sample of an infinite set.
+dnl
+dnl `tm-<key>.h' is a PURE FUNCTION OF (triple, gcc source).  Measured: the file
+dnl produced here is BYTE-IDENTICAL to the one the build tree generates, for
+dnl aarch64-unknown-linux-musl and armv6l-unknown-linux-gnueabihf, and the two
+dnl differ from each other -- so it is not identity by collapse.
+dnl
+dnl NOT GATED ON $have_target_tools, DELIBERATELY, unlike the spec file below.
+dnl Nothing here is probed: mkconfig.sh's inputs are all config.gcc output, and
+dnl its own HAVE_LD_* lines are hardcoded `#ifndef ... 1' (mkconfig.sh:129-146),
+dnl byte-identical for every triple.  A target whose binutils are absent still
+dnl gets correct headers; refusing to write them would tie a pure computation to
+dnl an unrelated probe.
+ts_tm_key=`echo "$target" | sed 's/[[^A-Za-z0-9_]]/_/g'`
+ts_hdr_dir=`dirname "$specs_file"`/include
+AS_MKDIR_P(["$ts_hdr_dir"])
+
+dnl THE PER-BACK-END REWRITE.  gen-target-manifest.sh:490 turns `options.h' and
+dnl `insn-constants.h' into the `-<cpu>' names on its way to emitting the build
+dnl rule, so the tm_include_list derived above (like the manifest's own line)
+dnl holds the PLAIN names -- and the plain names in any build directory are the
+dnl PRIMARY back end's.  Omitting this produced a tm-<key>.h differing from the
+dnl build tree's in exactly two lines: a cosmetic-looking delta that silently
+dnl hands every non-primary back end the wrong headers.  mkconfig.sh:207 states
+dnl the same contract from the other side.
+ts_tm_hdrs=`echo "$ts_tm_include_list" \
+  | sed -e "s|options\.h|options-${spec_cpu_type}.h|" \
+        -e "s|insn-constants\.h|insn-constants-${spec_cpu_type}.h|"`
+
+dnl TARGET_CPU_DEFAULT IS EMPTY, MATCHING gen-multi-target-md.awk:1153 -- the
+dnl generator of the PER-TRIPLE header -- and NOT gen-target-manifest.sh:693,
+dnl which passes the real value for the per-BASE tm-<cpu>.h.  The disagreement
+dnl between those two is deliberate and is commented at both sites.
+dnl `$ts_target_cpu_default' is therefore computed and NOT used here: it reaches
+dnl the compiler as the `cpu=' pair in option_defaults, i.e. `-mcpu=' in the
+dnl `*option_defaults' spec above.  Emitting it here as well would freeze a
+dnl per-triple fact into a header AND give one answer two authorities.
+AC_MSG_NOTICE([writing $ts_hdr_dir/tm-$ts_tm_key.h])
+if (cd "$ts_hdr_dir" \
+    && TARGET_CPU_DEFAULT="" HEADERS="$ts_tm_hdrs" DEFINES="$ts_tm_defines" \
+       INSN_BASE="$spec_cpu_type" \
+       $SHELL "$ts_gcc_srcdir/mkconfig.sh" "tm-$ts_tm_key.h") >/dev/null; then
+  :
+else
+  AC_MSG_ERROR([mkconfig.sh failed to write $ts_hdr_dir/tm-$ts_tm_key.h])
+fi
+dnl mkconfig.sh writes its `cs-<output>' stamp beside the header.  In gcc's build
+dnl directory that is a make timestamp with a rule behind it; here it is litter
+dnl in a directory that gets INSTALLED, and a stray `cs-tm-<triple>.h' is one
+dnl more triple-named file in an installed tree.  Remove it.
+rm -f "$ts_hdr_dir/cs-tm-$ts_tm_key.h"
+
+dnl NON-VACUITY, AND IT IS THE SAME CHECK install-target-headers.sh MADE.  Every
+dnl file above would be present and correctly NAMED if the wrong back end's data
+dnl had been used; what distinguishes them is the BODY.  mkconfig.sh emits the
+dnl options header include unconditionally, so a tm-<key>.h that does not name
+dnl this target's back end is not this target's.
+if grep "options-${spec_cpu_type}\\.h" "$ts_hdr_dir/tm-$ts_tm_key.h" >/dev/null 2>&1; then
+  :
+else
+  AC_MSG_ERROR([$ts_hdr_dir/tm-$ts_tm_key.h does not include
+options-${spec_cpu_type}.h, so it is not ${spec_cpu_type}'s.  config.gcc named
+that back end for ${target}; either the header list above lost the rewrite or
+mkconfig.sh was handed another target's data.])
+fi
+
+dnl The plain name libgcc's sources actually write.  One line, so there is
+dnl exactly one copy of the header and the shim cannot go stale against the file
+dnl it names.  Same shape as the build tree's own `<cpu>-inc/'.
+echo "#include \"tm-$ts_tm_key.h\"" > "$ts_hdr_dir/tm.h"
+
 dnl Only write a spec file if the probes actually ran.  Writing one built from
 dnl failed probes would record "feature absent" for every feature, which is a
 dnl worse outcome than having no file: the driver would silently lose behaviour

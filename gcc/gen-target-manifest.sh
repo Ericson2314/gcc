@@ -487,6 +487,20 @@ for gcc_mt in ${gcc_mt_own_probe} ${gcc_manifest_targets}; do
   # The two names coincide for 45 of the 48 back ends and come apart for the
   # three that share default-common.cc (ft32, moxie, rl78); keying on the
   # common file dropped exactly those three.
+  #
+  # THIS LINE IS WHY THE MANIFEST'S `tm_include_list' IS THE *PRE*-REWRITE FORM,
+  # AND ANYONE REPRODUCING IT MUST APPLY THIS SED TOO.  The `tm_include_list'
+  # recorded in multi-target.manifest carries the PLAIN names `options.h' and
+  # `insn-constants.h'; the rewrite to the per-back-end names happens HERE, on
+  # the way to the rule emitted below.  So a consumer that reads the manifest --
+  # or that re-derives it from config.gcc, as target-specs/configure now does --
+  # holds the plain names, and THE PLAIN NAMES IN ANY BUILD DIRECTORY ARE THE
+  # PRIMARY BACK END'S.  Measured: omitting this rewrite produced a
+  # tm-<key>.h differing from the build tree's in exactly two lines, which reads
+  # as a cosmetic delta and is not -- it silently hands every non-primary back
+  # end the wrong options.h and insn-constants.h.  mkconfig.sh:207 states the
+  # same contract from the other side ("the caller ... already rewrites
+  # options.h and insn-constants.h to the <base> names before calling us").
   gcc_mt_incl=`echo "${gcc_mt_incl}" | sed -e "s|^options\.h|options-${gcc_mt_cpu}.h|" -e "s|insn-constants\.h|insn-constants-${gcc_mt_cpu}.h|"`
   # config.gcc sets this per target and some back ends' tm.h reads it (nds32
   # builds its default ISA out ...
@@ -689,6 +703,20 @@ for gcc_mt in ${gcc_mt_own_probe} ${gcc_manifest_targets}; do
        # keeps this call site and the per-triple one in
        # gen-multi-target-md.awk the same shape, and mkconfig.sh now refuses
        # a tm-*.h without it.
+       #
+       # TARGET_CPU_DEFAULT IS PASSED HERE AND EMPTIED AT THE OTHER SITE, AND
+       # THAT DISAGREEMENT IS DELIBERATE.  This is the per-BASE tm-<cpu>.h and
+       # it gets the real ${gcc_mt_tcd}; gen-multi-target-md.awk:1153 hardcodes
+       # TARGET_CPU_DEFAULT="" for the per-TRIPLE tm-<key>.h.  DO NOT
+       # "fix the inconsistency" by making them agree.  target_cpu_default is a
+       # PER-TRIPLE fact (config.gcc gives armv6l-*-linux-gnueabihf
+       # `"arm10e"'), and it already reaches the compiler at run time as the
+       # `cpu=arm10e' pair in target_option_defaults, i.e. `-mcpu=arm10e' in
+       # the `*option_defaults' spec.  Compiling it into a per-triple header as
+       # well would freeze a per-triple fact at build time -- the thing this
+       # branch exists to remove -- and create a SECOND AUTHORITY for an answer
+       # that already has one.  Verified: the build tree's
+       # tm-armv6l_unknown_linux_gnueabihf.h has no TARGET_CPU_DEFAULT line.
        printf 'tm-%s.h: options-%s.h insn-constants-%s.h%s Makefile\n\tTARGET_CPU_DEFAULT="%s" HEADERS="%s" DEFINES="%s" \\\n\t  INSN_BASE="%s" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n' \
          "${gcc_mt_cpu}" "${gcc_mt_cpu}" "${gcc_mt_cpu}" "${gcc_mt_genh_files}" "${gcc_mt_tcd}" "${gcc_mt_incl}" "${gcc_mt_tmdef}" "${gcc_mt_cpu}" "${gcc_mt_cpu}" >> ${gcc_common_mk}
        ;;

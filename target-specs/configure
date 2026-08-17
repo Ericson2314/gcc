@@ -2688,6 +2688,37 @@ if test x"$option_defaults_unhandled" != x; then
 $as_echo "$as_me: WARNING: no OPTION_DEFAULT_SPECS template for:${option_defaults_unhandled}" >&2;}
 fi
 
+ts_tm_key=`echo "$target" | sed 's/[^A-Za-z0-9_]/_/g'`
+ts_hdr_dir=`dirname "$specs_file"`/include
+as_dir="$ts_hdr_dir"; as_fn_mkdir_p
+
+ts_tm_hdrs=`echo "$ts_tm_include_list" \
+  | sed -e "s|options\.h|options-${spec_cpu_type}.h|" \
+        -e "s|insn-constants\.h|insn-constants-${spec_cpu_type}.h|"`
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: writing $ts_hdr_dir/tm-$ts_tm_key.h" >&5
+$as_echo "$as_me: writing $ts_hdr_dir/tm-$ts_tm_key.h" >&6;}
+if (cd "$ts_hdr_dir" \
+    && TARGET_CPU_DEFAULT="" HEADERS="$ts_tm_hdrs" DEFINES="$ts_tm_defines" \
+       INSN_BASE="$spec_cpu_type" \
+       $SHELL "$ts_gcc_srcdir/mkconfig.sh" "tm-$ts_tm_key.h") >/dev/null; then
+  :
+else
+  as_fn_error $? "mkconfig.sh failed to write $ts_hdr_dir/tm-$ts_tm_key.h" "$LINENO" 5
+fi
+rm -f "$ts_hdr_dir/cs-tm-$ts_tm_key.h"
+
+if grep "options-${spec_cpu_type}\\.h" "$ts_hdr_dir/tm-$ts_tm_key.h" >/dev/null 2>&1; then
+  :
+else
+  as_fn_error $? "$ts_hdr_dir/tm-$ts_tm_key.h does not include
+options-${spec_cpu_type}.h, so it is not ${spec_cpu_type}'s.  config.gcc named
+that back end for ${target}; either the header list above lost the rewrite or
+mkconfig.sh was handed another target's data." "$LINENO" 5
+fi
+
+echo "#include \"tm-$ts_tm_key.h\"" > "$ts_hdr_dir/tm.h"
+
 if test x"$have_target_tools" != xyes; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: skipping $specs_file: target tools unavailable, nothing probed" >&5
 $as_echo "$as_me: skipping $specs_file: target tools unavailable, nothing probed" >&6;}

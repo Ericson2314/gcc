@@ -1150,6 +1150,18 @@ function emit_triple(	key, hdrs, i, n, parts, ssh, ssdep) {
   # from the machine description and so exist once per back end, exactly like
   # the options-<cpu>.h and insn-constants-<cpu>.h rewritten just above.
   # mkconfig.sh cannot infer it from `tm-<triple>.h'.
+  #
+  # TARGET_CPU_DEFAULT IS EMPTY HERE ON PURPOSE, AND THE OTHER SITE PASSES THE
+  # REAL VALUE ON PURPOSE.  gen-target-manifest.sh:693 emits the per-BASE
+  # tm-<cpu>.h with TARGET_CPU_DEFAULT="${gcc_mt_tcd}"; this is the per-TRIPLE
+  # tm-<key>.h and it must NOT carry it.  DO NOT make the two agree in the name
+  # of consistency.  target_cpu_default is a per-triple fact -- config.gcc gives
+  # armv6l-unknown-linux-gnueabihf `"arm10e"' -- and it already reaches the
+  # compiler at run time as the `cpu=arm10e' pair in target_option_defaults,
+  # which target-specs turns into `-mcpu=arm10e' in the `*option_defaults' spec.
+  # Emitting it here as well would freeze a per-triple fact at build time, which
+  # is the defect this whole branch removes, AND give one answer two authorities
+  # that can drift apart with no diagnostic.
   printf "\tTARGET_CPU_DEFAULT=\"\" HEADERS=\"%s\" DEFINES=\"%s\" \\\n", hdrs, def;
   printf "\t  INSN_BASE=\"%s\" $(SHELL) $(srcdir)/mkconfig.sh tm-%s.h\n\n", cpu, key;
 
