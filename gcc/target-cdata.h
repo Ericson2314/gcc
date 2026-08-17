@@ -339,9 +339,17 @@ along with GCC; see the file COPYING3.  If not see
    for TARGET_LARGE", and 20 is not an alignment.  avr wants 8 and gets 16.
 
    ITS HOME IS `target_frame_desc', beside `POINTER_SIZE' -- a call, so the
-   44 keep the dynamic answer and the 3 get their own.  NOT DONE HERE: it is a
-   different mechanism from this file's, and doing it inside a cdata task is
-   how a "same family" assumption lands the wrong shape.  */
+   44 keep the dynamic answer and the 3 get their own.  It was NOT done in the
+   cdata task that diagnosed it, deliberately: it is a different mechanism
+   from this file's, and doing it inside a cdata task is how a "same family"
+   assumption lands the wrong shape.
+
+   DONE NOW, IN THAT HOME.  `target_frame_desc::vtable_entry_align',
+   `mt_base_vtable_entry_align' (target-cumargs.cc),
+   `mt_vtable_entry_align' (target-cumargs-select.cc) and the redirect at the
+   foot of `multi-target-macros.h', beside `POINTER_SIZE' itself.  The refusal
+   above stands unedited because its argument is still the reason the slot is
+   not here.  Measured: scratchpad/A8F6F467D15197CD3-VTALIGN.md.  */
 
 /* `DWARF_FRAME_RETURN_COLUMN' WAS HERE AND IS NOT A CDATA FIELD.
 

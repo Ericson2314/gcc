@@ -346,6 +346,52 @@ struct target_frame_desc
   unsigned int (*biggest_alignment) (void);
 
   /* ------------------------------------------------------------------
+     `TARGET_VTABLE_ENTRY_ALIGN' -- THE FOURTH OF THAT FAMILY, AND IT IS HERE
+     RATHER THAN IN `TARGET_CDATA_FIELDS' FOR A REASON THAT LOOKS LIKE AN
+     ARGUMENT AGAINST CONVERTING IT AT ALL.
+
+     `defaults.h:972' is `#define TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE', and
+     a macro BODY is expanded at the USE site.  `POINTER_SIZE' is a call
+     (`mt_pointer_size', just above), so the 44 back ends that define nothing
+     ALREADY get their own dynamic answer today, through that call, and the
+     list forty lines up names this macro among the eleven the option-state
+     redirect converts for free.  A `TARGET_CDATA_FIELDS' slot would read the
+     macro ONCE per base at selection time and FREEZE a currently-correct
+     dynamic answer for 44 in order to fix 3 -- a regression wearing a fix's
+     clothes, which is why `target-cdata.h:316' refuses it by name.
+
+     THE RESIDUAL 3 ARE REAL, AND THEY ARE THE WHOLE DEFECT.  `ia64.h:236'
+     (64), `avr.h:139' (8) and `msp430.h:205' (16) DEFINE the macro, so for
+     them `defaults.h:971's `#ifndef' must not fire -- and in shared code it
+     is answered by the PRIMARY, i386, which does not define it.  All three
+     therefore got `POINTER_SIZE' and their explicit values reached nothing.
+     msp430's own comment states the symptom before the fact:
+
+	 msp430.h:202  "TARGET_VTABLE_ENTRY_ALIGN defaults to POINTER_SIZE,
+			which is 20 for TARGET_LARGE"
+
+     and 20 is not an alignment.  avr asks for 8 and got 16.
+
+     A CALL SERVES BOTH POPULATIONS AND THAT IS THE ONLY SHAPE THAT DOES.
+     `mt_base_vtable_entry_align' expands the macro in each base's OWN
+     translation unit, so a definer yields its literal and a non-definer
+     yields `defaults.h''s fallback computed against ITS `POINTER_SIZE' --
+     i.e. exactly the answer a single-target build of that back end gives.
+     Nothing is frozen: the 44 still reach `mt_pointer_size' on every call,
+     one indirection further out, so `TARGET_ILP32' and `TARGET_64BIT' still
+     move the answer within one compilation.  This is the supply-side floor
+     PRINCIPLES section 2a permits, not the consumer-side one it bans; no
+     base ever reads another's value.
+
+     POSITION: two consumers in the whole tree, `cp/class.cc:840' and
+     `d/decl.cc:2245', both `SET_DECL_ALIGN (decl, TARGET_VTABLE_ENTRY_ALIGN)'
+     -- an ordinary run-time argument.  No `#if', no array bound, no
+     enumerator, no `case' label, so a call is legal at every site.  (`d/' has
+     never been built multi-target; see
+     scratchpad/A8F6F467D15197CD3-FRONTENDS.md.)  */
+  unsigned int (*vtable_entry_align) (void);
+
+  /* ------------------------------------------------------------------
      `DATA_ALIGNMENT' AND `DATA_ABI_ALIGNMENT' -- THE PAIR THAT IS BOTH AN
      EXISTENCE PREDICATE AND A STATE LEAK AT ONCE.
 
@@ -1911,6 +1957,11 @@ extern scalar_int_mode mt_pmode (void);
 extern int mt_units_per_word (void);
 extern unsigned int mt_pointer_size (void);
 extern unsigned int mt_biggest_alignment (void);
+/* `TARGET_VTABLE_ENTRY_ALIGN'.  `unsigned int' rather than the `int' the two
+   consumers pass to `SET_DECL_ALIGN', because ia64's 64, avr's 8 and
+   msp430's 16 are alignments and `defaults.h''s fallback is `POINTER_SIZE',
+   which is already `unsigned int' here.  */
+extern unsigned int mt_vtable_entry_align (void);
 
 /* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
    for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */

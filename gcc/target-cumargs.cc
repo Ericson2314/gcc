@@ -685,6 +685,25 @@ mt_base_biggest_alignment (void)
   return (unsigned int) BIGGEST_ALIGNMENT;
 }
 
+/* `TARGET_VTABLE_ENTRY_ALIGN', read in THIS base's translation unit.  Three
+   back ends define it -- ia64 64, avr 8, msp430 16 -- and for the other 44
+   this expands `defaults.h:972's `TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE'
+   against THIS base's `POINTER_SIZE', which is the answer a single-target
+   build of that back end gives.
+
+   NOTE WHAT THIS FUNCTION IS NOT.  For the 44 it is not a frozen number: in
+   a supply-side TU `POINTER_SIZE' is still the real macro, but the value is
+   read on every CALL through `targetm_frame', not once at selection time, so
+   i386's `(TARGET_64BIT ? 64 : 32)' and aarch64's `(TARGET_ILP32 ? 32 : 64)'
+   keep moving with the option state exactly as they do for `mt_pointer_size'
+   itself.  That is the whole reason this is a `target_frame_desc' call and
+   not a `TARGET_CDATA_FIELDS' slot; see target-frame.h.  */
+static unsigned int
+mt_base_vtable_entry_align (void)
+{
+  return (unsigned int) TARGET_VTABLE_ENTRY_ALIGN;
+}
+
 /* `FUNCTION_MODE', read in THIS base's translation unit: QImode for i386,
    `Pmode' -- and so DImode -- for aarch64.  Compiled once against i386's tm.h,
    shared code built every target's call MEM as QImode, and aarch64's own
@@ -1896,6 +1915,7 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_units_per_word,
   mt_base_pointer_size,
   mt_base_biggest_alignment,
+  mt_base_vtable_entry_align,
   MT_BASE_HAS_DATA_ALIGNMENT,
   MT_BASE_DATA_ALIGNMENT,
   MT_BASE_HAS_DATA_ABI_ALIGNMENT,

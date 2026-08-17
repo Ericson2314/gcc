@@ -419,10 +419,13 @@ expmed.cc and lower-subreg.h.  Give the primary an explicit MAX_BITS_PER_WORD \
 #undef TARGET_PTRMEMFUNC_VBIT_LOCATION
 #define TARGET_PTRMEMFUNC_VBIT_LOCATION (targetm_cdata.ptrmemfunc_vbit_location)
 /* The vtable pair, the same leak one structure along; see target-cdata.h.
-   `TARGET_VTABLE_ENTRY_ALIGN' is NOT here and that is deliberate -- its
-   default is `POINTER_SIZE', which is already a per-base CALL, so it is
-   already converted for the 44 back ends that define nothing.  The header
-   says what to do about the 3 that do.
+   `TARGET_VTABLE_ENTRY_ALIGN' is still NOT here and that is still deliberate
+   -- its default is `POINTER_SIZE', which is already a per-base CALL, so a
+   cdata slot would FREEZE a correct dynamic answer for the 44 back ends that
+   define nothing in order to fix the 3 that do.  It is now converted, in the
+   OTHER family: `target_frame_desc::vtable_entry_align', redirected beside
+   `POINTER_SIZE' itself further down this file.  The 44 keep the call; ia64,
+   avr and msp430 get their own literals for the first time.
 
    NOT `#if'-BREAKING.  Swept over all of `gcc/': every use is an ordinary
    run-time expression -- loop bounds in `cp/class.cc', a `vec_safe_grow'
@@ -1536,6 +1539,25 @@ extern void mt_asm_output_align (FILE *, int);
 #define POINTER_SIZE (mt_pointer_size ())
 #undef BIGGEST_ALIGNMENT
 #define BIGGEST_ALIGNMENT (mt_biggest_alignment ())
+/* `TARGET_VTABLE_ENTRY_ALIGN' -- a derived name of `POINTER_SIZE' that the
+   list above says is converted FOR FREE, and it is, for the 44 back ends that
+   define nothing.  It is redirected EXPLICITLY as well, and the two facts do
+   not contradict each other: the free conversion works by `defaults.h:972's
+   body expanding `POINTER_SIZE' at the use site, and a back end that DEFINES
+   the macro never reaches that body.  ia64 (64), avr (8) and msp430 (16) were
+   the residual the free conversion cannot see, and `defaults.h:971's
+   `#ifndef' is answered by the primary, which defines nothing -- so their
+   values reached no shared code at all.  This line is what makes those three
+   arrive, and it costs the other 44 exactly one more indirection to the same
+   `mt_pointer_size' they already called.
+
+   MUST COME AFTER the `#undef POINTER_SIZE' above rather than before it, for
+   the reason recorded at :1510 about `defaults.h:864': these are `#undef' +
+   `#define' pairs and the last one wins, but the BODY installed here names a
+   function, not `POINTER_SIZE', so ordering cannot silently re-enter the
+   fallback.  */
+#undef TARGET_VTABLE_ENTRY_ALIGN
+#define TARGET_VTABLE_ENTRY_ALIGN (mt_vtable_entry_align ())
 #endif
 
 #endif /* ! GCC_MULTI_TARGET_MACROS_H */

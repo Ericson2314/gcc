@@ -392,6 +392,16 @@ mt_biggest_alignment (void)
   return mt_frame ()->biggest_alignment ();
 }
 
+/* `TARGET_VTABLE_ENTRY_ALIGN'.  Uncached for the same reason as the three
+   above: for the 44 back ends that define nothing it IS `POINTER_SIZE', so
+   caching it would freeze exactly the value `mt_pointer_size' is deliberately
+   not freezing.  */
+unsigned int
+mt_vtable_entry_align (void)
+{
+  return mt_frame ()->vtable_entry_align ();
+}
+
 /* `FUNCTION_MODE'.  Uncached for the same reason as `Pmode' just above: eight
    back ends define it AS `Pmode', which is option-dependent on i386 and on
    arm, so a value read once at selection time would be frozen.  */
