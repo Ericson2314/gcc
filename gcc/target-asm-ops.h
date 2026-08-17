@@ -94,6 +94,73 @@ struct target_asm_ops
      nothing and looks like correct output.  */
   void (*output_align) (FILE *, int);
 
+  /* ASM_OUTPUT_LABELREF (FILE, NAME) -- how a reference to a user-level
+     symbol is spelled.
+
+     THE DEFECT THIS CLOSES, MEASURED ON hppa64.  There is exactly ONE shared
+     consumer, `assemble_name_raw' (varasm.cc:3011), and it is reached by every
+     label, every `.globl', every `.type' and every `.size' the compiler emits.
+     `defaults.h:197' floors the macro with `user_label_prefix' + NAME; the
+     primary's chain does not define it, so the floor FIRES -- the
+     "floor-fires" class in INSTRUMENTS.md, where the dissenters read the
+     floor.
+
+     pa is a dissenter and it is not a cosmetic one.  pa marks function symbols
+     internally with a leading `@' (`FUNCTION_NAME_P'), and `pa.h:1096' strips
+     that `@' back off in ASM_OUTPUT_LABELREF.  With the floor in force nothing
+     strips it, so hppa64 emitted
+
+       .globl @f
+       .type  @f, @function
+       @f:
+
+     and its own assembler refused all seven corpus inputs with
+     `Error: expected symbol name'.  hppa64 compiled 7/7 the whole time: the
+     compile count said nothing at all, which is the shape this board exists
+     for.
+
+     A FUNCTION POINTER, like `output_align' and for the same two reasons: the
+     macro is a STATEMENT, not a string, and several back ends' bodies read
+     option state at use time (pa's reads `TARGET_GAS' in the sibling
+     ASM_OUTPUT_LABEL).  The table stores the wrapper's ADDRESS, so `constexpr'
+     still holds.
+
+     NO `#ifdef' WRAPPER, deliberately: `defaults.h' guarantees every base has
+     SOME definition, so a NULL here can only mean "no base was selected", and
+     that is what the selector reports by name.  */
+  void (*output_labelref) (FILE *, const char *);
+
+  /* ASM_GENERATE_INTERNAL_LABEL (BUF, PREFIX, NUM) -- how this back end spells
+     a compiler-generated label.
+
+     THE DEFECT THIS CLOSES, MEASURED ON microblaze, AND IT IS THIS BRANCH'S
+     ROOT BUG IN ITS PUREST FORM: ONE LABEL, TWO AUTHORITIES.  There is NO
+     `defaults.h' floor for this macro at all -- 37 back-end headers define it
+     and every base gets one from its own chain -- so 122 call sites in shared
+     code (`dwarf2out.cc', `except.cc', `varasm.cc', `final.cc', `asan.cc',
+     `coverage.cc', ...) read the PRIMARY's spelling, `i386/att.h:86', i.e.
+     `.L%s%ld'.
+
+     microblaze spells it `$L%s%ld' (`microblaze.h:679', from its own
+     `LOCAL_LABEL_PREFIX').  Its `ASM_DECLARE_FUNCTION_SIZE' is compiled in a
+     PER-BASE object, so that copy expanded microblaze's macro, while the label
+     DEFINITION went through shared `default_internal_label'.  The output is
+     the two authorities side by side:
+
+       .Lfe1:                 <- defined by shared code, primary's spelling
+       .size   f,$Lfe1-f      <- referenced by microblaze's own macro
+
+     and its assembler says `Error: .size expression for f does not evaluate to
+     a constant' -- for all seven corpus inputs, on a back end that compiled
+     7/7.  Nothing here is a missing feature; it is one name meaning two
+     things, linking cleanly.
+
+     `unsigned long' for NUM because that is what the two structured
+     definitions cast to (`elfos.h:138', `nvptx.h:286'); `i386/att.h' and
+     `mmix.h' cast to `long', and every shared caller passes a non-negative
+     counter, so the two agree over the whole reachable domain.  */
+  void (*generate_internal_label) (char *, const char *, unsigned long);
+
   /* USE_SELECT_SECTION_FOR_FUNCTIONS -- this back end wants
      `function_section_1' (varasm.cc) to route a function with no explicit
      section through TARGET_ASM_SELECT_SECTION rather than through
@@ -244,6 +311,24 @@ gcc_taop_output_align (FILE *stream, int log)
 {
   ASM_OUTPUT_ALIGN (stream, log);
 }
+
+/* ASM_OUTPUT_LABELREF's wrapper, under the same five-way test and for the
+   same reason: in a shared TU `multi-target-macros.h' has already redirected
+   the macro to `mt_asm_output_labelref', so a body compiled there would call
+   the selector which calls this wrapper.  */
+static inline void
+gcc_taop_output_labelref (FILE *stream, const char *name)
+{
+  ASM_OUTPUT_LABELREF (stream, name);
+}
+
+/* ASM_GENERATE_INTERNAL_LABEL's wrapper, same five-way test, same reason.  */
+static inline void
+gcc_taop_generate_internal_label (char *buf, const char *prefix,
+				  unsigned long num)
+{
+  ASM_GENERATE_INTERNAL_LABEL (buf, prefix, num);
+}
 #endif
 
 /* #ifndef so a back end that supplies its own hook still wins.  */
@@ -284,6 +369,12 @@ gcc_taop_output_align (FILE *stream, int log)
     || !defined (__cplusplus)
 #ifndef TARGET_ASM_OUTPUT_ALIGN
 #define TARGET_ASM_OUTPUT_ALIGN gcc_taop_output_align
+#endif
+#ifndef TARGET_ASM_OUTPUT_LABELREF
+#define TARGET_ASM_OUTPUT_LABELREF gcc_taop_output_labelref
+#endif
+#ifndef TARGET_ASM_GENERATE_INTERNAL_LABEL
+#define TARGET_ASM_GENERATE_INTERNAL_LABEL gcc_taop_generate_internal_label
 #endif
 #endif
 
@@ -340,6 +431,16 @@ extern void init_targetm_asm_ops (void);
    `targetm' counterpart upstream and inventing one would mean touching
    target.def and 50 back ends to change where a directive is printed.  */
 extern void mt_asm_output_align (FILE *stream, int log);
+
+/* ASM_OUTPUT_LABELREF for the base in force; `multi-target-macros.h' redirects
+   the macro here.  Same shape as `mt_asm_output_align' and, like it, with no
+   `targetm' counterpart to be copied into.  */
+extern void mt_asm_output_labelref (FILE *stream, const char *name);
+
+/* ASM_GENERATE_INTERNAL_LABEL for the base in force; `multi-target-macros.h'
+   redirects the macro here.  */
+extern void mt_asm_generate_internal_label (char *buf, const char *prefix,
+					    unsigned long num);
 
 /* USE_SELECT_SECTION_FOR_FUNCTIONS for the base in force.  Like
    `mt_asm_output_align', not copied into `targetm.asm_out': the macro has no
