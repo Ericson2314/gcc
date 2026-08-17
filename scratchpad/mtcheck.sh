@@ -375,14 +375,44 @@ for T in "$@"; do
   # cap that failed to parse would be silently absent -- the one outcome that
   # must not be possible.  Here it is plain shell and is read back immediately.
   CAP=${MT_MEMCAP_KB:-8388608}
+  # `DEJAGNU' IS SET ONLY FOR g++, AND EXPORTING IT EMPTY BREAKS check-gcc.
+  #
+  # This line used to be an unconditional `DEJAGNU='${DEJAGNU:-}'' beside the
+  # other three.  For `MT_CHECK_TOOL=gcc' nothing above sets `DEJAGNU', so that
+  # exported it as the EMPTY STRING -- and DejaGnu tests `[info exists
+  # env(DEJAGNU)]', which is TRUE for an empty value, then tries to source a
+  # file named "".  Every parallel job then prints
+  #
+  #     ERROR: global config file  not found.
+  #
+  # (note the doubled space: that is the empty filename) and runtest exits
+  # having written a ZERO-BYTE `gcc.sum'.  `make check-gcc' still exits **0**,
+  # because the check-% recipe is wrapped in `-(...)'.
+  #
+  # So the harness's `gcc' arm has been dead since `32dbd04da25' -- the commit
+  # that fixed the SAME failure shape for `g++' introduced it for `gcc', and no
+  # four-target board has been taken since, so nothing scored it.  Exactly the
+  # `one name, several authorities' shape, with the two authorities being the
+  # two values of `MT_CHECK_TOOL'.
+  #
+  # `unset' is NOT available across this quoting boundary in a useful way, so
+  # the assignment and the `export' are BOTH conditional: an unset DEJAGNU
+  # stays unset, which is what DejaGnu's own `info exists' arm is written for.
+  # GUARD 4 caught it -- the run produced no banner - which is that guard doing
+  # its job on a live event rather than a historical one.
+  if [ -n "${DEJAGNU:-}" ]; then
+    DJSET="DEJAGNU='$DEJAGNU'; export DEJAGNU;"
+  else
+    DJSET=""
+  fi
   ( ulimit -v "$CAP" || exit 9
     [ "$(ulimit -v)" = "$CAP" ] || { echo "FATAL: ulimit -v $CAP did not take"; exit 9; }
     cd "$B/gcc" && sh "$S/eb-shell-dj.sh" "cd $B/gcc && \
+      $DJSET \
       MT_TARGET_NAME=$T \
       MT_TARGET_CONFIG=$CFG \
       MT_COMPILE_ONLY='${MT_COMPILE_ONLY:-}' \
-      DEJAGNU='${DEJAGNU:-}' \
-      export MT_TARGET_NAME MT_TARGET_CONFIG MT_COMPILE_ONLY DEJAGNU; \
+      export MT_TARGET_NAME MT_TARGET_CONFIG MT_COMPILE_ONLY; \
       make ${MT_MAKEFLAGS:-} check-$TOOL \
         TEST_TARGET=$T \
         TESTSUITEDIR=$TSD \

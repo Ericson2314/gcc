@@ -65,6 +65,41 @@ is immune. Same shape as the aarch64 `-S` bar being filename-sensitive via
 its input path AND its build dir**; `a5764a65f9eec0063-gcheck.sh` settles it by
 compiling one constant absolute path with both compilers.
 | a hard `ulimit -v` around every `cc1` | `tb1-memcap.sh` |
+
+## THE FOUR LEAK CLASSES AND THEIR SWEEPS — read this before hunting a leak by hand
+
+Every leak this branch has found is in one of four enumerable classes, and
+until now **three of them had no sweep** and were found by accident.
+`A992B7E5FA4FFAAA7-FLOORSWEEP.md` / `-ABSENCESWEEP.md` carry the results.
+
+| class | shape | sweep |
+|---|---|---|
+| floor-dead | `#ifndef` floor in `defaults.h`, primary **defines** the name, so the floor is dead and all 47 get i386's body (`EPILOGUE_USES`, `REGMODE_NATURAL_SIZE`) | `agent-a992b7e5fa4ffaaa7-floorsweep.sh` |
+| floor-fires | `#ifndef` floor, primary **silent**, so the floor runs and the *dissenters* read it (`TARGET_HAS_FMV_TARGET_ATTRIBUTE`, `STACK_POINTER_OFFSET`) | same |
+| leaked absence | bare `#ifdef` in a **shared** TU on a name the primary does not define, so the guarded code runs for **nobody** (`FINAL_PRESCAN_INSN`, `TRAMPOLINE_SECTION`) | `agent-a992b7e5fa4ffaaa7-absencesweep.sh` |
+| generated header | the name lives only in a **generated per-base header** and the build root's shared copy is the primary's (`DELAY_SLOTS`, `HAVE_conditional_execution`, `insn-modes.h`, `options.h`) | `agent-a992b7e5fa4ffaaa7-genhdrsweep.sh` |
+
+**The per-row discriminator is `agent-a992b7e5fa4ffaaa7-floorread.sh`** — the
+both-sided header read, shared `tm.h` against each `<base>-inc/tm.h`. **It MUST
+be run with `-DIN_GCC`**: the back-end header chain sits inside `#ifdef IN_GCC`,
+so without it every arm reads the floor, every row looks converted, and the
+instrument refutes all findings at once while looking clean. That mistake was
+made and caught here.
+
+**A header divergence is a CANDIDATE. The compiler gives the verdict.** Two
+worked examples, opposite ways: `DEFAULT_PCC_STRUCT_RETURN` diverges (shared 1,
+aarch64 0) and is **not** a leak, because its only consumer is `common.opt`'s
+`Init(...)` and the options initialiser is generated per base; while
+`STACK_POINTER_OFFSET`'s divergence is a **live ABI break**, shown by diffing
+one function's assembly against the stock compiler. The three reproducers
+(`-spo.sh`, `-tramp.sh`, `-ehreturn.sh`) are the shape to copy: compile a small
+program with both compilers and diff, with a non-vacuity arm that refuses if
+the grep read nothing.
+
+**And a compile-only board cannot see any of this.** The s390x ABI break, the
+aarch64 trampoline in `.rodata` and `__builtin_eh_return` failing on two
+targets all assemble cleanly into well-formed objects of the right machine.
+Found by compiling four small programs; invisible to 197,827 test results.
 | **a real cross `as` for an ARBITRARY triple** | `a7ee6ca7c923e4a58-astry.sh` |
 
 ## GETTING A CROSS ASSEMBLER: THE TWO ATTRIBUTES, AND THE RECORDED CLAIM THAT IS ABOUT THE WRONG THING
