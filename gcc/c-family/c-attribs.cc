@@ -242,18 +242,23 @@ static const struct attribute_spec::exclusions attr_noinline_exclusions[] =
   ATTR_EXCL (NULL, false, false, false),
 };
 
-static const struct attribute_spec::exclusions attr_target_exclusions[] =
+/* NOT `const', and the `target_clones' entry's `false' is a placeholder:
+   `TARGET_HAS_FMV_TARGET_ATTRIBUTE' is per-configuration data now, so it is a
+   run-time load and cannot appear in a static initialiser.
+   `mt_fixup_fmv_exclusions ()' (attribs.cc) writes the selected base's answer
+   into this entry from `init_attributes ()', and refuses to be silent if it
+   finds nothing to patch.  */
+static struct attribute_spec::exclusions attr_target_exclusions[] =
 {
-  ATTR_EXCL ("target_clones", TARGET_HAS_FMV_TARGET_ATTRIBUTE,
-	     TARGET_HAS_FMV_TARGET_ATTRIBUTE, TARGET_HAS_FMV_TARGET_ATTRIBUTE),
+  ATTR_EXCL ("target_clones", false, false, false),
   ATTR_EXCL (NULL, false, false, false),
 };
 
-static const struct attribute_spec::exclusions attr_target_clones_exclusions[] =
+/* Not `const', and the `target' entry patched at run time -- see above.  */
+static struct attribute_spec::exclusions attr_target_clones_exclusions[] =
 {
   ATTR_EXCL ("always_inline", true, true, true),
-  ATTR_EXCL ("target", TARGET_HAS_FMV_TARGET_ATTRIBUTE,
-	     TARGET_HAS_FMV_TARGET_ATTRIBUTE, TARGET_HAS_FMV_TARGET_ATTRIBUTE),
+  ATTR_EXCL ("target", false, false, false),
   ATTR_EXCL ("omp declare simd", true, true, true),
   ATTR_EXCL ("simd", true, true, true),
   ATTR_EXCL (NULL, false, false, false),

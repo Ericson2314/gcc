@@ -15613,7 +15613,9 @@ get_clone_attr_versions (const tree arglist,
   gcc_assert (TREE_CODE (arglist) == TREE_LIST);
   auto_vec<string_slice> versions;
 
-  static const char separator_str[] = {TARGET_CLONES_ATTR_SEPARATOR, 0};
+  /* NOT `static' -- see the note in `attribs.cc:sorted_attr_string'.  The
+     `string_slice' below points into it and neither outlives this call.  */
+  const char separator_str[] = {TARGET_CLONES_ATTR_SEPARATOR, 0};
   string_slice separators = string_slice (separator_str);
 
   for (tree arg = arglist; arg; arg = TREE_CHAIN (arg))

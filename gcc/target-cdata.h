@@ -311,7 +311,66 @@ along with GCC; see the file COPYING3.  If not see
 					STACK_CHECK_MAX_FRAME_SIZE)	\
   NUM (unsigned short, max_fixed_mode_size,	MAX_FIXED_MODE_SIZE)	\
   NUM (int,	     store_flag_value,		STORE_FLAG_VALUE)	\
-  NUM (int,	     word_register_operations,	WORD_REGISTER_OPERATIONS)
+  NUM (int,	     word_register_operations,	WORD_REGISTER_OPERATIONS) \
+  /* THE FUNCTION-MULTIVERSIONING PAIR, AND THEY ARE THE `#ifndef' FLOOR IN
+     ITS OTHER POLARITY.  Everything else in this list, and every leak
+     PRINCIPLES records (`EPILOGUE_USES', `REGMODE_NATURAL_SIZE',
+     `TARGET_PTRMEMFUNC_VBIT_LOCATION'), is the shape where the PRIMARY
+     defines the name, `defaults.h''s `#ifndef' is therefore DEAD, and every
+     back end reads i386's body.  Here i386 defines NEITHER name, so
+     `defaults.h:1001' and `:1006' genuinely FIRE in every shared TU -- and
+     the value they supply is then wrong for exactly the back ends that
+     dissent.
+
+	 TARGET_HAS_FMV_TARGET_ATTRIBUTE   floor 1;  aarch64.h:1556,
+					   riscv.h:1349, loongarch.h:1297 all
+					   say 0.
+	 TARGET_CLONES_ATTR_SEPARATOR      floor ',';  riscv.h says '#'.
+
+     So "i386 does not define it" is not the absence of a leak; it is the
+     precondition for this variant of one.  Any `#ifndef' in `defaults.h'
+     whose name some back end `#define's is in this class, whether or not the
+     primary is that back end.
+
+     Measured from the build's own headers with `-DIN_GCC' (omitting it skips
+     the whole back-end chain inside `#ifdef IN_GCC' and makes every arm read
+     the floor, which is the plausible wrong reading):
+
+	 NAME                            SHARED aarch64 i386 riscv s390
+	 TARGET_HAS_FMV_TARGET_ATTRIBUTE    1      0      1     0    1
+
+     `c/c-decl.cc:3459' is the deciding line for the observable: with the
+     macro 1 the `disjoint_version_decls' arm is skipped, so a second
+     `target_version' definition of a function is diagnosed as `redefinition
+     of foo' instead of being recognised as another VERSION of it.  Worth
+     ~256 results on aarch64 (`mv*' 221 + `fmv*' 35), where stock fails zero;
+     riscv64's exposure is 3 test files plus every `target_clones' list, which
+     it parses on `#' rather than `,'.
+
+     INVARIANT AND REFRESH-POINT-EVALUABLE on this header's own terms: all
+     four definitions are literals (`0', `0', `0', `'#''), and both
+     `defaults.h' floors are literals too.  No option state, no `cfun', no
+     back-end call.
+
+     `int' for the flag: it is read with `!', `?:' and `&&' and never compared
+     against an unsigned, so rule (2) does not arise.  `char' for the
+     separator, the type the macro's expansion has, so `str[i] == SEP' keeps
+     its meaning.  Note the numeric poison read as a `char' is 17, which no
+     attribute separator could be -- but the reason a collision would matter
+     is worth stating: it is the post-refresh check in target-cdata-select.cc
+     that would then pass on an unwritten slot.
+
+     THE STATIC-INITIALISER SITES ARE THE WORK, NOT THE REDIRECT.  A cdata
+     slot is a run-time load, so the four front-end `attribute_spec::
+     exclusions' tables (`c-family/c-attribs.cc', `d/d-attribs.cc',
+     `jit/dummy-frontend.cc', `ada/gcc-interface/utils.cc') and the two
+     `static const char separator_str[]' arrays could no longer name the
+     macro.  The arrays became ordinary locals; the tables are now patched by
+     `mt_fixup_fmv_exclusions ()' in `init_attributes ()'.  */		\
+  NUM (int,	     has_fmv_target_attribute,				\
+					TARGET_HAS_FMV_TARGET_ATTRIBUTE) \
+  NUM (char,	     clones_attr_separator,				\
+					TARGET_CLONES_ATTR_SEPARATOR)
 
 /* `TARGET_VTABLE_ENTRY_ALIGN' IS THE THIRD OF THAT FAMILY AND IT MUST NOT
    COME HERE.  It was measured alongside the two above and it does NOT share

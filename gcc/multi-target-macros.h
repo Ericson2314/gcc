@@ -496,6 +496,31 @@ extern void mt_asm_output_align (FILE *, int);
    `STORE_FLAG_VALUE' above this redirect stands alone.  */
 #undef WORD_REGISTER_OPERATIONS
 #define WORD_REGISTER_OPERATIONS (targetm_cdata.word_register_operations)
+/* THE FUNCTION-MULTIVERSIONING PAIR.  See the field comment in
+   target-cdata.h: this is the `#ifndef' floor in the polarity where the
+   PRIMARY IS SILENT, so `defaults.h''s fallback really does fire and the
+   dissenters (aarch64, riscv, loongarch) get the floor's answer instead of
+   their own.
+
+   SWEPT BEFORE REDIRECTING, because a cdata slot is a run-time load and these
+   two are the first cdata macros with STATIC-INITIALISER consumers.  Over all
+   of `gcc/' outside `config/': no `#if', no `#ifdef', no case label, no array
+   bound.  Six static initialisers, all now converted -- four
+   `attribute_spec::exclusions' tables (c-family, d, jit, ada) patched at
+   `init_attributes ()' time by `mt_fixup_fmv_exclusions ()', and two
+   `static const char separator_str[]' arrays turned into ordinary locals.
+   Everything else (multiple_target.cc x12, attribs.cc x5, tree.cc x4 -- two
+   of them `gcc_assert's -- c-decl.cc x4, cp/ x6, c-attribs.cc x2,
+   c-pretty-print.cc x2) is an ordinary run-time expression.
+
+   The two `gcc_assert (!TARGET_HAS_FMV_TARGET_ATTRIBUTE)'s in tree.cc hold
+   today only because the macro is the floor's 1 in a shared TU; asked of the
+   SELECTED base they become real checks.  That is the point, and it is why
+   they are named here rather than assumed harmless.  */
+#undef TARGET_HAS_FMV_TARGET_ATTRIBUTE
+#define TARGET_HAS_FMV_TARGET_ATTRIBUTE (targetm_cdata.has_fmv_target_attribute)
+#undef TARGET_CLONES_ATTR_SEPARATOR
+#define TARGET_CLONES_ATTR_SEPARATOR (targetm_cdata.clones_attr_separator)
 /* `DWARF_FRAME_RETURN_COLUMN' WAS REDIRECTED HERE AND IS NOW A CALL, with the
    rest of the DWARF register family below.  epiphany's reads
    `current_function_decl', which is null when `target-cdata.cc' runs.  */
