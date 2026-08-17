@@ -276,6 +276,75 @@ rests on the text diff plus the `slli`/`lw` pair, and **is not confirmed at
 the object level here**; aarch64's is.
 
 
+### 3e. THE SUITE — aarch64, and it is INERT ACROSS 388,986 RESULTS
+
+Both runs stamped (`check-aarch64-unknown-linux-gnu.rc` = 0), compile-only,
+against aarch64's **own** cross assembler (`readelf` reported `AArch64`), with
+the `MULTI-TARGET RUN` attribution banner present in both logs. `gcc.sum` is
+389,937 lines on each side. `mt-namediff.sh`, by name:
+
+```
+                     OLD        NEW      DELTA
+PASS              341962     341962         +0
+FAIL               20688      20688         +0
+XPASS/XFAIL/UNSUPPORTED/UNRESOLVED/ERROR      all +0
+
+unchanged                388962
+PASS -> NOT PASS              0     <- real regressions
+NOT PASS -> PASS              0     <- real progress
+only in new / only in old  24 / 24  <- tcl, testcase, /tmp and two
+                                       snapshot-path-bearing gcc.dg/lto
+                                       rows; harness rows, both sides
+cardinality              2 files +3 results
+```
+
+**Zero movement in either direction.** Stated plainly rather than dressed up:
+this conversion fixes wrong code that the aarch64 testsuite cannot see, and
+that is itself the finding. Two reasons, both structural:
+
+- the run is `MT_COMPILE_ONLY=1`, so nothing **executes** a switch, and a jump
+  table with the wrong stride is only wrong when it is jumped through;
+- no `scan-assembler` test in the aarch64 suite asserts the case-vector
+  directive, so the `.quad` / `.word` difference is not asserted anywhere.
+
+So the aarch64 board is **not** the instrument that would have caught this,
+and it never was — which is precisely the argument for the byte-level and
+object-level arms in 3d. A defect worth 388,986 results of silence is exactly
+the shape PRINCIPLES describes for `EPILOGUE_USES`: *the only thing that sees
+it is comparing the emitted body against a control.*
+
+Read the other way, the zero is the strongest **non**-regression evidence
+available: a change that rewrites every jump table on this target moved
+nothing else at all.
+
+`KILLED` / `virtual memory exhausted` is **0 on both aarch64 sides** — counted,
+never subtracted. (The previous board recorded 10 per side on riscv64 under
+load; this machine was quieter.)
+
+### 3f. THE CONTROL — x86_64, BYTE-FOR-BYTE INERT
+
+Both stamped rc=0, 199,171-line `gcc.sum` on each side.
+
+```
+                     OLD        NEW      DELTA
+PASS              162164     162164         +0
+FAIL               16295      16295         +0
+XPASS/XFAIL/UNSUPPORTED/UNRESOLVED/ERROR      all +0
+
+joined rows              197825
+unchanged                197825      <- EVERY ONE
+PASS -> NOT PASS              0
+NOT PASS -> PASS              0
+cardinality        0 more / 0 fewer / 0 gone / 0 new
+only in new / old       21 / 21      harness rows
+```
+
+**197,825 results with zero transitions in either direction and zero
+cardinality movement**, reproducing the previous board's 197,827-result
+control on a different pair of trees. x86_64's codegen for a switch is
+byte-identical across this change (md5 `e153a7bc5904`), so this is the
+prediction that could have falsified and did not.
+
 ## 4. THE TWO POPULATIONS, TOGETHER
 
 Neither instrument is the answer and the brief is right that they must be
@@ -299,8 +368,23 @@ leak census (tm.texi @defmac population), TMH from the PRE build's own tm.h
   #32 ONLY        82     <- census-invisible BY CONSTRUCTION
   census ONLY    214     <- no measured value divergence
 
--undoc.sh (undocumented candidates)               106, and see 4a
+-undoc.sh (undocumented candidates)               106, BOTH ARMS GREEN
 ```
+
+The `106` is now **verified** rather than printed: on the first run the
+scanner exited 9 and called its own total void (4a). After the arm was rebuilt
+it reports
+
+```
+ok  ARM A (mechanism): HOST_BIT_BUCKET found
+ok  ARM B (population): still present: ASM_OUTPUT_ADDR_VEC
+      ASM_OUTPUT_ADDR_DIFF_VEC ASM_OUTPUT_EXTERNAL_LIBCALL FRAME_BEGIN_LABEL
+    converted or gone since this list was written: ASM_OUTPUT_CASE_END
+```
+
+and ARM B naming `ASM_OUTPUT_CASE_END` as already gone, unprompted, is the
+arm working: that macro **is** documented, so it was never in this population,
+and the list said so without anyone checking by hand.
 
 GROOM2 recorded **330 / 83 / 213** against a 543-name `tm.texi` side. The side
 is **545** here because the census's uppercase-only extraction was fixed —
@@ -365,9 +449,82 @@ one of these per session. It is now two arms:
 - **A harness's hardcoded population is a coverage claim nothing states.**
   `-syncheck.sh` prints `22/22 ok` from a hand-written `BASES=` list. Nothing
   in that output says 22 of 47. See 2f.
-- **Say in advance which targets a conversion cannot move.** All four scored
-  targets are LP64 and spell `.L`, which is precisely the combination i386's
-  emitter gets right, so all four are correct **by luck** and must come out
-  byte-identical. Stated before the run so a flat column could not be read as
-  a failed change — the statement `ADJUST_INSN_LENGTH` had to make, and the
-  reason the stdint family scores zero on this board too.
+- **I SAID IN ADVANCE WHICH TARGETS COULD NOT MOVE AND I WAS WRONG, WHICH IS
+  THE MOST USEFUL THING IN THIS BOARD.** The prediction — all four scored
+  targets are LP64 and spell `.L`, exactly what i386's emitter gets right, so
+  all four are correct by luck and byte-identical — went into the commit
+  message, the descriptor comment and the harness header. **Two of the four
+  changed.** The reasoning was about the POINTER width and a jump table may be
+  RELATIVE, at which point the entry width is not the pointer width at all but
+  whatever the back end's `casesi` pattern loads.
+
+  Saying it in advance is still right and is what made the failure legible:
+  the arm was run to confirm a stated prediction, so a `CHANGED` row was
+  immediately a finding rather than a puzzle. **A prediction that cannot fail
+  is not worth stating; this one failed and paid for itself.** The corrected
+  statement is in `target-frame.h` in place of the wrong one, because a
+  comment left standing while the board disagrees with it is how the next
+  agent inherits my error as a fact.
+- **THE SUITE COULD NOT SEE IT, AND THAT IS A PROPERTY OF THE SUITE.**
+  388,986 aarch64 results moved by **zero** across a change that rewrites
+  every jump table on the target. Compile-only means nothing executes a
+  switch, and no `scan-assembler` test asserts the case-vector directive. So
+  for this defect class the board is **not** the instrument, and the
+  object-level arm (`.rodata` 96 -> 48 against the stride the code uses) is.
+  Same shape as `EPILOGUE_USES`: the only thing that sees it is comparing the
+  emitted body against a control.
+
+## 6. WHAT I WOULD HAND THE NEXT AGENT
+
+1. **The rest of the jump-table family — the WHOLE-TABLE half.** This task
+   converted the *entries*; the *table* is still i386's. Measured through the
+   real `tm.h` chain:
+
+   ```
+   ASM_OUTPUT_ADDR_VEC        4 definers (avr pa sparc xstormy16)   i386: NO
+   ASM_OUTPUT_ADDR_DIFF_VEC   2 definers (pa sparc)                 i386: NO
+   ASM_OUTPUT_CASE_END        5 definers                            i386: NO
+   ASM_OUTPUT_CASE_LABEL     40 definers (elfos.h)                  i386: YES,
+                                          5 distinct bodies, 36 share i386's
+   ```
+
+   All four are LEAKED ABSENCE except the last. `final.cc:2476` and `:2559`
+   are `#if defined(A) || defined(B)`, so the four back ends with a
+   whole-table routine (`avr_output_addr_vec` and friends) **have never
+   emitted a jump table through it** — and `final.cc:2478`'s comment says the
+   label must then not be emitted either, so those four also get a label they
+   should not have. This is a **shape change**, not an emitter swap: the `#if`
+   becomes a runtime `if (mt_has_output_addr_vec () || …)`, which is why it
+   was not folded into this commit.
+
+   `ASM_OUTPUT_CASE_LABEL` is the low-value member (4 back ends differ from
+   i386) and is the one whose directory-grep count is wrong by 33; do not
+   re-derive it from `config/`.
+
+2. **`ASM_OUTPUT_MAX_SKIP_ALIGN`** — the board before last's item #3, still
+   live, still mis-scored as converted by the census (`varasm.cc:2173`,
+   `final.cc:2432`). Unchanged by this task.
+
+3. **The 34 DESCRIPTOR macros still spelled raw** (`-descaudit.sh`). Each is a
+   leak the census removes from its own headline. Head of the list unchanged:
+   `STACK_GROWS_DOWNWARD`, `DWARF2_FRAME_REG_OUT`, `CUMULATIVE_ARGS`,
+   `FRAME_POINTER_CFA_OFFSET`, `MAX_OFILE_ALIGNMENT`.
+
+4. **A 32-BIT TARGET ON THE BOARD IS NOW THE HIGHEST-VALUE HARNESS ITEM.**
+   Every scored target is LP64. Whole classes of leak — the stdint family, the
+   entry-width half of this one, `Pmode`-shaped defects — are invisible to all
+   four by construction, and this task only caught its own because two of the
+   four happen to use *relative* tables. `arm-eabi` or `m68k-elf` through
+   `mt-specs-fallback.sh` would cost one specs-config and change what the
+   board can see.
+
+5. **`mtcheck.sh`'s empty `DEJAGNU` (see the suite-driver commit).** Worked
+   around from outside because another agent's run was executing the file.
+   Make the export conditional once no run is in flight — otherwise the next
+   `check-gcc` gets a zero-byte `gcc.sum` beside `make` exit 0.
+
+6. **`-undoc.sh`'s ARM B is a list, and lists run out.** It currently holds
+   `ASM_OUTPUT_ADDR_VEC`, `ASM_OUTPUT_ADDR_DIFF_VEC`,
+   `ASM_OUTPUT_EXTERNAL_LIBCALL`, `FRAME_BEGIN_LABEL`. Item 1 above converts
+   the first two. **Top the list up in the same commit**, from the scan's own
+   ranked output; do not lower it to one name, which is how it expired twice.
