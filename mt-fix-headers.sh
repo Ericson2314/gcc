@@ -88,13 +88,21 @@ if test -z "$sysheaders"; then
         TARGET_SPECS_FLAGS_FOR_$triple=--with-native-system-header-dir=DIR"
 fi
 
-# THE NEGATIVE CONTROL LIVES HERE, NOT IN mkheaders.  Measured: mkheaders
-# pointed at a directory containing no headers exits 0 and installs a perfectly
-# ordinary-looking include-fixed holding only limits.h and syslimits.h, which it
-# copies from itoolsdatadir without consulting the header directory at all.  So
-# "fixed nothing" and "fixed a directory that does not exist" are indis-
-# tinguishable from its exit status and nearly indistinguishable from its
-# output.  Check the input before running.
+# DELIBERATE BELT-AND-BRACES DUPLICATE OF A CHECK mkheaders NOW MAKES ITSELF.
+# This is NOT a second authority: mkheaders is the authority, and the identical
+# check there (see "THE HEADER DIRECTORY MUST ACTUALLY BE READ" in
+# fixincludes/mkheaders.in) is the one that protects every OTHER caller -- a
+# distro, cc-wrapper, a per-target nix derivation.  It is repeated here only so
+# the diagnostic can name $triple and the config file the path came out of,
+# which mkheaders cannot know.  If the two ever disagree, mkheaders wins; do
+# not relax it there on the strength of this one.
+#
+# Measured, before mkheaders had the check: pointed at a directory containing
+# no headers it exits 0 and installs a perfectly ordinary-looking include-fixed
+# holding only limits.h and syslimits.h, which it copies from itoolsdatadir
+# without consulting the header directory at all.  So "fixed nothing" and
+# "fixed a directory that does not exist" were indistinguishable from its exit
+# status and nearly indistinguishable from its output.
 test -d "$sysheaders" || fail "$sysheaders does not exist.
   That is the directory target-specs recorded as $triple's system headers.
   Fixing it would produce an include-fixed holding only the copied limits.h and

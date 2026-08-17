@@ -976,7 +976,28 @@ EXTRA_GCC_FLAGS = \
 	"GCC_FOR_TARGET=$(GCC_FOR_TARGET) $$TFLAGS" \
 	"GM2_FOR_TARGET=$(GM2_FOR_TARGET) $$TFLAGS" \
 	"`echo 'STMP_FIXPROTO=$(STMP_FIXPROTO)' | sed -e s'/[^=][^=]*=$$/XFOO=/'`" \
-	"`echo 'LIMITS_H_TEST=$(LIMITS_H_TEST)' | sed -e s'/[^=][^=]*=$$/XFOO=/'`"
+	"`echo 'LIMITS_H_TEST=$(LIMITS_H_TEST)' | sed -e s'/[^=][^=]*=$$/XFOO=/'`" \
+	"itoolsdir=$(MT_INSTALL_ITOOLSDIR)" \
+	"itoolsdatadir=$(MT_INSTALL_ITOOLSDATADIR)"
+
+# The two above are the OTHER HALF of the fixincludes binding a few lines up in
+# this file's MT_INSTALL_ITOOLSDIR comment.  fixincludes is told where to put
+# the install-tools PROGRAMS; gcc is told where to put the install-tools DATA
+# that mkheaders then reads back.  One authority, two consumers.  gcc/ used to
+# compute its own from $(libsubdir)/$(libexecsubdir); it no longer has a
+# default at all, so a missing binding here is a named error and not a silent
+# install into some other directory -- see `check-itoolsdirs' in gcc/Makefile.in.
+#
+# Spelt as gcc's OWN names rather than reusing `bindir'/`datadir' as
+# fixincludes does: gcc really does install user-facing programs into $(bindir)
+# (xgcc, cpp, gcov), so overriding bindir for the gcc module would move those
+# too.  fixincludes has no such user-facing output, which is why the shorter
+# spelling is safe there and not here.
+#
+# EXTRA_GCC_FLAGS is appended AFTER $(FLAGS_TO_PASS) at every call site, which
+# is what lets a repeated assignment win; these two names appear nowhere in
+# FLAGS_TO_PASS, so unlike the fixincludes bindir/datadir case that ordering is
+# not load-bearing here.
 
 GCC_FLAGS_TO_PASS = $(BASE_FLAGS_TO_PASS) $(EXTRA_HOST_FLAGS) $(EXTRA_GCC_FLAGS)
 

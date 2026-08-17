@@ -6894,10 +6894,44 @@ install-base-headers: stmp-int-hdrs installdirs
 install-include-dir: installdirs
 	$(mkinstalldirs) $(DESTDIR)$(libsubdir)/include
 
+# THE INSTALL-TOOLS LAYOUT IS THE TOP LEVEL'S TO DEFINE, NOT OURS.
+#
+# These two used to be computed here, as $(libexecsubdir)/install-tools and
+# $(libsubdir)/install-tools.  fixincludes stopped computing its half in
+# 1c3abe915f5 -- it installs into plain $(bindir)/$(datadir) and the top level
+# binds those per module, at the call site, from MT_INSTALL_ITOOLSDIR /
+# MT_INSTALL_ITOOLSDATADIR (see Makefile.def's `extra_make_flags').  This side
+# had not moved, so the layout still had TWO authorities that agreed only
+# because one had been written to copy the other.  That arrangement has already
+# failed once here: fixincludes wrote under .../gcc/<triple>/<ver>/ while gcc
+# wrote under .../gcc/<ver>/, mkheaders looked for fixinc_list where nothing had
+# written any, and BOTH HALVES INSTALLED WITH EXIT 0.
+#
+# So they are now ARGUMENTS.  The top level passes itoolsdir= and
+# itoolsdatadir= in EXTRA_GCC_FLAGS, which comes after $(FLAGS_TO_PASS) on the
+# sub-make command line.  There is deliberately NO default: a default is a
+# second authority again, and a wrong one is silent.  SCOPE: only this pair
+# moved.  $(libsubdir)/$(libexecsubdir) still mean what they meant everywhere
+# else in this file and are not up for conversion here.
+itoolsdir =
+itoolsdatadir =
+
+# Both install rules go through this, so the diagnostic is written once.
+.PHONY: check-itoolsdirs
+check-itoolsdirs:
+	@if [ -z "$(itoolsdir)" ] || [ -z "$(itoolsdatadir)" ]; then \
+	  echo "gcc/Makefile: itoolsdir/itoolsdatadir are not set." >&2; \
+	  echo "  They name the install-tools directories, which the TOP LEVEL" >&2; \
+	  echo "  defines (MT_INSTALL_ITOOLSDIR / MT_INSTALL_ITOOLSDATADIR) and" >&2; \
+	  echo "  passes down per module.  There is no default on purpose: gcc" >&2; \
+	  echo "  recomputing the layout is how gcc and fixincludes came to" >&2; \
+	  echo "  install into two different directories, each with exit 0." >&2; \
+	  echo "  Run this through the top-level Makefile, or pass both." >&2; \
+	  exit 1; \
+	fi
+
 # Create or recreate the install-tools include file directory.
-itoolsdir = $(libexecsubdir)/install-tools
-itoolsdatadir = $(libsubdir)/install-tools
-install-itoolsdirs: installdirs
+install-itoolsdirs: installdirs check-itoolsdirs
 	$(mkinstalldirs) $(DESTDIR)$(itoolsdatadir)/include
 	$(mkinstalldirs) $(DESTDIR)$(itoolsdir)
 

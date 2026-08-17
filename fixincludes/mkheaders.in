@@ -243,6 +243,61 @@ case ${incdir} in
 	exit 1 ;;
 esac
 
+# THE HEADER DIRECTORY MUST ACTUALLY BE READ, AND THAT MUST BE CHECKED HERE.
+#
+# MEASURED: pointed at a directory with no headers in it -- or at one that does
+# not exist -- this script exited 0 and wrote an include-fixed containing
+# limits.h, syslimits.h and README, every byte of it copied out of
+# ${itoolsdatadir} and ${itoolsdir} WITHOUT THE HEADER DIRECTORY EVER BEING
+# OPENED.  fixinc.sh itself is happy to fix nothing.  So the output of a run
+# against a wrong --headers was byte-identical to the output of a correct run
+# against a libc needing no hacks.
+#
+# The checks above are for ABSENT answers; this one is for a WRONG one, and
+# "the option was given" was being read as "the option was right".
+#
+# THERE ARE THREE OUTCOMES, NOT TWO, and the reason this check is shaped the
+# way it is:
+#
+#   (a) headers read, no fixes needed -- SUCCESS.  armv6l glibc 2.42 needs no
+#       fixincludes hacks at all, so nothing in its include-fixed is derived
+#       from its headers.  A check demanding derived OUTPUT fails that correct
+#       run; one demanding readable INPUT does not.  The fix count is printed
+#       at the end so that zero is a visible number, not an implication.
+#   (b) headers read, fixes applied -- SUCCESS.
+#   (c) header directory absent, empty of headers, or unreadable -- FAILURE,
+#       naming the directory.
+#
+# Hence: check the INPUT, count the OUTPUT, assert nothing about the count.
+#
+# This runs BEFORE the `rm -rf' below, so a rejected run leaves --incdir
+# untouched rather than emptying it and then refusing to refill it.
+sysheaders_read="${isysroot}${sysheaders}"
+if [ ! -d "${sysheaders_read}" ] ; then
+    echo "$me: --headers directory \`${sysheaders_read}' does not exist." >&2
+    echo "  Those are supposed to be $target's system headers.  Refusing to" >&2
+    echo "  continue: fixincludes would read nothing, find nothing to fix," >&2
+    echo "  and this script would still write an include-fixed of files" >&2
+    echo "  copied from ${itoolsdatadir} -- output indistinguishable from a" >&2
+    echo "  correct run over a libc that needs no fixes." >&2
+    exit 1
+fi
+if [ ! -r "${sysheaders_read}" ] || [ ! -x "${sysheaders_read}" ] ; then
+    echo "$me: --headers directory \`${sysheaders_read}' is not readable." >&2
+    echo "  fixincludes cannot see $target's headers through it, and an" >&2
+    echo "  unreadable directory fixes exactly as much as an empty one: none," >&2
+    echo "  silently." >&2
+    exit 1
+fi
+if [ -z "`find \"${sysheaders_read}\" -name '*.h' -print 2>/dev/null | sed -n 1p`" ] ; then
+    echo "$me: --headers directory \`${sysheaders_read}' contains no headers." >&2
+    echo "  Nothing matching \`*.h' anywhere under it, so there is nothing of" >&2
+    echo "  $target's for fixincludes to read.  This is case (c) above -- a" >&2
+    echo "  wrong --headers -- and it is rejected rather than allowed to" >&2
+    echo "  produce the same include-fixed a correct zero-fix run produces." >&2
+    exit 1
+fi
+
 # `cd' MUST BE CHECKED: unchecked, a missing itoolsdir left this running in the
 # caller's cwd, where the fixinc.sh invocation below would find no fixincl and
 # the failure would name neither directory.
@@ -304,6 +359,13 @@ if [ -z "$macro_list" ] ; then
     mv ${macro_list}.tmp ${macro_list}
 fi
 
+# COUNT THE FIXES, DO NOT ASSERT ON THEM.  Zero is a legitimate answer (case
+# (a) above), so this number is reported, never required to be non-zero.  It is
+# counted per multilib, immediately after fixinc.sh runs and BEFORE the
+# unconditional limits.h/syslimits.h copies below, so it counts only what was
+# derived from ${sysheaders_read}.
+nfixed=0
+
 for ml in `cat ${itoolsdatadir}/fixinc_list`; do
   sysroot_headers_suffix=`echo ${ml} | sed -e 's/;.*$//'`
   multi_dir=`echo ${ml} | sed -e 's/^[^;]*;//'`
@@ -313,7 +375,8 @@ for ml in `cat ${itoolsdatadir}/fixinc_list`; do
   TARGET_MACHINE="${target}" target_canonical="${target}" \
       MACRO_LIST="${macro_list}" \
       $shell ./fixinc.sh ${subincdir} \
-      ${isysroot}${sysheaders} ${other_dirs}
+      ${sysheaders_read} ${other_dirs}
+  nfixed=`expr ${nfixed} + \`find ${subincdir} -name '*.h' -print | wc -l\``
   rm -f ${subincdir}/syslimits.h
   if [ -f ${subincdir}/limits.h ]; then
     mv ${subincdir}/limits.h ${subincdir}/syslimits.h
@@ -341,6 +404,10 @@ fi
 cat <<EOF
 mkheaders: wrote ${target}'s fixed headers to
   ${incdir}
+  ${nfixed} header(s) fixed from ${sysheaders_read}.
+  (Zero is a legitimate result -- a modern libc may need no hacks.  It is
+  printed because "fixed nothing" and "read nothing" used to look the same;
+  a --headers that could not be read is now rejected before this point.)
 Nothing searches them yet.  Give ${target}'s config file the key, via the one
 program that writes it:
   target-specs/configure --with-target=${target} \\
