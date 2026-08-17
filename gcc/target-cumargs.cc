@@ -88,6 +88,24 @@ along with GCC; see the file COPYING3.  If not see
    expansion now happens in the translation unit where the macro is that
    base's own, so that base's headers have to be satisfiable here.  */
 #include "output.h"
+/* For `lang_hooks'.  `defaults.h:1191's `TRAMPOLINE_ALIGNMENT' floor is
+   `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', and `FUNCTION_ALIGNMENT'
+   (`defaults.h:1182') reads `lang_hooks.custom_function_descriptors'.  46 of
+   the 47 back ends take that floor, so without this the build fails BY NAME:
+   `defaults.h:1183: lang_hooks was not declared in this scope'.
+
+   AN INCLUDE THAT MAKES A SCOPE ERROR GO AWAY IS SAFE EXACTLY WHEN YOU CAN
+   SAY WHAT THE MACRO READS, and `target-cdata.h' records the case where it is
+   NOT -- `DWARF_FRAME_RETURN_COLUMN', where the identical one-line fix would
+   have silenced a scope error over a macro reading per-FUNCTION state and
+   given epiphany the wrong DWARF column in every interrupt handler.  This is
+   the other case, and the difference is checkable: `lang_hooks' is a global
+   the front end fills in once, `custom_function_descriptors' is a property of
+   the LANGUAGE, and `mt_base_trampoline_alignment' is a CALL evaluated at each
+   use site rather than a value cached at selection time -- so it reads exactly
+   what `varasm.cc' and `builtins.cc' read, at the same moment they read it.
+   Nothing here is frozen and nothing is per-function.  */
+#include "langhooks.h"
 /* `explow.h' is here for `enum save_level' ALONE, and it is required rather
    than tidy: `mt_base_stack_savearea_mode' expands the base's OWN
    `STACK_SAVEAREA_MODE', and seven back ends spell `SAVE_NONLOCAL' /

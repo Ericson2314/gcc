@@ -144,22 +144,40 @@ FAIL: ... scan-assembler-times \n\t.type\tfoo, %gnu_indirect_function\n 1
 ```
 
 and the directive **is** emitted — as `.type foo, @gnu_indirect_function`.
-`TYPE_OPERAND_FMT`: `elfos.h:284` is `"@%s"`, **`aarch64-elf.h:149` and
-`arm/elf.h:74` are `"%%%s"`**, `sparc/sysv4.h:59` is `"#%s"`. `defaults.h:261`
-builds `ASM_OUTPUT_TYPE_DIRECTIVE` out of it and `varasm.cc` expands it, so all
-47 get i386's `@`.
+The culprit is `TYPE_OPERAND_FMT`. `defaults.h:261` builds
+`ASM_OUTPUT_TYPE_DIRECTIVE` out of it and `varasm.cc` expands it, so all 47 get
+i386's `@`.
+
+**The population, measured from the build's own headers over all 47 bases**
+(`agent-a992b7e5fa4ffaaa7-floorread.sh`, `-DIN_GCC`, non-vacuity arm asserting
+≥1000 defines per arm):
+
+```
+== TYPE_OPERAND_FMT
+  SHARED       "@%s"
+  aarch64      "%%%s"   <- DIFFERS      (aarch64-elf.h:149)
+  arm          "%%%s"   <- DIFFERS      (arm/elf.h:74)
+  sparc        "#%s"    <- DIFFERS      (sparc/sysv4.h:59)
+               agree 41   differ 3   undefined 3        <- pdp11, mmix, nvptx
+
+== TYPE_ASM_OP
+  SHARED       "\t.type\t"
+               agree 44   differ 0   undefined 3
+```
+
+So it is **one** macro, not the pair, and **3 of 47 dissent**.
 
 **Not fixed here, deliberately, and the reason is §2b.** It looks like a
-one-line `TARGET_CDATA_FIELDS` `STR` slot, and the supply side has a real
-design question: **not every back end defines `TYPE_OPERAND_FMT`**, so
-`target-cdata.cc` would need either an optional-STR mechanism (which does not
-exist — `TARGET_CDATA_OPT_FIELDS` is `OPTNUM` only) or an invented default.
-Worse, the *consumer* guard `#if defined TYPE_ASM_OP && defined
-TYPE_OPERAND_FMT` is itself answered by i386's chain, so shared code has
-`ASM_OUTPUT_TYPE_DIRECTIVE` defined for back ends that should not have it —
-a leaked *presence* under the leaked value. Handed over with the evidence
-rather than guessed at. `TYPE_ASM_OP` is **not** divergent (three definers,
-all `"\t.type\t"`), so it is only the one macro.
+one-line `TARGET_CDATA_FIELDS` `STR` slot, and the supply side carries a real
+design decision: **pdp11, mmix and nvptx define neither macro**, so
+`target-cdata.cc` would need either an optional-STR mechanism — which does not
+exist, `TARGET_CDATA_OPT_FIELDS` is `OPTNUM` only — or an invented default for
+three back ends that upstream gives no `.type` directive at all. And the
+*consumer* guard `#if defined TYPE_ASM_OP && defined TYPE_OPERAND_FMT` is
+itself answered by i386's chain, so shared code has `ASM_OUTPUT_TYPE_DIRECTIVE`
+defined for exactly those three — a leaked **presence** sitting under the
+leaked value, which any value-only fix would leave in place. Handed over with
+the evidence rather than guessed at.
 
 ---
 
