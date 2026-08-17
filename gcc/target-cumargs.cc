@@ -568,7 +568,8 @@ mt_base_output_local (FILE *file ATTRIBUTE_UNUSED,
       ASM_OUTPUT_ALIGNED_LOCAL (file, name, size, align);
       return true;
     }
-# ifdef ASM_OUTPUT_LOCAL
+# if defined ASM_OUTPUT_LOCAL \
+     && !defined ASM_OUTPUT_ALIGNED_LOCAL_P_IS_CONSTANT_TRUE
   ASM_OUTPUT_LOCAL (file, name, size, rounded);
   return false;
 # else
@@ -580,13 +581,26 @@ mt_base_output_local (FILE *file ATTRIBUTE_UNUSED,
      take this arm, and several of them define no `ASM_OUTPUT_LOCAL' at all --
      `aarch64` was the one the build named.
 
-     Reaching this is impossible rather than merely unlikely: `defaults.h:1607'
-     makes `ASM_OUTPUT_ALIGNED_LOCAL_P' the constant `true', and the only back
-     end that overrides it is `i386/bsd.h:76', which also defines
-     `ASM_OUTPUT_LOCAL'.  So for a base in this `#else' the test above is a
-     compile-time true and this code is dead -- but it is spelled as a hard
-     stop rather than deleted, because "the target emitted nothing for a local
-     variable" would otherwise be a silent hole in the data section.  */
+     Reaching this is impossible rather than merely unlikely: where
+     `defaults.h' supplied `ASM_OUTPUT_ALIGNED_LOCAL_P' the test above is the
+     compile-time constant `true', and the only back end that overrides it is
+     `i386/bsd.h:76' -- which also defines `ASM_OUTPUT_LOCAL'.  That is what
+     the `_IS_CONSTANT_TRUE' marker records, per base, in that base's own
+     translation unit.
+
+     THE SECOND CONDITION IS NOT BELT-AND-BRACES; IT IS WHAT bfin NEEDS.
+     `bfin.h:1054's ASM_OUTPUT_LOCAL spells `ASM_SPACE', and `ASM_SPACE' is
+     **defined nowhere in the GCC tree**.  bfin defines the macro, so an
+     `#ifdef ASM_OUTPUT_LOCAL' alone lets it through, and the build stops with
+     `'ASM_SPACE' was not declared in this scope'.  bfin's macro has never been
+     compiled by anything: upstream compiles `varasm.cc' once with the
+     primary's macros, i386 takes the DECL_LOCAL arm, and so this arm is
+     compiled for nobody.  A dormant upstream bug, surfaced by making 47 back
+     ends answer for themselves.  Worth reporting upstream.
+
+     Spelled as a hard stop rather than deleted, because "the target emitted
+     nothing for a local variable" would otherwise be a silent hole in the data
+     section.  */
   gcc_unreachable ();
 # endif
 #else

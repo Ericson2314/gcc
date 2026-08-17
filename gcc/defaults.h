@@ -1605,6 +1605,26 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    unconditional block below because a target header may set it first.  */
 #ifndef ASM_OUTPUT_ALIGNED_LOCAL_P
 #define ASM_OUTPUT_ALIGNED_LOCAL_P true
+/* AND A MARKER SAYING THE ABOVE IS THE CONSTANT, NOT A RUNTIME READ.
+
+   `mt_base_output_local' (target-cumargs.cc) needs to know, AT PREPROCESSING
+   TIME IN THIS BASE'S OWN TRANSLATION UNIT, whether the `false' branch of
+   `if (ASM_OUTPUT_ALIGNED_LOCAL_P)' can ever be taken -- because that branch
+   expands `ASM_OUTPUT_LOCAL', and for a base where the test is a compile-time
+   `true' the branch is dead code that still has to COMPILE.
+
+   It cannot: `bfin.h:1054's ASM_OUTPUT_LOCAL spells `ASM_SPACE', and
+   **`ASM_SPACE` is defined nowhere in the tree**.  bfin's macro has never been
+   compiled by anything, because upstream compiles `varasm.cc' once with the
+   primary's macros and i386 takes a different arm entirely.  It is a genuine
+   upstream defect, found only because 47 back ends now compile this chain.
+
+   This is a SUPPLY-side marker, not a floor: it says something about whether
+   THIS base overrode the macro, and no base can ever read another's.  The test
+   PRINCIPLES 2a sets -- "would a second configured back end change it?" -- is
+   answered no, because it is set exactly when this base's own headers were
+   silent.  */
+#define ASM_OUTPUT_ALIGNED_LOCAL_P_IS_CONSTANT_TRUE 1
 #endif
 #undef HAVE_GAS_SECTION_LINK_ORDER
 #define HAVE_GAS_SECTION_LINK_ORDER (targ_caps.gas_section_link_order)
