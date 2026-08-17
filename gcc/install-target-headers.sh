@@ -74,6 +74,44 @@
 # on `auto-target.h' and `stdio.h', so both arms fail identically -- a null
 # result shaped like a measurement.
 #
+# ARM D: THE SET RE-MEASURED WITH THE INSTRUMENT THAT IS SCOPED CORRECTLY BY
+# CONSTRUCTION, AND IT IS NINE FILES, NOT SEVEN.
+#
+# A STANDALONE libgcc build cannot make either of the scoping errors above:
+# there is no gcc build directory to over-collect from, so its `.dep' set is
+# exactly libgcc's own objects, and `.dep' records what the compiler OPENED, so
+# it sees includes reached through gcc's own headers.  Measured on
+# aarch64-unknown-linux-gnu, 452 objects:
+#
+#     tconfig.h                        197 TUs
+#     auto-host.h                      197
+#     tm.h                             195
+#     tm-<triple>.h                    195
+#     options-<base>.h                 195
+#     insn-modes.h                     195
+#     insn-modes-<base>.h              195
+#     insn-constants-<base>.h          195
+#     version.h                         28   <- all _gcov_*, via libgcov.h
+#
+# NOTE WHICH TWO OF THE CANONICAL SEVEN ARE ABSENT: `options.h' and
+# `insn-constants.h' are opened by ZERO translation units.  They are one-line
+# shims, and the target's `tm-<triple>.h' includes the per-base files directly,
+# so the shims are never reached.  `insn-modes.h' is NOT in that category -- it
+# is a shim that IS opened, by all 195.  Asymmetric, and only a measurement
+# distinguishes them.
+#
+# FOUR INSTALLED FILES ARE OPENED BY NOTHING: `options.h', `insn-constants.h',
+# `aarch64-builtin-iterators.h' and -- worth a second look --
+# `i386-builtin-types.inc', which is ANOTHER BACK END'S file sitting in
+# aarch64's include directory.
+#
+# THEY ARE NOT REMOVED HERE, DELIBERATELY.  "Opened by no TU in this
+# configuration" is exactly the evidence that removed `version.h' and had to be
+# put back: `version.h' is opened by 28 of 452 objects, so a header used by a
+# minority is easy to measure as absent in a differently configured build.  This
+# was the `-Dinhibit_libc' arm, which builds a REDUCED libgcov; the with-libc
+# arm builds more of it.  Before removing any of the four, build both ways
+# against one prefix and compare a named object, as arm A finally had to.
 # `tm_p.h' is NOT among the seven -- it is a compiler-internal header, it was
 # on every guessed list, and installing it would have been a file nothing opens.
 # `insn-flags.h' is not either: tm.h guards it with `!defined USED_FOR_TARGET', and
