@@ -2776,3 +2776,53 @@ to shift.**
 
 Do not weaken GCC's top level -- it must keep working for `./configure && make`,
 where it legitimately IS the distro.  Stop *using* it here.
+
+## THE TARGET LIST IS A DISTRO'S SAMPLE, AND IT STOPS AT THE TOP LEVEL
+
+The set of valid target triples is **infinite**: `config.sub` matches wildcard
+families, so no enumeration is or can be complete. What is finite — and
+therefore legitimately enumerable — is:
+
+  * **back ends**, which are `gcc/config/<cpu>/` directories;
+  * **the pattern-match arms** in `config.gcc` and its kin. `*-*-linux-musl*)`
+    is ONE arm matching infinitely many triples;
+  * **structural configure options** — the ones that are *choices*, not strings.
+
+The user's name for this is **finite control flow**: the input space is
+infinite, the behaviour space is finite. That is the existence proof for this
+whole branch. Every control-flow path can be compiled into one `cc1` and
+selected at run time precisely because there are finitely many of them. A
+per-triple answer could never be compiled in.
+
+THE RULE. `--enable-targets=...` is the *only* thing permitted to be per-target.
+It is a **finite sampling of an infinite space**, and that sample may be used
+**only within GCC's top-level build system** — which is playing the role
+nixpkgs' `gcc-ng` plays, or any other distro doing the same job. It must not
+reach `gcc/`, must not reach an installed artefact, and must not key any
+generated file.
+
+THE MECHANICAL TEST: **does a target triple appear anywhere below the top
+level?** In a source file, a generated file, an installed path, a manifest key.
+If yes, a sample of an infinite set is standing in for finite behaviour, and it
+is wrong however convenient. In particular an installed directory named after a
+triple is always this defect — see the `install-target-headers` correction.
+
+WHY IT KEEPS BEING GOT WRONG, and every instance is the same error —
+enumerating INPUTS where the finite thing is BRANCHES:
+
+  * `gcc/default-backends` is 47 **triples**, one per back end, each carrying an
+    arbitrary OS. So arm's option set is `arm-eabi`'s and every linux-arm target
+    silently lacks `gnu-user.opt`, `linux.opt`, `linux-android.opt`.
+  * i686 alongside x86_64 configured cleanly and gave `TARGET_64BIT` a
+    compile-time **0**, because the dedup keyed on `cpu_type` and the *first
+    triple* won.
+  * musl "has no back end" although `config.gcc` handles musl perfectly well —
+    the arm exists; the sample does not contain it.
+  * `install-target-headers.sh` writes `<target>/include/` per configured
+    target, so a target supplied later has none.
+
+The corollary that makes the architecture fall out: `gcc-unwrapped` is the
+finite side — all back ends, all control flow, built once. `target-specs` is
+the infinite side — one arbitrary triple, canonicalised, computed, probed,
+instantiated on demand. The split between the two derivations *is* the
+finite/infinite boundary, and that is the only place it can be.
