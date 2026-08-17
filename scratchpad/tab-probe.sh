@@ -230,18 +230,37 @@ REG_WORDS_BIG_ENDIAN SHIFT_COUNT_TRUNCATED STRICT_ALIGNMENT"
 REGS_MACROS="FIRST_PSEUDO_REGISTER N_REG_CLASSES REGNO_REG_CLASS"
 is_regs () { case " $REGS_MACROS " in *" $1 "*) return 0;; esac; return 1; }
 
-# Is macro $1 redirected by defaults.h to the register vocabulary?  Two
-# different redirects, matched separately and exactly, because they mean
-# different things and a check that accepted either would be satisfied by the
-# wrong one: the two COUNTS become the compile-time union width, and
-# REGNO_REG_CLASS becomes a run-time call.
+# THE REDIRECTS MOVED OUT OF `defaults.h' INTO `multi-target-macros.h' AND
+# THESE TWO HELPERS DID NOT FOLLOW.  Both of them grepped `$SRC/defaults.h',
+# which today carries ZERO `(targetm_cdata.' redirects and zero
+# `MULTI_TARGET_UNION_' ones -- all 24 cdata redirects and all three register
+# ones live in `multi-target-macros.h', which `defaults.h:1932' includes.
+#
+# So both helpers answered NO for every macro, and this script DIED at its own
+# controls (`control: ASM_COMMENT_START is redirected ... and the check says
+# it is not') before probing anything.  That is the control doing exactly its
+# job -- the same shape as `macro-probe-run.sh' exiting rc=9 before probing
+# anything, which PRINCIPLES records, except that this one refuses loudly on
+# the FIRST run rather than after a day of propagated figures.
+#
+# Repaired here rather than described: a finding written up with the code left
+# alone is rediscovered at full price by the next agent.  The file is named
+# rather than "either file", because "cannot tell which authority answered" is
+# this branch's own root bug and a two-file `grep' would reintroduce it.
+MTMACROS='multi-target-macros.h'
+
+# Is macro $1 redirected to the register vocabulary?  Two different redirects,
+# matched separately and exactly, because they mean different things and a
+# check that accepted either would be satisfied by the wrong one: the two
+# COUNTS become the compile-time union width, and REGNO_REG_CLASS becomes a
+# run-time call.
 reg_redirected () {
   case $1 in
     FIRST_PSEUDO_REGISTER|N_REG_CLASSES)
-      grep -qE "^#define $1 MULTI_TARGET_UNION_$1\$" "$SRC/defaults.h" ;;
+      grep -qE "^#define $1 MULTI_TARGET_UNION_$1\$" "$SRC/$MTMACROS" ;;
     REGNO_REG_CLASS)
-      grep -qE '^#define REGNO_REG_CLASS\(REGNO\)' "$SRC/defaults.h" \
-        && grep -qE 'targetm_regs->regno_reg_class' "$SRC/defaults.h" ;;
+      grep -qE '^#define REGNO_REG_CLASS\(REGNO\)' "$SRC/$MTMACROS" \
+        && grep -qE 'targetm_regs->regno_reg_class' "$SRC/$MTMACROS" ;;
     *) return 1 ;;
   esac
 }
@@ -256,13 +275,15 @@ cdata_num_want () {                    # cdata_num_want <macro> <base>
   done
 }
 
-# Is macro $1 redirected to a target-cdata slot by defaults.h?  Matched on the
+# Is macro $1 redirected to a target-cdata slot?  Matched on the
 # `#define <M> (targetm_cdata.' form specifically, not on the name appearing
-# somewhere in the file -- defaults.h also carries each macro's ORIGINAL
-# fallback definition, and a looser match would report every one of them
-# redirected whether or not the block below them still existed.
+# somewhere in the file -- `defaults.h' still carries each macro's ORIGINAL
+# fallback definition (`defaults.h:39' is `#define ASM_COMMENT_START ";#"'),
+# and a looser match would report every one of them redirected whether or not
+# the redirect below it still existed.  See the note above `reg_redirected'
+# for why the file this greps changed.
 redirected () {
-  grep -qE "^#define $1 \(targetm_cdata\." "$SRC/defaults.h"
+  grep -qE "^#define $1 \(targetm_cdata\." "$SRC/$MTMACROS"
 }
 
 # Comments are not uses.  varasm.cc explains in prose why GLOBAL_ASM_OP became
