@@ -803,6 +803,26 @@ if test -s "$work"/unwritten; then
 fi
 
 # --- The actual check. ------------------------------------------------------
+# --- Structural keys that must be PRESENT. ---------------------------------
+#
+# The arms above are all about a key that is written and not read.  This one is
+# the reverse and it had no arm at all: a key that should have been written and
+# was not.  `read_target_caps' leaves an absent key at its C++ initialiser, and
+# an initialiser is indistinguishable from a probe result -- so a target config
+# file that simply lacks `decimal_float' produces exactly the same cc1 behaviour
+# as one that says `decimal_float 0', with no diagnostic at any stage.  That is
+# the same silence as the wrong-value case and it deserves the same failure.
+#
+# Only STRUCTURAL keys belong here: the ones with a finite set of answers, where
+# "absent" is not one of the answers.  A free-string key (a path, a tool name)
+# may legitimately be absent because the thing it names is absent.  These four
+# are the structural keys target-specs/configure.ac writes into `specs-config';
+# the other structural options it takes (--with-libatomic, --with-shared-libgcc,
+# --enable-linker-build-id) select SPEC TEXT rather than a targ_caps key, so
+# they are checked by check-spec-refs.sh's corpus and not by this one.
+required_keys='decimal_float decimal_bid_format s390_excess_float_precision sjlj_exceptions'
+
+: > "$work"/missing
 : > "$work"/dead
 files=0
 for f in "$@"; do
@@ -820,10 +840,27 @@ for f in "$@"; do
   while read -r k; do
     reachable "$k" || echo "$k $f" >> "$work"/dead
   done < "$work"/keys
+  for k in $required_keys; do
+    grep -q "^$k\$" "$work"/keys || echo "$k $f" >> "$work"/missing
+  done
 done
 
 if test "$files" -eq 0; then
   echo "check-target-caps: no config files given; nothing checked" >&2
+  exit 1
+fi
+
+if test -s "$work"/missing; then
+  echo "check-target-caps: structural capabilit(ies) ABSENT from a target" \
+       "config file:" >&2
+  awk '{print "  " $1 "  (missing from " $2 ")"}' "$work"/missing | sort >&2
+  echo "check-target-caps: each of these has a finite set of answers and" \
+       "\`absent' is not one of them.  cc1 leaves an absent key at its C++" \
+       "initialiser, which reads exactly like a probe that answered that" \
+       "value -- so the target silently gets one of the real answers and" \
+       "nothing says which.  Pass the corresponding target-specs/configure" \
+       "option (--with-decimal-float, --with-decimal-bid-format," \
+       "--with-s390-excess-float-precision, --enable-sjlj-exceptions)." >&2
   exit 1
 fi
 

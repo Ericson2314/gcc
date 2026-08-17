@@ -165,23 +165,67 @@ dnl Properties of the target that are decided by the target itself rather than
 dnl probed from a tool: gcc/config.gcc derives them from the triple and
 dnl gcc/configure.ac reports them in the manifest.  They are passed through here
 dnl because the target config file is the one channel cc1 reads.
+dnl NO DEFAULT, DELIBERATELY.  These two used to default to 0, and nothing
+dnl passed them, so every `specs-config' this project ever wrote said
+dnl `decimal_float 0' -- on x86_64, aarch64, powerpc64 and s390x, whose
+dnl config.gcc arms all say 1.  `targ_caps.decimal_float' is the only thing cc1
+dnl reads, so decimal float was off for every target on every board, and
+dnl `dfp.exp' ran 1 line instead of 749 while contributing zero debt, because an
+dnl unattempted test is not a failure.  Fixed in 9ee972c229d by making the
+dnl top-level rule pass them from the manifest.
+dnl
+dnl The default is removed as well, because passing them was only half of it: a
+dnl default of 0 means that the day the top level stops passing them -- a
+dnl renamed manifest key, a hand-run of this script -- the answer silently
+dnl reverts to the wrong one and nothing anywhere says so.  0 is not a safe
+dnl floor for a fact; it is one of the two possible answers, chosen by whoever
+dnl forgot to supply the other.  A tri-state is not available here the way it is
+dnl for `sjlj_exceptions': cc1 reads these as a plain 0/1 capability and has no
+dnl "unstated" behaviour to fall back to, so the only honest handling of
+dnl "nobody said" is to refuse to write the file.
 AC_ARG_WITH([decimal-float],
   [AS_HELP_STRING([--with-decimal-float=0|1],
-     [target has decimal float support in its libgcc])],
-  [spec_decimal_float=$withval], [spec_decimal_float=0])
+     [target has decimal float support in its libgcc (REQUIRED)])],
+  [spec_decimal_float=$withval], [spec_decimal_float=])
 AC_ARG_WITH([decimal-bid-format],
   [AS_HELP_STRING([--with-decimal-bid-format=0|1],
-     [target ABI encodes decimal float as BID rather than DPD])],
-  [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=0])
+     [target ABI encodes decimal float as BID rather than DPD (REQUIRED)])],
+  [spec_decimal_bid_format=$withval], [spec_decimal_bid_format=])
+case $spec_decimal_float in
+  0 | 1 ) ;;
+  '' ) AC_MSG_ERROR([--with-decimal-float=0|1 is required: it is a property of ${target} that only gcc/config.gcc knows, it is not probed here, and there is no safe default -- 0 silently disables decimal float on every target that has it.  gcc's build records it as the `decimal_float' line for this target in gcc/multi-target.manifest]) ;;
+  * ) AC_MSG_ERROR([--with-decimal-float must be `0' or `1', not `$spec_decimal_float']) ;;
+esac
+case $spec_decimal_bid_format in
+  0 | 1 ) ;;
+  '' ) AC_MSG_ERROR([--with-decimal-bid-format=0|1 is required, for the same reason as --with-decimal-float: it is the `decimal_bid_format' line for this target in gcc/multi-target.manifest, and defaulting it picks DPD for a BID target with no diagnostic]) ;;
+  * ) AC_MSG_ERROR([--with-decimal-bid-format must be `0' or `1', not `$spec_decimal_bid_format']) ;;
+esac
 dnl Whether this build has a libatomic for this target.  Not probed: the
 dnl question is "did the top level build one", and when these probes run it has
 dnl not been installed yet, so asking the linker for -latomic would answer no on
 dnl a build that is about to have one.  gcc/configure knows (TARGET_CONFIGDIRS)
 dnl and gcc/Makefile.in passes it to exactly the one target it holds for.
+dnl THE DEFAULT STAYS `no', AND HERE IS WHY -- because "most targets want no" is
+dnl a guess, and this is not that.  Unlike `decimal_float', this option is not a
+dnl property OF THE TARGET at all: it is a property of the build tree that is
+dnl asking, and the answer for a target-specs run with no build tree behind it
+dnl (the install-time re-probe, which is the documented way to use this script)
+dnl is genuinely `no'.  `no' also produces byte-for-byte the link line that a
+dnl driver with no libatomic support emitted, so an unstated answer changes
+dnl nothing rather than choosing something.  That is the test `decimal_float 0'
+dnl failed: 0 there was a different answer from the one the target needed.
+dnl
+dnl What it must NOT do is accept a third value, which would take the `!= yes'
+dnl arm and be indistinguishable from a deliberate `no'.
 AC_ARG_WITH([libatomic],
   [AS_HELP_STRING([--with-libatomic=yes|no],
      [this build provides a libatomic for the target])],
   [spec_libatomic=$withval], [spec_libatomic=no])
+case $spec_libatomic in
+  yes | no ) ;;
+  * ) AC_MSG_ERROR([--with-libatomic must be `yes' or `no', not `$spec_libatomic'; any other value takes the same arm as `no' and silently drops -latomic from this target's link line]) ;;
+esac
 dnl Whether this target has a SHARED libgcc.  Not probed, for the same reason as
 dnl libatomic: when these probes run libgcc has not been built, so asking the
 dnl linker for -lgcc_s would answer no on a build that is about to have one.
@@ -191,8 +235,18 @@ dnl that fragment sets SHLIB, which used to reach the driver as
 dnl -DENABLE_SHARED_LIBGCC through gcc/Makefile.in's DRIVER_DEFINES.  The
 dnl tmake_file it reached through was the PRIMARY target's, and gcc.cc is
 dnl compiled once, so one target's answer was applied to all of them silently.
-dnl The manifest records tmake_file_present per target; gcc/Makefile.in reads
-dnl t-slibgcc out of it and passes the answer here, per target.
+dnl The manifest records tmake_file_present per target; the top level's
+dnl `configure-target-specs-<t>' rule (Makefile.tpl) reads t-slibgcc out of it
+dnl and passes the answer here, per target.
+dnl
+dnl THAT SENTENCE WAS FALSE UNTIL NOW, and it is worth saying so rather than
+dnl quietly correcting it.  It said `gcc/Makefile.in reads t-slibgcc out of it',
+dnl and gcc/Makefile.in does not run this script at all any more -- composition
+dnl moved to the top-level rule.  So nothing read the key, nothing passed the
+dnl option, the default below applied on every target, and both configured
+dnl targets in this tree (aarch64-*-linux-musl and armv6l-*-linux-gnueabihf) had
+dnl `t-slibgcc' in their manifest while their spec files said `*libgcc_variants:
+dnl -lgcc'.  A comment describing a mechanism is not the mechanism.
 dnl
 dnl `no' is the conservative default and it matches the driver's own built-in
 dnl `*libgcc_variants' -- an unprobed driver, and a target this is not passed
@@ -262,10 +316,29 @@ case ${target} in
     ;;
 esac
 
+dnl THE DEFAULT IS CONDITIONAL, and that is the point.  `0' is not "what most
+dnl targets want" -- it is the ONLY meaningful value on a target that is not
+dnl s390, because s390.cc is the sole reader and it is not compiled into any
+dnl other back end's decisions.  So off s390 the default is correct by
+dnl construction and stating it is noise.
+dnl
+dnl ON s390 it is a real question with two real answers -- upstream probes the
+dnl target C library for `float_t' being `double' -- and `0' there is a guess
+dnl wearing a default's clothes, exactly the shape that left `decimal_float 0'
+dnl on every target.  So on s390 an unstated answer is an error naming the
+dnl option, and off s390 it is not.
 AC_ARG_WITH([s390-excess-float-precision],
   [AS_HELP_STRING([--with-s390-excess-float-precision=0|1],
-     [s390 target C library typedefs float_t to double])],
-  [spec_s390_excess_fp=$withval], [spec_s390_excess_fp=0])
+     [s390 target C library typedefs float_t to double (required on s390)])],
+  [spec_s390_excess_fp=$withval], [spec_s390_excess_fp=])
+case $spec_s390_excess_fp in
+  0 | 1 ) ;;
+  '' ) case ${target} in
+	 s390*-*-* ) AC_MSG_ERROR([--with-s390-excess-float-precision=0|1 is required for ${target}: it says whether this target's C library typedefs `float_t' to `double', which s390.cc reads to decide excess precision, and it cannot be probed from the assembler or linker.  Off s390 it defaults to 0 because nothing reads it; on s390 defaulting it would pick one of two real answers silently]) ;;
+	 * ) spec_s390_excess_fp=0 ;;
+       esac ;;
+  * ) AC_MSG_ERROR([--with-s390-excess-float-precision must be `0' or `1', not `$spec_s390_excess_fp']) ;;
+esac
 
 dnl Was gcc/configure.ac's --enable-sjlj-exceptions.  It had to move because
 dnl the switch was GLOBAL: in a build serving arm and i386, one flag forced
@@ -685,10 +758,27 @@ AC_MSG_RESULT([$gcc_cv_ld_compress_debug])
 dnl Whether to pass --build-id is a matter of what this linker supports and
 dnl what the installation wants, so it is decided here rather than when the
 dnl compiler is built.
+dnl THE DEFAULT STAYS `no'.  This one is not in the class the five above are in:
+dnl it is not a fact about ${target} that somebody failed to pass, it is a
+dnl POLICY the person running this script states or does not state, and "not
+dnl stated" has a correct meaning -- do not add --build-id -- which is what
+dnl upstream's undefined LINKER_BUILD_ID meant and what every distribution that
+dnl does not turn it on gets.  There is nothing for the caller to look up and
+dnl nothing that can be silently wrong: an unstated policy is the absence of the
+dnl policy.  Contrast --with-decimal-float, where "not stated" was not an
+dnl answer at all and 0 was one of two.
+dnl
+dnl It is still validated, because AC_ARG_ENABLE accepts any string and
+dnl `--enable-linker-build-id=n' -- not `yes', so not enabled -- would look
+dnl exactly like `--disable-linker-build-id' to the test below.
 AC_ARG_ENABLE([linker-build-id],
   [AS_HELP_STRING([--enable-linker-build-id],
      [always pass --build-id to the linker])],
   [], [enable_linker_build_id=no])
+case $enable_linker_build_id in
+  yes | no ) ;;
+  * ) AC_MSG_ERROR([--enable-linker-build-id takes no argument (or `=yes'/`=no'), not `$enable_linker_build_id'; any other value is treated as `no' and the option looks accepted while doing nothing]) ;;
+esac
 
 AC_MSG_CHECKING([linker for --build-id])
 gcc_cv_ld_buildid=no

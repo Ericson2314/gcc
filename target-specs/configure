@@ -1311,9 +1311,10 @@ Optional Packages:
   --with-cpu-type=NAME    back end name, e.g. i386, mips
   --with-decimal-float=0|1
                           target has decimal float support in its libgcc
+                          (REQUIRED)
   --with-decimal-bid-format=0|1
                           target ABI encodes decimal float as BID rather than
-                          DPD
+                          DPD (REQUIRED)
   --with-libatomic=yes|no this build provides a libatomic for the target
   --with-shared-libgcc=yes|no
                           this target has a shared libgcc (config.gcc gave it
@@ -1322,6 +1323,7 @@ Optional Packages:
                           target runs glibc version M.N or later
   --with-s390-excess-float-precision=0|1
                           s390 target C library typedefs float_t to double
+                          (required on s390)
   --with-specs-file=PATH  where to write the spec file
   --with-source-specs=FILES
                           space-separated source-derived spec files (gcc's
@@ -2062,7 +2064,7 @@ fi
 if test "${with_decimal_float+set}" = set; then :
   withval=$with_decimal_float; spec_decimal_float=$withval
 else
-  spec_decimal_float=0
+  spec_decimal_float=
 fi
 
 
@@ -2070,9 +2072,19 @@ fi
 if test "${with_decimal_bid_format+set}" = set; then :
   withval=$with_decimal_bid_format; spec_decimal_bid_format=$withval
 else
-  spec_decimal_bid_format=0
+  spec_decimal_bid_format=
 fi
 
+case $spec_decimal_float in
+  0 | 1 ) ;;
+  '' ) as_fn_error $? "--with-decimal-float=0|1 is required: it is a property of ${target} that only gcc/config.gcc knows, it is not probed here, and there is no safe default -- 0 silently disables decimal float on every target that has it.  gcc's build records it as the \`decimal_float' line for this target in gcc/multi-target.manifest" "$LINENO" 5 ;;
+  * ) as_fn_error $? "--with-decimal-float must be \`0' or \`1', not \`$spec_decimal_float'" "$LINENO" 5 ;;
+esac
+case $spec_decimal_bid_format in
+  0 | 1 ) ;;
+  '' ) as_fn_error $? "--with-decimal-bid-format=0|1 is required, for the same reason as --with-decimal-float: it is the \`decimal_bid_format' line for this target in gcc/multi-target.manifest, and defaulting it picks DPD for a BID target with no diagnostic" "$LINENO" 5 ;;
+  * ) as_fn_error $? "--with-decimal-bid-format must be \`0' or \`1', not \`$spec_decimal_bid_format'" "$LINENO" 5 ;;
+esac
 
 # Check whether --with-libatomic was given.
 if test "${with_libatomic+set}" = set; then :
@@ -2081,6 +2093,10 @@ else
   spec_libatomic=no
 fi
 
+case $spec_libatomic in
+  yes | no ) ;;
+  * ) as_fn_error $? "--with-libatomic must be \`yes' or \`no', not \`$spec_libatomic'; any other value takes the same arm as \`no' and silently drops -latomic from this target's link line" "$LINENO" 5 ;;
+esac
 
 # Check whether --with-shared-libgcc was given.
 if test "${with_shared_libgcc+set}" = set; then :
@@ -2145,9 +2161,17 @@ esac
 if test "${with_s390_excess_float_precision+set}" = set; then :
   withval=$with_s390_excess_float_precision; spec_s390_excess_fp=$withval
 else
-  spec_s390_excess_fp=0
+  spec_s390_excess_fp=
 fi
 
+case $spec_s390_excess_fp in
+  0 | 1 ) ;;
+  '' ) case ${target} in
+	 s390*-*-* ) as_fn_error $? "--with-s390-excess-float-precision=0|1 is required for ${target}: it says whether this target's C library typedefs \`float_t' to \`double', which s390.cc reads to decide excess precision, and it cannot be probed from the assembler or linker.  Off s390 it defaults to 0 because nothing reads it; on s390 defaulting it would pick one of two real answers silently" "$LINENO" 5 ;;
+	 * ) spec_s390_excess_fp=0 ;;
+       esac ;;
+  * ) as_fn_error $? "--with-s390-excess-float-precision must be \`0' or \`1', not \`$spec_s390_excess_fp'" "$LINENO" 5 ;;
+esac
 
 # Check whether --enable-sjlj-exceptions was given.
 if test "${enable_sjlj_exceptions+set}" = set; then :
@@ -2449,6 +2473,10 @@ else
   enable_linker_build_id=no
 fi
 
+case $enable_linker_build_id in
+  yes | no ) ;;
+  * ) as_fn_error $? "--enable-linker-build-id takes no argument (or \`=yes'/\`=no'), not \`$enable_linker_build_id'; any other value is treated as \`no' and the option looks accepted while doing nothing" "$LINENO" 5 ;;
+esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker for --build-id" >&5
 $as_echo_n "checking linker for --build-id... " >&6; }

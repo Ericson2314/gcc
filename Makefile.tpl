@@ -2507,11 +2507,30 @@ configure-target-specs-$(1):
 	test -n "$$$$mt_df" && test -n "$$$$mt_dbf" || { \
 	  echo "*** target-specs for $(1): $$$$mt_manifest has no" >&2; \
 	  echo "*** \`decimal_float' or \`decimal_bid_format' line for this" >&2; \
-	  echo "*** target.  target-specs/configure DEFAULTS BOTH TO 0, so a" >&2; \
-	  echo "*** missing line would silently disable decimal float for a" >&2; \
+	  echo "*** target.  These are not probed and have no default --" >&2; \
+	  echo "*** target-specs/configure now REFUSES to run without them," >&2; \
+	  echo "*** because a default of 0 silently disabled decimal float for a" >&2; \
 	  echo "*** target whose config.gcc says it has it -- which is exactly" >&2; \
 	  echo "*** what happened before this was passed at all." >&2; \
 	  exit 1; }; \
+	mt_tfp=`$$(AWK) -v t="$(1)" \
+	  '$$$$1 == "target" { seen = ($$$$2 == t) } \
+	   seen && $$$$1 == "tmake_file_present" { $$$$1 = "PRESENT"; print; exit }' \
+	  "$$$$mt_manifest"`; \
+	test -n "$$$$mt_tfp" || { \
+	  echo "*** target-specs for $(1): $$$$mt_manifest has no" >&2; \
+	  echo "*** \`tmake_file_present' line for this target.  That line is" >&2; \
+	  echo "*** what says whether config.gcc gave $(1) \`t-slibgcc', i.e." >&2; \
+	  echo "*** whether this target has a SHARED libgcc.  A missing line is" >&2; \
+	  echo "*** not \`no': it is a manifest this rule cannot read, and" >&2; \
+	  echo "*** answering \`no' writes \`*libgcc_variants: -lgcc' for a" >&2; \
+	  echo "*** target that does have libgcc_s -- which is exactly what" >&2; \
+	  echo "*** happened on every target until this was passed at all." >&2; \
+	  exit 1; }; \
+	case " $$$$mt_tfp " in \
+	  *" t-slibgcc "* ) mt_slg=yes ;; \
+	  * ) mt_slg=no ;; \
+	esac; \
 	mt_src=; \
 	for f in gcc/specs-src-$(1) gcc/mlib-specs-$(1); do \
 	  test -f "$$$$r/$$$$f" && mt_src="$$$$mt_src $$$$r/$$$$f"; \
@@ -2537,6 +2556,7 @@ configure-target-specs-$(1):
 	  --with-option-defaults="$$$$mt_od" \
 	  --with-decimal-float="$$$$mt_df" \
 	  --with-decimal-bid-format="$$$$mt_dbf" \
+	  --with-shared-libgcc="$$$$mt_slg" \
 	  $$$${mt_src:+--with-source-specs="$$$$mt_src"} \
 	  $$(TARGET_SPECS_FLAGS_FOR_$(1)) \
 	  || exit 1; \
