@@ -384,6 +384,55 @@ through `FINAL_PRESCAN_INSN`, whose aarch64 body is a no-op without
 separating them needs a run at `d5ad77b33b3` for aarch64, which is stated as
 missing rather than papered over.
 
+#### aarch64's ranked residual — and 58% of it is ONE macro, root-caused this session
+
+```
+DIRECTORY                                    DEBT  STOCK_FAIL  STOCK_PASS
+gcc.target/aarch64/fmv_priority2.c             26           0          26
+gcc.target/aarch64/sve                         17           5       91512
+gcc.target/aarch64/mv-and-mvc3.c               15           0          15
+gcc.target/aarch64/aapcs64                     12          44          42
+gcc.target/aarch64/mv-symbols{7,8,9,10}.c      11 each      0          11
+gcc.target/aarch64/mv-and-mvc{1,2,4}.c         10 each      0          10
+gcc.target/aarch64/mv-1.c                       9           0           9
+... 42 files in the mv*/fmv* family
+```
+
+**The `mv*`/`fmv*` family sums to exactly `256` of the 443 — 58%.** Stock fails
+**zero** in every one of those files, so all 256 are genuine debt.
+
+`A992B7E5FA4FFAAA7-FMV.md` root-causes the whole family to **one macro**,
+found independently of this ranking and confirmed both-sided:
+
+```
+                                 SHARED  aarch64  i386  riscv  s390
+TARGET_HAS_FMV_TARGET_ATTRIBUTE     1       0       1     0      1
+```
+
+`defaults.h:1001` floors it to `1`; `aarch64.h:1556`, `riscv.h:1349` and
+`loongarch.h:1297` are the tree's only definers and all three say `0`. With the
+macro `1`, `c-decl.cc:3457`'s FMV arm is skipped entirely, so the second
+`target_version` definition is diagnosed as a plain redefinition — measured on
+this board's own compiler:
+
+```
+error: redefinition of 'foo'          (aarch64, and riscv64)
+```
+
+against the control that x86_64's own `target_clones` still emits a resolver on
+the same `cc1`.
+
+**So aarch64's number-one item is closed as a diagnosis and open as a fix**,
+and the fix shape is written down (a cdata field, with `defaults.h` supplying
+upstream's own `1` to the silent back ends — a *supply-side* floor, which §2a
+permits — and the three definers supplying their own `0`). The one trap
+recorded with it: `tree.cc:15659`/`:15685` are `gcc_assert`s on this macro and
+may be holding *because* the answer is wrong, the `function.cc:6766` /
+`DELAY_SLOTS` shape.
+
+`gcc.dg/lto`'s 53 — the item the last board flagged as identical on three
+targets — is **gone from aarch64's top rows entirely**.
+
 ### riscv64, s390x — running
 
 Provenance, the remaining rows, the debt and the ranked residual follow as they
