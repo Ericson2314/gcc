@@ -617,6 +617,9 @@ EGREP
 GREP
 long_double_type_size
 double_type_size
+INHIBIT_LIBC_CFLAGS
+libgcc_standalone
+gcc_target_incdir
 CPP
 OBJEXT
 EXEEXT
@@ -4397,6 +4400,75 @@ rm -rf conftest*
   fi
 
 
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking where this target's generated headers come from" >&5
+$as_echo_n "checking where this target's generated headers come from... " >&6; }
+libgcc_standalone=no
+gcc_target_incdir='$(gcc_objdir)'
+libgcc_sibling=
+for libgcc_up in . .. ../.. ../../..; do
+  if test -f "$libgcc_up/../../$host_subdir/gcc/libgcc.mvars"; then
+    libgcc_sibling=$libgcc_up/../../$host_subdir/gcc
+    break
+  fi
+done
+if test -n "$libgcc_sibling"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: the sibling gcc build directory (in-tree build): $libgcc_sibling" >&5
+$as_echo "the sibling gcc build directory (in-tree build): $libgcc_sibling" >&6; }
+else
+  libgcc_standalone=yes
+  gcc_target_incdir=`$CC $CFLAGS $CPPFLAGS -print-target-header-dir 2>&1`
+  case $gcc_target_incdir in
+    /*) ;;
+    *) { $as_echo "$as_me:${as_lineno-$LINENO}: result: nothing usable" >&5
+$as_echo "nothing usable" >&6; }
+       as_fn_error $? "there is no sibling gcc build directory, and
+  $CC -print-target-header-dir
+did not name one either.  It said:
+  $gcc_target_incdir
+This library must compile against ITS OWN machine's generated tm.h; there is
+no default to fall back on, because falling back means compiling against
+whichever back end happened to be the compiler's primary." "$LINENO" 5 ;;
+  esac
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_target_incdir" >&5
+$as_echo "$gcc_target_incdir" >&6; }
+            if test ! -f "$gcc_target_incdir/tm.h"; then
+    as_fn_error $? "$gcc_target_incdir/tm.h does not exist.
+The compiler named that directory, so it believes it was installed with
+per-target headers.  Install them with \`make install' in gcc/, which runs
+install-target-headers." "$LINENO" 5
+  fi
+fi
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether a C library is available for $host" >&5
+$as_echo_n "checking whether a C library is available for $host... " >&6; }
+if ${libgcc_cv_have_libc+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <stdio.h>
+#include <stdlib.h>
+int f (void) { return 0; }
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  libgcc_cv_have_libc=yes
+else
+  libgcc_cv_have_libc=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_have_libc" >&5
+$as_echo "$libgcc_cv_have_libc" >&6; }
+if test x$libgcc_cv_have_libc = xno; then
+  INHIBIT_LIBC_CFLAGS=-Dinhibit_libc
+else
+  INHIBIT_LIBC_CFLAGS=
 fi
 
 

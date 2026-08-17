@@ -24,6 +24,19 @@ host_subdir = @host_subdir@
 
 gcc_objdir = $(MULTIBUILDTOP)../../$(host_subdir)/gcc
 
+# Where this target's GENERATED headers are: the sibling gcc build directory in
+# an in-tree build, and the installed $(libdir)/gcc/$(version)/<target>/include
+# otherwise.  configure decides which and says why; see the long note there.
+#
+# A SEPARATE VARIABLE FROM $(gcc_objdir) ON PURPOSE.  $(gcc_objdir) has four
+# other jobs in this file -- libgcc.mvars, the install-leaf DESTDIR, the
+# per-multilib copy-back and unwind.h -- and every one of them really is about
+# the sibling BUILD directory.  Only the include path is about headers, and
+# only the include path can be satisfied from an installation, so only the
+# include path moves.
+gcc_target_incdir = @gcc_target_incdir@
+libgcc_standalone = @libgcc_standalone@
+
 srcdir = @srcdir@
 
 prefix = @prefix@
@@ -112,13 +125,17 @@ FLAGS_TO_PASS = \
 	"tooldir=$(tooldir)"
 
 # Dependencies for "all" are set later in the file.
+#
+# THE COPY-BACK IS AN IN-TREE STEP AND ONLY AN IN-TREE STEP.  It exists because
+# other in-tree libraries and DejaGNU know the layout of the build tree; a
+# standalone build has no such tree, and running it would either create a
+# `../../gcc/' directory out of nowhere or fail on a path that is not there.
+# Guarded rather than deleted: in-tree builds still need it.
 all: all-multi
-	# Now that we have built all the objects, we need to copy
-	# them back to the GCC directory.  Too many things (other
-	# in-tree libraries, and DejaGNU) know about the layout
-	# of the build tree, for now.
+ifneq ($(libgcc_standalone),yes)
 	$(MAKE) install-leaf DESTDIR=$(gcc_objdir) \
 	  slibdir= libsubdir= MULTIOSDIR=$(MULTIDIR)
+endif
 
 .PHONY: all-multi
 all-multi:
@@ -180,7 +197,29 @@ configure_deps = \
 $(srcdir)/configure: @MAINT@ $(srcdir)/configure.ac $(configure_deps)
 	cd $(srcdir) && $(AUTOCONF)
 
+# The only two variables gcc hands this library at build time: GCC_CFLAGS (its
+# warning set, -DIN_GCC, and `-isystem ./include') and INHIBIT_LIBC_CFLAGS.
+#
+# THE SECOND IS AN INVERSION AND IS NOT TAKEN FROM THERE ANY MORE WHEN THERE IS
+# NOWHERE TO TAKE IT FROM.  gcc/configure.ac decides `inhibit_libc' from the way
+# the COMPILER was configured -- one host build, one answer, for every target it
+# serves -- and whether a C library exists is a fact about the machine this
+# library is being built for.  Standalone, configure probes it here.
+#
+# THE FIRST IS RE-STATED, NOT APPROXIMATED FROM MEMORY: these are the flags
+# gcc/Makefile.in:589 composes, minus the ones that are the host compiler's
+# ($(CFLAGS_FOR_TARGET), $(INTERNAL_CFLAGS), $(TCFLAGS)) and minus
+# `-isystem ./include', which is a path relative to the GCC BUILD DIRECTORY and
+# means nothing here.  -DIN_GCC is load-bearing and not a warning flag: tm.h
+# guards the whole back-end header chain with `#ifdef IN_GCC', so without it
+# this library compiles against a tm.h that defines almost nothing, silently.
+ifeq ($(libgcc_standalone),yes)
+GCC_CFLAGS = -DIN_GCC -W -Wall -Wno-narrowing -Wwrite-strings -Wcast-qual \
+	     -Wstrict-prototypes -Wmissing-prototypes -Wold-style-definition
+INHIBIT_LIBC_CFLAGS = @INHIBIT_LIBC_CFLAGS@
+else
 include $(gcc_objdir)/libgcc.mvars
+endif
 
 # Flags to pass to recursive makes.
 
@@ -281,7 +320,7 @@ LIB2ADD_ST =
 # subdirectory rather than in the source directory.
 # -I$(@D) and -I$(srcdir)/$(@D) cause the subdirectory of the file
 # currently being compiled, in both source trees, to be examined as well.
-INCLUDES = -I. -I$(@D) -I$(gcc_objdir) \
+INCLUDES = -I. -I$(@D) -I$(gcc_target_incdir) \
 	   -I$(srcdir) -I$(srcdir)/$(@D) -I$(srcdir)/../gcc \
 	   -I$(srcdir)/../include $(DECNUMINC)
 
@@ -1106,6 +1145,8 @@ libgcc-extra-parts: $(EXTRA_PARTS)
 	# Early copyback; see "all" above for the rationale.  The
 	# early copy is necessary so that the gcc -B options find
 	# the right startup files when linking shared libgcc.
+	# In-tree only, for the same reason the one in "all" is.
+ifneq ($(libgcc_standalone),yes)
 	$(mkinstalldirs) $(gcc_objdir)$(MULTISUBDIR)
 	parts="$(EXTRA_PARTS)";					\
 	for file in $$parts; do					\
@@ -1116,6 +1157,7 @@ libgcc-extra-parts: $(EXTRA_PARTS)
 	      $(RANLIB) $(gcc_objdir)$(MULTISUBDIR)/$$file ;;	\
 	  esac;							\
 	done
+endif
 
 all: $(extra-parts)
 
@@ -1142,7 +1184,13 @@ install-unwind_h:
 	$(mkinstalldirs) $(DESTDIR)$(libsubdir)/include
 	$(INSTALL_DATA) unwind.h $(DESTDIR)$(libsubdir)/include
 
+# In-tree only: it writes into the sibling gcc BUILD directory's include/, so
+# that the compiler being built alongside can find unwind.h.  A standalone build
+# installs it through `install-unwind_h' instead, which is where an installed
+# compiler looks.
+ifneq ($(libgcc_standalone),yes)
 all: install-unwind_h-forbuild
+endif
 
 install-gcov_h:
 	$(mkinstalldirs) $(DESTDIR)$(libsubdir)/include
