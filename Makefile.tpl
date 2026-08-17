@@ -2541,6 +2541,44 @@ install-target-specs-$(1):
 	  "$$(DESTDIR)$$(MT_INSTALL_CONFIGDIR)/$(1)" \
 	  "$$(MT_INSTALL_CONFIGDIR)/$(1)" \
 	  "$(1)"
+
+# RUNNING mkheaders, WHICH NOTHING DID.
+#
+# `fixincludes/mkheaders.in' opens with "THIS IS NOW THE ONLY THING THAT RUNS
+# fixincludes", and no rule in this tree ran it: the single live mention of the
+# name anywhere in the build system was gcc/Makefile.in's `install-mkheaders',
+# which installs mkheaders' INPUT (fixinc_list, gsyslimits.h, the per-multilib
+# limits.h) and stops.  Its old caller, gcc/Makefile.in's `stmp-fixinc', went
+# away with gcc/'s target and nothing replaced it, so `make install' produced no
+# include-fixed for ANY target while every piece of the machinery existed.
+#
+# LIKE install-target-specs, THIS IS NOT PART OF `install'.  It fixes the
+# headers of the DEPLOYED machine, one target at a time, using that target's
+# probed configuration -- so it is the operator's to run, after installing,
+# against the header tree they actually mean.  An `install' that ran it would
+# have to guess, and guessing here is not a degraded answer: fixincludes gates
+# 137 of its 252 hacks on the target name, so the wrong headers under the right
+# name is a silently mis-fixed tree.
+#
+# `--headers' comes from target-specs' `native_system_header_dir' key, read out
+# of the per-target config file -- see mt-fix-headers.sh for why it is asked for
+# rather than supplied by a second knob here.
+#
+# MKHEADERS_FLAGS_FOR_<triple> passes anything else through (--isysroot=,
+# --other-dirs=), on the same reasoning as TARGET_SPECS_FLAGS_FOR_<triple>:
+# this makefile does not enumerate another program's options.
+.PHONY: install-fixed-headers-$(1)
+install-fixed-headers-$(1):
+	@r=`$${PWD_COMMAND}`; export r; \
+	$$(SHELL) $$(srcdir)/mt-fix-headers.sh \
+	  "$(1)" \
+	  "$$$$r/$(MT_BUILD_CONFIGDIR_REL)/$(1)/specs-config" \
+	  "$$(DESTDIR)$$(MT_INSTALL_ITOOLSDIR)" \
+	  "$$(DESTDIR)$$(MT_INSTALL_ITOOLSDATADIR)" \
+	  "$$(DESTDIR)$$(MT_INSTALL_CONFIGDIR)/$(1)/include-fixed" \
+	  "$$(MT_INSTALL_CONFIGDIR)/$(1)/include-fixed" \
+	  "$$(DESTDIR)$$(bindir)/$(1)-gcc" \
+	  $$(MKHEADERS_FLAGS_FOR_$(1))
 endef
 
 $(foreach mt_t,$(MT_TARGET_SUBDIRS),\
@@ -2559,6 +2597,11 @@ configure-target-specs: $(foreach mt_t,$(MT_TARGET_SUBDIRS),configure-target-spe
 # behaviour, not a gap to paper over.
 .PHONY: install-target-specs
 install-target-specs: $(foreach mt_t,$(MT_TARGET_SUBDIRS),install-target-specs-$(mt_t))
+
+# Every target's fixed headers.  Same status as install-target-specs: a
+# convenience over the per-target goals, not a prerequisite of `install'.
+.PHONY: install-fixed-headers
+install-fixed-headers: $(foreach mt_t,$(MT_TARGET_SUBDIRS),install-fixed-headers-$(mt_t))
 
 # NON-VACUITY GUARD ON THE LOOP ITSELF.
 #
