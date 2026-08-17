@@ -1951,6 +1951,39 @@ answer is still wrong is worse than the failure.**
   `pgrep -af <script>` answers the first half; reading the script for what it
   invokes late answers the second.
 
+- **A LONE BACKQUOTE IN A `#` COMMENT CAN BREAK A SHELL SCRIPT 150 LINES
+  AWAY — AND IT PUT THE TIP OF THIS BRANCH IN A STATE THAT COULD NOT
+  CONFIGURE, FOR A DAY.** Measured, not theorised: `multi-target-0` at
+  `a5cd237d9db` died with
+
+  ```
+  gen-target-manifest.sh: line 372: syntax error near unexpected token `('
+  make: *** [Makefile:4779: configure-gcc] Error 1
+  ```
+
+  **While the shell scans for the closing backquote of a multi-line command
+  substitution it does NOT honour `#` comments.** `e02b705aeea` added two
+  comment lines in the house `` `foo' `` style *inside* the substitution
+  assigned to `gcc_mt_data`, each contributing one backquote; the parity of
+  every backquote after them flipped, and the damage surfaced on **line 372,
+  an unrelated comment that had been legal for months**, whose backquote now
+  *opened* a substitution containing `struct GTY(())`.
+
+  Three things, and the last is the general one:
+
+  - **The diagnostic names the victim, not the cause**, and the victim is a
+    line nobody touched. `sh -n` over the FILE at five commits localised it in
+    seconds; reading the reported line cannot.
+  - **The commit that introduced it was itself about comments that lie** — it
+    corrected three source comments citing calibration scripts that were never
+    committed, and broke the build with the prose of the correction. The
+    agent that fixed it then **reproduced the bug while writing the warning
+    about it**, by spelling the warning with backquotes inside the block the
+    warning is about.
+  - Same family as the heredoc case two bullets down and as
+    `s-macro_list`: **shell text that reads correctly is not shell text that
+    parses.** `mt-conf.sh` now runs `sh -n` over every `$SRC/gcc/*.sh` before
+    configuring, because a loud failure nobody runs is a silent one.
 - **Build your own build dir.** Sharing `/tmp/b-objs` produces meaningless
   verdicts and spurious `mv: cannot stat tmp-*` failures; it has killed runs.
   **In a shared build dir, a file you did not write is not a fixture.**
@@ -2479,6 +2512,41 @@ re-reads its srcdir long after configure (`mt-bars.sh` takes `big.c` from it;
 rebuilding one object recompiles *its* source), so the next arm would have
 compiled the FIXED header and reported the bug gone, with a green everywhere.
 **Put the sha in the snapshot path**, not just the worktree id.
+
+**A FIFTH LEAK SHAPE: A BARE `#ifdef` ON A NAME THE PRIMARY *DEFINES*. NO
+FLOOR ANYWHERE, SO NO FLOOR SWEEP CAN SEE IT — AND IT LEAKS PRESENCE AND VALUE
+AT THE SAME TIME.** `INSTRUMENTS.md`'s four classes all involve a `defaults.h`
+`#ifndef` or a generated header. `EH_RETURN_STACKADJ_RTX` has neither:
+`i386.h:2187` defines it, shared code asks `#ifdef`, so the guard is **true for
+all 47** and the register inside is the primary's. `CX_REG` is 2; on riscv,
+register 2 is `sp`. `except.cc`'s
+`emit_move_insn (EH_RETURN_STACKADJ_RTX, crtl->eh.ehr_stackadj)` therefore wrote
+riscv64's stack adjustment **into the stack pointer**, while riscv's own
+epilogue (compiled per base, and correct) still read `a4`, which nothing set.
+The same `#ifdef` also ran the guarded code for the back ends that define
+nothing. Sweep for it as: *a bare `#ifdef <NAME>` in a shared TU where `<NAME>`
+IS defined by the primary and by some other back end with a different body.*
+
+**AND A LOUD LEAK CAN MASK A SILENT ONE ON THE SAME CONSTRUCT, SO ASK WHAT THE
+DIAGNOSTIC WAS PREVENTING BEFORE YOU REMOVE IT.** `EH_RETURN_HANDLER_RTX`'s
+floor makes `__builtin_eh_return` **error out** on aarch64 and s390x. That
+error is the only thing keeping those two targets away from the
+`EH_RETURN_STACKADJ_RTX` bug above. Fixing the handler alone — the obvious,
+well-evidenced, single-macro change — would have converted a diagnostic into
+wrong code **on two further targets**, and every instrument this project owns
+would have scored it as progress. The rule is the `EPILOGUE_USES` /
+`ASM_DECLARE_FUNCTION_NAME` rule stated forwards: when you are about to delete
+a diagnostic, find out what runs next.
+
+**AND THE BUG ABOVE WAS FOUND BY REPAIRING AN INSTRUMENT, ON ITS FIRST RUN
+AFTERWARDS.** `agent-a992b7e5fa4ffaaa7-ehreturn.sh` hardcoded another
+worktree's build dir, had no non-vacuity arm, and printed multi-target's `rc`
+with **no control**. Repaired to diff against genuine stock, it immediately
+reported `riscv64 rc=0 DIFFERS from stock` about a target the handover note
+recorded as **passing** — because `rc=0` was the only thing the old script
+could see. *Repairing a known-bad instrument is not overhead deferred from the
+real work; on this branch it has twice been the fastest route to a new
+defect.*
 
 Say what you measured, what you did not, and what your instrument cannot see.
 **A measured "still cannot be checked, because X" is a useful result; an
