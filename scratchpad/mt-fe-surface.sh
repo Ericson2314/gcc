@@ -90,6 +90,17 @@ if [ -n "$D" ] && [ -d "$D/gcc" ]; then
   NPO=$(wc -l < "$WORK/po")
   echo "build dir: $D  ($NPO .Po dependency records)"
   [ "$NPO" -gt 0 ] || echo "  NOTE: no .Po records -- OBJS columns will read '-' (NOT 'zero')"
+  # CONTROL WITH A KNOWN ANSWER, run before the table.  `cp/' is measured at
+  # 39 of 42 objects opening the shared `tm.h'; if this reads 0 the matcher is
+  # broken, and a broken matcher produces an all-zero column that reads as a
+  # clean bill of health for every front end at once.  That happened.
+  if [ -d "$D/gcc/cp/.deps" ]; then
+    cpn=$(grep -lE '(^|[ 	])tm\.h([ 	\]|$)' "$D/gcc"/cp/.deps/*.Po 2>/dev/null | wc -l)
+    [ "$cpn" -ge 20 ] || { echo "REFUSE: control cp/ reads $cpn objects opening tm.h (expected ~39)"; exit 9; }
+    echo "control ok: cp/ = $cpn objects open the shared tm.h"
+  else
+    echo "NOTE: no cp/.deps in this build -- the OBJS-TM matcher is UNCONTROLLED here"
+  fi
 else
   : > "$WORK/po"; NPO=0
   echo "no build dir given: OBJS columns read '-' meaning UNMEASURED, not zero"
@@ -114,7 +125,14 @@ for d in $DIRS; do
     if [ "$no" = 0 ]; then
       nt='-'; no='-'
     else
-      nt=$(xargs grep -l "^$D/gcc/tm\.h\|[ :]$D/gcc/tm\.h" < "$WORK/po.$$" 2>/dev/null | wc -l)
+      # THE DEP IS THE BARE RELATIVE `tm.h', NOT AN ABSOLUTE PATH.  The first
+      # version of this line matched `$D/gcc/tm.h' and scored 0 for EVERY
+      # front end -- including `cp/', whose answer is known to be 39 of 42.
+      # A known-answer row is the only reason that was caught, and it is why
+      # the control below is an assertion rather than a note: an all-zero
+      # OBJS-TM column reads exactly like "no front end opens the primary's
+      # chain", which is the opposite of the truth.
+      nt=$(xargs grep -lE '(^|[ 	])tm\.h([ 	\]|$)' < "$WORK/po.$$" 2>/dev/null | wc -l)
     fi
   else
     no='-'; nt='-'
