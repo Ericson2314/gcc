@@ -2874,3 +2874,27 @@ back end; every object, every generated header and `cc1` itself must be
 identical. Any difference is a target fact compiled in where a runtime fact
 belongs — and this branch has already moved 92 such facts into the runtime
 config, so the channel exists and the residue is the work.
+
+Demonstrated rather than argued, and worth keeping because it takes ten seconds
+to re-run:
+
+    $ ./config.sub aarch64-whateverIwant-linux-gnu2313123123234234
+    aarch64-whateverIwant-linux-gnu2313123123234234      # accepted VERBATIM
+
+    config.gcc answers, that triple vs aarch64-unknown-linux-gnu:
+      cpu_type    aarch64                                # identical
+      tm_defines  ... DEFAULT_LIBC=LIBC_GLIBC ... TARGET_HAS_IFUNC=1  # identical
+      tm_file     vxworks-dummy.h aarch64/biarchlp64.h aarch64/aarch64.h
+                  elfos.h gnu-user.h linux.h glibc-stdint.h
+                  aarch64/aarch64-elf.h aarch64/aarch64-errata.h
+                  aarch64/aarch64-linux.h                # identical
+
+`config.sub` does not even normalise the vendor away -- it passes
+`whateverIwant` through untouched -- and the ABI suffix can be any length of
+nonsense and still lands in the glibc arm.  Arbitrary vendor AND arbitrary
+ABI/OS suffix, same region, same answers.  No enumeration can contain that, and
+no `case` arm makes it finite: `*-*-linux-gnu*` is ONE branch matching
+uncountably many spellings.
+
+That is the whole argument in one command.  Anything that needs "the list of
+targets" is asking a question with no answer.
