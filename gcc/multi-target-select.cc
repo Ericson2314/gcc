@@ -27,8 +27,21 @@ along with GCC; see the file COPYING3.  If not see
    forwarding to the back end in force.
 
    The set was not guessed.  It is `nm --defined-only' over i386's 42 object
-   files intersected with aarch64's 52, filtered to strong symbols
-   (scratchpad/sweep.sh), and it must be re-run rather than reasoned about:
+   files intersected with aarch64's 52, filtered to strong symbols, and it
+   must be re-run rather than reasoned about.  THE INSTRUMENT IS
+   `scratchpad/mt-rename-sweep.sh'.
+
+   Until this commit that citation named a `sweep.sh' under the scratchpad
+   directory -- a file that has never existed in the history of this branch,
+   and the identical defect `mt-cite-check.sh' was written to catch in
+   `gcc/Makefile.in'.  It survived here because that checker's file list was
+   hardcoded to two files and this was not one of them.  A comment naming a
+   guard reads as evidence the guard ran; it did not, for as long as that line
+   stood.  (The dead path is described rather than spelled: the checker cannot
+   tell a QUOTATION of a bad citation from a citation, so writing it in full
+   would make the check fail on this very paragraph -- PRINCIPLES records the
+   same care being taken in its own text.)
+
    libbackend.a is an ARCHIVE, so a duplicate definition is diagnosed only
    when both members happen to be pulled in for other reasons.  `ld' once
    reported 7 of 40.  Never size this set with the linker.

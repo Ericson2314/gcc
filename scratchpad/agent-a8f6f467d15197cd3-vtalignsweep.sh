@@ -95,15 +95,29 @@ LBL=${MT_VA_LABEL:-default}
 printf '%-28s %-9s %s\n' TARGET VERDICT 'note'
 nscored=0; nchanged=0; nsame=0; nfail=0; nvoid=0
 : > "$W/changed"
+: > "$W/scored"
 for T in $BOTH; do
   emit "$PRE"  "$VPRE"  "$T" "$W/$T.pre.s"  "$EXTRA"
   emit "$POST" "$VPOST" "$T" "$W/$T.post.s" "$EXTRA"
-  if [ ! -s "$W/$T.pre.s" ] || [ ! -s "$W/$T.post.s" ]; then
+  # `test -s' IS NOT A CHECK HERE, AND THAT COST A WRONG VERDICT.  When
+  # cc1plus ICEs it still writes the file it was given: msp430 under
+  # `-mlarge' produces a **44-byte** `.s' -- a header comment and nothing
+  # else -- so `-s' passes on BOTH sides, `cmp' finds the two stubs identical,
+  # and the target is scored `identical', i.e. as evidence that the macro did
+  # not need to move there.  It is the exact shape PRINCIPLES records for the
+  # 39-line truncated spec file: *"non-empty" and "long enough" and "exists"
+  # are not checks; they are the shape that passes on the corrupted artefact.*
+  #
+  # So the artefact is checked against what it must CONTAIN -- the vtable
+  # symbol this input exists to emit.  A file without it did not compile,
+  # whatever its size and whatever cc1plus's exit status said.
+  have () { grep -q '_ZTV9mt_va_key' "$1" 2>/dev/null; }
+  if ! have "$W/$T.pre.s" || ! have "$W/$T.post.s"; then
     m=$(head -1 "$W/$T.pre.s.msg" 2>/dev/null | cut -c1-60)
     printf '%-28s %-9s %s\n' "$T" CC1PLUS-FAIL "$m"
     nfail=$((nfail + 1)); continue
   fi
-  nscored=$((nscored + 1))
+  nscored=$((nscored + 1)); echo "$T" >> "$W/scored"
   # ARM 2, the control, FIRST: if it moved, this target's verdict is void.
   prologue "$W/$T.pre.s"  mt_va_control > "$W/c.pre"
   prologue "$W/$T.post.s" mt_va_control > "$W/c.post"
@@ -133,6 +147,16 @@ echo
 echo "-- the prediction, checked by name:"
 CHANGED=$(cat "$W/changed" 2>/dev/null | tr '\n' ' ')
 check () {   # check <target> <must-move: yes|no> <why>
+  # "DID NOT MOVE" AND "WAS NEVER SCORED" MUST NOT BOTH PRINT `still'.  A
+  # target that ICEs is absent from the CHANGED list for a reason that has
+  # nothing to do with the macro, and the first version of this function read
+  # that absence as a passing prediction -- which is how msp430 and sparc64
+  # came back `OK ... still' while cc1plus was failing on both.
+  if ! grep -qx "$1" "$W/scored" 2>/dev/null; then
+    printf '   UNSCORED %-27s %s\n' "$1" \
+      "cc1plus emitted no vtable here -- no verdict ($3)"
+    return
+  fi
   case " $CHANGED " in
     *" $1 "*) got=moved ;;
     *)        got=still ;;
@@ -146,6 +170,32 @@ if [ "$LBL" = default ]; then
   check ia64-unknown-elf     no  'defines 64 and its POINTER_SIZE is 64 -- already right'
   check msp430-unknown-elf   no  'defines 16 and its POINTER_SIZE is 16 without -mlarge'
 else
-  check msp430-unknown-elf   yes 'defines 16, POINTER_SIZE is 20 under -mlarge -- 20 is not an alignment'
+  # THE `-mlarge' ARM CANNOT BE SCORED, AND SAYING SO IS THE RESULT.
+  # Measured at BOTH PRE and POST, identically:
+  #
+  #   cc1 -mlarge ... msp430  ->  <built-in>: internal compiler error:
+  #                               in type_suffix, at c-family/c-cppbuiltin.cc:2039
+  #
+  # msp430 under `-mlarge' does not compile AT ALL, in either build, on a
+  # two-line C file with no headers.  So "msp430 did not move" under this arm
+  # is not evidence about `TARGET_VTABLE_ENTRY_ALIGN' -- it is the target
+  # never having produced any output to compare.  The first version of this
+  # script printed `FINDING: still, predicted moved' here, which reads as
+  # "the fix did not work" and is the wrong reading of an unmeasurable arm.
+  #
+  # The ICE is PRE-EXISTING and unrelated to this conversion (identical at
+  # PRE), and it is plausibly downstream of the `INT_TYPE_SIZE' leak recorded
+  # in scratchpad/A8F6F467D15197CD3-INTWIDTH.md -- `type_suffix' is looking
+  # for an integer type matching a 20-bit pointer among type nodes that were
+  # all built with the PRIMARY's widths.  That is a HYPOTHESIS, stated as one;
+  # it has not been measured.
+  if ! grep -q '_ZTV9mt_va_key' "$W/msp430-unknown-elf.post.s" 2>/dev/null; then
+    printf '   UNMEASURABLE %-24s %s\n' msp430-unknown-elf \
+      'cc1plus produces nothing under -mlarge, at PRE and POST alike'
+    echo '   (pre-existing ICE in c-family/c-cppbuiltin.cc:2039 type_suffix;'
+    echo '    this arm has no verdict, which is NOT the same as a passing one)'
+  else
+    check msp430-unknown-elf yes 'defines 16, POINTER_SIZE is 20 under -mlarge -- 20 is not an alignment'
+  fi
 fi
 [ "$nvoid" = 0 ] || { echo "EXIT 9: $nvoid target(s) VOID"; exit 9; }
