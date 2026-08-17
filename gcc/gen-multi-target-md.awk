@@ -926,6 +926,34 @@ function flush(	i, n, parts, hdrs, modes, modesdep, objs, junk) {
   # built for all 45 bases rather than only the MULTI_TARGET_OBJS ones, so it
   # is genuinely a third category and needs its own name.
   printf "\t  -DMULTI_TARGET_SUPPLY_TU=1 \\\n";
+  # -DMT_BASE, ADDED WHEN THE TWO LABEL WRAPPERS ARRIVED, AND IT IS NOT A
+  # DUPLICATE OF -DTM_H_FILE ABOVE.
+  #
+  # Everything this TU held before was a string constant, so `tm-<cpu>.h' via
+  # TM_H_FILE was all it needed.  `gcc_taop_output_labelref' and
+  # `gcc_taop_generate_internal_label' expand whole BODIES out of 37 back-end
+  # headers, and those bodies reach `user_label_prefix', `sprint_ul',
+  # `asm_fprintf', `default_strip_name_encoding' and `targetm', so
+  # `target-asm-ops.cc' now includes `rtl.h', `tree.h', `target.h' and
+  # `output.h'.
+  #
+  # `target.h:57' is `#include MT_HEADER (tm.h)', and `MT_HEADER' degrades to a
+  # BARE `"tm.h"' when MT_BASE is undefined -- i.e. to the build root's shared
+  # copy, which is the PRIMARY's whole header chain under a target-neutral
+  # name.  Measured before this line existed: compiling
+  # `target-asm-ops-alpha.o' produced `ix86_asm_output_labelref was not
+  # declared', `conflicting declaration typedef struct ix86_args
+  # CUMULATIVE_ARGS' and `multiple definition of enum opt_code' -- i386's
+  # headers arriving underneath alpha's, in the object that exists to capture
+  # ALPHA's answers.  It failed loudly here; it is the silent version of this
+  # that the whole branch is about.
+  #
+  # Harmless against TM_H_FILE: `<cpu>-inc/tm.h' includes `tm-<cpu>.h', which
+  # carries `#ifndef GCC_TM_<CPU>_H', so the second arrival is a no-op.
+  # Verified over all 47 bases by scratchpad/a94d141d788a6b54f-taoptry.sh,
+  # which compiles this one file per base in seconds and carries a negative
+  # control that must fire.
+  printf "\t  -DMT_BASE=%s-inc \\\n", cpu;
   printf "\t  $(srcdir)/target-asm-ops.cc\n";
   printf "\t$(POSTCOMPILE)\n\n";
     asm_ops_objs = asm_ops_objs " target-asm-ops-" cpu ".o";

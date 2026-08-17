@@ -2351,11 +2351,19 @@ CXX_TARGET_OBJS = $(filter-out $(MT_CXX_OBJS_MOVED),@cxx_target_objs@) \
 #            through target.h and compiled cleanly.  They are given the witness
 #            with this change, which is what makes the two halves fail alike.
 #   rust     one back end (i386) and it already carried the witness.
-#   fortran  clean, and clean BY ACCIDENT: only darwin and vms name anything in
-#            fortran_target_objs and neither is in the 47-base set, so the
-#            defect has no reachable instance here.  Converted anyway --
-#            a board green because nothing can reach the bug is not evidence
-#            about the mechanism.
+#   fortran  clean, and clean BY ACCIDENT.  The brief said "darwin and vms
+#            only, and neither is in the 47-base set"; MEASURED, it is stronger
+#            than that and the difference matters.  The only two objects any
+#            config.gcc line puts in fortran_target_objs are `darwin-f.o'
+#            (config/darwin-f.cc) and `vms-f.o' (config/vms/vms-f.cc), and
+#            NEITHER IS A BACK END'S OWN OBJECT anywhere in the tree: there is
+#            no config/<cpu>/<cpu>-f.cc at all, and no back end has cpu_type
+#            `vms'.  They are the OS side, like glibc-c.o, and they stay shared
+#            and stay a leak in exactly the same way.  So MT_FORTRAN_OBJS_<b>
+#            is empty for EVERY base, on any base set, not just this one.
+#            Converted anyway, and with no non-vacuity check: a board green
+#            because the population is empty says nothing about the mechanism,
+#            and a check that cannot tell those apart says nothing either.
 #
 # NOT `$(MT_C_OBJS_<base>)' BY REFERENCE, unlike CXX_TARGET_OBJS: <cpu>-c.cc
 # serves both the C and C++ front ends, but <cpu>-d.cc, <cpu>-rust.cc and

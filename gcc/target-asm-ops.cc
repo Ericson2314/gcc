@@ -60,10 +60,49 @@ along with GCC; see the file COPYING3.  If not see
    declaration`) -- the same one-error-at-a-time shape, one header deeper,
    that `target-cumargs.cc` records for attribs.h/stringpool.h.  Found in
    seconds by `a76a331dcb554f700-asmopscheck.sh` rather than by a build.  */
+/* WHAT THE TWO LABEL WRAPPERS NEED, AND THIS FILE WAS DELIBERATELY MINIMAL
+   BEFORE THEM.  Everything the table holds is a string constant or a function
+   address, so `config.h', `system.h', `coretypes.h' and the base's own `tm.h'
+   sufficed.  `gcc_taop_output_labelref' and `gcc_taop_generate_internal_label'
+   expand whole BODIES out of 37 back-end headers, and those bodies call into
+   shared support code.  Measured over all 47 bases with
+   `scratchpad/a94d141d788a6b54f-taoptry.sh', which compiles THIS FILE ALONE
+   per base in seconds -- the same missing name found through `make all-gcc'
+   costs forty minutes per attempt:
+
+     alpha.h:867      user_label_prefix              output.h
+     elfos.h:138      sprint_ul                      output.h
+     arc.h:1142       targetm.strip_name_encoding    target.h
+     (several)        default_strip_name_encoding    output.h
+     (several)        asm_fprintf                    output.h
+     mips.h, riscv.h  make_decl_rtl                  varasm.h
+
+   Same one-error-at-a-time series the `TM_P_H_FILE' comment below records for
+   mmix and sparc, and the same conclusion: a macro expanded in a translation
+   unit where it is THAT base's own means that base's headers must be
+   satisfiable HERE.  The table is still `constexpr'; none of these headers
+   contributes to it.
+
+   THE ORDER IS LOAD-BEARING AND `rtl.h' MUST PRECEDE `TM_P_H_FILE'.  A back
+   end's `<cpu>-protos.h' wraps most of itself in `#ifdef RTX_CODE', so with
+   the old order the file was included and CONTRIBUTED NOTHING -- silently.
+   Measured: i386 alone of 47 failed with `ix86_asm_output_labelref was not
+   declared', because `i386-protos.h:205' sits inside that guard while alpha's
+   equivalent does not.  A header that is present, parsed, and empty is the
+   same object as a header that is absent, and only one base out of 47 was
+   positioned to say so.  This is the include order `target-cumargs.cc' already
+   uses, for the same reason.  */
+#include "rtl.h"
+#include "tree.h"
+
 #ifdef TM_P_H_FILE
 #include "memmodel.h"
 #include TM_P_H_FILE
 #endif
+
+#include "target.h"
+#include "output.h"
+#include "varasm.h"
 
 #include "target-asm-ops.h"
 
