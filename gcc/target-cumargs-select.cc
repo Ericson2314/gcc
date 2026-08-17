@@ -250,6 +250,47 @@ mt_finish_declare_object (FILE *file, tree decl, int top_level, int at_end)
   mt_frame ()->finish_declare_object (file, decl, top_level, at_end);
 }
 
+/* The four `SECTION_NOSWITCH' callbacks' macro chains.  Through `mt_frame ()'
+   like the rest: with no target selected these must fail BY NAME, because the
+   alternative is emitting a `.bss' or `.comm' block that assembles cleanly and
+   is simply the wrong target's.  See target-frame.h.  */
+
+bool
+mt_has_output_aligned_bss (void)
+{
+  return mt_frame ()->has_output_aligned_bss ();
+}
+
+void
+mt_output_aligned_bss (FILE *file, tree decl, const char *name,
+		       unsigned HOST_WIDE_INT size, unsigned int align)
+{
+  mt_frame ()->output_aligned_bss (file, decl, name, size, align);
+}
+
+bool
+mt_output_local (FILE *file, tree decl, const char *name,
+		 unsigned HOST_WIDE_INT size, unsigned HOST_WIDE_INT rounded,
+		 unsigned int align)
+{
+  return mt_frame ()->output_local (file, decl, name, size, rounded, align);
+}
+
+bool
+mt_output_common (FILE *file, tree decl, const char *name,
+		  unsigned HOST_WIDE_INT size, unsigned HOST_WIDE_INT rounded,
+		  unsigned int align)
+{
+  return mt_frame ()->output_common (file, decl, name, size, rounded, align);
+}
+
+bool
+mt_output_tls_common (FILE *file, tree decl, const char *name,
+		      unsigned HOST_WIDE_INT size)
+{
+  return mt_frame ()->output_tls_common (file, decl, name, size);
+}
+
 /* `ASM_OUTPUT_TYPE_DIRECTIVE'; `final.cc:2087' and `varasm.cc:6647', the two
    shared sites that read the macro directly rather than through
    `ASM_DECLARE_OBJECT_NAME'.  False means the selected base defines no such

@@ -2177,6 +2177,80 @@ struct target_frame_desc
   void (*finish_declare_object) (FILE *file, tree decl, int top_level,
 				 int at_end);
 
+  /* THE FOUR `SECTION_NOSWITCH' CALLBACKS -- WHERE EVERY UNINITIALIZED AND
+     EVERY COMMON VARIABLE IN THE PROGRAM IS EMITTED, AND ALL FOUR WERE i386's.
+
+     `varasm.cc' :2411 `emit_local', :2447 `emit_bss', :2461 `emit_common',
+     :2482 `emit_tls_common'.  Each is a `#if defined' chain over macros the
+     primary supplies, so the ARM TAKEN and the BODY RUN were both i386's for
+     all 47 bases.
+
+     `emit_bss' IS NOT A DIRECTIVE-SPELLING BUG AND IT IS THE REASON THIS BLOCK
+     EXISTS.  `i386/gnu-user.h:87' is
+
+	 #define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN) \
+	   x86_output_aligned_bss (FILE, DECL, NAME, SIZE, ALIGN)
+
+     -- a FUNCTION IN `i386.cc'.  So every uninitialized global on every back
+     end went through i386's back end, and `i386.cc:973' opens by consulting
+     `ix86_cmodel' and `ix86_section_threshold' to decide whether the variable
+     belongs in `.lbss'.  arm's `.bss' placement was being decided by i386's
+     code model.  arm's own answer is the GENERIC `asm_output_aligned_bss' in
+     `varasm.cc', whose `ASM_OUTPUT_SKIP' is `.space' where i386's is `.zero'.
+
+     HOW IT WAS FOUND, WHICH IS THE PART WORTH KEEPING.  It was NOT found by a
+     sweep.  `declare_object_name' had just been converted and arm's `.data`
+     variables came out correctly as `%object'; the `ilp32' effective-target
+     probe was then re-run to test the prediction that fixing `.type' would
+     restore it, and it still read FALSE.  The prediction was REFUTED, and the
+     refutation is what pointed here: `check_effective_target_ilp32's body is
+     `int dummy[...]' with no initializer, so it goes to `.bss' and never
+     touches the site that had been fixed.  A prediction that had been assumed
+     rather than tested would have closed this task with the second leak intact
+     and the debt attributed to the first.
+
+     ALSO NOTE WHAT THIS SETTLES ABOUT `ASM_OUTPUT_ALIGN'.
+     A660907426E03E4E9-ARM-BOARD.md 5 reports multi-target emitting `.align 4'
+     where arm wants `.align 2'.  `ASM_OUTPUT_ALIGN' itself was already
+     converted (7247d7aea83) and arm's `.data' path already emitted `.align 2'
+     correctly -- so the board's diagnosis was wrong while its OBSERVATION was
+     right.  The `.align 4' is real and it is HERE: `x86_output_aligned_bss'
+     expands `ASM_OUTPUT_ALIGN' inside `i386.cc', a per-base translation unit
+     where the redirect does not apply and the macro is genuinely i386's.  A
+     converted macro can still be leaked by an unconverted CALLER.
+
+     `has_output_aligned_bss' IS A SEPARATE FIELD, and only `bss' needs one.
+     `varasm.cc:7108' creates `bss_noswitch_section' at all only
+     `#if defined ASM_OUTPUT_ALIGNED_BSS'.  30 back ends define it and 17 do
+     not; for those 17 the section must not exist.  That question is asked ONCE
+     at `init_varasm_once', not per variable, so an in-band "nothing was
+     emitted" return cannot carry it -- the same argument
+     `has_incoming_return_addr_rtx' makes.
+
+     The other three carry their answer in the return value because their
+     callers already did: `false' has always meant "the target did not honour
+     the requested alignment", which `assemble_noswitch_variable' turns into
+     the `requested alignment ... is greater than implemented alignment'
+     error.  `output_tls_common' returning false means the base has no
+     ASM_OUTPUT_TLS_COMMON and the caller must `sorry' -- that message is
+     target-neutral and stays on the shared side.
+
+     ONLY THE MACRO CHAIN MOVED.  `symtab_node::get (decl)->definition_alignment ()'
+     and `get_variable_align (decl)' stay in `varasm.cc': they are facts about
+     the declaration, not about the back end, and keeping them shared is what
+     lets the per-base translation unit need no new includes.  */
+  bool (*has_output_aligned_bss) (void);
+  void (*output_aligned_bss) (FILE *file, tree decl, const char *name,
+			      unsigned HOST_WIDE_INT size, unsigned int align);
+  bool (*output_local) (FILE *file, tree decl, const char *name,
+			unsigned HOST_WIDE_INT size,
+			unsigned HOST_WIDE_INT rounded, unsigned int align);
+  bool (*output_common) (FILE *file, tree decl, const char *name,
+			 unsigned HOST_WIDE_INT size,
+			 unsigned HOST_WIDE_INT rounded, unsigned int align);
+  bool (*output_tls_common) (FILE *file, tree decl, const char *name,
+			     unsigned HOST_WIDE_INT size);
+
   /* ASM_OUTPUT_TYPE_DIRECTIVE, read DIRECTLY by shared code at two sites that
      do not go through `declare_object_name': `final.cc:2087' (the `.type ...,
      "function"' for a weak/global/static ENTRY label) and `varasm.cc:6647'
@@ -2506,6 +2580,21 @@ extern void mt_declare_object_name (FILE *, const char *, tree);
 
 /* `ASM_FINISH_DECLARE_OBJECT', the closing half; `passes.cc:376'.  */
 extern void mt_finish_declare_object (FILE *, tree, int, int);
+
+/* The four `SECTION_NOSWITCH' callbacks' macro chains; `varasm.cc' :2411,
+   :2447, :2461, :2482, plus `varasm.cc:7108' for whether `bss_noswitch_section'
+   exists at all.  See the descriptor fields -- `emit_bss' was routing every
+   back end's uninitialized globals through `x86_output_aligned_bss', i386's
+   code model included.  */
+extern bool mt_has_output_aligned_bss (void);
+extern void mt_output_aligned_bss (FILE *, tree, const char *,
+				   unsigned HOST_WIDE_INT, unsigned int);
+extern bool mt_output_local (FILE *, tree, const char *, unsigned HOST_WIDE_INT,
+			     unsigned HOST_WIDE_INT, unsigned int);
+extern bool mt_output_common (FILE *, tree, const char *, unsigned HOST_WIDE_INT,
+			      unsigned HOST_WIDE_INT, unsigned int);
+extern bool mt_output_tls_common (FILE *, tree, const char *,
+				  unsigned HOST_WIDE_INT);
 
 /* `ASM_OUTPUT_TYPE_DIRECTIVE', for the two shared sites that read it directly.
    Returns false when the selected base defines no such macro and NOTHING was

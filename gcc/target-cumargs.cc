@@ -482,6 +482,139 @@ mt_base_declare_object_name (FILE *file, const char *name,
 #endif
 }
 
+/* THE FOUR `SECTION_NOSWITCH' CALLBACKS' MACRO CHAINS, ASKED OF THIS BASE.
+   `varasm.cc' :2411 (`emit_local'), :2447 (`emit_bss'), :2461 (`emit_common')
+   and :2482 (`emit_tls_common') each dispatch on `#if defined' over macros the
+   PRIMARY supplies, so every arm and every body was i386's for all 47 bases.
+
+   `emit_bss' IS THE WORST OF THE FOUR AND IT IS NOT A DIRECTIVE-SPELLING BUG.
+   `i386/gnu-user.h:87' defines ASM_OUTPUT_ALIGNED_BSS as `x86_output_aligned_bss'
+   -- a FUNCTION IN `i386.cc' -- so every uninitialized global on every one of
+   the 47 back ends was emitted by i386's back end, including
+
+       i386.cc:973   if ((ix86_cmodel == CM_MEDIUM || ... || CM_LARGE_PIC)
+		      && size > (unsigned int) ix86_section_threshold)
+		       switch_to_section (get_named_section (decl, ".lbss", 0));
+
+   i.e. arm's `.bss' placement was decided by i386's code model and i386's
+   `-mlarge-data-threshold'.  Exactly the `ix86_asm_output_function_label'
+   shape that `declare_function_name' records, on the data side.  arm's own
+   answer is the GENERIC `asm_output_aligned_bss', and its ASM_OUTPUT_SKIP is
+   `.space' where i386's is `.zero'.
+
+   ONLY THE MACRO CHAIN MOVES.  The callers keep the target-neutral
+   bookkeeping -- `symtab_node::get (decl)->definition_alignment ()',
+   `get_variable_align', the `sorry' for thread-local COMMON -- so this file
+   needs no new includes and the split is at the macro boundary rather than at
+   an arbitrary one.
+
+   EXISTENCE IS A SEPARATE ANSWER FOR `bss' AND ONLY FOR `bss', because
+   `varasm.cc:7108' creates `bss_noswitch_section' at all only
+   `#if defined ASM_OUTPUT_ALIGNED_BSS'.  30 back ends define the macro and 17
+   do not, and for those 17 the section must not exist -- an in-band "the thunk
+   emitted nothing" cannot say that, since the question is asked once at
+   `init_varasm_once' and not per variable.  */
+
+static bool
+mt_base_has_output_aligned_bss (void)
+{
+#ifdef ASM_OUTPUT_ALIGNED_BSS
+  return true;
+#else
+  return false;
+#endif
+}
+
+static void
+mt_base_output_aligned_bss (FILE *file ATTRIBUTE_UNUSED,
+			    tree decl ATTRIBUTE_UNUSED,
+			    const char *name ATTRIBUTE_UNUSED,
+			    unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+			    unsigned int align ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_ALIGNED_BSS
+  ASM_OUTPUT_ALIGNED_BSS (file, decl, name, size, align);
+#else
+  /* Unreachable: the caller asks `has_output_aligned_bss' first, and a base
+     answering false never gets a `bss_noswitch_section' to route a variable
+     through.  It is a hard stop rather than a no-op because a silently empty
+     `.bss' emission is indistinguishable from a correct one in the output.  */
+  gcc_unreachable ();
+#endif
+}
+
+/* `emit_local's chain.  Returns true when an ALIGNED form was used, which is
+   what the caller's "did the target honour the alignment" test reads.  */
+
+static bool
+mt_base_output_local (FILE *file ATTRIBUTE_UNUSED,
+		      tree decl ATTRIBUTE_UNUSED,
+		      const char *name ATTRIBUTE_UNUSED,
+		      unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+		      unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED,
+		      unsigned int align ATTRIBUTE_UNUSED)
+{
+#if defined ASM_OUTPUT_ALIGNED_DECL_LOCAL
+  ASM_OUTPUT_ALIGNED_DECL_LOCAL (file, decl, name, size, align);
+  return true;
+#elif defined ASM_OUTPUT_ALIGNED_LOCAL
+  /* ASM_OUTPUT_ALIGNED_LOCAL_P is a RUNTIME read of an assembler capability on
+     i386/bsd.h -- `.lcomm' takes an alignment operand only on some
+     assemblers -- so it stays a runtime test here rather than becoming part of
+     the `#if' chain.  It is now this BASE's capability rather than the
+     primary's.  */
+  if (ASM_OUTPUT_ALIGNED_LOCAL_P)
+    {
+      ASM_OUTPUT_ALIGNED_LOCAL (file, name, size, align);
+      return true;
+    }
+  ASM_OUTPUT_LOCAL (file, name, size, rounded);
+  return false;
+#else
+  ASM_OUTPUT_LOCAL (file, name, size, rounded);
+  return false;
+#endif
+}
+
+/* `emit_common's chain.  */
+
+static bool
+mt_base_output_common (FILE *file ATTRIBUTE_UNUSED,
+		       tree decl ATTRIBUTE_UNUSED,
+		       const char *name ATTRIBUTE_UNUSED,
+		       unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+		       unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED,
+		       unsigned int align ATTRIBUTE_UNUSED)
+{
+#if defined ASM_OUTPUT_ALIGNED_DECL_COMMON
+  ASM_OUTPUT_ALIGNED_DECL_COMMON (file, decl, name, size, align);
+  return true;
+#elif defined ASM_OUTPUT_ALIGNED_COMMON
+  ASM_OUTPUT_ALIGNED_COMMON (file, name, size, align);
+  return true;
+#else
+  ASM_OUTPUT_COMMON (file, name, size, rounded);
+  return false;
+#endif
+}
+
+/* `emit_tls_common's chain.  False means this base has no ASM_OUTPUT_TLS_COMMON
+   and the caller must `sorry'; the message is target-neutral and stays there.  */
+
+static bool
+mt_base_output_tls_common (FILE *file ATTRIBUTE_UNUSED,
+			   tree decl ATTRIBUTE_UNUSED,
+			   const char *name ATTRIBUTE_UNUSED,
+			   unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_TLS_COMMON
+  ASM_OUTPUT_TLS_COMMON (file, decl, name, size);
+  return true;
+#else
+  return false;
+#endif
+}
+
 /* ASM_FINISH_DECLARE_OBJECT, asked of THIS base -- `passes.cc:376', the
    CLOSING half of the bracket `mt_base_declare_object_name' opens.  An
    `#ifdef' with no `#else', so absence is "do nothing" and stays so.  */
@@ -2337,6 +2470,11 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_function_size,
   mt_base_declare_object_name,
   mt_base_finish_declare_object,
+  mt_base_has_output_aligned_bss,
+  mt_base_output_aligned_bss,
+  mt_base_output_local,
+  mt_base_output_common,
+  mt_base_output_tls_common,
   mt_base_output_type_directive,
   mt_base_declare_function_prefix,
   mt_base_adjust_insn_length,

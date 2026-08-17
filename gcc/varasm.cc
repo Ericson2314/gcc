@@ -118,13 +118,15 @@ static unsigned HOST_WIDE_INT output_constant (tree, unsigned HOST_WIDE_INT,
 					       unsigned int, bool, bool);
 static void globalize_decl (tree);
 static bool decl_readonly_section_1 (enum section_category);
-#ifdef BSS_SECTION_ASM_OP
-#ifdef ASM_OUTPUT_ALIGNED_BSS
-static void asm_output_aligned_bss (FILE *, tree, const char *,
-				    unsigned HOST_WIDE_INT, int)
-     ATTRIBUTE_UNUSED;
-#endif
-#endif /* BSS_SECTION_ASM_OP */
+/* `asm_output_aligned_bss' IS NO LONGER `static' AND NO LONGER GUARDED, and
+   both changes are forced by the same thing.  It is the GENERIC body that most
+   back ends' `ASM_OUTPUT_ALIGNED_BSS' expands to -- alpha, arm, m68k, sh,
+   sparc, v850, xtensa and more all spell the macro as a call to it -- and
+   those macros are now expanded in the PER-BASE translation unit
+   (`mt_base_output_aligned_bss' in target-cumargs.cc), which cannot reach a
+   `static' in this file.  The `#ifdef' pair was the primary's in any case: it
+   asked whether i386 has the macro in order to decide whether ARM's body gets
+   compiled.  Declared in output.h beside the other emitters.  */
 static void mark_weak (tree);
 static void output_constant_pool (const char *, tree);
 static void handle_vtv_comdat_section (section *, const_tree);
@@ -498,16 +500,17 @@ resolve_unique_section (tree decl, int reloc ATTRIBUTE_UNUSED,
     }
 }
 
-#ifdef BSS_SECTION_ASM_OP
-
-#ifdef ASM_OUTPUT_ALIGNED_BSS
-
 /* Utility function for targets to use in implementing
    ASM_OUTPUT_ALIGNED_BSS.
    ??? It is believed that this function will work in most cases so such
-   support is localized here.  */
+   support is localized here.
 
-static void
+   COMPILED UNCONDITIONALLY.  The `#ifdef BSS_SECTION_ASM_OP' /
+   `#ifdef ASM_OUTPUT_ALIGNED_BSS' pair around it was answered by the primary,
+   so it asked whether i386 has those macros in order to decide whether the
+   body every OTHER back end's macro calls gets compiled at all.  */
+
+void
 asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 			const char *name, unsigned HOST_WIDE_INT size,
 			int align)
@@ -522,10 +525,6 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
   mt_declare_object_name (file, name, decl);
   ASM_OUTPUT_SKIP (file, size ? size : 1);
 }
-
-#endif
-
-#endif /* BSS_SECTION_ASM_OP */
 
 /* Return the hot section for function DECL.  Return text_section for
    null DECLs.
@@ -2414,46 +2413,35 @@ emit_local (tree decl ATTRIBUTE_UNUSED,
 	    unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	    unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-#if defined ASM_OUTPUT_ALIGNED_DECL_LOCAL
-  unsigned int align = symtab_node::get (decl)->definition_alignment ();
-  ASM_OUTPUT_ALIGNED_DECL_LOCAL (asm_out_file, decl, name,
-				 size, align);
-  return true;
-#elif defined ASM_OUTPUT_ALIGNED_LOCAL
-  /* ASM_OUTPUT_ALIGNED_LOCAL_P is 1 unless the target makes it a runtime read
-     of an assembler capability -- see i386/bsd.h, where `.lcomm' only takes an
-     alignment operand on some assemblers.  It used to be an `#ifdef' around the
-     macro's definition, which a runtime value cannot replace, so the choice
-     moved here.  The false arm is the code the `#else' arm below used to run,
-     and `rounded' is in scope for it.  */
-  if (ASM_OUTPUT_ALIGNED_LOCAL_P)
-    {
-      unsigned int align = symtab_node::get (decl)->definition_alignment ();
-      ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, align);
-      return true;
-    }
-  ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
-  return false;
-#else
-  ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
-  return false;
-#endif
+  /* THE `#if defined ASM_OUTPUT_ALIGNED_DECL_LOCAL' CHAIN THAT WAS HERE PICKED
+     ITS ARM, AND RAN ITS BODY, ENTIRELY OUT OF THE PRIMARY'S HEADERS.  The
+     alignment is a fact about the DECLARATION and stays here; only the macro
+     chain is a fact about the back end.  See target-frame.h.  */
+  return mt_output_local (asm_out_file, decl, name, size, rounded,
+			  symtab_node::get (decl)->definition_alignment ());
 }
 
 /* A noswitch_section_callback for bss_noswitch_section.  */
 
-#if defined ASM_OUTPUT_ALIGNED_BSS
+/* THE `#if defined ASM_OUTPUT_ALIGNED_BSS' HERE, AND THE ONE AROUND
+   `bss_noswitch_section's CREATION AT :7108, WERE BOTH THE PRIMARY'S -- and so
+   was the body, which on i386 is `x86_output_aligned_bss' in `i386.cc'.  Every
+   uninitialized global on every one of the 47 back ends was emitted by i386's
+   back end, `ix86_cmodel'/`.lbss' decision included.  See target-frame.h.
+
+   The function is now defined unconditionally; whether the SECTION exists is
+   asked of the selected base at :7108 through `mt_has_output_aligned_bss'.  */
+
 static bool
 emit_bss (tree decl ATTRIBUTE_UNUSED,
 	  const char *name ATTRIBUTE_UNUSED,
 	  unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	  unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-  ASM_OUTPUT_ALIGNED_BSS (asm_out_file, decl, name, size,
-			  get_variable_align (decl));
+  mt_output_aligned_bss (asm_out_file, decl, name, size,
+			 get_variable_align (decl));
   return true;
 }
-#endif
 
 /* A noswitch_section_callback for comm_section.  */
 
@@ -2463,18 +2451,10 @@ emit_common (tree decl ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-#if defined ASM_OUTPUT_ALIGNED_DECL_COMMON
-  ASM_OUTPUT_ALIGNED_DECL_COMMON (asm_out_file, decl, name,
-				  size, get_variable_align (decl));
-  return true;
-#elif defined ASM_OUTPUT_ALIGNED_COMMON
-  ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, name, size,
-			     get_variable_align (decl));
-  return true;
-#else
-  ASM_OUTPUT_COMMON (asm_out_file, name, size, rounded);
-  return false;
-#endif
+  /* Same leak as `emit_local' and `emit_bss': the arm and the body were both
+     the primary's.  See target-frame.h.  */
+  return mt_output_common (asm_out_file, decl, name, size, rounded,
+			   get_variable_align (decl));
 }
 
 /* A noswitch_section_callback for tls_comm_section.  */
@@ -2485,13 +2465,13 @@ emit_tls_common (tree decl ATTRIBUTE_UNUSED,
 		 unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 		 unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-#ifdef ASM_OUTPUT_TLS_COMMON
-  ASM_OUTPUT_TLS_COMMON (asm_out_file, decl, name, size);
+  /* The `#ifdef' was the primary's here too.  `false' means the SELECTED base
+     has no ASM_OUTPUT_TLS_COMMON -- the `sorry' stays on this side because the
+     message is target-neutral, and because a thunk that emitted nothing and
+     returned would be indistinguishable from one that emitted correctly.  */
+  if (!mt_output_tls_common (asm_out_file, decl, name, size))
+    sorry ("thread-local COMMON data not implemented");
   return true;
-#else
-  sorry ("thread-local COMMON data not implemented");
-  return true;
-#endif
 }
 
 /* Assemble DECL given that it belongs in SECTION_NOSWITCH section SECT.
@@ -7104,10 +7084,15 @@ init_varasm_once (void)
   comm_section = get_noswitch_section (SECTION_WRITE | SECTION_BSS
 				       | SECTION_COMMON, emit_common);
 
-#if defined ASM_OUTPUT_ALIGNED_BSS
-  bss_noswitch_section = get_noswitch_section (SECTION_WRITE | SECTION_BSS,
-					       emit_bss);
-#endif
+  /* WHETHER THIS SECTION EXISTS AT ALL IS A PER-BASE ANSWER, and it was the
+     primary's: i386 defines ASM_OUTPUT_ALIGNED_BSS, so all 47 bases got a
+     `bss_noswitch_section' -- including the 17 back ends that define no such
+     macro and for which upstream creates none.  Asked of the selected base
+     here; `init_targetm_asm_ops' and the frame selection both run before
+     `init_varasm_once', so the base is settled.  See target-frame.h.  */
+  if (mt_has_output_aligned_bss ())
+    bss_noswitch_section = get_noswitch_section (SECTION_WRITE | SECTION_BSS,
+						 emit_bss);
 
   targetm.asm_out.init_sections ();
 
