@@ -6478,10 +6478,17 @@ MT_INSTALL_HEADERDIR = $(libdir)/gcc/$(version)
 # An install that quietly skipped the headers would leave an installation whose
 # libgcc cannot be built, reporting success -- and the failure would surface in
 # another component, as a missing `tm.h', naming nothing that led to it.
-install-target-headers: installdirs multi-target.manifest
+#
+# $(MULTI_TARGET_GEN_HDRS) is a PREREQUISITE as well as an argument.  `install'
+# is reached from a built tree, so these normally exist already -- but they are
+# only built because something depends on them, and the one thing that does is
+# the in-build options.h rule above.  An `install' run in a tree where that has
+# been cleaned would otherwise fail in the script rather than build them.
+install-target-headers: installdirs multi-target.manifest $(MULTI_TARGET_GEN_HDRS)
 	$(SHELL) $(srcdir)/install-target-headers.sh \
-	  $(objdir) multi-target.manifest \
+	  $(objdir) $(srcdir) multi-target.manifest \
 	  $(DESTDIR)$(MT_INSTALL_HEADERDIR) $(MT_INSTALL_HEADERDIR) \
+	  "$(MULTI_TARGET_GEN_HDRS)" \
 	  $(enabled_targets)
 
 ifeq ($(enable_libgdiagnostics),yes)
