@@ -346,52 +346,6 @@ struct target_frame_desc
   unsigned int (*biggest_alignment) (void);
 
   /* ------------------------------------------------------------------
-     `TARGET_VTABLE_ENTRY_ALIGN' -- THE FOURTH OF THAT FAMILY, AND IT IS HERE
-     RATHER THAN IN `TARGET_CDATA_FIELDS' FOR A REASON THAT LOOKS LIKE AN
-     ARGUMENT AGAINST CONVERTING IT AT ALL.
-
-     `defaults.h:972' is `#define TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE', and
-     a macro BODY is expanded at the USE site.  `POINTER_SIZE' is a call
-     (`mt_pointer_size', just above), so the 44 back ends that define nothing
-     ALREADY get their own dynamic answer today, through that call, and the
-     list forty lines up names this macro among the eleven the option-state
-     redirect converts for free.  A `TARGET_CDATA_FIELDS' slot would read the
-     macro ONCE per base at selection time and FREEZE a currently-correct
-     dynamic answer for 44 in order to fix 3 -- a regression wearing a fix's
-     clothes, which is why `target-cdata.h:316' refuses it by name.
-
-     THE RESIDUAL 3 ARE REAL, AND THEY ARE THE WHOLE DEFECT.  `ia64.h:236'
-     (64), `avr.h:139' (8) and `msp430.h:205' (16) DEFINE the macro, so for
-     them `defaults.h:971's `#ifndef' must not fire -- and in shared code it
-     is answered by the PRIMARY, i386, which does not define it.  All three
-     therefore got `POINTER_SIZE' and their explicit values reached nothing.
-     msp430's own comment states the symptom before the fact:
-
-	 msp430.h:202  "TARGET_VTABLE_ENTRY_ALIGN defaults to POINTER_SIZE,
-			which is 20 for TARGET_LARGE"
-
-     and 20 is not an alignment.  avr asks for 8 and got 16.
-
-     A CALL SERVES BOTH POPULATIONS AND THAT IS THE ONLY SHAPE THAT DOES.
-     `mt_base_vtable_entry_align' expands the macro in each base's OWN
-     translation unit, so a definer yields its literal and a non-definer
-     yields `defaults.h''s fallback computed against ITS `POINTER_SIZE' --
-     i.e. exactly the answer a single-target build of that back end gives.
-     Nothing is frozen: the 44 still reach `mt_pointer_size' on every call,
-     one indirection further out, so `TARGET_ILP32' and `TARGET_64BIT' still
-     move the answer within one compilation.  This is the supply-side floor
-     PRINCIPLES section 2a permits, not the consumer-side one it bans; no
-     base ever reads another's value.
-
-     POSITION: two consumers in the whole tree, `cp/class.cc:840' and
-     `d/decl.cc:2245', both `SET_DECL_ALIGN (decl, TARGET_VTABLE_ENTRY_ALIGN)'
-     -- an ordinary run-time argument.  No `#if', no array bound, no
-     enumerator, no `case' label, so a call is legal at every site.  (`d/' has
-     never been built multi-target; see
-     scratchpad/A8F6F467D15197CD3-FRONTENDS.md.)  */
-  unsigned int (*vtable_entry_align) (void);
-
-  /* ------------------------------------------------------------------
      `DATA_ALIGNMENT' AND `DATA_ABI_ALIGNMENT' -- THE PAIR THAT IS BOTH AN
      EXISTENCE PREDICATE AND A STATE LEAK AT ONCE.
 
@@ -1318,255 +1272,6 @@ struct target_frame_desc
      a generic ladder.  */
   poly_int64 (*stack_dynamic_offset) (tree fndecl);
 
-  /* ------------------------------------------------------------------
-     `STACK_POINTER_OFFSET' -- WHERE A TARGET'S OUTGOING STACK ARGUMENTS
-     START, RELATIVE TO THE STACK POINTER.  A LIVE ABI BREAK, MEASURED.
-
-     `defaults.h:1156' floors it at 0 and i386 does not define it, so the
-     floor FIRES -- the same polarity as `TARGET_HAS_FMV_TARGET_ATTRIBUTE' and
-     the opposite of `EPILOGUE_USES' -- and every dissenting back end reads
-     the floor instead of its own value.  Twenty back ends dissent, and the
-     one that was measured is the worst case in the tree:
-
-	 s390.h:569       160     the 160-byte register save area every s390x
-				  callee's own prologue writes into
-	 s390/tpf.h:49    448
-	 ia64.h:755        16     pa.h:547  negative, and reads crtl
-	 c6x, mn10300       4     sparc  FIRST_PARM_OFFSET(0)+SPARC_STACK_BIAS
-	 avr.h:298          1     lm32   UNITS_PER_WORD
-	 rs6000.h:1392     RS6000_SAVE_AREA        epiphany  a Var() option
-	 microblaze.h:296  FIRST_PARM_OFFSET(FNDECL)
-	 or1k arc nds32 frv m32r gcn fr30           0  (agree with the floor)
-
-     On s390x, stack arguments 6..n were emitted at 0/8/16/24/32(%r15) where
-     stock emits 160/168/176/184/192(%r15) -- i.e. exactly 160 bytes low,
-     inside the register save area the callee's own `stmg %r6,%r15,48(%r15)'
-     then overwrites.  **Every other instruction of the function is identical
-     to genuine stock**, which is why no board can see it: it compiles, it
-     assembles, and `readelf' reports a well-formed S/390 object.
-
-     A CALL, NOT A `TARGET_CDATA_FIELDS' SLOT, AND THE DEFINER SET IS THE
-     ARGUMENT.  Twelve of the twenty are plain constants and two are derived
-     constants, so a `NUM' slot looks obviously right.  Four are not
-     invariant: `epiphany_stack_offset' is an option variable, rs6000's
-     `RS6000_SAVE_AREA' is ABI-flag dependent, microblaze's reads
-     `FIRST_PARM_OFFSET', and pa's reads `crtl->outgoing_args_size' -- i.e.
-     PER-FUNCTION state, which a value cached at selection time freezes with
-     no diagnostic.  That is `target-cdata.h:316's own refusal of
-     `TARGET_VTABLE_ENTRY_ALIGN', one macro further out: a slot would freeze a
-     currently-correct dynamic answer for four in order to fix sixteen.
-
-     `poly_int64' AND NOT `HOST_WIDE_INT', for pa: its arm is
-     `-(crtl->outgoing_args_size + 48)', and `crtl->outgoing_args_size' is a
-     `poly_int64'.  The shared consumers agree -- `function.cc:4198' assigns
-     it to a `poly_int64' and `:2725' asks `known_eq (..., 0)'.
-
-     POSITION: five shared uses, all ordinary run-time expressions --
-     `function.cc:1964' (`out_arg_offset'), `:2725', `:4198',
-     `rtlanal.cc:489' and `calls.cc:4576' (the `argblock' for a call's
-     outgoing arguments after virtual registers are instantiated, which is the
-     one the s390x diff lands on).  No `#if', no array bound, no static
-     initialiser, no case label.
-
-     AND `function.cc:1396' CARRIED A SECOND, LOCAL `#ifndef' FLOOR, deleted
-     with this change.  It is dead once `defaults.h' defines the name
-     unconditionally -- but only for that reason, which is exactly the
-     `REGMODE_NATURAL_SIZE' trap read the other way round, and leaving a
-     shadowing floor in a shared TU next to a redirect is how the next
-     reordering of includes silently reinstates the primary's 0.  */
-  poly_int64 (*stack_pointer_offset) (void);
-
-  /* ------------------------------------------------------------------
-     `EH_RETURN_HANDLER_RTX' -- WHERE `__builtin_eh_return' WRITES THE HANDLER
-     ADDRESS.  A LOUD HALF AND A SILENT HALF, AND THE LOUD ONE IS HIDING THE
-     OTHER.
-
-     `defaults.h:1432' floors it at `NULL', i386 is silent, so the floor fires
-     for all 47.  `except.cc:2323':
-
-	 if (targetm.have_eh_return ())
-	   emit_insn (targetm.gen_eh_return (crtl->eh.ehr_handler));
-	 else if (rtx handler = EH_RETURN_HANDLER_RTX)   -- NULL, from the floor
-	   emit_move_insn (handler, crtl->eh.ehr_handler);
-	 else
-	   error ("%<__builtin_eh_return%> not supported on this target");
-
-     Measured with the four-target board's own `cc1' on
-     `void f (long o, void *h) { __builtin_eh_return (o, h); }':
-
-	 aarch64   rc=1  error: __builtin_eh_return not supported on this target
-	 s390x     rc=1  error: __builtin_eh_return not supported on this target
-	 x86_64    rc=0
-	 riscv64   rc=0
-
-     Upstream supports it on all four.  The two that fail are exactly the two
-     whose own header defines a non-NULL handler RTX (`aarch64.h:875'
-     `gen_rtx_REG (Pmode, R6_REGNUM)'; `s390.h:618' `gen_rtx_MEM (Pmode,
-     return_address_pointer_rtx)').  x86_64 passes because i386's `eh_return'
-     pattern is unconditional, i.e. THE PRIMARY TAKES A PATH THAT NEVER READS
-     THE MACRO -- which is why this survived.
-
-     AND THE TWO FAILURES ARE ONE DEFECT, WHICH TOOK CHECKING: s390 does have
-     an `eh_return' pattern, but `s390.md:11103' conditions it on `TARGET_TPF',
-     false for `s390x-linux', so `have_eh_return ()' is correctly false and
-     s390 falls through to the same floor.  aarch64 has no such pattern at all.
-
-     THE SILENT HALF IS `df-scan.cc:3738', and it is `EPILOGUE_USES' again in
-     the same file:
-
-	 rtx tmp = EH_RETURN_HANDLER_RTX;
-	 if (tmp && REG_P (tmp))
-	   df_mark_reg (tmp, exit_block_uses);
-
-     With NULL, aarch64's `R6_REGNUM' never joins the exit block's use set, so
-     dataflow can conclude the instruction writing the handler is dead -- the
-     exact mechanism by which `EPILOGUE_USES' emptied SME functions to a bare
-     `ret'.  It cannot be observed today because the loud half stops
-     compilation first, so **fixing the loud half alone would convert a
-     diagnostic into wrong code**.  Both consumers move together here.
-
-     A CALL, NECESSARILY: the bodies BUILD RTL (`gen_rtx_REG', `gen_rtx_MEM',
-     `RETURN_ADDR_RTX', and `pa_eh_return_handler_rtx ()' /
-     `visium_eh_return_handler_rtx ()' / `cris_eh_return_handler_rtx ()' are
-     back-end function calls).  There is nothing to cache and no point before
-     RTL exists at which this has a value.
-
-     NO `has_' FLAG.  `NULL' is a REAL answer here -- it is what upstream gives
-     a back end that does not define the macro, and `except.cc' and
-     `df-scan.cc' both test the pointer -- so unlike `INIT_EXPANDERS' the
-     absent case is representable in band without ambiguity.  The floor stays
-     in `defaults.h' as a SUPPLY-side default, evaluated against each base's
-     own `tm.h'.
-
-     POSITION: three shared spellings, all run-time expressions --
-     `except.cc:2323', `except.cc:2338' (inside `#ifdef EH_RETURN_TAKEN_RTX',
-     which is a separate leaked absence and is NOT fixed here) and
-     `df-scan.cc:3738'.  */
-  rtx (*eh_return_handler_rtx) (void);
-
-  /* ------------------------------------------------------------------
-     `EH_RETURN_STACKADJ_RTX' -- THE REGISTER `__builtin_eh_return' LEAVES THE
-     STACK ADJUSTMENT IN.  SILENT WRONG CODE ON riscv64, AND IT IS THE REASON
-     `EH_RETURN_HANDLER_RTX' COULD NOT BE FIXED ALONE.
-
-     FOUND BY REPAIRING AN INSTRUMENT, not by looking for it.  The committed
-     `agent-a992b7e5fa4ffaaa7-ehreturn.sh' printed multi-target's exit status
-     and nothing else; given a control against genuine stock it reported
-
-	 riscv64-unknown-linux-gnu    rc=0  DIFFERS from stock
-
-     on a target the earlier note had recorded as passing, because rc=0 was all
-     it could see.  The diff:
-
-	 STOCK                        MULTI-TARGET
-	   sd    a1,40(sp)              mv    sp,a0        <- register 2
-	   ...                          ...
-	   mv    a4,a0                  (a4 never written)
-	   add   sp,sp,a4               add   sp,sp,a4     <- a4 is garbage
-
-     Unlike everything else in this block THIS IS NOT A `defaults.h' FLOOR --
-     there is no floor.  It is a bare `#ifdef' on a name **the primary
-     defines**, so the guard is true for all 47 and the VALUE is i386's:
-     `i386.h:2187' is `gen_rtx_REG (Pmode, CX_REG)', and `CX_REG' is 2.
-     Register 2 on riscv is `sp'.  So `except.cc:2313's
-     `emit_move_insn (EH_RETURN_STACKADJ_RTX, crtl->eh.ehr_stackadj)' wrote the
-     stack adjustment into **the stack pointer**, while riscv's own epilogue
-     (`riscv.cc:10806', compiled per base and therefore correct) still reads
-     `a4' -- `GP_ARG_FIRST + 4' -- which nothing ever sets.
-
-     Around 35 back ends define the macro and every one of them was answered by
-     `CX_REG`; the back ends that define nothing had the guarded code run for
-     them anyway.  Leaked value and leaked presence at once.
-
-     THIS HAD TO LAND WITH `EH_RETURN_HANDLER_RTX', not after it.  On aarch64
-     and s390x the handler leak stops compilation with a diagnostic, which
-     MASKS this one; fixing the handler alone would have let those two targets
-     through to the same wrong `mv' -- **a diagnostic converted into wrong
-     code on two further targets**, which is the exact half-fix shape the
-     handler's own entry warns about, arriving from the other side.
-
-     A `has_' PAIR, because what shared code asks is `#ifdef' in four places
-     (`except.cc:2261', `:2298', `:2312', `df-scan.cc:3715') plus
-     `c-family/c-cppbuiltin.cc:1634', which turns the answer into
-     `__LIBGCC_EH_RETURN_STACKADJ_RTX__' -- i.e. the existence answer is
-     exported to libgcc, so getting it from the primary is wrong twice over.
-
-     THE NAME IS `#undef'd IN SHARED CODE and not redirected.  That is what
-     makes this change self-verifying: any shared spelling I failed to convert
-     is a compile error naming the macro, rather than a site quietly still
-     reading i386's register.  */
-  bool has_eh_return_stackadj_rtx;
-  rtx (*eh_return_stackadj_rtx) (void);
-
-  /* ------------------------------------------------------------------
-     THE TRAMPOLINE PAIR -- AND ONE OF THEM PUTS EXECUTABLE CODE IN `.rodata'.
-
-     Measured against genuine stock aarch64 on
-
-	 int outer (int x) { int inner (int y) { return y + x; }
-			     int (*p) (int) = inner; return p (1); }
-
-	 the section the trampoline lands in   STOCK .text   MT .section .rodata
-	 the alignment before .LTRAMP0         STOCK .align 3  MT .align 2
-
-     `TRAMPOLINE_SECTION' IS THE LEAKED-ABSENCE CLASS, not the floor class,
-     and no `#ifndef' sweep could have found it.  `varasm.cc:3065' is a bare
-     `#ifdef TRAMPOLINE_SECTION' in a SHARED TU; **aarch64 is the only back end
-     in the whole tree that defines the name** (`aarch64.h:1486',
-     `text_section'), and i386 does not, so the `#ifdef' is false for all 47
-     and every target takes the `#else' arm, `readonly_data_section'.
-
-     CORRECTION TO THE FINDING THAT PUT THIS ON THE QUEUE, because overstating
-     it is worse than not reporting it.  `A992B7E5FA4FFAAA7-TRAMPOLINE.md'
-     records this as *"a trampoline is EXECUTED, `.rodata' is not mapped
-     executable, so a call through a nested function's address faults at run
-     time -- a W^X failure"*, and reads `.rodata' as "wherever the previous
-     section left off".  Both halves are wrong.  `varasm.cc' has an explicit
-     `#else switch_to_section (readonly_data_section)' with the comment "by
-     default, put trampoline templates in read-only data section", so the
-     section is chosen, not inherited; and what lands there is the TEMPLATE
-     (`.LTRAMP0'), which `targetm.calls.trampoline_init' COPIES into the
-     writable, executable trampoline at run time.  Nothing is executed out of
-     `.rodata' and nothing faults.
-
-     What is true, and is why it is still fixed here: **aarch64 asks for
-     `text_section' and does not get it**, so multi-target's output differs
-     from genuine stock aarch64's on this construct, by exactly the leak
-     mechanism this branch exists to remove.  Severity is "a divergence from
-     the target's own declared answer", not "wrong code".
-
-     A `has_' PAIR, and here the flag is load-bearing in a way it is not for
-     `EH_RETURN_HANDLER_RTX': the question shared code asks is `#ifdef', i.e.
-     an EXISTENCE question, and 46 back ends genuinely have no answer.  A null
-     `section *' would conflate "this base has no trampoline section" with "a
-     table built before this field existed".  Same shape, same reason, as
-     `has_init_expanders'.
-
-     THE PAYLOAD IS `section *' AND NOT A `switch_to_section' THUNK, because
-     `section' is a `coretypes.h' name and the value is a plain global on the
-     one base that has one -- so the per-base TU needs no output machinery and
-     the shared side keeps the `switch_to_section' call it already has.
-
-     `TRAMPOLINE_ALIGNMENT' IS THE FLOOR-FIRES CLASS beside it.  aarch64 asks
-     for 64 (`aarch64.h:1482'); `defaults.h:1190' floors it at
-     `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', which in a shared TU is i386's,
-     giving `.align 2' where aarch64 wants `.align 3'.  It is a CALL rather
-     than a cdata slot for `TARGET_VTABLE_ENTRY_ALIGN''s reason exactly: the
-     floor is a function of `FUNCTION_BOUNDARY', and riscv's `FUNCTION_BOUNDARY'
-     moves with `TARGET_RVC', so a value frozen at selection time would freeze
-     a currently-dynamic answer for the back ends that define nothing.
-     Expanding the floor in each base's own TU gives each of them the answer a
-     single-target build of that back end gives.
-
-     POSITION: `TRAMPOLINE_ALIGNMENT' has five shared spellings
-     (`varasm.cc:3072', `:3086', `builtins.cc:6121', `:6126', `:6168',
-     `tree-nested.cc:628'), all run-time expressions -- note `:6126' and
-     `:6168' are arguments to `gen_int_mode' and `set_mem_align', not array
-     bounds.  `TRAMPOLINE_SECTION' has exactly one, the `#ifdef' above.  */
-  bool has_trampoline_section;
-  section *(*trampoline_section) (void);
-  unsigned int (*trampoline_alignment) (void);
-
   /* `PUSH_ARGS_REVERSED' -- the cheapest leak in the `PUSH_ROUNDING' closure
      and the one with the widest consequence per line of code.  i386.h:1658
      defines it to `1'; aarch64 does not; bpf and nvptx do.  Its ONLY shared
@@ -2218,6 +1923,137 @@ struct target_frame_desc
      and the one `-undoc.sh`'s control is now anchored on. Re-anchor that
      control before relying on it again.  */
   int (*addr_vec_align) (rtx_jump_table_data *table);
+
+  /* ASM_OUTPUT_ADDR_VEC_ELT / ASM_OUTPUT_ADDR_DIFF_ELT -- THE CONTENTS OF
+     EVERY JUMP TABLE, WRITTEN BY i386 FOR ALL 47 BACK ENDS.
+
+     `addr_vec_align' above is the ALIGNMENT of the case vector.  These two are
+     the vector's ENTRIES, they sit in the same `final.cc' block (`:2578' and
+     `:2586'), and they are the larger leak of the two by a wide margin.
+
+     MEASURED AT THE OBJECT LEVEL, WHICH IS WHY THIS IS NOT AN INFERENCE.
+     `nm -uC final.o' in the 47-base build binds
+
+	 U ix86_output_addr_vec_elt(_IO_FILE*, int)
+	 U ix86_output_addr_diff_elt(_IO_FILE*, int, int)
+
+     `final.cc' is SHARED, so both macros are `i386.h:2231' and `:2237' -- and
+     neither symbol is in MULTI_TARGET_RENAME_NAMES, so this is one bare
+     definition in `i386.cc' serving every target's case vectors.
+
+     THE DIVERGENCE IS BY VALUE AND IT IS ENORMOUS.  Measured through each
+     base's REAL tm.h chain (`-eltbodies.sh', `cpp -dM -imacros tm-<base>.h',
+     not a `config/' directory grep):
+
+	 ASM_OUTPUT_ADDR_VEC_ELT    38 definers,  34 DISTINCT bodies
+	 ASM_OUTPUT_ADDR_DIFF_ELT   38 definers,  33 DISTINCT bodies
+
+     Nearly every definer has its own.  A sample of what they were not
+     emitting, and note none of these is a stylistic difference:
+
+	 mips    "\t%s\t%sL%d\n", ptr_mode == DImode ? ".dword" : ".word",
+		 LOCAL_LABEL_PREFIX          -- entry width chosen per ABI
+	 m68k    "\t.long .L%d - 1b\n"        -- PC-relative against a
+					        different anchor entirely
+	 arm     switch (GET_MODE (BODY)) { SImode .long / HImode .word /
+					    QImode .byte }
+	 xtensa  (%LL%d - %LLrtx%d) / 4       -- a SCALED difference
+	 mmix    mmix_asm_output_addr_diff_elt (...)
+
+     WHAT i386 GIVES THEM INSTEAD, and the second defect inside the first.
+     `ix86_output_addr_vec_elt' (`i386.cc:16133') picks `ASM_QUAD` over
+     `ASM_LONG` on `TARGET_LP64`, and `TARGET_LP64` is
+     `global_options.x_ix86_isa_flags`, promoted only by
+     `ix86_option_override` -- which runs only when i386 is SELECTED.  So a
+     non-i386 base does not even get x86_64's answer; it gets i386's
+     UNCONFIGURED default.  That is the `Pmode' shape PRINCIPLES records, the
+     one behind riscv64 emitting 32-bit code into an ELF64 object, and it is
+     the reason "i386's answer happens to be right for LP64 targets" is not a
+     safe reading.  `LPREFIX' is i386's label prefix on top of that.
+
+     I PREDICTED THE SCORED BOARD WOULD NOT MOVE AND THAT WAS WRONG, IN THE
+     DIRECTION THAT MATTERS.  The prediction was: x86_64, aarch64, riscv64 and
+     s390x are all LP64 and all spell `.L', i386's emitter writes
+     `.quad .L<n>' for exactly that combination, so all four are correct by
+     luck and must be byte-identical.  Measured, TWO OF THE FOUR CHANGED.
+
+     The reasoning failed because it was about the POINTER width.  A jump
+     table may be RELATIVE, and then the entry width is not the pointer width
+     at all -- it is whatever that back end's own `casesi' pattern LOADS:
+
+	 aarch64  ldr  w1, [x1, w0, uxtw #2]     4-byte entry, index scaled
+		  add  x1, x0, w1, sxtw #2      and the ENTRY is scaled too
+	 riscv64  slli a0,a0,2 ; lw a5,0(a0)     4-byte entry
+
+     `aarch64-elf.h:72' emits `.word (%LL%d - %LLrtx%d) / 4' and `riscv.h:1102'
+     `.word %sL%d'.  Both were replaced by `.quad'.  So on every aarch64 and
+     riscv64 switch compiled into a jump table, entry `i' was read from bytes
+     [4i, 4i+4) of a table written with an 8-byte stride -- the low half of
+     entry i/2 -- and on aarch64 the value was additionally UNSCALED where the
+     `add' scales by 4.  The branch target was garbage.
+
+     Measured at the object level with a real cross assembler: aarch64's
+     `.rodata' goes 96 -> 48 bytes for a twelve-entry table, i.e. it was
+     exactly twice the size its own code indexed.  BOTH SIDES ASSEMBLE rc=0
+     into a well-formed AArch64 object, which is why nothing before this saw
+     it.  s390x and x86_64 are byte-identical and genuinely do use 8-byte
+     entries; they are the control.
+
+     The 32- and 16-bit targets (mips o32, avr, msp430, m68k, arm, xtensa) are
+     wrong for the width reason too, and none of them is on the four-target
+     board -- so that part of the prediction stands and is simply not the
+     whole of it.
+
+     NO `has_' FLAG, AND THE `#else' IS `gcc_unreachable ()' RATHER THAN A
+     FALLBACK.  That is not a floor being declined for tidiness: it is exactly
+     what shared code did.  `final.cc's own `#else' for each of these two was
+     `gcc_unreachable ()', because a back end that emits a case vector must
+     say how.  Nine bases define neither (avr bpf ia64 moxie nvptx or1k
+     xstormy16 and, for the DIFF half, ft32 mcore pdp11); four of those --
+     avr, pa, sparc, xstormy16 -- define the WHOLE-TABLE `ASM_OUTPUT_ADDR_VEC'
+     form instead, which is a separate leak and is NOT converted here (see the
+     hand-over in this branch's board).  Supplying a generic body here would
+     give those nine i386's directive under a new name, which is the
+     `#ifndef' floor in its most disguised form.
+
+     Not in `doc/tm.texi'... except that they ARE: both are documented, so
+     unlike `ADDR_VEC_ALIGN' and `ADJUST_INSN_LENGTH' these two ARE in the
+     leak census's population.  Stated because the last four conversions on
+     this branch all came from the undocumented set and it would be easy to
+     read that as where the remaining value is.  */
+  void (*output_addr_vec_elt) (FILE *file, int value);
+  void (*output_addr_diff_elt) (FILE *file, rtx body, int value, int rel);
+
+  /* Does this base define ASM_OUTPUT_ADDR_DIFF_ELT at all?
+
+     THE CLOSURE, AND IT IS THE GUARD ON THE `gcc_unreachable ()' ABOVE.
+     `tree-switch-conversion.h:537' is a SECOND consumer of that macro and it
+     asks the opposite question:
+
+	 #ifndef ASM_OUTPUT_ADDR_DIFF_ELT
+	   if (flag_pic)
+	     return false;          <- do not build a jump table at all
+	 #endif
+
+     i386 defines the macro, so that `#ifndef' was FALSE for all 47 bases and
+     the nine which define nothing -- avr bpf ft32 mcore moxie nvptx or1k
+     pdp11 xstormy16 -- had PIC jump tables enabled on i386's authority.
+     Before this change they then reached `final.cc' and wrote their entries
+     with `ix86_output_addr_diff_elt'; after it they would reach a
+     `gcc_unreachable ()'.
+
+     Converting only the emitter would therefore have traded a silent wrong
+     answer for an ICE on those nine, which PRINCIPLES names exactly: when a
+     symbol points at your suspect, walk the GUARDS that decided you reached
+     that line and convert the closure.  A loud failure is better than a quiet
+     one and it is still not the fix.
+
+     Note this predicate answers about the DIFF half only, because that is the
+     half the `#ifndef' asks about: a PIC jump table is relative by
+     construction.  A base defining the VEC half and not the DIFF half is a
+     real configuration (ft32, mcore, pdp11) and it is precisely the case
+     upstream's `#ifndef' was written for.  */
+  bool (*has_output_addr_diff_elt) (void);
 };
 
 /* The answers in force, or NULL until a target is selected.  Shared code goes
@@ -2283,6 +2119,17 @@ extern void mt_adjust_insn_length (rtx_insn *, int *);
    aarch64 and vax ask for 0 and were given the generic computation; see the
    descriptor field.  */
 extern int mt_addr_vec_align (rtx_jump_table_data *);
+
+/* `ASM_OUTPUT_ADDR_VEC_ELT' / `ASM_OUTPUT_ADDR_DIFF_ELT'; `final.cc:2578' and
+   `:2586' -- the entries of every case vector, 34 and 33 distinct bodies, all
+   of them i386's until now.  See the descriptor fields.  */
+extern void mt_output_addr_vec_elt (FILE *, int);
+extern void mt_output_addr_diff_elt (FILE *, rtx, int, int);
+
+/* Replaces `#ifndef ASM_OUTPUT_ADDR_DIFF_ELT' at `tree-switch-conversion.h:537',
+   which decided whether PIC jump tables are possible -- on i386's behalf, for
+   all 47 bases.  See the descriptor field.  */
+extern bool mt_has_output_addr_diff_elt (void);
 
 /* Replaces `#ifdef INIT_EXPANDERS / INIT_EXPANDERS;' at both of its sites in
    emit-rtl.cc.  Unconditional at the call site on purpose: the condition is
@@ -2381,11 +2228,6 @@ extern scalar_int_mode mt_pmode (void);
 extern int mt_units_per_word (void);
 extern unsigned int mt_pointer_size (void);
 extern unsigned int mt_biggest_alignment (void);
-/* `TARGET_VTABLE_ENTRY_ALIGN'.  `unsigned int' rather than the `int' the two
-   consumers pass to `SET_DECL_ALIGN', because ia64's 64, avr's 8 and
-   msp430's 16 are alignments and `defaults.h''s fallback is `POINTER_SIZE',
-   which is already `unsigned int' here.  */
-extern unsigned int mt_vtable_entry_align (void);
 
 /* `FUNCTION_MODE', redirected in `defaults.h'.  See the field comment above
    for the insn dump that diagnosed the `recog.cc:2890' wall with it.  */
@@ -2497,34 +2339,6 @@ extern bool mt_accumulate_outgoing_args (void);
    `mt_init_expanders' gave `#ifdef INIT_EXPANDERS' rather than redirecting a
    name that would then still be spellable.  */
 extern poly_int64 mt_stack_dynamic_offset (tree fndecl);
-
-/* `STACK_POINTER_OFFSET', for shared code.  Redirected in
-   `multi-target-macros.h' rather than called directly, because unlike
-   `STACK_DYNAMIC_OFFSET' the name is spelled at all five of its use sites and
-   `defaults.h:1156's floor is what has to be displaced there.  */
-extern poly_int64 mt_stack_pointer_offset (void);
-
-/* `EH_RETURN_HANDLER_RTX', for shared code.  Redirected in
-   `multi-target-macros.h': all three consumers spell the name.  */
-extern rtx mt_eh_return_handler_rtx (void);
-
-/* `EH_RETURN_STACKADJ_RTX', for shared code.  NOT redirected: the name is
-   `#undef'd in `multi-target-macros.h' so that a shared spelling fails BY
-   NAME, and every consumer asks these two instead.  */
-extern bool mt_has_eh_return_stackadj_rtx (void);
-extern rtx mt_eh_return_stackadj_rtx (void);
-
-/* The trampoline pair, for shared code.  `TRAMPOLINE_ALIGNMENT' is redirected
-   in `multi-target-macros.h' because its five consumers spell the name;
-   `TRAMPOLINE_SECTION' is NOT redirected and is called directly from
-   `varasm.cc', because what shared code asks of it is `#ifdef' -- an
-   existence question a redirected name cannot answer -- and the same
-   treatment `mt_init_expanders' gave `#ifdef INIT_EXPANDERS'.  Leaving the
-   name unspellable in shared code means a future shared use fails BY NAME
-   rather than silently picking up the primary's absence.  */
-extern bool mt_has_trampoline_section (void);
-extern section *mt_trampoline_section (void);
-extern unsigned int mt_trampoline_alignment (void);
 
 /* `PUSH_ARGS_REVERSED', for shared code.  Redirected in `defaults.h' rather
    than called directly, because unlike `STACK_DYNAMIC_OFFSET' the name is

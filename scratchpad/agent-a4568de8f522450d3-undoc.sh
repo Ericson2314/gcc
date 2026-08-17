@@ -102,12 +102,55 @@ echo "TOTAL: $(wc -l < "$O/hits") -- a population the leak census cannot see."
 # move this arm again -- do not delete it.
 echo
 echo "NON-VACUITY (an arm on the scanner):"
-if grep -qw ADDR_VEC_ALIGN "$O/hits" 2>/dev/null; then
-  echo "  ok: ADDR_VEC_ALIGN found -- a known undocumented member of this set"
+
+# THE ANCHOR HAS NOW EXPIRED TWICE, AND THE SECOND TIME WAS PREDICTED IN
+# WRITING BY THE COMMENT ABOVE.  ASM_OUTPUT_FUNCTION_PREFIX went first;
+# ADDR_VEC_ALIGN was chosen "because it is NOT being converted" and was
+# converted in the next commit of the same branch.  It refused with FATAL
+# rather than going quiet, which is the wanted behaviour and is the third time
+# this project has paid for a control whose subject is also its work queue.
+#
+# So the arm is now TWO arms, and only one of them can expire.
+#
+# ARM A -- THE MECHANISM, AND IT CANNOT EXPIRE.  `HOST_BIT_BUCKET' is
+# undocumented and is a HOST fact (`/dev/null''s spelling), not a target one,
+# so it is not on anybody's conversion queue and never will be.  It proves
+# both halves of the pipeline ran: the `config/' `#define' scan AND the shared
+# spelling scan, since a name reaches `hits' only by appearing in both.
+#
+# ARM B -- THE POPULATION, WHICH IS ALLOWED TO EXPIRE, LOUDLY.  A list of
+# multi-back-end undocumented macros, of which at least one must survive.  Each
+# conversion removes one; when the last goes this refuses by name and the
+# remedy is to TOP THE LIST UP from the ranked output above, not to delete it.
+# Naming several rather than one is the whole difference: a single-name anchor
+# expires on its first conversion, and this branch converts roughly one of
+# these a session.
+if grep -qw HOST_BIT_BUCKET "$O/hits" 2>/dev/null; then
+  echo "  ok  ARM A (mechanism): HOST_BIT_BUCKET found -- both halves of the"
+  echo "      scan ran, and this anchor is a HOST macro so it cannot expire."
 else
-  echo "  FATAL: the scanner cannot see ADDR_VEC_ALIGN, which is undocumented,"
-  echo "         defined by 12 back ends and spelled at final.cc:2479 under"
-  echo "         #ifdef.  Every total above is void.  If you have just"
-  echo "         CONVERTED it, re-point this arm rather than deleting it."
+  echo "  FATAL ARM A: the scanner cannot see HOST_BIT_BUCKET, which is"
+  echo "         undocumented and spelled in shared code.  Both halves of the"
+  echo "         scan are suspect and every total above is void.  This anchor"
+  echo "         is NOT a conversion target, so a failure here is a defect in"
+  echo "         the scanner, not a stale list."
+  exit 9
+fi
+
+UNDOC_ANCHORS="ASM_OUTPUT_ADDR_VEC ASM_OUTPUT_ADDR_DIFF_VEC \
+ASM_OUTPUT_EXTERNAL_LIBCALL ASM_OUTPUT_CASE_END FRAME_BEGIN_LABEL"
+found=""; gone=""
+for a in $UNDOC_ANCHORS; do
+  if grep -qw "$a" "$O/hits" 2>/dev/null; then found="$found $a"; else gone="$gone $a"; fi
+done
+if [ -n "$found" ]; then
+  echo "  ok  ARM B (population): still present:$found"
+  [ -n "$gone" ] && echo "      converted or gone since this list was written:$gone"
+else
+  echo "  FATAL ARM B: none of$UNDOC_ANCHORS"
+  echo "         remains in the population.  That is not a failure of the scan"
+  echo "         -- it means every macro this list named has been converted."
+  echo "         TOP THE LIST UP from the ranked output above; do not delete"
+  echo "         this arm and do not lower it to one name."
   exit 9
 fi

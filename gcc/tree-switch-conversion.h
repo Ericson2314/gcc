@@ -534,10 +534,14 @@ bool jump_table_cluster::is_enabled (void)
     return false;
   if (!flag_jump_tables)
     return false;
-#ifndef ASM_OUTPUT_ADDR_DIFF_ELT
-  if (flag_pic)
+  /* This was `#ifndef ASM_OUTPUT_ADDR_DIFF_ELT', i.e. "this target cannot
+     write a relative case-vector entry, so it cannot have a PIC jump table".
+     This file is SHARED, so the question was asked of i386 -- which defines
+     the macro -- and answered `yes it can' for all 47 bases, including the
+     nine that define nothing (avr bpf ft32 mcore moxie nvptx or1k pdp11
+     xstormy16).  See target-frame.h.  */
+  if (!mt_has_output_addr_diff_elt () && flag_pic)
     return false;
-#endif
 
   return true;
 }
