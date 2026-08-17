@@ -135,6 +135,40 @@ weak one for anything wrong about the ABI.**
 #endif
 ```
 
+#### THE FIX IS A CALL, NOT A `NUM` cdata SLOT — the obvious shape is wrong
+
+Worth settling before anyone writes it, because `target-cdata.h` is full of
+`NUM (unsigned short, …)` rows and this looks exactly like one. The 20 definers:
+
+```
+constants          s390 160, s390/tpf 448, ia64 16, c6x 4, mn10300 4, avr 1,
+                   or1k 0, gcn 0, nds32 0, m32r 0, fr30 0, frv 0
+derived-constant   sparc  (FIRST_PARM_OFFSET(0) + SPARC_STACK_BIAS)
+                   lm32   (UNITS_PER_WORD)
+NOT INVARIANT      epiphany  epiphany_stack_offset      <- a VARIABLE
+                   rs6000    RS6000_SAVE_AREA           <- ABI-flag dependent
+                   microblaze FIRST_PARM_OFFSET(FNDECL)
+                   pa        a multi-line conditional
+```
+
+A `NUM` slot caches its value when the base is selected. For epiphany, rs6000,
+microblaze and pa that would **freeze a value that is currently correct and
+dynamic** — which is precisely the argument `target-cdata.h` already makes, in
+its own words, for keeping `TARGET_VTABLE_ENTRY_ALIGN` out:
+
+> a slot here would FREEZE a value that is currently correct and dynamic for 44
+> back ends, in order to fix 3. That is a regression wearing a fix's clothes.
+
+So the shape is the **call** family — `mt_stack_pointer_offset ()`, as
+`POINTER_SIZE`, `MOVE_MAX_PIECES` and `mt_case_vector_pc_relative` already are
+— and the fix must remove `function.cc:1396`'s local floor in the same change
+or four of the five uses keep reading 0.
+
+**Not implemented here.** It is a design choice between two existing
+mechanisms with a live counterexample on each side, the board was mid-run, and
+§2b's test applies: getting it wrong reintroduces the class this project
+exists to remove, on four back ends, silently.
+
 a shared TU re-flooring the same name locally. One name, two floors, no
 diagnostic — so converting `defaults.h` alone would leave `function.cc`'s four
 uses still reading 0. Both must go together, and a fix that moves the s390x
