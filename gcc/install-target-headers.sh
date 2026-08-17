@@ -21,32 +21,60 @@
 # sibling build directory in an installation, which is what every packaging
 # attempt so far has had to reach around.
 #
-# THE LIST IS MEASURED, NOT GUESSED -- AND IT WAS MEASURED WRONG ONCE, SO THE
-# METHOD MATTERS AS MUCH AS THE ANSWER.
+# THE LIST IS MEASURED, NOT GUESSED -- AND IT HAS NOW BEEN MEASURED WRONG TWICE,
+# IN OPPOSITE DIRECTIONS, BY THE SAME MISTAKE.  The method matters more than the
+# number, so both errors are recorded rather than just the answer.
 #
-# libgcc opens SIX generated headers:
+# libgcc opens SEVEN generated headers:
 #
 #     tconfig.h  auto-host.h  tm.h  options.h  insn-constants.h  insn-modes.h
+#     version.h
 #
-# THIS SCRIPT NOW INSTALLS FIVE OF THEM.  `tm.h' -- and the `tm-<key>.h' it
-# shims -- comes from `target-specs/configure' instead, which generates it per
-# target after the build by running `mkconfig.sh' on what it derives from
-# `config.gcc'.  The six are still what libgcc opens; they no longer all come
-# from one producer.  See the note over the copy loop for why that had to change.
+# THIS SCRIPT INSTALLS SIX OF THEM.  `tm.h' -- and the `tm-<key>.h' it shims --
+# comes from `target-specs/configure' instead, which generates it per target
+# after the build.  The seven are still what libgcc opens; they no longer all
+# come from one producer.  See the note over the copy loop.
 #
-# It used to say seven, with `version.h', and that was an artefact of HOW the
-# set was collected: by building libgcc in-tree and taking every path under the
-# gcc build directory that appeared in a `.dep' file.  That scopes by SOURCE
-# DIRECTORY, not by what actually links into the library, and `gcc/' compiles a
-# file out of `libgcc/' for its own use -- `libgcc/libgcov-util.c' becomes
-# `libgcov-util.o' in GCOV_TOOL_OBJS (gcc/Makefile.in:5883,5891), part of the
-# HOST tool `gcov-tool'.  That file is the only thing under libgcc/ that
-# includes "version.h", and `libgcc/Makefile.in' never names it, so it is not a
-# libgcc object at all.  (`libgcc/config/gthr-vxworks.h:312' has
-# `#include <version.h>' -- angle brackets, VxWorks' own system header, not
-# gcc's.)
+# ERROR 1, OVER-COUNTING.  The original set was collected by building libgcc
+# in-tree with `.dep' files on and taking every path under the gcc BUILD
+# directory.  That swept in `gcov-tool', a HOST tool: `gcc/' compiles
+# `libgcc/libgcov-util.c' into `libgcov-util.o' for GCOV_TOOL_OBJS
+# (gcc/Makefile.in:5883,5891), and `libgcc/Makefile.in' never names that file.
 #
-# `tm_p.h' is NOT among them either -- it is a compiler-internal header, it was
+# ERROR 2, UNDER-COUNTING, and it removed `version.h' from this loop for a
+# while.  Reacting to error 1, the set was re-derived by grepping `libgcc/'.
+# Two hits, both genuinely not libgcc's -- `libgcov-util.c:34' is gcov-tool's,
+# and `libgcc/config/gthr-vxworks.h:312' is `#include <version.h>', angle
+# brackets, VxWorks' own system header.  Both readings were correct.  The
+# conclusion was not, because THE INCLUDE THAT MATTERS IS NOT UNDER libgcc/:
+#
+#     libgcc/libgcov.h:191   #include "gcov-io.h"
+#     gcc/gcov-io.h:240      #include "version.h"
+#
+# and libgcc reaches gcc/ through `-I$(srcdir)/../gcc' (libgcc/Makefile.in:324).
+# Every `_gcov_*' object -- LIBGCOV_MERGE, LIBGCOV_PROFILER, LIBGCOV_INTERFACE,
+# LIBGCOV_DRIVER (libgcc/Makefile.in:946,948,960,964) -- includes `libgcov.h'
+# and therefore opens `version.h'.
+#
+# THE COMMON FAULT: both asked "which directory is this file in?" when the
+# question is "what does the compiler open while building these objects?".
+# Scoping a dependency question by source directory is wrong whenever one
+# component compiles against another's headers -- which is the whole
+# relationship between libgcc and gcc.  Neither `grep' nor `.dep'-collection can
+# answer it.
+#
+# THE INSTRUMENT THAT CAN: build libgcc BOTH WAYS against one prefix, differing
+# only in whether the header is installed, and compare a NAMED OBJECT.  Measured
+# for aarch64-unknown-linux-musl: with `version.h', `_gcov_merge_add.o' is 7456
+# bytes; without it the object is absent and the error is
+# `gcc/gcov-io.h:240:10: fatal error: version.h: No such file or directory'.
+# Exit status will NOT do -- both arms stop later on an unrelated sysroot gap
+# (pthread.h), so comparing statuses reports that instead and shows nothing.
+# A single-TU `-fsyntax-only' probe will not do either: it stops earlier still,
+# on `auto-target.h' and `stdio.h', so both arms fail identically -- a null
+# result shaped like a measurement.
+#
+# `tm_p.h' is NOT among the seven -- it is a compiler-internal header, it was
 # on every guessed list, and installing it would have been a file nothing opens.
 # `insn-flags.h' is not either: tm.h guards it with `!defined USED_FOR_TARGET', and
 # tconfig.h defines USED_FOR_TARGET.  Both absences are load-bearing; re-measure before adding.
@@ -185,7 +213,7 @@ for t in "$@"; do
   # and is recorded as such; it is installed here because it is what libgcc
   # opens TODAY, and removing it is a separate measured change, not something
   # to do silently by omitting a file and seeing what breaks.
-  for f in tconfig.h auto-host.h; do
+  for f in tconfig.h auto-host.h version.h; do
     test -f "$builddir/$f" || fail "$t: $builddir/$f is absent"
     cp "$builddir/$f" "$d/$f.tmp" && mv "$d/$f.tmp" "$d/$f"
   done

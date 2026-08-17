@@ -226,20 +226,45 @@ dnl WHERE THIS LIBRARY'S GENERATED HEADERS COME FROM.
 dnl
 dnl libgcc is ONE MACHINE'S LIBRARY, so it compiles against that machine's
 dnl `tm.h', `options.h', `insn-modes.h' and `insn-constants.h', plus
-dnl `tconfig.h' and `auto-host.h' -- SIX generated headers.
+dnl `tconfig.h', `auto-host.h' and `version.h' -- SEVEN generated headers.
 dnl
-dnl IT SAID SEVEN, AND THE SEVENTH WAS AN ARTEFACT OF THE MEASUREMENT.  The set
-dnl was collected by building libgcc in-tree with `.dep' files on and taking
-dnl every path under the gcc build directory.  That scopes by SOURCE DIRECTORY
-dnl rather than by what links into the library, and `gcc/' compiles a file out
-dnl of `libgcc/' for its own use: `libgcc/libgcov-util.c' becomes
-dnl `libgcov-util.o' in GCOV_TOOL_OBJS (gcc/Makefile.in:5883,5891), part of the
-dnl HOST tool `gcov-tool'.  It is the only file under libgcc/ that includes
-dnl "version.h", and `libgcc/Makefile.in' never names it -- so `version.h' was
-dnl a host tool's dependency counted as the library's.
+dnl THIS COMMENT HAS BEEN WRONG IN BOTH DIRECTIONS, SO IT CARRIES THE EVIDENCE
+dnl NOW RATHER THAN A NUMBER.
 dnl
-dnl A standalone build cannot make that mistake: there is no gcc build directory
-dnl to over-collect from, so its `.dep' set is exactly libgcc's own objects.
+dnl It said seven, derived by building libgcc in-tree with `.dep' files on and
+dnl taking every path under the gcc BUILD directory.  That over-collects: it
+dnl swept in `gcov-tool', a HOST tool, because `gcc/' compiles
+dnl `libgcc/libgcov-util.c' into GCOV_TOOL_OBJS (gcc/Makefile.in:5883,5891)
+dnl while `libgcc/Makefile.in' never names that file.
+dnl
+dnl It then said SIX, derived by grepping `libgcc/' for `version.h'.  That
+dnl under-collects, and the two hits it finds are both genuinely not ours --
+dnl `libgcov-util.c:34' is gcov-tool's, and `config/gthr-vxworks.h:312' is
+dnl `#include <version.h>', VxWorks' own system header.  The include that
+dnl matters is not under libgcc/ at all:
+dnl
+dnl     libgcc/libgcov.h:191   #include "gcov-io.h"
+dnl     gcc/gcov-io.h:240      #include "version.h"
+dnl
+dnl reached through `-I$(srcdir)/../gcc' in Makefile.in's INCLUDES, so every
+dnl `_gcov_*' object opens it.
+dnl
+dnl Both attempts asked "which directory is this file in?".  The question is
+dnl "what does the compiler open while building these objects?", and scoping by
+dnl source directory cannot answer it whenever one component compiles against
+dnl another's headers -- which is the entire relationship between libgcc and
+dnl gcc.
+dnl
+dnl WHAT DOES ANSWER IT: build libgcc both ways against one prefix, differing
+dnl only in whether the header is installed, and compare a NAMED OBJECT.
+dnl Measured for aarch64-unknown-linux-musl -- with `version.h',
+dnl `_gcov_merge_add.o' is 7456 bytes; without it the object is absent and the
+dnl error is `gcc/gcov-io.h:240:10: fatal error: version.h: No such file or
+dnl directory'.  Exit status does NOT work: both arms stop later on an
+dnl unrelated sysroot gap, so it would report that instead.  Nor does a
+dnl single-TU `-fsyntax-only' probe: it stops earlier on `auto-target.h' and
+dnl `stdio.h', so both arms fail identically -- a null result shaped like a
+dnl measurement.
 dnl
 dnl Makefile.in has had one source for them: `-I$(gcc_objdir)', the SIBLING GCC
 dnl BUILD DIRECTORY.  That is legitimate in an in-tree build and impossible
