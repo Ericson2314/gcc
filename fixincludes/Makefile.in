@@ -259,6 +259,19 @@ install : all
 	$(INSTALL_SCRIPT) fixinc.sh $(DESTDIR)$(bindir)/fixinc.sh
 	$(INSTALL_PROGRAM) $(FI) $(DESTDIR)$(bindir)/$(FI)
 	$(INSTALL_SCRIPT) mkheaders $(DESTDIR)$(bindir)/mkheaders
+# mkinstalldirs, WHICH THIS COMPONENT NOW INSTALLS ITSELF.
+#
+# `mkheaders' runs `$(itoolsdir)/mkinstalldirs' -- it is part of fixincludes'
+# own tool directory, beside fixincl and fixinc.sh, and mkheaders locates it by
+# `dirname $0'.  But it was installed by gcc's `install-mkheaders' instead, so
+# this component could not produce a WORKING tool directory on its own: every
+# consumer of fixincludes had to also install gcc, for one shell script.
+#
+# Installing it here does not create a second authority for it -- it removes
+# one.  gcc's copy of this line should go when gcc stops being the second
+# authority for the directory itself.
+	$(INSTALL_SCRIPT) $(srcdir)/../mkinstalldirs \
+	  $(DESTDIR)$(bindir)/mkinstalldirs
 
 install-strip: install
 	test -z '$(STRIP)' || $(STRIP) $(DESTDIR)$(bindir)/$(FI)
