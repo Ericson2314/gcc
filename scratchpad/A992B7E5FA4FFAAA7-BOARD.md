@@ -430,6 +430,28 @@ recorded with it: `tree.cc:15659`/`:15685` are `gcc_assert`s on this macro and
 may be holding *because* the answer is wrong, the `function.cc:6766` /
 `DELAY_SLOTS` shape.
 
+**AND THE BOARD'S OWN LOG CLOSES THE CHAIN, which upgrades this from
+"consistent with" to "measured".** The debt row itself carries no diagnostic —
+
+```
+FAIL: gcc.target/aarch64/mv-1.c (test for excess errors)
+```
+
+— which is exactly why `mt-debt-attribute.sh` exists and why
+`grep <diagnostic>` over a debt list returns 0 on a target where that cause is
+dominant. The `gcc.log` for the *same run* does carry it:
+
+```
+gcc.target/aarch64/mv-1.c:12:1: error: redefinition of 'foo'
+gcc.target/aarch64/mv-1.c:18:1: error: redefinition of 'foo'
+gcc.target/aarch64/mv-1.c:24:1: error: redefinition of 'foo'
+```
+
+byte-for-byte the diagnostic my hand reproducer produced before this row was
+scored. So the chain is closed at every link: **board FAIL → run's own log →
+standalone reproducer → the deciding line in `c-decl.cc` → the both-sided
+header read** — rather than a plausible story fitted to a number.
+
 `gcc.dg/lto`'s 53 — the item the last board flagged as identical on three
 targets — is **gone from aarch64's top rows entirely**.
 
