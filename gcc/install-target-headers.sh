@@ -24,9 +24,15 @@
 # THE LIST IS MEASURED, NOT GUESSED -- AND IT WAS MEASURED WRONG ONCE, SO THE
 # METHOD MATTERS AS MUCH AS THE ANSWER.
 #
-# It is SIX generated headers:
+# libgcc opens SIX generated headers:
 #
 #     tconfig.h  auto-host.h  tm.h  options.h  insn-constants.h  insn-modes.h
+#
+# THIS SCRIPT NOW INSTALLS FIVE OF THEM.  `tm.h' -- and the `tm-<key>.h' it
+# shims -- comes from `target-specs/configure' instead, which generates it per
+# target after the build by running `mkconfig.sh' on what it derives from
+# `config.gcc'.  The six are still what libgcc opens; they no longer all come
+# from one producer.  See the note over the copy loop for why that had to change.
 #
 # It used to say seven, with `version.h', and that was an artefact of HOW the
 # set was collected: by building libgcc in-tree and taking every path under the
@@ -61,6 +67,14 @@
 # target gets ITS OWN directory holding ITS OWN headers, and the per-triple
 # `tm-<key>.h' is the authority -- not the per-base `<cpu>-inc/tm.h', because
 # two triples on one back end can differ (glibc vs musl, ILP32 vs LP64).
+#
+# THAT ARGUMENT STILL HOLDS AND IS EXACTLY WHY tm.h LEFT THIS SCRIPT.  "Two
+# triples on one back end can differ" is the reason the header is per-triple;
+# and a per-triple header is precisely what an install cannot enumerate, because
+# the triples it could enumerate are the ones `--enable-targets' happened to
+# name.  The authority did not change, its PRODUCER did: target-specs runs once
+# per target, after the build, for an arbitrary triple, which is the only shape
+# that can satisfy both halves at once.
 # THE SECOND HALF: THE BACK-END GENERATED HEADERS THE *UNION* REACHES.
 #
 # The installed `options-<base>.h' is not one back end's.  opth-gen.awk emits,
@@ -127,7 +141,6 @@ test -f "$manifest" || fail "no $manifest.
 ninst=0
 checked_bases=
 for t in "$@"; do
-  key=`echo "$t" | sed 's/[^A-Za-z0-9_]/_/g'`
   cpu=`awk -v t="$t" '$1 == "target" { seen = ($2 == t) }
                       seen && $1 == "cpu_type" { print $2; exit }' "$manifest"`
   test -n "$cpu" || fail "$t: $manifest has no cpu_type line for it, so the
@@ -137,11 +150,31 @@ for t in "$@"; do
   d=$dest_root/$t/include
   mkdir -p "$d" || fail "$t: cannot create $d"
 
-  # The per-target files, under the name that back end generated them with.
-  for f in tm-$key.h options-$cpu.h insn-constants-$cpu.h insn-modes-$cpu.h; do
+  # The per-BACK-END files, under the name that back end generated them with.
+  #
+  # `tm-<key>.h' IS NO LONGER AMONG THEM, AND THAT IS A DELETION, NOT A GAP.
+  # target-specs/configure generates this target's tm-<key>.h and its tm.h shim
+  # itself, by running gcc/mkconfig.sh on what it derives from config.gcc, into
+  # $(dirname $specs_file)/include -- the same directory gcc.cc's
+  # -print-target-header-dir already names.  Measured byte-identical to what
+  # this script used to copy, for aarch64-unknown-linux-musl and
+  # armv6l-unknown-linux-gnueabihf, with the two differing from each other.
+  #
+  # It had to go rather than merely being redundant: two producers were writing
+  # the same installed paths, and a consumer that MERGES the two directories
+  # (nixpkgs' `gcc-composed`) refuses colliding paths and stopped on
+  # `lib/gcc/*/<target>/include'.  Duplicate authority for one file is a defect
+  # even when the two copies agree, and this pair agreed.
+  #
+  # The deeper reason is the one this whole branch is about: tm-<key>.h is keyed
+  # on a TRIPLE, and gcc's install can only ship triples that were named when
+  # gcc was configured.  A target supplied later got none.  Computing it in
+  # target-specs -- which runs per target, after the build, for an arbitrary
+  # triple -- is the only place it can come from without enumerating.
+  for f in options-$cpu.h insn-constants-$cpu.h insn-modes-$cpu.h; do
     test -f "$builddir/$f" || fail "$t: $builddir/$f is absent.
-  This is the per-target half of the header set and it cannot be substituted
-  by the top-level $builddir/`echo $f | sed -e "s/-$key//" -e "s/-$cpu//"`,
+  This is the per-back-end half of the header set and it cannot be substituted
+  by the top-level $builddir/`echo $f | sed -e "s/-$cpu//"`,
   which is the PRIMARY back end's."
     cp "$builddir/$f" "$d/$f.tmp" && mv "$d/$f.tmp" "$d/$f"
   done
@@ -160,20 +193,25 @@ for t in "$@"; do
   # The plain names libgcc's sources actually write.  One line each, so there
   # is exactly one copy of every header and a shim cannot go stale against the
   # file it names.  Same shape as the build tree's own `<cpu>-inc/'.
-  echo "#include \"tm-$key.h\""                 > "$d/tm.h"
+  # NO `tm.h' HERE.  target-specs/configure writes it, next to the tm-<key>.h it
+  # generates, so that the shim and the file it names are produced together and
+  # cannot go stale against each other.  Writing one here too is what collided.
   echo "#include \"options-$cpu.h\""            > "$d/options.h"
   echo "#include \"insn-constants-$cpu.h\""     > "$d/insn-constants.h"
   echo "#include \"insn-modes-$cpu.h\""         > "$d/insn-modes.h"
 
-  # NON-VACUITY, per target: the installed tm.h must reach THIS target's back
-  # end.  A copy of the wrong file is the failure this script exists to
-  # prevent, and it is invisible by name -- every file above would be present
-  # and correctly named.  So look at the body: the triple header names its own
-  # base's options header, and mkconfig.sh emits that line unconditionally.
-  grep -q "options-$cpu\\.h" "$d/tm-$key.h" || fail "$t: the installed
-  tm-$key.h does not include options-$cpu.h, so it is not $cpu's.  Either the
-  manifest and the header disagree about this target's back end, or the wrong
-  file was copied."
+  # THE NON-VACUITY CHECK THAT STOOD HERE HAS MOVED, IT IS NOT DROPPED.  It read
+  # the installed tm-<key>.h's BODY and required it to name this target's back
+  # end, because a copy of the wrong file is invisible by name -- every file
+  # would be present and correctly spelled.  That check now lives in
+  # target-specs/configure.ac, beside the mkconfig.sh call that is the only
+  # remaining producer of that header, which is the only place it can be made
+  # now.  It was verified to discriminate in BOTH directions rather than merely
+  # to pass: riscv64's header matches options-riscv.h and NOT options-i386.h,
+  # and x86_64-w64-mingw32's the reverse.
+  #
+  # What is still checkable HERE is the per-back-end half, and the union closure
+  # below is that check.
 
   # The back ends' generated headers -- see the note at the top.  The WHOLE of
   # $(MULTI_TARGET_GEN_HDRS) goes in, not the two the closure names today:
