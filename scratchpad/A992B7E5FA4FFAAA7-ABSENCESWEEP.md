@@ -94,3 +94,83 @@ scores.
   that it is blind to it.
 - It looks at `gcc/*.cc`, `gcc/*.h`, `gcc/c/` and `gcc/c-family/` only. The C++
   and other front ends are not swept.
+
+---
+
+# THE FOURTH CLASS, AND IT NEEDED A FOURTH INSTRUMENT
+
+`scratchpad/agent-a992b7e5fa4ffaaa7-genhdrsweep.sh`.
+
+Both sweeps above enumerate definers by grepping **`gcc/config/`**, i.e. the
+source tree. A whole population is invisible to that: names that exist only in
+**generated per-base headers**, where the build root's shared copy is the
+**primary's**. `genattr-common` writes `DELAY_SLOTS` and `INSN_SCHEDULING`;
+`genconfig` writes `HAVE_*` and the `MAX_*` bounds; `genmodes` writes
+`insn-modes.h`; `opth-gen.awk` writes `options.h`. PRINCIPLES records the
+`insn-modes.h` and `options.h` instances separately, each measured by hand.
+
+The sweep diffs the shared copy against each per-base copy **body by body**,
+not name by name — the interesting case is a name in *both* with *different*
+bodies (`DELAY_SLOTS 0` vs `DELAY_SLOTS 1`), which a name-set diff scores as
+identical. That is exactly how these survived.
+
+Control fires:
+
+```
+$ genhdrsweep.sh <builddir> mips sh sparc aarch64
+== insn-attr-common.h
+   mips    DELAY_SLOTS  shared[0]  mips[1]
+   sh      DELAY_SLOTS  shared[0]  sh[1]
+   sparc   DELAY_SLOTS  shared[0]  sparc[1]
+```
+
+## What it found: `HAVE_conditional_execution`, five back ends
+
+```
+/* targhooks.cc:2039 -- SHARED */
+bool default_have_conditional_execution (void)
+{
+  return HAVE_conditional_execution;      /* the shared copy: i386's 0 */
+}
+```
+
+```
+insn-config-<base>.h says 1 for:   c6x  arc  frv  ia64  nvptx  arm
+back ends overriding the hook:     arm  (arm.cc:652) -- and ONLY arm
+```
+
+So **c6x, arc, frv, ia64 and nvptx** take the default hook, which returns
+i386's `0`, and the middle end believes they have no conditional execution.
+`ifcvt` therefore never forms predicated code on five back ends that support
+it. arm escapes only because it supplies its own hook — which is also why this
+was never noticed: the one back end everybody thinks of when they hear
+"conditional execution" is the one back end that is fine.
+
+This is PRINCIPLES' **unsupplied hook** disguise (`TARGET_LIBCALL_VALUE` —
+*"every target got i386's registers"*), reached mechanically rather than by
+somebody happening to look.
+
+**None of the five is on this board**, so the four-target debt cannot see it —
+the third finding today in that category.
+
+## What it correctly did NOT find
+
+`HAVE_lo_sum` diverges (shared 0, aarch64 1) and is **not** a leak: its only
+consumers are `target-cumargs.cc`, `multi-target-macros.h` and
+`target-insn.h`, all per-base conversion files. `insn-flags.h` diverges by
+**403 names** for mips and is the **negative control** — that header is
+per-base by design and PRINCIPLES already names it as such
+(*"insn-flags-<base>.h 45 files, 45 distinct bodies"*).
+
+And `genconfig.cc` turns out to have handled its own family carefully and to
+document it: the six `MAX_`/`NUM_` bounds are **unioned** (a maximum is safe to
+raise), and the two booleans that reach a shared `#if` line (`HAVE_rotate`,
+`HAVE_rotatert`) are **checked for unanimity rather than averaged**, with the
+comment explaining that OR-ing booleans would tell the middle end a pattern
+exists when the selected back end has none. `HAVE_conditional_execution` is
+the one that escaped, because it reaches shared code through a **function
+body** rather than a `#if` line — and a unanimity check keyed on preprocessor
+use cannot see that.
+
+**That is the transferable point: `genconfig`'s own safety analysis was
+correct and its population was one narrower than the code.**
