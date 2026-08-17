@@ -401,9 +401,11 @@ get_attr_length_1 (rtx_insn *insn, int (*fallback_fn) (rtx_insn *))
 	break;
       }
 
-#ifdef ADJUST_INSN_LENGTH
-  ADJUST_INSN_LENGTH (insn, length);
-#endif
+  /* If needed, do any adjustment.  This was `#ifdef ADJUST_INSN_LENGTH', i.e.
+     a fact about whichever base compiled final.cc -- and i386 defines no such
+     macro, so it was false for all 47 bases and none of the 13 back ends that
+     DO define it ever had its lengths adjusted.  See target-frame.h.  */
+  mt_adjust_insn_length (insn, &length);
   return length;
 }
 
@@ -480,8 +482,19 @@ get_attr_min_length (rtx_insn *insn)
 #define JUMP_ALIGN(LABEL) align_jumps
 #endif
 
-#ifndef ADDR_VEC_ALIGN
-static int
+/* The generic jump-table alignment, for a back end that defines no
+   ADDR_VEC_ALIGN of its own.
+
+   IT USED TO BE `static' INSIDE `#ifndef ADDR_VEC_ALIGN', WITH A `#define'
+   POINTING THE MACRO AT IT -- AND THAT `#ifndef' WAS TAKEN FOR ALL 47 BASES,
+   because i386 defines no ADDR_VEC_ALIGN.  So every back end got this
+   function and the 12 that define the macro never got their own answer.  It
+   is now non-static, declared in output.h, and called from the per-base thunk
+   so that a base defining nothing still gets THIS answer -- the supply-side
+   fallback PRINCIPLES permits, reached in that base's own translation unit,
+   and the same text rather than a restatement of it.  See target-frame.h.  */
+
+int
 final_addr_vec_align (rtx_jump_table_data *addr_vec)
 {
   int align = GET_MODE_SIZE (addr_vec->get_data_mode ());
@@ -491,9 +504,6 @@ final_addr_vec_align (rtx_jump_table_data *addr_vec)
   return exact_log2 (align);
 
 }
-
-#define ADDR_VEC_ALIGN(ADDR_VEC) final_addr_vec_align (ADDR_VEC)
-#endif
 
 #ifndef INSN_LENGTH_ALIGNMENT
 #define INSN_LENGTH_ALIGNMENT(INSN) length_unit_log
@@ -889,7 +899,7 @@ shorten_branches (rtx_insn *first)
 	       || readonly_data_section == text_section)
 	      && table)
 	    {
-	      align_flags alignment = align_flags (ADDR_VEC_ALIGN (table));
+	      align_flags alignment = align_flags (mt_addr_vec_align (table));
 	      max_alignment = align_flags::max (max_alignment, alignment);
 	    }
 	  LABEL_TO_ALIGNMENT (label) = max_alignment;
@@ -1109,12 +1119,13 @@ shorten_branches (rtx_insn *first)
 	  varying_length[uid] = insn_variable_length_p (insn);
 	}
 
-      /* If needed, do any adjustment.  */
-#ifdef ADJUST_INSN_LENGTH
-      ADJUST_INSN_LENGTH (insn, insn_lengths[uid]);
+      /* If needed, do any adjustment.  The `negative insn length' check is now
+	 unconditional: it was inside the `#ifdef' because only an adjustment
+	 can make a generated length negative, and that remains true -- a base
+	 whose thunk body is empty cannot trip it.  */
+      mt_adjust_insn_length (insn, &insn_lengths[uid]);
       if (insn_lengths[uid] < 0)
 	fatal_insn ("negative insn length", insn);
-#endif
     }
 
   /* Now loop over all the insns finding varying length insns.  For each,
@@ -1130,9 +1141,7 @@ shorten_branches (rtx_insn *first)
 	   insn = NEXT_INSN (insn))
 	{
 	  int new_length;
-#ifdef ADJUST_INSN_LENGTH
 	  int tmp_length;
-#endif
 	  int length_align;
 
 	  uid = INSN_UID (insn);
@@ -1151,7 +1160,7 @@ shorten_branches (rtx_insn *first)
 		  rtx_jump_table_data *table = jump_table_for_label (label);
 		  if (table)
 		    {
-		      int newlog = ADDR_VEC_ALIGN (table);
+		      int newlog = mt_addr_vec_align (table);
 		      if (newlog != log)
 			{
 			  log = newlog;
@@ -1367,12 +1376,12 @@ shorten_branches (rtx_insn *first)
 	      insn_current_address += new_length;
 	    }
 
-#ifdef ADJUST_INSN_LENGTH
-	  /* If needed, do any adjustment.  */
+	  /* If needed, do any adjustment.  For a base defining no
+	     ADJUST_INSN_LENGTH the thunk body is empty, so the delta is 0 and
+	     this is exactly what the dead `#ifdef' did.  */
 	  tmp_length = new_length;
-	  ADJUST_INSN_LENGTH (insn, new_length);
+	  mt_adjust_insn_length (insn, &new_length);
 	  insn_current_address += (new_length - tmp_length);
-#endif
 
 	  if (new_length != insn_lengths[uid]
 	      && (!increasing || new_length > insn_lengths[uid]))
@@ -2477,11 +2486,14 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 				 (current_function_decl,
 				  jumptable_relocatable ()));
 
-#ifdef ADDR_VEC_ALIGN
-	      log_align = ADDR_VEC_ALIGN (table);
-#else
-	      log_align = exact_log2 (BIGGEST_ALIGNMENT / BITS_PER_UNIT);
-#endif
+	      /* This was `#ifdef ADDR_VEC_ALIGN' with an `#else' -- and the
+		 `#else' was DEAD, because the `#ifndef' block near the top of
+		 this file defined the macro whenever a back end had not, so
+		 the `#ifdef' was true for every base.  Removing it loses
+		 nothing: a base defining no macro now reaches
+		 `final_addr_vec_align' through the thunk, which is the arm
+		 that was actually running.  */
+	      log_align = mt_addr_vec_align (table);
 	      ASM_OUTPUT_ALIGN (file, log_align);
 	    }
 	  else

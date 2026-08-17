@@ -96,6 +96,40 @@ along with GCC; see the file COPYING3.  If not see
    this scope'.  Note it did NOT fail for i386: that base's object was already
    up to date, so the first draft looked like it built.  */
 #include "explow.h"
+/* For `lookup_attribute', which `epiphany.h:776's ASM_DECLARE_FUNCTION_SIZE
+   calls to find its `forwarder_section' attribute.  Without it the 47-base
+   build failed BY NAME --
+
+     config/epiphany/epiphany.h:776: error: lookup_attribute was not declared
+     in this scope
+     target-cumargs.cc:313: note: in expansion of macro ASM_DECLARE_FUNCTION_SIZE
+
+   -- which is the same mechanism `crtl', `cfun' and `assemble_function_label_raw'
+   above record, arriving for a fourth macro: the expansion now happens in the
+   translation unit where the macro is that base's own, so that base's headers
+   have to be satisfiable HERE.  One back end of 47 needed it, and the build
+   named the back end, the file, the line and the identifier.
+
+   `stringpool.h' FIRST, and not by style: `attribs.h:165's
+   `canonicalize_attr_name' calls `get_identifier_with_length', which
+   stringpool.h declares.  Including attribs.h alone failed the next 47-base
+   build by name --
+
+     attribs.h:165: error: get_identifier_with_length was not declared in this
+     scope
+
+   -- which is the same one-error-at-a-time shape as the epiphany diagnostic
+   above, one header deeper.  This is the pairing the rest of GCC uses.  */
+#include "stringpool.h"
+#include "attribs.h"
+/* For `recog_memoized', which `msp430.h:541's ADJUST_INSN_LENGTH calls to get
+   an insn's code before adjusting its length.  Third in the same series and
+   found the cheap way: `-syncheck.sh' compiles this file for 22 bases against
+   an existing build dir with `-fsyntax-only', so all the missing declarations
+   of a conversion turn up in ONE run instead of one 47-base build each.  The
+   first two (epiphany/attribs.h, attribs.h/stringpool.h) cost a build apiece
+   before that harness existed.  */
+#include "recog.h"
 #include "target-cumargs.h"
 /* For MT_LEGITADDR_STRICT_FN -- the name of the strict GO_IF_LEGITIMATE_ADDRESS
    thunk this base's `target-legitaddr-strict.o' defines.  */
@@ -372,6 +406,99 @@ mt_base_go_if_legitimate_address (machine_mode mode, rtx addr, bool strict,
   if (strict)
     return MT_LEGITADDR_STRICT_FN (mode, addr, win);
   return mt_base_go_if_legitimate_address_nonstrict (mode, addr, win);
+}
+
+/* ASM_DECLARE_FUNCTION_SIZE, asked of THIS base.  `varasm.cc:2254's whole
+   `#ifdef' block, section switch included, relocated unchanged -- see
+   target-frame.h for why the switch may not be split away from the macro
+   call, and for what the leaked `elfos.h' answer costs riscv (an unbalanced
+   `.option push', because the matching `ASM_DECLARE_FUNCTION_NAME' three
+   lines above it in riscv.h IS converted) and s390 (`.machine pop').
+
+   `decl' is read by the section switch as well as by the macro, so it is not
+   ATTRIBUTE_UNUSED even for a base defining nothing -- but the whole body is
+   then empty, so it is marked and the attribute is harmless where it is
+   used.  */
+
+static void
+mt_base_declare_function_size (FILE *file ATTRIBUTE_UNUSED,
+			       const char *name ATTRIBUTE_UNUSED,
+			       tree decl ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_DECLARE_FUNCTION_SIZE
+  /* We could have switched section in the middle of the function.  */
+  if (crtl->has_bb_partition)
+    switch_to_section (function_section (decl));
+  ASM_DECLARE_FUNCTION_SIZE (file, name, decl);
+#endif
+}
+
+/* ASM_OUTPUT_FUNCTION_PREFIX, asked of THIS base -- `varasm.cc:2192'.  s390 is
+   the only definer and i386 is not, so in shared code the `#ifdef' was false
+   for all 47 bases and s390's `.machine push' / `.machinemode zarch' never
+   appeared.  See target-frame.h, including why the leak census cannot see
+   this macro at all.  */
+
+static void
+mt_base_declare_function_prefix (FILE *file ATTRIBUTE_UNUSED,
+				 const char *name ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_FUNCTION_PREFIX
+  ASM_OUTPUT_FUNCTION_PREFIX (file, name);
+#endif
+}
+
+/* ADJUST_INSN_LENGTH, asked of THIS base.  Four `#ifdef' sites in `final.cc'
+   (:404, :1111, :1131, :1368), all answered by whichever base compiled that
+   file.  i386 does not define the macro, so the condition was FALSE for all 47
+   bases and the adjustment ran for NONE of the 13 back ends that define it --
+   rx, mips, avr, sh, iq2000, msp430, v850, rs6000, arc, arm, pa, nds32 and
+   aarch64.
+
+   `*length' rather than a return value so the macro sees an lvalue: every
+   definition assigns to its LENGTH parameter in place (`length += 4',
+   `LENGTH = ...'), which is the interface upstream documents by example
+   rather than in tm.texi -- the macro is not documented there at all.  */
+
+static void
+mt_base_adjust_insn_length (rtx_insn *insn ATTRIBUTE_UNUSED,
+			    int *length ATTRIBUTE_UNUSED)
+{
+#ifdef ADJUST_INSN_LENGTH
+  ADJUST_INSN_LENGTH (insn, *length);
+#endif
+}
+
+/* ADDR_VEC_ALIGN, asked of THIS base.  Three sites in `final.cc'; the leak was
+   behind an `#ifndef' rather than an `#ifdef', so all 47 bases took the
+   generic `final_addr_vec_align' and the 12 definers -- aarch64 and vax want
+   0, i.e. NO alignment -- never got their own.  See target-frame.h.
+
+   The `#else' calls the very function `final.cc' used to define privately,
+   now non-static, rather than restating its body: one authority for the
+   fallback, so it cannot drift from the generic answer it is meant to be.
+
+   ATTRIBUTE_UNUSED ON `table' BECAUSE 10 OF THE 12 DEFINERS IGNORE IT, AND
+   THE COUNT IS EVIDENCE WORTH RECORDING RATHER THAN JUST NOISE TO SILENCE.
+   Before this attribute the 47-base build gained exactly **10** `unused
+   parameter 'table'` warnings, one per base whose ADDR_VEC_ALIGN is a
+   constant or ignores its argument -- aarch64 0, vax 0, csky 0, sh 2, pa 2,
+   nds32 2, xstormy16 1, ia64 `(CASE_VECTOR_MODE == SImode ? 2 : 3)', and
+   nvptx / c6x `(JUMP_TABLES_IN_TEXT_SECTION ? 5 : 2)'.  The two that DO read
+   the table are arm and arc.  10 + 2 = the 12 definers, so the warning count
+   enumerated exactly the population this conversion was aimed at, and nothing
+   else -- a cheap confirmation that it reached the right back ends and only
+   them.  Stated here because once the attribute silences it that evidence is
+   no longer reproducible from a build log.  */
+
+static int
+mt_base_addr_vec_align (rtx_jump_table_data *table ATTRIBUTE_UNUSED)
+{
+#ifdef ADDR_VEC_ALIGN
+  return ADDR_VEC_ALIGN (table);
+#else
+  return final_addr_vec_align (table);
+#endif
 }
 
 /* INIT_EXPANDERS, asked of THIS base.  See target-frame.h for why an existence
@@ -1946,7 +2073,11 @@ static const struct target_frame_desc mt_base_frame = {
   mt_base_declare_function_name,
   mt_base_declare_cold_function_name,
   mt_base_final_prescan_insn,
-  mt_base_go_if_legitimate_address
+  mt_base_go_if_legitimate_address,
+  mt_base_declare_function_size,
+  mt_base_declare_function_prefix,
+  mt_base_adjust_insn_length,
+  mt_base_addr_vec_align
 };
 
 /* THIS BASE'S CONDITION-CODE MODE SELECTION; see target-ccmode.h for what

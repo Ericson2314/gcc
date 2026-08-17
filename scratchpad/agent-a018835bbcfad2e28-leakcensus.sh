@@ -39,8 +39,40 @@ mkdir -p "$O"
 cd "$W/gcc"
 
 # 1. the authority: every documented target macro
-sed -n 's/^@defmac \([A-Z_][A-Z_0-9]*\).*/\1/p;s/^@defmacx \([A-Z_][A-Z_0-9]*\).*/\1/p' \
+# THE CHARACTER CLASS WAS UPPERCASE-ONLY AND IT TRUNCATED THREE NAMES RATHER
+# THAN SKIPPING THEM, WHICH IS THE DANGEROUS DIRECTION.
+#
+# `[A-Z_][A-Z_0-9]*' stops at the first lowercase letter, so it did not decline
+# to match `@defmac Pmode' -- it matched `P'.  Five of tm.texi's @defmac names
+# contain lowercase, and the old pattern turned three of them into short
+# identifiers that are word-matched all over shared code:
+#
+#     @defmac Pmode                    ->  P            (80 "uses" in gcc/*.cc)
+#     @defmac INVOKE__main             ->  INVOKE__
+#     @defmac __builtin_saveregs  etc  ->  __
+#
+# So the census population contained three garbage names AND WAS MISSING
+# `Pmode' -- the macro PRINCIPLES names first among the leaks this whole
+# instrument exists to enumerate ("Pmode, ELIMINABLE_REGS, INIT_EXPANDERS,
+# ACCUMULATE_OUTGOING_ARGS were each a file reading that list and not knowing
+# it"), and the one behind riscv64 emitting 32-bit code in an ELF64 object.
+# A census that cannot see its own headline example.
+#
+# Both halves are the same one-character bug and neither is visible in the
+# total: `P' is spelled everywhere so it always classified into SOME bucket,
+# and the non-vacuity arm asks only that its four named macros be classified.
+sed -n 's/^@defmacx* \([A-Za-z_][A-Za-z_0-9]*\).*/\1/p' \
   doc/tm.texi | sort -u > "$O/macros.all"
+# The three truncations must be GONE and the five real names PRESENT.  Stated
+# as an arm rather than trusted, because the failure is silent in the total.
+for bad in P __ INVOKE__; do
+  grep -qx "$bad" "$O/macros.all" \
+    && { echo "FATAL: truncated name '$bad' still in the macro list"; exit 9; }
+done
+for good in Pmode INVOKE__main __builtin_saveregs; do
+  grep -qx "$good" "$O/macros.all" \
+    || { echo "FATAL: '$good' missing from the macro list"; exit 9; }
+done
 N=$(wc -l < "$O/macros.all")
 [ "$N" -gt 100 ] || { echo "FATAL: only $N macros from tm.texi -- the extraction is wrong"; exit 9; }
 echo "tm.texi documents $N target macros"
@@ -49,15 +81,46 @@ echo "tm.texi documents $N target macros"
 ls *.cc *.h > "$O/ti.files" 2>/dev/null
 echo "target-independent files scanned: $(wc -l < "$O/ti.files")"
 
-# 3. the primary chain, read from the BUILD's own tm.h rather than assumed
+# 3. the primary chain, read from the BUILD's own tm.h.
+#
+# TMH IS REQUIRED, AND THAT IS A FIX.  This step used to fall back to a
+# hand-written nine-header list when no TMH was given, announced with a NOTE
+# and then used exactly as if it were the real thing.  The list is INCOMPLETE:
+# `config.gcc:1396' puts `glibc-stdint.h' in every `*-*-linux*' target's
+# tm_file, and the fallback does not name it.  Measured on `4387bf9ce42':
+#
+#   with the fallback chain      LEAK-PRIMARY  88   DEAD-DEFAULT 208
+#   with the build's real tm.h   LEAK-PRIMARY 119   DEAD-DEFAULT 177
+#
+# The 31 are exactly `glibc-stdint.h's `INT8_TYPE' .. `UINTPTR_TYPE' plus
+# `SIG_ATOMIC_TYPE'.  They are LEAK-PRIMARY -- glibc's answers, served to all
+# 47 back ends through `c-family/c-common.cc's `__INT32_TYPE__' and friends --
+# and the fallback chain reported every one of them as DEAD-DEFAULT, i.e. as a
+# DIFFERENT KIND OF DEFECT in a bucket the census describes as the harder half
+# to find.  A wrong classification, not a missing row, so the total stayed 296
+# and nothing looked amiss.
+#
+# That is this project's standing shape: a default that is not the answer,
+# quietly substituted, reported in the same voice as a measurement.  So there
+# is no default any more -- a census run without a real `tm.h' now fails BY
+# NAME rather than producing a plausible wrong split.
 TMH=${TMH:-}
-if [ -n "$TMH" ] && [ -f "$TMH" ]; then
-  sed -n 's|^# *include "\(config/[^"]*\)"|\1|p' "$TMH" > "$O/chain"
-  echo "primary chain from $TMH: $(wc -l < "$O/chain") headers"
-else
-  echo "NOTE: no TMH= given; primary chain taken as the i386 linux64 chain"
-  printf 'config/i386/i386.h\nconfig/i386/att.h\nconfig/i386/unix.h\nconfig/i386/x86-64.h\nconfig/i386/gnu-user64.h\nconfig/i386/linux64.h\nconfig/elfos.h\nconfig/gnu-user.h\nconfig/linux.h\n' > "$O/chain"
-fi
+[ -n "$TMH" ] || {
+  echo "FATAL: set TMH=<builddir>/gcc/tm.h -- the primary chain must be read"
+  echo "  from a real build, never assumed.  See the comment above this check:"
+  echo "  the old hardcoded chain omitted glibc-stdint.h and misclassified 31"
+  echo "  macros from LEAK-PRIMARY to DEAD-DEFAULT with no change in the total."
+  exit 9
+}
+[ -f "$TMH" ] || { echo "FATAL: TMH=$TMH does not exist"; exit 9; }
+sed -n 's|^# *include "\(config/[^"]*\)"|\1|p' "$TMH" > "$O/chain"
+NC=$(wc -l < "$O/chain")
+echo "primary chain from $TMH: $NC headers"
+# NON-VACUITY ON THE CHAIN ITSELF.  An empty or truncated tm.h yields an empty
+# chain, every macro then scores `p=no', and the census reports 100%
+# DEAD-DEFAULT -- a clean-looking run with every row wrong in the same
+# direction.  `test -s' would pass on it; a header count will not.
+[ "$NC" -ge 5 ] || { echo "FATAL: only $NC headers in the chain; tm.h is truncated or not a tm.h"; exit 9; }
 
 printf '%s\n' "$(cat "$O/chain")" | sed 's|^|./|' > "$O/chain.paths"
 
@@ -135,7 +198,12 @@ echo
 # one the extraction, the use-scan or the back-end scan dropped, which is the
 # failure this arm exists to catch.
 echo "NON-VACUITY: each proven macro must be CLASSIFIED, as leak or as handled."
-for m in ASM_OUTPUT_ALIGN HAVE_POST_MODIFY_DISP PROMOTE_MODE REG_ALLOC_ORDER; do
+# INT32_TYPE is here because it is the macro that caught the chain bug: it must
+# land in SOME bucket, and WHICH bucket is a function of whether the chain the
+# census read is the real one.  Deliberately not asserted to be a leak -- that
+# is the defect-as-pass-condition shape this arm was rewritten to avoid.
+for m in ASM_OUTPUT_ALIGN HAVE_POST_MODIFY_DISP PROMOTE_MODE REG_ALLOC_ORDER \
+         INT32_TYPE ASM_DECLARE_FUNCTION_SIZE; do
   r=$(grep -w "$m" "$O/report" "$O/report.conv" 2>/dev/null | head -1)
   if [ -n "$r" ]; then echo "  ok: $m -- $r"
   else echo "  FATAL: $m is in NEITHER bucket; the census dropped it"; fi
