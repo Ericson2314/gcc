@@ -177,5 +177,52 @@ MT_RUNTESTFLAGS=dg.exp=pr9906*     0 results -> "REFUSED: a board of zeroes
 so the instrument is shown able to report a pass **and** a refusal, rather than
 merely having stopped complaining.
 
+## 0c. TWO INHERITED WORK ITEMS RE-VERIFIED AT TIP, AND ONE OF THEM IS
+##     MIS-FILED IN THE DOCUMENT THAT HANDED IT OVER
+
+Checked against the snapshot rather than copied forward, because a handover
+item is a claim with an expiry date.
+
+**`ASM_OUTPUT_MAX_SKIP_ALIGN` (A018 item 3) — LIVE, and the population is 7,
+not 6.** `final.cc:2434` and `varasm.cc:2173,:2181` still spell
+`#ifdef ASM_OUTPUT_MAX_SKIP_ALIGN` in shared TUs, so it is unconverted. The
+definers are:
+
+```
+aarch64/aarch64-elf.h  arm/arm.h  rs6000/darwin.h  rs6000/sysv4.h
+rx/rx.h  visium/visium.h                                   -- the recorded six
+i386/i386.h:2262                                           -- AND i386
+```
+
+i386 being a definer is the whole mechanism and the handover list omits it:
+the shared `#ifdef` is **true for all 47 back ends** because the primary
+defines the name, so every target executes i386's body. That is the
+`REGMODE_NATURAL_SIZE` / `EPILOGUE_USES` shape exactly — a `#ifdef` in shared
+code that is not "off for the 40 that say nothing" but "on, with the primary's
+answer, for everybody".
+
+**`.machinemode zarch` (A018 item 4) — LIVE, but it is NOT "new, unfiled".**
+The board that handed it over calls it *"new, unfiled"*. It is filed, in the
+artefact itself. `s390.cc:8633` guards the emitter on
+`#ifdef HAVE_AS_MACHINE_MACHINEMODE`, which `auto-host.h` does not define (0
+occurrences — correct, `gcc/configure.ac` is host-and-build only). The probe
+runs and the answer is deliberately withheld, with the reason written into
+`specs-config` where the key would be:
+
+```
+# as_s390_machine_machinemode is PROBED AND NOT WRITTEN.  Its consumer is
+# S390_USE_TARGET_ATTRIBUTE, which is tested with "#if" in nine places, one of
+# them selecting SWITCHABLE_TARGET -- that one changes data layout and cannot
+# become a run-time answer.  Making it a capability needs s390 to stop deciding
+# SWITCHABLE_TARGET from an assembler probe, which is its own change.
+#   as_s390_machine_machinemode 1
+```
+
+So it is a **blocked** item with a named blocker, not an unexamined one, and
+the next agent should not spend a session rediscovering the blocker. The
+underlying question — a capability that selects `SWITCHABLE_TARGET`, i.e. one
+that cannot be a runtime read — is a design question of the kind §2b says to
+report rather than resolve by whichever choice builds.
+
 Provenance, guards, the board, the debt and the ranked residual follow as they
 land.
