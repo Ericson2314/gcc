@@ -47,6 +47,25 @@ kind=$(mt_assert_src_frozen "$SRC") || exit 9
 # its absence as a mysterious single-base build.
 grep -q 'gcc_backends_arg' "$SRC/configure" \
   || mt_die "$SRC/configure has no gcc_backends_arg mapping"
+
+# EVERY SHELL SCRIPT UNDER gcc/ MUST PARSE, asserted here rather than
+# discovered inside `configure-gcc'.  Not hypothetical: `gen-target-manifest.sh'
+# was a syntax error at the tip of multi-target-0 for a day, so NOTHING built
+# from the tip in that window, and the failure surfaced as
+#
+#   gen-target-manifest.sh: line 372: syntax error near unexpected token `('
+#   make: *** [Makefile:4779: configure-gcc] Error 1
+#
+# 150 lines away from the two comment lines that caused it, on a comment that
+# had been legal for months.  The cause is the family PRINCIPLES already
+# records for heredocs: while the shell scans for the closing backquote of a
+# multi-line command substitution it does NOT honour `#' comments, so a lone
+# backquote inside one closes the substitution early and shifts the parity of
+# every backquote after it.  `sh -n' costs milliseconds and names the file.
+for s in "$SRC"/gcc/*.sh; do
+  [ -e "$s" ] || continue
+  sh -n "$s" || mt_die "$s does not parse (sh -n); the build would die inside configure-gcc"
+done
 echo "srcdir $SRC anchor=$n $kind; list=$LIST"
 
 HDR=${MT_HDR:-/nix/store/q5wv2ldpcv5w8yb2wmsngsygvlxb73fk-glibc-2.42-67-dev/include}

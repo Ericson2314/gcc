@@ -215,11 +215,22 @@ for gcc_mt in ${gcc_manifest_targets}; do
     # NOTE THE NAMES CANNOT SHARE ONE DIRECTORY, which is what makes this
     # unlike extra_objs and unlike PASSES_EXTRA.  Measured over all 47 back
     # ends -- 180 headers, 14 back ends, and 18 basenames claimed by more than
-    # one back end.  (This cited a census script under scratchpad as the measurement;
-    # `git log --all' has no record of that file, so the SCRIPT was never
-    # committed even though the numbers below are checkable by hand from
-    # config.gcc and are reproduced by `mt-cite-check.sh' being widened.  The
-    # figures stand; the named instrument does not exist.) --
+    # one back end.  (This cited a census script under scratchpad as the
+    # measurement; "git log --all" has no record of that file, so the SCRIPT
+    # was never committed even though the numbers below are checkable by hand
+    # from config.gcc and are reproduced by "mt-cite-check.sh" being widened.
+    # The figures stand; the named instrument does not exist.)
+    #
+    # NO BACKQUOTE QUOTING IN THE COMMENTS OF THIS BLOCK.  It looks like the
+    # GNU "foo" style used everywhere else in this file, and here it is a
+    # syntax error: these lines sit INSIDE the multi-line command
+    # substitution assigned to gcc_mt_data above, which closes at the "|| {"
+    # far below.  While the shell scans for that closing backquote it does NOT
+    # honour "#" comments, so a lone backquote in a comment CLOSES THE
+    # SUBSTITUTION EARLY.  Two of them here shifted the backquote parity of
+    # everything after, and the file then died 150 lines away on an unrelated
+    # comment that had been legal for months.  Use double quotes in this
+    # block.
     #
     #   mmintrin.h        arm i386 rs6000
     #   arm_neon.h  arm_acle.h  arm_fp16.h  arm_bf16.h        aarch64 arm
