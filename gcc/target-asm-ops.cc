@@ -52,8 +52,16 @@ along with GCC; see the file COPYING3.  If not see
 
    `#ifdef' rather than unconditional only because the single-target build
    compiles this file without the per-base -D; there `tm_p.h' comes in through
-   the ordinary chain.  */
+   the ordinary chain.
+
+   And `memmodel.h' FIRST, which is not style either: `sparc-protos.h:46'
+   takes an `enum memmodel` parameter, so including tm_p.h alone failed the
+   next build by name (`use of enum 'memmodel' without previous
+   declaration`) -- the same one-error-at-a-time shape, one header deeper,
+   that `target-cumargs.cc` records for attribs.h/stringpool.h.  Found in
+   seconds by `a76a331dcb554f700-asmopscheck.sh` rather than by a build.  */
 #ifdef TM_P_H_FILE
+#include "memmodel.h"
 #include TM_P_H_FILE
 #endif
 
