@@ -455,7 +455,60 @@ header read** — rather than a plausible story fitted to a number.
 `gcc.dg/lto`'s 53 — the item the last board flagged as identical on three
 targets — is **gone from aarch64's top rows entirely**.
 
-### riscv64, s390x — running
+### riscv64-unknown-linux-gnu — LANDED, `.rc` = 0, DEBT **772**, PREDICTION CONFIRMED
+
+```
+TARGET                      PASS    FAIL   XPASS   XFAIL   UNSUP   UNRES  ERRLIN
+riscv64-unknown-linux-gnu 268925   16762       4    1522   20625   13116      46
+KILLED 10
+```
+
+```
+                 multi-target        stock           DEBT      WAS
+riscv64     PASS 268925 FAIL 16762   270248 / 15904   772      772
+```
+
+**The debt is 772 — the recorded figure, to the unit**, and §0a predicted NULL
+for this row because its baseline `d5ad77b33b3` makes its span *exactly* the
+brief's four causes. Shown in the strong form:
+
+```
+joined rows: 320,946      unchanged: 320,946
+REAL REGRESSIONS:  0        REAL PROGRESS:  0
+```
+
+Every one of 320,946 shared rows unchanged. The `PASS -7 / ERROR +18` is the
+same `tcl`/`testcase`/`xgcc:` `ERROR:`-line artefact as x86_64, and
+`mt-namediff.sh` sizes it at **+27 results** — larger than either delta, in
+either direction.
+
+**KILLED IS 10, AND IT IS NOT THE SAME TEN AS BEFORE — the column's meaning
+changed and quoting the old explanation would have been wrong.** Both previous
+boards recorded riscv64 KILLED **20**, every one the assembler asked to
+allocate `9223372036854841454` bytes (2^63 − 6162) on
+`gcc.c-torture/execute/align-2.c` and `align-3.c`, flagged as *"a compiler
+defect wearing the KILLED column's clothes"*.
+
+In this run that message does not appear at all — `grep -o 'out of memory
+allocating [0-9]*'` over the whole log returns **nothing** — while
+`align-2.c`/`align-3.c` are still exercised (225 mentions). The ten that remain
+are a different thing entirely:
+
+```
+virtual memory exhausted: Cannot allocate memory     x10
+  gcc.target/riscv/pr117483.c
+  gcc.target/riscv/pr117506.c
+```
+
+i.e. **the `ulimit -v` 8 GB cap firing**, on the two files the harness already
+knows about — `mtcheck.sh`'s own comment records `pr117506.c` taking `cc1` to
+20.8 GB RSS on a four-line testcase, which is why the cap exists.
+
+So: the 2^63 assembler bug is **absent from this board**, and I am not claiming
+it fixed — it is not in the debt either way, the sums are equal to the unit,
+and the honest statement is *"that diagnostic did not occur in this run"*. The
+brief's note that riscv64's ~20 are "known non-contaminating, present on both
+sides" is **stale for this board**: the count is 10 and the cause is different.
 
 Provenance, the remaining rows, the debt and the ranked residual follow as they
 land.
