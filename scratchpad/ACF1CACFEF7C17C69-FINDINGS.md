@@ -333,6 +333,39 @@ on riscv64 sat behind a script that could only see `rc`.
 
 ---
 
+## 3b. THE MOVEMENT REPRODUCES ON THE FINAL COMPILER
+
+The `47 → 252 PASS / 72 → 16 FAIL / 150 → 0 UNRESOLVED` figures above were
+first taken on the build that carried **only** the FMV fix. Re-run on the final
+build (`95d90a64818`, anchor 55, all five macros converted), the subset gives
+**the same numbers, exactly**, with the same single cardinality move
+(`mvc-symbols3.c` 9→8). So items 1, 2, 3 and `EH_RETURN_STACKADJ_RTX` moved
+this population by **zero**, which is what §3 predicts and is worth having
+measured rather than assumed.
+
+`mt-rename-sweep.sh` on the final build, in the dev shell: **0 base-vs-base and
+0 base-vs-shared strong-symbol collisions**, 372 shared generated definitions
+compared.
+
+### GUARD 3c FIRED ON A LIVE EVENT, WHICH IS WORTH RECORDING
+
+Between the first scoring run and the last, `/tmp/tools-acf1cacfef7c17c69/bin/
+aarch64-unknown-linux-gnu-as` became a **dangling symlink** — nix garbage-
+collected the store path under it. `ls` still showed the file. The scorer
+refused by name:
+
+```
+FATAL: no /tmp/tools-.../aarch64-unknown-linux-gnu-as
+       (GUARD 3c would fall back to the host as)
+```
+
+That is exactly the failure INSTRUMENTS.md predicts (*"`OK` asserts the binary
+RUNS, not that a path exists: a dangling symlink is the shape that falls back
+to the host `as` three layers away"*), firing on a real event rather than a
+historical one, and worth ~10,000 wrong results per target had it not. The
+tools were re-materialised and the run redone; **no figure in this document was
+taken with a host assembler.**
+
 ## 4. INSTRUMENT DEFECTS FIXED, NOT JUST REPORTED
 
 - `scratchpad/agent-a992b7e5fa4ffaaa7-ehreturn.sh` — hardcoded another
