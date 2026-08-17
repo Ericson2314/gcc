@@ -31,13 +31,19 @@ STCC="$SB/gcc/xgcc -B$SB/gcc/" \
   sh "$S/a660907426e03e4e9-widthprobe.sh" 4 4 "$TA"
 set +e
 
+if [ -z "${SKIP_STOCK:-}" ]; then
 echo "######## STOCK suite"
 MT_COMPILE_ONLY=1 MT_MAKEFLAGS=-j10 \
   sh "$S/sc-check.sh" "$SB" "$TA" > /tmp/b-a660907426e03e4e9-stockcheck.log 2>&1
 echo "stock check driver rc=$?"
+fi
 
+# `WANT_ANCHOR' IS REQUIRED BY `mt-lib.sh' AND `mtcheck.sh' DOES NOT SUPPLY IT.
+# Omitted, the whole multi-target run dies in one line -- AFTER the eight-hour
+# stock run has already finished -- with a message about an unset variable that
+# reads as a broken tree rather than as a missing argument.
 echo "######## MULTI-TARGET suite"
-MT_COMPILE_ONLY=1 MT_MAKEFLAGS=-j10 \
+MT_COMPILE_ONLY=1 MT_MAKEFLAGS=-j10 WANT_ANCHOR=55 \
   MT_TOOLS_arm_unknown_linux_gnueabihf=$TOOLS/bin \
   sh "$S/mtcheck.sh" "$B" "$TA" > /tmp/b-a660907426e03e4e9-mtcheck.log 2>&1
 echo "mt check driver rc=$?"
