@@ -14,7 +14,15 @@ set -u
 S=$(cd "$(dirname "$0")" && pwd)
 B=${1:?build dir}; T=${2:?triple}; shift 2
 [ $# -ge 1 ] || { echo "FATAL: name at least one tool"; exit 9; }
-OUT=$B/feboard; mkdir -p "$OUT"
+OUT=$B/feboard
+# CLEAR THE WHOLE DIRECTORY, NOT JUST THE STAMP OF THE TOOL ABOUT TO RUN.
+# Measured live: a first launch died at the anchor assert and left six
+# `<tool>.rc' files; the relaunch was still on its FIRST tool when a waiter
+# polling for `algol68.rc' -- the LAST tool -- saw the previous launch's stamp
+# and reported the board complete.  "A log being written looks exactly like a
+# log that finished" (PRINCIPLES 4), with the finished-looking file belonging
+# to a different run entirely.
+rm -rf "$OUT"; mkdir -p "$OUT"
 for TOOL in "$@"; do
   echo "################################ $TOOL"
   rm -f "$B/check-$T.rc"

@@ -118,30 +118,41 @@ case "$TOOL" in
   # `check-gm2' alias writing `gm2.sum'.  Keying on the language would look for
   # a `.sum' that is never written, and GUARD 4 would then report the run
   # inert -- a false RED costing exactly what a false green costs.
-  objc)     DRIVER=xgcc; UTVAR=GCC_UNDER_TEST;  SUMDIR=objc;     SUM=objc
+  # THE `<TOOL>_UNDER_TEST' VARIABLE IS NOT DERIVABLE FROM THE TOOL NAME, AND
+  # GUESSING IT PRODUCES A BOARD THAT MEASURES NOTHING WHILE LOOKING FULL.
+  # The first version of this table guessed, and four of nine were wrong:
+  # `GCC_UNDER_TEST' for objc (it is `OBJC_UNDER_TEST', lib/objc.exp:115),
+  # `GXX_UNDER_TEST' for obj-c++ (`OBJCXX_UNDER_TEST'), `GCCGO_UNDER_TEST' for
+  # go (`GOC_UNDER_TEST'), `GCCRS_UNDER_TEST' for rust (`RUST_UNDER_TEST').
+  # The `.exp' then falls back to `[find_gcc]' -- a bare `xgcc' carrying no
+  # `-ftarget-config=' -- which refuses by name, CORRECTLY, once per test.  The
+  # result is a full-looking board: objc 16 PASS / 1470 FAIL, go 0 / 3813, and
+  # every one of those FAILs is the harness, not the compiler.  Each name below
+  # is read out of that tool's own `lib/<tool>.exp'.
+  objc)     DRIVER=xgcc; UTVAR=OBJC_UNDER_TEST;  SUMDIR=objc;     SUM=objc
             [ -x "$B/gcc/cc1obj" ] || { echo "FATAL: no $B/gcc/cc1obj -- objc was never built"; exit 9; } ;;
-  obj-c++)  DRIVER=xg++; UTVAR=GXX_UNDER_TEST;  SUMDIR=obj-c++;  SUM=obj-c++
+  obj-c++)  DRIVER=xg++; UTVAR=OBJCXX_UNDER_TEST; SUMDIR=obj-c++;  SUM=obj-c++
             [ -x "$B/gcc/cc1objplus" ] || { echo "FATAL: no $B/gcc/cc1objplus -- obj-c++ was never built"; exit 9; }
             [ -x "$B/gcc/xg++" ]       || { echo "FATAL: no $B/gcc/xg++"; exit 9; } ;;
   gfortran) DRIVER=gfortran; UTVAR=GFORTRAN_UNDER_TEST; SUMDIR=gfortran; SUM=gfortran
             [ -x "$B/gcc/f951" ]     || { echo "FATAL: no $B/gcc/f951 -- fortran was never built"; exit 9; }
             [ -x "$B/gcc/gfortran" ] || { echo "FATAL: no $B/gcc/gfortran driver"; exit 9; } ;;
-  go)       DRIVER=gccgo; UTVAR=GCCGO_UNDER_TEST; SUMDIR=go; SUM=go
+  go)       DRIVER=gccgo; UTVAR=GOC_UNDER_TEST; SUMDIR=go; SUM=go
             [ -x "$B/gcc/go1" ]   || { echo "FATAL: no $B/gcc/go1 -- go was never built"; exit 9; }
             [ -x "$B/gcc/gccgo" ] || { echo "FATAL: no $B/gcc/gccgo driver"; exit 9; } ;;
   gdc)      DRIVER=gdc; UTVAR=GDC_UNDER_TEST; SUMDIR=gdc; SUM=gdc
             [ -x "$B/gcc/d21" ] || { echo "FATAL: no $B/gcc/d21 -- d was never built"; exit 9; }
             [ -x "$B/gcc/gdc" ] || { echo "FATAL: no $B/gcc/gdc driver"; exit 9; } ;;
-  gm2)      DRIVER=gm2; UTVAR=GM2_UNDER_TEST; SUMDIR=gm2; SUM=gm2
+  gm2)      DRIVER=gm2; UTVAR=GCC_UNDER_TEST; SUMDIR=gm2; SUM=gm2
             [ -x "$B/gcc/cc1gm2" ] || { echo "FATAL: no $B/gcc/cc1gm2 -- m2 was never built"; exit 9; }
             [ -x "$B/gcc/gm2" ]    || { echo "FATAL: no $B/gcc/gm2 driver"; exit 9; } ;;
-  cobol)    DRIVER=gcobol; UTVAR=GCOBOL_UNDER_TEST; SUMDIR=cobol; SUM=cobol
+  cobol)    DRIVER=gcobol; UTVAR=COBOL_UNDER_TEST; SUMDIR=cobol; SUM=cobol
             [ -x "$B/gcc/cobol1" ] || { echo "FATAL: no $B/gcc/cobol1 -- cobol was never built"; exit 9; }
             [ -x "$B/gcc/gcobol" ] || { echo "FATAL: no $B/gcc/gcobol driver"; exit 9; } ;;
   algol68)  DRIVER=ga68; UTVAR=ALGOL68_UNDER_TEST; SUMDIR=algol68; SUM=algol68
             [ -x "$B/gcc/a681" ] || { echo "FATAL: no $B/gcc/a681 -- algol68 was never built"; exit 9; }
             [ -x "$B/gcc/ga68" ] || { echo "FATAL: no $B/gcc/ga68 driver"; exit 9; } ;;
-  rust)     DRIVER=gccrs; UTVAR=GCCRS_UNDER_TEST; SUMDIR=rust; SUM=rust
+  rust)     DRIVER=gccrs; UTVAR=RUST_UNDER_TEST; SUMDIR=rust; SUM=rust
             [ -x "$B/gcc/crab1" ] || { echo "FATAL: no $B/gcc/crab1 -- rust was never built"; exit 9; }
             [ -x "$B/gcc/gccrs" ] || { echo "FATAL: no $B/gcc/gccrs driver"; exit 9; } ;;
   *) echo "FATAL: MT_CHECK_TOOL=$TOOL is not one of:"
