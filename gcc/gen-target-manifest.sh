@@ -214,8 +214,12 @@ for gcc_mt in ${gcc_manifest_targets}; do
     #
     # NOTE THE NAMES CANNOT SHARE ONE DIRECTORY, which is what makes this
     # unlike extra_objs and unlike PASSES_EXTRA.  Measured over all 47 back
-    # ends (scratchpad/eh-census.sh): 180 headers, 14 back ends, and 18
-    # basenames claimed by more than one back end --
+    # ends -- 180 headers, 14 back ends, and 18 basenames claimed by more than
+    # one back end.  (This cited a census script under scratchpad as the measurement;
+    # `git log --all' has no record of that file, so the SCRIPT was never
+    # committed even though the numbers below are checkable by hand from
+    # config.gcc and are reproduced by `mt-cite-check.sh' being widened.  The
+    # figures stand; the named instrument does not exist.) --
     #
     #   mmintrin.h        arm i386 rs6000
     #   arm_neon.h  arm_acle.h  arm_fp16.h  arm_bf16.h        aarch64 arm

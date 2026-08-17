@@ -191,8 +191,16 @@ function frag_source_for(obj, frags,	i, n, parts, path, line, cont, tok, j, m, t
 # against unconverted conditions.  No fragment does that today, which is
 # exactly why it had to be fixed today: the must-hit control for this function
 # is drawn from the ten fragments that DO declare it, and by rule 20 no member
-# of that population can exhibit the misclassification.  Calibrated against a
-# synthetic fragment instead -- see scratchpad/pz-polyaware-selftest.sh.
+# of that population can exhibit the misclassification.
+#
+# THE SYNTHETIC-FRAGMENT CALIBRATION THIS CLAIMED DOES NOT EXIST.  It cited
+# a selftest script under scratchpad (name deliberately not spelled as a path
+# here, so this comment does not itself read as a citation), and `git log --all' has no record of
+# that file: it was never committed, so the calibration was never run.  Found
+# by mt-cite-check.sh once it was widened from a hardcoded 2 files to the 240
+# that carry citations.  The reasoning above -- that no member of the
+# ten-fragment population can exhibit the bug, so the control must be synthetic
+# -- is still correct, and the synthetic control is still OWED.
 function poly_aware(c,   frag, line, found) {
   if (c in poly_aware_cache)
     return poly_aware_cache[c];

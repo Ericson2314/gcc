@@ -109,11 +109,18 @@
 #     spec file and referred to from NOWHERE IN THE TREE, and a name in a target
 #     header is referred to somewhere in the tree.  All three real instances
 #     (`link_eh', `link_as_needed', `link_no_as_needed') appear in no target
-#     header and are still flagged.  Calibrated in
-#     `scratchpad/ct-specrefs-cal.sh' with four must-hits and the two known
-#     false positives; the must-hits are the historical bugs and a name that
-#     exists in no file at all, deliberately NOT drawn from the class the
-#     widening affects.
+#     header and are still flagged.
+#
+#     THE CALIBRATION THIS PARAGRAPH CLAIMED DOES NOT EXIST.  It cited
+#     a calibration script under scratchpad (name deliberately not spelled as a
+#     path here, so this correction does not itself read as a citation) with
+#     "four must-hits and the two known false positives" -- and `git log --all'
+#     for that path returns NOTHING: the file was never committed, so no such
+#     calibration was ever run.  Found by `mt-cite-check.sh' once it was widened from a
+#     hardcoded 2 files to the 240 that actually carry citations.  The widening
+#     above may well be sound -- the argument in this comment stands on its own
+#     -- but it is UNCALIBRATED, and a sentence describing a check that was
+#     never written reads exactly like one describing a check that passed.
 
 set -e
 
