@@ -223,22 +223,61 @@ diagnostic.
 
 ## What this hands over
 
-The 90-row `FLOOR-FIRES` list is a ranked queue with a cheap per-row
-discriminator (the `-DIN_GCC` both-sided read). **42 rows were read here and 5
-are live leaks**, every one on a target this board scores:
+**THE `FLOOR-FIRES` LIST IS NOW READ IN FULL: 90 of 90.** Seven confirmed live
+leaks and one flagged, every one on a target this board scores:
 
 ```
-name                            wrong for      kind
-EH_RETURN_HANDLER_RTX           aarch64 s390x  LOUD (error) + silent df-scan
-STACK_POINTER_OFFSET            s390x          stack layout, 0 vs 160
-TARGET_HAS_FMV_TARGET_ATTRIBUTE aarch64 riscv  256 results on aarch64
-TRAMPOLINE_ALIGNMENT            aarch64 riscv s390x
-SHORT_IMMEDIATES_SIGN_EXTEND    riscv64        combine pessimisation
-TARGET_MEM_CONSTRAINT           s390x          flagged, not diagnosed
+name                             wrong for              what it is
+EH_RETURN_HANDLER_RTX            aarch64 s390x   LOUD error + silent df-scan
+STACK_POINTER_OFFSET             s390x           stack layout, 0 vs 160
+TARGET_HAS_FMV_TARGET_ATTRIBUTE  aarch64 riscv64 256 results on aarch64
+TRAMPOLINE_ALIGNMENT             aarch64 riscv64 s390x
+SHORT_IMMEDIATES_SIGN_EXTEND     riscv64         combine pessimisation
+TARGET_CLONES_ATTR_SEPARATOR     riscv64         ',' vs '#'  -- the FMV family again
+INITIAL_FRAME_ADDRESS_RTX        s390x           NULL vs plus_constant(...)
+TARGET_MEM_CONSTRAINT            s390x           FLAGGED, not diagnosed
 ```
 
-**48 rows are unread.** A hit rate of 5 in 42 on the read half is not a
-prediction about the unread half, and is not offered as one.
+Two additions from the tail of the list:
+
+- **`TARGET_CLONES_ATTR_SEPARATOR`** — shared `','`, riscv `'#'`. It is the
+  separator for `target_clones` attribute components, i.e. **the same family
+  as the FMV macro and the same target**, so riscv64 both mis-selects the FMV
+  attribute *and* mis-parses the clone list. They should be fixed together;
+  fixing one alone would move riscv64's FMV tests from one wrong answer to
+  another.
+- **`INITIAL_FRAME_ADDRESS_RTX`** — shared `NULL`, s390
+  `(plus_constant (Pmode, …))`. One shared consumer, `builtins.cc:819`, which
+  is `__builtin_frame_address`. Same floor-returns-NULL shape as
+  `EH_RETURN_HANDLER_RTX`.
+
+**Known false positive, stated so the count is honest:** `GCC_DEFAULTS_H` is in
+the class because it is the file's own **include guard**, not a target macro.
+`ARG_POINTER_CFA_OFFSET` reads `(undef)` through `tm.h` on all five arms, so
+the sweep cannot decide it from headers — PRINCIPLES records it as *"correct
+only because `FIRST_PARM_OFFSET` is 0 in both bases"*, which is a live
+question this instrument does **not** answer. Both are listed rather than
+quietly dropped.
+
+Per-target totals from this sweep alone:
+
+```
+s390x    5   EH_RETURN_HANDLER_RTX, STACK_POINTER_OFFSET, TRAMPOLINE_ALIGNMENT,
+             INITIAL_FRAME_ADDRESS_RTX, TARGET_MEM_CONSTRAINT (flagged)
+riscv64  4   TARGET_HAS_FMV_TARGET_ATTRIBUTE, TARGET_CLONES_ATTR_SEPARATOR,
+             SHORT_IMMEDIATES_SIGN_EXTEND, TRAMPOLINE_ALIGNMENT
+aarch64  3   EH_RETURN_HANDLER_RTX, TARGET_HAS_FMV_TARGET_ATTRIBUTE,
+             TRAMPOLINE_ALIGNMENT
+x86_64   0   -- it is the primary; the floor is i386's answer by construction
+```
+
+**x86_64's zero is the control and it is not a compliment to that target.** It
+is the reason every one of these survived: the primary agrees with the floor
+in all seven cases, so no amount of testing on x86_64 could have found any of
+them.
+
+The 106-row `FLOOR-DEAD` list is the already-understood variant and is **not**
+read here. It is the larger half and it is untouched work.
 
 The 106-row `FLOOR-DEAD` list is the already-understood variant and is not
 re-derived here.
