@@ -250,10 +250,27 @@ dnl the driver would either answer with a directory that does not exist or fail;
 dnl either way the sibling directory is the right answer and is the one with the
 dnl freshly generated files in it.
 AC_MSG_CHECKING([where this target's generated headers come from])
+dnl THE SEARCH CLIMBS, because a MULTILIB SUB-CONFIGURE IS ONE LEVEL DEEPER and
+dnl a single `../../' test gets it wrong in the direction that hurts.  Makefile.in
+dnl spells the sibling `$(MULTIBUILDTOP)../../$(host_subdir)/gcc' precisely
+dnl because config-ml.in re-runs this configure in `32/'; from there `../../gcc'
+dnl is `<target>/gcc', which does not exist.  Measured: without the loop, the
+dnl top-level libgcc configured in-tree correctly and the 32-bit multilib then
+dnl decided it was a STANDALONE build, asked the compiler, and stopped on
+dnl `<builddir>/gcc/../lib/gcc/<version>/<target>/include/tm.h does not exist'
+dnl -- a real path, in the build tree, holding specs-config and no headers.
+dnl Four levels is more than config-ml.in nests and costs four `test -f'.
 libgcc_standalone=no
 gcc_target_incdir='$(gcc_objdir)'
-if test -f "../../$host_subdir/gcc/libgcc.mvars"; then
-  AC_MSG_RESULT([the sibling gcc build directory (in-tree build)])
+libgcc_sibling=
+for libgcc_up in . .. ../.. ../../..; do
+  if test -f "$libgcc_up/../../$host_subdir/gcc/libgcc.mvars"; then
+    libgcc_sibling=$libgcc_up/../../$host_subdir/gcc
+    break
+  fi
+done
+if test -n "$libgcc_sibling"; then
+  AC_MSG_RESULT([the sibling gcc build directory (in-tree build): $libgcc_sibling])
 else
   libgcc_standalone=yes
   gcc_target_incdir=`$CC $CFLAGS $CPPFLAGS -print-target-header-dir 2>&1`

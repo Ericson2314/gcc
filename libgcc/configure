@@ -4407,9 +4407,16 @@ fi
 $as_echo_n "checking where this target's generated headers come from... " >&6; }
 libgcc_standalone=no
 gcc_target_incdir='$(gcc_objdir)'
-if test -f "../../$host_subdir/gcc/libgcc.mvars"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: the sibling gcc build directory (in-tree build)" >&5
-$as_echo "the sibling gcc build directory (in-tree build)" >&6; }
+libgcc_sibling=
+for libgcc_up in . .. ../.. ../../..; do
+  if test -f "$libgcc_up/../../$host_subdir/gcc/libgcc.mvars"; then
+    libgcc_sibling=$libgcc_up/../../$host_subdir/gcc
+    break
+  fi
+done
+if test -n "$libgcc_sibling"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: the sibling gcc build directory (in-tree build): $libgcc_sibling" >&5
+$as_echo "the sibling gcc build directory (in-tree build): $libgcc_sibling" >&6; }
 else
   libgcc_standalone=yes
   gcc_target_incdir=`$CC $CFLAGS $CPPFLAGS -print-target-header-dir 2>&1`
