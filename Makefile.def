@@ -41,7 +41,16 @@ host_modules= { module= cgen; };
 host_modules= { module= dejagnu; };
 host_modules= { module= etc; };
 host_modules= { module= fastjar; no_check_cross= true; };
+// fixincludes installs into $(bindir) and $(datadir) and appends NOTHING to
+// them -- it holds no opinion about gcc's install layout.  We do, so we bind
+// them here, at the call site.  These are the child's LOCAL names, and they
+// deliberately do not mean what `bindir' means up here: fixincl and fixinc.sh
+// are run by other programs, not by users.  See MT_INSTALL_ITOOLSDIR in
+// Makefile.tpl for why the layout is decided once, up here, rather than
+// recomputed by each of the two components that write into these directories.
 host_modules= { module= fixincludes; bootstrap=true;
+		extra_make_flags= 'bindir=$(MT_INSTALL_ITOOLSDIR) '
+				  'datadir=$(MT_INSTALL_ITOOLSDATADIR)';
 		missing= TAGS;
 		missing= install-dvi; };
 host_modules= { module= flex; no_check_cross= true; };

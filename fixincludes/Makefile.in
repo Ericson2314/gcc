@@ -57,10 +57,10 @@ VPATH = $(srcdir)
 # mechanism whose install rule cannot run is not one.
 prefix = @prefix@
 exec_prefix = @exec_prefix@
-# Directory in which to put the directories used by the compiler.
-libdir = @libdir@
-# Directory in which GCC puts its executables.
-libexecdir = @libexecdir@
+# No `libdir' or `libexecdir' here: this component installs into $(bindir) and
+# $(datadir) and nothing else, so a definition for either would be a variable
+# nothing reads -- and one a later reader would take as evidence that this file
+# still knows something about gcc's lib layout.  It does not.
 
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -84,26 +84,41 @@ target = @target@
 # The version of GCC in this tree
 gcc_version := $(shell @get_gcc_base_ver@ $(srcdir)/../gcc/BASE-VER)
 
-# THE TWO DIRECTORIES THIS COMPONENT INSTALLS INTO.  THE CALLER DEFINES THEM.
+# THE TWO DIRECTORIES THIS COMPONENT INSTALLS INTO.
 #
-# These are the only install paths fixincludes has.  There is deliberately no
-# `libsubdir' here any more: computing $(libdir)/gcc/$(gcc_version) in this file
-# meant fixincludes had to know, and agree with, gcc's install layout.  It once
-# did not agree -- this file put install-tools/ under .../gcc/<triple>/<ver>/
-# while gcc's `install-mkheaders' put fixinc_list, gsyslimits.h and the
-# per-multilib limits.h under .../gcc/<ver>/.  Two halves of one mechanism
-# installed to two directories, so `mkheaders' looked for its data where nothing
-# had written any, and the split was invisible because each half installed with
-# exit 0.
+# Programs go in $(bindir), data goes in $(datadir).  That is the whole layout
+# this file knows, and the standard spelling of it.
 #
-# A layout this component merely COPIES from another component is a layout it
-# can silently disagree with.  So it no longer holds an opinion: whoever knows
-# the layout -- the top-level build system, or a distro's packaging -- passes it
-# in, e.g. `make install itoolsdir=... itoolsdatadir=...'.  The defaults below
-# reproduce the historic paths for a standalone build, and are the ONLY place
-# gcc's layout is written down here.
-itoolsdir = $(libexecdir)/gcc/$(gcc_version)/install-tools
-itoolsdatadir = $(libdir)/gcc/$(gcc_version)/install-tools
+# NOTHING IS APPENDED TO THEM.  No `/gcc/$(gcc_version)/install-tools', no
+# `libsubdir'.  The moment this file computes a path component it has an opinion
+# about gcc's install layout, and a layout a component merely COPIES from
+# another component is one it can silently disagree with.  It did once -- this
+# file put install-tools/ under .../gcc/<triple>/<ver>/ while gcc's
+# `install-mkheaders' put fixinc_list, gsyslimits.h and the per-multilib
+# limits.h under .../gcc/<ver>/.  Two halves of one mechanism installed into two
+# directories, `mkheaders' looked for its data where nothing had written any,
+# and the split was invisible because each half installed with exit 0.
+#
+# THESE ARE LOCAL NAMES -- PARAMETERS OF THIS MAKEFILE, BOUND BY THE CALLER.
+# `bindir' here means "where fixincludes' programs go", which is not obliged to
+# be what anyone else means by `bindir'.  The caller states both, the way one
+# passes an argument:
+#
+#   make install bindir=.../gcc/17.0.0/install-tools \
+#                datadir=.../gcc/17.0.0/install-tools
+#
+# The top level does exactly that -- see `extra_make_flags' for fixincludes in
+# Makefile.def, and MT_INSTALL_ITOOLSDIR in Makefile.tpl for why the layout is
+# settled there rather than here.  A distro's packaging says the same thing,
+# pointing them wherever it puts things.
+bindir = @bindir@
+datadir = @datadir@
+# `datarootdir' AND `exec_prefix' ARE LOAD-BEARING, though nothing below spells
+# them: @datadir@ substitutes to the literal text `${datarootdir}' and @bindir@
+# to `${exec_prefix}/bin'.  Leave one out and make expands it to EMPTY, putting
+# every installed file at the filesystem root -- which is the same fault the
+# comment above `prefix' records, and how it happened the first time.
+datarootdir = @datarootdir@
 
 # Locate mkinstalldirs.
 mkinstalldirs=$(SHELL) $(srcdir)/../mkinstalldirs
@@ -227,26 +242,26 @@ check : all
 	@rm -f ./check.sh
 
 install : all
-# NO `rm -rf $(DESTDIR)$(itoolsdir)' here.  TWO components install into that
+# NO `rm -rf $(DESTDIR)$(bindir)' here.  TWO components install into that
 # directory -- this one puts fixincl, fixinc.sh and mkheaders in it, gcc's
 # `install-mkheaders' puts mkinstalldirs in it -- so wiping it made the result
 # depend on which ran last.  Measured: with the wipe, installing gcc and then
 # fixincludes left NO mkinstalldirs, and mkheaders fails on it.  Both orders
 # "succeeded" with exit 0.
-	$(mkinstalldirs) $(DESTDIR)$(itoolsdir)
-	$(mkinstalldirs) $(DESTDIR)$(itoolsdatadir)/include
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	$(mkinstalldirs) $(DESTDIR)$(datadir)/include
 	$(INSTALL_DATA) $(srcdir)/README-fixinc \
-	  $(DESTDIR)$(itoolsdatadir)/include/README
+	  $(DESTDIR)$(datadir)/include/README
 # mkheaders copies this into each target's include-fixed as its README.  gcc's
 # build used to do that, from its own srcdir; it has no include-fixed now.
 	$(INSTALL_DATA) $(srcdir)/README-fixinc \
-	  $(DESTDIR)$(itoolsdir)/README-fixinc
-	$(INSTALL_SCRIPT) fixinc.sh $(DESTDIR)$(itoolsdir)/fixinc.sh
-	$(INSTALL_PROGRAM) $(FI) $(DESTDIR)$(itoolsdir)/$(FI)
-	$(INSTALL_SCRIPT) mkheaders $(DESTDIR)$(itoolsdir)/mkheaders
+	  $(DESTDIR)$(bindir)/README-fixinc
+	$(INSTALL_SCRIPT) fixinc.sh $(DESTDIR)$(bindir)/fixinc.sh
+	$(INSTALL_PROGRAM) $(FI) $(DESTDIR)$(bindir)/$(FI)
+	$(INSTALL_SCRIPT) mkheaders $(DESTDIR)$(bindir)/mkheaders
 
 install-strip: install
-	test -z '$(STRIP)' || $(STRIP) $(DESTDIR)$(itoolsdir)/$(FI)
+	test -z '$(STRIP)' || $(STRIP) $(DESTDIR)$(bindir)/$(FI)
 
 .PHONY: all check install install-strip
 .PHONY: dvi pdf info html install-pdf install-info install-html

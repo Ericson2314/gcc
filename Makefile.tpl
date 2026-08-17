@@ -351,6 +351,37 @@ endif
 # The installed location.  $(DESTDIR) is added by the install goals only.
 MT_INSTALL_CONFIGDIR = $(libdir)/gcc/$(MT_GCC_VERSION)
 
+# WHERE THE INSTALL-TOOLS LIVE, AND WHY THE TOP LEVEL IS THE ONE SAYING SO
+# ---------------------------------------------------------------------------
+#
+# Two components put files in these directories: `fixincludes' installs
+# `fixincl', `fixinc.sh' and `mkheaders'; gcc's `install-mkheaders' installs
+# `fixinc_list', `gsyslimits.h', the per-multilib `limits.h' and
+# `mkinstalldirs'.  `mkheaders' then reads what BOTH of them wrote.
+#
+# They used to agree by copying: each computed `$(libdir)/gcc/$(version)/...'
+# for itself, under the private names `itoolsdir' and `itoolsdatadir' that
+# nothing up here could set.  Two authorities for one path, and they diverged --
+# fixincludes wrote under .../gcc/<triple>/<ver>/ while gcc wrote under
+# .../gcc/<ver>/, so `mkheaders' looked for its data where nothing had put any.
+# Each half installed successfully, which is why nobody noticed.
+#
+# So the layout is decided HERE, once, and passed down.  A component that is
+# told where to install cannot disagree with a sibling about it.
+#
+# The children spell these `bindir' and `datadir' -- standard names, but LOCAL
+# ONES, meaning "where my programs go" and "where my data goes".  That is
+# deliberately not what the top level means by `bindir': `fixincl' and
+# `fixinc.sh' are run by other programs and do not belong in the user's
+# $(prefix)/bin.  Which is also why $(BASE_FLAGS_TO_PASS), which broadcasts
+# every directory to every module, is the wrong instrument for this: it is
+# dynamic scoping, and a child that happens to spell a name the same as its
+# parent silently inherits the parent's meaning for it.  These are bound per
+# module, at the call site, like arguments -- see `extra_make_flags' for
+# fixincludes in Makefile.def.
+MT_INSTALL_ITOOLSDIR = $(libexecdir)/gcc/$(MT_GCC_VERSION)/install-tools
+MT_INSTALL_ITOOLSDATADIR = $(libdir)/gcc/$(MT_GCC_VERSION)/install-tools
+
 # The build tree's mirror of it.
 #
 # An uninstalled driver finds its own files by RELATIVE POSITION, not by the

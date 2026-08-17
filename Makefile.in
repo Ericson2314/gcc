@@ -348,6 +348,37 @@ endif
 # The installed location.  $(DESTDIR) is added by the install goals only.
 MT_INSTALL_CONFIGDIR = $(libdir)/gcc/$(MT_GCC_VERSION)
 
+# WHERE THE INSTALL-TOOLS LIVE, AND WHY THE TOP LEVEL IS THE ONE SAYING SO
+# ---------------------------------------------------------------------------
+#
+# Two components put files in these directories: `fixincludes' installs
+# `fixincl', `fixinc.sh' and `mkheaders'; gcc's `install-mkheaders' installs
+# `fixinc_list', `gsyslimits.h', the per-multilib `limits.h' and
+# `mkinstalldirs'.  `mkheaders' then reads what BOTH of them wrote.
+#
+# They used to agree by copying: each computed `$(libdir)/gcc/$(version)/...'
+# for itself, under the private names `itoolsdir' and `itoolsdatadir' that
+# nothing up here could set.  Two authorities for one path, and they diverged --
+# fixincludes wrote under .../gcc/<triple>/<ver>/ while gcc wrote under
+# .../gcc/<ver>/, so `mkheaders' looked for its data where nothing had put any.
+# Each half installed successfully, which is why nobody noticed.
+#
+# So the layout is decided HERE, once, and passed down.  A component that is
+# told where to install cannot disagree with a sibling about it.
+#
+# The children spell these `bindir' and `datadir' -- standard names, but LOCAL
+# ONES, meaning "where my programs go" and "where my data goes".  That is
+# deliberately not what the top level means by `bindir': `fixincl' and
+# `fixinc.sh' are run by other programs and do not belong in the user's
+# $(prefix)/bin.  Which is also why $(BASE_FLAGS_TO_PASS), which broadcasts
+# every directory to every module, is the wrong instrument for this: it is
+# dynamic scoping, and a child that happens to spell a name the same as its
+# parent silently inherits the parent's meaning for it.  These are bound per
+# module, at the call site, like arguments -- see `extra_make_flags' for
+# fixincludes in Makefile.def.
+MT_INSTALL_ITOOLSDIR = $(libexecdir)/gcc/$(MT_GCC_VERSION)/install-tools
+MT_INSTALL_ITOOLSDATADIR = $(libdir)/gcc/$(MT_GCC_VERSION)/install-tools
+
 # The build tree's mirror of it.
 #
 # An uninstalled driver finds its own files by RELATIVE POSITION, not by the
@@ -9881,7 +9912,7 @@ all-fixincludes: configure-fixincludes
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS)  \
 	(cd $(HOST_SUBDIR)/fixincludes && \
-	  $(MAKE) $(BASE_FLAGS_TO_PASS) $(EXTRA_HOST_FLAGS) $(STAGE1_FLAGS_TO_PASS)  \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) $(EXTRA_HOST_FLAGS) $(STAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		$(TARGET-fixincludes))
 @endif fixincludes
 
@@ -9912,7 +9943,7 @@ all-stage1-fixincludes: configure-stage1-fixincludes
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
 		$(EXTRA_HOST_FLAGS)  \
-		$(STAGE1_FLAGS_TO_PASS)  \
+		$(STAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGE1_TFLAGS)"  \
 		$(TARGET-stage1-fixincludes)
 
@@ -9927,7 +9958,7 @@ clean-stage1-fixincludes:
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
 	$(MAKE) $(EXTRA_HOST_FLAGS)  \
-	$(STAGE1_FLAGS_TO_PASS)  clean
+	$(STAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -9956,7 +9987,7 @@ all-stage2-fixincludes: configure-stage2-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGE2_TFLAGS)"  \
 		$(TARGET-stage2-fixincludes)
 
@@ -9970,7 +10001,7 @@ clean-stage2-fixincludes:
 	  $(MAKE) stage2-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -9999,7 +10030,7 @@ all-stage3-fixincludes: configure-stage3-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGE3_TFLAGS)"  \
 		$(TARGET-stage3-fixincludes)
 
@@ -10013,7 +10044,7 @@ clean-stage3-fixincludes:
 	  $(MAKE) stage3-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10042,7 +10073,7 @@ all-stage4-fixincludes: configure-stage4-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGE4_TFLAGS)"  \
 		$(TARGET-stage4-fixincludes)
 
@@ -10056,7 +10087,7 @@ clean-stage4-fixincludes:
 	  $(MAKE) stage4-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10085,7 +10116,7 @@ all-stageprofile-fixincludes: configure-stageprofile-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGEprofile_TFLAGS)"  \
 		$(TARGET-stageprofile-fixincludes)
 
@@ -10099,7 +10130,7 @@ clean-stageprofile-fixincludes:
 	  $(MAKE) stageprofile-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10128,7 +10159,7 @@ all-stagetrain-fixincludes: configure-stagetrain-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGEtrain_TFLAGS)"  \
 		$(TARGET-stagetrain-fixincludes)
 
@@ -10142,7 +10173,7 @@ clean-stagetrain-fixincludes:
 	  $(MAKE) stagetrain-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10171,7 +10202,7 @@ all-stagefeedback-fixincludes: configure-stagefeedback-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGEfeedback_TFLAGS)"  \
 		$(TARGET-stagefeedback-fixincludes)
 
@@ -10185,7 +10216,7 @@ clean-stagefeedback-fixincludes:
 	  $(MAKE) stagefeedback-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10214,7 +10245,7 @@ all-stageautoprofile-fixincludes: configure-stageautoprofile-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGEautoprofile_TFLAGS)"  \
 		$(TARGET-stageautoprofile-fixincludes)
 
@@ -10228,7 +10259,7 @@ clean-stageautoprofile-fixincludes:
 	  $(MAKE) stageautoprofile-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10257,7 +10288,7 @@ all-stageautofeedback-fixincludes: configure-stageautofeedback-fixincludes
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
 		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
 		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
-		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  \
+		$(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) \
 		TFLAGS="$(STAGEautofeedback_TFLAGS)" PERF_DATA=perf.data \
 		$(TARGET-stageautofeedback-fixincludes)
 
@@ -10271,7 +10302,7 @@ clean-stageautofeedback-fixincludes:
 	  $(MAKE) stageautofeedback-start; \
 	fi; \
 	cd $(HOST_SUBDIR)/fixincludes && \
-	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS)  clean
+	$(MAKE) $(EXTRA_HOST_FLAGS) $(POSTSTAGE1_FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) clean
 @endif fixincludes-bootstrap
 
 
@@ -10289,7 +10320,7 @@ check-fixincludes:
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) $(EXTRA_HOST_EXPORTS) \
 	(cd $(HOST_SUBDIR)/fixincludes && \
-	  $(MAKE) $(FLAGS_TO_PASS)  $(EXTRA_BOOTSTRAP_FLAGS) check)
+	  $(MAKE) $(FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) $(EXTRA_BOOTSTRAP_FLAGS) check)
 
 @endif fixincludes
 
@@ -10304,7 +10335,7 @@ install-fixincludes: installdirs
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
 	(cd $(HOST_SUBDIR)/fixincludes && \
-	  $(MAKE) $(FLAGS_TO_PASS)  install)
+	  $(MAKE) $(FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) install)
 
 @endif fixincludes
 
@@ -10319,7 +10350,7 @@ install-strip-fixincludes: installdirs
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
 	(cd $(HOST_SUBDIR)/fixincludes && \
-	  $(MAKE) $(FLAGS_TO_PASS)  install-strip)
+	  $(MAKE) $(FLAGS_TO_PASS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR) install-strip)
 
 @endif fixincludes
 
@@ -10336,7 +10367,7 @@ info-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing info in fixincludes"; \
@@ -10361,7 +10392,7 @@ dvi-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing dvi in fixincludes"; \
@@ -10386,7 +10417,7 @@ pdf-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing pdf in fixincludes"; \
@@ -10411,7 +10442,7 @@ html-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing html in fixincludes"; \
@@ -10447,7 +10478,7 @@ install-info-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing install-info in fixincludes"; \
@@ -10483,7 +10514,7 @@ install-pdf-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing install-pdf in fixincludes"; \
@@ -10509,7 +10540,7 @@ install-html-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing install-html in fixincludes"; \
@@ -10534,7 +10565,7 @@ installcheck-fixincludes: \
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing installcheck in fixincludes"; \
@@ -10558,7 +10589,7 @@ mostlyclean-fixincludes:
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing mostlyclean in fixincludes"; \
@@ -10582,7 +10613,7 @@ clean-fixincludes:
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing clean in fixincludes"; \
@@ -10606,7 +10637,7 @@ distclean-fixincludes:
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing distclean in fixincludes"; \
@@ -10630,7 +10661,7 @@ maintainer-clean-fixincludes:
 	r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(HOST_EXPORTS) \
-	for flag in $(EXTRA_HOST_FLAGS) ; do \
+	for flag in $(EXTRA_HOST_FLAGS) bindir=$(MT_INSTALL_ITOOLSDIR) datadir=$(MT_INSTALL_ITOOLSDATADIR); do \
 	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
 	done; \
 	echo "Doing maintainer-clean in fixincludes"; \
