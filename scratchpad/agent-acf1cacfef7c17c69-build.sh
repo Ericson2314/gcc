@@ -23,8 +23,17 @@ SRC=/tmp/snap-$SHA-agent-$ID
 B=/tmp/b-$ID
 
 # The anchor is a property of the tree, not of anybody's belief about it.
+#
+# 52 UNTIL `56890d52173', 55 AFTER, and the three lines are a COMMENT BLOCK in
+# `gcc/Makefile.in' explaining `MULTI_TARGET_MD_TU' -- exactly the shape
+# PRINCIPLES predicts ("the last three moves came from comment prose, not from
+# mechanism"), and exactly the shape that makes an agent diff the rules, find
+# nothing, and conclude a script is broken.  It is a content hash of one file,
+# comments deliberately included, which is what makes it catch a stale tree.
+# Do not narrow the grep; update the number.
+WANT=${MT_WANT_ANCHOR:-55}
 A=$(grep -c MULTI_TARGET gcc/Makefile.in)
-[ "$A" = 52 ] || { echo "FATAL: anchor $A != 52 in $W"; exit 9; }
+[ "$A" = "$WANT" ] || { echo "FATAL: anchor $A != $WANT in $W"; exit 9; }
 
 if [ ! -r "$SRC/SNAP-SHA" ]; then
   rm -rf "$SRC"; mkdir -p "$SRC"

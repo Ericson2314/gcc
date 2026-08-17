@@ -1645,9 +1645,32 @@ extern void mt_asm_output_align (FILE *, int);
    DEFINES IT (`i386.h:2187', `gen_rtx_REG (Pmode, CX_REG)', register 2), so
    there is no `defaults.h' floor anywhere in the story and no floor sweep
    could have found it: the `#ifdef' is simply true for everybody, with i386's
-   register inside.  See target-frame.h.  */
+   register inside.  See target-frame.h.
+
+   AND `MULTI_TARGET_MD_TU' IS THE ONE EXEMPTION, WHICH THE BUILD FOUND RATHER
+   THAN A REVIEW.  `insn-emit-*.cc' is generated from every configured back
+   end's `.md' and compiled ONCE, so `i386.md:21873's `gen_eh_return' body --
+   `rtx sa = EH_RETURN_STACKADJ_RTX' -- is BACK-END code sitting in a shared
+   object's file name.  `#undef'ing there does not catch a missed conversion,
+   it breaks a build that was correct: `EH_RETURN_STACKADJ_RTX was not declared
+   in this scope, did you mean EH_RETURN_HANDLER_RTX'.  Those objects carry
+   `-DMULTI_TARGET_MD_TU' (gcc/Makefile.in) and keep the names spellable.
+
+   THEY THEN GET THE PRIMARY'S ANSWER, and that is a pre-existing structural
+   ceiling rather than something this change introduces -- the same one
+   `Makefile.in' records for `only_leaf_regs_used' and `immed_double_const'.
+   For `EH_RETURN_STACKADJ_RTX' specifically the exposure is small: only i386
+   and s390 have an `eh_return' expander at all, i386's body is i386's own and
+   therefore right, and s390's is `TARGET_TPF'-only.  Stated, not waved past.
+
+   Note the flag is NOT an entry on the exempt `#if' at the top of this file:
+   that branch takes a TU out of the conversion ENTIRELY, which for these
+   objects would revert every redirect at once.  This suppresses two `#undef's
+   and nothing else.  */
+#ifndef MULTI_TARGET_MD_TU
 #undef EH_RETURN_STACKADJ_RTX
 #undef TRAMPOLINE_SECTION
+#endif
 #endif
 
 #endif /* ! GCC_MULTI_TARGET_MACROS_H */

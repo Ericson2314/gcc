@@ -240,6 +240,28 @@ INSNEMIT_SPLITS_SEQ = $(wordlist 1,$(NUM_INSNEMIT_SPLITS),$(one_to_9999))
 INSNEMIT_SEQ_SRC = $(patsubst %, insn-emit-%.cc, $(INSNEMIT_SPLITS_SEQ))
 INSNEMIT_SEQ_TMP = $(patsubst %, tmp-emit-%.cc, $(INSNEMIT_SPLITS_SEQ))
 INSNEMIT_SEQ_O = $(patsubst %, insn-emit-%.o, $(INSNEMIT_SPLITS_SEQ))
+# MULTI_TARGET_MD_TU -- "this shared object contains BACK ENDS' OWN md bodies".
+#
+# `insn-emit-*.cc' is generated from every configured back end's `.md' and
+# compiled ONCE, so a `define_expand' body such as `i386.md:21873's
+# `gen_eh_return' spells its own target's macros in a translation unit that has
+# the PRIMARY's `tm.h'.  That is the `only_leaf_regs_used' / `immed_double_const'
+# ceiling this file already documents, and it is not what this flag is for.
+#
+# What it IS for: `multi-target-macros.h' `#undef's a small set of names that
+# shared code must not be able to spell, so that a site the conversion missed
+# fails BY NAME instead of silently reading the primary's answer
+# (`EH_RETURN_STACKADJ_RTX', `TRAMPOLINE_SECTION').  These objects are not that
+# population -- they are back-end code wearing a shared object's file name --
+# and `#undef'ing there turns a build that used to work into
+# `EH_RETURN_STACKADJ_RTX was not declared in this scope' inside `i386.md'.
+# The flag suppresses ONLY those `#undef's; every redirect still applies, which
+# is why it is a name of its own rather than an entry on the exempt `#if' at
+# `multi-target-macros.h:188' -- that branch would take these objects out of
+# the conversion entirely.
+CFLAGS-insn-emit.o += -DMULTI_TARGET_MD_TU
+$(foreach n,$(INSNEMIT_SPLITS_SEQ),\
+  $(eval CFLAGS-insn-emit-$(n).o += -DMULTI_TARGET_MD_TU))
 
 # Re-use the split number for insn-recog as well.
 INSNRECOG_SPLITS_SEQ = $(wordlist 1,$(NUM_INSNEMIT_SPLITS),$(one_to_9999))
