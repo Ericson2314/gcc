@@ -93,6 +93,38 @@ made precisely where the comment says not to. Same shape as
 `function.cc:6766`'s `gcc_assert (!DELAY_SLOTS)` holding only because the
 answer was wrong.
 
+#### CONFIRMED WRONG CODE, both-sided against genuine upstream stock
+
+Not inferred from the header read.
+`scratchpad/agent-a992b7e5fa4ffaaa7-spo.sh` compiles one ten-argument function
+with **the board's compiler** and with **the stock s390x compiler the board's
+debt is scored against**:
+
+```
+-- outgoing-argument stores, STOCK (correct):
+   stg %r4,160(%r15)   stg %r3,168   stg %r2,176   stg %r0,184   stg %r1,192
+-- outgoing-argument stores, MULTI-TARGET:
+   stg %r4,0(%r15)     stg %r3,8     stg %r2,16    stg %r0,24    stg %r1,32
+```
+
+**Every other instruction in the function is identical.** The entire diff is
+those five offsets, each exactly **160 low** — `STACK_POINTER_OFFSET` to the
+byte.
+
+The consequence is not cosmetic. 160 is the s390x ELF register save area and
+the callee's own prologue is `stmg %r6,%r15,48(%r15)`, so **arguments 6..10 are
+written into the region the callee immediately overwrites with its saved
+registers**. Any s390x function taking more than five integer arguments
+receives garbage.
+
+**THE BOARD CANNOT SEE THIS, WHICH IS THE PART TO CARRY.** Every arm is
+`MT_COMPILE_ONLY=1`, so the bad code compiles, assembles with the real
+`s390x-ibm-linux-gnu-as`, and yields a well-formed `ELF64 / IBM S/390` object
+`readelf` is happy with. s390x's measured debt is **207** and this is not in
+it. Same lesson as riscv64 emitting 32-bit code while passing
+"assembles, right ELF machine": **a compile-only board is a lower bound, and a
+weak one for anything wrong about the ABI.**
+
 **And there is a SECOND authority for this floor.** It is not only in
 `defaults.h`:
 
@@ -276,8 +308,49 @@ is the reason every one of these survived: the primary agrees with the floor
 in all seven cases, so no amount of testing on x86_64 could have found any of
 them.
 
-The 106-row `FLOOR-DEAD` list is the already-understood variant and is **not**
-read here. It is the larger half and it is untouched work.
+## THE `FLOOR-DEAD` HALF, SAMPLED — AND A CANDIDATE REFUTED BY MEASUREMENT
+
+The 106-row half is **not** read in full. Its eighteen largest rows were, and
+they are almost all already cdata (`PTRDIFF_TYPE`, `SIZE_TYPE`, `WCHAR_TYPE`,
+`ASM_COMMENT_START`, `LONG_TYPE_SIZE`, `ACCUMULATE_OUTGOING_ARGS`, …).
+
+One row diverged and **it is not a leak**, which is worth more than another
+finding because it fixes the method:
+
+```
+DEFAULT_PCC_STRUCT_RETURN    SHARED 1    aarch64 0    i386 1    riscv 1    s390 1
+```
+
+A header divergence on a macro consumed by `function.cc:2122`:
+
+```c
+  if (flag_pcc_struct_return && AGGREGATE_TYPE_P (type))
+    return true;                       /* BEFORE targetm.calls.return_in_memory */
+```
+
+which would force every aarch64 aggregate into memory — an ABI break. Measured
+instead of believed, `struct s { int a, b; } f (int)` at `-O2`:
+
+```
+f:  mov w2,0 / add w1,w0,1 / bfi x2,x0,0,32 / bfi x2,x1,32,32 / mov x0,x2 / ret
+```
+
+Returned in `x0`. **No leak.** The reason is that this macro's only consumer is
+`common.opt:2594`'s `Init(DEFAULT_PCC_STRUCT_RETURN)`, and the options
+initialiser is generated **per base** (`mt-<base>/options-init.o`), so the
+runtime `flag_pcc_struct_return` is already aarch64's own 0. The shared
+*header* value is read by nobody.
+
+**So the rule the sweep needs, and which the FMV write-up did not state: a
+header divergence is a leak only if a SHARED consumer reads the MACRO.** A
+macro whose only consumer is `common.opt` reaches the compiler through per-base
+generated code and is already correct. Check the consumer's population before
+believing a divergence, and prefer an end-to-end observable to a header read —
+the header read produces candidates, the compiler produces verdicts.
+
+That test also states its own limit: it shows the flag is right *today, at
+`-O2`, for this type*. It is not a proof the macro is unreachable from any
+shared TU.
 
 The 106-row `FLOOR-DEAD` list is the already-understood variant and is not
 re-derived here.
