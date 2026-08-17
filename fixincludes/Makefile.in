@@ -84,26 +84,26 @@ target = @target@
 # The version of GCC in this tree
 gcc_version := $(shell @get_gcc_base_ver@ $(srcdir)/../gcc/BASE-VER)
 
-# Directory in which the compiler finds libraries etc.
+# THE TWO DIRECTORIES THIS COMPONENT INSTALLS INTO.  THE CALLER DEFINES THEM.
 #
-# NO TRIPLE IN THIS PATH -- it must match gcc/Makefile.in's
-# `libsubdir = $(libdir)/gcc/$(version)' exactly.  It did not: this file put
-# install-tools/ under .../gcc/<triple>/<ver>/ while gcc/'s `install-mkheaders'
-# put fixinc_list, gsyslimits.h and the per-multilib limits.h under
-# .../gcc/<ver>/.  Two halves of one mechanism installed to two directories, so
-# `mkheaders' looked for its data where nothing had written any -- the split
-# was invisible because each half installed successfully.
+# These are the only install paths fixincludes has.  There is deliberately no
+# `libsubdir' here any more: computing $(libdir)/gcc/$(gcc_version) in this file
+# meant fixincludes had to know, and agree with, gcc's install layout.  It once
+# did not agree -- this file put install-tools/ under .../gcc/<triple>/<ver>/
+# while gcc's `install-mkheaders' put fixinc_list, gsyslimits.h and the
+# per-multilib limits.h under .../gcc/<ver>/.  Two halves of one mechanism
+# installed to two directories, so `mkheaders' looked for its data where nothing
+# had written any, and the split was invisible because each half installed with
+# exit 0.
 #
-# One compiler serves every back end, so there is no triple to put in the path.
-# The target reappears one level DOWN, in the directory mkheaders writes:
-# $(libsubdir)/<target>/include-fixed.
-libsubdir = $(libdir)/gcc/$(gcc_version)
-# Directory in which the compiler finds executables
-libexecsubdir = $(libexecdir)/gcc/$(gcc_version)
-# Where our executable files go
-itoolsdir = $(libexecsubdir)/install-tools
-# Where our data files go
-itoolsdatadir = $(libsubdir)/install-tools
+# A layout this component merely COPIES from another component is a layout it
+# can silently disagree with.  So it no longer holds an opinion: whoever knows
+# the layout -- the top-level build system, or a distro's packaging -- passes it
+# in, e.g. `make install itoolsdir=... itoolsdatadir=...'.  The defaults below
+# reproduce the historic paths for a standalone build, and are the ONLY place
+# gcc's layout is written down here.
+itoolsdir = $(libexecdir)/gcc/$(gcc_version)/install-tools
+itoolsdatadir = $(libdir)/gcc/$(gcc_version)/install-tools
 
 # Locate mkinstalldirs.
 mkinstalldirs=$(SHELL) $(srcdir)/../mkinstalldirs

@@ -25,12 +25,12 @@ ACX_PROG_CC_WARNING_ALMOST_PEDANTIC([-Wno-long-long])
 ACX_PROG_CC_WARNINGS_ARE_ERRORS([manual])
 
 # NO ACX_NONCANONICAL_TARGET.  It was here to "determine the noncanonical
-# target name, for directory use", and there is no such directory any more:
-# `libsubdir' below is `$(libdir)/gcc/$(gcc_version)' with no triple in it,
-# because one compiler serves every back end.  The target reappears one level
-# DOWN, in what `mkheaders' writes -- `$(libsubdir)/<target>/include-fixed' --
-# and mkheaders takes the target as an ARGUMENT, not as an @target@
-# substitution (see mkheaders.in).
+# target name, for directory use", and there is no such directory any more.
+# This component installs into `itoolsdir' and `itoolsdatadir', which the CALLER
+# defines (see Makefile.in); neither carries a triple, because one compiler
+# serves every back end.  The target reappears one level DOWN, in what
+# `mkheaders' writes -- `<target>/include-fixed' -- and mkheaders takes the
+# target as an ARGUMENT, not as an @target@ substitution (see mkheaders.in).
 #
 # The macro was still expanded and `target_noncanonical' still substituted
 # into Makefile.in, where NOTHING READ IT: the only other mention was a comment
