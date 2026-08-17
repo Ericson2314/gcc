@@ -1583,6 +1583,52 @@ extern void mt_asm_output_align (FILE *, int);
    fallback.  */
 #undef TARGET_VTABLE_ENTRY_ALIGN
 #define TARGET_VTABLE_ENTRY_ALIGN (mt_vtable_entry_align ())
+
+/* `STACK_POINTER_OFFSET' -- where a target's outgoing stack arguments begin,
+   relative to the stack pointer.  `defaults.h:1156' floors it at 0, i386 does
+   not define it so the floor FIRES, and twenty back ends dissent; on s390x
+   that put every stack argument 160 bytes low, inside the callee's register
+   save area, with every other instruction identical to genuine stock.  See
+   target-frame.h for the definer set and for why this is a call.
+
+   `#undef' first, deliberately: `defaults.h' has already defined the name by
+   the time this header is reached (it is included from `defaults.h''s own
+   foot), so a bare `#define' would only warn -- and PRINCIPLES records a
+   `FUNCTION_MODE' redirect whose ONLY signal was 495 warnings.
+
+   SWEPT: five shared spellings, all ordinary run-time expressions
+   (`function.cc:1964', `:2725', `:4198', `rtlanal.cc:489', `calls.cc:4576').
+   No `#if', no array bound, no static initialiser.  `function.cc:1396's local
+   `#ifndef' floor is deleted with this change: it is dead only because this
+   redirect defines the name first, which is the `REGMODE_NATURAL_SIZE' trap
+   read backwards, and a shadowing floor left beside a redirect is how the
+   next include reordering silently reinstates the 0.  */
+#undef STACK_POINTER_OFFSET
+#define STACK_POINTER_OFFSET (mt_stack_pointer_offset ())
+
+/* `EH_RETURN_HANDLER_RTX' -- `defaults.h:1432' floors it at NULL and i386 is
+   silent, so the floor fires and `__builtin_eh_return' ERRORS OUT on aarch64
+   and s390x, which are exactly the two back ends whose own header defines a
+   non-NULL handler.  x86_64 is unaffected because i386's `eh_return' pattern
+   is unconditional, i.e. the primary never reads the macro.  See
+   target-frame.h, including the SILENT half in `df-scan.cc' that must move
+   with the loud one or a diagnostic becomes wrong code.  */
+#undef EH_RETURN_HANDLER_RTX
+#define EH_RETURN_HANDLER_RTX (mt_eh_return_handler_rtx ())
+
+/* `TRAMPOLINE_ALIGNMENT' -- `defaults.h:1190' floors it at
+   `FUNCTION_ALIGNMENT (FUNCTION_BOUNDARY)', i386's in shared code, so
+   aarch64's trampolines came out `.align 2' where it asks for 64 and stock
+   emits `.align 3'.  See target-frame.h.
+
+   `TRAMPOLINE_SECTION' IS DELIBERATELY NOT REDIRECTED HERE.  Its only shared
+   use is `#ifdef TRAMPOLINE_SECTION' in `varasm.cc' -- an EXISTENCE question,
+   which a redirect turns into an unconditional yes for all 47.  That site
+   calls `mt_has_trampoline_section ()' directly instead, and the name stays
+   unspellable in shared code so a future shared use fails by name.  Same
+   treatment, same reason, as `#ifdef INIT_EXPANDERS'.  */
+#undef TRAMPOLINE_ALIGNMENT
+#define TRAMPOLINE_ALIGNMENT (mt_trampoline_alignment ())
 #endif
 
 #endif /* ! GCC_MULTI_TARGET_MACROS_H */

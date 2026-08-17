@@ -3062,11 +3062,17 @@ assemble_trampoline_template (void)
 
   /* By default, put trampoline templates in read-only data section.  */
 
-#ifdef TRAMPOLINE_SECTION
-  switch_to_section (TRAMPOLINE_SECTION);
-#else
-  switch_to_section (readonly_data_section);
-#endif
+  /* THE `#ifdef' HERE WAS ANSWERED BY THE PRIMARY FOR ALL 47 BACK ENDS.
+     aarch64 is the only back end in the tree that defines
+     `TRAMPOLINE_SECTION' (`aarch64.h:1486', `text_section'); i386 does not,
+     so the `#ifdef' was false and every target -- aarch64 included -- took
+     the `readonly_data_section' arm.  That is the leaked-ABSENCE shape: no
+     wrong value, just code that never runs, for everyone, with nothing to say
+     so.  Asked of the SELECTED base instead; see target-frame.h.  */
+  if (mt_has_trampoline_section ())
+    switch_to_section (mt_trampoline_section ());
+  else
+    switch_to_section (readonly_data_section);
 
   /* Write the assembler code to define one.  */
   align = floor_log2 (TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT);
