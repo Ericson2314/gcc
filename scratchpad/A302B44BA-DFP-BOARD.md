@@ -213,3 +213,88 @@ stated.  The riscv64 `1` is the `Running ...` banner and nothing else — the
 negative control, and the sharpest available: same compiler, same harness, same
 `dfp.exp`, three orders of magnitude apart, decided by the target's own
 manifest line.
+
+7. THE BOARD — x86_64, AND THE PREDICTION IS REFUTED ON IT
+------------------------------------------------------------
+
+```
+x86_64-pc-linux-gnu     stock control: PASS 163816 / FAIL 16223 (both runs)
+
+                        BEFORE (e1f0cad1c2c)      AFTER (7b39423abba)
+multi-target PASS/FAIL  162164 / 16295            163438 / 16299
+DEBT                    67                        70          <- PREDICTED 67
+SCOPE  results in mt    197,878                   199,046
+       results in stock 199,289                   199,289
+       only in STOCK    1,647                     322
+       only in MT       236                       79
+```
+
+`.rc` stamp 0, `make check-gcc` rc=0, 1/1 `site.exp` attributes to
+x86_64-pc-linux-gnu, `multi-target.exp` banner present, GUARD 3c reports
+*Advanced Micro Devices X86-64*.
+
+**THE SCOPE HALF OF THE PREDICTION HOLDS AND THEN SOME.**  The only-in-stock
+column closes by **1,325**, of which 858 are the `dfp.exp` verdicts — so the
+understatement really was in scope, and the fix accounts for about two thirds
+of the closure.
+
+**THE DEBT HALF IS REFUTED.  67 was predicted UNCHANGED; it is 70.**  Reported
+as a refutation rather than rounded to "essentially unchanged": the prediction
+was written to be falsifiable and this falsifies it.
+
+**AND THE THREE ARE CLASSIFIED, NOT ASSUMED.**  The standing rule on this
+branch is that new debt names are not automatically regressions — ten such were
+once measured to be previously-UNSUPPORTED tests that had started running.
+These are not those.  Joined by name against the before run and the control:
+
+```
+gcc.target/i386/pr43644.c scan-assembler-times movq 2      before PASS -> now FAIL, stock PASS
+gcc.target/i386/pr78671.c (test for excess errors)         before PASS -> now FAIL, stock PASS
+gcc.target/i386/zext-sse-2.c check-function-bodies func2   before PASS -> now FAIL, stock PASS
+```
+
+Zero debt names went away.  All three are **genuine PASS -> FAIL regressions**,
+and all three are `gcc.target/i386` codegen — **none is decimal float**.
+
+`pr78671` is not a scan mismatch at all; it is an ICE, and it reproduces off
+the built `xgcc` in about a second:
+
+```
+error: insn does not satisfy its constraints:
+(insn 228 21 22 2 (set (reg:TI 43 r15 [orig:699 _37 ] [699])
+        (reg:TI 0 ax [orig:699 _37 ] [699])) ... 98 {*movti_internal})
+during RTL pass: reload
+internal compiler error: in extract_constrain_insn, at recog.cc:2794
+```
+
+A TImode value allocated to `r15` — the last general register, which cannot
+start a two-register pair.  That is the register allocator's
+prohibited-class-mode table failing to prohibit it.
+
+**WHAT THE ATTRIBUTION IS, AND WHAT IT IS NOT YET.**  Established:
+
+* **It is NOT the `decimal_float` fix.**  All 858 dfp verdicts on this target
+  are 846 PASS / 0 FAIL / 12 UNSUPPORTED (§6); none of the three regressions
+  involves decimal float; and `pr78671`'s failure is in `reload`.
+* **It is NOT any of the five commits the brief names as confounders.**  None
+  of them is in this binary (§1).
+* **It is new in `e1f0cad1c2c..7b39423abba`.**  All three names are `PASS` in
+  FOUR preserved earlier x86_64 boards — `a992b7e5fa4ffaaa7` (the recorded
+  one), `a01e6c604f26604a7`, `a97cff7619d3cabd9` and `ab1900d5279ba137f` — so
+  the introducing commit is inside that 150-commit window.
+* Of those 150, exactly **three** touch the register/mode/recog machinery:
+  `3241754cf12` (bounds the MODE axis of two `ira.cc` walks,
+  `setup_prohibited_and_exclude_class_mode_regs` among them),
+  `f1c3095db2c` (`asm_fprintf`'s `%R`/`%I`/`%L`) and `24ef2a0c2ff`.
+
+**NOT YET established: which one.**  Reading points hard at `3241754cf12` — it
+makes `ira_prohibited_class_mode_regs[cl][j]` stay CLEARED for skipped modes,
+and for a *prohibition* table CLEARED is not the inert value its commit message
+claims ("both already mean 'nothing here'"); it is the maximally PERMISSIVE
+value, which is exactly what would let `r15` hold TImode.  But `MODE_IS_HOLE_P`
+is per-base and x86 really has TImode, so that path should not fire for this
+mode, and the reading does not close.  **Stated as an open suspect, not as the
+attribution**, because on this branch a plausible mechanism that was never run
+is precisely the failure mode being guarded against.  A bisect is running
+(`a302b44ba-icebuild.sh`); `pr78671` answers in one second per step, so only
+the build is expensive.
