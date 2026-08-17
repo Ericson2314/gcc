@@ -151,7 +151,16 @@ init_expr_target (void)
       /* See if there is some register that can be used in this mode and
 	 directly loaded or stored from memory.  */
 
-      if (mode != VOIDmode && mode != BLKmode)
+      /* ...AND THE MODE AXIS OF THE SAME RULE, which the register note just
+	 below does not cover.  `mode' is an ordinal in the SHARED numbering;
+	 a HOLE is a mode some other configured back end defines and this one
+	 does not, and the hook has no answer for it.  `pru_hard_regno_mode_ok'
+	 (pru.cc:547) says so with an assert, and pru died HERE -- the fifth
+	 and last of the ordinal mode walks that ask a back-end hook, found by
+	 following the backtrace after reginfo.cc (three) and function-abi.cc
+	 (three) were bounded.  `direct_load'/`direct_store' keep their zero,
+	 which is what "this base has no such mode" means.  See MODE_IS_HOLE_P.  */
+      if (mode != VOIDmode && mode != BLKmode && !MODE_IS_HOLE_P (mode))
 	/* MT_FIRST_PSEUDO_REGISTER: this asks a BACK-END HOOK about a register
 	   number, and each back end answers from a table of its own width.
 	   Named by an ASAN `cc1' compiling for mips64:
