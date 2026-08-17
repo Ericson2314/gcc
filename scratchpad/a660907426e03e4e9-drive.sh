@@ -6,7 +6,7 @@
 set -u
 S=$(cd "$(dirname "$0")" && pwd)
 B=/tmp/b-a660907426e03e4e9
-SRC=/tmp/snap-agent-a660907426e03e4e9-3f75b7f16a3
+SRC=/tmp/snap-agent-a660907426e03e4e9-b351eb857d1
 TOOLS=/tmp/tools-agent-a660907426e03e4e9
 
 WANT_ANCHOR=55 MT_JOBS=12 sh "$S/mt-build.sh" "$B" all-gcc all-gcc

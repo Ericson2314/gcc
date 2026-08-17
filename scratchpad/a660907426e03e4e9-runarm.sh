@@ -16,11 +16,13 @@ set -e
 [ "$(cat "$B/all-gcc.rc")" = 0 ]  || { echo "FATAL: mt build.rc != 0"; exit 9; }
 [ "$(cat "$SB/build.rc")" = 0 ]   || { echo "FATAL: stock build.rc != 0"; exit 9; }
 
+if [ -z "${SKIP_SPECS:-}" ]; then
 echo "######## specs"
 B=$B TOOLS=$TOOLS sh "$S/a660907426e03e4e9-specs.sh"
+fi
 
 echo "######## bars"
-sh "$S/mt-bars.sh" "$B"
+WANT_ANCHOR=55 sh "$S/mt-bars.sh" "$B"
 
 echo "######## width probe -- the axis no LP64 board can see"
 VER=$(cat "$(cat "$B/MY-SRC")/gcc/BASE-VER")
