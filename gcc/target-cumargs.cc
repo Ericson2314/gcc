@@ -568,8 +568,27 @@ mt_base_output_local (FILE *file ATTRIBUTE_UNUSED,
       ASM_OUTPUT_ALIGNED_LOCAL (file, name, size, align);
       return true;
     }
+# ifdef ASM_OUTPUT_LOCAL
   ASM_OUTPUT_LOCAL (file, name, size, rounded);
   return false;
+# else
+  /* THIS ARM COMPILES FOR THE FIRST TIME ON THIS BRANCH, AND THAT IS WHY IT
+     NEEDS A GUARD UPSTREAM DOES NOT HAVE.  Upstream compiles `varasm.cc' once,
+     with the primary's macros; i386 takes the ASM_OUTPUT_ALIGNED_DECL_LOCAL
+     arm, so the ALIGNED_LOCAL arm below it is never compiled by anyone and its
+     `ASM_OUTPUT_LOCAL' fallback is never looked up.  Here 31 of the 47 bases
+     take this arm, and several of them define no `ASM_OUTPUT_LOCAL' at all --
+     `aarch64` was the one the build named.
+
+     Reaching this is impossible rather than merely unlikely: `defaults.h:1607'
+     makes `ASM_OUTPUT_ALIGNED_LOCAL_P' the constant `true', and the only back
+     end that overrides it is `i386/bsd.h:76', which also defines
+     `ASM_OUTPUT_LOCAL'.  So for a base in this `#else' the test above is a
+     compile-time true and this code is dead -- but it is spelled as a hard
+     stop rather than deleted, because "the target emitted nothing for a local
+     variable" would otherwise be a silent hole in the data section.  */
+  gcc_unreachable ();
+# endif
 #else
   ASM_OUTPUT_LOCAL (file, name, size, rounded);
   return false;
